@@ -38,12 +38,53 @@ Houses comprehensive design documentation that explains architecture, deployment
 
 ### Core Architecture
 
-| Document | Description | Key Sections |
-|----------|-------------|--------------|
-| **repository_architecture.md** | Two-repository split design, module distribution, interaction patterns | Previous monorepo structure, new architecture, module distribution (12 to runtime, 10 to cage), repository interaction (crates.io + HTTP), versioning strategy, CI/CD implications, development workflow changes |
-| **deployment_packages.md** | 6 independent deployment packages across both repositories | Package definitions (Control Panel, Marketing Site, Agent Runtime, Sandbox, CLI Tool, Python CLI), deployment methods, actor inventory, architecture diagrams, deployment scenarios, build/release process |
-| **module_package_matrix.md** | Module-to-package mapping for all 22 modules | 22×6 matrix showing which modules go into which packages, repository distribution, shared module analysis, foundation module distribution, package composition statistics |
-| **package_dependencies.md** | Runtime dependencies between packages and across repositories | 6×6 dependency matrix, cross-repository dependencies (crates.io for Rust, HTTP API for telemetry), runtime requirements (databases, APIs), deployment independence analysis |
+| Document | Description |
+|----------|-------------|
+| **repository_architecture.md** | Two-repository split design, module distribution |
+| **deployment_packages.md** | 6 deployment packages across both repositories |
+| **module_package_matrix.md** | Module-to-package mapping for all 22 modules |
+| **package_dependencies.md** | Runtime dependencies between packages |
+
+### Technical Documentation
+
+| Document | Description |
+|----------|-------------|
+| **technical_architecture.md** | Complete system architecture and design |
+| **architecture.md** | High-level architecture overview |
+| **requirements.md** | Technical requirements specification |
+| **capabilities.md** | Platform capabilities overview |
+| **glossary.md** | Terminology and definitions |
+
+### Developer Guides
+
+| Document | Description |
+|----------|-------------|
+| **developer_guide.md** | Developer onboarding and workflows |
+| **deployment_guide.md** | Deployment procedures and environments |
+
+### Feature Documentation (`features/`)
+
+| Document | Description |
+|----------|-------------|
+| **token_management.md** | Token management feature overview |
+| **token_management_api_reference.md** | Token API reference |
+| **token_management_cli_api_parity.md** | CLI/API parity matrix |
+| **token_management_implementation_plan.md** | Implementation roadmap |
+| **token_management_validation_framework.md** | Validation framework |
+
+### Capability Specifications (`spec/`)
+
+| Document | Description |
+|----------|-------------|
+| **capability_1_enterprise_data_access.md** | Enterprise data access spec |
+| **capability_2_ai_safety_guardrails.md** | AI safety guardrails spec |
+| **capability_3_llm_access_control.md** | LLM access control spec |
+| **capability_4_safe_execution.md** | Safe execution spec |
+| **capability_5_credential_management.md** | Credential management spec |
+| **capability_6_observability.md** | Observability spec |
+| **capability_7_mcp_integration.md** | MCP integration spec |
+| **capability_8_agent_runtime.md** | Agent runtime spec |
+| **pilot_platform.md** | Pilot platform specification |
 
 ---
 
