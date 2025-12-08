@@ -1,0 +1,63 @@
+[package]
+name = "iron_runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "iron_runtime"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = ["enabled"]
+enabled = [
+  "dep:iron_types",
+  "dep:iron_state",
+  "dep:iron_telemetry",
+  "dep:iron_safety",
+  "dep:iron_cost",
+  "dep:iron_reliability",
+  "dep:tokio",
+  "dep:pyo3",
+  # pyo3-asyncio temporarily disabled due to version conflict
+  # "dep:pyo3-asyncio",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:uuid",
+  "dep:anyhow",
+]
+full = ["enabled"]
+pyo3 = ["dep:pyo3"]
+
+[dependencies]
+# Iron Cage crates
+iron_types = { workspace = true, features = ["full"], optional = true }
+iron_state = { workspace = true, features = ["full"], optional = true }
+iron_telemetry = { workspace = true, features = ["full"], optional = true }
+iron_safety = { workspace = true, features = ["full"], optional = true }
+iron_cost = { workspace = true, features = ["full"], optional = true }
+iron_reliability = { workspace = true, features = ["full"], optional = true }
+
+# Python FFI
+pyo3 = { workspace = true, features = ["extension-module", "auto-initialize"], optional = true }
+# pyo3-asyncio temporarily disabled due to version conflict with pyo3 0.22
+# pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"], optional = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"], optional = true }
+
+# Serialization
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+
+# Error handling
+anyhow = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+
+# Utilities
+uuid = { workspace = true, features = ["v4"], optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tokio-test = "0.4"

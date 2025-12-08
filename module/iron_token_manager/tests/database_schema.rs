@@ -1,0 +1,303 @@
+//! Database schema integration tests
+//!
+//! Tests that verify database schema is correctly created and functional.
+//! These tests use REAL `SQLite` databases (no mocks).
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_schema_creates_all_tables` | All tables created | Run migration | 5 tables exist (`api_tokens`, `token_usage`, `usage_limits`, `api_call_traces`, `audit_log`) | ✅ |
+//! | `test_api_tokens_table_structure` | `api_tokens` table accepts data | Insert token with all fields | Row inserted successfully | ✅ |
+//! | `test_token_hash_uniqueness_constraint` | UNIQUE constraint on `token_hash` | Insert duplicate `token_hash` | Second insert fails with constraint error | ✅ |
+//! | `test_token_usage_foreign_key_constraint` | Foreign key constraint enforced | Insert usage with invalid `token_id` | Insert fails with foreign key error | ✅ |
+//! | `test_cascade_delete_removes_usage_records` | CASCADE DELETE behavior | Delete token with usage records | Usage records automatically deleted | ✅ |
+//! | `test_usage_limits_unique_constraint` | UNIQUE constraint on `user_id`+`project_id` | Insert duplicate `user_id`+`project_id` pair | Second insert fails | ✅ |
+//! | `test_all_indexes_created` | All performance indexes exist | Run migration | 15 indexes created (idx_* pattern) | ✅ |
+//!
+//! ## Corner Cases Covered
+//!
+//! **Happy Path:**
+//! - ✅ Schema migration creates all 5 tables
+//! - ✅ `api_tokens` table accepts valid data
+//! - ✅ All 15 indexes created for query performance
+//!
+//! **Boundary Conditions:**
+//! - ✅ Empty database → Schema created
+//! - ✅ Token with all optional fields (`project_id`, `name`, `scopes`, `expires_at`)
+//!
+//! **Error Conditions:**
+//! - ✅ Duplicate `token_hash` → UNIQUE constraint violation
+//! - ✅ Invalid foreign key (`token_id`=999) → Foreign key constraint violation
+//! - ✅ Duplicate `user_id`+`project_id` in `usage_limits` → UNIQUE constraint violation
+//!
+//! **Edge Cases:**
+//! - ✅ CASCADE DELETE behavior (token deletion → usage deletion)
+//! - ✅ Foreign key validation (rejects invalid `token_id`)
+//! - ✅ Uniqueness constraints (`token_hash`, `user_id`+`project_id`)
+//! - ✅ Index naming pattern (all `idx_*` for discoverability)
+//!
+//! **State Transitions:**
+//! - ✅ Empty database → Migrated database (5 tables, 15 indexes)
+//! - ✅ Token with usage → Token deleted → Usage deleted (cascade)
+//!
+//! **Concurrent Access:** Not tested (`SQLite` handles locking, out of scope)
+//! **Resource Limits:** Not applicable (temporary databases, bounded by test data)
+//! **Precondition Violations:**
+//! - ✅ Duplicate `token_hash` rejected by UNIQUE constraint
+//! - ✅ Invalid foreign key rejected by foreign key constraint
+//! - ✅ Duplicate `usage_limits` rejected by UNIQUE(`user_id`, `project_id`)
+
+use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
+use tempfile::TempDir;
+
+/// Helper: Create test database with schema
+async fn create_test_db() -> ( SqlitePool, TempDir )
+{
+  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
+  let db_path = temp_dir.path().join( "test.db" );
+  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
+
+  let pool = SqlitePoolOptions::new()
+    .max_connections( 5 )
+    .connect( &db_url )
+    .await
+    .expect( "Failed to connect to test database" );
+
+  // Load schema from migration file
+  let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
+  sqlx::raw_sql( migration_sql )
+    .execute( &pool )
+    .await
+    .expect( "Failed to run migration" );
+
+  ( pool, temp_dir )
+}
+
+#[ tokio::test ]
+async fn test_schema_creates_all_tables()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Verify all 5 tables exist
+  let table_count : i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN \
+     ('api_tokens', 'token_usage', 'usage_limits', 'api_call_traces', 'audit_log')"
+  )
+  .fetch_one( &pool )
+  .await
+  .expect( "Failed to count tables" );
+
+  assert_eq!( table_count, 5, "Expected 5 tables to be created" );
+}
+
+#[ tokio::test ]
+async fn test_api_tokens_table_structure()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Insert test token
+  let result = sqlx::query(
+    "INSERT INTO api_tokens (token_hash, user_id, project_id, name, scopes, created_at) \
+     VALUES ($1, $2, $3, $4, $5, $6)"
+  )
+  .bind( "test_hash_123" )
+  .bind( "user_001" )
+  .bind( "project_123" )
+  .bind( "Test Token" )
+  .bind( "[\"read\", \"write\"]" )
+  .bind( 1_733_270_400_000_i64 )  // 2024-12-04 00:00:00 UTC
+  .execute( &pool )
+  .await;
+
+  assert!( result.is_ok(), "Failed to insert test token: {:?}", result.err() );
+
+  // Verify token was inserted
+  let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM api_tokens" )
+    .fetch_one( &pool )
+    .await
+    .expect( "Failed to count tokens" );
+
+  assert_eq!( count, 1 );
+}
+
+#[ tokio::test ]
+async fn test_token_hash_uniqueness_constraint()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Insert first token
+  sqlx::query(
+    "INSERT INTO api_tokens (token_hash, user_id, created_at) VALUES ($1, $2, $3)"
+  )
+  .bind( "duplicate_hash" )
+  .bind( "user_001" )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await
+  .expect( "First insert should succeed" );
+
+  // Attempt to insert duplicate hash (should fail)
+  let result = sqlx::query(
+    "INSERT INTO api_tokens (token_hash, user_id, created_at) VALUES ($1, $2, $3)"
+  )
+  .bind( "duplicate_hash" )  // same hash
+  .bind( "user_002" )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await;
+
+  assert!( result.is_err(), "Duplicate token_hash should be rejected" );
+}
+
+#[ tokio::test ]
+async fn test_token_usage_foreign_key_constraint()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Insert token first
+  sqlx::query(
+    "INSERT INTO api_tokens (id, token_hash, user_id, created_at) VALUES ($1, $2, $3, $4)"
+  )
+  .bind( 1 )
+  .bind( "test_hash" )
+  .bind( "user_001" )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await
+  .expect( "Token insert should succeed" );
+
+  // Insert usage record (should succeed)
+  let result = sqlx::query(
+    "INSERT INTO token_usage (token_id, provider, model, total_tokens, recorded_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( 1 )  // valid token_id
+  .bind( "openai" )
+  .bind( "gpt-4" )
+  .bind( 100 )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await;
+
+  assert!( result.is_ok(), "Usage insert with valid token_id should succeed" );
+
+  // Attempt insert with invalid token_id (should fail due to foreign key)
+  let result = sqlx::query(
+    "INSERT INTO token_usage (token_id, provider, model, total_tokens, recorded_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( 999 )  // invalid token_id
+  .bind( "openai" )
+  .bind( "gpt-4" )
+  .bind( 100 )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await;
+
+  assert!( result.is_err(), "Usage insert with invalid token_id should fail" );
+}
+
+#[ tokio::test ]
+async fn test_cascade_delete_removes_usage_records()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Insert token
+  sqlx::query(
+    "INSERT INTO api_tokens (id, token_hash, user_id, created_at) VALUES ($1, $2, $3, $4)"
+  )
+  .bind( 1 )
+  .bind( "test_hash" )
+  .bind( "user_001" )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await
+  .expect( "Token insert failed" );
+
+  // Insert usage record
+  sqlx::query(
+    "INSERT INTO token_usage (token_id, provider, model, total_tokens, recorded_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( 1 )
+  .bind( "openai" )
+  .bind( "gpt-4" )
+  .bind( 100 )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await
+  .expect( "Usage insert failed" );
+
+  // Verify usage record exists
+  let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM token_usage WHERE token_id = 1" )
+    .fetch_one( &pool )
+    .await
+    .expect( "Count query failed" );
+  assert_eq!( count, 1 );
+
+  // Delete token (should cascade to usage)
+  sqlx::query( "DELETE FROM api_tokens WHERE id = 1" )
+    .execute( &pool )
+    .await
+    .expect( "Token delete failed" );
+
+  // Verify usage record was cascade-deleted
+  let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM token_usage WHERE token_id = 1" )
+    .fetch_one( &pool )
+    .await
+    .expect( "Count query failed" );
+  assert_eq!( count, 0, "Usage record should be cascade-deleted" );
+}
+
+#[ tokio::test ]
+async fn test_usage_limits_unique_constraint()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Insert first limit
+  sqlx::query(
+    "INSERT INTO usage_limits (user_id, project_id, max_tokens_per_day, created_at, updated_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( "user_001" )
+  .bind( "project_123" )
+  .bind( 1_000_000 )
+  .bind( 1_733_270_400_000_i64 )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await
+  .expect( "First limit insert should succeed" );
+
+  // Attempt duplicate (same user_id + project_id)
+  let result = sqlx::query(
+    "INSERT INTO usage_limits (user_id, project_id, max_tokens_per_day, created_at, updated_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( "user_001" )
+  .bind( "project_123" )
+  .bind( 2_000_000 )
+  .bind( 1_733_270_400_000_i64 )
+  .bind( 1_733_270_400_000_i64 )
+  .execute( &pool )
+  .await;
+
+  assert!( result.is_err(), "Duplicate user_id+project_id should be rejected" );
+}
+
+#[ tokio::test ]
+async fn test_all_indexes_created()
+{
+  let ( pool, _temp ) = create_test_db().await;
+
+  // Count indexes (excluding sqlite internal indexes)
+  let index_count : i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'"
+  )
+  .fetch_one( &pool )
+  .await
+  .expect( "Failed to count indexes" );
+
+  // Expected: 3 (api_tokens) + 3 (token_usage) + 2 (usage_limits) + 3 (api_call_traces) + 4 (audit_log) = 15
+  assert_eq!( index_count, 15, "Expected 15 indexes to be created" );
+}

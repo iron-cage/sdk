@@ -1,0 +1,16 @@
+# Python dependencies for Iron Runtime examples
+
+# LangChain for AI agent framework
+langchain==0.3.13
+langchain-community==0.3.13
+langchain-openai==0.2.14
+
+# OpenAI SDK
+openai==1.59.5
+
+# Type hints
+typing-extensions==4.12.2
+
+# Development dependencies
+pytest==8.3.4
+pytest-asyncio==0.24.0

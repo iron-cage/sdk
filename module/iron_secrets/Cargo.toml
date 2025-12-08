@@ -1,0 +1,48 @@
+[package]
+name = "iron_secrets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["enabled"]
+enabled = []
+full = ["enabled"]
+
+[dependencies]
+# Workspace crates
+iron_types = { workspace = true }
+iron_state = { workspace = true }
+
+# Error handling (per rulebook)
+error_tools = { workspace = true }
+
+# Crypto
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = { workspace = true }
+zeroize = "1"
+
+# Database
+sqlx = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Modularity
+mod_interface = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = "0.5"

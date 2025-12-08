@@ -1,0 +1,296 @@
+[workspace]
+resolver = "2"
+members = [
+  # Foundation layer
+  # NOTE: iron_types, iron_cost, iron_telemetry are published to crates.io
+  #       and consumed as external dependencies, not workspace members
+
+  # Infrastructure layer
+  "module/iron_state",
+
+  # Feature layer
+  "module/iron_safety",
+  "module/iron_reliability",
+  "module/iron_secrets",
+  "module/iron_token_manager",
+
+  # Specialized layer
+  "module/iron_lang",
+
+  # Integration layer
+  "module/iron_api",
+  "module/iron_runtime",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["iron_cage contributors"]
+license = "Apache-2.0"
+
+[workspace.metadata]
+branches = ["master"]
+master_branch = "master"
+workspace_name = "iron_runtime"
+repo_url = "https://github.com/.../iron_runtime"
+description = "Control Panel and Agent Runtime for Iron Cage AI agent management"
+
+# Strict lints per rulebook requirements
+[workspace.lints.rust]
+# Warn on unsafe code (not deny - we need FFI for landlock/seccomp)
+unsafe_code = "warn"
+# Warn if public items lack documentation
+missing_docs = "warn"
+# Denies non-idiomatic code for Rust 2018 edition
+rust_2018_idioms = { level = "warn", priority = -1 }
+# Denies using features that may break in future Rust versions
+future_incompatible = { level = "warn", priority = -1 }
+# Warns for public types not implementing Debug
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# Denies pedantic lints, enforcing strict coding styles and conventions
+pedantic = { level = "warn", priority = -1 }
+# Denies undocumented unsafe blocks
+undocumented_unsafe_blocks = "deny"
+# Denies to prefer `core` over `std` when available, for `no_std` compatibility
+std_instead_of_core = "warn"
+# Denies including files in documentation unconditionally
+doc_include_without_cfg = "warn"
+
+# Exceptions - following willbe patterns
+# Allows functions that are only called once
+single_call_fn = "allow"
+# Allows forcing a function to always be inlined
+inline_always = "allow"
+# Allows item names that repeat the module name
+module_name_repetitions = "allow"
+# Allows using fully qualified paths instead of `use` statements
+absolute_paths = "allow"
+# Allows wildcard imports
+wildcard_imports = "allow"
+# Allow to prefer `alloc` over `std` when available, for `no_std` compatibility
+std_instead_of_alloc = "allow"
+# Allow put definitions of struct at any point in functions
+items_after_statements = "allow"
+# Allow precision loss, for example during conversion from i64 to f64
+cast_precision_loss = "allow"
+# Allows `pub use` statements
+pub_use = "allow"
+# Allows the `?` operator
+question_mark_used = "allow"
+# Allows implicit returns
+implicit_return = "allow"
+# Allow ordering of fields in intuitive way
+arbitrary_source_item_ordering = "allow"
+# Allow mod.rs files
+mod_module_files = "allow"
+# Allow missing docs for private items
+missing_docs_in_private_items = "allow"
+# Don't require inline in public items (too restrictive for this use case)
+missing_inline_in_public_items = "allow"
+
+## Error Handling - MUST use error_tools per rulebook
+
+[workspace.dependencies.error_tools]
+version = "0.35"
+
+## Serialization
+
+[workspace.dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+## Web Framework Dependencies
+
+[workspace.dependencies.axum]
+version = "0.7"
+
+[workspace.dependencies.tower]
+version = "0.5"
+
+[workspace.dependencies.tower-http]
+version = "0.6"
+features = ["cors", "trace"]
+
+## Async Runtime
+
+[workspace.dependencies.tokio]
+version = "1.48"
+features = ["full"]
+
+[workspace.dependencies.async-trait]
+version = "0.1"
+
+## Concurrency & State
+
+[workspace.dependencies.dashmap]
+version = "5.5"
+
+## Persistence
+
+[workspace.dependencies.sqlx]
+version = "0.8"
+features = ["sqlite", "runtime-tokio-rustls"]
+
+[workspace.dependencies.redis]
+version = "0.27"
+features = ["tokio-comp", "connection-manager"]
+
+## Additional Error Handling
+
+[workspace.dependencies.thiserror]
+version = "1.0"
+
+[workspace.dependencies.anyhow]
+version = "1.0"
+
+## Additional Serialization
+
+[workspace.dependencies.serde_json]
+version = "1.0"
+
+[workspace.dependencies.serde_yaml]
+version = "0.9"
+
+## Logging & Tracing
+
+[workspace.dependencies.tracing]
+version = "=0.1.41"
+
+[workspace.dependencies.tracing-subscriber]
+version = "=0.3.20"
+
+## Utilities
+
+[workspace.dependencies.regex]
+version = "1.12"
+
+[workspace.dependencies.uuid]
+version = "1.18"
+features = ["v4", "serde"]
+
+[workspace.dependencies.chrono]
+version = "0.4"
+features = ["serde"]
+
+[workspace.dependencies.clap]
+version = "4.0"
+features = ["derive"]
+
+[workspace.dependencies.rand]
+version = "0.8"
+
+## Cryptography (for token management and secrets)
+
+[workspace.dependencies.sha2]
+version = "0.10"
+
+[workspace.dependencies.blake3]
+version = "1.5"
+
+[workspace.dependencies.aes-gcm]
+version = "0.10"
+
+[workspace.dependencies.argon2]
+version = "0.5"
+
+[workspace.dependencies.zeroize]
+version = "1"
+
+## Authentication & Rate Limiting
+
+[workspace.dependencies.jsonwebtoken]
+version = "9.0"
+
+[workspace.dependencies.governor]
+version = "0.7"
+
+[workspace.dependencies.nonzero_ext]
+version = "0.3"
+
+[workspace.dependencies.base64]
+version = "0.22"
+
+[workspace.dependencies.headers]
+version = "0.4"
+
+## Modularity
+
+[workspace.dependencies.mod_interface]
+version = "0.54"
+
+## PyO3 for Python Bindings
+
+[workspace.dependencies.pyo3]
+version = "0.22"
+features = ["extension-module"]
+
+## LLM API Clients (from api_llm workspace)
+
+[workspace.dependencies.api_openai]
+version = "0.3.0"
+path = "../../../api_llm/dev/api/openai"
+default-features = false
+features = [ "enabled" ]
+
+[workspace.dependencies.api_claude]
+version = "0.4.0"
+path = "../../../api_llm/dev/api/claude"
+default-features = false
+features = [ "enabled" ]
+
+[workspace.dependencies.api_gemini]
+path = "../../../api_llm/dev/api/gemini"
+default-features = false
+features = [ "enabled" ]
+
+## Foundation Modules (from crates.io after publishing)
+## NOTE: These will use crates.io versions once published
+
+[workspace.dependencies.iron_types]
+version = "0.1.0"
+# TEMPORARY: Using path dependency until published to crates.io
+path = "../../iron_cage/dev/module/iron_types"
+
+[workspace.dependencies.iron_cost]
+version = "0.1.0"
+# TEMPORARY: Using path dependency until published to crates.io
+path = "../../iron_cage/dev/module/iron_cost"
+
+[workspace.dependencies.iron_telemetry]
+version = "0.1.0"
+# TEMPORARY: Using path dependency until published to crates.io
+path = "../../iron_cage/dev/module/iron_telemetry"
+
+## Workspace Crates (internal modules)
+
+[workspace.dependencies.iron_state]
+path = "module/iron_state"
+
+[workspace.dependencies.iron_safety]
+path = "module/iron_safety"
+
+[workspace.dependencies.iron_reliability]
+path = "module/iron_reliability"
+
+[workspace.dependencies.iron_api]
+path = "module/iron_api"
+
+[workspace.dependencies.iron_runtime]
+path = "module/iron_runtime"
+
+[workspace.dependencies.iron_lang]
+path = "module/iron_lang"
+
+[workspace.dependencies.iron_secrets]
+path = "module/iron_secrets"
+
+[workspace.dependencies.iron_token_manager]
+path = "module/iron_token_manager"
+
+## Dev Dependencies
+
+[workspace.dependencies.tempfile]
+version = "3.0"

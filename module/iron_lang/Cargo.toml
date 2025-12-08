@@ -1,0 +1,44 @@
+[package]
+name = "iron_lang"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme = "readme.md"
+documentation = "https://docs.rs/iron_lang"
+repository = "https://github.com/Wandalen/willbe"
+description = """
+Protocol for AI agents to safely access and manipulate data sources.
+Provides type-safe message definitions for reading, writing, and querying databases, files, APIs, caches, and object storage.
+"""
+categories = ["development-tools", "api-bindings"]
+keywords = ["protocol", "ai", "agent", "data", "ndjson"]
+
+[lints]
+workspace = true
+
+[features]
+default = ["enabled"]
+enabled = [
+  "dep:error_tools",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:uuid",
+  "dep:chrono",
+  "dep:async-trait",
+  "dep:tokio",
+  "dep:mod_interface",
+]
+full = ["enabled"]
+
+[dependencies]
+error_tools = { workspace = true, optional = true }
+mod_interface = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+uuid = { workspace = true, features = ["v4", "serde"], optional = true }
+chrono = { workspace = true, features = ["serde"], optional = true }
+async-trait = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["full"], optional = true }
+
+[dev-dependencies]

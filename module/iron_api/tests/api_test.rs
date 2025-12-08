@@ -1,0 +1,35 @@
+use iron_api::*;
+use iron_state::StateManager;
+use std::sync::Arc;
+
+#[test]
+fn test_api_server_creation()
+{
+  let state_manager = Arc::new(StateManager::new());
+  let server = ApiServer::new(state_manager, 3000);
+
+  // Just verify it compiles and creates
+  drop(server);
+}
+
+#[tokio::test]
+async fn test_api_state_access()
+{
+  let state_manager = Arc::new(StateManager::new());
+
+  // Add test agent
+  state_manager.save_agent_state(iron_state::AgentState {
+    agent_id: "test-agent-123".to_string(),
+    status: iron_state::AgentStatus::Running,
+    budget_spent: 10.0,
+    pii_detections: 2,
+  });
+
+  // Verify state accessible
+  let state = state_manager.get_agent_state("test-agent-123");
+  assert!(state.is_some());
+
+  let state = state.unwrap();
+  assert_eq!(state.agent_id, "test-agent-123");
+  assert_eq!(state.budget_spent, 10.0);
+}
