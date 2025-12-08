@@ -1,0 +1,43 @@
+#
+# Common Parameters
+#
+# Common parameters that can be used across multiple commands
+#
+
+commands: []
+
+# Common argument definitions referenced by commands
+common_arguments:
+  format:
+    name: "format"
+    description: "Output format"
+    kind: "String"
+    hint: "Controls how results are displayed"
+    attributes:
+      optional: true
+      default: "table"
+      enum:
+        - "table"
+        - "expanded"
+        - "json"
+        - "yaml"
+
+  verbosity:
+    name: "verbosity"
+    description: "Verbosity level (0-5)"
+    kind: "Integer"
+    hint: "0=silent, 5=debug"
+    attributes:
+      optional: true
+      min: 0
+      max: 5
+      default: 1
+
+  config:
+    name: "config"
+    description: "Path to configuration file"
+    kind: "String"
+    hint: "Override default config location"
+    attributes:
+      optional: true
+      pattern: "^[^\\0]+$"

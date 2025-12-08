@@ -6,7 +6,7 @@ Control Panel and Agent Runtime for Iron Cage AI agent management.
 
 **iron_runtime** is one of two repositories in the Iron Cage project:
 - **iron_runtime** (this repo) - Control Panel, Agent Runtime, runtime services
-- **iron_cage** - Sandboxing, CLI tools, supporting infrastructure
+- **iron_cage** - Sandboxing only (OS-level isolation via Landlock, seccomp, rlimits)
 
 This repository contains the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
 
@@ -16,38 +16,39 @@ See [`docs/repository_architecture.md`](docs/repository_architecture.md) for com
 
 ## Modules
 
-### Infrastructure Layer
-- **iron_state** - State management for agent execution tracking
+All modules are located in the `module/` directory.
 
-### Feature Layer
-- **iron_safety** - PII detection and redaction
-- **iron_reliability** - Circuit breaker patterns
-- **iron_secrets** - Secrets management with encrypted storage
-- **iron_token_manager** - JWT authentication and token management
+| Module | Responsibility | Language |
+|--------|----------------|----------|
+| **iron_types** | Shared types, data structures, API contracts | Rust |
+| **iron_cost** | Budget tracking, cost calculation, spending limits | Rust |
+| **iron_telemetry** | Logging, tracing, metrics collection | Rust |
+| **iron_state** | Agent execution state management | Rust |
+| **iron_safety** | PII detection and redaction | Rust |
+| **iron_reliability** | Circuit breaker, retry patterns, fault tolerance | Rust |
+| **iron_secrets** | Encrypted secrets storage, access control | Rust |
+| **iron_token_manager** | API token generation, JWT auth, rate limiting | Rust |
+| **iron_lang** | LLM protocol integration, provider routing | Rust |
+| **iron_api** | REST API server, WebSocket endpoints | Rust |
+| **iron_runtime** | Agent orchestration, PyO3 Python bridge | Rust |
+| **iron_cli** | Command-line interface for API operations | Rust |
+| **iron_cli_py** | Python bindings for CLI | Python |
+| **iron_sdk** | Pythonic SDK for Agent Runtime integration | Python |
+| **iron_examples** | Example agent implementations | Python |
+| **iron_testing** | Test utilities, fixtures, mock runtime | Python |
+| **iron_dashboard** | Control Panel web UI | Vue.js |
 
-### Specialized Layer
-- **iron_lang** - LLM protocol integration
+### Layer Organization
 
-### Integration Layer
-- **iron_api** - REST API + WebSocket server
-- **iron_runtime** - Agent orchestration and PyO3 bridge
-
-### Frontend
-- **iron_dashboard** - Vue 3 Control Panel UI (in `frontend/dashboard/`)
-
-### Python Packages
-- **iron_sdk** - Pythonic SDK wrapper for Agent Runtime (in `python/iron_sdk/`)
-- **iron_examples** - Example agent implementations (in `python/iron_examples/`)
-
-### Production Database Schema (Spec-Only)
-- **iron_control_store** - PostgreSQL schema for production Control Panel (specification in `docs/`, no implementation in this repo)
-
-## External Dependencies
-
-Foundation modules consumed from crates.io:
-- **iron_types** - Shared types and data structures
-- **iron_cost** - Budget tracking and cost enforcement
-- **iron_telemetry** - Logging and tracing infrastructure
+```
+Foundation:     iron_types, iron_cost, iron_telemetry
+Infrastructure: iron_state
+Feature:        iron_safety, iron_reliability, iron_secrets, iron_token_manager
+Specialized:    iron_lang
+Integration:    iron_api, iron_runtime
+Application:    iron_cli, iron_cli_py, iron_sdk, iron_examples, iron_testing
+Frontend:       iron_dashboard
+```
 
 ## Building
 
@@ -59,9 +60,13 @@ cargo build --release
 cargo nextest run --all-features
 
 # Build Control Panel UI
-cd frontend/dashboard
+cd module/iron_dashboard
 npm install
 npm run build
+
+# Install Python SDK
+cd module/iron_sdk
+pip install -e .
 ```
 
 ## Status

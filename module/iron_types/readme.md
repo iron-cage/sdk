@@ -1,0 +1,64 @@
+# iron_cage_types
+
+Shared types and traits for the Iron Cage multi-agent safety framework.
+
+### Scope
+
+**Responsibilities:**
+Defines shared types, traits, and error types used across all iron_cage crates as foundation layer. Provides type-safe builders for configuration, comprehensive error handling with error_tools integration, and Serde serialization support. Requires Rust 1.75+, all platforms supported, serves as dependency for all other workspace crates.
+
+**In Scope:**
+- Common configuration types (SafetyConfig, CostConfig, ReliabilityConfig)
+- Shared error types and Result aliases
+- Core trait definitions (Agent, SafetyGuard, CostTracker, CircuitBreaker)
+- Type-safe builders for configuration
+- Serde serialization support (behind `enabled` feature)
+
+**Out of Scope:**
+- Implementation logic (see iron_cage_safety, iron_cage_cost, iron_cage_reliability)
+- CLI interface (see iron_cage_cli)
+- Python bindings (see iron_cage_cli)
+- Business logic or orchestration
+
+## Installation
+
+```toml
+[dependencies]
+iron_cage_types = { version = "0.1", features = ["full"] }
+```
+
+## Features
+
+- `enabled` (default): Core functionality with all required dependencies
+- `full`: All functionality (currently same as `enabled`)
+
+## Example
+
+```rust
+use iron_cage_types::{Config, SafetyConfig, CostConfig};
+
+// Create configuration for multi-agent system
+let config = Config {
+    safety: SafetyConfig {
+        pii_detection_enabled: true,
+        audit_log_path: Some("/var/log/safety.log".into()),
+    },
+    cost: CostConfig {
+        budget_usd: 100.0,
+        alert_threshold: 0.8,
+    },
+    reliability: Default::default(),
+};
+
+// Configuration is serializable when `enabled` feature is active
+let json = serde_json::to_string(&config)?;
+```
+
+## Documentation
+
+- [API Reference](https://docs.rs/iron_cage_types)
+- [Architecture Guide](docs/architecture.md)
+
+## License
+
+MIT

@@ -16,7 +16,7 @@
 #==============================================================================
 
 BACKEND_DIR := .
-DASHBOARD_DIR := frontend/dashboard
+DASHBOARD_DIR := module/iron_dashboard
 API_DIR := module/iron_api
 RUNTIME_DIR := module/iron_runtime
 DB_FILE := module/iron_api/iron_api.db

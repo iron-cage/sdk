@@ -1,0 +1,117 @@
+#
+# Call Tracing Commands
+#
+# Commands for tracking and analyzing API call traces
+#
+
+commands:
+  - name: ".traces.list"
+    namespace: ""
+    description: "List recent API call traces"
+    hint: "Shows trace details (ID, token, provider, model, tokens, cost)"
+    arguments:
+      - name: "limit"
+        description: "Max number of traces to return"
+        kind: "Integer"
+        hint: "Maximum trace count"
+        attributes:
+          optional: true
+          default: 20
+          min: 1
+          max: 1000
+
+      - name: "format"
+        description: "Output format"
+        kind: "String"
+        hint: "Controls how results are displayed"
+        attributes:
+          optional: true
+          default: "table"
+          enum:
+            - "table"
+            - "expanded"
+            - "json"
+            - "yaml"
+
+    status: "stable"
+    version: "1.0.0"
+    examples:
+      - ".traces.list"
+      - ".traces.list limit::50"
+      - ".traces.list format::json"
+
+  - name: ".traces.get"
+    namespace: ""
+    description: "Get specific trace details by ID"
+    hint: "Shows all fields including total tokens calculation"
+    arguments:
+      - name: "trace_id"
+        description: "Trace ID to retrieve"
+        kind: "Integer"
+        hint: "Numeric trace identifier"
+        attributes:
+          optional: false
+          min: 1
+
+      - name: "format"
+        description: "Output format"
+        kind: "String"
+        hint: "Controls how results are displayed"
+        attributes:
+          optional: true
+          default: "table"
+          enum:
+            - "table"
+            - "expanded"
+            - "json"
+            - "yaml"
+
+    status: "stable"
+    version: "1.0.0"
+    examples:
+      - ".traces.get trace_id::999"
+      - ".traces.get trace_id::123 format::json"
+
+  - name: ".traces.export"
+    namespace: ""
+    description: "Export trace data to file or stdout"
+    hint: "Exports up to 1000 traces in JSON or CSV format"
+    arguments:
+      - name: "export_format"
+        description: "Export format"
+        kind: "String"
+        hint: "Data format for export"
+        attributes:
+          optional: true
+          default: "json"
+          enum:
+            - "json"
+            - "csv"
+
+      - name: "output"
+        description: "Output file path"
+        kind: "String"
+        hint: "Write to file (stdout if not provided)"
+        attributes:
+          optional: true
+          pattern: "^[^\\0]+$"
+
+      - name: "format"
+        description: "Display format"
+        kind: "String"
+        hint: "Controls how results are displayed"
+        attributes:
+          optional: true
+          default: "table"
+          enum:
+            - "table"
+            - "expanded"
+            - "json"
+            - "yaml"
+
+    status: "stable"
+    version: "1.0.0"
+    examples:
+      - ".traces.export"
+      - ".traces.export export_format::json output::traces.json"
+      - ".traces.export export_format::csv output::traces.csv"

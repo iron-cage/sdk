@@ -1,0 +1,270 @@
+# iron_cli
+
+Command-line interface for LLM token management using unilang framework.
+
+## Architecture
+
+**Current Status:** Unilang migration in progress (Phases 1-6 complete)
+
+### Layers (Hexagonal Architecture)
+
+```
+CLI (unilang) → Adapter (async I/O) → Handler (pure logic) → Formatter (output)
+     ↓               ↓                      ↓                      ↓
+VerifiedCommand   Services          HashMap validation      Table/JSON/YAML
+```
+
+**Components:**
+- **Handlers** (`src/handlers/`) - Pure business logic, no I/O, fully testable
+- **Adapters** (`src/adapters/`) - Async I/O bridge, calls handlers + services
+  - **HttpAdapter** - Production implementation using reqwest HTTP client
+  - **InMemoryAdapter** - Test-only implementation (compile_error! guard enforced)
+- **Services** - Service traits (AuthService, TokenService, UsageService, LimitsService, TracesService, HealthService, StorageService)
+- **Formatters** (`src/formatting.rs`) - Universal output (table/expanded/json/yaml)
+- **Config** (`src/config.rs`) - Hierarchical configuration system
+
+## Quick Start
+
+```bash
+# Authentication
+iron-token .auth.login username::alice password::secret123
+
+# List tokens
+iron-token .tokens.list
+
+# Generate token
+iron-token .tokens.generate name::my-token scope::read:tokens ttl::3600
+
+# Revoke token
+iron-token .tokens.revoke name::my-token
+
+# Check health
+iron-token .health
+
+# Get version
+iron-token .version
+```
+
+## Command Syntax
+
+**Unilang keyword::value format:**
+```bash
+iron-token .command.subcommand param1::value1 param2::value2
+```
+
+**Examples:**
+```bash
+# Login
+.auth.login username::user@example.com password::secret
+
+# Refresh tokens
+.auth.refresh
+
+# Logout
+.auth.logout
+
+# Generate token
+.tokens.generate name::api-token scope::read:write:tokens ttl::7200
+
+# List tokens
+.tokens.list filter::api
+
+# Get token
+.tokens.get name::api-token
+
+# Rotate token
+.tokens.rotate name::api-token
+
+# Revoke token
+.tokens.revoke name::api-token
+
+# Show usage
+.usage.show start_date::2025-01-01 end_date::2025-12-31
+
+# Usage by project
+.usage.by_project project_id::my-project
+
+# Usage by provider
+.usage.by_provider provider::openai
+
+# Export usage
+.usage.export output::usage.csv format::csv
+
+# List limits
+.limits.list
+
+# Get limit
+.limits.get limit_id::lim_tokens
+
+# Create limit
+.limits.create resource_type::tokens limit_value::100000
+
+# Update limit
+.limits.update limit_id::lim_tokens limit_value::200000
+
+# Delete limit
+.limits.delete limit_id::lim_tokens
+
+# List traces
+.traces.list filter::error limit::50
+
+# Get trace
+.traces.get trace_id::trace-123
+
+# Export traces
+.traces.export output::traces.json format::json
+
+# Health check
+.health
+
+# Version
+.version
+```
+
+## Configuration
+
+**Configuration Hierarchy** (highest to lowest priority):
+1. CLI arguments (keyword::value)
+2. Environment variables (IRON_*)
+3. Local temp config (.iron.local.tmp.toml)
+4. Local project config (.iron.local.toml)
+5. Global config (~/.config/iron-token/config.toml)
+6. Built-in defaults
+
+**Environment Variables:**
+```bash
+IRON_API_URL=https://api.example.com
+IRON_FORMAT=json
+IRON_USER=alice
+```
+
+**Example Config:**
+```rust
+use iron_cli::config::Config;
+
+// Simple usage
+let config = Config::new();
+
+// With CLI args
+let mut cli_args = HashMap::new();
+cli_args.insert("format".to_string(), "json".to_string());
+let config = Config::with_cli_args(cli_args);
+
+// Builder pattern
+let config = Config::builder()
+    .with_cli_args(cli_args)
+    .with_env()
+    .with_defaults()
+    .validate()
+    .build();
+```
+
+## Output Formats
+
+All commands support multiple output formats:
+
+```bash
+# Table format (default)
+iron-token .tokens.list
+
+# Expanded format
+iron-token .tokens.list format::expanded
+
+# JSON format
+iron-token .tokens.list format::json
+
+# YAML format
+iron-token .tokens.list format::yaml
+```
+
+## Testing
+
+**Test Commands:**
+```bash
+# Run all tests
+cargo test --all-features
+
+# Run specific test suites
+cargo test --test handlers
+cargo test --test adapters
+cargo test --test integration_test
+cargo test --test config_test
+
+# Run with strict warnings
+RUSTFLAGS="-D warnings" cargo nextest run --all-features
+```
+
+**Test Coverage:**
+- Handler tests: 100 tests (pure function validation)
+- Adapter tests: 110 tests (integration with services)
+- Integration tests: 12 tests (end-to-end workflows)
+- Config tests: 13 tests (configuration system)
+- Format tests: 19 tests (output formatting)
+
+## Development
+
+**Architecture Principles:**
+- **No mocking** - Use real alternative implementations (InMemoryAdapter)
+- **TDD workflow** - PLAN → RED → GREEN → REFACTOR → DOCUMENT → VERIFY
+- **Pure handlers** - No async, no I/O, fully testable
+- **Hexagonal architecture** - Clear separation of concerns
+
+**Module Structure:**
+```
+src/
+├── handlers/           # Pure business logic (sync, no I/O)
+│   ├── auth_handlers.rs
+│   ├── token_handlers.rs
+│   ├── usage_handlers.rs
+│   ├── limits_handlers.rs
+│   ├── traces_handlers.rs
+│   └── health_handlers.rs
+├── adapters/           # Async I/O bridge
+│   ├── auth.rs
+│   ├── tokens.rs
+│   ├── usage.rs
+│   ├── limits.rs
+│   ├── traces.rs
+│   ├── health.rs
+│   ├── services.rs     # Service trait definitions
+│   └── implementations/
+│       └── in_memory.rs
+├── formatting.rs       # Universal formatter
+├── config.rs           # Configuration system
+└── lib.rs             # Module exports
+
+tests/
+├── handlers.rs         # Handler unit tests
+├── adapters.rs         # Adapter integration tests
+├── integration_test.rs # End-to-end tests
+├── config_test.rs      # Config tests
+└── formatting.rs       # Formatter tests
+```
+
+## Migration Status
+
+**Completed Phases (6/10):**
+- ✅ Phase 1: Project Structure (YAML commands, feature flags)
+- ✅ Phase 2: Handlers (22 pure functions)
+- ✅ Phase 3: Formatters (4 output formats)
+- ✅ Phase 4: Adapters (22 async functions, 110 tests)
+- ✅ Phase 5: Configuration (hierarchical config)
+- ✅ Phase 6: Integration Testing (12 tests)
+
+**Deferred:**
+- ⏸️ Phase 7: Performance Benchmarks
+
+**Remaining:**
+- Phase 8: Documentation Update (in progress)
+- Phase 9: Final Cutover
+- Phase 10: Cleanup
+
+**Current Metrics:**
+- Total tests: 288 (283 passing)
+- Pattern ratio: 88% new, 11% old
+- Architecture purity: Hexagonal ✓
+- No mocking: ✓
+
+## License
+
+MIT

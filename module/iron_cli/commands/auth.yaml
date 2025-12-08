@@ -1,0 +1,98 @@
+#
+# Authentication Commands
+#
+# Commands for user authentication and session management
+#
+
+commands:
+  - name: ".auth.login"
+    namespace: ""
+    description: "Authenticate user and obtain JWT tokens"
+    hint: "Stores access and refresh tokens in system keyring"
+    arguments:
+      - name: "username"
+        description: "Username for authentication"
+        kind: "String"
+        hint: "Email address or username"
+        attributes:
+          optional: false
+          pattern: "^[a-zA-Z0-9@._-]+$"
+          min_length: 3
+          max_length: 100
+
+      - name: "password"
+        description: "User password"
+        kind: "String"
+        hint: "Will prompt securely if not provided"
+        attributes:
+          optional: true
+          min_length: 1
+          max_length: 256
+
+      - name: "format"
+        description: "Output format"
+        kind: "String"
+        hint: "Controls how results are displayed"
+        attributes:
+          optional: true
+          default: "table"
+          enum:
+            - "table"
+            - "expanded"
+            - "json"
+            - "yaml"
+
+    status: "stable"
+    version: "1.0.0"
+    examples:
+      - ".auth.login username::alice@example.com"
+      - ".auth.login username::alice@example.com password::secret123"
+      - ".auth.login username::bob format::json"
+
+  - name: ".auth.refresh"
+    namespace: ""
+    description: "Refresh access token using stored refresh token"
+    hint: "Updates tokens in keyring using existing refresh token"
+    arguments:
+      - name: "format"
+        description: "Output format"
+        kind: "String"
+        hint: "Controls how results are displayed"
+        attributes:
+          optional: true
+          default: "table"
+          enum:
+            - "table"
+            - "expanded"
+            - "json"
+            - "yaml"
+
+    status: "stable"
+    version: "1.0.0"
+    examples:
+      - ".auth.refresh"
+      - ".auth.refresh format::json"
+
+  - name: ".auth.logout"
+    namespace: ""
+    description: "Invalidate tokens and clear keyring storage"
+    hint: "Removes all stored authentication tokens"
+    arguments:
+      - name: "format"
+        description: "Output format"
+        kind: "String"
+        hint: "Controls how results are displayed"
+        attributes:
+          optional: true
+          default: "table"
+          enum:
+            - "table"
+            - "expanded"
+            - "json"
+            - "yaml"
+
+    status: "stable"
+    version: "1.0.0"
+    examples:
+      - ".auth.logout"
+      - ".auth.logout format::json"
