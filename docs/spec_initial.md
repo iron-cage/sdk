@@ -32,6 +32,19 @@ A wrapper library that integrates with LangChain/LlamaIndex. Runs in the user's 
 - **Local Accountant:**
     - Uses tokenizers (e.g., `tiktoken`) to estimate request cost before sending
     - Manages local cache of "leased budget"
+    - **POST Request Price Calculation:**
+      - Cost formula: `(input_tokens / 1,000,000) × input_rate + (output_tokens / 1,000,000) × output_rate`
+      - Pricing Table (USD per 1M tokens, as of Dec 2025):
+        | Provider | Model | Input | Output |
+        |----------|-------|-------|--------|
+        | OpenAI | gpt-4-turbo | $10.00 | $30.00 |
+        | OpenAI | gpt-3.5-turbo | $0.50 | $1.50 |
+        | Anthropic | claude-3-5-sonnet | $3.00 | $15.00 |
+        | Anthropic | claude-3-opus | $15.00 | $75.00 |
+        | Anthropic | claude-3-haiku | $0.25 | $1.25 |
+        | Google | gemini-1.5-pro | $1.25 | $5.00 |
+        | Google | gemini-1.5-flash | $0.075 | $0.30 |
+      - Returns cost in cents (USD) for budget tracking
 
 - **Lease Manager:**
     - Background process. Communicates with the server
@@ -170,3 +183,72 @@ Single binary deployment: high-load API server (REST/gRPC) + embedded web dashbo
 ---
 
 This structure enables the creation of a scalable system that can easily be sold as a B2B solution for AI development management.
+
+---
+
+## 6. First Milestone: Server Control Panel
+
+### Objective
+
+Minimal viable control panel that allows users to securely store and manage LLM provider API keys.
+
+### Scope
+
+**In Scope:**
+- Web-based control panel served at `/dashboard`
+- Save and retrieve Anthropic API keys
+- Save and retrieve OpenAI API keys
+- Basic key management (add, view masked, delete)
+- Encrypted storage (AES-256-GCM)
+- Key balance display (fetch remaining credits from OpenAI/Anthropic APIs)
+
+**Out of Scope (Future Milestones):**
+- Budget management and leasing
+- Token counting and cost tracking
+- Team/user management
+- Analytics and usage graphs
+- Python SDK integration
+
+### Technical Requirements
+
+1. **Backend (Rust):**
+   - REST API endpoints:
+     - `POST /api/keys` - Save a new API key
+     - `GET /api/keys` - List all keys (masked) with balances
+     - `GET /api/keys/:id/balance` - Fetch balance from provider API
+     - `DELETE /api/keys/:id` - Remove a key
+   - Key encryption before database storage
+   - Key types: `openai`, `anthropic`
+   - Provider API integration:
+     - OpenAI: `GET https://api.openai.com/v1/dashboard/billing/credit_grants`
+     - Anthropic: `GET https://api.anthropic.com/v1/usage` (check available credits)
+
+2. **Frontend (Vue.js):**
+   - Vue 3 with Composition API
+   - Simple form to add new keys (provider dropdown + key input)
+   - Table displaying saved keys (masked: `sk-...xxxx`) with balance column
+   - Refresh balance button per key
+   - Delete button per key
+   - Served as static assets from Rust backend
+
+3. **Database Schema:**
+   ```sql
+   CREATE TABLE api_keys (
+     id SERIAL PRIMARY KEY,
+     provider VARCHAR(50) NOT NULL,  -- 'openai' or 'anthropic'
+     key_name VARCHAR(255),          -- user-friendly label
+     encrypted_key BYTEA NOT NULL,   -- AES-256-GCM encrypted
+     cached_balance_cents INTEGER,   -- cached balance (updated on fetch)
+     balance_updated_at TIMESTAMP,   -- last balance check
+     created_at TIMESTAMP DEFAULT NOW()
+   );
+   ```
+
+### Success Criteria
+
+- [ ] User can add an OpenAI API key via web UI
+- [ ] User can add an Anthropic API key via web UI
+- [ ] Keys are stored encrypted in database
+- [ ] Keys display masked in the UI (never show full key after save)
+- [ ] Balance is fetched from OpenAI/Anthropic APIs and displayed
+- [ ] User can delete keys
