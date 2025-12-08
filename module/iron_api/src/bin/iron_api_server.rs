@@ -90,10 +90,12 @@ enum DeploymentMode
 /// - `Pilot`: Localhost development environment
 fn detect_deployment_mode() -> DeploymentMode
 {
-  // Check for explicit production mode setting
-  if env::var( "IRON_DEPLOYMENT_MODE" ).as_deref() == Ok( "production" )
+  // Check for explicit deployment mode setting
+  match env::var( "IRON_DEPLOYMENT_MODE" ).as_deref()
   {
-    return DeploymentMode::Production;
+    Ok( "production" ) => return DeploymentMode::Production,
+    Ok( "pilot" ) => return DeploymentMode::Pilot,
+    _ => {}
   }
 
   // Heuristics for unintentional production deployment
@@ -145,6 +147,7 @@ struct AppState
   usage: iron_api::routes::usage::UsageState,
   limits: iron_api::routes::limits::LimitsState,
   traces: iron_api::routes::traces::TracesState,
+  providers: iron_api::routes::providers::ProvidersState,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -199,9 +202,32 @@ impl axum::extract::FromRef< AppState > for iron_api::routes::traces::TracesStat
   }
 }
 
+/// Enable providers routes to access ProvidersState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_api::routes::providers::ProvidersState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.providers.clone()
+  }
+}
+
 #[ tokio::main ]
 async fn main() -> Result< (), Box< dyn std::error::Error > >
 {
+  // Load .env file if present (ignore if not found)
+  match dotenvy::dotenv()
+  {
+    Ok( path ) => eprintln!( "Loaded .env from: {:?}", path ),
+    Err( e ) => eprintln!( "No .env file loaded: {}", e ),
+  }
+
+  // Debug: Check if master key is set
+  match std::env::var( "IRON_SECRETS_MASTER_KEY" )
+  {
+    Ok( _ ) => eprintln!( "IRON_SECRETS_MASTER_KEY is set" ),
+    Err( _ ) => eprintln!( "IRON_SECRETS_MASTER_KEY is NOT set" ),
+  }
+
   // Initialize tracing
   tracing_subscriber::fmt::init();
 
@@ -260,6 +286,10 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .await
     .expect( "Failed to initialize traces state" );
 
+  let providers_state = iron_api::routes::providers::ProvidersState::new( &database_url )
+    .await
+    .expect( "Failed to initialize providers storage" );
+
   // Create combined app state
   let app_state = AppState
   {
@@ -268,6 +298,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     usage: usage_state,
     limits: limits_state,
     traces: traces_state,
+    providers: providers_state,
   };
 
   // Build router with all endpoints
@@ -302,6 +333,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Traces endpoints
     .route( "/api/traces", get( iron_api::routes::traces::list_traces ) )
     .route( "/api/traces/:id", get( iron_api::routes::traces::get_trace ) )
+
+    // Provider key management endpoints
+    .route( "/api/providers", post( iron_api::routes::providers::create_provider_key ) )
+    .route( "/api/providers", get( iron_api::routes::providers::list_provider_keys ) )
+    .route( "/api/providers/:id", get( iron_api::routes::providers::get_provider_key ) )
+    .route( "/api/providers/:id", axum::routing::put( iron_api::routes::providers::update_provider_key ) )
+    .route( "/api/providers/:id", delete( iron_api::routes::providers::delete_provider_key ) )
+    .route( "/api/projects/:project_id/provider", post( iron_api::routes::providers::assign_provider_to_project ) )
 
     // Apply combined state to all routes
     .with_state( app_state )
@@ -345,6 +384,12 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  DELETE /api/limits/:id" );
   tracing::info!( "  GET  /api/traces" );
   tracing::info!( "  GET  /api/traces/:id" );
+  tracing::info!( "  POST /api/providers" );
+  tracing::info!( "  GET  /api/providers" );
+  tracing::info!( "  GET  /api/providers/:id" );
+  tracing::info!( "  PUT  /api/providers/:id" );
+  tracing::info!( "  DELETE /api/providers/:id" );
+  tracing::info!( "  POST /api/projects/:project_id/provider" );
 
   // Start server
   let listener = tokio::net::TcpListener::bind( addr ).await?;

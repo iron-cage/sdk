@@ -38,6 +38,7 @@ yarn-error.log*
 dist/
 .cache/
 .vite/
+.env
 .env.local
 .env.*.local
 

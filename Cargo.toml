@@ -294,7 +294,30 @@ path = "module/iron_token_manager"
 [workspace.dependencies.iron_cli]
 path = "module/iron_cli"
 
+## HTTP Client
+
+[workspace.dependencies.reqwest]
+version = "0.12"
+features = ["json"]
+
+## Environment Loading
+
+[workspace.dependencies.dotenvy]
+version = "0.15"
+
+## Password Hashing
+
+[workspace.dependencies.bcrypt]
+version = "0.16"
+
 ## Dev Dependencies
 
 [workspace.dependencies.tempfile]
 version = "3.0"
+
+[workspace.dependencies.hyper]
+version = "1.5"
+features = ["full"]
+
+[workspace.dependencies.http-body-util]
+version = "0.1"
