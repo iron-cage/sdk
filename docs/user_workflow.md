@@ -1,264 +1,138 @@
-# Iron Cage — Workflows
+# Iron Cage — How It Works
 
-## Overview
-
-| Actor | Interface | Actions |
-|-------|-----------|---------|
-| Admin | Dashboard | All management |
-| Developer | Library | Usage only (automatic) |
-
-**All management — Dashboard only. No CLI, no direct API calls.**
-
----
-
-# Admin Workflow (Dashboard)
-
-## Step 1: Initial Setup
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      DASHBOARD: FIRST TIME                      │
-├─────────────────────────────────────────────────────────────────┤
+│  CLIENT (Developer Machine)                                     │
 │                                                                 │
-│  1. Deploy server (docker-compose up)                           │
-│                    ↓                                            │
-│  2. Open http://localhost:3000                                  │
-│     → Register (first user = admin)                             │
-│                    ↓                                            │
-│  3. Dashboard → Projects → Create New                           │
-│     ├── Name: "Production Agent"                                │
-│     └── Budget: $500                                            │
-│                    ↓                                            │
-│  4. Dashboard → Project → Vault → Add Key                       │
-│     ├── Provider: OpenAI                                        │
-│     │   Key: sk-xxxxx                                           │
-│     └── Provider: Anthropic                                     │
-│         Key: sk-ant-xxxxx                                       │
-│                    ↓                                            │
-│  5. Dashboard → Project → IC Keys → Generate                    │
-│     ├── "Dev 1" → ic_dev1_xxxxx                                 │
-│     ├── "Dev 2" → ic_dev2_xxxxx                                 │
-│     └── "CI/CD" → ic_ci_xxxxx                                   │
-│                    ↓                                            │
-│  6. Copy IC key → Send to developer (Slack/Email)               │
+│  Python Script                                                  │
+│       │                                                         │
+│       ▼                                                         │
+│  iron_runtime (PyO3)                                            │
+│       │                                                         │
+│       ├──▶ Start/stop agents locally                            │
+│       ├──▶ Track budget (iron_cost)                             │
+│       ├──▶ Detect PII (iron_safety)                             │
+│       └──▶ Report state to server ─────────────────────┐        │
+│                                                        │        │
+└────────────────────────────────────────────────────────│────────┘
+                                                         │
+                                                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  SERVER                                                         │
+│                                                                 │
+│  iron_api (REST)                                                │
+│       │                                                         │
+│       ├──▶ Authentication (JWT)                                 │
+│       ├──▶ Token management                                     │
+│       ├──▶ Store agent state (iron_state)                       │
+│       ├──▶ Usage tracking                                       │
+│       └──▶ WebSocket events                                     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## Dashboard Pages
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  🔒 Iron Cage                                      admin ▾      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│  │ Projects │ │  Users   │ │ Settings │ │  Logout  │           │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-/projects           → List all projects
-/projects/new       → Create project
-/projects/:id       → Project details
-/projects/:id/keys  → Manage IC keys
-/projects/:id/vault → Manage provider keys
-/projects/:id/usage → View spending
-/users              → Manage team members
-/settings           → Server settings
-```
+**Key point:** Agents run on CLIENT. Server only tracks state and provides monitoring.
 
 ---
 
-## Daily Management
+## Client Side (Python)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  DASHBOARD: Projects                                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Production Agent                                           │ │
-│  │ Budget: $234.50 / $500.00                    [Edit] [View] │ │
-│  │ ████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 47%           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Dev Testing                                                │ │
-│  │ Budget: $12.30 / $50.00                      [Edit] [View] │ │
-│  │ █████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 25%           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Research                                              ⚠️   │ │
-│  │ Budget: $89.00 / $100.00                     [Edit] [View] │ │
-│  │ ██████████████████████████████████████████░░ 89%           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│                                        [+ Create Project]       │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Project Detail Page
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  DASHBOARD: Production Agent                                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Budget                                                         │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ $234.50 / $500.00                         [Change Budget]  │ │
-│  │ ████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 47%           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  Provider Keys (Vault)                          [+ Add Key]     │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ OpenAI      sk-...abc                           [Remove]   │ │
-│  │ Anthropic   sk-ant-...xyz                       [Remove]   │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  IC Keys                                      [+ Generate Key]  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Dev 1       ic_a1b2...   ✅ Active  dev@co.com   [Revoke]  │ │
-│  │ Dev 2       ic_c3d4...   ✅ Active  dev2@co.com  [Revoke]  │ │
-│  │ CI/CD       ic_e5f6...   ✅ Active  admin@co.com [Revoke]  │ │
-│  │ Old Key     ic_x9y8...   ❌ Revoked              [Delete]  │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  Usage (Last 7 Days)                                            │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  $                                                         │ │
-│  │  50├       ▄▄                                              │ │
-│  │    │    ▄▄ ██ ▄▄                                           │ │
-│  │  25├ ▄▄ ██ ██ ██ ▄▄                                        │ │
-│  │    │ ██ ██ ██ ██ ██ ▄▄                                     │ │
-│  │   0└─────────────────────                                  │ │
-│  │     Mon Tue Wed Thu Fri Sat Sun                            │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  Recent Activity                                                │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ 10:23  Dev 1   gpt-4        1.2k tokens    $0.048          │ │
-│  │ 10:21  Dev 2   claude-3     890 tokens     $0.027          │ │
-│  │ 10:19  CI/CD   gpt-4        3.4k tokens    $0.136          │ │
-│  │ 10:15  Dev 1   gpt-4        2.1k tokens    $0.084          │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Admin Actions (All via Dashboard)
-
-| Action | Where |
-|--------|-------|
-| Create project | Projects → Create |
-| Set/change budget | Project → Change Budget |
-| Add OpenAI key | Project → Vault → Add |
-| Remove provider key | Project → Vault → Remove |
-| Generate IC key | Project → IC Keys → Generate |
-| Revoke IC key | Project → IC Keys → Revoke |
-| View usage | Project → Usage |
-| Add user | Users → Invite |
-| Remove user | Users → Remove |
-| Change role | Users → Edit |
-
----
-
-# Developer Workflow (Automatic)
-
-## Developer Receives IC Key
-
-```
-Admin (Dashboard)                    Developer
-      │                                  │
-      │  Generate IC Key                 │
-      │  ────────────────────────────►   │
-      │  ic_a1b2c3d4...                  │
-      │  (via Slack/Email)               │
-      │                                  │
-      │                                  ▼
-      │                           ┌─────────────────┐
-      │                           │ export IC_KEY=  │
-      │                           │ "ic_a1b2c3d4.." │
-      │                           └─────────────────┘
-```
-
----
-
-## Developer Uses in Code
+Developer uses `iron_runtime` to run agents with protection:
 
 ```python
-from langchain import Agent
-from iron_cage import SafetyRuntime
+from iron_runtime import Runtime
 
-agent = Agent(llm="gpt-4", tools=[...])
+runtime = Runtime(budget=50.0)
+agent_id = runtime.start_agent("/path/to/agent.py")
+metrics = runtime.get_metrics(agent_id)
+runtime.stop_agent(agent_id)
+```
 
-runtime = SafetyRuntime(budget_usd=50.0)
-runtime.run(agent, "Analyze this data")
+**What happens locally:**
+- Agent script executes on client machine
+- Budget tracked per agent
+- PII detected and redacted
+- State synced to server
 
-# Done. Everything else is automatic:
-# ✅ Fetch keys from server
-# ✅ Inject to os.environ
-# ✅ Check budget
-# ✅ Filter PII
-# ✅ Execute agent
-# ✅ Report usage
-# ✅ Cleanup keys
+---
+
+## Server Side (REST API)
+
+Server provides monitoring and configuration:
+
+### Authentication
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/auth/login` | Get JWT tokens |
+| `POST /api/auth/refresh` | Refresh access token |
+| `POST /api/auth/logout` | Invalidate session |
+
+### Token Management
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/tokens` | Create token |
+| `GET /api/tokens` | List tokens |
+| `DELETE /api/tokens/:id` | Revoke token |
+
+### Monitoring (receives data from clients)
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/agents/:id/status` | Get agent status |
+| `POST /api/agents/:id/stop` | Request agent stop |
+| `GET /api/usage` | Get budget status |
+| `GET /api/limits` | Get rate limits |
+
+### WebSocket
+```
+ws://localhost:8080/ws
+```
+Events: `AgentStarted`, `CostUpdate`, `PiiAlert`, `BudgetWarning`
+
+---
+
+## Data Flow
+
+```
+1. Client starts agent
+   iron_runtime.start_agent()
+       │
+       ├──▶ Execute script locally
+       ├──▶ Generate agent_id (UUID)
+       └──▶ POST state to server
+
+2. During execution
+   Agent makes LLM calls
+       │
+       ├──▶ iron_cost.record_cost()
+       ├──▶ iron_safety.check() for PII
+       └──▶ Sync updates to server
+
+3. Server receives updates
+       │
+       ├──▶ Store in iron_state (DashMap + SQLite)
+       ├──▶ Broadcast via WebSocket
+       └──▶ Available via REST API
+
+4. Dashboard/Admin queries server
+   GET /api/agents/:id/status
+   GET /api/usage
 ```
 
 ---
 
-## What Happens Automatically
+## Components
 
-```
-runtime.run(agent)
-       │
-       ├──► POST /lib/keys      → Get OpenAI/Claude keys
-       │
-       ├──► Inject keys         → os.environ (RAM only)
-       │
-       ├──► Check budget        → Stop if exceeded
-       │
-       ├──► Filter PII          → Redact emails/phones
-       │
-       ├──► Execute agent       → Run actual LLM calls
-       │
-       ├──► POST /lib/usage     → Report tokens & cost
-       │
-       └──► Cleanup             → Remove keys from RAM
-```
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `iron_runtime` | Client | Agent lifecycle, PyO3 bridge |
+| `iron_cost` | Client | Budget tracking |
+| `iron_safety` | Client | PII detection |
+| `iron_reliability` | Client | Circuit breaker |
+| `iron_api` | Server | REST API |
+| `iron_state` | Server | State storage |
+| `iron_token_manager` | Server | Auth tokens |
+| `iron_telemetry` | Both | Logging |
 
 ---
-
-# Error Handling
-
-| Error | Developer Sees | Admin Sees in Dashboard |
-|-------|----------------|--------------------------|
-| **Budget Exceeded** | `BudgetExceededError` | ⚠️ "Budget exhausted" → [Increase] |
-| **Key Revoked** | `KeyRevokedError` | Key marked as revoked |
-| **Rate Limited** | Auto-retry (if circuit_breaker=True) | Rate limit stats |
-
----
-
-# Summary
-
-| Who | Interface | What They Do |
-|-----|-----------|--------------|
-| **Admin** | Dashboard | All management |
-| **Developer** | Library | `runtime.run(agent)` — everything else automatic |
-
-```python
-# Developer: 3 lines
-from iron_cage import SafetyRuntime
-
-runtime = SafetyRuntime(budget_usd=50.0)
-runtime.run(agent)
-```
