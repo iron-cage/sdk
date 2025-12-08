@@ -1,7 +1,7 @@
 # Iron Runtime Development Makefile
 # Minimal commands for daily development workflow
 
-.PHONY: help dev api dashboard test clean setup status db-reset ports validate build
+.PHONY: help dev api dashboard test clean setup status db-reset db-seed ports validate build
 .DEFAULT_GOAL := help
 
 # Configuration
@@ -88,8 +88,12 @@ status: ## Show installation status
 # Database & Ports
 #===============================================================================
 
+db-seed: ## Create demo user (demo/testpass)
+	@sqlite3 iron.db "INSERT OR IGNORE INTO users (username, password_hash, role, is_active, created_at) VALUES ('demo', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'user', 1, strftime('%s', 'now'));"
+	@echo "✅ Demo user created (demo/testpass)"
+
 db-reset: ## Reset database (deletes all data)
-	rm -f $(DB_FILE)
+	rm -f iron.db $(DB_FILE)
 	@echo "Database reset. Restart API to recreate."
 
 ports: ## Kill processes on ports 3000/5173
