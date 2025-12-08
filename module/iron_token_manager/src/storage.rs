@@ -92,6 +92,23 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
+    // Migration 003: Users table for authentication
+    let migration_003_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_003_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_003_completed == 0
+    {
+      let migration_003 = include_str!( "../migrations/003_create_users_table.sql" );
+      sqlx::raw_sql( migration_003 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),
