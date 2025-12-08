@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,9 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
+const showAssignModal = ref(false)
 const editingKey = ref<ProviderKey | null>(null)
+const assigningKey = ref<ProviderKey | null>(null)
 
 // Form fields
 const provider = ref<ProviderType>('openai')
@@ -36,15 +38,35 @@ const apiKey = ref('')
 const baseUrl = ref('')
 const description = ref('')
 const isEnabled = ref(true)
+const projectId = ref('')
 
 // Error states
 const createError = ref('')
 const editError = ref('')
+const assignError = ref('')
 
 // Fetch provider keys
 const { data: providerKeys, isLoading, error, refetch } = useQuery({
   queryKey: ['providerKeys'],
   queryFn: () => api.getProviderKeys(),
+})
+
+// Fetch tokens to get available projects
+const { data: tokens } = useQuery({
+  queryKey: ['tokens'],
+  queryFn: () => api.getTokens(),
+})
+
+// Computed: unique project IDs from tokens
+const availableProjects = computed(() => {
+  if (!tokens.value) return []
+  const projects = new Set<string>()
+  for (const token of tokens.value) {
+    if (token.project_id) {
+      projects.add(token.project_id)
+    }
+  }
+  return Array.from(projects).sort()
 })
 
 // Create provider key mutation
@@ -92,14 +114,40 @@ const toggleMutation = useMutation({
   },
 })
 
+// Assign provider key to project mutation
+const assignMutation = useMutation({
+  mutationFn: (data: { projectId: string; keyId: number }) =>
+    api.assignProjectProvider(data.projectId, data.keyId),
+  onSuccess: () => {
+    showAssignModal.value = false
+    assigningKey.value = null
+    projectId.value = ''
+    assignError.value = ''
+    queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+  },
+  onError: (err) => {
+    assignError.value = err instanceof Error ? err.message : 'Failed to assign provider key'
+  },
+})
+
+// Unassign provider key from project mutation
+const unassignMutation = useMutation({
+  mutationFn: (projectId: string) => api.unassignProjectProvider(projectId),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+  },
+})
+
 function resetForm() {
   provider.value = 'openai'
   apiKey.value = ''
   baseUrl.value = ''
   description.value = ''
   isEnabled.value = true
+  projectId.value = ''
   createError.value = ''
   editError.value = ''
+  assignError.value = ''
 }
 
 function handleCreateKey() {
@@ -147,6 +195,34 @@ function handleDeleteKey(key: ProviderKey) {
 
 function handleToggleEnabled(key: ProviderKey) {
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
+}
+
+function openAssignModal(key: ProviderKey) {
+  assigningKey.value = key
+  projectId.value = ''
+  assignError.value = ''
+  showAssignModal.value = true
+}
+
+function handleAssignKey() {
+  if (!assigningKey.value) return
+  assignError.value = ''
+
+  if (!projectId.value.trim()) {
+    assignError.value = 'Project ID is required'
+    return
+  }
+
+  assignMutation.mutate({
+    projectId: projectId.value.trim(),
+    keyId: assigningKey.value.id,
+  })
+}
+
+function handleUnassignKey(project: string) {
+  if (confirm(`Unassign this key from project "${project}"?`)) {
+    unassignMutation.mutate(project)
+  }
 }
 
 function formatDate(timestamp: number): string {
@@ -202,6 +278,9 @@ function getProviderBadgeClass(providerType: ProviderType): string {
               Status
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Project
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
             </th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -232,6 +311,31 @@ function getProviderBadgeClass(providerType: ProviderType): string {
               >
                 {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
               </Button>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex flex-wrap items-center gap-2">
+                <template v-if="key.assigned_projects && key.assigned_projects.length > 0">
+                  <Badge
+                    v-for="project in key.assigned_projects"
+                    :key="project"
+                    class="bg-blue-100 text-blue-800 cursor-pointer hover:bg-red-200"
+                    @click="handleUnassignKey(project)"
+                    title="Click to unassign"
+                  >
+                    {{ project }} ✕
+                  </Badge>
+                </template>
+                <span v-else class="text-gray-400 text-sm">none</span>
+                <Button
+                  @click="openAssignModal(key)"
+                  :disabled="assignMutation.isPending.value"
+                  variant="outline"
+                  size="sm"
+                  class="text-xs ml-1"
+                >
+                  +
+                </Button>
+              </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(key.created_at) }}
@@ -418,6 +522,71 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="updateMutation.isPending.value"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Key' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Assign to project modal -->
+    <Dialog v-model:open="showAssignModal">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Assign to Project</DialogTitle>
+          <DialogDescription>
+            Assign this {{ assigningKey ? getProviderLabel(assigningKey.provider) : '' }} key to a project.
+            The project will be able to fetch this key via API token.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Alert v-if="assignError" variant="destructive">
+          <AlertDescription>{{ assignError }}</AlertDescription>
+        </Alert>
+
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="projectId">Project</Label>
+            <div v-if="availableProjects.length > 0">
+              <Select v-model="projectId" :disabled="assignMutation.isPending.value">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="project in availableProjects" :key="project" :value="project">
+                    {{ project }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p class="text-xs text-gray-500 mt-1">
+                Select from projects that have API tokens.
+              </p>
+            </div>
+            <div v-else>
+              <Input
+                id="projectId"
+                v-model="projectId"
+                placeholder="e.g., lupo, my-project"
+                :disabled="assignMutation.isPending.value"
+              />
+              <p class="text-xs text-gray-500 mt-1">
+                No projects with tokens found. Create a token with a project ID first, or enter manually.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            @click="showAssignModal = false; assigningKey = null"
+            :disabled="assignMutation.isPending.value"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button
+            @click="handleAssignKey"
+            :disabled="assignMutation.isPending.value"
+          >
+            {{ assignMutation.isPending.value ? 'Assigning...' : 'Assign' }}
           </Button>
         </DialogFooter>
       </DialogContent>

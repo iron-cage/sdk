@@ -167,6 +167,8 @@ pub struct ProviderKeyResponse
   pub created_at: i64,
   pub last_used_at: Option< i64 >,
   pub masked_key: String,
+  /// Projects this key is assigned to
+  pub assigned_projects: Vec< String >,
 }
 
 /// Assign provider to project request
@@ -277,6 +279,7 @@ pub async fn create_provider_key(
     created_at: metadata.created_at,
     last_used_at: metadata.last_used_at,
     masked_key,
+    assigned_projects: vec![], // New key has no assignments
   } ) ).into_response()
 }
 
@@ -299,12 +302,18 @@ pub async fn list_provider_keys(
     }
   };
 
-  // For each key, we need to get the masked key
-  // Since we don't store the plaintext key, we'll show a generic masked value
-  // The actual masked key is only shown once at creation time
-  let responses: Vec< ProviderKeyResponse > = keys
-    .into_iter()
-    .map( |meta| ProviderKeyResponse
+  // For each key, fetch assigned projects and build response
+  let mut responses: Vec< ProviderKeyResponse > = Vec::with_capacity( keys.len() );
+
+  for meta in keys
+  {
+    // Fetch projects assigned to this key
+    let assigned_projects = state.storage
+      .get_key_projects( meta.id )
+      .await
+      .unwrap_or_default();
+
+    responses.push( ProviderKeyResponse
     {
       id: meta.id,
       provider: meta.provider.to_string(),
@@ -314,8 +323,9 @@ pub async fn list_provider_keys(
       created_at: meta.created_at,
       last_used_at: meta.last_used_at,
       masked_key: "***".to_string(), // Cannot unmask without decrypting
-    } )
-    .collect();
+      assigned_projects,
+    } );
+  }
 
   ( StatusCode::OK, Json( responses ) ).into_response()
 }
@@ -348,6 +358,12 @@ pub async fn get_provider_key(
     }) ) ).into_response();
   }
 
+  // Fetch assigned projects
+  let assigned_projects = state.storage
+    .get_key_projects( key_id )
+    .await
+    .unwrap_or_default();
+
   ( StatusCode::OK, Json( ProviderKeyResponse
   {
     id: metadata.id,
@@ -358,6 +374,7 @@ pub async fn get_provider_key(
     created_at: metadata.created_at,
     last_used_at: metadata.last_used_at,
     masked_key: "***".to_string(),
+    assigned_projects,
   } ) ).into_response()
 }
 
@@ -434,6 +451,12 @@ pub async fn update_provider_key(
     }
   };
 
+  // Fetch assigned projects
+  let assigned_projects = state.storage
+    .get_key_projects( key_id )
+    .await
+    .unwrap_or_default();
+
   ( StatusCode::OK, Json( ProviderKeyResponse
   {
     id: updated.id,
@@ -444,6 +467,7 @@ pub async fn update_provider_key(
     created_at: updated.created_at,
     last_used_at: updated.last_used_at,
     masked_key: "***".to_string(),
+    assigned_projects,
   } ) ).into_response()
 }
 
@@ -525,6 +549,46 @@ pub async fn assign_provider_to_project(
     {
       ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
         "error": "Failed to assign provider key to project"
+      }) ) ).into_response()
+    }
+  }
+}
+
+/// DELETE /api/projects/:project_id/provider
+///
+/// Unassign provider key from project
+pub async fn unassign_provider_from_project(
+  State( state ): State< ProvidersState >,
+  crate::jwt_auth::AuthenticatedUser( _claims ): crate::jwt_auth::AuthenticatedUser,
+  Path( project_id ): Path< String >,
+) -> impl IntoResponse
+{
+  // Get the current assignment to verify it exists
+  let provider_key_id = match state.storage.get_project_key( &project_id ).await
+  {
+    Ok( Some( id ) ) => id,
+    Ok( None ) =>
+    {
+      return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
+        "error": "No provider key assigned to this project"
+      }) ) ).into_response();
+    }
+    Err( _ ) =>
+    {
+      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+        "error": "Failed to query project assignment"
+      }) ) ).into_response();
+    }
+  };
+
+  // Unassign from project
+  match state.storage.unassign_from_project( provider_key_id, &project_id ).await
+  {
+    Ok( () ) => StatusCode::NO_CONTENT.into_response(),
+    Err( _ ) =>
+    {
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+        "error": "Failed to unassign provider key from project"
       }) ) ).into_response()
     }
   }

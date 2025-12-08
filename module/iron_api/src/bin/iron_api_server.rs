@@ -148,6 +148,7 @@ struct AppState
   limits: iron_api::routes::limits::LimitsState,
   traces: iron_api::routes::traces::TracesState,
   providers: iron_api::routes::providers::ProvidersState,
+  keys: iron_api::routes::keys::KeysState,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -208,6 +209,27 @@ impl axum::extract::FromRef< AppState > for iron_api::routes::providers::Provide
   fn from_ref( state: &AppState ) -> Self
   {
     state.providers.clone()
+  }
+}
+
+/// Enable keys routes to access KeysState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_api::routes::keys::KeysState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.keys.clone()
+  }
+}
+
+/// Enable API token authentication extractor to access ApiTokenState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_api::token_auth::ApiTokenState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    iron_api::token_auth::ApiTokenState
+    {
+      token_storage: state.keys.token_storage.clone(),
+    }
   }
 }
 
@@ -290,6 +312,19 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .await
     .expect( "Failed to initialize providers storage" );
 
+  // Initialize keys state for /api/keys endpoint (requires crypto)
+  let crypto_service = std::sync::Arc::new(
+    iron_secrets::crypto::CryptoService::from_env()
+      .expect( "IRON_SECRETS_MASTER_KEY required for key fetch API" )
+  );
+
+  let keys_state = iron_api::routes::keys::KeysState
+  {
+    token_storage: token_state.storage.clone(),
+    provider_storage: providers_state.storage.clone(),
+    crypto: crypto_service,
+  };
+
   // Create combined app state
   let app_state = AppState
   {
@@ -299,6 +334,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     limits: limits_state,
     traces: traces_state,
     providers: providers_state,
+    keys: keys_state,
   };
 
   // Build router with all endpoints
@@ -341,6 +377,10 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/providers/:id", axum::routing::put( iron_api::routes::providers::update_provider_key ) )
     .route( "/api/providers/:id", delete( iron_api::routes::providers::delete_provider_key ) )
     .route( "/api/projects/:project_id/provider", post( iron_api::routes::providers::assign_provider_to_project ) )
+    .route( "/api/projects/:project_id/provider", delete( iron_api::routes::providers::unassign_provider_from_project ) )
+
+    // Key fetch endpoint (API token authentication)
+    .route( "/api/keys", get( iron_api::routes::keys::get_key ) )
 
     // Apply combined state to all routes
     .with_state( app_state )
@@ -390,6 +430,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  PUT  /api/providers/:id" );
   tracing::info!( "  DELETE /api/providers/:id" );
   tracing::info!( "  POST /api/projects/:project_id/provider" );
+  tracing::info!( "  DELETE /api/projects/:project_id/provider" );
+  tracing::info!( "  GET  /api/keys" );
 
   // Start server
   let listener = tokio::net::TcpListener::bind( addr ).await?;

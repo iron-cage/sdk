@@ -104,6 +104,7 @@ interface ProviderKey {
   created_at: number
   last_used_at?: number
   masked_key: string
+  assigned_projects: string[]
 }
 
 interface CreateProviderKeyRequest {
@@ -147,7 +148,12 @@ export function useApi() {
       throw new Error(error.error || `HTTP ${response.status}`)
     }
 
-    return response.json()
+    // Handle empty responses (204 No Content, or empty body)
+    const text = await response.text()
+    if (!text) {
+      return undefined as T
+    }
+    return JSON.parse(text)
   }
 
   // Token API methods
@@ -292,6 +298,12 @@ export function useApi() {
     })
   }
 
+  async function unassignProjectProvider(projectId: string): Promise<void> {
+    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+      method: 'DELETE',
+    })
+  }
+
   return {
     getTokens,
     getToken,
@@ -314,6 +326,7 @@ export function useApi() {
     updateProviderKey,
     deleteProviderKey,
     assignProjectProvider,
+    unassignProjectProvider,
   }
 }
 
