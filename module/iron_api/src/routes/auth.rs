@@ -43,6 +43,21 @@ impl AuthState
   {
     let db_pool = SqlitePool::connect( database_url ).await?;
 
+    // Run migration 003 (users table) if not already applied
+    let migration_003_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_003_completed'"
+    )
+    .fetch_one( &db_pool )
+    .await?;
+
+    if migration_003_completed == 0
+    {
+      let migration_003 = include_str!( "../../../iron_token_manager/migrations/003_create_users_table.sql" );
+      sqlx::raw_sql( migration_003 )
+        .execute( &db_pool )
+        .await?;
+    }
+
     Ok( Self
     {
       jwt_secret: Arc::new( JwtSecret::new( jwt_secret_key ) ),
