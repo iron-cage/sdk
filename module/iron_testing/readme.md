@@ -2,9 +2,25 @@
 
 Testing utilities for Iron Cage agents with pytest fixtures, mocks, and assertion helpers.
 
-**Status:** Initial scaffolding (v0.1.0)
-**Layer:** 4 (Infrastructure)
-**License:** Apache-2.0
+### Scope
+
+**Responsibilities:**
+Provides comprehensive testing utilities for Iron Cage agents, enabling developers to write unit and integration tests without requiring real LLM API calls or expensive token consumption. Includes pytest fixtures, mock implementations, test data generators, and assertion helpers.
+
+**In Scope:**
+- Pytest fixtures (mock_runtime, mock_budget, mock_safety, mock_llm)
+- Mock implementations (MockRuntime, MockLLM, MockBudgetTracker, MockSafetyChecker)
+- Test data generators (valid inputs, PII data, cost data)
+- Assertion helpers (budget, safety, reliability assertions)
+- Async test support (async fixtures and mocks)
+- Property-based testing strategies (Hypothesis integration)
+
+**Out of Scope:**
+- Production runtime (see iron_runtime)
+- Real LLM integrations (see iron_sdk)
+- Example code (see iron_examples)
+- End-to-end integration tests (see individual module tests)
+- Performance benchmarking utilities
 
 ---
 

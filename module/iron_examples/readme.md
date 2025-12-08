@@ -2,9 +2,25 @@
 
 Example library for Iron Cage with LangChain, CrewAI, and AutoGPT integrations.
 
-**Status:** Initial scaffolding (v0.1.0)
-**Layer:** 6 (Application)
-**License:** Apache-2.0
+### Scope
+
+**Responsibilities:**
+Provides production-ready example code demonstrating Iron Cage protection patterns with popular AI agent frameworks. Each example is self-contained, runnable, and demonstrates specific protection features like budget tracking, PII detection, and circuit breakers.
+
+**In Scope:**
+- LangChain examples (chat agents, RAG pipelines, multi-step agents)
+- CrewAI examples (protected crews, multi-agent collaboration)
+- AutoGPT examples (autonomous agents, plugin integration)
+- Pattern examples (budget enforcement, PII redaction, circuit breakers)
+- Runnable example scripts with documentation
+- Framework-specific best practices
+
+**Out of Scope:**
+- SDK implementation (see iron_sdk)
+- Testing utilities (see iron_testing)
+- CLI tools (see iron_cli, iron_cli_py)
+- Production deployment guides (see iron_api documentation)
+- Framework source code modifications
 
 ---
 

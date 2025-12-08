@@ -2,9 +2,27 @@
 
 Python command-line tool for Iron Cage token management and agent control.
 
-**Status:** Initial scaffolding (v0.1.0)
-**Layer:** 6 (Application)
-**License:** Apache-2.0
+### Scope
+
+**Responsibilities:**
+Provides a Python-based command-line alternative to the Rust iron_cli binary. Enables token generation, configuration management, project initialization, and agent control for Python developers and environments without Rust toolchain.
+
+**In Scope:**
+- Token commands (generate, validate, inspect)
+- Configuration commands (init, validate, edit)
+- Project initialization from templates (LangChain, CrewAI, AutoGPT)
+- Agent control commands (start, stop, status)
+- Secrets management commands (add, rotate, list)
+- Rich terminal output (colors, progress bars, tables)
+- Programmatic Python API for library usage
+
+**Out of Scope:**
+- REST API server (see iron_api)
+- Token generation backend logic (see iron_token_manager)
+- Budget enforcement (see iron_cost)
+- Rust-based CLI (see iron_cli)
+- Python SDK decorators (see iron_sdk)
+- Framework integrations (see iron_sdk)
 
 ---
 

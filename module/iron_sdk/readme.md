@@ -2,9 +2,26 @@
 
 Pythonic SDK layer for Iron Cage agent protection with decorators and framework integrations.
 
-**Status:** Initial scaffolding (v0.1.0)
-**Layer:** 5 (Integration)
-**License:** Apache-2.0
+### Scope
+
+**Responsibilities:**
+Provides a clean, Pythonic API for protecting AI agents with budget tracking, PII detection, and reliability patterns. Wraps the low-level PyO3 bindings from iron_runtime with decorators, context managers, and typed configurations for ergonomic Python usage.
+
+**In Scope:**
+- `@protect_agent` decorator for function-level protection
+- Context managers (`with Budget(...)`, `with Protection(...)`)
+- Typed configuration classes (BudgetConfig, SafetyConfig, ReliabilityConfig)
+- Framework integrations (LangChain, CrewAI, AutoGPT)
+- Async/await support for async agents
+- Error handling with Python exceptions
+
+**Out of Scope:**
+- PyO3 FFI bindings (see iron_runtime)
+- Budget calculation logic (see iron_cost)
+- PII detection patterns (see iron_safety)
+- Circuit breaker implementation (see iron_reliability)
+- Example code (see iron_examples)
+- Testing utilities (see iron_testing)
 
 ---
 

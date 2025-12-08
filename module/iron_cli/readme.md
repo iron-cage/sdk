@@ -2,6 +2,30 @@
 
 Command-line interface for LLM token management using unilang framework.
 
+### Scope
+
+**Responsibilities:**
+Provides command-line access to all Iron Cage token management features using the unilang keyword::value syntax. Implements hexagonal architecture with pure handlers for business logic, async adapters for I/O, and multiple output formatters for terminal display.
+
+**In Scope:**
+- Token CRUD commands (generate, list, get, rotate, revoke)
+- Authentication commands (login, refresh, logout)
+- Usage reporting commands (show, by_project, by_provider, export)
+- Limits management commands (list, get, create, update, delete)
+- Traces inspection commands (list, get, export)
+- Health check and version commands
+- Unilang keyword::value command syntax
+- Multiple output formats (table, expanded, json, yaml)
+- Hierarchical configuration (CLI, env, local, global, defaults)
+
+**Out of Scope:**
+- REST API server implementation (see iron_api)
+- Token generation logic (see iron_token_manager)
+- Budget enforcement logic (see iron_cost)
+- GUI/dashboard interface (see iron_dashboard)
+- Python CLI alternative (see iron_cli_py)
+- Framework integrations (see iron_sdk)
+
 ## Architecture
 
 **Current Status:** Unilang migration in progress (Phases 1-6 complete)
