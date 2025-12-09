@@ -1,6 +1,6 @@
 # ADR-001: Two-Repository Split
 
-**Status:** Accepted
+**Status:** Superseded (2025-12-09, see ADR-006 Package Consolidation)
 **Date:** 2025-01
 
 ---

@@ -2,7 +2,9 @@
 
 **Purpose:** Overview of Iron Cage CLI tools and their responsibilities.
 
-**See:** [ADR-002](../../pilot/decisions/002-cli-architecture.md) for architecture decision.
+**Package Distribution:** iron_cli + iron_cli_py (Package 5: CLI Tools)
+
+**See:** [ADR-005](../decisions/adr_005_cli_architecture.md) for architecture decision.
 
 ---
 

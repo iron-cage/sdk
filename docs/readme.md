@@ -1,36 +1,25 @@
 # Documentation Directory
 
-This directory contains comprehensive documentation for the Iron Cage project with emphasis on iron_runtime modules (Control Panel, Agent Runtime, and runtime services).
-
----
-
-## 📍 Repository Context
-
-You are viewing documentation from the **iron_runtime** repository. Iron Cage uses a two-repository architecture:
-- **iron_runtime** (this repository) - Control Panel, Agent Runtime, runtime services (11 modules)
-- **iron_cage** (separate repository) - OS sandboxing, CLI tools, foundation modules (10 modules)
-
-The design documents in this directory describe the **complete Iron Cage platform** architecture across both repositories.
+This directory contains comprehensive documentation for the Iron Cage project (Control Panel, Agent Runtime, and runtime services).
 
 ---
 
 ## Scope
 
 **Responsibility:**
-Houses comprehensive design documentation that explains architecture, deployment strategies, module distribution, and package dependencies for the Iron Cage platform (both iron_runtime and iron_cage repositories). Documents here are reference materials for understanding the system as a whole.
+Houses comprehensive design documentation that explains architecture, deployment strategies, module distribution, and package dependencies for the Iron Cage platform. Documents here are reference materials for understanding the system as a whole.
 
 **In Scope:**
-- Architecture and design documentation (two-repository model)
-- Deployment and packaging strategies (5 deployment packages)
-- Module-to-package mappings (21 modules across both repos)
-- Cross-repository dependencies (crates.io + HTTP API)
+- Architecture and design documentation
+- Deployment and packaging strategies (6 deployment packages)
+- Module-to-package mappings
 - System-level design decisions and rationale
+- Integration patterns with external systems
 
 **Out of Scope:**
-- Module-specific implementation details (see `module/*/spec.md` in respective repos)
+- Module-specific implementation details (see `module/*/spec.md`)
 - Module-specific API documentation (see `module/*/readme.md`)
 - Product specifications and requirements (see `/spec/` directory)
-- Business and market strategy (see `business/` directory in iron_cage)
 - Development workflow and contribution guides (see root `readme.md`)
 
 ---
@@ -42,31 +31,32 @@ Root-level reference documents in docs/:
 | Entity | Responsibility | Input → Output | Scope | Out of Scope |
 |--------|----------------|----------------|-------|--------------|
 | **vocabulary.md** | Define canonical project terminology | Term question → Definition | Project-specific terms, glossary, terminology standards, naming conventions | NOT implementation details (→ module/*/spec.md), NOT architecture concepts (→ architecture/), NOT design decisions (→ decisions/) |
-| **module_package_matrix.md** | Map modules to deployment packages | Module location question → Package assignment | 21 modules across 5 packages, module distribution analysis, shared modules, reuse patterns | NOT package definitions (→ deployment/package_model.md), NOT module specs (→ module/*/spec.md), NOT deployment procedures (→ deployment_guide.md) |
-| **deployment_guide.md** | Document operational deployment procedures | Deployment question → Operational guide | Deployment procedures, configuration, environment setup, troubleshooting | NOT package model (→ deployment/package_model.md), NOT module mappings (→ module_package_matrix.md), NOT architecture (→ architecture/) |
+| **module_package_matrix.md** | Map modules to deployment packages | Module location question → Package assignment | 20 modules across 5 packages, module distribution analysis, shared modules, reuse patterns | NOT package definitions (→ deployment/001_package_model.md), NOT module specs (→ module/*/spec.md), NOT deployment procedures (→ deployment_guide.md) |
+| **deployment_guide.md** | Document operational deployment procedures | Deployment question → Operational guide | Deployment procedures, configuration, environment setup, troubleshooting | NOT package model (→ deployment/001_package_model.md), NOT module mappings (→ module_package_matrix.md), NOT architecture (→ architecture/) |
 
 ---
 
-## Design Collections
+## Documentation Collections
 
-Conceptual documentation organized into focused collections (~30-50 lines per file).
+All documentation organized as numbered Design Collections (NNN_ format) per documentation.rulebook.md standards.
 
-| Collection | Files | Description |
-|------------|-------|-------------|
-| **[architecture/](architecture/)** | 7 | System architecture: execution models, layers, service boundaries |
-| **[deployment/](deployment/)** | 5 | Packaging: 5 packages, actors, distribution, scaling |
-| **[security/](security/)** | 5 | Security model: threats, isolation, credentials, audit |
-| **[integration/](integration/)** | 5 | External systems: LLM providers, secrets, identity, observability |
-| **[technology/](technology/)** | 5 | Tech choices: why Rust, PyO3, dependencies, infrastructure |
-| **[decisions/](decisions/)** | 6 | Architecture Decision Records (ADRs) |
-| **[capabilities/](capabilities/)** | 9 | Platform capabilities: safety, cost, reliability, etc. |
+| Collection | Instances | Description |
+|------------|-----------|-------------|
+| **[capabilities/](capabilities/)** | 8 (001-008) | Platform capabilities (runtime, LLM control, sandbox, safety, credentials, MCP, observability, data) |
+| **[integration/](integration/)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
+| **[architecture/](architecture/)** | 5 (001-005) | System architecture concepts (execution models, layers, service boundaries, data flow, integration) |
+| **[deployment/](deployment/)** | 5 (001-005) | Deployment concepts (package model, actors, distribution, scaling, module mapping) |
+| **[security/](security/)** | 4 (001-004) | Security model concepts (threat model, isolation, credential flow, audit) |
+| **[technology/](technology/)** | 4 (001-004) | Technology choices (Rust, PyO3, infrastructure, dependencies) |
+| **[features/](features/)** | 6 (001-006) | Feature documentation (CLI architecture, token management suite) |
+| **[decisions/](decisions/)** | 6 (adr_001-006) | Architecture Decision Records (ADR format) |
 
 ### Reference Documents
 
 | Document | Description |
 |----------|-------------|
 | **[vocabulary.md](vocabulary.md)** | Canonical definitions for project terminology |
-| **module_package_matrix.md** | Module-to-package mapping for all 21 modules |
+| **module_package_matrix.md** | Module-to-package mapping for all 20 modules |
 | **deployment_guide.md** | Operational deployment procedures |
 
 ### Research
@@ -94,9 +84,14 @@ Conceptual documentation organized into focused collections (~30-50 lines per fi
 
 ---
 
-## Key Insights for iron_runtime Developers
+## Key Insights
 
-### Modules in This Repository (12 total)
+### Modules (17 total)
+
+**Foundation (3 modules):**
+- iron_types - Core types, errors, Result types
+- iron_cost - Cost calculation and budget types
+- iron_telemetry - Unified logging with tracing
 
 **Runtime & API (5 modules):**
 - iron_api - REST API + WebSocket server
@@ -110,26 +105,23 @@ Conceptual documentation organized into focused collections (~30-50 lines per fi
 - iron_reliability - Circuit breaker patterns
 - iron_lang - AI agent data protocol
 
+**CLI & Tools (2 modules):**
+- iron_cli - Command-line interface (Rust, authoritative)
+- iron_cli_py - Python CLI with wrapper pattern
+
 **Frontend & SDK (4 modules):**
 - iron_dashboard - Web dashboard (Vue 3 + TypeScript)
-- iron_sdk - Pythonic SDK with decorators (Python)
-- iron_examples - Example library for LangChain, CrewAI (Python)
-- (iron_control_store - PostgreSQL schema for production, spec-only)
-
-### Dependencies on iron_cage
-
-Iron_runtime depends on **3 foundation modules** published to crates.io from iron_cage:
-1. **iron_types** - Core types, errors, Result types
-2. **iron_cost** - Cost calculation and budget types
-3. **iron_telemetry** - Unified logging with tracing
-
-These are consumed via crates.io (not path dependencies).
+- iron_sdk - Pythonic SDK with decorators (Python, includes examples/)
+- iron_examples - Moved to iron_sdk/examples/ (archived)
+- iron_testing - Testing utilities and fixtures
 
 ### Deployment Packages
 
-Iron_runtime produces **2 primary deployment packages:**
+**Primary deployment packages:**
 1. **Control Panel** (Package 1) - Docker container with iron_api + iron_dashboard
 2. **Agent Runtime** (Package 3) - PyPI wheel (iron-cage-runtime) with Python SDK
+3. **CLI Tool** (Package 5) - Binary distribution (iron-token)
+4. **Python CLI** (Package 6) - PyPI wheel (iron-cli-py)
 
 ---
 
@@ -143,7 +135,7 @@ Iron_runtime produces **2 primary deployment packages:**
 **Security Model:**
 -> See [`security/readme.md`](security/readme.md) for threat model, isolation layers, credential flow
 
-**Deploying iron_runtime:**
+**Deployment:**
 -> See [`deployment/readme.md`](deployment/readme.md) for packages, distribution, scaling patterns
 
 **Technology Decisions:**
@@ -159,23 +151,13 @@ Iron_runtime produces **2 primary deployment packages:**
 -> See [`capabilities/readme.md`](capabilities/readme.md) for the 8 platform capabilities
 
 **CLI Tools Architecture:**
--> See `features/cli_architecture.md` for iron_cli vs iron_cli_py wrapper pattern
+-> See `features/001_cli_architecture.md` for iron_cli vs iron_cli_py wrapper pattern
 
 **Module Organization:**
 -> See `module_package_matrix.md` to understand which modules belong where
 
 **Terminology:**
 -> See [`vocabulary.md`](vocabulary.md) for canonical definitions of project terms
-
----
-
-## Document Maintenance
-
-These design documents are synchronized between both repositories:
-- **Source of Truth:** Documents exist in both iron_runtime and iron_cage
-- **Updates:** When architecture changes, update documents in BOTH repositories
-- **Version Control:** Documents include version numbers and update dates
-- **Cross-References:** Documents reference each other; keep links valid
 
 ---
 
@@ -194,7 +176,7 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 | docs/security/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/technology/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/integration/ | 4 | ✅ Compliant | ✅ Unique |
-| docs/architecture/ | 6 | ✅ Compliant | ✅ Unique |
+| docs/architecture/ | 5 | ✅ Compliant | ✅ Unique |
 | docs/decisions/ | 5 | ✅ Compliant | ✅ Unique |
 | docs/capabilities/ | 8 | ✅ Compliant | ✅ Unique |
 | docs/deployment/ | 5 | ✅ Compliant | ✅ Unique |
@@ -240,18 +222,13 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 
 ## Related Documentation
 
-**In iron_runtime Repository:**
 - `/readme.md` - Repository overview, quick start, building instructions
-- `/module/*/spec.md` - Module specifications (iron_api, iron_runtime, etc.)
+- `/module/*/spec.md` - Module specifications (iron_api, iron_runtime, iron_cli, etc.)
 - `/module/*/readme.md` - Module API documentation and usage guides
-
-**In iron_cage Repository:**
-- `/readme.md` - Sandboxing, CLI tools, foundation modules overview
-- `/docs/repository_architecture.md` - Same content, iron_cage perspective
-- `/module/*/spec.md` - Sandbox and foundation module specifications
+- `/pilot/spec.md` - Pilot platform specification
 
 ---
 
-**Last Updated:** 2025-12-08
+**Last Updated:** 2025-12-09
 **Maintained By:** Iron Cage Team
-**Status:** Active - Two Repository Architecture
+**Status:** Active

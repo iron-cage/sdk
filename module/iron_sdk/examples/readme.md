@@ -1,6 +1,8 @@
-# Iron Examples
+# Iron SDK Examples
 
-Example library for Iron Cage with LangChain, CrewAI, and AutoGPT integrations.
+Example library for Iron Cage SDK with LangChain, CrewAI, and AutoGPT integrations.
+
+**Note:** These examples are part of the iron_sdk module (located in `module/iron_sdk/examples/`)
 
 ---
 
@@ -54,11 +56,11 @@ Iron Examples provides 20+ production-ready examples demonstrating Iron Cage pro
 ## Quick Start
 
 ```bash
-# Install with framework dependencies
-pip install iron-examples[langchain]
+# Install SDK with examples and framework dependencies
+pip install iron-sdk[examples,langchain]
 
-# Run an example
-python -m iron_examples.langchain.simple_chat
+# Run an example (from module/iron_sdk/ directory)
+python examples/langchain/simple_chat.py
 ```
 
 ---
@@ -66,16 +68,16 @@ python -m iron_examples.langchain.simple_chat
 ## Installation
 
 ```bash
-# Base package
-pip install iron-examples
+# SDK with examples
+pip install iron-sdk[examples]
 
 # With specific framework
-pip install iron-examples[langchain]
-pip install iron-examples[crewai]
-pip install iron-examples[autogpt]
+pip install iron-sdk[examples,langchain]
+pip install iron-sdk[examples,crewai]
+pip install iron-sdk[examples,autogpt]
 
 # All frameworks
-pip install iron-examples[all]
+pip install iron-sdk[examples,all]
 ```
 
 **Requirements:**
@@ -117,11 +119,11 @@ pip install iron-examples[all]
 # Set API keys
 export OPENAI_API_KEY=sk-...
 
-# Run example
-python -m iron_examples.langchain.simple_chat
+# Run example (from module/iron_sdk/ directory)
+python examples/langchain/simple_chat.py
 
 # View example source
-python -m iron_examples.langchain.simple_chat --help
+cat examples/langchain/simple_chat.py
 ```
 
 ---

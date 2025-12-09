@@ -31,4 +31,4 @@ The insight: Don't rebuild secrets management - **integrate** with enterprise st
 
 ## Related Capabilities
 
-- [LLM Access Control](llm_access_control.md) - Uses credentials to authenticate
+- [LLM Access Control](002_llm_access_control.md) - Uses credentials to authenticate

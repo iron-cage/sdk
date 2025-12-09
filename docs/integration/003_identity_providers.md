@@ -51,4 +51,4 @@ auth:
 
 ---
 
-*Related: [secret_backends.md](secret_backends.md) | [observability_backends.md](observability_backends.md)*
+*Related: [002_secret_backends.md](002_secret_backends.md) | [004_observability_backends.md](004_observability_backends.md)*

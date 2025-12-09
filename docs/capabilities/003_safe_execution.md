@@ -31,5 +31,5 @@ The insight: Sandboxing is a **solved problem** (containers, seccomp, cgroups). 
 
 ## Related Capabilities
 
-- [AI Safety Guardrails](ai_safety_guardrails.md) - Validates before execution
-- [Observability](observability.md) - Logs all sandbox activity
+- [AI Safety Guardrails](004_ai_safety_guardrails.md) - Validates before execution
+- [Observability](007_observability.md) - Logs all sandbox activity

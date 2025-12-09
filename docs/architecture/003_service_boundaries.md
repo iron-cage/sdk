@@ -52,4 +52,4 @@ Know which component to look at for dashboards vs request processing vs agent ex
 
 ---
 
-*Related: [two_repo_model.md](two_repo_model.md) | [service_integration.md](service_integration.md)*
+*Related: [service_integration.md](service_integration.md)*

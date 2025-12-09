@@ -31,5 +31,5 @@ The insight: AI observability requires **semantic understanding** of what agents
 
 ## Related Capabilities
 
-- [LLM Access Control](llm_access_control.md) - Source of cost data
-- [AI Safety Guardrails](ai_safety_guardrails.md) - Source of safety events
+- [LLM Access Control](002_llm_access_control.md) - Source of cost data
+- [AI Safety Guardrails](004_ai_safety_guardrails.md) - Source of safety events

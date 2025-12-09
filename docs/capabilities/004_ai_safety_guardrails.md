@@ -39,6 +39,6 @@ The insight: Security must be **inline** (blocking, not just detecting) and **AI
 
 ## Related Capabilities
 
-- [Safe Execution](safe_execution.md) - Sandboxes complement guardrails
-- [LLM Access Control](llm_access_control.md) - Budget enforcement is a form of safety
-- [Observability](observability.md) - Audit trail for all safety decisions
+- [Safe Execution](003_safe_execution.md) - Sandboxes complement guardrails
+- [LLM Access Control](002_llm_access_control.md) - Budget enforcement is a form of safety
+- [Observability](007_observability.md) - Audit trail for all safety decisions

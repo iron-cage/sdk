@@ -31,6 +31,6 @@ The insight: Runtime is **infrastructure** - leverage Kubernetes (don't rebuild 
 
 ## Related Capabilities
 
-- [Observability](observability.md) - Monitors runtime health
-- [Safe Execution](safe_execution.md) - Agents run in sandboxes
-- [LLM Access Control](llm_access_control.md) - Governs agent LLM usage
+- [Observability](007_observability.md) - Monitors runtime health
+- [Safe Execution](003_safe_execution.md) - Agents run in sandboxes
+- [LLM Access Control](002_llm_access_control.md) - Governs agent LLM usage

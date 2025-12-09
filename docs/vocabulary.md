@@ -24,8 +24,6 @@
 | Term | Definition |
 |------|------------|
 | **Iron Cage** | AI agent governance platform providing safety, cost control, and reliability for enterprise AI agents |
-| **iron_runtime** | Repository containing Control Panel, Agent Runtime, and runtime services (12 modules) |
-| **iron_cage** | Repository containing OS sandboxing, CLI tools, and foundation modules (10 modules) |
 
 ### Architecture
 
@@ -37,7 +35,6 @@
 | **Model A (Client-Side)** | Primary execution model where agent runs on user's machine (95% of users) |
 | **Model B (Server-Side)** | Optional execution model where agent runs on Iron Cage infrastructure (5% of users) |
 | **Gateway** | Central orchestrator that routes requests through processing layers |
-| **Two-Repo Model** | Architecture split: iron_runtime (frequent changes) + iron_cage (stable foundation) |
 
 ### Capabilities (8 Total)
 

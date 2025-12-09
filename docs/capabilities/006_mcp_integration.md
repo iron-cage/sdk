@@ -31,5 +31,5 @@ The insight: MCP provides the **protocol** - Iron Cage adds the **governance** (
 
 ## Related Capabilities
 
-- [Safe Execution](safe_execution.md) - Sandboxes tool execution
-- [AI Safety Guardrails](ai_safety_guardrails.md) - Validates tool parameters
+- [Safe Execution](003_safe_execution.md) - Sandboxes tool execution
+- [AI Safety Guardrails](004_ai_safety_guardrails.md) - Validates tool parameters

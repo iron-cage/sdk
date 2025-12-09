@@ -31,5 +31,5 @@ The insight: **Real-time enforcement** (automatic cutoffs) is different from **m
 
 ## Related Capabilities
 
-- [Observability](observability.md) - Detailed usage analytics
-- [Credential Management](credential_management.md) - API key storage for providers
+- [Observability](007_observability.md) - Detailed usage analytics
+- [Credential Management](005_credential_management.md) - API key storage for providers

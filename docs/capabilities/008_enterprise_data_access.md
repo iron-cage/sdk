@@ -32,5 +32,5 @@ The insight: AI agents don't need raw database access - they need **semantically
 
 ## Related Capabilities
 
-- [AI Safety Guardrails](ai_safety_guardrails.md) - Enforces data access policies
-- [Observability](observability.md) - Tracks data access patterns
+- [AI Safety Guardrails](004_ai_safety_guardrails.md) - Enforces data access policies
+- [Observability](007_observability.md) - Tracks data access patterns
