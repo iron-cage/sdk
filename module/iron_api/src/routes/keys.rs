@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use iron_token_manager::storage::TokenStorage;
 use iron_token_manager::provider_key_storage::ProviderKeyStorage;
+use iron_token_manager::rate_limiter::RateLimiter;
 use iron_secrets::crypto::{ CryptoService, EncryptedSecret };
 
 use crate::token_auth::{ ApiTokenAuth, ApiTokenState };
@@ -27,6 +28,8 @@ pub struct KeysState
   pub provider_storage: Arc< ProviderKeyStorage >,
   /// Crypto service for decryption
   pub crypto: Arc< CryptoService >,
+  /// Rate limiter for key fetch endpoint
+  pub rate_limiter: RateLimiter,
 }
 
 impl std::fmt::Debug for KeysState
@@ -37,6 +40,7 @@ impl std::fmt::Debug for KeysState
       .field( "token_storage", &"<TokenStorage>" )
       .field( "provider_storage", &"<ProviderKeyStorage>" )
       .field( "crypto", &"<CryptoService>" )
+      .field( "rate_limiter", &self.rate_limiter )
       .finish()
   }
 }
@@ -80,12 +84,22 @@ pub struct KeyResponse
 /// - 400: Token not assigned to a project
 /// - 401: Invalid or missing token
 /// - 404: No provider key assigned to project
+/// - 429: Rate limit exceeded
 /// - 500: Decryption failed
 pub async fn get_key(
   auth: ApiTokenAuth,
   State( state ): State< KeysState >,
 ) -> Result< Json< KeyResponse >, ( StatusCode, Json< serde_json::Value > ) >
 {
+  // 0. Rate limit check
+  if !state.rate_limiter.check_rate_limit( &auth.user_id, auth.project_id.as_deref() )
+  {
+    return Err( (
+      StatusCode::TOO_MANY_REQUESTS,
+      Json( serde_json::json!({ "error": "Rate limit exceeded" }) ),
+    ) );
+  }
+
   // 1. Require project_id
   let project_id = auth.project_id.ok_or_else( || (
     StatusCode::BAD_REQUEST,
@@ -128,18 +142,24 @@ pub async fn get_key(
     &key_record.encrypted_api_key,
     &key_record.encryption_nonce,
   )
-  .map_err( |e| (
-    StatusCode::INTERNAL_SERVER_ERROR,
-    Json( serde_json::json!({ "error": format!( "Failed to decode encrypted key: {}", e ) }) ),
-  ) )?;
+  .map_err( |e| {
+    tracing::error!( "Failed to decode encrypted key: {}", e );
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Internal server error" }) ),
+    )
+  } )?;
 
   // 6. Decrypt the API key
   let decrypted = state.crypto
     .decrypt( &encrypted )
-    .map_err( |e| (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": format!( "Failed to decrypt key: {}", e ) }) ),
-    ) )?;
+    .map_err( |e| {
+      tracing::error!( "Failed to decrypt key: {}", e );
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Internal server error" }) ),
+      )
+    } )?;
 
   // 7. Log to audit_log
   let now_ms = std::time::SystemTime::now()

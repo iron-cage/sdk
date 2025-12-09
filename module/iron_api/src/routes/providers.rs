@@ -44,13 +44,12 @@ impl ProvidersState
     {
       Ok( c ) =>
       {
-        eprintln!( "✓ AI Provider Keys feature enabled" );
+        tracing::info!( "AI Provider Keys feature enabled" );
         Some( Arc::new( c ) )
       }
-      Err( e ) =>
+      Err( _ ) =>
       {
-        eprintln!( "⚠ AI Provider Keys feature disabled: {}", e );
-        eprintln!( "  Set IRON_SECRETS_MASTER_KEY environment variable to enable" );
+        tracing::warn!( "AI Provider Keys feature disabled: IRON_SECRETS_MASTER_KEY not set" );
         None
       }
     };

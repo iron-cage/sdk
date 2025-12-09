@@ -237,18 +237,7 @@ impl axum::extract::FromRef< AppState > for iron_api::token_auth::ApiTokenState
 async fn main() -> Result< (), Box< dyn std::error::Error > >
 {
   // Load .env file if present (ignore if not found)
-  match dotenvy::dotenv()
-  {
-    Ok( path ) => eprintln!( "Loaded .env from: {:?}", path ),
-    Err( e ) => eprintln!( "No .env file loaded: {}", e ),
-  }
-
-  // Debug: Check if master key is set
-  match std::env::var( "IRON_SECRETS_MASTER_KEY" )
-  {
-    Ok( _ ) => eprintln!( "IRON_SECRETS_MASTER_KEY is set" ),
-    Err( _ ) => eprintln!( "IRON_SECRETS_MASTER_KEY is NOT set" ),
-  }
+  let _ = dotenvy::dotenv();
 
   // Initialize tracing
   tracing_subscriber::fmt::init();
@@ -318,11 +307,18 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
       .expect( "IRON_SECRETS_MASTER_KEY required for key fetch API" )
   );
 
+  // Rate limiter for /api/keys endpoint: 10 requests per minute per user/project
+  let key_rate_limiter = iron_token_manager::rate_limiter::RateLimiter::new(
+    10,
+    std::time::Duration::from_secs( 60 ),
+  );
+
   let keys_state = iron_api::routes::keys::KeysState
   {
     token_storage: token_state.storage.clone(),
     provider_storage: providers_state.storage.clone(),
     crypto: crypto_service,
+    rate_limiter: key_rate_limiter,
   };
 
   // Create combined app state
