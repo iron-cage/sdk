@@ -126,10 +126,9 @@ This document provides the definitive mapping between Iron Cage's 20 modules (ac
 - "How many modules does each package contain?"
 
 **Quick Stats:**
-- **20 total modules** across **2 repositories** and **5 deployment packages**
-- **iron_runtime repository**: 10 modules (9 Rust + 1 Vue + 0 Python)
-- **iron_cage repository**: 10 modules (6 Rust + 1 Vue + 3 Python)
-- **3 foundation modules** published to crates.io (shared between repositories)
+- **17 total modules** across **6 deployment packages**
+- **Module distribution:** 12 Rust, 1 Vue, 4 Python
+- **Foundation modules:** 3 (iron_types, iron_cost, iron_telemetry)
 - **Package sizes:** 1-10 modules per package
 
 ---
@@ -167,10 +166,11 @@ This matrix shows which modules are included in each deployment package and whic
 
 **Matrix Dimensions:** 20 modules × 5 packages = 100 cells (23 ✅ marks)
 
-**Repository Legend:**
-- **iron_runtime**: Module source code hosted in iron_runtime repository
-- **iron_cage**: Module source code hosted in iron_cage repository
-- **iron_cage***: Foundation module hosted in iron_cage, published to crates.io, consumed by iron_runtime
+**Module Legend:**
+- **Foundation modules** (3): iron_types, iron_cost, iron_telemetry - Core types and infrastructure
+- **Runtime modules** (5): iron_api, iron_runtime, iron_state, iron_token_manager, iron_secrets - Control Panel and Agent Runtime
+- **Feature modules** (3): iron_safety, iron_reliability, iron_lang - Safety, cost, data features
+- **Application modules** (6): iron_cli, iron_cli_py, iron_sdk, iron_dashboard, iron_testing, iron_control_store
 
 ---
 

@@ -49,6 +49,36 @@ Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
 Frontend:       iron_dashboard
 ```
 
+---
+
+## Documentation
+
+**Governance Compliance:** ✅ 100% (22 directories, 11 Design Collections, 68 numbered files)
+
+**Collections:**
+- **[Architecture](docs/architecture/)** (6) - Execution models, layers, boundaries, data flow, integration, **budget control protocol**
+- **[Protocol](docs/protocol/)** (4) - IronLang data, REST API, WebSocket, MCP integration
+- **[Security](docs/security/)** (4) - Threat model, isolation, credential flow, audit
+- **[Capabilities](docs/capabilities/)** (8) - Runtime, LLM control, sandbox, safety, credentials, MCP, observability, data
+- **[Integration](docs/integration/)** (4) - LLM providers, secrets, identity, observability
+- **[Deployment](docs/deployment/)** (5) - Packages, actors, distribution, scaling
+- **[Technology](docs/technology/)** (4) - Rust, PyO3, infrastructure, dependencies
+- **[Features](docs/features/)** (6) - CLI architecture, token management
+- **[Principles](docs/principles/)** (5) - Design, quality, errors, testing, workflow
+- **[Constraints](docs/constraints/)** (4) - Technical, business, scope, trade-offs
+- **[Decisions](docs/decisions/)** (7) - ADRs (Architecture Decision Records)
+
+**Key Documentation:**
+- **[Budget Control Protocol](docs/architecture/006_budget_control_protocol.md)** - Two-token system (IC Token, IP Token), budget borrowing, incremental allocation
+- **[Execution Models](docs/architecture/001_execution_models.md)** - Client-Side, Server-Side, Control Panel-Managed
+- **[Data Flow](docs/architecture/004_data_flow.md)** - 11-step request flow with token translation
+- **[Protocol Collection](docs/protocol/readme.md)** - Communication protocols
+- **[Vocabulary](docs/vocabulary.md)** - Canonical terminology
+
+**Start Here:** [docs/readme.md](docs/readme.md) - Complete documentation index
+
+---
+
 ## Building
 
 ```bash
