@@ -291,12 +291,14 @@ This matrix shows which modules are included in each deployment package and whic
 
 ### Package 6: Python CLI (1 module)
 
-**Purpose:** Python package for token management CLI
+**Purpose:** Python CLI with wrapper architecture - native Python for developer experience, delegates operations to iron_cli binary
+
+**Architecture:** See [ADR-002](../pilot/decisions/002-cli-architecture.md) for wrapper pattern decision.
 
 **Included Modules:**
-1. iron_cli_py (Python) - Python CLI tool
+1. iron_cli_py (Python) - CLI with wrapper pattern (native: init/config/agent/secrets; wrapper: token/usage/limits/traces/auth)
 
-**Technology Mix:** 1 Python
+**Technology Mix:** 1 Python + iron_cli binary dependency for operations commands
 
 ---
 

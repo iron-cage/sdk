@@ -29,62 +29,56 @@ Houses comprehensive design documentation that explains architecture, deployment
 **Out of Scope:**
 - Module-specific implementation details (see `module/*/spec.md` in respective repos)
 - Module-specific API documentation (see `module/*/readme.md`)
+- Product specifications and requirements (see `/spec/` directory)
 - Business and market strategy (see `business/` directory in iron_cage)
 - Development workflow and contribution guides (see root `readme.md`)
 
 ---
 
-## Design Documents
+## Design Collections
 
-### Core Architecture
+Conceptual documentation organized into focused collections (~30-50 lines per file).
+
+| Collection | Files | Description |
+|------------|-------|-------------|
+| **[architecture/](architecture/)** | 7 | System architecture: execution models, layers, service boundaries |
+| **[deployment/](deployment/)** | 5 | Packaging: 6 packages, actors, distribution, scaling |
+| **[security/](security/)** | 5 | Security model: threats, isolation, credentials, audit |
+| **[integration/](integration/)** | 5 | External systems: LLM providers, secrets, identity, observability |
+| **[technology/](technology/)** | 5 | Tech choices: why Rust, PyO3, dependencies, infrastructure |
+| **[decisions/](decisions/)** | 6 | Architecture Decision Records (ADRs) |
+| **[capabilities/](capabilities/)** | 9 | Platform capabilities: safety, cost, reliability, etc. |
+
+### Reference Documents
 
 | Document | Description |
 |----------|-------------|
-| **repository_architecture.md** | Two-repository split design, module distribution |
-| **deployment_packages.md** | 6 deployment packages across both repositories |
+| **[vocabulary.md](vocabulary.md)** | Canonical definitions for project terminology |
 | **module_package_matrix.md** | Module-to-package mapping for all 22 modules |
-| **package_dependencies.md** | Runtime dependencies between packages |
+| **deployment_guide.md** | Operational deployment procedures |
 
-### Technical Documentation
-
-| Document | Description |
-|----------|-------------|
-| **technical_architecture.md** | Complete system architecture and design |
-| **architecture.md** | High-level architecture overview |
-| **requirements.md** | Technical requirements specification |
-| **capabilities.md** | Platform capabilities overview |
-| **glossary.md** | Terminology and definitions |
-
-### Developer Guides
+### Research
 
 | Document | Description |
 |----------|-------------|
-| **developer_guide.md** | Developer onboarding and workflows |
-| **deployment_guide.md** | Deployment procedures and environments |
+| **[research/](research/)** | Time-stamped provider research and analysis |
+
+### Specifications (see `/spec/`)
+
+| Document | Description |
+|----------|-------------|
+| **[/spec/requirements.md](../spec/requirements.md)** | Technical requirements specification (FR-x.y identifiers) |
 
 ### Feature Documentation (`features/`)
 
 | Document | Description |
 |----------|-------------|
+| **cli_architecture.md** | CLI tools architecture (wrapper pattern, iron_cli/iron_cli_py) |
 | **token_management.md** | Token management feature overview |
 | **token_management_api_reference.md** | Token API reference |
 | **token_management_cli_api_parity.md** | CLI/API parity matrix |
 | **token_management_implementation_plan.md** | Implementation roadmap |
 | **token_management_validation_framework.md** | Validation framework |
-
-### Capability Specifications (`spec/`)
-
-| Document | Description |
-|----------|-------------|
-| **capability_1_enterprise_data_access.md** | Enterprise data access spec |
-| **capability_2_ai_safety_guardrails.md** | AI safety guardrails spec |
-| **capability_3_llm_access_control.md** | LLM access control spec |
-| **capability_4_safe_execution.md** | Safe execution spec |
-| **capability_5_credential_management.md** | Credential management spec |
-| **capability_6_observability.md** | Observability spec |
-| **capability_7_mcp_integration.md** | MCP integration spec |
-| **capability_8_agent_runtime.md** | Agent runtime spec |
-| **pilot_platform.md** | Pilot platform specification |
 
 ---
 
@@ -132,19 +126,34 @@ Iron_runtime produces **2 primary deployment packages:**
 ### Where to Find Information
 
 **Understanding the Architecture:**
-→ Start with `repository_architecture.md` to understand why two repositories exist
+-> Start with [`architecture/readme.md`](architecture/readme.md) for system concepts (execution models, layers, data flow)
+
+**Security Model:**
+-> See [`security/readme.md`](security/readme.md) for threat model, isolation layers, credential flow
 
 **Deploying iron_runtime:**
-→ See `deployment_packages.md` § Package 1 (Control Panel) and § Package 3 (Agent Runtime)
+-> See [`deployment/readme.md`](deployment/readme.md) for packages, distribution, scaling patterns
+
+**Technology Decisions:**
+-> See [`technology/readme.md`](technology/readme.md) for why Rust, PyO3, infrastructure choices
+
+**Architecture Decision Records:**
+-> See [`decisions/readme.md`](decisions/readme.md) for ADRs documenting key decisions
+
+**Integration Patterns:**
+-> See [`integration/readme.md`](integration/readme.md) for LLM providers, secrets, identity
+
+**Capability Concepts:**
+-> See [`capabilities/readme.md`](capabilities/readme.md) for the 8 platform capabilities
+
+**CLI Tools Architecture:**
+-> See `features/cli_architecture.md` for iron_cli vs iron_cli_py wrapper pattern
 
 **Module Organization:**
-→ See `module_package_matrix.md` to understand which modules belong where
+-> See `module_package_matrix.md` to understand which modules belong where
 
-**Cross-Repository Dependencies:**
-→ See `package_dependencies.md` to understand how iron_runtime depends on iron_cage
-
-**Module-Specific Details:**
-→ See `module/*/spec.md` and `module/*/readme.md` in this repository
+**Terminology:**
+-> See [`vocabulary.md`](vocabulary.md) for canonical definitions of project terms
 
 ---
 

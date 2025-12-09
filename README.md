@@ -31,8 +31,8 @@ All modules are located in the `module/` directory.
 | **iron_lang** | LLM protocol integration, provider routing | Rust |
 | **iron_api** | REST API server, WebSocket endpoints | Rust |
 | **iron_runtime** | Agent orchestration, PyO3 Python bridge | Rust |
-| **iron_cli** | Command-line interface for API operations | Rust |
-| **iron_cli_py** | Python bindings for CLI | Python |
+| **iron_cli** | Command-line interface for API operations (authoritative) | Rust |
+| **iron_cli_py** | Python CLI with wrapper to iron_cli for operations | Python |
 | **iron_sdk** | Pythonic SDK for Agent Runtime integration | Python |
 | **iron_examples** | Example agent implementations | Python |
 | **iron_testing** | Test utilities, fixtures, mock runtime | Python |
