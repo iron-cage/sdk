@@ -108,3 +108,6 @@ pub mod cost_calculator;
 
 #[cfg(feature = "enabled")]
 pub mod trace_storage;
+
+#[cfg(feature = "enabled")]
+pub mod provider_key_storage;

@@ -1,9 +1,9 @@
 # Token Management API Reference
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Base URL:** `http://localhost:3000` (development) / `https://api.example.com` (production)
-**Authentication:** JWT Bearer Token
-**Date:** 2025-12-03
+**Authentication:** JWT Bearer Token (most endpoints) / API Token (Key Fetch API)
+**Date:** 2025-12-09
 
 ---
 
@@ -14,8 +14,10 @@
 3. [Usage Analytics](#usage-analytics)
 4. [Limits Management](#limits-management)
 5. [Call Tracing](#call-tracing)
-6. [Error Codes](#error-codes)
-7. [Rate Limiting](#rate-limiting)
+6. [AI Provider Key Management](#ai-provider-key-management)
+7. [Key Fetch API](#key-fetch-api)
+8. [Error Codes](#error-codes)
+9. [Rate Limiting](#rate-limiting)
 
 ---
 
@@ -537,6 +539,251 @@ Authorization: Bearer <access_token>
 
 ---
 
+### AI Provider Key Management
+
+Manage AI provider API keys (OpenAI, Anthropic) with encrypted storage and per-project assignment.
+
+### POST /api/providers
+
+Create a new AI provider key.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request:**
+```json
+{
+  "provider": "openai",
+  "api_key": "sk-proj-xxx...",
+  "base_url": "https://api.openai.com/v1 (optional)",
+  "description": "Production API key (optional)"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": 1,
+  "provider": "openai",
+  "base_url": null,
+  "description": "Production API key",
+  "is_enabled": true,
+  "created_at": 1733788800,
+  "last_used_at": null,
+  "masked_key": "***",
+  "assigned_projects": []
+}
+```
+
+**Errors:**
+- `400 Bad Request` - Invalid provider or missing api_key
+- `401 Unauthorized` - Missing/invalid JWT
+
+---
+
+### GET /api/providers
+
+List all provider keys for authenticated user.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "provider": "openai",
+    "base_url": null,
+    "description": "Production API key",
+    "is_enabled": true,
+    "created_at": 1733788800,
+    "last_used_at": 1733875200,
+    "masked_key": "***",
+    "assigned_projects": ["lupo", "my-project"]
+  }
+]
+```
+
+---
+
+### GET /api/providers/{id}
+
+Get specific provider key (masked).
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "provider": "openai",
+  "base_url": null,
+  "description": "Production API key",
+  "is_enabled": true,
+  "created_at": 1733788800,
+  "last_used_at": 1733875200,
+  "masked_key": "***",
+  "assigned_projects": ["lupo"]
+}
+```
+
+**Errors:**
+- `404 Not Found` - Provider key ID not found
+
+---
+
+### PUT /api/providers/{id}
+
+Update provider key settings.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request:**
+```json
+{
+  "base_url": "https://custom-endpoint.example.com (optional)",
+  "description": "Updated description (optional)",
+  "is_enabled": true
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "provider": "openai",
+  "base_url": "https://custom-endpoint.example.com",
+  "description": "Updated description",
+  "is_enabled": true,
+  "created_at": 1733788800,
+  "last_used_at": 1733875200,
+  "masked_key": "***",
+  "assigned_projects": ["lupo"]
+}
+```
+
+**Errors:**
+- `404 Not Found` - Provider key ID not found
+
+---
+
+### DELETE /api/providers/{id}
+
+Delete provider key.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (204 No Content)**
+
+**Errors:**
+- `404 Not Found` - Provider key ID not found
+
+---
+
+### POST /api/projects/{project_id}/provider
+
+Assign provider key to a project.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request:**
+```json
+{
+  "provider_key_id": 1
+}
+```
+
+**Response (204 No Content)**
+
+**Errors:**
+- `404 Not Found` - Provider key ID not found
+- `400 Bad Request` - Invalid request body
+
+---
+
+### DELETE /api/projects/{project_id}/provider
+
+Unassign provider key from project.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (204 No Content)**
+
+---
+
+### Key Fetch API
+
+External applications can fetch decrypted AI provider keys using API tokens. This endpoint uses **API token authentication** (not JWT).
+
+### GET /api/keys
+
+Fetch decrypted provider key for token's project.
+
+**Headers:**
+```
+Authorization: Bearer <api_token>
+```
+
+**Note:** This endpoint uses the API token (from `/api/tokens`), NOT JWT. The token must be assigned to a project.
+
+**Response (200 OK):**
+```json
+{
+  "provider": "openai",
+  "api_key": "sk-proj-actual-decrypted-key-here",
+  "base_url": null
+}
+```
+
+**Errors:**
+- `400 Bad Request` - Token not assigned to a project
+- `401 Unauthorized` - Invalid or expired API token
+- `403 Forbidden` - Provider key is disabled
+- `404 Not Found` - No provider key assigned to project
+- `500 Internal Server Error` - Decryption failed
+
+**Security Notes:**
+1. This endpoint returns the **full decrypted API key** - treat responses carefully
+2. Uses API tokens (not JWT) for authentication
+3. Keys are scoped to projects via token's `project_id`
+4. All fetches logged to audit_log for security review
+
+**Example Usage:**
+```bash
+# Get API token's project key
+curl -H "Authorization: Bearer pP/IDEeDNxQC/Kr3UHk8bWXjKAEkI1IgsGN465c9x88=" \
+  http://localhost:3000/api/keys
+
+# Response:
+{
+  "provider": "openai",
+  "api_key": "sk-proj-actual-decrypted-key-here",
+  "base_url": null
+}
+```
+
+---
+
 ### Error Codes
 
 ### Standard HTTP Status Codes
@@ -720,6 +967,10 @@ curl -X POST http://localhost:3000/api/tokens/123/revoke \
 
 ---
 
-**Document Version:** 1.0.0
-**Last Updated:** 2025-12-03
+**Document Version:** 1.1.0
+**Last Updated:** 2025-12-09
 **Maintained By:** Token Management Team
+
+**Changelog:**
+- 1.1.0 (2025-12-09): Added AI Provider Key Management (FR-11) and Key Fetch API (FR-12)
+- 1.0.0 (2025-12-03): Initial release with Token Management, Usage Analytics, Limits, and Traces
