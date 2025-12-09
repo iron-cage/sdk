@@ -28,6 +28,27 @@ Manages API token lifecycle with secure generation, SHA-256 hashing, and SQLite 
 - Cost calculation (see iron_cost)
 - Budget tracking (see iron_cost)
 
+## Token Types
+
+This module manages API tokens for Control Panel authentication.
+
+**IC Token (Internal Control Token):**
+- Purpose: Link agent to budget allocation (Model C architecture)
+- Visibility: Developer-visible (JWT format)
+- **See:** [docs/architecture/006_budget_control_protocol.md](../../docs/architecture/006_budget_control_protocol.md) § IC Token Format
+
+**API Token:**
+- Purpose: Authenticate Control Panel REST API requests
+- Visibility: Developer-visible (for API access)
+- Format: Opaque Base64 string (SHA-256 hashed in storage)
+- Lifetime: Long-lived (manually revoked)
+
+**Distinction:**
+- IC Token: For Runtime (agent execution, budget-linked)
+- API Token: For Control Panel API (CRUD operations)
+
+---
+
 ## Installation
 
 ```toml

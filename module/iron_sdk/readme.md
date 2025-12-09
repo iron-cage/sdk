@@ -20,7 +20,6 @@ Provides a clean, Pythonic API for protecting AI agents with budget tracking, PI
 - Budget calculation logic (see iron_cost)
 - PII detection patterns (see iron_safety)
 - Circuit breaker implementation (see iron_reliability)
-- Testing utilities (see iron_testing)
 
 ---
 

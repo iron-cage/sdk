@@ -10,14 +10,15 @@ Run AI agents with enterprise governance WITHOUT surrendering source code or dat
 
 ## Core Idea
 
-**Two execution models based on where agent code runs:**
+**Three execution models based on where agent runs and where control happens:**
 
-| Model | Where Agent Runs | Use Case | Users |
-|-------|------------------|----------|-------|
-| **Model A: Client-Side** | User's laptop/server | Local files, private data | 95% |
-| **Model B: Server-Side** | Iron Cage infrastructure | Fully managed, no setup | 5% |
+| Model | Where Agent Runs | Where Control Happens | Use Case | Users |
+|-------|------------------|----------------------|----------|-------|
+| **Model A: Client-Side** | User's machine | User's machine (self-managed) | Local files, private data, self-managed | Small teams (1-5 devs) |
+| **Model B: Server-Side** | Iron Cage servers | Iron Cage servers (managed) | Fully managed, no setup | Managed hosting (5%) |
+| **Model C: Control Panel-Managed** | User's machine | Control Panel (centralized admin) | Enterprise budgets, central control | Enterprise (10+ devs) |
 
-**The key insight:** Governance doesn't require running agent code. The SDK intercepts LLM calls and routes them through Iron Cage for validation/tracking, while the agent stays local.
+**The key insight:** Governance doesn't require running agent code. Model C keeps agent local while centralizing budget control via two-token architecture.
 
 ## Model A: Client-Side (Primary)
 
@@ -39,6 +40,36 @@ User's Machine                    Iron Cage Gateway
 - Iron Cage runs agent code in managed environment
 - User uploads agent definition, we execute it
 - Best for: teams without infrastructure, quick prototypes
+
+## Model C: Control Panel-Managed (Enterprise)
+
+**Where Agent Runs:** Developer's machine (local execution, data stays local)
+**Where Control Happens:** Centralized Control Panel (admin oversight, budget enforcement)
+
+```
+Developer Machine              Control Panel (Centralized)
++-----------------+            +-------------------------+
+| Python Agent    |            | Admin Dashboard         |
+| + Runtime       |            | - Budget allocations    |
+| Uses: IC Token  |<─ HTTPS ─>| - IP Tokens (vault)     |
+| (visible)       |   Budget   | - Real-time tracking    |
++-----------------+   Protocol +-------------------------+
+                                       │
+                                       │ Admin sees ALL agents
+                                       ▼
+                               Aggregate spending,
+                               enforce limits,
+                               real-time control
+```
+
+**Key Characteristics:**
+- ✅ Agent runs locally (code/data stay on developer machine)
+- ✅ Budget controlled centrally (admin approves spending)
+- ✅ IC Token → IP Token translation (developer never sees provider credentials)
+- ✅ Incremental budgeting (borrow $10 portions, not full $100)
+- ✅ Real-time enforcement (admin can stop spending mid-session)
+
+**See:** [architecture/006: Budget Control Protocol](006_budget_control_protocol.md) for complete two-token architecture and budget borrowing protocol.
 
 ## Key Components
 

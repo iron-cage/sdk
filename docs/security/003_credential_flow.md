@@ -52,4 +52,57 @@ Agent --needs key--> Credential Service --fetches--> Vault
 
 ---
 
-*Related: [004_audit_model.md](004_audit_model.md) | [002_isolation_layers.md](002_isolation_layers.md)*
+## Two-Token Architecture (Model C)
+
+**For Control Panel-Managed deployments, Iron Cage uses dual-token security separating developer-visible credentials from provider credentials.**
+
+**See:** [architecture/006: Budget Control Protocol](../architecture/006_budget_control_protocol.md) for complete specification.
+
+### Token Separation
+
+```
+┌────────────────────────────────────────────────────┐
+│          TWO-TOKEN SECURITY MODEL                   │
+├────────────────────────────────────────────────────┤
+│                                                     │
+│  IC TOKEN (Internal Control)                       │
+│  ┌───────────────────────────────────────────────┐ │
+│  │ Visibility: ✅ Developer sees                 │ │
+│  │ Format: JWT (eyJhbGc...)                      │ │
+│  │ Contains: agent_id, budget_id, permissions    │ │
+│  │ Safe to: Log, CLI args, config files          │ │
+│  │ Risk: 🟢 LOW (no provider credentials)       │ │
+│  └───────────────────────────────────────────────┘ │
+│                        ⬇                            │
+│               TRANSLATION (<1ms)                    │
+│                        ⬇                            │
+│  IP TOKEN (Inference Provider)                     │
+│  ┌───────────────────────────────────────────────┐ │
+│  │ Visibility: ❌ Developer NEVER sees           │ │
+│  │ Format: Provider-specific (sk-proj-...)       │ │
+│  │ Contains: Full provider API key               │ │
+│  │ Storage: Memory only (AES-256 encrypted)      │ │
+│  │ Risk: 🔴 CRITICAL (full provider access)     │ │
+│  └───────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────┘
+```
+
+### Security Comparison
+
+| Property | IC Token | IP Token |
+|----------|----------|----------|
+| **Developer Visibility** | ✅ Visible | ❌ Hidden |
+| **Logging** | ✅ Safe to log | ❌ NEVER log |
+| **CLI Arguments** | ✅ Safe | ❌ NEVER |
+| **Config Files** | ✅ Safe | ❌ NEVER |
+| **Disk Storage** | ✅ OK | ❌ Memory only |
+| **Lifetime** | 24 hours | Session only |
+| **If Stolen** | ⚠️ Limited (24h) | 🚨 Full provider access |
+
+**Rationale:** IC Token identifies budget without exposing provider credentials. IP Token managed by Control Panel, delivered to Runtime encrypted, never exposed to developer.
+
+**See:** [architecture/006: Budget Control Protocol](../architecture/006_budget_control_protocol.md) § The Two Tokens for complete specification.
+
+---
+
+*Related: [004_audit_model.md](004_audit_model.md) | [002_isolation_layers.md](002_isolation_layers.md) | [architecture/006: Budget Control](../architecture/006_budget_control_protocol.md)*

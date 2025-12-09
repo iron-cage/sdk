@@ -35,7 +35,28 @@
 | **Agent Runtime** | Execution layer: Agent pods, SDK, Sandbox |
 | **Model A (Client-Side)** | Primary execution model where agent runs on user's machine (95% of users) |
 | **Model B (Server-Side)** | Optional execution model where agent runs on Iron Cage infrastructure (5% of users) |
+| **Model C (Control Panel-Managed)** | Enterprise execution model where agent runs locally but budget controlled centrally via two-token architecture. See [architecture/001](architecture/001_execution_models.md), [architecture/006](architecture/006_budget_control_protocol.md). |
 | **Gateway** | Central orchestrator that routes requests through processing layers |
+
+### Tokens
+
+| Term | Definition |
+|------|------------|
+| **IC Token** | Internal Control Token - Developer-visible JWT linking agent to budget allocation. Does NOT contain provider credentials. Format: JWT with claims (agent_id, budget_id, permissions). Safe to log, CLI args, config files. Lifetime: 24 hours. See [architecture/006](architecture/006_budget_control_protocol.md) § IC Token Format. |
+| **IP Token** | Inference Provider Token - LLM provider API key (sk-proj-, sk-ant-). Encrypted in Runtime memory, NEVER exposed to developer. Obtained from Control Panel via budget allocation protocol. Session-only lifetime. See [architecture/006](architecture/006_budget_control_protocol.md) § The Two Tokens. |
+| **Token Translation** | Process where Runtime replaces IC Token with IP Token in LLM requests. Latency: <1ms. Security: IP Token in plaintext <1ms, then zeroed. See [architecture/006](architecture/006_budget_control_protocol.md) § Step 2. |
+| **API Token** | Control Panel REST API authentication token (opaque Base64 string). Different from IC Token (which is for Runtime/agents). For: Control Panel API calls. NOT for: Agent execution. |
+
+### Budget Management
+
+| Term | Definition |
+|------|------------|
+| **Budget Allocation** | Total budget admin assigns to agent (e.g., $100) in Control Panel. Tracked centrally in database. |
+| **Budget Portion** | Incremental amount Runtime borrows from total (e.g., $10). Enables real-time control without upfront full budget transfer. Default: $10 per borrow. |
+| **Budget Borrowing** | Protocol where Runtime requests more budget when low. Trigger: remaining < $1. Messages: BUDGET_REFRESH_REQUEST/RESPONSE. See [architecture/006](architecture/006_budget_control_protocol.md) § Step 3. |
+| **Lease ID** | Unique identifier for budget portion allocation. Tracks which $10 portion Runtime currently using. Changes with each borrow (lease-001, lease-002, etc.). |
+| **Budget Threshold** | Remaining budget level triggering borrow request. Default: $1.00. When remaining < threshold, Runtime requests more. |
+| **Incremental Budget** | Strategy of allocating budget in portions ($10) rather than full amount ($100) upfront. Benefits: Real-time enforcement, admin can stop mid-session, limits exposure if IC Token stolen. |
 | **Two-Repo Model** | Architecture split: iron_runtime (frequent changes) + iron_cage (stable foundation) |
 | **Layer Model** | Six processing layers: Safety, Cost, Reliability, Provider, Output Safety, Observability |
 | **Service Boundaries** | Separation between Control Plane, Data Plane, and Agent Runtime |

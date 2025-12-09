@@ -42,12 +42,15 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 
 | Collection | Instances | Description |
 |------------|-----------|-------------|
+| **[principles/](principles/)** | 5 (001-005) | Design principles (philosophy, quality, error handling, testing, workflow) |
+| **[constraints/](constraints/)** | 4 (001-004) | System constraints (technical, business, scope, trade-offs) |
 | **[capabilities/](capabilities/)** | 8 (001-008) | Platform capabilities (runtime, LLM control, sandbox, safety, credentials, MCP, observability, data) |
-| **[integration/](integration/)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
 | **[architecture/](architecture/)** | 6 (001-006) | System architecture concepts (execution models, layers, service boundaries, data flow, integration, budget control) |
 | **[deployment/](deployment/)** | 5 (001-005) | Deployment concepts (package model, actors, distribution, scaling, module mapping) |
 | **[security/](security/)** | 4 (001-004) | Security model concepts (threat model, isolation, credential flow, audit) |
+| **[integration/](integration/)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
 | **[technology/](technology/)** | 4 (001-004) | Technology choices (Rust, PyO3, infrastructure, dependencies) |
+| **[protocol/](protocol/)** | 4 (001-004) | Communication protocols (IronLang, REST API, WebSocket, MCP) |
 | **[features/](features/)** | 6 (001-006) | Feature documentation (CLI architecture, token management suite) |
 | **[decisions/](decisions/)** | 7 (adr_001-007) | Architecture Decision Records (ADR format) |
 
@@ -109,19 +112,16 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 - iron_cli - Command-line interface (Rust, authoritative)
 - iron_cli_py - Python CLI with wrapper pattern
 
-**Frontend & SDK (4 modules):**
+**Frontend & SDK (2 modules):**
 - iron_dashboard - Web dashboard (Vue 3 + TypeScript)
 - iron_sdk - Pythonic SDK with decorators (Python, includes examples/)
-- iron_examples - Moved to iron_sdk/examples/ (archived)
-- iron_testing - Testing utilities and fixtures
 
 ### Deployment Packages
 
 **Primary deployment packages:**
 1. **Control Panel** (Package 1) - Docker container with iron_api + iron_dashboard
-2. **Agent Runtime** (Package 3) - PyPI wheel (iron-cage-runtime) with Python SDK
-3. **CLI Tool** (Package 5) - Binary distribution (iron-token)
-4. **Python CLI** (Package 6) - PyPI wheel (iron-cli-py)
+2. **Agent Runtime** (Package 3) - PyPI wheel (iron-cage) with Python SDK
+3. **CLI Tools** (Package 5) - Binary + PyPI wheel (iron-cli + iron-cli-py)
 
 ---
 
@@ -165,19 +165,22 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 
 All documentation directories with 3+ files maintain Responsibility Tables per organizational_principles.rulebook.md § Responsibility Table Format § Mandatory Locations.
 
-**Compliance Status:** 19/19 directories (100%)
+**Compliance Status:** 22/22 directories (100%)
 
 **Documentation Directories:**
 
 | Directory | Files | Table Status | I/O Validation |
 |-----------|-------|--------------|----------------|
 | docs/ (root) | 3 | ✅ Compliant | ✅ Unique |
+| docs/principles/ | 5 | ✅ Compliant | ✅ Unique |
+| docs/constraints/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/features/ | 6 | ✅ Compliant | ✅ Unique |
 | docs/security/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/technology/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/integration/ | 4 | ✅ Compliant | ✅ Unique |
-| docs/architecture/ | 5 | ✅ Compliant | ✅ Unique |
-| docs/decisions/ | 5 | ✅ Compliant | ✅ Unique |
+| docs/architecture/ | 6 | ✅ Compliant | ✅ Unique |
+| docs/protocol/ | 4 | ✅ Compliant | ✅ Unique |
+| docs/decisions/ | 7 | ✅ Compliant | ✅ Unique |
 | docs/capabilities/ | 8 | ✅ Compliant | ✅ Unique |
 | docs/deployment/ | 5 | ✅ Compliant | ✅ Unique |
 

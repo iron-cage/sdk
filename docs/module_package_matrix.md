@@ -165,7 +165,7 @@ This matrix shows which modules are included in each deployment package and whic
 | iron_token_manager    | iron_runtime   | ✅            |      |                |                |           |
 | iron_types            | iron_cage*     | ✅            |      | ✅             |                |           |
 
-**Matrix Dimensions:** 21 modules × 5 packages = 105 cells (24 ✅ marks)
+**Matrix Dimensions:** 20 modules × 5 packages = 100 cells (23 ✅ marks)
 
 **Repository Legend:**
 - **iron_runtime**: Module source code hosted in iron_runtime repository
@@ -331,7 +331,7 @@ These foundation modules are compiled/bundled separately for each package:
 
 ### Pattern 2: Exclusive Application Modules
 
-**Modules:** iron_api, iron_dashboard, iron_cli, iron_cli_py, iron_sdk, iron_testing, iron_site
+**Modules:** iron_api, iron_dashboard, iron_cli, iron_cli_py, iron_sdk, iron_site
 
 **Characteristics:**
 - Each appears in exactly one package
@@ -428,7 +428,7 @@ Based on the 7-layer architecture (see `readme.md` § Architecture):
 
 **Layer 4 (Infrastructure):**
 - Package: Agent Runtime
-- Modules: iron_lang, iron_testing
+- Modules: iron_lang
 
 **Layer 5 (Integration):**
 - Packages: Control Panel, Agent Runtime
