@@ -11,10 +11,10 @@
 ### Providers WITH Full Programmatic Key Management 
 - AWS Bedrock [AWS documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html#api-keys-generate-api-long-term)
 - xAI Grok (Keys can be created pragrammatically with [management key](https://console.x.ai/team/4e8bc96d-e5d9-4f29-a19e-6048a550906c/settings/management-keys/create and [RESTful API call](https://docs.x.ai/docs/key-information/using-management-api#create-an-api-key))
+- Google Gemini (API KEY works for Gemini too, they can be created via [Google Key Service](https://docs.cloud.google.com/docs/authentication/api-keys#rest_1))
 
 ### Providers WITH Partial Programmatic Key Management
 - Azure OpenAI ([Forum answer](https://learn.microsoft.com/en-us/answers/questions/1630958/will-the-azure-openai-api-key-be-expired-and-is-th))
-- Google Gemini ([Can be configured in `gcloud` CLI, but needs Google Authorization first](https://docs.cloud.google.com/iam/docs/keys-create-delete#rest))
 
 ### Providers WITHOUT Programmatic Key Management
  - OpenAI (Has [administrator RESTful API](https://platform.openai.com/docs/api-reference/project-api-keys), but doesn't allow to create project keys.)
@@ -25,7 +25,7 @@
  - Together AI (Only [web UI](https://docs.together.ai/docs/together-and-llamarank#1-get-your-together-api-key))
  - Replicate (Only [web UI](https://replicate.com/docs/reference/http))
 
-**Final Outcome:** Cloud providers have their own RESTful API and CLI for service control that includes AI service, but setup needs extensive authorization procedure (e. g. Google Sign In). Other popular services rely on web UI for token setup and control. xAI grok supports programmatic key management which is useful in automatic key rotation, although it is needed to create a management key first.
+**Final Outcome:** Cloud providers have their own RESTful API and CLI for service control that includes AI service. Other popular services rely on web UI for token setup and control. xAI grok supports programmatic key management which is useful in automatic key rotation, although it is needed to create a management key first.
 
 ## Hard Limit availability (Billing limit)
 
@@ -75,7 +75,7 @@
 | AWS Bedrock  ☁️| ✅                              | ✅                         | ✅                   |
 | xAI Grok       | ✅                              | 💲                         | ✅                   |
 | Azure OpenAI ☁️| ⚠️                              | ✅                         | ✅                   |
-| Google Gemini☁️| ⚠️                              | ✅                         | ✅                   |
+| Google Gemini☁️| ✅                              | ❌                         | ✅                   |
 | OpenAI         | ❌                              | ✅                         | ✅                   |
 | Anthropic      | ❌                              | 💲                         | ✅                   |
 | Groq           | ❌                              | ✅                         | ❌                   |
