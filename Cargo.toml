@@ -25,8 +25,11 @@ members = [
   # Application layer
   "module/iron_cli",
 
+  # Database schemas (spec-only)
+  "module/iron_control_store",
+
   # NOTE: Non-Rust modules (not in Cargo workspace):
-  # Python: iron_cli_py, iron_sdk, iron_examples, iron_testing
+  # Python: iron_cli_py, iron_sdk, iron_testing
   # Frontend: iron_dashboard (Vue.js)
 ]
 
@@ -293,6 +296,9 @@ path = "module/iron_token_manager"
 
 [workspace.dependencies.iron_cli]
 path = "module/iron_cli"
+
+[workspace.dependencies.iron_control_store]
+path = "module/iron_control_store"
 
 ## HTTP Client
 

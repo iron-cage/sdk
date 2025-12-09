@@ -1,47 +1,23 @@
 # Module-to-Package Mapping Matrix
 
-**Version:** 2.0.0
-**Date:** 2025-12-08
-**Status:** Active - Two Repository Architecture
-**Repository:** iron_runtime (this document exists in both iron_runtime and iron_cage repositories)
-
----
-
-> **📍 Note:** You are viewing from the **iron_runtime** repository. This matrix shows all 22 modules across both repositories. Iron_runtime contains 12 modules; iron_cage contains 10 modules (including 3 foundation modules published to crates.io).
-
----
-
-## ⚠️ IMPORTANT: Two-Repository Architecture
-
-As of December 2025, Iron Cage transitioned from a single monorepo to a **two-repository architecture**:
-
-1. **iron_runtime** (this repository) - Control Panel, Agent Runtime, runtime services (12 modules)
-2. **iron_cage** (separate repository) - OS sandboxing, CLI tools, foundation modules (10 modules)
-
-**This document describes the module-to-package mapping across BOTH repositories.**
-
-**Module Distribution:**
-- **9 modules moved to iron_runtime**: iron_state, iron_safety, iron_reliability, iron_secrets, iron_token_manager, iron_lang, iron_api, iron_runtime, (+ iron_dashboard Vue app, + Python packages)
-- **10 modules remain in iron_cage**: iron_sandbox_core, iron_sandbox, iron_types, iron_cost, iron_telemetry, iron_cli, iron_site, iron_cli_py, iron_sandbox_py, iron_testing
-
-**Repository Communication:** iron_runtime and iron_cage communicate via crates.io (shared foundation modules) and HTTPS API (telemetry, optional).
-
-**See:** `repository_architecture.md` for complete two-repository documentation.
+**Version:** 3.0.0
+**Date:** 2025-12-09
+**Status:** Active
 
 ---
 
 ## Scope
 
-**Responsibility:** Maps all 22 modules across both repositories to their deployment packages showing which modules are included in each package
+**Responsibility:** Maps all Iron Cage modules to their deployment packages showing which modules are included in each package
 
 **In Scope:**
-- Module-to-package mapping matrix (22 modules × 6 packages)
-- Repository distribution (which modules in iron_runtime vs iron_cage)
+- Module-to-package mapping matrix (modules × packages)
 - Shared module identification (modules appearing in multiple packages)
+- Package composition analysis
 - Module reuse pattern analysis
-- Foundation module distribution across packages and repositories
+- Foundation module distribution across packages
 - Package composition statistics
-- Quick reference lookup (which package contains module X, which repository)
+- Quick reference lookup (which package contains module X)
 
 **Out of Scope:**
 - Two-repository architecture design (see `repository_architecture.md`)
@@ -85,7 +61,7 @@ Agent Event → iron_runtime
 ```
 
 **Pilot Mode Package Composition:**
-- All 21 modules compiled into single binary
+- All 20 modules compiled into single binary
 - iron_state shared between iron_runtime and iron_api
 - Single SQLite database (./iron_state.db)
 
@@ -141,7 +117,7 @@ Cloud: Control Panel                Developer Machines
 
 ## Overview
 
-This document provides the definitive mapping between Iron Cage's 22 modules (across **two repositories**) and 6 deployment packages. Use this as a quick reference to answer questions like:
+This document provides the definitive mapping between Iron Cage's 20 modules (across **two repositories**) and 5 deployment packages. Use this as a quick reference to answer questions like:
 
 - "Which repository contains `iron_api`?" (Answer: iron_runtime)
 - "Which package contains `iron_sdk`?" (Answer: Agent Runtime)
@@ -150,11 +126,11 @@ This document provides the definitive mapping between Iron Cage's 22 modules (ac
 - "How many modules does each package contain?"
 
 **Quick Stats:**
-- **22 total modules** across **2 repositories** and **6 deployment packages**
-- **iron_runtime repository**: 12 modules (9 Rust + 1 Vue + 2 Python)
+- **20 total modules** across **2 repositories** and **5 deployment packages**
+- **iron_runtime repository**: 10 modules (9 Rust + 1 Vue + 0 Python)
 - **iron_cage repository**: 10 modules (6 Rust + 1 Vue + 3 Python)
 - **3 foundation modules** published to crates.io (shared between repositories)
-- **Package sizes:** 1-11 modules per package
+- **Package sizes:** 1-10 modules per package
 
 ---
 
@@ -166,32 +142,30 @@ This document provides the definitive mapping between Iron Cage's 22 modules (ac
 
 This matrix shows which modules are included in each deployment package and which repository hosts each module:
 
-| Module                | Repository     | Control Panel | Site | Runtime (PyPI) | Sandbox (PyPI) | CLI | Python CLI |
-|-----------------------|----------------|---------------|------|----------------|----------------|-----|------------|
-| iron_api              | iron_runtime   | ✅            |      |                |                |     |            |
-| iron_cli              | iron_cage      |               |      |                |                | ✅  |            |
-| iron_cli_py           | iron_cage      |               |      |                |                |     | ✅         |
-| iron_control_store    | iron_runtime   | ✅            |      |                |                |     |            |
-| iron_cost             | iron_cage*     | ✅            |      | ✅             |                |     |            |
-| iron_dashboard        | iron_runtime   | ✅            |      |                |                |     |            |
-| iron_examples         | iron_runtime   |               |      | ✅             |                |     |            |
-| iron_lang             | iron_runtime   |               |      | ✅             |                |     |            |
-| iron_reliability      | iron_runtime   |               |      | ✅             |                |     |            |
-| iron_runtime          | iron_runtime   |               |      | ✅             |                |     |            |
-| iron_safety           | iron_runtime   |               |      | ✅             |                |     |            |
-| iron_sandbox          | iron_cage      |               |      |                | ✅             |     |            |
-| iron_sandbox_core     | iron_cage      |               |      |                | ✅             |     |            |
-| iron_sandbox_py       | iron_cage      |               |      |                | ✅             |     |            |
-| iron_sdk              | iron_runtime   |               |      | ✅             |                |     |            |
-| iron_secrets          | iron_runtime   | ✅            |      |                |                |     |            |
-| iron_site             | iron_cage      |               | ✅   |                |                |     |            |
-| iron_state            | iron_runtime   | ❌            |      | ✅             |                |     |            |
-| iron_telemetry        | iron_cage*     | ✅            |      | ✅             |                |     |            |
-| iron_testing          | iron_cage      |               |      | ✅             |                |     |            |
-| iron_token_manager    | iron_runtime   | ✅            |      |                |                |     |            |
-| iron_types            | iron_cage*     | ✅            |      | ✅             |                |     |            |
+| Module                | Repository     | Control Panel | Site | Runtime (PyPI) | Sandbox (PyPI) | CLI Tools |
+|-----------------------|----------------|---------------|------|----------------|----------------|-----------|
+| iron_api              | iron_runtime   | ✅            |      |                |                |           |
+| iron_cli              | iron_cage      |               |      |                |                | ✅        |
+| iron_cli_py           | iron_cage      |               |      |                |                | ✅        |
+| iron_control_store    | iron_runtime   | ✅            |      |                |                |           |
+| iron_cost             | iron_cage*     | ✅            |      | ✅             |                |           |
+| iron_dashboard        | iron_runtime   | ✅            |      |                |                |           |
+| iron_lang             | iron_runtime   |               |      | ✅             |                |           |
+| iron_reliability      | iron_runtime   |               |      | ✅             |                |           |
+| iron_runtime          | iron_runtime   |               |      | ✅             |                |           |
+| iron_safety           | iron_runtime   |               |      | ✅             |                |           |
+| iron_sandbox          | iron_cage      |               |      |                | ✅             |           |
+| iron_sandbox_core     | iron_cage      |               |      |                | ✅             |           |
+| iron_sandbox_py       | iron_cage      |               |      |                | ✅             |           |
+| iron_sdk              | iron_runtime   |               |      | ✅             |                |           |
+| iron_secrets          | iron_runtime   | ✅            |      |                |                |           |
+| iron_site             | iron_cage      |               | ✅   |                |                |           |
+| iron_state            | iron_runtime   | ❌            |      | ✅             |                |           |
+| iron_telemetry        | iron_cage*     | ✅            |      | ✅             |                |           |
+| iron_token_manager    | iron_runtime   | ✅            |      |                |                |           |
+| iron_types            | iron_cage*     | ✅            |      | ✅             |                |           |
 
-**Matrix Dimensions:** 22 modules × 6 packages = 132 cells (27 ✅ marks)
+**Matrix Dimensions:** 20 modules × 5 packages = 100 cells (23 ✅ marks)
 
 **Repository Legend:**
 - **iron_runtime**: Module source code hosted in iron_runtime repository
@@ -240,7 +214,7 @@ This matrix shows which modules are included in each deployment package and whic
 
 ---
 
-### Package 3: Agent Runtime (11 modules)
+### Package 3: Agent Runtime (9 modules)
 
 **Purpose:** PyPI package for running protected AI agents
 
@@ -249,19 +223,17 @@ This matrix shows which modules are included in each deployment package and whic
 - **Production Mode:** Runs on developer machine, reports telemetry to Control Panel API (optional)
 
 **Included Modules:**
-1. iron_sdk (Python) - Pythonic SDK layer
-2. iron_examples (Python) - Example library
-3. iron_testing (Python) - Testing utilities
-4. iron_runtime (Rust) - Agent orchestrator
-5. iron_safety (Rust) - PII detection
-6. iron_cost (Rust) - Budget tracking
-7. iron_reliability (Rust) - Circuit breakers
-8. iron_lang (Rust) - AI data protocol
-9. iron_types (Rust) - Foundation types
-10. iron_state (Rust) - Local state management, audit logs
-11. iron_telemetry (Rust) - Logging
+1. iron_sdk (Python) - Pythonic SDK layer (includes examples/)
+2. iron_runtime (Rust) - Agent orchestrator
+3. iron_safety (Rust) - PII detection
+4. iron_cost (Rust) - Budget tracking
+5. iron_reliability (Rust) - Circuit breakers
+6. iron_lang (Rust) - AI data protocol
+7. iron_types (Rust) - Foundation types
+8. iron_state (Rust) - Local state management, audit logs
+9. iron_telemetry (Rust) - Logging
 
-**Technology Mix:** 3 Python + 8 Rust
+**Technology Mix:** 1 Python + 8 Rust
 
 ---
 
@@ -278,25 +250,17 @@ This matrix shows which modules are included in each deployment package and whic
 
 ---
 
-### Package 5: CLI Tool (1 module)
+### Package 5: CLI Tools (2 modules)
 
-**Purpose:** Rust binary for token management CLI
+**Purpose:** Token management CLI with Rust binary + Python wrapper
+
+**Architecture:** See [ADR-005](../docs/decisions/adr_005_cli_architecture.md) for wrapper pattern decision.
 
 **Included Modules:**
 1. iron_cli (Rust) - CLI tool
+2. iron_cli_py (Python) - CLI with wrapper pattern (native: init/config/agent/secrets; wrapper: token/usage/limits/traces/auth)
 
-**Technology Mix:** 1 Rust
-
----
-
-### Package 6: Python CLI (1 module)
-
-**Purpose:** Python package for token management CLI
-
-**Included Modules:**
-1. iron_cli_py (Python) - Python CLI tool
-
-**Technology Mix:** 1 Python
+**Technology Mix:** 1 Rust + 1 Python (wrapper delegates to binary)
 
 ---
 
@@ -340,7 +304,7 @@ These foundation modules are compiled/bundled separately for each package:
 
 **Key Observations:**
 - **3 shared modules** appear in both Control Panel and Agent Runtime (production mode)
-- **No module appears in all 6 packages**
+- **No module appears in all 5 packages**
 - **Shared modules are foundation only** (types, telemetry, cost)
 - **Application modules are exclusive** (CLI, SDK, Dashboard, etc.)
 - **iron_state is NOT shared** in production mode (Agent Runtime only)
@@ -367,7 +331,7 @@ These foundation modules are compiled/bundled separately for each package:
 
 ### Pattern 2: Exclusive Application Modules
 
-**Modules:** iron_api, iron_dashboard, iron_cli, iron_cli_py, iron_sdk, iron_examples, iron_testing, iron_site
+**Modules:** iron_api, iron_dashboard, iron_cli, iron_cli_py, iron_sdk, iron_site
 
 **Characteristics:**
 - Each appears in exactly one package
@@ -378,9 +342,9 @@ These foundation modules are compiled/bundled separately for each package:
 
 ### Pattern 3: Technology-Specific Modules
 
-**Python Modules:** iron_sdk, iron_examples, iron_testing, iron_cli_py, iron_sandbox_py
+**Python Modules:** iron_sdk, iron_cli_py, iron_sandbox_py
 - Distributed via PyPI
-- Grouped in Runtime/Sandbox/Python CLI packages
+- Grouped in Runtime/Sandbox/CLI Tools packages
 
 **Rust Modules:** iron_*, iron_*_core (majority)
 - Compiled into binaries or .so files
@@ -398,13 +362,12 @@ These foundation modules are compiled/bundled separately for each package:
 |----------------|---------|------|--------|------------|----------------|
 | Control Panel  | 8       | 7    | 0      | 1          | 4              |
 | Marketing Site | 1       | 0    | 0      | 1          | 0              |
-| Agent Runtime  | 11      | 8    | 3      | 0          | 4              |
+| Agent Runtime  | 9       | 8    | 1      | 0          | 4              |
 | Sandbox        | 3       | 2    | 1      | 0          | 0              |
-| CLI Tool       | 1       | 1    | 0      | 0          | 0              |
-| Python CLI     | 1       | 0    | 1      | 0          | 0              |
-| **Total**      | **25*** | **18**| **5**  | **2**      | **4**          |
+| CLI Tools      | 2       | 1    | 1      | 0          | 0              |
+| **Total**      | **23*** | **18**| **3**  | **2**      | **4**          |
 
-\* Total is 25 (not 21) because 4 modules appear in 2 packages each: 21 + 4 = 25
+\* Total is 23 (not 20) because 3 modules appear in 2 packages each: 20 + 3 = 23
 
 ---
 
@@ -415,15 +378,13 @@ These foundation modules are compiled/bundled separately for each package:
 Use this section for quick lookups:
 
 **Python Modules:**
-- `iron_sdk` → Agent Runtime
-- `iron_examples` → Agent Runtime
-- `iron_testing` → Agent Runtime
-- `iron_cli_py` → Python CLI
+- `iron_sdk` → Agent Runtime (includes examples/)
+- `iron_cli_py` → CLI Tools
 - `iron_sandbox_py` → Sandbox
 
 **Rust Core Modules:**
 - `iron_api` → Control Panel
-- `iron_cli` → CLI Tool
+- `iron_cli` → CLI Tools
 - `iron_runtime` → Agent Runtime
 - `iron_sandbox_core` → Sandbox
 - `iron_token_manager` → Control Panel
@@ -467,15 +428,15 @@ Based on the 7-layer architecture (see `readme.md` § Architecture):
 
 **Layer 4 (Infrastructure):**
 - Package: Agent Runtime
-- Modules: iron_lang, iron_testing
+- Modules: iron_lang
 
 **Layer 5 (Integration):**
 - Packages: Control Panel, Agent Runtime
 - Modules: iron_api, iron_runtime, iron_sdk
 
 **Layer 6 (Application):**
-- Packages: Control Panel, Marketing Site, CLI Tool, Python CLI, Agent Runtime
-- Modules: iron_cli, iron_cli_py, iron_dashboard, iron_site, iron_examples
+- Packages: Control Panel, Marketing Site, CLI Tools, Agent Runtime
+- Modules: iron_cli, iron_cli_py, iron_dashboard, iron_site
 
 ---
 

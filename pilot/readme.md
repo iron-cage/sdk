@@ -38,18 +38,14 @@ Minimal viable platform for conference demonstrations and early customer pilots.
 
 ---
 
-## Directory Contents & Responsibilities
+## Directory Responsibilities
 
-| Directory/File | Responsibility | In Scope | Out of Scope (See) |
-|----------------|----------------|----------|-------------------|
-| **development_references.md** | Master dev reference | Quick links to all essential files (START HERE) | Individual detailed specs (see file links) |
-| **spec.md** | Product specification | 35+ features with secrets, acceptance criteria, demo usage | Full platform (→ /spec/), Implementation (→ /runtime/) |
-| **crates.md** | Rust dependency specification | WHY each crate needed, feature mapping, versions | Actual Cargo.toml (→ /runtime/Cargo.toml) |
-| **tech_stack.md** | Complete technology inventory | Rust, Python, Vue versions and setup | Detailed crate explanations (→ crates.md) |
-| **execution/** | Execution plans & status | 8-week plan, quick start, status tracking | Implementation guide (→ /runtime/PILOT_GUIDE.md) |
-| **demo/** | Demo components | Python agent, Vue control panel, test data | Rust runtime (→ /runtime/) |
-| **conferences/** | Conference materials | Warsaw slides, submission package, execution status | General business presentations (→ /business/presentations/) |
-| **implementation.md** | Pointer to implementation | Navigation to runtime/ crate | Actual code (→ /runtime/) |
+| Entity | Responsibility | Input → Output | Scope | Out of Scope |
+|--------|----------------|----------------|-------|--------------|
+| **spec.md** | Define pilot platform product specification | Feature requirements → Complete spec | 35+ features with acceptance criteria, demo triggers (leads #34, #67, #85), pricing ($10-25K) | NOT full platform (→ /spec/), NOT implementation (→ /runtime/), NOT execution plans (→ execution/) |
+| **development_references.md** | Provide master development quick reference | Developer onboarding → Essential file links | Quick navigation to specs, implementations, plans, architecture docs (START HERE) | NOT detailed specs (→ spec.md), NOT implementation guide (→ /runtime/PILOT_GUIDE.md), NOT execution tracking (→ execution/status.md) |
+| **implementation.md** | Navigate to runtime implementation location | Implementation question → Runtime crate pointer | Points to /runtime/ crate, build commands, source structure | NOT specifications (→ spec.md), NOT implementation details (→ /runtime/PILOT_GUIDE.md), NOT execution plans (→ execution/) |
+| **llm_inference_providers_landscape.md** | Analyze LLM provider capabilities and pricing | Provider selection question → Provider comparison | OpenAI, Anthropic, Azure, Google analysis, capabilities, pricing, rate limits, budget controls, fallback strategy | NOT implementation (→ module/iron_lang/spec.md), NOT integration (→ docs/integration/001_llm_providers.md), NOT capability (→ docs/capabilities/002_llm_access_control.md) |
 
 ---
 

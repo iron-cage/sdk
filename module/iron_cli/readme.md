@@ -23,8 +23,47 @@ Provides command-line access to all Iron Cage token management features using th
 - Token generation logic (see iron_token_manager)
 - Budget enforcement logic (see iron_cost)
 - GUI/dashboard interface (see iron_dashboard)
-- Python CLI alternative (see iron_cli_py)
+- Python CLI wrapper (see iron_cli_py)
 - Framework integrations (see iron_sdk)
+
+---
+
+## Authoritative Role
+
+iron_cli is the **authoritative source** for operations commands. The Python CLI (iron_cli_py) wraps this binary rather than reimplementing operations logic.
+
+**See:** [ADR-002](../../pilot/decisions/002-cli-architecture.md) for architecture decision.
+
+**Domains owned by iron_cli:**
+
+| Domain | Commands | Description |
+|--------|----------|-------------|
+| **Authentication** | login, refresh, logout | JWT token management |
+| **Tokens** | generate, list, get, rotate, revoke, validate, inspect | API token CRUD |
+| **Usage** | show, by_project, by_provider, export | Usage analytics |
+| **Limits** | list, get, create, update, delete | Budget limits CRUD |
+| **Traces** | list, get, export | Request trace inspection |
+| **Health** | health, version | System status |
+
+**Wrapper relationship:**
+```
+iron_cli_py (Python)         iron_cli (Rust)
+     │                            │
+     │ WRAPPER COMMANDS:          │ NATIVE IMPLEMENTATION:
+     │ token.*  ─────────────────▶│ Token CRUD
+     │ usage.*  ─────────────────▶│ Usage reporting
+     │ limits.* ─────────────────▶│ Limits management
+     │ traces.* ─────────────────▶│ Traces inspection
+     │ auth.*   ─────────────────▶│ Authentication
+     │ health   ─────────────────▶│ Health/version
+     │                            │
+     │ NATIVE COMMANDS:           │
+     │ init, config, agent,       │
+     │ secrets (NOT delegated)    │
+     └────────────────────────────┘
+```
+
+---
 
 ## Architecture
 

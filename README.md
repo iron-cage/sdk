@@ -31,10 +31,9 @@ All modules are located in the `module/` directory.
 | **iron_lang** | LLM protocol integration, provider routing | Rust |
 | **iron_api** | REST API server, WebSocket endpoints | Rust |
 | **iron_runtime** | Agent orchestration, PyO3 Python bridge | Rust |
-| **iron_cli** | Command-line interface for API operations | Rust |
-| **iron_cli_py** | Python bindings for CLI | Python |
-| **iron_sdk** | Pythonic SDK for Agent Runtime integration | Python |
-| **iron_examples** | Example agent implementations | Python |
+| **iron_cli** | Command-line interface for API operations (authoritative) | Rust |
+| **iron_cli_py** | Python CLI with wrapper to iron_cli for operations | Python |
+| **iron_sdk** | Pythonic SDK for Agent Runtime integration (includes examples/) | Python |
 | **iron_testing** | Test utilities, fixtures, mock runtime | Python |
 | **iron_dashboard** | Control Panel web UI | Vue.js |
 
@@ -44,9 +43,9 @@ All modules are located in the `module/` directory.
 Foundation:     iron_types, iron_cost, iron_telemetry
 Infrastructure: iron_state
 Feature:        iron_safety, iron_reliability, iron_secrets, iron_token_manager
-Specialized:    iron_lang
+Specialized:    iron_lang, iron_control_store
 Integration:    iron_api, iron_runtime
-Application:    iron_cli, iron_cli_py, iron_sdk, iron_examples, iron_testing
+Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
 Frontend:       iron_dashboard
 ```
 

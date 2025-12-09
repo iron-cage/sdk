@@ -1642,7 +1642,7 @@ pilot/
 
 ### Technical Architecture
 - **System design:** [docs/architecture.md](../docs/architecture.md) - Full system architecture (this spec implements minimal subset)
-- **Requirements:** [docs/requirements.md](../docs/requirements.md) - Functional requirements mapped to pilot features
+- **Requirements:** [spec/requirements.md](../spec/requirements.md) - Functional requirements mapped to pilot features
 
 ---
 

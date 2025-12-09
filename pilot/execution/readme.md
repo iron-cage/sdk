@@ -16,14 +16,13 @@
 
 ---
 
-## Directory Contents & Responsibilities
+## Directory Responsibilities
 
-| File | Responsibility | In Scope | Out of Scope (See) |
-|------|----------------|----------|-------------------|
-| **8_week_plan.md** | Original 8-week execution plan | 580 hours, 35+ features with secrets, week-by-week breakdown | Quick start alternative (→ quick_start.md) |
-| **quick_start.md** | Minimal viable demo plan | 80-120 hours, 4 core features, slides-only approach | Full features (→ 8_week_plan.md) |
-| **status.md** | Weekly status tracking | Decision log, risk control panel, team availability, progress updates | Execution plans (→ 8_week_plan.md, quick_start.md) |
-| **readme.md** (this file) | Execution plan navigation | Plan comparison, decision matrix, recommendation | Detailed plans (→ other files) |
+| Entity | Responsibility | Input → Output | Scope | Out of Scope |
+|--------|----------------|----------------|-------|--------------|
+| **8_week_plan.md** | Define complete 8-week implementation plan | Implementation need → Detailed timeline | 580 hours, 35+ features with secrets, week-by-week breakdown, 3-person team allocation | NOT minimal approach (→ quick_start.md), NOT status tracking (→ status.md), NOT feature specs (→ ../spec.md) |
+| **quick_start.md** | Define minimal viable demo plan | Quick path need → Streamlined approach | 80-120 hours, 4 core features, slides-only option, solo/small team | NOT full implementation (→ 8_week_plan.md), NOT status tracking (→ status.md), NOT presentation materials (→ ../conferences/) |
+| **status.md** | Track weekly execution progress | Progress question → Status report | Decision log, risk panel, team availability, timeline tracking, success probability | NOT execution plans (→ 8_week_plan.md, quick_start.md), NOT feature specs (→ ../spec.md), NOT implementation guide (→ /runtime/PILOT_GUIDE.md) |
 
 ---
 
