@@ -135,15 +135,15 @@ These design documents are synchronized between both repositories:
 
 | Entity | Responsibility | Input→Output | Scope | Out of Scope |
 |--------|----------------|--------------|-------|--------------|
-| `readme.md` | Documentation index and navigation | - → Directory overview | Structure, navigation, repository context | Module-specific details (see module/*/readme.md) |
-| `api_example.md` | API endpoint reference | - → Endpoint documentation | All REST endpoints, auth, errors | Implementation details (see iron_api module) |
-| `python_lib.md` | Proposed Python API design | - → Future API spec | SafetyRuntime design (PROPOSED) | Current implementation (see python_lib_current.md) |
-| `python_lib_current.md` | Current Python API reference | - → API documentation | iron_runtime.Runtime methods | Future API design (see python_lib.md) |
-| `user_workflow.md` | Architecture and data flow | - → System overview | Client/server interaction, components | API details (see api_example.md) |
-| `repository_architecture.md` | Two-repository design | - → Architecture docs | Module distribution, versioning | Implementation (see module/*) |
-| `deployment_packages.md` | Package definitions | - → Deployment guide | 6 packages, deployment methods | Build scripts (see package.json, Cargo.toml) |
-| `module_package_matrix.md` | Module-to-package mapping | - → 22×6 matrix | Which modules go where | Module internals (see module/*/spec.md) |
-| `package_dependencies.md` | Cross-package dependencies | - → Dependency matrix | Runtime requirements | Code dependencies (see Cargo.toml) |
+| `readme.md` | Documentation index and navigation | - → Directory overview | Structure, navigation, repository context | (1) Module-specific details (see module/*/readme.md), (2) Implementation code (see module/*/src/), (3) API usage examples (see api_example.md) |
+| `api_example.md` | API endpoint reference | - → Endpoint documentation | All REST endpoints, auth, errors | (1) Implementation details (see iron_api module), (2) Database schema (see iron_state module), (3) Python client API (see python_lib.md) |
+| `python_lib.md` | Proposed Python API design | - → Future API spec | SafetyRuntime design (PROPOSED) | (1) Current implementation (see python_lib_current.md), (2) Server-side API (see iron_api module), (3) Database layer (see iron_state module) |
+| `python_lib_current.md` | Current Python API reference | - → API documentation | iron_runtime.Runtime methods | (1) Future API design (see python_lib.md), (2) Server implementation (see iron_api module), (3) Safety rules (see iron_safety module) |
+| `user_workflow.md` | Architecture and data flow | - → System overview | Client/server interaction, components | (1) API endpoint details (see api_example.md), (2) Python API specifics (see python_lib.md), (3) Module implementation (see module/) |
+| `repository_architecture.md` | Two-repository design | - → Architecture docs | Module distribution, versioning | (1) Implementation details (see module/*), (2) Build configuration (see Cargo.toml), (3) Python SDK details (see python_lib.md) |
+| `deployment_packages.md` | Package definitions | - → Deployment guide | 6 packages, deployment methods | (1) Build scripts (see package.json, Cargo.toml), (2) Module implementation (see module/), (3) API endpoint details (see api_example.md) |
+| `module_package_matrix.md` | Module-to-package mapping | - → 22×6 matrix | Which modules go where | (1) Module internals (see module/*/spec.md), (2) Build process (see Cargo.toml), (3) Deployment procedures (see deployment_packages.md) |
+| `package_dependencies.md` | Cross-package dependencies | - → Dependency matrix | Runtime requirements | (1) Code dependencies (see Cargo.toml), (2) Module implementation (see module/), (3) API endpoints (see api_example.md) |
 
 ---
 

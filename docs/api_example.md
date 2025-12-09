@@ -73,7 +73,9 @@
 
 ---
 
-### Provider Key Management (Dashboard)
+### Provider Key Management (PLANNED)
+
+> **Note:** Provider management endpoints are planned but not yet implemented.
 
 | Method | Endpoint | Caller | Purpose |
 |--------|----------|--------|---------|
@@ -87,7 +89,9 @@
 
 ---
 
-### Key Fetch (Client)
+### Key Fetch (PLANNED)
+
+> **Note:** Key fetch endpoint is planned but not yet implemented.
 
 | Method | Endpoint | Caller | Purpose |
 |--------|----------|--------|---------|
@@ -199,14 +203,14 @@ Developer Code          Client (iron_runtime)         Server (iron_api)
 | Server | `DELETE /api/limits/:id` | JWT | Admin |
 | Server | `GET /api/traces` | JWT | Dashboard |
 | Server | `GET /api/traces/:id` | JWT | Dashboard |
-| Server | `GET /api/providers` | JWT | Admin |
-| Server | `POST /api/providers` | JWT | Admin |
-| Server | `GET /api/providers/:id` | JWT | Admin |
-| Server | `PUT /api/providers/:id` | JWT | Admin |
-| Server | `DELETE /api/providers/:id` | JWT | Admin |
-| Server | `POST /api/projects/:id/provider` | JWT | Admin |
-| Server | `DELETE /api/projects/:id/provider` | JWT | Admin |
-| Server | `GET /api/keys` | IC Token | Client |
+| Server | `GET /api/providers` | JWT | Admin (PLANNED) |
+| Server | `POST /api/providers` | JWT | Admin (PLANNED) |
+| Server | `GET /api/providers/:id` | JWT | Admin (PLANNED) |
+| Server | `PUT /api/providers/:id` | JWT | Admin (PLANNED) |
+| Server | `DELETE /api/providers/:id` | JWT | Admin (PLANNED) |
+| Server | `POST /api/projects/:id/provider` | JWT | Admin (PLANNED) |
+| Server | `DELETE /api/projects/:id/provider` | JWT | Admin (PLANNED) |
+| Server | `GET /api/keys` | IC Token | Client (PLANNED) |
 | Server | `GET /ws` | JWT | Dashboard (PLANNED) |
 | Client | `Runtime()` | - | Developer |
 | Client | `start_agent()` | - | Developer |
