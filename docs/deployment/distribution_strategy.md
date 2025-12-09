@@ -18,8 +18,7 @@ Know where to get each package and how updates are delivered.
 | Marketing Site | CDN | `ironcage.ai` |
 | Agent Runtime | PyPI | `pip install iron-cage` |
 | Sandbox | PyPI | `pip install iron-sandbox` |
-| CLI Tool | GitHub Releases | Binary download |
-| Python CLI | PyPI | `pip install iron-cli` |
+| CLI Tools | GitHub + PyPI | Binary + `pip install iron-cli` |
 
 ## Channel Characteristics
 
@@ -28,13 +27,13 @@ Know where to get each package and how updates are delivered.
 | Docker Hub | Pull latest | Tags | Yes |
 | CDN | Automatic | Immutable | CDN cache |
 | PyPI | `pip install --upgrade` | Semantic | Pin version |
-| GitHub | Manual download | Releases | Download older |
+| GitHub + PyPI | Manual + pip | Releases + Semantic | Download older / Pin |
 
 ## Version Compatibility
 
 ```
 Agent Runtime 1.x --- compatible ---> Control Panel 1.x
-                 +-- compatible ---> CLI Tool 1.x
+                 +-- compatible ---> CLI Tools 1.x
 ```
 
 - Major versions must match across packages

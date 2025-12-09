@@ -23,8 +23,9 @@ Understand codebase organization and where to find code for different concerns.
 - iron_api - REST API + WebSocket server
 - iron_dashboard - Vue 3 control panel
 - iron_runtime - Agent orchestrator + PyO3
-- iron_sdk - Python SDK with decorators
-- iron_safety, iron_cost, iron_reliability - Core services
+- iron_sdk - Python SDK with decorators (includes examples/)
+- iron_safety, iron_reliability, iron_lang, iron_state - Core services
+- iron_token_manager, iron_secrets, iron_control_store - Management services
 
 **iron_cage:**
 - iron_sandbox - OS-level isolation (Landlock, seccomp)

@@ -53,3 +53,5 @@ iron_cli_py (Python/Click)
 ---
 
 *Original: pilot/decisions/002-cli-architecture.md*
+
+**Note:** As of December 2025, iron_cli and iron_cli_py are packaged together as "Package 5: CLI Tools" to reflect their tight integration and unified distribution model.

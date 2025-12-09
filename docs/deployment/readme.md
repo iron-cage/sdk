@@ -8,7 +8,7 @@
 
 | Entity | Responsibility | Input → Output | Scope | Out of Scope |
 |--------|----------------|----------------|-------|--------------|
-| **package_model.md** | Define the 6 deployment packages | Packaging question → Package definitions | Six packages (Control Panel, Marketing Site, Agent Runtime, Sandbox, CLI Tool, Python CLI), package characteristics, grouping rationale | NOT module mappings (→ module_distribution.md), NOT distribution channels (→ distribution_strategy.md), NOT actors (→ actor_model.md) |
+| **package_model.md** | Define the 5 deployment packages | Packaging question → Package definitions | Five packages (Control Panel, Marketing Site, Agent Runtime, Sandbox, CLI Tools), package characteristics, grouping rationale | NOT module mappings (→ module_distribution.md), NOT distribution channels (→ distribution_strategy.md), NOT actors (→ actor_model.md) |
 | **actor_model.md** | Document system actors and interactions | Actor question → Actor taxonomy | Human actors (developer, operations, security, admin, visitor), software actors (agent, browser, terminal, LLM API, database), interaction patterns | NOT packages (→ package_model.md), NOT distribution (→ distribution_strategy.md), NOT scaling (→ scaling_patterns.md) |
 | **distribution_strategy.md** | Explain package distribution channels | Distribution question → Channel strategy | Docker Hub, CDN, PyPI, GitHub Releases, versioning, compatibility matrix, update mechanisms | NOT package contents (→ package_model.md), NOT module mappings (→ module_distribution.md), NOT scaling (→ scaling_patterns.md) |
 | **scaling_patterns.md** | Describe horizontal scaling approach | Scaling question → Scaling architecture | Stateless services, shared state (PostgreSQL, Redis), load balancing, K8s HPA, replica management | NOT packages (→ package_model.md), NOT distribution (→ distribution_strategy.md), NOT actors (→ actor_model.md) |
@@ -20,7 +20,7 @@
 
 | # | Concept | Core Idea |
 |---|---------|-----------|
-| 1 | [Package Model](package_model.md) | 6 deployment packages |
+| 1 | [Package Model](package_model.md) | 5 deployment packages |
 | 2 | [Actor Model](actor_model.md) | Who/what interacts with system |
 | 3 | [Distribution Strategy](distribution_strategy.md) | How packages reach users |
 | 4 | [Scaling Patterns](scaling_patterns.md) | Horizontal scaling approach |
@@ -36,11 +36,12 @@
 |  (Docker)   |  |  (Static)   |  |   (PyPI)    |
 +-------------+  +-------------+  +-------------+
 
-+-------------+  +-------------+  +-------------+
-|  Package 4  |  |  Package 5  |  |  Package 6  |
-|  Sandbox    |  |  CLI Tool   |  |  Python CLI |
-|  (PyPI)     |  |  (Binary)   |  |  (PyPI)     |
-+-------------+  +-------------+  +-------------+
++-------------+  +-------------+
+|  Package 4  |  |  Package 5  |
+|  Sandbox    |  |   CLI       |
+|  (PyPI)     |  |  Tools      |
+|             |  | (Bin + PyPI)|
++-------------+  +-------------+
 ```
 
 *For operational procedures, see [deployment_guide.md](../deployment_guide.md)*

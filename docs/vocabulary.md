@@ -52,7 +52,7 @@
 | **Unified Observability** | OpenTelemetry export to Datadog, Grafana, etc. |
 | **Multi-Provider LLM Access** | Unified API across OpenAI, Anthropic, Azure, Google |
 
-### Deployment Packages (6 Total)
+### Deployment Packages (5 Total)
 
 | Term | Definition |
 |------|------------|
@@ -60,8 +60,7 @@
 | **Package 2: Marketing Site** | Static website (ironcage.ai) |
 | **Package 3: Agent Runtime** | PyPI wheel (iron-cage) with SDK and core services |
 | **Package 4: Sandbox** | PyPI wheel (iron-sandbox) with OS isolation |
-| **Package 5: CLI Tool** | Binary (iron_cli) for token management |
-| **Package 6: Python CLI** | PyPI wheel (iron-cli-py) developer experience wrapper |
+| **Package 5: CLI Tools** | Binary (iron_cli) + PyPI wrapper (iron-cli-py) |
 
 ### Modules
 
@@ -69,7 +68,8 @@
 |------|------------|
 | **iron_api** | REST API + WebSocket server (Rust/axum) |
 | **iron_dashboard** | Web control panel (Vue 3 + TypeScript) |
-| **iron_sdk** | Python SDK with decorators for agent protection |
+| **iron_sdk** | Python SDK with decorators (includes examples/) |
+| **iron_control_store** | PostgreSQL schema for Control Panel (spec-only) |
 | **iron_safety** | PII detection, prompt injection blocking |
 | **iron_cost** | Budget tracking, token counting |
 | **iron_reliability** | Circuit breaker patterns, retry logic |

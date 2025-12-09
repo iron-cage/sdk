@@ -2,6 +2,21 @@
 
 Example library for Iron Cage with LangChain, CrewAI, and AutoGPT integrations.
 
+---
+
+## Directory Responsibilities
+
+| Entity | Responsibility | Input → Output | Scope | Out of Scope |
+|--------|----------------|----------------|-------|--------------|
+| **patterns/** | Demonstrate Iron Cage protection patterns | Pattern question → Pattern examples | Circuit breaker, cost optimization, PII handling, rate limiting (4 examples) | NOT framework-specific (→ langchain/, crewai/, autogpt/), NOT raw API (→ raw_api/), NOT testing utils (→ testing/) |
+| **langchain/** | Show LangChain framework integration | LangChain use case → LangChain examples | Simple chain, memory chain, agent with tools, multi-agent, streaming (5 examples) | NOT CrewAI (→ crewai/), NOT AutoGPT (→ autogpt/), NOT raw API (→ raw_api/) |
+| **crewai/** | Illustrate CrewAI framework integration | CrewAI use case → CrewAI examples | Simple crew, research crew, multi-stage crew (3 examples) | NOT LangChain (→ langchain/), NOT AutoGPT (→ autogpt/), NOT patterns (→ patterns/) |
+| **autogpt/** | Demonstrate AutoGPT framework integration | AutoGPT use case → AutoGPT examples | Autonomous agent examples (2 examples, below table threshold) | NOT LangChain (→ langchain/), NOT CrewAI (→ crewai/), NOT testing (→ testing/) |
+| **raw_api/** | Show direct provider API usage | Raw API need → Provider examples | OpenAI direct, Anthropic direct, multi-provider fallback (3 examples) | NOT framework wrappers (→ langchain/, crewai/, autogpt/), NOT patterns (→ patterns/), NOT testing (→ testing/) |
+| **testing/** | Provide testing and simulation utilities | Testing need → Testing examples | Integration tests, budget simulation, mock runtime (3 examples) | NOT production examples (→ langchain/, crewai/), NOT patterns (→ patterns/), NOT raw API (→ raw_api/) |
+
+---
+
 ### Scope
 
 **Responsibilities:**

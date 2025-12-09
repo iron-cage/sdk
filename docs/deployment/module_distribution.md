@@ -36,12 +36,12 @@ Know where to find code for a specific feature and which package ships it.
 | iron_sandbox | OS isolation (Landlock, seccomp) |
 | iron_executor | Code runner |
 
-## Package 5: CLI Tool
+## Package 5: CLI Tools
 
 | Module | Purpose |
 |--------|---------|
 | iron_cli | Binary CLI |
-| iron_tokens | Token management |
+| iron_cli_py | Python CLI wrapper |
 
 ## Shared Modules (crates.io)
 

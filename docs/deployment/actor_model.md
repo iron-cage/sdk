@@ -19,7 +19,7 @@ Understand system boundaries and who uses which packages.
 | Developer | Builds AI agents | Agent Runtime |
 | Operations | Monitors execution | Control Panel |
 | Security | Implements isolation | Sandbox |
-| Administrator | Manages tokens/secrets | CLI Tool |
+| Administrator | Manages tokens/secrets | CLI Tools |
 | Visitor | Views marketing | Marketing Site |
 
 ## Software Actors

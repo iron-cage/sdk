@@ -25,7 +25,6 @@ Provides Pythonic SDK layer for Iron Cage agent protection with decorators, cont
 **Out of Scope:**
 - Core runtime functionality (use iron_runtime Rust crate)
 - OS-level sandboxing (use iron_sandbox)
-- Example implementations (use iron_examples)
 - Testing utilities (use iron_testing)
 - CLI functionality (use iron_cli_py)
 - Direct PyO3 FFI (hidden behind Pythonic API)
@@ -131,6 +130,25 @@ iron_sdk/
     ├── __init__.py
     └── plugin.py        # ProtectedPlugin
 ```
+
+### Examples Directory
+
+**Purpose:** Production-ready examples demonstrating SDK usage with popular frameworks
+
+**Structure:**
+- `examples/langchain/` - LangChain examples (10+)
+- `examples/crewai/` - CrewAI examples (5+)
+- `examples/autogpt/` - AutoGPT examples (5+)
+- `examples/patterns/` - Protection patterns (circuit breaker, PII, rate limiting)
+- `examples/raw_api/` - Direct API usage without frameworks
+- `examples/testing/` - Testing utilities for examples
+
+**Installation:**
+```bash
+pip install iron-sdk[examples]  # Includes example dependencies
+```
+
+**Distribution:** Examples ship with iron-sdk PyPI package, accessible after installation
 
 ---
 

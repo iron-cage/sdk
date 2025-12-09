@@ -20,7 +20,6 @@ Provides a clean, Pythonic API for protecting AI agents with budget tracking, PI
 - Budget calculation logic (see iron_cost)
 - PII detection patterns (see iron_safety)
 - Circuit breaker implementation (see iron_reliability)
-- Example code (see iron_examples)
 - Testing utilities (see iron_testing)
 
 ---
@@ -83,7 +82,17 @@ pip install iron-sdk[all]
 
 ## Examples
 
-See `iron_examples` package for 20+ runnable examples.
+See `examples/` directory for 20+ runnable examples:
+- `examples/langchain/` - LangChain integration examples
+- `examples/crewai/` - CrewAI integration examples
+- `examples/autogpt/` - AutoGPT integration examples
+- `examples/patterns/` - Protection pattern examples
+- `examples/raw_api/` - Direct API usage examples
+
+Run examples:
+```bash
+python examples/langchain/simple_chat.py
+```
 
 ---
 
@@ -91,7 +100,7 @@ See `iron_examples` package for 20+ runnable examples.
 
 - **Specification:** See `spec.md` for complete technical requirements
 - **API Reference:** Coming soon
-- **Examples:** See `module/iron_examples/` for runnable examples
+- **Examples:** See `examples/` directory for runnable examples
 
 ---
 
