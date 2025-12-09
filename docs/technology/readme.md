@@ -15,7 +15,7 @@
 
 ---
 
-## The Four Technology Concepts
+## Technology Concepts
 
 | # | Concept | Core Idea |
 |---|---------|-----------|
@@ -23,6 +23,7 @@
 | 2 | [Why PyO3](002_why_pyo3.md) | Rust-Python FFI choice |
 | 3 | [Dependency Strategy](004_dependency_strategy.md) | External crate philosophy |
 | 4 | [Infrastructure Choices](003_infrastructure_choices.md) | Database, cache, queue |
+| 5 | [Environments](005_environments.md) | Runtime modes and behaviors |
 
 ## Technology Principles
 

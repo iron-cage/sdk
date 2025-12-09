@@ -73,6 +73,9 @@ enum DeploymentMode
 
   /// Explicit production deployment (IRON_DEPLOYMENT_MODE=production set)
   Production,
+
+  /// Explicit development deployment (IRON_DEPLOYMENT_MODE=development set)
+  Development,
 }
 
 /// Detect deployment mode using environment signals
@@ -93,6 +96,7 @@ fn detect_deployment_mode() -> DeploymentMode
   // Check for explicit deployment mode setting
   match env::var( "IRON_DEPLOYMENT_MODE" ).as_deref()
   {
+    Ok( "development" ) => return DeploymentMode::Development,
     Ok( "production" ) => return DeploymentMode::Production,
     Ok( "pilot" ) => return DeploymentMode::Pilot,
     _ => {}
@@ -266,6 +270,22 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     {
       eprintln!( "✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)" );
     }
+    DeploymentMode::Development =>
+    {
+      eprintln!( "✓ Development mode (clearing iron.db)" );
+      if std::path::Path::new( "iron.db" ).exists()
+      {
+        if let Err( e ) = std::fs::remove_file( "iron.db" )
+        {
+          eprintln!( "⚠️  Failed to delete iron.db: {}", e );
+        }
+        else
+        {
+          eprintln!( "✓ Cleared iron.db" );
+        }
+      }
+    }
+
     DeploymentMode::Pilot =>
     {
       eprintln!( "✓ Pilot mode (localhost only)" );

@@ -30,7 +30,7 @@ dev: ## Run full stack (API:3000 + Dashboard:5173)
 		cd $(DASHBOARD_DIR) && npm install; \
 	fi
 	@trap 'kill 0' EXIT; \
-		cargo run --release --bin iron_api_server & \
+		RUST_LOG="trace" cargo run --release --bin iron_api_server & \
 		sleep 2 && cd $(DASHBOARD_DIR) && npm run dev
 
 api: ## Run API server only (port 3000)

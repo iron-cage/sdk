@@ -98,6 +98,16 @@ cd module/iron_sdk
 pip install -e .
 ```
 
+## Running
+
+```bash
+# Run in Pilot mode (default, preserves data)
+cargo run --bin iron_api_server
+
+# Run in Development mode (clears iron.db on startup)
+IRON_DEPLOYMENT_MODE=development cargo run --bin iron_api_server
+```
+
 ## Status
 
 **Version:** 0.1.0
