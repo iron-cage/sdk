@@ -34,7 +34,7 @@ Provides Python-based command-line tool for Iron Cage with two implementation pa
 - Token generation algorithm (delegated to iron_cli)
 - Usage calculation logic (delegated to iron_cli)
 - Limits enforcement logic (delegated to iron_cli)
-- REST API server (see iron_api)
+- REST API server (see iron_control_api)
 - Python SDK decorators (see iron_sdk)
 - Framework integrations (see iron_sdk)
 

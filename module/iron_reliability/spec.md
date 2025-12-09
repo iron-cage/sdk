@@ -24,7 +24,6 @@ Circuit breaker patterns and retry logic for LLM provider reliability. Prevents 
 - Failure tracking and recovery
 
 **Out of Scope:**
-- LLM provider integration (see iron_lang)
 - Cost tracking (see iron_cost)
 - Safety validation (see iron_safety)
 - Observability export (see iron_telemetry)

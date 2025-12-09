@@ -96,16 +96,15 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 - iron_telemetry - Unified logging with tracing
 
 **Runtime & API (5 modules):**
-- iron_api - REST API + WebSocket server
+- iron_control_api - REST API + WebSocket server
 - iron_runtime - Agent orchestrator + PyO3 bridge
-- iron_state - Multi-backend state management
+- iron_runtime_state - Multi-backend state management
 - iron_token_manager - JWT token management backend
 - iron_secrets - Encrypted secrets management
 
-**Safety & Reliability (3 modules):**
+**Safety & Reliability (2 modules):**
 - iron_safety - PII detection and redaction
 - iron_reliability - Circuit breaker patterns
-- iron_lang - AI agent data protocol
 
 **CLI & Tools (2 modules):**
 - iron_cli - Command-line interface (Rust, authoritative)
@@ -118,7 +117,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 ### Deployment Packages
 
 **Primary deployment packages:**
-1. **Control Panel** (Package 1) - Docker container with iron_api + iron_dashboard
+1. **Control Panel** (Package 1) - Docker container with iron_control_api + iron_dashboard
 2. **Agent Runtime** (Package 3) - PyPI wheel (iron-cage) with Python SDK
 3. **CLI Tools** (Package 5) - Binary + PyPI wheel (iron-cli + iron-cli-py)
 
@@ -188,7 +187,7 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 | Module | Test Files | Table Status |
 |--------|-----------|--------------|
 | module/iron_cli/tests/ | 6 | ✅ Compliant |
-| module/iron_api/tests/ | 10 | ✅ Compliant |
+| module/iron_control_api/tests/ | 10 | ✅ Compliant |
 | module/iron_token_manager/tests/ | 8 | ✅ Compliant |
 
 **Module Documentation Compliance:**
@@ -225,7 +224,7 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 ## Related Documentation
 
 - `/readme.md` - Repository overview, quick start, building instructions
-- `/module/*/spec.md` - Module specifications (iron_api, iron_runtime, iron_cli, etc.)
+- `/module/*/spec.md` - Module specifications (iron_control_api, iron_runtime, iron_cli, etc.)
 - `/module/*/readme.md` - Module API documentation and usage guides
 - `/pilot/spec.md` - Pilot platform specification
 

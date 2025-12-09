@@ -6,7 +6,7 @@
 
 # Configuration
 DASHBOARD_DIR := module/iron_dashboard
-DB_FILE := module/iron_api/iron_api.db
+DB_FILE := module/iron_control_api/iron_control_api.db
 
 #===============================================================================
 # Help
@@ -30,11 +30,11 @@ dev: ## Run full stack (API:3000 + Dashboard:5173)
 		cd $(DASHBOARD_DIR) && npm install; \
 	fi
 	@trap 'kill 0' EXIT; \
-		cargo run --release --bin iron_api_server & \
+		cargo run --release --bin iron_control_api_server & \
 		sleep 2 && cd $(DASHBOARD_DIR) && npm run dev
 
 api: ## Run API server only (port 3000)
-	cargo run --release --bin iron_api_server
+	cargo run --release --bin iron_control_api_server
 
 dashboard: ## Run dashboard only (port 5173)
 	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \
@@ -57,13 +57,13 @@ test-quick: ## Run tests fast (nextest only)
 #===============================================================================
 
 build: ## Build API + Dashboard for production
-	cargo build --release --bin iron_api_server
+	cargo build --release --bin iron_control_api_server
 	cd $(DASHBOARD_DIR) && npm run build
 
 validate: ## Full production validation
 	@echo "=== Rust Tests ===" && w3 .test l::3
 	@echo "=== Dashboard ===" && cd $(DASHBOARD_DIR) && npm run type-check && npm run build
-	@echo "=== Build ===" && cargo build --release --bin iron_api_server
+	@echo "=== Build ===" && cargo build --release --bin iron_control_api_server
 	@echo "✅ Validation complete"
 
 #===============================================================================

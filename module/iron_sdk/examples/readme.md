@@ -36,7 +36,7 @@ Provides production-ready example code demonstrating Iron Cage protection patter
 - SDK implementation (see iron_sdk)
 - Testing utilities (see iron_testing)
 - CLI tools (see iron_cli, iron_cli_py)
-- Production deployment guides (see iron_api documentation)
+- Production deployment guides (see iron_control_api documentation)
 - Framework source code modifications
 
 ---

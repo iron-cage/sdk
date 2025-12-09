@@ -16,9 +16,9 @@ Know where to find code for a specific feature and which package ships it.
 
 | Module | Purpose |
 |--------|---------|
-| iron_api | REST API + WebSocket server |
+| iron_control_api | REST API + WebSocket server |
 | iron_dashboard | Vue 3 SPA |
-| iron_db | PostgreSQL schemas |
+| iron_control_schema | PostgreSQL schemas |
 
 ## Package 3: Agent Runtime
 

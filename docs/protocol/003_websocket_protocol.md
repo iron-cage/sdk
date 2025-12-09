@@ -16,7 +16,7 @@ Real-time WebSocket message format for streaming agent state updates, events, an
 - REST API protocol (see [002_rest_api_protocol.md](002_rest_api_protocol.md))
 - IronLang data protocol (see [001_ironlang_data_protocol.md](001_ironlang_data_protocol.md))
 - Dashboard UI implementation (see `module/iron_dashboard/`)
-- WebSocket server implementation (see `module/iron_api/spec.md` § FR-3)
+- WebSocket server implementation (see `module/iron_control_api/spec.md` § FR-3)
 
 ---
 
@@ -135,9 +135,9 @@ WebSocket streaming provides:
 - [architecture/005: Service Integration](../architecture/005_service_integration.md) - WebSocket server integration pattern
 
 **Implementation:**
-- Source: `module/iron_api/src/websocket.rs` - WebSocket handler
-- Tests: `module/iron_api/tests/websocket_test.rs` - Connection and message tests
-- Specification: `module/iron_api/spec.md` § FR-3 - WebSocket streaming specification
+- Source: `module/iron_control_api/src/websocket.rs` - WebSocket handler
+- Tests: `module/iron_control_api/tests/websocket_test.rs` - Connection and message tests
+- Specification: `module/iron_control_api/spec.md` § FR-3 - WebSocket streaming specification
 
 ---
 

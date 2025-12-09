@@ -1897,8 +1897,8 @@ test('renders all 6 panels', () => {
 ### 18.2 Related Specifications
 
 - **iron_runtime:** WebSocket server at :8080/ws (message source)
-- **iron_api:** Alternative WebSocket endpoint (optional)
-- **iron_state:** StateManager data structure (matches TypeScript types)
+- **iron_control_api:** Alternative WebSocket endpoint (optional)
+- **iron_runtime_state:** StateManager data structure (matches TypeScript types)
 
 ---
 
@@ -1999,7 +1999,7 @@ test('renders all 6 panels', () => {
 
 **Dependencies:**
 - iron_runtime WebSocket server must be implemented first
-- iron_state must expose all required metrics
+- iron_runtime_state must expose all required metrics
 - iron_secrets must provide /secrets REST API endpoints
 - Test data (100 leads) must be ready
 

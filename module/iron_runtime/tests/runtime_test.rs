@@ -80,5 +80,5 @@ async fn test_stop_agent()
 
   // Check status is Stopped
   let metrics = metrics.unwrap();
-  assert!(matches!(metrics.status, iron_state::AgentStatus::Stopped));
+  assert!(matches!(metrics.status, iron_runtime_state::AgentStatus::Stopped));
 }

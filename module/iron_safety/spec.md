@@ -36,7 +36,7 @@ PII detection and output redaction for compliance. Prevents GDPR violations by d
 
 **Required Modules:**
 - iron_types - Foundation types
-- iron_state - Audit logging
+- iron_runtime_state - Audit logging
 - iron_telemetry - Logging
 
 **Required External:**
@@ -53,7 +53,7 @@ PII detection and output redaction for compliance. Prevents GDPR violations by d
 - **PII Detector:** Regex-based scanner for email, phone, SSN
 - **Redactor:** Replaces PII with placeholder text
 - **Hash Generator:** SHA256 for audit trail
-- **Audit Logger:** Records PII detections to iron_state
+- **Audit Logger:** Records PII detections to iron_runtime_state
 
 ---
 
@@ -63,7 +63,7 @@ PII detection and output redaction for compliance. Prevents GDPR violations by d
 - iron_runtime - Validates LLM outputs before logging
 
 **Uses:**
-- iron_state - Persists PII detection audit logs
+- iron_runtime_state - Persists PII detection audit logs
 
 ---
 

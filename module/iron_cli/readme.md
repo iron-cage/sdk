@@ -19,7 +19,7 @@ Provides command-line access to all Iron Cage token management features using th
 - Hierarchical configuration (CLI, env, local, global, defaults)
 
 **Out of Scope:**
-- REST API server implementation (see iron_api)
+- REST API server implementation (see iron_control_api)
 - Token generation logic (see iron_token_manager)
 - Budget enforcement logic (see iron_cost)
 - GUI/dashboard interface (see iron_dashboard)

@@ -34,7 +34,7 @@ Encrypted secrets management for LLM provider credentials. Stores API keys with 
 
 **Required Modules:**
 - iron_types - Foundation types
-- iron_state - Encrypted storage
+- iron_runtime_state - Encrypted storage
 - iron_telemetry - Audit logging
 
 **Required External:**
@@ -60,11 +60,11 @@ Encrypted secrets management for LLM provider credentials. Stores API keys with 
 ## Integration Points
 
 **Used by:**
-- iron_api - Secret retrieval for agents
+- iron_control_api - Secret retrieval for agents
 - iron_runtime - Just-in-time secret injection
 
 **Uses:**
-- iron_state - Encrypted persistence
+- iron_runtime_state - Encrypted persistence
 
 ---
 

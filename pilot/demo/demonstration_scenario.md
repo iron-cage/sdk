@@ -58,7 +58,7 @@
 │  │  ├─ iron_safety (privacy protection)                 │  │
 │  │  ├─ iron_budget (budget tracking)                 │  │
 │  │  ├─ iron_reliability (circuit breaker)          │  │
-│  │  └─ iron_api (WebSocket server :3001)          │  │
+│  │  └─ iron_control_api (WebSocket server :3001)          │  │
 │  └──────────┬──────────────────────────────────────┘  │
 │             │                                          │
 │             ▼                                          │
@@ -103,7 +103,7 @@ NO EXTERNAL DEPENDENCIES:
    ```bash
    # Verify all components installed
    cd /home/user1/pro/lib/willbe
-   cargo build --release -p iron_cli -p iron_runtime -p iron_api
+   cargo build --release -p iron_cli -p iron_runtime -p iron_control_api
    cd module/iron_cage/pilot/demo/control panel
    npm run build
    cd ../agent
@@ -976,7 +976,7 @@ tail -f /var/log/iron_cage/api_server.log
 ```
 
 **Fix:**
-1. Restart API server: `killall iron_api && iron_cage start --api-only`
+1. Restart API server: `killall iron_control_api && iron_cage start --api-only`
 2. Reload control panel: Ctrl+R in browser
 3. Check firewall: `sudo ufw allow 3000 && sudo ufw allow 3001`
 4. Use fallback: Pre-recorded video
@@ -1174,7 +1174,7 @@ time.sleep(2)  # 2 seconds per lead = ~3.5 min total
 - **iron_safety:** `/module/iron_safety/` (privacy protection, redaction)
 - **iron_budget:** `/module/iron_budget/` (budget tracking, alerts)
 - **iron_reliability:** `/module/iron_reliability/` (circuit breakers, fallbacks)
-- **iron_api:** `/module/iron_api/` (WebSocket server, REST API)
+- **iron_control_api:** `/module/iron_control_api/` (WebSocket server, REST API)
 - **iron_control:** `/pilot/demo/control panel/` (React + TypeScript UI)
 
 ### Test Data

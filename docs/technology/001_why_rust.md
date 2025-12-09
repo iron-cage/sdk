@@ -39,7 +39,7 @@ Request --> [Safety: 10ms] --> [Cost: 5ms] --> [Reliability: 5ms] --> LLM
 
 ## Where Rust Is Used
 
-- iron_api: REST API + WebSocket server
+- iron_control_api: REST API + WebSocket server
 - iron_safety: PII detection, prompt injection blocking
 - iron_cost: Budget tracking, token counting
 - iron_reliability: Circuit breakers, retry logic

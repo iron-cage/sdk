@@ -28,7 +28,7 @@
 
 **Key Differences:**
 - **This Guide:** Centralized runtime, PostgreSQL + Redis, Docker Compose/K8s, Local and Server execution
-- **Current Pilot:** Distributed packages, SQLite (iron_state), single process, localhost only
+- **Current Pilot:** Distributed packages, SQLite (iron_runtime_state), single process, localhost only
 
 ## Document Purpose
 

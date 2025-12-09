@@ -25,7 +25,7 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 **Out of Scope:**
 - Python CLI wrapper (see iron_cli_py)
-- REST API (see iron_api)
+- REST API (see iron_control_api)
 - Dashboard UI (see iron_dashboard)
 - Agent execution (see iron_runtime)
 
@@ -35,7 +35,7 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 **Required Modules:**
 - iron_token_manager - Token operations
-- iron_state - State persistence
+- iron_runtime_state - State persistence
 - iron_telemetry - Logging
 
 **Required External:**
@@ -65,7 +65,7 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 **Uses:**
 - iron_token_manager - Token CRUD operations
-- iron_state - Data retrieval
+- iron_runtime_state - Data retrieval
 
 ---
 

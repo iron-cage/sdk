@@ -32,7 +32,7 @@ Manages API token lifecycle for Iron Cage with secure generation, SHA-256 hashin
 - API key rotation automation (future enhancement)
 - Multi-tenant token isolation (future enhancement)
 - Token analytics and reporting UI (see iron_dashboard)
-- REST API endpoints (see iron_api)
+- REST API endpoints (see iron_control_api)
 - Cost calculation logic (see iron_cost)
 - Budget tracking implementation (see iron_cost)
 
@@ -51,7 +51,7 @@ Iron Cage supports two deployment modes. This module operates in both modes with
 
 **Production Mode:**
 - Part of Control Panel (cloud deployment)
-- Uses PostgreSQL (iron_control_store schema)
+- Uses PostgreSQL (iron_control_schema schema)
 - Tokens centralized for multi-user access
 - Replicated across Control Panel instances
 
@@ -61,7 +61,7 @@ Iron Cage supports two deployment modes. This module operates in both modes with
 
 **Required:**
 - iron_types (foundation types, errors)
-- iron_state (state management)
+- iron_runtime_state (state management)
 - iron_telemetry (logging)
 - iron_cost (cost types and calculations)
 - sqlx (database operations)
@@ -255,7 +255,7 @@ CREATE INDEX idx_tokens_owner ON tokens(owner);
 - ✅ Usage tracking (requests, tokens, cost)
 - ✅ Quota enforcement (daily limits)
 - ✅ Rate limiting (token bucket algorithm)
-- ✅ Integration with iron_state for audit
+- ✅ Integration with iron_runtime_state for audit
 - ✅ Integration tests (288 tests)
 
 **Pending:**
@@ -293,8 +293,8 @@ CREATE INDEX idx_tokens_owner ON tokens(owner);
 
 ## Integration Points
 
-### With iron_api
-- iron_api calls `token_manager.verify()` on every API request
+### With iron_control_api
+- iron_control_api calls `token_manager.verify()` on every API request
 - Middleware extracts Bearer token from Authorization header
 - Returns 401 if token invalid, 429 if rate limited
 
@@ -303,7 +303,7 @@ CREATE INDEX idx_tokens_owner ON tokens(owner);
 - Delegates cost calculation to iron_cost
 - Stores calculated costs in usage table
 
-### With iron_state
+### With iron_runtime_state
 - Emits audit events for token operations (create, revoke, quota exceeded)
 - Usage data available for dashboard queries
 - PII detections logged (if token used by iron_safety)
@@ -324,13 +324,13 @@ CREATE INDEX idx_tokens_owner ON tokens(owner);
 - Single-instance storage
 
 **Target (Production):**
-- PostgreSQL database (iron_control_store schema)
+- PostgreSQL database (iron_control_schema schema)
 - Multi-instance with replication
 - Redis for rate limiter state sharing
 
 **Migration:**
 1. Export tokens from SQLite
-2. Import to PostgreSQL (iron_control_store)
+2. Import to PostgreSQL (iron_control_schema)
 3. Update storage backend configuration
 4. Deploy Redis for rate limiter
 5. Verify quota enforcement across replicas

@@ -69,9 +69,9 @@ The project updated its user-facing terminology from technical terms to more int
 | iron_secrets | iron_secrets | Matches "Credentials Panel" UI term |
 
 ### Crates Preserved (7)
-- iron_runtime, iron_api, iron_cli (technical terms)
+- iron_runtime, iron_control_api, iron_cli (technical terms)
 - iron_reliability (already matches concept)
-- iron_types, iron_state, iron_telemetry (infrastructure)
+- iron_types, iron_runtime_state, iron_telemetry (infrastructure)
 
 ### Migration Statistics
 - Files modified: 33 markdown files

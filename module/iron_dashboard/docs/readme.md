@@ -20,7 +20,7 @@ This directory contains in-depth technical documentation for developers working 
    - Build pipeline (Vite configuration)
 
 2. **[api_integration.md](api_integration.md)** - Backend integration guide
-   - REST API endpoints (iron_api)
+   - REST API endpoints (iron_control_api)
    - TypeScript type definitions (matching Rust schemas)
    - WebSocket integration (connection lifecycle, message handling)
    - Error handling patterns
@@ -107,7 +107,7 @@ When adding new documentation file, update the Responsibility Table below with:
 |--------|----------------|--------------|-------|--------------|
 | `readme.md` | Documentation index and organization guide | - → Doc navigation | Index of all docs, documentation standards, when to use each doc | Actual technical content (architecture.md, api_integration.md, sitemap.md, components.md, development_setup.md) |
 | `architecture.md` | Vue 3 architecture and implementation patterns | - → Architecture guide | Component structure, state management, routing, build pipeline | API integration (api_integration.md), requirements (spec.md), sitemap (sitemap.md), component catalog (components.md), setup (development_setup.md) |
-| `api_integration.md` | Backend integration patterns and type safety | - → Integration guide | REST endpoints, TypeScript types, WebSocket, error handling, auth | Frontend architecture (architecture.md), backend spec (iron_api/spec.md), component details (components.md) |
+| `api_integration.md` | Backend integration patterns and type safety | - → Integration guide | REST endpoints, TypeScript types, WebSocket, error handling, auth | Frontend architecture (architecture.md), backend spec (iron_control_api/spec.md), component details (components.md) |
 | `sitemap.md` | Navigation structure and route hierarchy | - → Sitemap | Route hierarchy, navigation schema, page flow, access control matrix | Route implementation (architecture.md), component details (components.md), requirements (spec.md) |
 | `components.md` | UI component inventory and catalog (shadcn-vue + views) | - → Component catalog | shadcn-vue components (Button, Dialog, etc.), Vue views, composables, props/emits, usage examples, dependency graph | Architecture patterns (architecture.md), API contracts (api_integration.md), navigation structure (sitemap.md) |
 | `development_setup.md` | Development environment setup and configuration | - → Setup guide | Node.js install, dependencies, env vars, dev server, IDE config, troubleshooting | Architecture (architecture.md), quick start (readme.md), production deployment (TBD) |

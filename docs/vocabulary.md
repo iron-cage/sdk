@@ -55,6 +55,19 @@
 | **Master Budget** | Informative budget (statistics only, no blocking). Part of master project. Shows all spending across all projects |
 | **Budget Control** | Agents are the ONLY way to control budget. Agent budget blocks requests (restrictive). All other budgets (project, Inference Provider, master) are informative only (show spending, can't block) |
 
+### Resources
+
+| Term | Definition |
+|------|------------|
+| **Resource** | REST API endpoint or endpoint group exposed by Control Panel. Maps to domain entities or operations. See [architecture/009](architecture/009_resource_catalog.md) |
+| **Entity Resource** | REST resource with 1:1 or 1:N mapping to domain entity, supporting CRUD operations. Plural names (/api/tokens, /api/projects). Example: /api/tokens → IC Token entity |
+| **Operation Resource** | REST resource exposing operations/actions not mapping directly to single entity CRUD. Action-oriented, often POST-only. Example: /api/auth → login/logout operations |
+| **Analytics Resource** | Read-only REST resource providing aggregated/derived metrics from multiple entities. GET-only, statistical nature. Example: /api/usage → usage statistics |
+| **Configuration Resource** | REST resource managing system-level configuration and constraints. Admin-only access, affects multiple entities. Example: /api/limits → Agent Budget limits |
+| **Resource Catalog** | Exhaustive inventory of all REST API resources with entity mapping, authentication patterns, and certainty classification. See [architecture/009](architecture/009_resource_catalog.md) |
+| **User-Facing Resource** | REST resource accessible via CLI and Control Panel dashboard. Requires User Token authentication. Has CLI-API parity |
+| **Agent-Facing Resource** | REST resource used by iron_runtime for agent operations. Requires IC Token authentication. No CLI mapping (e.g., /api/budget/*) |
+
 ### Roles
 
 | Term | Definition |
@@ -101,7 +114,7 @@
 
 | Term | Definition |
 |------|------------|
-| **Package 1: Control Panel** | Docker image with iron_api + iron_dashboard |
+| **Package 1: Control Panel** | Docker image with iron_control_api + iron_dashboard |
 | **Package 2: Marketing Site** | Static website (ironcage.ai) |
 | **Package 3: Agent Runtime** | PyPI wheel (iron-cage) with SDK and core services |
 | **Package 4: Sandbox** | PyPI wheel (iron-sandbox) with OS isolation |
@@ -111,13 +124,12 @@
 
 | Term | Definition |
 |------|------------|
-| **iron_api** | REST API + WebSocket server (Rust/axum) |
+| **iron_control_api** | REST API + WebSocket server (Rust/axum) |
 | **iron_cli** | Binary CLI for token/usage/limits management (Rust) |
 | **iron_cli_py** | Python CLI wrapper delegating to iron_cli (Python) |
-| **iron_control_store** | PostgreSQL schema for Control Panel (Rust, spec-only) |
+| **iron_control_schema** | PostgreSQL schema for Control Panel (Rust, spec-only) |
 | **iron_cost** | Budget tracking, token counting (Rust, crates.io) |
 | **iron_dashboard** | Web control panel (Vue 3 + TypeScript) |
-| **iron_lang** | AI agent data protocol (Rust) |
 | **iron_reliability** | Circuit breaker patterns, retry logic (Rust) |
 | **iron_runtime** | Agent orchestrator + PyO3 bridge (Rust) |
 | **iron_safety** | PII detection, prompt injection blocking (Rust) |
@@ -127,7 +139,7 @@
 | **iron_sdk** | Python SDK with decorators (Python, includes examples/) |
 | **iron_secrets** | Encrypted secrets management (Rust) |
 | **iron_site** | Marketing website (Vue 3 + TypeScript, static) |
-| **iron_state** | Local state management with SQLite (Rust) |
+| **iron_runtime_state** | Local state management with SQLite (Rust) |
 | **iron_telemetry** | Unified logging with tracing (Rust, crates.io) |
 | **iron_token_manager** | JWT token management backend (Rust) |
 | **iron_types** | Foundation types, errors, Result types (Rust, crates.io) |
@@ -164,7 +176,7 @@
 | **ADR** | Architecture Decision Record documenting significant decisions |
 | **Design Collection** | Directory of focused concept files (~30-50 lines each) |
 | **Capability** | High-level platform feature (safety, cost, reliability, etc.) |
-| **Spec-only Module** | Module with specification but no implementation (e.g., iron_control_store) |
+| **Spec-only Module** | Module with specification but no implementation (e.g., iron_control_schema) |
 
 ### Deployment
 

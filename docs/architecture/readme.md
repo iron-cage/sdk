@@ -16,6 +16,7 @@
 | 006 | **006_roles_and_permissions.md** | Define three access roles (Admin, Super User, Developer) and their permission boundaries |
 | 007 | **007_entity_model.md** | Document core entities (Agent, Project, IP, IC Token, budgets) and their 1:1 relationships |
 | 008 | **008_runtime_modes.md** | Explain runtime deployment configurations (Router vs Library, same SDK code, different internal machinery) |
+| 009 | **009_resource_catalog.md** | Exhaustive inventory of REST API resources, entity mapping, authentication patterns, certainty classification |
 
 ---
 
@@ -31,6 +32,7 @@
 | 006 | [Roles and Permissions](006_roles_and_permissions.md) | Access levels and control |
 | 007 | [Entity Model](007_entity_model.md) | Core entities and relationships |
 | 008 | [Runtime Modes](008_runtime_modes.md) | Router vs Library execution modes |
+| 009 | [Resource Catalog](009_resource_catalog.md) | REST API resources and entity mapping |
 
 ## Relationships
 

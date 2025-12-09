@@ -24,8 +24,8 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 - WebSocket integration for live updates
 
 **Out of Scope:**
-- REST API backend (see iron_api)
-- WebSocket server (see iron_api)
+- REST API backend (see iron_control_api)
+- WebSocket server (see iron_control_api)
 - Token authentication logic (see iron_token_manager)
 - Agent execution (see iron_runtime)
 
@@ -34,7 +34,7 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 ## Dependencies
 
 **Required Modules:**
-- iron_api - REST endpoints and WebSocket server
+- iron_control_api - REST endpoints and WebSocket server
 
 **Required External:**
 - Vue 3 - Frontend framework
@@ -64,7 +64,7 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 - Administrators - Web browser access
 
 **Uses:**
-- iron_api - REST API for data, WebSocket for real-time updates
+- iron_control_api - REST API for data, WebSocket for real-time updates
 
 ---
 

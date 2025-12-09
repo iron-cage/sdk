@@ -9,7 +9,7 @@ Manual testing procedures for iron_dashboard pilot.
 **Scope:** All frontend functionality (authentication, dashboard, token management, usage analytics, limits, traces, accessibility).
 
 **Prerequisites:**
-- Backend (iron_api) running on http://localhost:3000
+- Backend (iron_control_api) running on http://localhost:3000
 - Frontend dev server running on http://localhost:5173
 - Modern browser (Chrome 120+, Firefox 120+, Safari 17+)
 - Test credentials: username `test`, password `test`
@@ -741,7 +741,7 @@ This section documents exhaustive corner cases across all frontend functionality
 ## Test Execution Checklist
 
 **Before Testing:**
-- [ ] Backend (iron_api) running on http://localhost:3000
+- [ ] Backend (iron_control_api) running on http://localhost:3000
 - [ ] Frontend dev server running on http://localhost:5173
 - [ ] Browser DevTools open (Console tab for error monitoring)
 - [ ] Test credentials confirmed: `test` / `test`
@@ -793,7 +793,7 @@ After completing manual testing, document results:
 **Duration:** [Minutes]
 **Environment:**
 - Browser: [Chrome 120 / Firefox 120 / Safari 17]
-- Backend: [iron_api version / commit hash]
+- Backend: [iron_control_api version / commit hash]
 - Frontend: [git commit hash]
 
 ### Test Results

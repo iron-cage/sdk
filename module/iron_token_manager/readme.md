@@ -23,7 +23,7 @@ Manages API token lifecycle with secure generation, SHA-256 hashing, and SQLite 
 - API key rotation automation (future)
 - Multi-tenant token isolation (future)
 - Token analytics and reporting (future)
-- REST API endpoints (see iron_api)
+- REST API endpoints (see iron_control_api)
 - Dashboard UI (see iron_dashboard)
 - Cost calculation (see iron_cost)
 - Budget tracking (see iron_cost)
