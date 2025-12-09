@@ -1,4 +1,8 @@
-# Iron Cage Python Library
+# Iron Cage Python Library (PROPOSED)
+
+> **PROPOSED API** - This document describes a planned future API design.
+> The API described here (`iron_cage.SafetyRuntime`) does not yet exist.
+> For the current implementation, see [python_lib_current.md](python_lib_current.md).
 
 ```
 pip install iron-cage

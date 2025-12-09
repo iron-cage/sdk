@@ -28,7 +28,7 @@
 │       ├──▶ Token management                                     │
 │       ├──▶ Store agent state (iron_state)                       │
 │       ├──▶ Usage tracking                                       │
-│       └──▶ WebSocket events                                     │
+│       └──▶ WebSocket events (PLANNED)                           │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -76,19 +76,36 @@ Server provides monitoring and configuration:
 | `GET /api/tokens` | List tokens |
 | `DELETE /api/tokens/:id` | Revoke token |
 
-### Monitoring (receives data from clients)
+### Usage Analytics
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/agents/:id/status` | Get agent status |
-| `POST /api/agents/:id/stop` | Request agent stop |
-| `GET /api/usage` | Get budget status |
-| `GET /api/limits` | Get rate limits |
+| `GET /api/usage/aggregate` | Aggregate usage statistics |
+| `GET /api/usage/by-project/:id` | Usage by project |
+| `GET /api/usage/by-provider/:name` | Usage by provider |
 
-### WebSocket
+### Limits Management
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/limits` | List all limits |
+| `POST /api/limits` | Create limit |
+| `GET /api/limits/:id` | Get specific limit |
+| `PUT /api/limits/:id` | Update limit |
+| `DELETE /api/limits/:id` | Delete limit |
+
+### Traces
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/traces` | List all traces |
+| `GET /api/traces/:id` | Get specific trace |
+
+### WebSocket (PLANNED)
+
+> **Note:** WebSocket endpoint exists but events are not yet implemented.
+
 ```
-ws://localhost:8080/ws
+ws://localhost:3000/ws
 ```
-Events: `AgentStarted`, `CostUpdate`, `PiiAlert`, `BudgetWarning`
+Events (PLANNED): `AgentStarted`, `CostUpdate`, `PiiAlert`, `BudgetWarning`
 
 ---
 
@@ -112,12 +129,12 @@ Events: `AgentStarted`, `CostUpdate`, `PiiAlert`, `BudgetWarning`
 3. Server receives updates
        │
        ├──▶ Store in iron_state (DashMap + SQLite)
-       ├──▶ Broadcast via WebSocket
+       ├──▶ Broadcast via WebSocket (PLANNED)
        └──▶ Available via REST API
 
 4. Dashboard/Admin queries server
-   GET /api/agents/:id/status
-   GET /api/usage
+   GET /api/usage/aggregate
+   GET /api/traces
 ```
 
 ---

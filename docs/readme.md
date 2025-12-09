@@ -131,6 +131,22 @@ These design documents are synchronized between both repositories:
 
 ---
 
+## Responsibility Table
+
+| Entity | Responsibility | Input→Output | Scope | Out of Scope |
+|--------|----------------|--------------|-------|--------------|
+| `readme.md` | Documentation index and navigation | - → Directory overview | Structure, navigation, repository context | Module-specific details (see module/*/readme.md) |
+| `api_example.md` | API endpoint reference | - → Endpoint documentation | All REST endpoints, auth, errors | Implementation details (see iron_api module) |
+| `python_lib.md` | Proposed Python API design | - → Future API spec | SafetyRuntime design (PROPOSED) | Current implementation (see python_lib_current.md) |
+| `python_lib_current.md` | Current Python API reference | - → API documentation | iron_runtime.Runtime methods | Future API design (see python_lib.md) |
+| `user_workflow.md` | Architecture and data flow | - → System overview | Client/server interaction, components | API details (see api_example.md) |
+| `repository_architecture.md` | Two-repository design | - → Architecture docs | Module distribution, versioning | Implementation (see module/*) |
+| `deployment_packages.md` | Package definitions | - → Deployment guide | 6 packages, deployment methods | Build scripts (see package.json, Cargo.toml) |
+| `module_package_matrix.md` | Module-to-package mapping | - → 22×6 matrix | Which modules go where | Module internals (see module/*/spec.md) |
+| `package_dependencies.md` | Cross-package dependencies | - → Dependency matrix | Runtime requirements | Code dependencies (see Cargo.toml) |
+
+---
+
 **Last Updated:** 2025-12-08
 **Maintained By:** Iron Cage Team
 **Status:** Active - Two Repository Architecture

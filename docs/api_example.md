@@ -12,6 +12,14 @@
 
 ## Server API
 
+### Health Check
+
+| Method | Endpoint | Caller | Purpose |
+|--------|----------|--------|---------|
+| GET | `/api/health` | Any | Server health status |
+
+---
+
 ### Authentication (Dashboard)
 
 | Method | Endpoint | Caller | Purpose |
@@ -34,23 +42,66 @@
 
 ---
 
-### Monitoring (Dashboard + Client)
+### Usage Analytics (Dashboard)
 
 | Method | Endpoint | Caller | Purpose |
 |--------|----------|--------|---------|
-| GET | `/api/agents/:id/status` | Dashboard | Get agent state |
-| POST | `/api/agents/:id/stop` | Dashboard | Request agent stop |
-| GET | `/api/usage` | Dashboard | Budget status |
-| GET | `/api/limits` | Dashboard | Rate limits |
+| GET | `/api/usage/aggregate` | Dashboard | Aggregate usage statistics |
+| GET | `/api/usage/by-project/:project_id` | Dashboard | Usage by project |
+| GET | `/api/usage/by-provider/:provider` | Dashboard | Usage by provider |
 
 ---
 
-### System
+### Limits Management (Dashboard)
 
 | Method | Endpoint | Caller | Purpose |
 |--------|----------|--------|---------|
-| GET | `/health` | Any | Health check |
-| GET | `/ws` | Dashboard | WebSocket events |
+| GET | `/api/limits` | Dashboard | List all limits |
+| POST | `/api/limits` | Admin | Create new limit |
+| GET | `/api/limits/:id` | Dashboard | Get specific limit |
+| PUT | `/api/limits/:id` | Admin | Update limit |
+| DELETE | `/api/limits/:id` | Admin | Delete limit |
+
+---
+
+### Traces (Dashboard)
+
+| Method | Endpoint | Caller | Purpose |
+|--------|----------|--------|---------|
+| GET | `/api/traces` | Dashboard | List all traces |
+| GET | `/api/traces/:id` | Dashboard | Get specific trace |
+
+---
+
+### Provider Key Management (Dashboard)
+
+| Method | Endpoint | Caller | Purpose |
+|--------|----------|--------|---------|
+| GET | `/api/providers` | Admin | List provider keys |
+| POST | `/api/providers` | Admin | Create provider key |
+| GET | `/api/providers/:id` | Admin | Get provider key |
+| PUT | `/api/providers/:id` | Admin | Update provider key |
+| DELETE | `/api/providers/:id` | Admin | Delete provider key |
+| POST | `/api/projects/:project_id/provider` | Admin | Assign provider to project |
+| DELETE | `/api/projects/:project_id/provider` | Admin | Unassign provider from project |
+
+---
+
+### Key Fetch (Client)
+
+| Method | Endpoint | Caller | Purpose |
+|--------|----------|--------|---------|
+| GET | `/api/keys` | Client | Fetch API key (rate limited: 10/min) |
+
+---
+
+### WebSocket (PLANNED)
+
+> **Note:** WebSocket endpoint exists but events are not yet implemented.
+
+| Method | Endpoint | Caller | Purpose |
+|--------|----------|--------|---------|
+| GET | `/ws` | Dashboard | Real-time events (PLANNED) |
 
 ---
 
@@ -83,8 +134,8 @@ Developer Code          Client (iron_runtime)         Server (iron_api)
       │                        │───────────────────────────▶│
       │                        │                            │
       │                        │         Dashboard ◀────────│
-      │                        │         GET /api/usage     │
-      │                        │         WS events          │
+      │                        │    GET /api/usage/aggregate│
+      │                        │         WS events (PLANNED)│
 ```
 
 ---
@@ -99,7 +150,9 @@ Developer Code          Client (iron_runtime)         Server (iron_api)
 
 ---
 
-## WebSocket Events
+## WebSocket Events (PLANNED)
+
+> **Note:** These events are planned but not yet implemented.
 
 | Event | Source | Purpose |
 |-------|--------|---------|
@@ -127,6 +180,7 @@ Developer Code          Client (iron_runtime)         Server (iron_api)
 
 | Location | Endpoint | Auth | Caller |
 |----------|----------|------|--------|
+| Server | `GET /api/health` | - | Any |
 | Server | `POST /api/auth/login` | - | Dashboard |
 | Server | `POST /api/auth/refresh` | - | Dashboard |
 | Server | `POST /api/auth/logout` | JWT | Dashboard |
@@ -135,12 +189,25 @@ Developer Code          Client (iron_runtime)         Server (iron_api)
 | Server | `GET /api/tokens/:id` | JWT | Admin |
 | Server | `POST /api/tokens/:id/rotate` | JWT | Admin |
 | Server | `DELETE /api/tokens/:id` | JWT | Admin |
-| Server | `GET /api/agents/:id/status` | JWT | Dashboard |
-| Server | `POST /api/agents/:id/stop` | JWT | Dashboard |
-| Server | `GET /api/usage` | JWT | Dashboard |
+| Server | `GET /api/usage/aggregate` | JWT | Dashboard |
+| Server | `GET /api/usage/by-project/:id` | JWT | Dashboard |
+| Server | `GET /api/usage/by-provider/:name` | JWT | Dashboard |
 | Server | `GET /api/limits` | JWT | Dashboard |
-| Server | `GET /health` | - | Any |
-| Server | `GET /ws` | JWT | Dashboard |
+| Server | `POST /api/limits` | JWT | Admin |
+| Server | `GET /api/limits/:id` | JWT | Dashboard |
+| Server | `PUT /api/limits/:id` | JWT | Admin |
+| Server | `DELETE /api/limits/:id` | JWT | Admin |
+| Server | `GET /api/traces` | JWT | Dashboard |
+| Server | `GET /api/traces/:id` | JWT | Dashboard |
+| Server | `GET /api/providers` | JWT | Admin |
+| Server | `POST /api/providers` | JWT | Admin |
+| Server | `GET /api/providers/:id` | JWT | Admin |
+| Server | `PUT /api/providers/:id` | JWT | Admin |
+| Server | `DELETE /api/providers/:id` | JWT | Admin |
+| Server | `POST /api/projects/:id/provider` | JWT | Admin |
+| Server | `DELETE /api/projects/:id/provider` | JWT | Admin |
+| Server | `GET /api/keys` | IC Token | Client |
+| Server | `GET /ws` | JWT | Dashboard (PLANNED) |
 | Client | `Runtime()` | - | Developer |
 | Client | `start_agent()` | - | Developer |
 | Client | `stop_agent()` | - | Developer |
