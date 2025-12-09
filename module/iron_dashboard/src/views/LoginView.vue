@@ -38,7 +38,7 @@ async function handleLogin() {
   <div class="min-h-screen flex items-center justify-center bg-gray-50">
     <Card class="w-full max-w-md">
       <CardHeader class="space-y-1">
-        <CardTitle class="text-3xl text-center">Iron Token Manager</CardTitle>
+        <CardTitle class="text-3xl text-center">Iron Dashboard</CardTitle>
         <CardDescription class="text-center">
           Sign in to your account
         </CardDescription>
