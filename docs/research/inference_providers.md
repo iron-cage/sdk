@@ -35,7 +35,7 @@
  - Cohere (spending limit in [billing](https://dashboard.cohere.com/billing?tab=spending-limit))
  - Mistral AI (Organization limits in [Limits](https://admin.mistral.ai/plateforme/limits))
 
-### Providers WITH Per-Project billing (Clouds)
+## Providers WITH Per-Project billing (Clouds)
  - AWS Bedrock (kill-switch can be developed for [policy](https://docs.aws.amazon.com/pdfs/bedrock/latest/userguide/bedrock-ug.pdf) - page 57)
  - Google Gemini (kill-switch in [cloud](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications#cap_and_disable_billing_to_stop_usage))
  - Azure OpenAI (kill-switch via [action groups](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets?tabs=psbudget#trigger-an-action-group))
@@ -66,6 +66,29 @@
 - Replicate ([rate limits are predefined](https://replicate.com/docs/topics/predictions/rate-limits))
 
 **Final Outcome:** OpenAI, Antropic and Mistral AI allow to explicitly setup project limits via API or web interface. Cloud providers have infrastructure to setup custom rate limits. However, there are some providers that don't allow to setup rate limits explicitly, relying on customer tiers and sales-support to set custom rate limits. xAI grok allows to adjust rate limits programmatically.
+
+
+## Summary Table
+
+| Provider       | Programmatic Key Management 🔑 | Hard Limit Availability 💰 | Rate Limit Config 🚀 |
+|----------------|:--------------------------------:|:--------------------------:|:--------------------:|
+| AWS Bedrock  ☁️| ✅                              | ✅                         | ✅                   |
+| xAI Grok       | ✅                              | 💲                         | ✅                   |
+| Azure OpenAI ☁️| ⚠️                              | ✅                         | ✅                   |
+| Google Gemini☁️| ⚠️                              | ✅                         | ✅                   |
+| OpenAI         | ❌                              | ✅                         | ✅                   |
+| Anthropic      | ❌                              | 💲                         | ✅                   |
+| Groq           | ❌                              | ✅                         | ❌                   |
+| Cohere         | ❌                              | ✅                         | ❌                   |
+| Mistral AI     | ❌                              | ✅                         | ✅                   |
+| Together AI    | ❌                              | 💲                         | ❌                   |
+| Replicate      | ❌                              | 💲                         | ❌                   |
+
+**Legend:**
+- ✅ Full support
+- ⚠️ Partial support
+- ❌ No direct support
+- 💲 Credit system / external billing
 
 ## Vocabulary
 
