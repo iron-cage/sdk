@@ -114,14 +114,22 @@ Idea → ADR (if significant) → Spec Update → Tests (RED) → Implementation
 
 ### 4. File Creation Protocol
 
-**Principle:** Check readme.md before creating any file.
+**Principle:** Check readme.md Responsibility Table before creating any file.
 
 **Process:**
 1. Open [directory]/readme.md
-2. Check Responsibility Table Input→Output column
-3. If your file's I/O matches existing row → Use that file, don't create new
-4. If no match → Add row with File and Input→Output
-5. Commit readme.md update + new file together (atomic change)
+2. Check Responsibility Table (3 columns: ID, Entity, Responsibility)
+3. Review existing file responsibilities
+4. If your intended file responsibility matches existing file → Use that file, don't create new
+5. If no match → Add row to table: `| NNN | **NNN_file_name.md** | Describe what file is responsible for |`
+6. Commit readme.md update + new file together (atomic change)
+
+**Responsibility Table Format:**
+```markdown
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| 001 | **001_file_name.md** | Brief description (key details in parentheses) |
+```
 
 **Prohibited filenames:**
 - utils.rs, helpers.rs, common.rs, misc.rs

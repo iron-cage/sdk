@@ -48,8 +48,8 @@ When adding documentation for a new feature:
 
 1. Create `feature_name.md` as the primary overview document
 2. Add supporting documents as needed (api_reference, implementation_plan, etc.)
-3. Update this readme.md with new entries in the Responsibility Table
-4. Ensure Out of Scope column has 3+ cross-references
+3. Update this readme.md with new entries in the Responsibility Table (3 columns: ID, Entity, Responsibility)
+4. Add cross-references in file's "Related" section at bottom
 
 ---
 

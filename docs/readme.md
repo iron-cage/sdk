@@ -28,11 +28,11 @@ Houses comprehensive design documentation that explains architecture, deployment
 
 Root-level reference documents in docs/:
 
-| Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|--------|----------------|----------------|-------|--------------|
-| **vocabulary.md** | Define canonical project terminology | Term question → Definition | Project-specific terms, glossary, terminology standards, naming conventions | NOT implementation details (→ module/*/spec.md), NOT architecture concepts (→ architecture/), NOT design decisions (→ decisions/) |
-| **module_package_matrix.md** | Map modules to deployment packages | Module location question → Package assignment | 20 modules across 5 packages, module distribution analysis, shared modules, reuse patterns | NOT package definitions (→ deployment/001_package_model.md), NOT module specs (→ module/*/spec.md), NOT deployment procedures (→ deployment_guide.md) |
-| **deployment_guide.md** | Document operational deployment procedures | Deployment question → Operational guide | Deployment procedures, configuration, environment setup, troubleshooting | NOT package model (→ deployment/001_package_model.md), NOT module mappings (→ module_package_matrix.md), NOT architecture (→ architecture/) |
+| Entity | Responsibility |
+|--------|----------------|
+| **vocabulary.md** | Define canonical project terminology (glossary, naming conventions, project-specific terms) |
+| **module_package_matrix.md** | Map modules to deployment packages (20 modules across 5 packages, distribution analysis) |
+| **deployment_guide.md** | Document operational deployment procedures (configuration, environment setup, troubleshooting) |
 
 ---
 
@@ -216,8 +216,8 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 | pilot/execution/ | 3 | ✅ Compliant |
 
 **Validation:**
-- ✅ One-Second Test passed (no duplicate Input→Output signatures)
-- ✅ All Out of Scope columns have ≥3 cross-references
+- ✅ All Responsibility Tables use correct format (3 columns: ID, Entity, Responsibility)
+- ✅ No duplicate file responsibilities within same directory
 - ✅ All cross-referenced files verified to exist
 
 ---

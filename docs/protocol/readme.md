@@ -6,12 +6,12 @@ Communication protocols defining message formats, wire protocols, and version co
 
 ## Directory Responsibilities
 
-| ID | Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|----|--------|----------------|----------------|-------|--------------|
-| 002 | **002_rest_api_protocol.md** | Document HTTP endpoint schemas | REST API question → Protocol spec | Control Panel endpoints (auth handshake, budget report/refresh, token CRUD), request/response formats, HTTP status codes | NOT WebSocket (→ 003), NOT implementation (→ module/iron_api/), NOT budget logic (→ 005) |
-| 003 | **003_websocket_protocol.md** | Specify real-time dashboard message format | WebSocket question → Message protocol | Message types (STATE_UPDATE, AGENT_EVENT, COST_ALERT), connection lifecycle, heartbeat, reconnection | NOT REST API (→ 002), NOT implementation (→ module/iron_api/), NOT budget logic (→ 005) |
-| 004 | **004_mcp_integration_protocol.md** | Define Model Context Protocol implementation | MCP question → Integration protocol | Tool discovery, invocation, error mapping (Iron Cage ↔ MCP), governance layer integration | NOT REST API (→ 002), NOT WebSocket (→ 003), NOT capability overview (→ capabilities/006) |
-| 005 | **005_budget_control_protocol.md** | Document budget and token management protocol | Budget control question → Protocol flow | Two-token system (IC/IP), budget borrowing/leasing, token handshake, usage reporting, budget refresh | NOT capability overview (→ capabilities/002), NOT implementation (→ module/iron_cost/), NOT REST/WebSocket details (→ 002, 003) |
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| 002 | **002_rest_api_protocol.md** | Document HTTP REST API endpoint schemas for Control Panel operations (budget handshake, reporting, refresh, token management) |
+| 003 | **003_websocket_protocol.md** | Specify real-time dashboard WebSocket message format (STATE_UPDATE, AGENT_EVENT, COST_ALERT, connection lifecycle, heartbeat) |
+| 004 | **004_mcp_integration_protocol.md** | Define Model Context Protocol implementation (tool discovery, invocation, error mapping Iron Cage ↔ MCP) |
+| 005 | **005_budget_control_protocol.md** | Document budget enforcement and token management protocol (two-token system, budget borrowing, token handshake) |
 
 ---
 
