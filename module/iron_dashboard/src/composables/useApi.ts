@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 interface TokenMetadata {
   id: number
   user_id: string
-  project_id?: string
+  provider?: string
   name?: string
   created_at: number
   last_used_at?: number
@@ -22,7 +22,7 @@ interface CreateTokenResponse {
   id: number
   token: string
   user_id: string
-  project_id?: string
+  provider?: string
   description?: string
   created_at: number
 }
@@ -329,6 +329,110 @@ export function useApi() {
     })
   }
 
+  // Agent API methods (MOCKED)
+  async function getAgents(): Promise<Agent[]> {
+    const authStore = useAuthStore()
+    
+    // Mock data - all agents
+    const allAgents = [
+      { id: 1, name: 'Support Bot', providers: ['openai', 'anthropic'], created_at: Date.now() - 1000000 },
+      { id: 2, name: 'Sales Assistant', providers: ['openai'], created_at: Date.now() - 500000 },
+      { id: 3, name: 'Admin Bot', providers: ['anthropic'], created_at: Date.now() - 300000 },
+    ]
+    
+    // Admin sees all agents
+    if (authStore.isAdmin) {
+      return Promise.resolve(allAgents)
+    }
+    
+    // Regular users only see agents where they have tokens
+    // For mock: assume current user has tokens for agents 1 and 2
+    return Promise.resolve(allAgents.filter(a => a.id === 1 || a.id === 2))
+  }
+
+  async function getAgent(id: number): Promise<Agent> {
+    // Mock data
+    const agents = {
+      1: { id: 1, name: 'Support Bot', providers: ['openai', 'anthropic'], created_at: Date.now() - 1000000 },
+      2: { id: 2, name: 'Sales Assistant', providers: ['openai'], created_at: Date.now() - 500000 },
+      3: { id: 3, name: 'Admin Bot', providers: ['anthropic'], created_at: Date.now() - 300000 },
+    }
+    return Promise.resolve(agents[id as keyof typeof agents] || agents[1])
+  }
+
+  async function createAgent(data: { name: string; providers: string[] }): Promise<Agent> {
+    // Mock response
+    return Promise.resolve({
+      id: Math.floor(Math.random() * 1000),
+      name: data.name,
+      providers: data.providers,
+      created_at: Date.now(),
+    })
+  }
+
+  async function deleteAgent(_id: number): Promise<void> {
+    // Mock response
+    return Promise.resolve()
+  }
+
+  async function getAgentTokens(_agentId: number): Promise<TokenMetadata[]> {
+    const authStore = useAuthStore()
+    
+    // Mock data - all tokens for this agent
+    const allTokens = [
+      {
+        id: 101,
+        user_id: 'admin',
+        provider: 'openai',
+        name: 'Admin Token',
+        created_at: Date.now() - 100000,
+        is_active: true,
+      },
+      {
+        id: 102,
+        user_id: authStore.username || 'user',
+        provider: 'anthropic',
+        name: 'User Token',
+        created_at: Date.now() - 50000,
+        is_active: true,
+      },
+      {
+        id: 103,
+        user_id: authStore.username || 'user',
+        provider: 'openai',
+        name: 'Another User Token',
+        created_at: Date.now() - 25000,
+        is_active: true,
+      },
+    ]
+    
+    // Admin sees all tokens
+    if (authStore.isAdmin) {
+      return Promise.resolve(allTokens)
+    }
+    
+    // Regular users only see their own tokens
+    return Promise.resolve(allTokens.filter(t => t.user_id === authStore.username))
+  }
+
+  async function createAgentToken(data: { agent_id: number; user_id: string; provider: string; description?: string }): Promise<CreateTokenResponse> {
+    // Mock response
+    return Promise.resolve({
+      id: Math.floor(Math.random() * 1000),
+      token: 'sk-iron-' + Math.random().toString(36).substring(2),
+      user_id: data.user_id,
+      provider: data.provider,
+      description: data.description,
+      created_at: Date.now(),
+    })
+  }
+
+  async function updateTokenProvider(tokenId: number, provider: string): Promise<void> {
+    // Mock response - allows users to switch provider
+    console.log(`Switching token ${tokenId} to provider ${provider}`)
+    return Promise.resolve()
+  }
+
   return {
     getTokens,
     getToken,
@@ -356,6 +460,14 @@ export function useApi() {
     createUser,
     updateUserStatus,
     deleteUser,
+    // Agent methods
+    getAgents,
+    getAgent,
+    createAgent,
+    deleteAgent,
+    getAgentTokens,
+    createAgentToken,
+    updateTokenProvider,
   }
 }
 
@@ -370,6 +482,13 @@ interface CreateUserRequest {
   username: string
   password: string
   role?: string
+}
+
+export interface Agent {
+  id: number
+  name: string
+  providers: string[]
+  created_at: number
 }
 
 export type {

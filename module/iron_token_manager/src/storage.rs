@@ -109,6 +109,23 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
+    // Migration 005: Agents table and token updates
+    let migration_005_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_005_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_005_completed == 0
+    {
+      let migration_005 = include_str!( "../migrations/005_create_agents_table.sql" );
+      sqlx::raw_sql( migration_005 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),

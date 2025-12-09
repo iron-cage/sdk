@@ -61,7 +61,7 @@ async function handleLogout() {
         </router-link>
 
         <router-link
-          to="/tokens"
+          to="/agents"
           class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
         >
           <svg
@@ -74,10 +74,10 @@ async function handleLogout() {
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3M3.343 15.657l.707-.707m16.536-5.657l-.707.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
-          Tokens
+          Agents
         </router-link>
 
         <router-link
@@ -141,6 +141,7 @@ async function handleLogout() {
         </router-link>
 
         <router-link
+          v-if="authStore.isAdmin"
           to="/providers"
           class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
         >

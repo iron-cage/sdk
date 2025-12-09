@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type TokenMetadata, type CreateTokenResponse } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
@@ -15,37 +16,58 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+const route = useRoute()
 const api = useApi()
 const authStore = useAuthStore()
 const queryClient = useQueryClient()
 
+const agentId = parseInt(route.params.agentId as string)
+
 const showCreateModal = ref(false)
 const showTokenModal = ref(false)
+const showSwitchProviderModal = ref(false)
 const newTokenData = ref<CreateTokenResponse | null>(null)
-const projectId = ref('')
+const selectedProvider = ref('')
 const description = ref('')
 const createError = ref('')
+const targetUserId = ref('')
+const switchingToken = ref<TokenMetadata | null>(null)
+const newProvider = ref('')
 
-// Fetch tokens
+// Fetch agent details
+const { data: agent } = useQuery({
+  queryKey: ['agent', agentId],
+  queryFn: () => api.getAgent(agentId),
+})
+
+// Fetch tokens for this agent
 const { data: tokens, isLoading, error, refetch } = useQuery({
-  queryKey: ['tokens'],
-  queryFn: () => api.getTokens(),
+  queryKey: ['agent-tokens', agentId],
+  queryFn: () => api.getAgentTokens(agentId),
 })
 
 // Create token mutation
 const createMutation = useMutation({
-  mutationFn: (data: { user_id: string; project_id?: string; description?: string }) =>
-    api.createToken(data),
+  mutationFn: (data: { agent_id: number; user_id: string; provider: string; description?: string }) =>
+    api.createAgentToken(data),
   onSuccess: (data) => {
     newTokenData.value = data
     showCreateModal.value = false
     showTokenModal.value = true
-    projectId.value = ''
+    selectedProvider.value = ''
     description.value = ''
+    targetUserId.value = ''
     createError.value = ''
-    queryClient.invalidateQueries({ queryKey: ['tokens'] })
+    queryClient.invalidateQueries({ queryKey: ['agent-tokens', agentId] })
   },
   onError: (err) => {
     createError.value = err instanceof Error ? err.message : 'Failed to create token'
@@ -58,7 +80,7 @@ const rotateMutation = useMutation({
   onSuccess: (data) => {
     newTokenData.value = data
     showTokenModal.value = true
-    queryClient.invalidateQueries({ queryKey: ['tokens'] })
+    queryClient.invalidateQueries({ queryKey: ['agent-tokens', agentId] })
   },
 })
 
@@ -66,15 +88,38 @@ const rotateMutation = useMutation({
 const revokeMutation = useMutation({
   mutationFn: (id: number) => api.revokeToken(id),
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['tokens'] })
+    queryClient.invalidateQueries({ queryKey: ['agent-tokens', agentId] })
+  },
+})
+
+// Switch provider mutation
+const switchProviderMutation = useMutation({
+  mutationFn: (data: { tokenId: number; provider: string }) =>
+    api.updateTokenProvider(data.tokenId, data.provider),
+  onSuccess: () => {
+    showSwitchProviderModal.value = false
+    switchingToken.value = null
+    newProvider.value = ''
+    queryClient.invalidateQueries({ queryKey: ['agent-tokens', agentId] })
   },
 })
 
 function handleCreateToken() {
+  if (!selectedProvider.value) {
+    createError.value = 'Provider is required'
+    return
+  }
+
+  // Admin can create tokens for other users
+  const userId = authStore.isAdmin && targetUserId.value 
+    ? targetUserId.value 
+    : authStore.username || 'default'
+
   createError.value = ''
   createMutation.mutate({
-    user_id: authStore.username || 'default',
-    project_id: projectId.value || undefined,
+    agent_id: agentId,
+    user_id: userId,
+    provider: selectedProvider.value,
     description: description.value || undefined,
   })
 }
@@ -91,6 +136,28 @@ function handleRevokeToken(token: TokenMetadata) {
   }
 }
 
+function openSwitchProviderModal(token: TokenMetadata) {
+  switchingToken.value = token
+  newProvider.value = token.provider || ''
+  showSwitchProviderModal.value = true
+}
+
+function handleSwitchProvider() {
+  if (!switchingToken.value || !newProvider.value) return
+  
+  switchProviderMutation.mutate({
+    tokenId: switchingToken.value.id,
+    provider: newProvider.value,
+  })
+}
+
+function canManageToken(token: TokenMetadata): boolean {
+  // Admin can manage all tokens
+  if (authStore.isAdmin) return true
+  // Users can only manage their own tokens
+  return token.user_id === authStore.username
+}
+
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
 }
@@ -104,8 +171,15 @@ function copyToken(token: string) {
 <template>
   <div>
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Token Management</h1>
-      <Button @click="showCreateModal = true">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">
+          Agent Tokens: {{ agent?.name || 'Loading...' }}
+        </h1>
+        <router-link to="/agents" class="text-sm text-blue-600 hover:underline">
+          &larr; Back to Agents
+        </router-link>
+      </div>
+      <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
         Generate New Token
       </Button>
     </div>
@@ -131,6 +205,9 @@ function copyToken(token: string) {
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               ID
             </th>
+            <th v-if="authStore.isAdmin" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              User
+            </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Provider
             </th>
@@ -153,6 +230,9 @@ function copyToken(token: string) {
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ token.id }}
             </td>
+            <td v-if="authStore.isAdmin" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ token.user_id }}
+            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <Badge variant="outline">{{ token.provider || '-' }}</Badge>
             </td>
@@ -169,7 +249,16 @@ function copyToken(token: string) {
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
               <Button
-                v-if="token.is_active"
+                v-if="token.is_active && agent && agent.providers.length > 1 && canManageToken(token)"
+                @click="openSwitchProviderModal(token)"
+                :disabled="switchProviderMutation.isPending.value"
+                variant="ghost"
+                size="sm"
+              >
+                Switch
+              </Button>
+              <Button
+                v-if="token.is_active && canManageToken(token)"
                 @click="handleRotateToken(token)"
                 :disabled="rotateMutation.isPending.value"
                 variant="ghost"
@@ -178,7 +267,7 @@ function copyToken(token: string) {
                 Rotate
               </Button>
               <Button
-                v-if="token.is_active"
+                v-if="token.is_active && canManageToken(token)"
                 @click="handleRevokeToken(token)"
                 :disabled="revokeMutation.isPending.value"
                 variant="ghost"
@@ -195,7 +284,7 @@ function copyToken(token: string) {
 
     <!-- Empty state -->
     <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-gray-600 mb-4">No tokens found</p>
+      <p class="text-gray-600 mb-4">No tokens found for this agent</p>
       <Button @click="showCreateModal = true">
         Generate First Token
       </Button>
@@ -207,7 +296,7 @@ function copyToken(token: string) {
         <DialogHeader>
           <DialogTitle>Generate New Token</DialogTitle>
           <DialogDescription>
-            Create a new API token with optional project ID and description.
+            Create a new API token for this agent.
           </DialogDescription>
         </DialogHeader>
 
@@ -216,14 +305,35 @@ function copyToken(token: string) {
         </Alert>
 
         <div class="space-y-4 py-4">
-          <div class="space-y-2">
-            <Label for="project">Project ID (optional)</Label>
+          <div v-if="authStore.isAdmin" class="space-y-2">
+            <Label for="targetUser">User (Admin only)</Label>
             <Input
-              id="project"
-              v-model="projectId"
-              placeholder="my-project"
+              id="targetUser"
+              v-model="targetUserId"
+              placeholder="Leave empty for yourself"
               :disabled="createMutation.isPending.value"
             />
+            <p class="text-xs text-gray-500">
+              Specify a username to create the token for another user.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="provider">Provider</Label>
+            <Select v-model="selectedProvider" :disabled="createMutation.isPending.value">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem 
+                  v-for="provider in agent?.providers || []" 
+                  :key="provider" 
+                  :value="provider"
+                >
+                  {{ provider }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div class="space-y-2">
@@ -250,6 +360,54 @@ function copyToken(token: string) {
             :disabled="createMutation.isPending.value"
           >
             {{ createMutation.isPending.value ? 'Generating...' : 'Generate Token' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Switch Provider Modal -->
+    <Dialog v-model:open="showSwitchProviderModal">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Switch Provider</DialogTitle>
+          <DialogDescription>
+            Change the AI provider for this token.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="newProvider">New Provider</Label>
+            <Select v-model="newProvider" :disabled="switchProviderMutation.isPending.value">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem 
+                  v-for="provider in agent?.providers || []" 
+                  :key="provider" 
+                  :value="provider"
+                >
+                  {{ provider }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            @click="showSwitchProviderModal = false"
+            :disabled="switchProviderMutation.isPending.value"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button
+            @click="handleSwitchProvider"
+            :disabled="switchProviderMutation.isPending.value"
+          >
+            {{ switchProviderMutation.isPending.value ? 'Switching...' : 'Switch Provider' }}
           </Button>
         </DialogFooter>
       </DialogContent>
