@@ -2,10 +2,12 @@
 # Minimal commands for daily development workflow
 
 .PHONY: help dev api dashboard test clean setup status db-reset db-seed ports validate build
+.PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-clean
 .DEFAULT_GOAL := help
 
 # Configuration
 DASHBOARD_DIR := module/iron_dashboard
+RUNTIME_DIR := module/iron_runtime
 DB_FILE := module/iron_api/iron_api.db
 
 #===============================================================================
@@ -100,3 +102,39 @@ ports: ## Kill processes on ports 3000/5173
 	@lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
 	@lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
 	@echo "Ports 3000 and 5173 cleared"
+
+#===============================================================================
+# Python Bindings (iron_runtime / LlmRouter)
+#===============================================================================
+
+py-build: ## Build iron_runtime Python wheel (release)
+	cd $(RUNTIME_DIR) && maturin build --release
+
+py-dev: ## Build and install iron_runtime for development
+	cd $(RUNTIME_DIR) && maturin develop
+
+py-test: ## Run iron_runtime Python tests (unit)
+	cd $(RUNTIME_DIR) && python -m pytest python/tests/ -v --ignore=python/tests/test_llm_router_e2e.py
+
+py-test-e2e: ## Run E2E tests (requires IC_TOKEN, IC_SERVER)
+	@if [ -z "$$IC_TOKEN" ] || [ -z "$$IC_SERVER" ]; then \
+		echo "ERROR: Set IC_TOKEN and IC_SERVER environment variables"; \
+		echo "  export IC_TOKEN=iron_xxx"; \
+		echo "  export IC_SERVER=http://localhost:3000"; \
+		exit 1; \
+	fi
+	cd $(RUNTIME_DIR) && python -m pytest python/tests/test_llm_router_e2e.py -v
+
+py-test-manual: ## Run manual LlmRouter test (requires IC_TOKEN, IC_SERVER)
+	@if [ -z "$$IC_TOKEN" ] || [ -z "$$IC_SERVER" ]; then \
+		echo "ERROR: Set IC_TOKEN and IC_SERVER environment variables"; \
+		echo "  export IC_TOKEN=iron_xxx"; \
+		echo "  export IC_SERVER=http://localhost:3000"; \
+		exit 1; \
+	fi
+	cd $(RUNTIME_DIR) && python python/examples/test_manual.py
+
+py-clean: ## Clean Python build artifacts
+	cd $(RUNTIME_DIR) && rm -rf target/wheels dist *.egg-info
+	find $(RUNTIME_DIR) -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find $(RUNTIME_DIR) -type f -name "*.so" -delete 2>/dev/null || true
