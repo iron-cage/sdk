@@ -10,10 +10,9 @@
 |--------|----------------|----------------|-------|--------------|
 | 001 | **001_cli_architecture.md** | CLI tools architecture overview | Architecture question → Tool selection guidance | CLI responsibilities, wrapper pattern, binary discovery | iron_cli implementation (→ module/iron_cli/spec.md), iron_cli_py implementation (→ module/iron_cli_py/spec.md), Architecture decision rationale (→ pilot/decisions/002-cli-architecture.md) |
 | 002 | **002_token_management.md** | Token management feature overview | User need → Feature description | Feature concepts, user workflows, integration points | API details (→ token_management_api_reference.md), CLI specifics (→ token_management_cli_api_parity.md), Implementation (→ token_management_implementation_plan.md) |
-| 003 | **003_token_management_api_reference.md** | Token API endpoint reference | API call → Response schema | REST endpoints, request/response formats, error codes | Feature concepts (→ token_management.md), CLI commands (→ token_management_cli_api_parity.md), Validation rules (→ token_management_validation_framework.md) |
+| 003 | **003_token_management_api_reference.md** | Token API endpoint reference | API call → Response schema | REST endpoints, request/response formats, error codes | Feature concepts (→ token_management.md), CLI commands (→ token_management_cli_api_parity.md), Implementation plan (→ token_management_implementation_plan.md) |
 | 004 | **004_token_management_cli_api_parity.md** | CLI/API parity matrix | CLI command → API equivalent | Command mapping, coverage gaps, implementation status | API details (→ token_management_api_reference.md), Feature overview (→ token_management.md), Implementation timeline (→ token_management_implementation_plan.md) |
-| 005 | **005_token_management_implementation_plan.md** | Implementation roadmap | Requirement → Implementation steps | Phases, milestones, technical approach | API reference (→ token_management_api_reference.md), Validation (→ token_management_validation_framework.md), Feature overview (→ token_management.md) |
-| 006 | **006_token_management_validation_framework.md** | Validation framework | Input → Validation rules | Validation patterns, error handling, test coverage | Implementation details (→ token_management_implementation_plan.md), API endpoints (→ token_management_api_reference.md), Feature concepts (→ token_management.md) |
+| 005 | **005_token_management_implementation_plan.md** | Implementation roadmap | Requirement → Implementation steps | Phases, milestones, technical approach | API reference (→ token_management_api_reference.md), Feature overview (→ token_management.md), CLI parity (→ token_management_cli_api_parity.md) |
 
 ---
 
@@ -25,7 +24,6 @@ Token Management documentation follows a layered structure:
 2. **API Reference** (`token_management_api_reference.md`) - For developers using the API
 3. **CLI Parity** (`token_management_cli_api_parity.md`) - For CLI users
 4. **Implementation** (`token_management_implementation_plan.md`) - For contributors
-5. **Validation** (`token_management_validation_framework.md`) - For QA/testing
 
 ```
                     ┌────────────────────────┐
@@ -39,15 +37,7 @@ Token Management documentation follows a layered structure:
 ┌───────────────────┐ ┌────────────────────┐ ┌─────────────────────┐
 │ api_reference.md  │ │ cli_api_parity.md  │ │ implementation_     │
 │   (REST API)      │ │  (CLI Commands)    │ │    plan.md          │
-└─────────┬─────────┘ └────────────────────┘ └──────────┬──────────┘
-          │                                             │
-          └──────────────────┬──────────────────────────┘
-                             │
-                             ▼
-                 ┌───────────────────────────┐
-                 │ validation_framework.md   │
-                 │  (Test & Validation)      │
-                 └───────────────────────────┘
+└───────────────────┘ └────────────────────┘ └─────────────────────┘
 ```
 
 ---

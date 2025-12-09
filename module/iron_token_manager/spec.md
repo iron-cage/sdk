@@ -6,6 +6,8 @@
 **Layer:** 3 (Feature)
 **Date:** 2025-12-09
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility.
+
 ---
 
 ## Scope

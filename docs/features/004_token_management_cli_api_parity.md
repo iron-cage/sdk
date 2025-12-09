@@ -6,7 +6,6 @@
 **Related Documents:**
 - Architecture: [002_token_management.md](002_token_management.md)
 - Implementation Plan: [005_token_management_implementation_plan.md](005_token_management_implementation_plan.md)
-- Validation Framework: [006_token_management_validation_framework.md](006_token_management_validation_framework.md)
 
 ---
 

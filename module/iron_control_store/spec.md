@@ -5,6 +5,8 @@
 **Purpose:** PostgreSQL schema for production Control Panel
 **Status:** Planning
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. This is a spec-only module - implementation planned for production phase. Schema definitions document intent, not enforce exact structure.
+
 ---
 
 ## Overview
