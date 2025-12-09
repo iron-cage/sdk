@@ -8,22 +8,22 @@
 ## Programmatic Key Management
 
 ### Providers WITH Full Programmatic Key Management 
-- AWS Bedrock [AWS docmentation](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html#api-keys-generate-api-long-term)
+- AWS Bedrock [AWS documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html#api-keys-generate-api-long-term)
 
-### Providerw WITH Partial Programmatic Key Management
+### Providers WITH Partial Programmatic Key Management
 - Azure OpenAI [Forum answer](https://learn.microsoft.com/en-us/answers/questions/1630958/will-the-azure-openai-api-key-be-expired-and-is-th)
 - Google Gemini ([Can be configured in `gcloud` CLI, but needs Google Authorization first](https://docs.cloud.google.com/iam/docs/keys-create-delete#rest))
 
 ### Providers WITHOUT Programmatic Key Management
  - OpenAI (Has [administrator RESTful API](https://platform.openai.com/docs/api-reference/project-api-keys), but doesn't allow to create project keys.)
- - Antropic (Has [endpoints](https://platform.claude.com/docs/en/api/admin/api_keys/retrieve) only for read-update)
+ - Anthropic (Has [endpoints](https://platform.claude.com/docs/en/api/admin/api_keys/retrieve) only for read-update)
  - Groq (Only [web UI](https://console.groq.com/keys))
  - Cohere (Only [web UI](https://dashboard.cohere.com/api-keys))
  - Mistral AI (Only [web UI](https://admin.mistral.ai/organization/api-keys))
  - Together AI (Only [web UI](https://docs.together.ai/docs/together-and-llamarank#1-get-your-together-api-key))
  - Replicate (Only [web UI](https://replicate.com/docs/reference/http))
 
-**Final Outcome:** Cloud providers have their own RESTful API and CLI for service control that includes AI service, but setup needs extensive authorization procedure (e. g. Google Sign In). Other popular services rely on web UI for token setup and control. However, there are solution with programatic key control, not present in report (`xAI grok`, `Baseten`).
+**Final Outcome:** Cloud providers have their own RESTful API and CLI for service control that includes AI service, but setup needs extensive authorization procedure (e. g. Google Sign In). Other popular services rely on web UI for token setup and control. However, there are solution with programmatic key control, not present in report (`xAI grok`, `Baseten`).
 
 ## Hard Limit availability (Billing limit)
 
@@ -33,7 +33,7 @@
  - Cohere (spending limit in [billing](https://dashboard.cohere.com/billing?tab=spending-limit))
  - Mistral AI (Organization limits in [Limits](https://admin.mistral.ai/plateforme/limits))
 
-### Providers WITH Outer Hard billing (Clouds)
+### Providers WITH Cloud-level Hard billing (Clouds)
  - AWS Bedrock (kill-switch can be developed for [policy](https://docs.aws.amazon.com/pdfs/bedrock/latest/userguide/bedrock-ug.pdf) - page 57)
  - Google Gemini (kill-switch in [cloud](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications#cap_and_disable_billing_to_stop_usage))
  - Azure OpenAI (kill-switch via [action groups](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets?tabs=psbudget#trigger-an-action-group))
@@ -43,7 +43,7 @@
  - Together AI ([Credits + Autorecharge Configurable Option](https://docs.together.ai/docs/billing#auto-recharge-credits))
  - Replicate ([Prepaid Credits + Arrears Billed accounts for overspending](https://replicate.com/docs/topics/billing#billing))
 
-**Final Outcome:** Almost any inference provider has an option for setting up hard-billing (except Deepseek, it is not present in report). LLM Providers usually allow to setup billing explicitly in USD. Cloud providers have outer billing, there are no hard-limit setup directly inside their LLM Services, but it can be implemented using other provided infrastructure. Some providers allow to buy credits and setup billing for overspent tokens as option.
+**Final Outcome:** Almost any inference provider has an option for setting up hard-billing (except DeepSeek, it is not present in report). LLM Providers usually allow to setting up billing explicitly in USD. Cloud providers have outer billing, there are no hard-limit setup directly inside their LLM Services, but it can be implemented using other provided infrastructure. Some providers allow to buy credits and setup billing for overspent tokens as option.
 
 ## Rate Limit Config
 
@@ -53,7 +53,7 @@
 - Mistral AI (Maximum request per second adjustment in [Limits](https://admin.mistral.ai/plateforme/limits))
 - Azure OpenAI (allows [TPM setup on model deploy](https://www.youtube.com/watch?v=RT9boo1wZ4g) - 2m08s)
 - AWS Bedrock (Via [Provisioned Throughput](https://docs.aws.amazon.com/bedrock/latest/userguide/prov-throughput.html) allows set higher rate limits)
-- Google Gemini (using [Google Cloud Console Quote](https://console.cloud.google.com/iam-admin/quotas) with `Request limit per minute for a region`)
+- Google Gemini (using [Google Cloud Console Quotas](https://console.cloud.google.com/iam-admin/quotas) with `Request limit per minute for a region`)
 
 ### Providers WITHOUT Rate limit adjusting
 - Groq ([limits predefined for free and developer plan limits](https://console.groq.com/docs/rate-limits#rate-limits))
