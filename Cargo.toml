@@ -300,7 +300,30 @@ path = "module/iron_cli"
 [workspace.dependencies.iron_control_store]
 path = "module/iron_control_store"
 
+## HTTP Client
+
+[workspace.dependencies.reqwest]
+version = "0.12"
+features = ["json"]
+
+## Environment Loading
+
+[workspace.dependencies.dotenvy]
+version = "0.15"
+
+## Password Hashing
+
+[workspace.dependencies.bcrypt]
+version = "0.16"
+
 ## Dev Dependencies
 
 [workspace.dependencies.tempfile]
 version = "3.0"
+
+[workspace.dependencies.hyper]
+version = "1.5"
+features = ["full"]
+
+[workspace.dependencies.http-body-util]
+version = "0.1"

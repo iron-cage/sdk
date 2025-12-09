@@ -23,6 +23,9 @@ pub mod error;
 pub mod user_auth;
 
 #[cfg(feature = "enabled")]
+pub mod token_auth;
+
+#[cfg(feature = "enabled")]
 mod implementation
 {
   use axum::{

@@ -92,6 +92,38 @@ interface TraceRecord {
   metadata?: Record<string, unknown>
 }
 
+// AI Provider Key types
+type ProviderType = 'openai' | 'anthropic'
+
+interface ProviderKey {
+  id: number
+  provider: ProviderType
+  base_url?: string
+  description?: string
+  is_enabled: boolean
+  created_at: number
+  last_used_at?: number
+  masked_key: string
+  assigned_projects: string[]
+}
+
+interface CreateProviderKeyRequest {
+  provider: ProviderType
+  api_key: string
+  base_url?: string
+  description?: string
+}
+
+interface UpdateProviderKeyRequest {
+  base_url?: string
+  description?: string
+  is_enabled?: boolean
+}
+
+interface AssignProviderRequest {
+  provider_key_id: number
+}
+
 export function useApi() {
   const authStore = useAuthStore()
 
@@ -116,7 +148,12 @@ export function useApi() {
       throw new Error(error.error || `HTTP ${response.status}`)
     }
 
-    return response.json()
+    // Handle empty responses (204 No Content, or empty body)
+    const text = await response.text()
+    if (!text) {
+      return undefined as T
+    }
+    return JSON.parse(text)
   }
 
   // Token API methods
@@ -225,6 +262,48 @@ export function useApi() {
     return fetchApi<TraceRecord>(`/api/traces/${id}`)
   }
 
+  // Provider Key API methods
+  async function getProviderKeys(): Promise<ProviderKey[]> {
+    return fetchApi<ProviderKey[]>('/api/providers')
+  }
+
+  async function getProviderKey(id: number): Promise<ProviderKey> {
+    return fetchApi<ProviderKey>(`/api/providers/${id}`)
+  }
+
+  async function createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey> {
+    return fetchApi<ProviderKey>('/api/providers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
+    return fetchApi<ProviderKey>(`/api/providers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function deleteProviderKey(id: number): Promise<void> {
+    await fetchApi<void>(`/api/providers/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async function assignProjectProvider(projectId: string, keyId: number): Promise<void> {
+    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+      method: 'POST',
+      body: JSON.stringify({ provider_key_id: keyId }),
+    })
+  }
+
+  async function unassignProjectProvider(projectId: string): Promise<void> {
+    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+      method: 'DELETE',
+    })
+  }
+
   return {
     getTokens,
     getToken,
@@ -241,6 +320,13 @@ export function useApi() {
     deleteLimit,
     getTraces,
     getTrace,
+    getProviderKeys,
+    getProviderKey,
+    createProviderKey,
+    updateProviderKey,
+    deleteProviderKey,
+    assignProjectProvider,
+    unassignProjectProvider,
   }
 }
 
@@ -254,4 +340,9 @@ export type {
   CreateLimitRequest,
   UpdateLimitRequest,
   TraceRecord,
+  ProviderType,
+  ProviderKey,
+  CreateProviderKeyRequest,
+  UpdateProviderKeyRequest,
+  AssignProviderRequest,
 }

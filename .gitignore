@@ -16,7 +16,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Python virtual env lib dirs (not src/lib/)
+/lib/
 lib64/
 parts/
 sdist/
@@ -37,6 +38,7 @@ yarn-error.log*
 dist/
 .cache/
 .vite/
+.env
 .env.local
 .env.*.local
 
