@@ -174,7 +174,7 @@ pub async fn get_key(
 
   // Insert audit log entry (fire and forget - don't fail request if logging fails)
   let pool = state.provider_storage.pool();
-  let _ = sqlx::query(
+  if let Err( e ) = sqlx::query(
     "INSERT INTO audit_log ( entity_type, entity_id, action, actor_user_id, changes, logged_at ) \
      VALUES ( $1, $2, $3, $4, $5, $6 )"
   )
@@ -185,10 +185,16 @@ pub async fn get_key(
   .bind( changes.to_string() )
   .bind( now_ms )
   .execute( pool )
-  .await;
+  .await
+  {
+    tracing::warn!( "Audit log insert failed: {}", e );
+  }
 
   // 8. Update last_used_at for the provider key
-  let _ = state.provider_storage.update_last_used( provider_key_id ).await;
+  if let Err( e ) = state.provider_storage.update_last_used( provider_key_id ).await
+  {
+    tracing::warn!( "Failed to update last_used_at: {}", e );
+  }
 
   // 9. Return decrypted key
   Ok( Json( KeyResponse {

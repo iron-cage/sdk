@@ -237,10 +237,17 @@ impl axum::extract::FromRef< AppState > for iron_api::token_auth::ApiTokenState
 async fn main() -> Result< (), Box< dyn std::error::Error > >
 {
   // Load .env file if present (ignore if not found)
-  let _ = dotenvy::dotenv();
+  let dotenv_result = dotenvy::dotenv();
 
   // Initialize tracing
   tracing_subscriber::fmt::init();
+
+  // Log .env loading result (after tracing is initialized)
+  match dotenv_result
+  {
+    Ok( path ) => tracing::debug!( "Loaded .env from: {:?}", path ),
+    Err( _ ) => tracing::debug!( "No .env file loaded (not required)" ),
+  }
 
   // Detect deployment mode before starting server
   let mode = detect_deployment_mode();
