@@ -134,6 +134,7 @@ pub struct LoginResponse
   pub refresh_token: String,
   pub token_type: String,
   pub expires_in: u64,
+  pub role: String,
 }
 
 /// Refresh request body
@@ -184,6 +185,7 @@ pub struct RefreshResponse
   pub refresh_token: String,
   pub token_type: String,
   pub expires_in: u64,
+  pub role: String,
 }
 
 /// Logout request body
@@ -325,6 +327,7 @@ pub async fn login(
     refresh_token,
     token_type: "Bearer".to_string(),
     expires_in: 3600, // 1 hour
+    role: user_role.clone(),
   } ) )
     .into_response()
 }
@@ -427,6 +430,7 @@ pub async fn refresh(
     refresh_token,
     token_type: "Bearer".to_string(),
     expires_in: 3600, // 1 hour
+    role: user.role.clone(),
   } ) )
     .into_response()
 }

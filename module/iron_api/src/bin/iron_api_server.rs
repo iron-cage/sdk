@@ -49,7 +49,7 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  routing::{ get, post, delete },
+  routing::{ get, post, delete, patch },
   Router,
   http::{ Method, header },
 };
@@ -370,6 +370,12 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/auth/refresh", post( iron_api::routes::auth::refresh ) )
     .route( "/api/auth/logout", post( iron_api::routes::auth::logout ) )
 
+    // User management endpoints
+    .route( "/api/users", post( iron_api::routes::users::create_user ) )
+    .route( "/api/users", get( iron_api::routes::users::list_users ) )
+    .route( "/api/users/:id/status", patch( iron_api::routes::users::update_user_status ) )
+    .route( "/api/users/:id", delete( iron_api::routes::users::delete_user ) )
+
     // Token management endpoints
     .route( "/api/tokens", post( iron_api::routes::tokens::create_token ) )
     .route( "/api/tokens", get( iron_api::routes::tokens::list_tokens ) )
@@ -405,10 +411,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Key fetch endpoint (API token authentication)
     .route( "/api/keys", get( iron_api::routes::keys::get_key ) )
 
-    // User management endpoints
-    .route( "/api/users", post( iron_api::routes::users::create_user ) )
-    .route( "/api/users", get( iron_api::routes::users::list_users ) )
-
     // Apply combined state to all routes
     .with_state( app_state )
 
@@ -423,7 +425,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
           "http://localhost:5174".parse::<axum::http::HeaderValue>().unwrap(),
           "http://localhost:5175".parse::<axum::http::HeaderValue>().unwrap(),
         ] )
-        .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE ] )
+        .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH ] )
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
     );
 

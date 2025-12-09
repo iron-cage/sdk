@@ -316,6 +316,19 @@ export function useApi() {
     })
   }
 
+  async function updateUserStatus(id: number, isActive: boolean): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>(`/api/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: isActive }),
+    })
+  }
+
+  async function deleteUser(id: number): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>(`/api/users/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
   return {
     getTokens,
     getToken,
@@ -341,6 +354,8 @@ export function useApi() {
     unassignProjectProvider,
     getUsers,
     createUser,
+    updateUserStatus,
+    deleteUser,
   }
 }
 

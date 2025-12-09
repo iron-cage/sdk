@@ -161,6 +161,7 @@ async function handleLogout() {
         </router-link>
 
         <router-link
+          v-if="authStore.isAdmin"
           to="/users"
           class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
         >
