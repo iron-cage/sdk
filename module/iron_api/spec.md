@@ -1,10 +1,10 @@
 # spec
 
-**Version:** 0.4
-**Date:** 2025-12-07
+**Version:** 0.5
+**Date:** 2025-12-09
 **Component:** iron_api
 **Layer:** Integration (Layer 5)
-**Status:** Specification Complete (10 FRs), Implementation Complete (FR-7/8/9/10 Complete with Tests + Phases 1-5 Security Fixes and Corner Case Coverage)
+**Status:** Specification Complete (12 FRs), Implementation Complete (FR-7/8/9/10/11/12 Complete with Tests + Phases 1-5 Security Fixes and Corner Case Coverage)
 **Priority:** REQUIRED for Dashboard (iron_dashboard depends on token/usage/limits/traces APIs)
 **Phases 1-5 Security Fixes and Corner Cases:** DoS protection (issue-001), NULL byte injection (issue-002), database test hooks (issue-003), state transitions (7 tests, 3 bugs fixed), concurrency (4 tests, 3 bugs fixed), malformed JSON (16 tests), HTTP methods (14 tests), Content-Type (6 tests), idempotency (4 tests, 1 bug fixed), error format (2 tests), empty body (4 tests), additional coverage (+23 tests)
 
@@ -853,6 +853,182 @@ curl http://localhost:3000/api/traces/123
 
 ---
 
+### FR-11: AI Provider Key Management API
+
+**Requirement:**
+Provide REST endpoints for managing AI provider API keys (OpenAI, Anthropic) with encrypted storage and per-project assignment.
+
+**Endpoints:**
+
+| Method | Path | Description | Request | Response |
+|--------|------|-------------|---------|----------|
+| POST | /api/providers | Create provider key | CreateProviderKeyRequest | ProviderKeyResponse |
+| GET | /api/providers | List all provider keys | - | Vec<ProviderKeyResponse> |
+| GET | /api/providers/:id | Get specific key | - | ProviderKeyResponse |
+| PUT | /api/providers/:id | Update key | UpdateProviderKeyRequest | ProviderKeyResponse |
+| DELETE | /api/providers/:id | Delete key | - | 204 No Content |
+| POST | /api/projects/:project_id/provider | Assign key to project | AssignProviderRequest | 204 No Content |
+| DELETE | /api/projects/:project_id/provider | Unassign key from project | - | 204 No Content |
+
+**Request/Response Types:**
+```rust
+#[derive(Deserialize)]
+pub struct CreateProviderKeyRequest {
+  pub provider: String,      // "openai" or "anthropic"
+  pub api_key: String,       // Plaintext (encrypted before storage)
+  pub base_url: Option<String>,
+  pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateProviderKeyRequest {
+  pub base_url: Option<String>,
+  pub description: Option<String>,
+  pub is_enabled: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct AssignProviderRequest {
+  pub provider_key_id: i64,
+}
+
+#[derive(Serialize)]
+pub struct ProviderKeyResponse {
+  pub id: i64,
+  pub provider: String,
+  pub base_url: Option<String>,
+  pub description: Option<String>,
+  pub is_enabled: bool,
+  pub created_at: i64,
+  pub last_used_at: Option<i64>,
+  pub masked_key: String,           // "***" - never expose full key
+  pub assigned_projects: Vec<String>, // List of project IDs
+}
+```
+
+**Security:**
+- API keys encrypted with AES-256-GCM before storage
+- Master key from IRON_SECRETS_MASTER_KEY environment variable
+- Masked keys only returned via dashboard API ("***")
+- Full keys only retrievable via Key Fetch API (FR-12)
+
+**Implementation Status:** ✅ COMPLETE (iron_api/src/routes/providers.rs)
+- Endpoint structure: ✅ Complete
+- Database integration: ✅ Complete (ProviderKeyStorage with AES-256-GCM encryption)
+- Project assignment: ✅ Complete (project_provider_key_assignments table)
+- Tests: Manual testing verified
+
+**Example Usage:**
+```bash
+# Create provider key
+curl -X POST http://localhost:3000/api/providers \
+  -H "Authorization: Bearer <jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "openai", "api_key": "sk-proj-xxx", "description": "Production"}'
+
+# List provider keys
+curl http://localhost:3000/api/providers \
+  -H "Authorization: Bearer <jwt>"
+# Response: [{"id": 1, "provider": "openai", "masked_key": "***", "assigned_projects": ["lupo"], ...}]
+
+# Assign key to project
+curl -X POST http://localhost:3000/api/projects/my-project/provider \
+  -H "Authorization: Bearer <jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"provider_key_id": 1}'
+
+# Unassign key from project
+curl -X DELETE http://localhost:3000/api/projects/my-project/provider \
+  -H "Authorization: Bearer <jwt>"
+```
+
+---
+
+### FR-12: Key Fetch API
+
+**Requirement:**
+Provide REST endpoint for external applications to fetch decrypted AI provider keys using API tokens (not JWT).
+
+**Endpoints:**
+
+| Method | Path | Description | Auth | Response |
+|--------|------|-------------|------|----------|
+| GET | /api/keys | Fetch decrypted provider key | API Token | KeyResponse |
+
+**Request/Response Types:**
+```rust
+#[derive(Serialize)]
+pub struct KeyResponse {
+  pub provider: String,      // "openai" or "anthropic"
+  pub api_key: String,       // DECRYPTED - full plaintext key
+  pub base_url: Option<String>,
+}
+```
+
+**Authentication Flow:**
+```
+1. Client sends: Authorization: Bearer <api_token>
+2. Server validates token via TokenStorage::verify_token()
+3. Server gets token metadata (project_id) via TokenStorage::get_token_metadata()
+4. Server looks up provider key via ProviderKeyStorage::get_project_key(project_id)
+5. Server decrypts key via CryptoService::decrypt()
+6. Server logs fetch to audit_log table
+7. Server returns decrypted key
+```
+
+**Error Responses:**
+
+| Status | Error | Cause |
+|--------|-------|-------|
+| 400 | "Token not assigned to project" | Token has no project_id |
+| 401 | "Invalid or expired token" | Token validation failed |
+| 403 | "Provider key is disabled" | Key exists but is_enabled=false |
+| 404 | "No provider key assigned to project" | No key assigned to token's project |
+| 500 | "Failed to decrypt key" | Decryption error (wrong master key) |
+
+**Audit Logging:**
+Every key fetch is logged to `audit_log` table:
+```sql
+INSERT INTO audit_log (
+  entity_type,    -- "provider_key"
+  entity_id,      -- provider_key_id
+  action,         -- "key_fetched"
+  actor_user_id,  -- from token metadata
+  changes,        -- JSON: { "token_id": X, "project_id": "Y" }
+  logged_at       -- timestamp
+)
+```
+
+**Implementation Status:** ✅ COMPLETE (iron_api/src/routes/keys.rs, token_auth.rs)
+- Endpoint structure: ✅ Complete
+- API token authentication: ✅ Complete (ApiTokenAuth extractor)
+- Decryption: ✅ Complete (CryptoService integration)
+- Audit logging: ✅ Complete
+- Tests: curl verified
+
+**Example Usage:**
+```bash
+# Fetch key using API token (not JWT!)
+curl -H "Authorization: Bearer pP/IDEeDNxQC/Kr3UHk8bWXjKAEkI1IgsGN465c9x88=" \
+  http://localhost:3000/api/keys
+
+# Response:
+{
+  "provider": "openai",
+  "api_key": "sk-proj-actual-decrypted-key-here",
+  "base_url": null
+}
+```
+
+**Security Notes:**
+- This endpoint returns **decrypted plaintext keys** - intentional for external application use
+- Uses API tokens (not JWT) for authentication - tokens should be treated as secrets
+- Keys are scoped to projects - token's project_id determines which key is returned
+- All fetches logged to audit_log for security review
+- No rate limiting in MVP (add for production)
+
+---
+
 ## 4. Non-Functional Requirements
 
 ### NFR-1: API Response Time
@@ -1287,12 +1463,28 @@ GET    /api/traces              Query API call traces
 GET    /api/traces/:id          Get specific trace details
 ```
 
+**AI Provider Key Management (FR-11):**
+```
+POST   /api/providers                      Create provider key (JWT Auth)
+GET    /api/providers                      List all provider keys (JWT Auth)
+GET    /api/providers/:id                  Get specific key (JWT Auth)
+PUT    /api/providers/:id                  Update key (JWT Auth)
+DELETE /api/providers/:id                  Delete key (JWT Auth)
+POST   /api/projects/:project_id/provider  Assign key to project (JWT Auth)
+DELETE /api/projects/:project_id/provider  Unassign key from project (JWT Auth)
+```
+
+**Key Fetch API (FR-12):**
+```
+GET    /api/keys                           Fetch decrypted provider key (API Token Auth)
+```
+
 **WebSocket (FR-3):**
 ```
 GET    /ws                      WebSocket upgrade for streaming
 ```
 
-**Total Endpoints:** 26 REST endpoints + 1 WebSocket
+**Total Endpoints:** 34 REST endpoints + 1 WebSocket
 
 ### 8.2 Rust API
 
@@ -2014,6 +2206,8 @@ Two options for dashboard WebSocket connection:
 - ✅ FR-8: Usage analytics API implemented (usage.rs, 3 endpoints COMPLETE, 21 tests)
 - ✅ FR-9: Budget limits API implemented (limits.rs, 5 endpoints COMPLETE, 30 tests)
 - ✅ FR-10: Request traces API implemented (traces.rs, 2 endpoints COMPLETE, 16 tests)
+- ✅ FR-11: AI Provider Key Management API implemented (providers.rs, 7 endpoints COMPLETE)
+- ✅ FR-12: Key Fetch API implemented (keys.rs, token_auth.rs, 1 endpoint COMPLETE with audit logging)
 - ❌ NFR-1: REST response time <50ms P99 verified
 - ❌ NFR-2: WebSocket latency <100ms P99 verified
 - ❌ NFR-3: 10 concurrent connections tested
@@ -2225,8 +2419,9 @@ iron_api is OPTIONAL for pilot. Demo uses iron_runtime's embedded WebSocket serv
 
 ---
 
-**Last Updated:** 2025-12-07
+**Last Updated:** 2025-12-09
 **Revision History:**
+- 2025-12-09 (v0.5): Added FR-11 (AI Provider Key Management), FR-12 (Key Fetch API) for external applications
 - 2025-12-07 (v0.4): Added § 2.3 Deployment Modes, completed Phases 1-5 security fixes and corner case coverage (353 tests, 8 bugs fixed)
 - 2025-12-06 (v0.3): Added FR-7 (Token Management), FR-8 (Usage Analytics), FR-9 (Budget Limits), FR-10 (Request Traces)
 **Next Review:** Post-pilot (all FRs implemented, comprehensive test coverage achieved)
