@@ -100,15 +100,29 @@ pub async fn create_test_user( pool: &SqlitePool, username: &str ) -> ( i64, Str
 /// Generate valid JWT access token for test user.
 ///
 /// Uses real JWT generation (not mocked) to catch signing issues.
-pub fn create_test_access_token( user_id: &str, jwt_secret: &str ) -> String
+pub fn create_test_access_token( user_id: &str, role: &str, jwt_secret: &str ) -> String
 {
   let jwt = JwtSecret::new( jwt_secret.to_string() );
-  jwt.generate_access_token( user_id )
+  jwt.generate_access_token( user_id, role )
     .unwrap_or_else( |_| panic!(
       "LOUD FAILURE: Failed to generate test JWT for user '{}'",
       user_id
     ) )
 }
+
+// ... (skipping refresh token stuff)
+
+  #[ test ]
+  fn test_create_test_access_token()
+  {
+    let token = create_test_access_token( "user_123", "user", "test_secret" );
+    assert!( !token.is_empty(), "Token should not be empty" );
+
+    let claims = decode_test_access_token( &token, "test_secret" );
+    assert_eq!( claims.sub, "user_123" );
+    assert_eq!( claims.role, "user" );
+    assert_eq!( claims.token_type, "access" );
+  }
 
 /// Generate valid JWT refresh token for test user.
 ///
@@ -255,11 +269,12 @@ mod tests
   #[ test ]
   fn test_create_test_access_token()
   {
-    let token = create_test_access_token( "user_123", "test_secret" );
+    let token = create_test_access_token( "user_123", "user", "test_secret" );
     assert!( !token.is_empty(), "Token should not be empty" );
 
     let claims = decode_test_access_token( &token, "test_secret" );
     assert_eq!( claims.sub, "user_123" );
+    assert_eq!( claims.role, "user" );
     assert_eq!( claims.token_type, "access" );
   }
 

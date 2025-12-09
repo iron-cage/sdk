@@ -18,6 +18,8 @@ pub struct AccessTokenClaims
 {
   /// User ID
   pub sub: String,
+  /// User Role
+  pub role: String,
   /// Issued at (Unix timestamp)
   pub iat: u64,
   /// Expiration time (Unix timestamp)
@@ -66,11 +68,12 @@ impl JwtSecret
   /// # Arguments
   ///
   /// * `user_id` - User ID to encode in token
+  /// * `role` - User role to encode in token
   ///
   /// # Errors
   ///
   /// Returns error if JWT encoding fails
-  pub fn generate_access_token( &self, user_id: &str ) -> Result< String, jsonwebtoken::errors::Error >
+  pub fn generate_access_token( &self, user_id: &str, role: &str ) -> Result< String, jsonwebtoken::errors::Error >
   {
     let now = SystemTime::now()
       .duration_since( UNIX_EPOCH )
@@ -80,6 +83,7 @@ impl JwtSecret
     let claims = AccessTokenClaims
     {
       sub: user_id.to_string(),
+      role: role.to_string(),
       iat: now,
       exp: now + 3600, // 1 hour
       token_type: "access".to_string(),
@@ -294,7 +298,7 @@ mod tests
   fn test_generate_access_token()
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( "user_123" ).expect( "Should generate token" );
+    let token = jwt.generate_access_token( "user_123", "user" ).expect( "Should generate token" );
     assert!( !token.is_empty(), "Token should not be empty" );
   }
 
@@ -302,10 +306,11 @@ mod tests
   fn test_verify_access_token()
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( "user_456" ).expect( "Should generate token" );
+    let token = jwt.generate_access_token( "user_456", "admin" ).expect( "Should generate token" );
 
     let claims = jwt.verify_access_token( &token ).expect( "Should verify token" );
     assert_eq!( claims.sub, "user_456" );
+    assert_eq!( claims.role, "admin" );
     assert_eq!( claims.token_type, "access" );
   }
 
@@ -347,7 +352,7 @@ mod tests
     let jwt1 = JwtSecret::new( "secret_1".to_string() );
     let jwt2 = JwtSecret::new( "secret_2".to_string() );
 
-    let token = jwt1.generate_access_token( "user_123" ).expect( "Should generate" );
+    let token = jwt1.generate_access_token( "user_123", "user" ).expect( "Should generate" );
     let result = jwt2.verify_access_token( &token );
 
     assert!( result.is_err(), "Token signed with different secret should fail" );

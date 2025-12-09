@@ -304,6 +304,18 @@ export function useApi() {
     })
   }
 
+  // User API methods
+  async function getUsers(): Promise<User[]> {
+    return fetchApi<User[]>('/api/users')
+  }
+
+  async function createUser(data: CreateUserRequest): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   return {
     getTokens,
     getToken,
@@ -327,7 +339,22 @@ export function useApi() {
     deleteProviderKey,
     assignProjectProvider,
     unassignProjectProvider,
+    getUsers,
+    createUser,
   }
+}
+
+interface User {
+  id: number
+  username: string
+  role: string
+  is_active: boolean
+}
+
+interface CreateUserRequest {
+  username: string
+  password: string
+  role?: string
 }
 
 export type {
@@ -345,4 +372,6 @@ export type {
   CreateProviderKeyRequest,
   UpdateProviderKeyRequest,
   AssignProviderRequest,
+  User,
+  CreateUserRequest,
 }

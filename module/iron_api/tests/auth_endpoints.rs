@@ -13,7 +13,7 @@ use iron_api::jwt_auth::JwtSecret;
 fn test_jwt_secret_creation()
 {
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
-  let token = secret.generate_access_token( "user_123" ).expect( "Should generate token" );
+  let token = secret.generate_access_token( "user_123", "user" ).expect( "Should generate token" );
   assert!( !token.is_empty() );
 }
 
@@ -23,7 +23,7 @@ fn test_access_token_lifecycle()
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
 
   // Generate access token
-  let token = secret.generate_access_token( "user_456" ).expect( "Should generate" );
+  let token = secret.generate_access_token( "user_456", "user" ).expect( "Should generate" );
 
   // Verify access token
   let claims = secret.verify_access_token( &token ).expect( "Should verify" );
@@ -59,7 +59,7 @@ fn test_login_flow_concept()
   let _user_role = Role::User;
 
   // Server generates access + refresh tokens
-  let access_token = secret.generate_access_token( user_id ).expect( "Should generate" );
+  let access_token = secret.generate_access_token( user_id, "user" ).expect( "Should generate" );
   let refresh_token = secret
     .generate_refresh_token( user_id, "refresh_001" )
     .expect( "Should generate" );
@@ -91,7 +91,7 @@ fn test_token_refresh_flow_concept()
   assert_eq!( claims.sub, user_id );
 
   // Server generates new access token
-  let new_access_token = secret.generate_access_token( user_id ).expect( "Should generate" );
+  let new_access_token = secret.generate_access_token( user_id, "user" ).expect( "Should generate" );
   assert!( !new_access_token.is_empty() );
 
   // Optionally generate new refresh token (rotation)

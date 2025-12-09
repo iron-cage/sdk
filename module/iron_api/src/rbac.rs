@@ -285,10 +285,7 @@ pub mod middleware
   #[ must_use ]
   pub fn extract_role_from_claims( claims: &crate::jwt_auth::AccessTokenClaims ) -> Role
   {
-    // In real implementation, role would be stored in JWT claims
-    // For now, default to User role
-    // Future: Add role field to AccessTokenClaims
-    let _ = claims;
-    Role::User
+    use std::str::FromStr;
+    Role::from_str( &claims.role ).unwrap_or( Role::User )
   }
 }

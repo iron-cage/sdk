@@ -405,6 +405,10 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Key fetch endpoint (API token authentication)
     .route( "/api/keys", get( iron_api::routes::keys::get_key ) )
 
+    // User management endpoints
+    .route( "/api/users", post( iron_api::routes::users::create_user ) )
+    .route( "/api/users", get( iron_api::routes::users::list_users ) )
+
     // Apply combined state to all routes
     .with_state( app_state )
 
@@ -432,6 +436,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  POST /api/auth/login" );
   tracing::info!( "  POST /api/auth/refresh" );
   tracing::info!( "  POST /api/auth/logout" );
+  tracing::info!( "  POST /api/users" );
+  tracing::info!( "  GET  /api/users" );
   tracing::info!( "  GET  /api/tokens" );
   tracing::info!( "  POST /api/tokens" );
   tracing::info!( "  GET  /api/tokens/:id" );

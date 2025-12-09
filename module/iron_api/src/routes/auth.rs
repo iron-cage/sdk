@@ -8,7 +8,6 @@
 //! - POST /api/auth/logout - Logout (blacklist refresh token)
 
 use crate::jwt_auth::JwtSecret;
-use crate::rbac::Role;
 use crate::user_auth;
 use axum::{
   extract::State,
@@ -289,10 +288,10 @@ pub async fn login(
   };
 
   let user_id = &user.username;
-  let _user_role = Role::User; // Can parse from user.role if needed
+  let user_role = &user.role;
 
   // Generate tokens
-  let access_token = match state.jwt_secret.generate_access_token( user_id )
+  let access_token = match state.jwt_secret.generate_access_token( user_id, user_role )
   {
     Ok( token ) => token,
     Err( _ ) =>
@@ -376,8 +375,22 @@ pub async fn refresh(
 
   let user_id = &claims.sub;
 
+  // Fetch user to get role
+  let user = match user_auth::get_user_by_username( &state.db_pool, user_id ).await
+  {
+    Ok( Some( user ) ) => user,
+    _ =>
+    {
+      return (
+        StatusCode::UNAUTHORIZED,
+        Json( serde_json::json!({ "error": "User not found" }) ),
+      )
+        .into_response();
+    }
+  };
+
   // Generate new access token
-  let access_token = match state.jwt_secret.generate_access_token( user_id )
+  let access_token = match state.jwt_secret.generate_access_token( user_id, &user.role )
   {
     Ok( token ) => token,
     Err( _ ) =>

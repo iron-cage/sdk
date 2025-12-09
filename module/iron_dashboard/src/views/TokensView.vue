@@ -276,7 +276,7 @@ function copyToken(token: string) {
             <Label>Token</Label>
             <div class="flex space-x-2">
               <Input
-                :value="newTokenData.token"
+                v-model="newTokenData.token"
                 readonly
                 class="font-mono text-sm bg-muted"
               />
