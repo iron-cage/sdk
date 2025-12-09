@@ -54,4 +54,4 @@ def my_agent(prompt: str) -> str:
 
 ---
 
-*Related: [why_rust.md](why_rust.md)*
+*Related: [001_why_rust.md](001_why_rust.md)*

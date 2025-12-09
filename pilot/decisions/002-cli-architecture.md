@@ -243,7 +243,7 @@ User: iron-py token generate --name foo --scope read
 
 ## References
 
-- [CLI Architecture Guide](../../docs/features/cli_architecture.md)
+- [CLI Architecture Guide](../../docs/features/001_cli_architecture.md)
 - [iron_cli Specification](../../module/iron_cli/spec.md)
 - [iron_cli_py Specification](../../module/iron_cli_py/spec.md)
 - [Comprehensive Plan](../../-cli_architecture_plan.md)

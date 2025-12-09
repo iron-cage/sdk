@@ -259,7 +259,7 @@ initializer.create_project(name="my-agent", path="./my-agent")
 
 - **Specification:** See `spec.md` for complete requirements
 - **Architecture Decision:** See [ADR-002](../../pilot/decisions/002-cli-architecture.md)
-- **CLI Architecture Guide:** See [docs/features/cli_architecture.md](../../docs/features/cli_architecture.md)
+- **CLI Architecture Guide:** See [docs/features/001_cli_architecture.md](../../docs/features/001_cli_architecture.md)
 - **iron_cli (authoritative):** See [module/iron_cli/readme.md](../iron_cli/readme.md)
 
 ---

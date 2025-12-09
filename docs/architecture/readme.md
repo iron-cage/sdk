@@ -13,6 +13,7 @@
 | 003 | **003_service_boundaries.md** | Define Control/Data/Runtime plane separation | Plane question → Boundary definition | Control Plane (API, dashboard, scheduler), Data Plane (safety, cost, reliability, observability), Agent Runtime (SDK, sandbox, agents) | NOT layer pipeline (→ 002), NOT communication (→ 005), NOT implementation (→ module/*/spec.md) |
 | 004 | **004_data_flow.md** | Trace end-to-end request journey | Data journey question → Flow diagram | Nine steps (API → Input FW → Agent → Tools → LLM → Output FW → Audit → Response), latency budget per step, critical path analysis | NOT layer responsibilities (→ 002), NOT service boundaries (→ 003), NOT implementation (→ module specifications) |
 | 005 | **005_service_integration.md** | Explain inter-service communication patterns | Integration question → Communication approach | Gateway orchestration, service ports, HTTP communication, dependency graph, call sequences | NOT plane boundaries (→ 003), NOT processing layers (→ 002), NOT data flow (→ 004) |
+| 006 | **006_budget_control_protocol.md** | Document budget enforcement and token management | Budget control question → Protocol flow | IC Token vs IP Token, budget borrowing/leasing, token handshake, real-time tracking, budget refresh, provider token security | NOT capability overview (→ docs/capabilities/002_llm_access_control.md), NOT implementation (→ module/iron_cost/spec.md), NOT other architecture (→ 001-005) |
 
 ---
 
@@ -25,6 +26,7 @@
 | 003 | [Service Boundaries](003_service_boundaries.md) | Control Plane / Data Plane / Runtime separation |
 | 004 | [Data Flow](004_data_flow.md) | End-to-end request journey |
 | 005 | [Service Integration](005_service_integration.md) | How services communicate |
+| 006 | [Budget Control Protocol](006_budget_control_protocol.md) | Budget enforcement and token management |
 
 ## Relationships
 

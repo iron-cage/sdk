@@ -54,4 +54,4 @@ Understand why PostgreSQL/Redis/S3 instead of alternatives.
 
 ---
 
-*Related: [dependency_strategy.md](dependency_strategy.md)*
+*Related: [004_dependency_strategy.md](004_dependency_strategy.md)*

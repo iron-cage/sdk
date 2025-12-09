@@ -50,4 +50,4 @@ Contain agent failures and attacks through layered isolation.
 
 ---
 
-*Related: [threat_model.md](threat_model.md) | [credential_flow.md](credential_flow.md)*
+*Related: [001_threat_model.md](001_threat_model.md) | [003_credential_flow.md](003_credential_flow.md)*

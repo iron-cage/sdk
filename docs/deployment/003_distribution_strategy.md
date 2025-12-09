@@ -42,4 +42,4 @@ Agent Runtime 1.x --- compatible ---> Control Panel 1.x
 
 ---
 
-*Related: [package_model.md](package_model.md) | [scaling_patterns.md](scaling_patterns.md)*
+*Related: [001_package_model.md](001_package_model.md) | [004_scaling_patterns.md](004_scaling_patterns.md)*

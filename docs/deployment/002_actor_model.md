@@ -44,4 +44,4 @@ Administrator --CLI--> CLI Tool --REST API--+
 
 ---
 
-*Related: [package_model.md](package_model.md)*
+*Related: [001_package_model.md](001_package_model.md)*

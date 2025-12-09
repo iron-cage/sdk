@@ -4,7 +4,7 @@
 
 **Package Distribution:** iron_cli + iron_cli_py (Package 5: CLI Tools)
 
-**See:** [ADR-005](../decisions/adr_005_cli_architecture.md) for architecture decision.
+**See:** [ADR-005](../decisions/adr_005_001_cli_architecture.md) for architecture decision.
 
 ---
 

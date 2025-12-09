@@ -52,4 +52,4 @@ Scale beyond single instance as agent workload grows.
 
 ---
 
-*Related: [distribution_strategy.md](distribution_strategy.md)*
+*Related: [003_distribution_strategy.md](003_distribution_strategy.md)*

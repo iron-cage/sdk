@@ -49,4 +49,4 @@ Understand why certain crates are chosen and the criteria for adding new ones.
 
 ---
 
-*Related: [why_rust.md](why_rust.md) | [infrastructure_choices.md](infrastructure_choices.md)*
+*Related: [001_why_rust.md](001_why_rust.md) | [003_infrastructure_choices.md](003_infrastructure_choices.md)*

@@ -3,9 +3,9 @@
 **Version:** 3.2.0
 **Date:** 2025-12-02
 **Status:** Planning document (TDD enforced, no mocks, CLI/API parity)
-**Architecture:** [token_management.md](token_management.md)
-**Validation Framework:** [token_management_validation_framework.md](token_management_validation_framework.md)
-**CLI/API Parity:** [token_management_cli_api_parity.md](token_management_cli_api_parity.md)
+**Architecture:** [002_token_management.md](002_token_management.md)
+**Validation Framework:** [006_token_management_validation_framework.md](006_token_management_validation_framework.md)
+**CLI/API Parity:** [004_token_management_cli_api_parity.md](004_token_management_cli_api_parity.md)
 **Related Task:** [task/backlog/001_implement_llm_token_management_dashboard_and_backend.md](../../../task/backlog/001_implement_llm_token_management_dashboard_and_backend.md)
 
 ---
@@ -1820,8 +1820,8 @@ dashboard/                    # Vue.js frontend (separate repo)
 
 **Key Files:**
 ```
-business/docs/features/token_management.md              # Architecture
-business/docs/features/token_management_implementation_plan.md  # This file
+business/docs/features/002_token_management.md              # Architecture
+business/docs/features/005_token_management_implementation_plan.md  # This file
 task/backlog/001_implement_llm_token_management_dashboard_and_backend.md  # Requirements
 ```
 
@@ -1854,8 +1854,8 @@ task/backlog/001_implement_llm_token_management_dashboard_and_backend.md  # Requ
 - **Test commands**: `w3 .test l::3` (daily), `w3 .test l::5` (final release)
 
 **Cross-References Verified:**
-- ✅ Architecture document: `token_management.md`
-- ✅ Validation framework: `token_management_validation_framework.md`
-- ✅ CLI/API parity spec: `token_management_cli_api_parity.md`
+- ✅ Architecture document: `002_token_management.md`
+- ✅ Validation framework: `006_token_management_validation_framework.md`
+- ✅ CLI/API parity spec: `004_token_management_cli_api_parity.md`
 - ✅ Task requirements: `task/backlog/001_implement_llm_token_management_dashboard_and_backend.md`
 - ✅ Workspace crates: `api_llm`, `wTools`, `iron_cage` (28 total crates referenced)

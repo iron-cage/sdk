@@ -52,4 +52,4 @@ Agent --needs key--> Credential Service --fetches--> Vault
 
 ---
 
-*Related: [audit_model.md](audit_model.md) | [isolation_layers.md](isolation_layers.md)*
+*Related: [004_audit_model.md](004_audit_model.md) | [002_isolation_layers.md](002_isolation_layers.md)*

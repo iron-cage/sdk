@@ -49,4 +49,4 @@ Understand the attack surface and adversary capabilities we consider.
 
 ---
 
-*Related: [isolation_layers.md](isolation_layers.md) | [audit_model.md](audit_model.md)*
+*Related: [002_isolation_layers.md](002_isolation_layers.md) | [004_audit_model.md](004_audit_model.md)*

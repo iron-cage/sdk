@@ -4,8 +4,8 @@
 **Date:** 2025-12-02
 **Status:** Validation framework
 **Related Documents:**
-- Architecture: [token_management.md](token_management.md)
-- Implementation Plan: [token_management_implementation_plan.md](token_management_implementation_plan.md)
+- Architecture: [002_token_management.md](002_token_management.md)
+- Implementation Plan: [005_token_management_implementation_plan.md](005_token_management_implementation_plan.md)
 
 ---
 

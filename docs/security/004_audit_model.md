@@ -50,4 +50,4 @@ Prove compliance, debug incidents, attribute actions to agents.
 
 ---
 
-*Related: [credential_flow.md](credential_flow.md) | [threat_model.md](threat_model.md)*
+*Related: [003_credential_flow.md](003_credential_flow.md) | [001_threat_model.md](001_threat_model.md)*

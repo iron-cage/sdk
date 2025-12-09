@@ -41,4 +41,4 @@ Understand what ships together and how to deploy each component.
 
 ---
 
-*Related: [module_distribution.md](module_distribution.md) | [distribution_strategy.md](distribution_strategy.md)*
+*Related: [005_module_distribution.md](005_module_distribution.md) | [003_distribution_strategy.md](003_distribution_strategy.md)*

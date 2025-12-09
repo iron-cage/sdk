@@ -51,4 +51,4 @@ Request --> [Safety: 10ms] --> [Cost: 5ms] --> [Reliability: 5ms] --> LLM
 
 ---
 
-*Related: [why_pyo3.md](why_pyo3.md) | [dependency_strategy.md](dependency_strategy.md)*
+*Related: [002_why_pyo3.md](002_why_pyo3.md) | [004_dependency_strategy.md](004_dependency_strategy.md)*

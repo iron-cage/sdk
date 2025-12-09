@@ -40,4 +40,4 @@ Use PyO3 FFI for Rust-Python integration:
 
 ---
 
-*Related: [technology/why_pyo3.md](../technology/why_pyo3.md)*
+*Related: [technology/002_why_pyo3.md](../technology/002_why_pyo3.md)*

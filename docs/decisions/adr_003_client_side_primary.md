@@ -39,4 +39,4 @@ Server-side is optional for Phase 2 (5% of users).
 
 ---
 
-*Related: [architecture/execution_models.md](../architecture/execution_models.md)*
+*Related: [architecture/001_execution_models.md](../architecture/001_execution_models.md)*

@@ -44,12 +44,12 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 |------------|-----------|-------------|
 | **[capabilities/](capabilities/)** | 8 (001-008) | Platform capabilities (runtime, LLM control, sandbox, safety, credentials, MCP, observability, data) |
 | **[integration/](integration/)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
-| **[architecture/](architecture/)** | 5 (001-005) | System architecture concepts (execution models, layers, service boundaries, data flow, integration) |
+| **[architecture/](architecture/)** | 6 (001-006) | System architecture concepts (execution models, layers, service boundaries, data flow, integration, budget control) |
 | **[deployment/](deployment/)** | 5 (001-005) | Deployment concepts (package model, actors, distribution, scaling, module mapping) |
 | **[security/](security/)** | 4 (001-004) | Security model concepts (threat model, isolation, credential flow, audit) |
 | **[technology/](technology/)** | 4 (001-004) | Technology choices (Rust, PyO3, infrastructure, dependencies) |
 | **[features/](features/)** | 6 (001-006) | Feature documentation (CLI architecture, token management suite) |
-| **[decisions/](decisions/)** | 6 (adr_001-006) | Architecture Decision Records (ADR format) |
+| **[decisions/](decisions/)** | 7 (adr_001-007) | Architecture Decision Records (ADR format) |
 
 ### Reference Documents
 

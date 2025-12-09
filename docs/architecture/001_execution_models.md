@@ -48,4 +48,4 @@ User's Machine                    Iron Cage Gateway
 
 ---
 
-*Related: [layer_model.md](layer_model.md) | [data_flow.md](data_flow.md)*
+*Related: [002_layer_model.md](002_layer_model.md) | [004_data_flow.md](004_data_flow.md)*
