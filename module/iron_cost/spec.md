@@ -69,4 +69,4 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 ---
 
 *For detailed pricing and algorithms, see spec/-archived_detailed_spec.md*
-*For budget protocol, see docs/architecture/006_budget_control_protocol.md*
+*For budget protocol, see docs/protocol/005_budget_control_protocol.md*

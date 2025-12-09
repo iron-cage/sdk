@@ -18,7 +18,7 @@ Understand what ships together and how to deploy each component.
 |---------|----------|----------|---------|
 | **1. Control Panel** | API + Dashboard | Docker image | `docker pull` |
 | **2. Marketing Site** | Static website | HTML/CSS/JS | CDN deploy |
-| **3. Agent Runtime** | SDK + core services | PyPI wheel | `pip install` |
+| **3. Agent Runtime** | SDK + core services | PyPI wheel | `pip install iron-sdk` |
 | **4. Sandbox** | OS isolation | PyPI wheel | `pip install` |
 | **5. CLI Tools** | Token management + wrapper | Binary + PyPI | Download + pip |
 
@@ -34,10 +34,16 @@ Understand what ships together and how to deploy each component.
 
 ## Key Principle
 
-- **Control Panel** = always deployed together (API needs dashboard)
-- **Agent Runtime** = single `pip install` for all protection features
+- **Control Panel** = REQUIRED for all deployments (admin service, always standalone)
+- **Agent Runtime** = single `pip install iron-sdk` for all protection features (uses Library mode - runtime embedded via PyO3)
 - **Sandbox** = optional, security-focused teams only
 - **CLI Tools** = binary + Python wrapper, installed together
+
+**Deployment Mode:**
+- **Pilot:** Library mode (runtime embedded in SDK, single process, PyO3)
+- **Production:** Library mode default, Router mode optional for multi-framework support
+
+**See:** [architecture/008: Runtime Modes](../architecture/008_runtime_modes.md) for Router vs Library comparison.
 
 ---
 

@@ -10,26 +10,41 @@ Understand which component handles safety, cost, reliability - and in what order
 
 ## Core Idea
 
-**Six processing layers, each with single responsibility:**
+**Six processing layers with bidirectional request-response flow:**
 
 ```
-Request --> [Safety] --> [Cost] --> [Reliability] --> [Provider] --> Response
-              |           |            |              |
-              v           v            v              v
-          Validate    Check        Circuit       Forward to
-          input       budget       breaker       OpenAI/etc
+REQUEST PATH (Input Processing):
+Request → [1. Input Safety] → [2. Cost] → [3. Reliability] → [4. Provider]
+            |                   |             |                  |
+            ▼                   ▼             ▼                  ▼
+        Validate input      Check budget   Circuit           Forward to
+        (PII, injection)    (remaining)    breaker           LLM provider
+
+PROVIDER:
+[4. Provider] ← Request sent to → OpenAI/Anthropic/etc (3000ms processing)
+              ← Response received ←
+
+RESPONSE PATH (Output Processing):
+[4. Provider] → [5. Output Safety] → [6. Observability] → Response to Agent
+                      |                    |
+                      ▼                    ▼
+                  Scan for secrets      Log & trace
+                  Redact PII            (async)
 ```
 
 ## The Six Layers
 
-| Layer | Responsibility | Failure Mode |
-|-------|---------------|--------------|
-| **1. Safety** | Validate input (prompt injection, PII) | Block request |
-| **2. Cost** | Check budget, track tokens | Block if exceeded |
-| **3. Reliability** | Circuit breaker, retry logic | Fallback provider |
-| **4. Provider** | Route to LLM (OpenAI, Anthropic) | Error response |
-| **5. Output Safety** | Scan response (secrets, PII) | Redact content |
-| **6. Observability** | Log, trace, metrics | Async (non-blocking) |
+| Layer | Phase | Responsibility | Failure Mode |
+|-------|-------|---------------|--------------|
+| **1. Input Safety** | Request | Validate input (prompt injection, PII) | Block request |
+| **2. Cost** | Request | Check budget, track tokens | Block if exceeded |
+| **3. Reliability** | Request | Circuit breaker, retry logic | Fallback provider |
+| **4. Provider** | Both | Route to LLM, receive response | Error response |
+| **5. Output Safety** | Response | Scan response (secrets, PII) | Redact content |
+| **6. Observability** | Response | Log, trace, metrics | Async (non-blocking) |
+
+**Request Path:** Layers 1 → 2 → 3 → 4 → LLM Provider
+**Response Path:** LLM Provider → 4 → 5 → 6 → Agent
 
 ## Design Principles
 
@@ -40,14 +55,18 @@ Request --> [Safety] --> [Cost] --> [Reliability] --> [Provider] --> Response
 
 ## Latency Budget
 
-| Layer | Target | Notes |
-|-------|--------|-------|
-| Safety (input) | <10ms | Regex + ML classifier |
-| Cost | <5ms | Redis lookup |
-| Reliability | <5ms | State machine check |
-| Provider | 1-5s | LLM inference (external) |
-| Safety (output) | <10ms | Pattern matching |
-| Observability | 0ms | Async, non-blocking |
+| Layer | Pilot Target | Production Target | Notes |
+|-------|--------------|-------------------|-------|
+| Safety (input) | 10ms | 50ms | Regex (pilot) → ML classifier (production) |
+| Cost | 5ms | 0.5ms | Per-request (pilot) → Batched (production optimization) |
+| Reliability | <5ms | <5ms | Same for both |
+| Provider | 1-5s | 1-5s | LLM inference (external) |
+| Safety (output) | 10ms | 50ms | Regex (pilot) → ML classifier (production) |
+| Observability | 0ms | 0ms | Async, non-blocking |
+
+**Total Added Latency:** ~30ms (pilot) → ~106ms (production)
+
+**See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) for authoritative latency reference and rationale.
 
 ---
 

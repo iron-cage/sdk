@@ -31,6 +31,9 @@ Understand why certain features were deferred or simplified.
 | **Sandboxing** | Spec-only | Full implementation |
 | **Budget Currency** | USD only | Multi-currency |
 | **Agents** | Single agent | Multi-agent orchestration |
+| **Projects** | Master project + simple projects | Advanced project management |
+| **IP Binding** | Admin binds IPs to agents (minimal) | Policy-based IP assignment |
+| **Master Project** | REQUIRED (admin sees all) | Enhanced with analytics |
 
 ## Team Constraints
 

@@ -19,13 +19,15 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 
 ## Performance
 
-| Metric | Target | Rationale |
-|--------|--------|-----------|
-| **Total Overhead** | <10ms per LLM call | Governance shouldn't slow agents noticeably |
-| **Budget Check** | <1ms | Local check, no network call |
-| **Safety Validation** | <10ms | Regex + ML classifier |
-| **Token Translation** | <0.1ms | Memory operation only |
-| **Cost Tracking** | <5ms | Database write, async |
+| Metric | Pilot Target | Production Target | Rationale |
+|--------|--------------|-------------------|-----------|
+| **Total Overhead** | ~25ms | ~100ms | Governance shouldn't slow agents noticeably |
+| **Budget Check** | <1ms | <1ms | Local check, no network call |
+| **Safety Validation** | 10ms (Regex) | 50ms (ML) | Pilot: demo-adequate, Production: compliance-grade |
+| **Token Translation** | <0.5ms | <0.5ms | Memory operation only |
+| **Cost Tracking** | 5ms (per-request) | 0.5ms (batched) | Pilot: simpler implementation, Production: optimized for scale |
+
+**See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) for complete latency budget and decision rationale.
 
 ## Reliability
 
@@ -42,8 +44,8 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 |-----------|--------|--------------|
 | **Agents** | 10,000+ per Control Panel | Horizontal scaling, stateless services |
 | **Requests** | 1,000 RPS | Async runtime, connection pooling |
-| **Storage** | Millions of audit records | PostgreSQL, partitioned tables |
-| **Tokens** | 10,000+ active tokens | Indexed lookups, Redis cache |
+| **Storage** | Millions of audit records | Database (partitioned tables), Object Storage (archives) |
+| **Tokens** | 10,000+ active tokens | Indexed lookups, Cache layer |
 
 ## Security
 

@@ -27,7 +27,7 @@ AI agent data protocol enabling safe data source access through type-safe NDJSON
 - Data source implementations (see data connectors)
 - REST API protocol (see docs/protocol/002)
 - WebSocket protocol (see docs/protocol/003)
-- Budget control protocol (see docs/architecture/006)
+- Budget control protocol (see docs/protocol/005)
 
 ---
 

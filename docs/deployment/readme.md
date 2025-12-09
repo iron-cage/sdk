@@ -6,13 +6,13 @@
 
 ## Directory Responsibilities
 
-| ID | Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|----|--------|----------------|----------------|-------|--------------|
-| 001 | **001_package_model.md** | Define the 5 deployment packages | Packaging question → Package definitions | Five packages (Control Panel, Marketing Site, Agent Runtime, Sandbox, CLI Tools), package characteristics, grouping rationale | NOT module mappings (→ 005), NOT distribution channels (→ 003), NOT actors (→ 002) |
-| 002 | **002_actor_model.md** | Document system actors and interactions | Actor question → Actor taxonomy | Human actors (developer, operations, security, admin, visitor), software actors (agent, browser, terminal, LLM API, database), interaction patterns | NOT packages (→ 001), NOT distribution (→ 003), NOT scaling (→ 004) |
-| 003 | **003_distribution_strategy.md** | Explain package distribution channels | Distribution question → Channel strategy | Docker Hub, CDN, PyPI, GitHub Releases, versioning, compatibility matrix, update mechanisms | NOT package contents (→ 001), NOT module mappings (→ 005), NOT scaling (→ 004) |
-| 004 | **004_scaling_patterns.md** | Describe horizontal scaling approach | Scaling question → Scaling architecture | Stateless services, shared state (PostgreSQL, Redis), load balancing, K8s HPA, replica management | NOT packages (→ 001), NOT distribution (→ 003), NOT actors (→ 002) |
-| 005 | **005_module_distribution.md** | Map modules to deployment packages | Module location question → Package assignment | Which modules in which packages, runtime dependencies, module grouping rationale | NOT package definitions (→ 001), NOT distribution channels (→ 003), NOT scaling (→ 004) |
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| 001 | **001_package_model.md** | Define the 5 deployment packages (Control Panel, Marketing Site, Agent Runtime, Sandbox, CLI Tools) and their characteristics |
+| 002 | **002_actor_model.md** | Document system actors and interactions (human actors, software actors, interaction patterns) |
+| 003 | **003_distribution_strategy.md** | Explain package distribution channels (Docker Hub, CDN, PyPI, GitHub Releases, versioning, compatibility) |
+| 004 | **004_scaling_patterns.md** | Describe horizontal scaling approach (stateless services, shared state, load balancing, K8s HPA) |
+| 005 | **005_module_distribution.md** | Map modules to deployment packages (which modules in which packages, runtime dependencies) |
 
 ---
 

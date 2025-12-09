@@ -6,13 +6,13 @@
 
 ## Directory Responsibilities
 
-| Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|--------|----------------|----------------|-------|--------------|
-| 001 | **001_cli_architecture.md** | CLI tools architecture overview | Architecture question → Tool selection guidance | CLI responsibilities, wrapper pattern, binary discovery | iron_cli implementation (→ module/iron_cli/spec.md), iron_cli_py implementation (→ module/iron_cli_py/spec.md), Architecture decision rationale (→ pilot/decisions/002-cli-architecture.md) |
-| 002 | **002_token_management.md** | Token management feature overview | User need → Feature description | Feature concepts, user workflows, integration points | API details (→ token_management_api_reference.md), CLI specifics (→ token_management_cli_api_parity.md), Implementation (→ token_management_implementation_plan.md) |
-| 003 | **003_token_management_api_reference.md** | Token API endpoint reference | API call → Response schema | REST endpoints, request/response formats, error codes | Feature concepts (→ token_management.md), CLI commands (→ token_management_cli_api_parity.md), Implementation plan (→ token_management_implementation_plan.md) |
-| 004 | **004_token_management_cli_api_parity.md** | CLI/API parity matrix | CLI command → API equivalent | Command mapping, coverage gaps, implementation status | API details (→ token_management_api_reference.md), Feature overview (→ token_management.md), Implementation timeline (→ token_management_implementation_plan.md) |
-| 005 | **005_token_management_implementation_plan.md** | Implementation roadmap | Requirement → Implementation steps | Phases, milestones, technical approach | API reference (→ token_management_api_reference.md), Feature overview (→ token_management.md), CLI parity (→ token_management_cli_api_parity.md) |
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| 001 | **001_cli_architecture.md** | Document CLI tools architecture (wrapper pattern, binary discovery, tool responsibilities) |
+| 002 | **002_token_management.md** | Explain token management feature overview (concepts, user workflows, integration points) |
+| 003 | **003_token_management_api_reference.md** | Document token management API endpoints (request/response schemas, error codes, authentication) |
+| 004 | **004_token_management_cli_api_parity.md** | Define CLI and API parity requirements (command mapping, coverage gaps, implementation status) |
+| 005 | **005_token_management_implementation_plan.md** | Provide token management implementation roadmap (TDD phases, milestones, technical approach) |
 
 ---
 

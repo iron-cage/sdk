@@ -6,12 +6,12 @@
 
 ## Directory Responsibilities
 
-| Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|--------|----------------|----------------|-------|--------------|
-| 001 | **001_why_rust.md** | Justify Rust selection for runtime components | Language requirements → Rust rationale | Memory safety, performance needs, predictable latency, fearless concurrency, ecosystem maturity | NOT Python rationale (→ why_pyo3.md), NOT infrastructure (→ infrastructure_choices.md), NOT dependencies (→ dependency_strategy.md) |
-| 002 | **002_why_pyo3.md** | Explain PyO3 choice for Rust-Python bridge | FFI requirements → PyO3 justification | In-process FFI, zero-copy performance, native Python types, latency comparison (0.1ms vs 5-10ms HTTP) | NOT Rust rationale (→ why_rust.md), NOT infrastructure (→ infrastructure_choices.md), NOT implementation (→ module/iron_runtime/spec.md) |
-| 003 | **003_infrastructure_choices.md** | Document infrastructure technology selections | Infrastructure needs → Technology choices | Database (PostgreSQL), cache (Redis), messaging, storage (S3), rationale for each | NOT language choices (→ why_rust.md, why_pyo3.md), NOT dependency management (→ dependency_strategy.md), NOT deployment (→ docs/deployment/) |
-| 004 | **004_dependency_strategy.md** | Define dependency management philosophy | Dependency question → Strategy principles | Selection criteria (maintenance, security, size, popularity, license), core dependencies, audit requirements | NOT specific tech choices (→ infrastructure_choices.md), NOT language rationale (→ why_rust.md), NOT implementation (→ Cargo.toml files) |
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| 001 | **001_why_rust.md** | Explain Rust selection rationale for runtime components (memory safety, performance, predictable latency, no GC pauses) |
+| 002 | **002_why_pyo3.md** | Explain PyO3 choice for Rust-Python integration (in-process FFI 0.1ms vs HTTP 5-10ms, zero-copy performance) |
+| 003 | **003_infrastructure_choices.md** | Document infrastructure technology selections (Database: SQLite/PostgreSQL, Cache: In-memory/Redis, Storage: None/S3, pilot vs production) |
+| 004 | **004_dependency_strategy.md** | Define dependency management philosophy (selection criteria, minimal dependencies, audit requirements, core dependencies) |
 
 ---
 

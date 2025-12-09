@@ -45,14 +45,14 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **[principles/](principles/)** | 5 (001-005) | Design principles (philosophy, quality, error handling, testing, workflow) |
 | **[constraints/](constraints/)** | 4 (001-004) | System constraints (technical, business, scope, trade-offs) |
 | **[capabilities/](capabilities/)** | 8 (001-008) | Platform capabilities (runtime, LLM control, sandbox, safety, credentials, MCP, observability, data) |
-| **[architecture/](architecture/)** | 5 (001-005) | System architecture concepts (execution models, layers, service boundaries, data flow, integration) |
+| **[architecture/](architecture/)** | 8 (001-008) | System architecture concepts (execution models, layers, service boundaries, data flow, integration, roles, entity model, runtime modes) |
 | **[deployment/](deployment/)** | 5 (001-005) | Deployment concepts (package model, actors, distribution, scaling, module mapping) |
 | **[security/](security/)** | 4 (001-004) | Security model concepts (threat model, isolation, credential flow, audit) |
 | **[integration/](integration/)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
 | **[technology/](technology/)** | 4 (001-004) | Technology choices (Rust, PyO3, infrastructure, dependencies) |
-| **[protocol/](protocol/)** | 5 (001-005) | Communication protocols (IronLang, REST API, WebSocket, MCP, budget control) |
+| **[protocol/](protocol/)** | 4 (002-005) | Communication protocols (REST API, WebSocket, MCP, budget control) |
 | **[features/](features/)** | 5 (001-005) | Feature documentation (CLI architecture, token management suite) |
-| **[decisions/](decisions/)** | 7 (adr_001-007) | Architecture Decision Records (ADR format) |
+| **[decisions/](decisions/)** | 6 (adr_002-007) | Architecture Decision Records (ADR format) |
 
 ### Reference Documents
 

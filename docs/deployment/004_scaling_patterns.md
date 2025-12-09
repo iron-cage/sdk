@@ -16,11 +16,13 @@ Scale beyond single instance as agent workload grows.
 
 | Component | Scaling Method | State Location |
 |-----------|---------------|----------------|
-| Control Panel | Multiple replicas + LB | PostgreSQL |
-| Agent Runtime | K8s HPA | Redis + PostgreSQL |
-| Services | Per-service replicas | Redis (cache) |
+| Control Panel | Multiple replicas + LB | Database |
+| Agent Runtime | K8s HPA | Cache + Database |
+| Services | Per-service replicas | Cache |
 
-## Architecture
+*Note: This describes production multi-replica deployment. Pilot uses single instance (no replicas, in-memory cache, no shared state needed). See [technology/003](../technology/003_infrastructure_choices.md#cache) for pilot vs production cache choice.*
+
+## Architecture (Production Multi-Replica)
 
 ```
                     +-------------+
@@ -36,10 +38,13 @@ Scale beyond single instance as agent workload grows.
         +----------------+----------------+
                          v
               +---------------------+
-              | PostgreSQL + Redis  |
+              | Database + Cache    |
               | (shared state)      |
+              | PostgreSQL + Redis  |
               +---------------------+
 ```
+
+**Pilot Architecture:** Single process, in-memory cache, no load balancer (simpler).
 
 ## Scaling Triggers
 

@@ -22,9 +22,6 @@
 | Term | Definition |
 |------|------------|
 | **Iron Cage** | AI agent governance platform providing safety, cost control, and reliability for enterprise AI agents |
-| **iron_runtime** | Repository containing Control Panel, Agent Runtime, runtime services (10 modules) |
-| **iron_cage** | Repository containing OS sandboxing, CLI tools, foundation modules (10 modules) |
-| **iron_site** | Repository containing marketing website (Vue-based static site) |
 
 ### Architecture
 
@@ -33,18 +30,47 @@
 | **Control Plane** | Management layer: API Gateway, Dashboard, Scheduler |
 | **Data Plane** | Processing layer: Safety, Cost, Reliability, Observability services |
 | **Agent Runtime** | Execution layer: Agent pods, SDK, Sandbox |
-| **Model A (Client-Side)** | Primary execution model where agent runs on user's machine (95% of users) |
-| **Model B (Server-Side)** | Optional execution model where agent runs on Iron Cage infrastructure (5% of users) |
-| **Model C (Control Panel-Managed)** | Enterprise execution model where agent runs locally but budget controlled centrally via two-token architecture. See [architecture/001](architecture/001_execution_models.md), [architecture/006](architecture/006_budget_control_protocol.md). |
+| **Local Execution** | Agent runs on developer's machine (primary). Control Panel manages budget via IC Token protocol. See [architecture/001](architecture/001_execution_models.md) |
+| **Server Execution** | Agent runs on Iron Cage servers (future, post-pilot). Control Panel manages budget identically to local execution |
+| **Control Panel** | ALWAYS present standalone admin service. Admin allocates budgets, manages developers, stores IP Tokens, monitors spending. See [architecture/003](architecture/003_service_boundaries.md) |
 | **Gateway** | Central orchestrator that routes requests through processing layers |
+| **Layer Model** | Six processing layers: Safety, Cost, Reliability, Provider, Output Safety, Observability |
+| **Service Boundaries** | Separation between Control Plane, Data Plane, and Agent Runtime |
+| **Data Flow** | End-to-end request journey from user input to LLM response |
+| **Execution Models** | Where agents execute: Local (primary) vs Server (future, post-pilot) |
+| **Library Mode** | Default SDK deployment where runtime embedded in-process via PyO3. Developer code: `from iron_sdk import protect_agent`. Overhead: ~0.5ms (FFI). Single process, no separate runtime. See [architecture/008](architecture/008_runtime_modes.md) |
+| **Router Mode** | Optional deployment where runtime runs as separate process exposing HTTP API. Two use cases: (1) Non-SDK frameworks (LangChain, CrewAI) point to localhost:8080, (2) iron_sdk optionally configured for HTTP. Same developer code as Library mode for SDK users. Overhead: ~5ms (HTTP). See [architecture/008](architecture/008_runtime_modes.md) |
+
+### Entities
+
+| Term | Definition |
+|------|------------|
+| **Agent** | AI agent executing on developer's machine. Has exactly one IC Token (1:1), exactly one Agent Budget (1:1, restrictive), can use multiple Inference Providers. Belongs to one Project |
+| **Project** | Collection of agents, Inference Provider assignments, and entities. Has exactly one Project Budget (1:1, informative). Owned by admin or team |
+| **Master Project** | Special project containing ALL resources (all agents, all Inference Providers, all budgets). Admin-only. Has Master Budget (informative). MUST be in Pilot |
+| **IP** | Inference Provider entity (OpenAI, Anthropic, etc.). Has IP Budget (informative), has IP Token(s). Can be assigned to multiple agents |
+| **Agent Budget** | Restrictive budget (ONLY budget that blocks requests). 1:1 with agent. Hard limit enforcement |
+| **Project Budget** | Informative budget (statistics only, no blocking). 1:1 with project. Shows aggregate agent spending |
+| **IP Budget** | Informative budget (statistics only, no blocking). Per Inference Provider. Shows provider spending |
+| **Master Budget** | Informative budget (statistics only, no blocking). Part of master project. Shows all spending across all projects |
+| **Budget Control** | Agents are the ONLY way to control budget. Agent budget blocks requests (restrictive). All other budgets (project, Inference Provider, master) are informative only (show spending, can't block) |
+
+### Roles
+
+| Term | Definition |
+|------|------------|
+| **Admin** | Full Control Panel access. Allocates budgets, creates developer accounts, monitors all spending, manages IP Tokens |
+| **Super User** | Developer + read-only Control Panel dashboard access (own budgets only). Cannot allocate budgets or see other developers |
+| **Developer** | Regular user managed by admin. Runs agents with IC Token, views usage via CLI + Dashboard (read-only own usage). Can select model and Inference Provider among allowed |
 
 ### Tokens
 
 | Term | Definition |
 |------|------------|
-| **IC Token** | Internal Control Token - Developer-visible JWT linking agent to budget allocation. Does NOT contain provider credentials. Format: JWT with claims (agent_id, budget_id, permissions). Safe to log, CLI args, config files. Lifetime: 24 hours. See [architecture/006](architecture/006_budget_control_protocol.md) § IC Token Format. |
-| **IP Token** | Inference Provider Token - LLM provider API key (sk-proj-, sk-ant-). Encrypted in Runtime memory, NEVER exposed to developer. Obtained from Control Panel via budget allocation protocol. Session-only lifetime. See [architecture/006](architecture/006_budget_control_protocol.md) § The Two Tokens. |
-| **Token Translation** | Process where Runtime replaces IC Token with IP Token in LLM requests. Latency: <1ms. Security: IP Token in plaintext <1ms, then zeroed. See [architecture/006](architecture/006_budget_control_protocol.md) § Step 2. |
+| **IC Token** | Internal Control Token - Developer-visible JWT for agent authentication. 1:1 with agent (one agent = one IC token, can't share). Developer can regenerate their own IC Token (replaces existing). Admin can regenerate any IC Token. Lifetime: Until agent deleted (long-lived, no auto-expiration). See [protocol/005](protocol/005_budget_control_protocol.md) |
+| **User Token** | Control Panel CLI/Dashboard authentication token. Different from IC Token (agent auth). Users can have multiple active User Tokens. Developer can regenerate own, admin can regenerate any. Lifetime: 30 days default |
+| **IP Token** | Inference Provider Token - LLM provider API key (sk-proj-, sk-ant-). Stored in Control Panel vault, NEVER exposed to developer. Runtime receives encrypted copy from Control Panel. Session-only lifetime. See [protocol/005](protocol/005_budget_control_protocol.md) |
+| **Token Translation** | Process where Runtime replaces IC Token with IP Token in LLM requests. Latency: <1ms. IP Token decrypted, used, then zeroed. See [protocol/005](protocol/005_budget_control_protocol.md) |
 | **API Token** | Control Panel REST API authentication token (opaque Base64 string). Different from IC Token (which is for Runtime/agents). For: Control Panel API calls. NOT for: Agent execution. |
 
 ### Budget Management
@@ -53,15 +79,10 @@
 |------|------------|
 | **Budget Allocation** | Total budget admin assigns to agent (e.g., $100) in Control Panel. Tracked centrally in database. |
 | **Budget Portion** | Incremental amount Runtime borrows from total (e.g., $10). Enables real-time control without upfront full budget transfer. Default: $10 per borrow. |
-| **Budget Borrowing** | Protocol where Runtime requests more budget when low. Trigger: remaining < $1. Messages: BUDGET_REFRESH_REQUEST/RESPONSE. See [architecture/006](architecture/006_budget_control_protocol.md) § Step 3. |
+| **Budget Borrowing** | Protocol where Runtime requests budget portions from Control Panel. Borrows $10 chunks from total allocation. Trigger: remaining < $1. See [protocol/005](protocol/005_budget_control_protocol.md) |
 | **Lease ID** | Unique identifier for budget portion allocation. Tracks which $10 portion Runtime currently using. Changes with each borrow (lease-001, lease-002, etc.). |
 | **Budget Threshold** | Remaining budget level triggering borrow request. Default: $1.00. When remaining < threshold, Runtime requests more. |
 | **Incremental Budget** | Strategy of allocating budget in portions ($10) rather than full amount ($100) upfront. Benefits: Real-time enforcement, admin can stop mid-session, limits exposure if IC Token stolen. |
-| **Two-Repo Model** | Architecture split: iron_runtime (frequent changes) + iron_cage (stable foundation) |
-| **Layer Model** | Six processing layers: Safety, Cost, Reliability, Provider, Output Safety, Observability |
-| **Service Boundaries** | Separation between Control Plane, Data Plane, and Agent Runtime |
-| **Data Flow** | End-to-end request journey from user input to LLM response |
-| **Execution Models** | Where agents execute: client-side (primary) vs server-side (optional) |
 
 ### Capabilities (8 Total)
 
@@ -144,8 +165,6 @@
 | **Design Collection** | Directory of focused concept files (~30-50 lines each) |
 | **Capability** | High-level platform feature (safety, cost, reliability, etc.) |
 | **Spec-only Module** | Module with specification but no implementation (e.g., iron_control_store) |
-| **Monorepo** | Current physical state: all modules in single repository |
-| **Two-Repo Split** | Target state: iron_runtime and iron_cage as separate repositories |
 
 ### Deployment
 
@@ -167,7 +186,7 @@
 | **Budget Portion** | Chunk of budget borrowed by runtime for local tracking (default $10 per borrow) |
 | **Token Translation** | Runtime converts IC Token to IP Token when forwarding requests to LLM provider |
 | **Budget Overshoot** | Condition when agent attempts to exceed allocated budget, blocked by runtime |
-| **Budget Reporting** | Runtime reports token usage to Control Panel after each LLM request for centralized tracking |
+| **Budget Reporting** | Runtime reports token usage to Control Panel for centralized tracking. Pilot: per-request (simpler). Production: batched (every 10 requests, optimized). See [constraints/004: Trade-offs](constraints/004_trade_offs.md#cost-vs-reliability) |
 | **Budget Lease** | Borrowed budget portion with runtime tracking, returned/refreshed as needed |
 | **Control Panel** | Admin-facing interface for centralized budget control, monitoring, and access management |
 | **Agent Runtime** | Developer-facing execution environment for local routing and heavy lifting |
