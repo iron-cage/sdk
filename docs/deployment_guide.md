@@ -27,8 +27,8 @@
 - **Production Mode (Future):** Will use deployment architecture described in this guide
 
 **Key Differences:**
-- **This Guide:** Centralized runtime, PostgreSQL + Redis, Docker Compose/K8s, Model A/B execution
-- **Current Pilot:** Distributed packages, SQLite (iron_state), single process, localhost only
+- **This Guide:** Centralized runtime, PostgreSQL + Redis, Docker Compose/K8s, Local and Server execution
+- **Current Pilot:** Distributed packages, SQLite (iron_runtime_state), single process, localhost only
 
 ## Document Purpose
 
@@ -936,7 +936,7 @@ All deployment modes share these core components:
 
 Iron Cage supports two execution models depending on where the Python agent runs:
 
-### 6.1 Model A: Client-Side Execution (Most Common)
+### 6.1 Local Execution (Client-Side, Most Common)
 
 **Agent runs on user's infrastructure, calls Iron Cage API for safety/monitoring:**
 
@@ -969,7 +969,7 @@ Data Flow:
 - Data stays on user's infrastructure
 - User controls when agent runs
 
-### 6.2 Model B: Server-Side Execution (Enterprise 24/7)
+### 6.2 Server Execution (Enterprise 24/7)
 
 **Agent uploaded to Iron Cage, runs 24/7 in Iron Cage's infrastructure:**
 
@@ -1009,7 +1009,7 @@ Data Flow:
 
 ### 6.3 Execution Model Comparison
 
-| Aspect | Client-Side (Model A) | Server-Side (Model B) |
+| Aspect | Local Execution | Server Execution |
 |--------|----------------------|----------------------|
 | **Agent Location** | User's laptop/server | Iron Cage K8s cluster |
 | **Uptime** | User-controlled | 24/7 managed |
@@ -1072,7 +1072,7 @@ Data Flow:
 
 ### 7.4 Sandboxing Requirements (Server-Side Agents)
 
-For **server-side agent execution** (Model B deployment), Iron Cage requires Linux kernel features to isolate and secure agent tool execution. These requirements ONLY apply when agents are uploaded to Iron Cage and run on Iron Cage infrastructure (not required for client-side execution).
+For **server execution**, Iron Cage requires Linux kernel features to isolate and secure agent tool execution. These requirements ONLY apply when agents are uploaded to Iron Cage and run on Iron Cage infrastructure (not required for local execution).
 
 ### Kernel Features
 

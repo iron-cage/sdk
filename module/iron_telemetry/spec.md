@@ -25,7 +25,7 @@ Unified logging infrastructure using tracing crate. Provides structured logging 
 
 **Out of Scope:**
 - Observability export to external systems (see docs/integration/004)
-- Metrics collection (see iron_api)
+- Metrics collection (see iron_control_api)
 - Dashboard visualization (see iron_dashboard)
 
 ---

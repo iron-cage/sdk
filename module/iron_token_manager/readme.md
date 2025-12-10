@@ -23,7 +23,7 @@ Manages API token lifecycle with secure generation, SHA-256 hashing, and SQLite 
 - API key rotation automation (future)
 - Multi-tenant token isolation (future)
 - Token analytics and reporting (future)
-- REST API endpoints (see iron_api)
+- REST API endpoints (see iron_control_api)
 - Dashboard UI (see iron_dashboard)
 - Cost calculation (see iron_cost)
 - Budget tracking (see iron_cost)
@@ -35,7 +35,7 @@ This module manages API tokens for Control Panel authentication.
 **IC Token (Internal Control Token):**
 - Purpose: Link agent to budget allocation (Model C architecture)
 - Visibility: Developer-visible (JWT format)
-- **See:** [docs/architecture/006_budget_control_protocol.md](../../docs/architecture/006_budget_control_protocol.md) § IC Token Format
+- **See:** [docs/protocol/005_budget_control_protocol.md](../../docs/protocol/005_budget_control_protocol.md) § IC Token Format
 
 **API Token:**
 - Purpose: Authenticate Control Panel REST API requests

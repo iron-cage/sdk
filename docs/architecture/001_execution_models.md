@@ -1,82 +1,165 @@
 # Execution Models
 
-**Purpose:** Where AI agents execute - the fundamental architectural decision.
+**Purpose:** Where AI agents execute - Control Panel always manages budget.
 
 ---
 
 ## User Need
 
-Run AI agents with enterprise governance WITHOUT surrendering source code or data to a third party.
+Run AI agents with admin-controlled budgets and governance while keeping code/data local.
 
 ## Core Idea
 
-**Three execution models based on where agent runs and where control happens:**
-
-| Model | Where Agent Runs | Where Control Happens | Use Case | Users |
-|-------|------------------|----------------------|----------|-------|
-| **Model A: Client-Side** | User's machine | User's machine (self-managed) | Local files, private data, self-managed | Small teams (1-5 devs) |
-| **Model B: Server-Side** | Iron Cage servers | Iron Cage servers (managed) | Fully managed, no setup | Managed hosting (5%) |
-| **Model C: Control Panel-Managed** | User's machine | Control Panel (centralized admin) | Enterprise budgets, central control | Enterprise (10+ devs) |
-
-**The key insight:** Governance doesn't require running agent code. Model C keeps agent local while centralizing budget control via two-token architecture.
-
-## Model A: Client-Side (Primary)
+**Control Panel is ALWAYS present (admin service managing developers):**
 
 ```
-User's Machine                    Iron Cage Gateway
-+-----------------+              +-----------------+
-| Python Agent    |--- LLM ---->| Validate/Track  |----> OpenAI
-| + Iron Cage SDK |    calls    | Forward         |
-| (code stays)    |<-- response-|                 |<---- Response
-+-----------------+              +-----------------+
+All Deployments:
++-------------------+
+| Control Panel     | <-- ALWAYS exists (admin manages developers)
+| - Admin dashboard |
+| - Budget control  |
+| - IP Token vault  |
++-------------------+
+         |
+         | IC Token ↔ Budget Protocol
+         |
+         v
+    Agent Execution
+    (local or server)
 ```
 
-- Agent has full access to local files, APIs, databases
-- Code never leaves user's infrastructure
-- SDK adds <0.1ms overhead via PyO3 FFI
+**The fundamental choice: WHERE does the agent execute?**
 
-## Model B: Server-Side (Optional)
+| Execution Location | Where Agent Runs | Who Manages Budget | Use Case |
+|--------------------|------------------|-------------------|----------|
+| **Local Execution** | Developer's machine | Admin via Control Panel | Primary (current, pilot) |
+| **Server Execution** | Iron Cage servers | Admin via Control Panel | Future (post-pilot) |
 
-- Iron Cage runs agent code in managed environment
-- User uploads agent definition, we execute it
-- Best for: teams without infrastructure, quick prototypes
+**Key insight:** Control Panel ALWAYS manages budget (admin oversight). The only choice is WHERE the agent code executes.
 
-## Model C: Control Panel-Managed (Enterprise)
+## Local Execution (Primary - 95% of deployments)
 
-**Where Agent Runs:** Developer's machine (local execution, data stays local)
-**Where Control Happens:** Centralized Control Panel (admin oversight, budget enforcement)
+**Where Agent Runs:** Developer's machine
+**Who Manages Budget:** Admin via Control Panel (standalone service)
+**Budget Control:** IC Token → IP Token protocol
 
 ```
-Developer Machine              Control Panel (Centralized)
+Developer Machine              Control Panel (Admin Service)
 +-----------------+            +-------------------------+
 | Python Agent    |            | Admin Dashboard         |
-| + Runtime       |            | - Budget allocations    |
-| Uses: IC Token  |<─ HTTPS ─>| - IP Tokens (vault)     |
-| (visible)       |   Budget   | - Real-time tracking    |
-+-----------------+   Protocol +-------------------------+
-                                       │
-                                       │ Admin sees ALL agents
-                                       ▼
-                               Aggregate spending,
-                               enforce limits,
-                               real-time control
+| + Runtime       |            | - Allocate budgets      |
+| Uses: IC Token  |<─ HTTPS ─>| - Monitor spending      |
++-----------------+   Budget   | - Store IP Tokens       |
+                      Protocol +-------------------------+
+                                       |
+                                       | Admin manages ALL developers
 ```
 
-**Key Characteristics:**
-- ✅ Agent runs locally (code/data stay on developer machine)
-- ✅ Budget controlled centrally (admin approves spending)
-- ✅ IC Token → IP Token translation (developer never sees provider credentials)
-- ✅ Incremental budgeting (borrow $10 portions, not full $100)
-- ✅ Real-time enforcement (admin can stop spending mid-session)
+**Characteristics:**
+- Agent code stays on developer machine (privacy)
+- Data stays local (files, databases, APIs)
+- Control Panel is separate service (localhost in pilot, cloud in production)
+- Developer receives IC Token from admin
+- Runtime borrows budget portions ($10 from $100 total)
+- Admin sees spending across all developers in dashboard
 
-**See:** [architecture/006: Budget Control Protocol](006_budget_control_protocol.md) for complete two-token architecture and budget borrowing protocol.
+**Developer Roles:**
+- **Developer:** IC Token, runs agents, views usage via CLI + Dashboard (read-only, own usage), selects model/IP
+- **Super User:** Also has read-only Control Panel dashboard access (own budgets only, CLI + Dashboard)
+
+**Developer Control (High Level for Efficient Development):**
+- Select LLM model among allowed list
+- Select IP/provider among allowed list (Pilot: admin pre-binds)
+- Regenerate own IC Token and User Token
+- View own usage in real-time
+
+## Server Execution (Future - 5% of deployments, post-pilot)
+
+**Where Agent Runs:** Iron Cage servers
+**Who Manages Budget:** Admin via Control Panel (identical to local)
+**Budget Control:** Same IC Token → IP Token protocol
+
+- Developer uploads agent code to Iron Cage
+- Iron Cage executes agent on managed infrastructure
+- Control Panel manages budget identically to local execution
+- Same two-token protocol, same admin oversight
+- Developer still uses IC Token, never sees IP Token
+
+**Status:** Deferred to post-pilot (not in current scope)
+
+## Control Panel (Always Present)
+
+**Role:** Standalone admin service for managing developers and budgets
+
+**Admin Functions:**
+- Create developer accounts
+- Allocate budgets per developer/team
+- Monitor spending real-time across all developers
+- Manage IP Tokens (provider credentials in vault)
+- Revoke access, adjust limits real-time
+- Protect developers from overspending
+
+**Developer Functions (with elevated access):**
+- View own spending in dashboard (read-only)
+- See budget allocation and remaining
+- Cannot allocate budgets or see IP Tokens
+- Cannot view other developers' data
+
+**Deployment:**
+- Pilot: localhost (admin-managed service)
+- Production: cloud (admin-managed service)
+- Future: Local emulation service using same protocol (development only)
+
+**Always Required:** Cannot run agents without Control Panel - it's fundamental infrastructure.
+
+## Runtime Modes (On Developer Platform)
+
+**Both modes run on developer's platform - no data leaves developer infrastructure:**
+
+**Developer code IDENTICAL for both modes:**
+```python
+from iron_sdk import protect_agent
+
+@protect_agent(ic_token=os.getenv("IC_TOKEN"))
+def my_agent(prompt: str):
+    return llm.chat(prompt)
+```
+
+**Mode is deployment configuration (SDK internal machinery):**
+
+| Mode | SDK Implementation | Overhead | Primary Use Case |
+|------|-------------------|----------|------------------|
+| **Library** | PyO3 FFI (in-process) | ~0.5ms | Default for iron_sdk users |
+| **Router** | HTTP API (separate process) | ~5ms | Non-SDK frameworks (LangChain, CrewAI) |
+
+**Router Mode:**
+- Runtime exposes OpenAI-compatible REST API (localhost:8080)
+- Two use cases: (1) Non-SDK frameworks change endpoint, (2) Optional SDK HTTP deployment
+- Works with ANY framework (LangChain, CrewAI, custom)
+- Easy migration (just change endpoint URL for non-SDK frameworks)
+
+**Library Mode:**
+- Runtime embedded via PyO3 (in-process)
+- Default for iron_sdk users
+- Better performance (direct FFI calls, no HTTP)
+- Single process deployment (simpler)
+
+**Competitive Advantage:**
+- Both modes run locally on developer platform
+- No data leaves developer infrastructure
+- No confidentiality issues (vs competitors routing through centralized servers)
+- Lower latency, no bandwidth waste
+
+**See:** [008_runtime_modes.md](008_runtime_modes.md) for detailed comparison.
 
 ## Key Components
 
-- **Iron Cage SDK:** Python library that intercepts LLM calls
-- **PyO3 FFI:** Zero-copy Rust-Python bridge (<0.1ms)
-- **API Gateway:** Receives calls, validates, forwards to providers
+- **Control Panel:** Admin service (ALWAYS present, standalone)
+- **Runtime:** Agent execution environment (local or server)
+- **IC Token:** Developer-visible budget credential (from Control Panel)
+- **IP Token:** Admin-managed provider credential (Control Panel vault only)
+- **Budget Protocol:** Communication between Runtime and Control Panel
 
 ---
 
-*Related: [002_layer_model.md](002_layer_model.md) | [004_data_flow.md](004_data_flow.md)*
+*Related: [../protocol/005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md) | [003_service_boundaries.md](003_service_boundaries.md) | [006_roles_and_permissions.md](006_roles_and_permissions.md)*

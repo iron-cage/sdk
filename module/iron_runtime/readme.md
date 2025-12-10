@@ -19,12 +19,12 @@ Bridges Python AI agents with Rust-based safety, cost, and reliability infrastru
 - Single-agent execution model
 
 **Out of Scope:**
-- REST API endpoints (see iron_api)
+- REST API endpoints (see iron_control_api)
 - PII detection logic (see iron_safety)
 - Cost calculation (see iron_cost)
 - Circuit breaker patterns (see iron_reliability)
 - Token management (see iron_token_manager)
-- State persistence (see iron_state)
+- State persistence (see iron_runtime_state)
 - Multi-agent orchestration (future)
 - Distributed runtime (future)
 

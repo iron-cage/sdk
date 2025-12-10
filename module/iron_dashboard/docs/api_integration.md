@@ -1,10 +1,10 @@
 # api_integration
 
-Backend integration guide for iron_dashboard ↔ iron_api.
+Backend integration guide for iron_dashboard ↔ iron_control_api.
 
 ## Purpose
 
-This document describes how iron_dashboard integrates with iron_api backend, including REST API endpoints, TypeScript type definitions, WebSocket integration, error handling patterns, and authentication flow. Intended for developers adding new API endpoints or modifying integration logic.
+This document describes how iron_dashboard integrates with iron_control_api backend, including REST API endpoints, TypeScript type definitions, WebSocket integration, error handling patterns, and authentication flow. Intended for developers adding new API endpoints or modifying integration logic.
 
 ---
 
@@ -23,7 +23,7 @@ This document describes how iron_dashboard integrates with iron_api backend, inc
 
 ### Base Configuration
 
-**Backend:** iron_api (Axum Rust server)
+**Backend:** iron_control_api (Axum Rust server)
 **Base URL:** `http://localhost:3000` (dev), configurable via `VITE_API_URL`
 **Content-Type:** `application/json`
 **Authentication:** `Authorization: Bearer <jwt_token>` header
@@ -216,7 +216,7 @@ export function useApi() {
 
 **Backend (Rust):**
 ```rust
-// iron_api/src/models/token.rs
+// iron_control_api/src/models/token.rs
 #[derive(Serialize, Deserialize)]
 pub struct TokenMetadata {
     pub id: i64,
@@ -336,10 +336,10 @@ async function getTokens(): Promise<TokenMetadata[]> {
 **When to Use:**
 - Critical data (authentication, tokens)
 - User-provided data (form submissions)
-- External APIs (not iron_api, which we control)
+- External APIs (not iron_control_api, which we control)
 
 **When NOT to Use:**
-- Internal iron_api responses (trust backend types)
+- Internal iron_control_api responses (trust backend types)
 - Non-critical data (usage stats, traces)
 
 ---
@@ -776,10 +776,10 @@ router.beforeEach((to, from, next) => {
 
 ### Step-by-Step Guide
 
-**1. Add Backend Endpoint (iron_api)**
+**1. Add Backend Endpoint (iron_control_api)**
 
 ```rust
-// iron_api/src/routes/example.rs
+// iron_control_api/src/routes/example.rs
 #[derive(Serialize, Deserialize)]
 pub struct ExampleData {
     pub id: i64,
@@ -859,7 +859,7 @@ const { data, isLoading } = useQuery({
 
 When adding new endpoint:
 
-- [ ] Backend endpoint implemented (iron_api)
+- [ ] Backend endpoint implemented (iron_control_api)
 - [ ] Backend types defined (Rust structs with Serialize/Deserialize)
 - [ ] Frontend types defined (TypeScript interfaces in useApi.ts)
 - [ ] Types match exactly (Rust ↔ TypeScript)

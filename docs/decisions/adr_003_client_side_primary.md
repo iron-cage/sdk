@@ -14,28 +14,30 @@ Two deployment models possible:
 
 ## Decision
 
-Client-side execution is the primary model (95% of users).
-Server-side is optional for Phase 2 (5% of users).
+Client-side execution is the primary model (95% of deployments).
+Server-side is optional for Phase 2 (5% of deployments).
 
-**Key insight:** Governance doesn't require running agent code. The SDK intercepts LLM calls and routes through Iron Cage for validation, while agent stays local.
+**Key insight:** Governance doesn't require running agent code ON Iron Cage servers. Agent stays local, but Control Panel is required infrastructure for budget management and IP Token storage.
 
 ## Consequences
 
 **Positive:**
 - User keeps code and data local (privacy)
-- No infrastructure needed from Iron Cage
-- Simple integration (just add SDK)
+- Minimal infrastructure: Control Panel only (no agent hosting servers)
+- Simple integration (just add SDK + IC Token)
 - Agents have full local access (files, APIs)
 
 **Negative:**
 - Can't enforce execution isolation (user's machine)
-- Harder to debug (can't see agent state)
+- Harder to debug (can't see agent state remotely)
 - SDK must be trusted (runs in user's process)
+- Requires Control Panel deployment (admin service infrastructure)
 
 **Mitigations:**
 - Optional server-side for managed execution
 - Rich logging/tracing for debugging
 - SDK is open-source for auditability
+- Control Panel can be localhost (pilot) or cloud (production)
 
 ---
 

@@ -1,24 +1,49 @@
-# WebSocket Protocol
+# Protocol: WebSocket Protocol
 
-**Purpose:** Real-time dashboard message format for live agent state updates.
+### Scope
+
+Real-time WebSocket message format for streaming agent state updates, events, and alerts to dashboard.
+
+**In Scope:**
+- Message types (STATE_UPDATE, AGENT_EVENT, COST_ALERT, HEARTBEAT)
+- WebSocket connection lifecycle (connect, authenticate, subscribe, disconnect)
+- Message format (JSON with type discriminator)
+- Heartbeat protocol (30s interval)
+- Reconnection strategy (exponential backoff, max 30s)
+- Error handling and timeout behavior
+
+**Out of Scope:**
+- REST API protocol (see [002_rest_api_protocol.md](002_rest_api_protocol.md))
+- IronLang data protocol (see [001_ironlang_data_protocol.md](001_ironlang_data_protocol.md))
+- Dashboard UI implementation (see `module/iron_dashboard/`)
+- WebSocket server implementation (see `module/iron_control_api/spec.md` § FR-3)
 
 ---
 
-### User Need
+### Purpose
 
-Understand how dashboard receives real-time updates from runtime and Control Panel.
+Enable real-time dashboard updates without polling, providing instant visibility into agent execution, budget usage, and safety events.
 
-### Core Idea
+**Problem:**
 
-**Bidirectional WebSocket for dashboard live updates:**
+HTTP polling for dashboard updates:
+- High latency (1-5 second delay between updates)
+- Server load (constant polling creates unnecessary requests)
+- Wasted bandwidth (mostly "no changes" responses)
+- Complex client logic (retry, backoff, state reconciliation)
 
-```
-Runtime/Control Panel → WebSocket → Dashboard
-                        - STATE_UPDATE: Agent state changes
-                        - AGENT_EVENT: LLM calls, tool usage
-                        - COST_ALERT: Budget warnings
-                        - HEARTBEAT: Connection keep-alive
-```
+**Solution:**
+
+WebSocket streaming provides:
+- Real-time updates (<100ms latency from event to dashboard)
+- Low server load (single persistent connection per dashboard)
+- Efficient bandwidth (only changed data sent)
+- Simple client logic (receive message, update UI)
+- Bidirectional communication (heartbeat, reconnection)
+
+---
+
+### Protocol Definition
 
 ### Message Types
 
@@ -95,4 +120,27 @@ Runtime/Control Panel → WebSocket → Dashboard
 
 ---
 
-*Related: [002_rest_api_protocol.md](002_rest_api_protocol.md) | [../architecture/005_service_integration.md](../architecture/005_service_integration.md)*
+### Cross-References
+
+**Dependencies:**
+- None (foundational real-time protocol)
+
+**Used By:**
+- [capabilities/007: Observability](../capabilities/007_observability.md) - Real-time metrics streaming
+- [protocol/005: Budget Control](005_budget_control_protocol.md) - Budget warnings via WebSocket
+- Dashboard implementations - Receive real-time updates
+
+**Related:**
+- [002: REST API Protocol](002_rest_api_protocol.md) - Complementary request/response protocol
+- [architecture/005: Service Integration](../architecture/005_service_integration.md) - WebSocket server integration pattern
+
+**Implementation:**
+- Source: `module/iron_control_api/src/websocket.rs` - WebSocket handler
+- Tests: `module/iron_control_api/tests/websocket_test.rs` - Connection and message tests
+- Specification: `module/iron_control_api/spec.md` § FR-3 - WebSocket streaming specification
+
+---
+
+**Last Updated:** 2025-12-09
+**Protocol Version:** 1.0
+**Status:** Specification complete

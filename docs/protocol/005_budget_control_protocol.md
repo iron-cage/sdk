@@ -34,11 +34,48 @@ Admin (Control Panel)          Developer (Runtime)
          +--------- + $10 more --------->|
 ```
 
+## When This Protocol Applies
+
+**Universal Application:** This protocol is used in ALL deployment scenarios. Control Panel is always present as standalone admin service managing developer budgets. There is no "self-managed" mode without Control Panel.
+
+**Control Panel Role:**
+- Admin allocates budgets to developers
+- Stores IP Tokens (provider credentials) in vault
+- Runtime never has direct access to IP Tokens
+- Developer never sees IP Tokens
+
+**Protocol Scope:**
+- Pilot: Control Panel manages local agent execution
+- Production: Control Panel manages distributed agents
+- Future: Local emulation service may implement same protocol
+
+## IC Token 1:1 Relationship
+
+**Critical Design:** One Agent = One IC Token (strict 1:1 relationship)
+
+- Agent can't have multiple IC Tokens
+- IC Token can't belong to multiple agents
+- IC Token can't be shared between agents
+- Agent has exactly one Agent Budget (1:1, restrictive)
+- Agent can have multiple IPs (developer selects which to use)
+
+## Budget Types
+
+**Restrictive Budget (ONLY ONE):**
+- **Agent Budget:** Blocks requests when exceeded. This is the ONLY budget that enforces limits.
+
+**Informative Budgets (STATISTICS ONLY):**
+- **Project Budget:** Shows project spending, doesn't block
+- **IP Budget:** Shows provider spending, doesn't block
+- **Master Budget:** Shows all spending, doesn't block
+
+**Key Point:** Agents are the ONLY way to control budget. Project/IP/Master budgets are for monitoring only.
+
 ## The Two Tokens
 
 | Token | Visible To | Stored | Purpose |
 |-------|-----------|--------|---------|
-| **IC Token** | Developer | Plaintext on disk | Budget ID, authentication with Control Panel |
+| **IC Token** | Developer | Plaintext on disk | Budget ID, authentication with Control Panel, 1:1 with agent |
 | **IP Token** | Runtime only | Encrypted in memory | Actual LLM provider API key |
 
 **Key insight:** Developer NEVER sees provider credentials. Runtime acts as secure proxy.
@@ -53,11 +90,13 @@ Admin (Control Panel)          Developer (Runtime)
   "agent_id": "agent-abc123",
   "budget_id": "budget-xyz789",
   "issued_at": 1702123456,
-  "expires_at": 1702209856,
+  "expires_at": null,
   "issuer": "iron-control-panel",
   "permissions": ["llm:call", "data:read"]
 }
 ```
+
+*Note: `expires_at` is null for long-lived IC Tokens (no auto-expiration). Token lives until agent deleted or regenerated.*
 
 **Claim Specifications:**
 
@@ -66,17 +105,17 @@ Admin (Control Panel)          Developer (Runtime)
 | `agent_id` | string | `^agent-[a-z0-9]{6,32}$` | "agent-abc123" | Unique agent identifier |
 | `budget_id` | string | `^budget-[a-z0-9]{6,32}$` | "budget-xyz789" | Links to budget allocation |
 | `issued_at` | number | Unix timestamp (seconds) | 1702123456 | Token creation time |
-| `expires_at` | number | Unix timestamp (seconds) | 1702209856 | Expiration (24h default) |
+| `expires_at` | number or null | Unix timestamp or null | null | Optional expiration (null = long-lived, no auto-expiration) |
 | `issuer` | string | Literal "iron-control-panel" | "iron-control-panel" | Token source validation |
 | `permissions` | array | Strings from vocabulary | ["llm:call"] | Allowed operations |
 
 **Validation Rules:**
 - Signature: HMAC-SHA256 with Control Panel secret key
-- Expiration: `expires_at > current_time`
+- Expiration: `expires_at == null` (long-lived) OR `expires_at > current_time` (if expiration set)
 - Issuer: Must be "iron-control-panel"
 - Format: IDs match regex patterns
 
-**Lifetime:** 24 hours (renewable by re-login)
+**Lifetime:** Until agent deleted or IC Token regenerated (long-lived, no auto-expiration)
 
 ## Budget Borrowing Protocol
 
@@ -339,16 +378,52 @@ if local_budget_remaining < estimated_cost:
 - Memory dump attack: IP Token encrypted, key unavailable outside process
 - Disk forensics: No IP Token on disk
 
-## Performance
+## Implementation Variants
+
+### Pilot Implementation (Per-Request Reporting)
+
+**Characteristics:**
+- Cost reporting after every LLM call
+- Overhead: 5ms per request (local tracking + HTTP report to Control Panel)
+- Real-time consistency (Control Panel sees every call within 5ms)
+- Suitable for: 5-minute demo, simpler implementation logic
+- Implementation: In-memory tracking (pilot) or cache write (production)
+
+**Performance:**
 
 | Operation | Latency | Frequency |
 |-----------|---------|-----------|
 | Token handshake | ~50ms | Once per runtime startup |
-| Usage reporting | ~5ms | Per LLM request (async) |
+| Usage reporting | ~5ms | Per LLM request |
 | Budget refresh | ~50ms | Every ~100 requests (when $10 depleted) |
 | Local budget check | <0.1ms | Per LLM request |
 
-**Overhead:** <1ms per request (local check + async reporting)
+**Overhead:** ~5ms per request (local check + per-request reporting)
+
+**Trade-off:** Simple implementation (no buffering logic) vs higher overhead
+
+### Production Implementation (Batched Reporting)
+
+**Characteristics:**
+- Cost reporting batched every 10 requests
+- Average overhead: 0.5ms per request (5ms / 10 requests)
+- Eventual consistency (reports delayed by up to 10 requests)
+- Optimized for: Scale, high-throughput production scenarios
+
+**Performance:**
+
+| Operation | Latency | Frequency |
+|-----------|---------|-----------|
+| Token handshake | ~50ms | Once per runtime startup |
+| Usage reporting | ~0.5ms avg | Every 10 LLM requests (batched async) |
+| Budget refresh | ~50ms | Every ~100 requests (when $10 depleted) |
+| Local budget check | <0.1ms | Per LLM request |
+
+**Overhead:** ~0.6ms per request (local check + batched reporting)
+
+**Trade-off:** Lower overhead (optimized for scale) vs implementation complexity
+
+**See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#cost-vs-reliability) for decision rationale.
 
 ## Failure Handling
 

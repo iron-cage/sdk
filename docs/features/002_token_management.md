@@ -13,7 +13,7 @@
 
 **In Scope:**
 - System architecture for token management backend
-- Component breakdown (iron_token_manager, iron_api, iron_state extensions)
+- Component breakdown (iron_token_manager, iron_control_api, iron_runtime_state extensions)
 - Data flow diagrams (token generation, usage tracking, limit enforcement)
 - Security architecture (JWT + RBAC, token encryption, API authentication)
 - Performance architecture (async-first, database indexing, caching)
@@ -113,7 +113,7 @@ This document defines the architecture for implementing an LLM token management 
    - Separate deployment from backend
    - Uses REST API for all operations
 
-2. **API Layer** (`iron_api` enhanced)
+2. **API Layer** (`iron_control_api` enhanced)
    - Axum HTTP server
    - JWT authentication middleware
    - RBAC authorization
@@ -125,7 +125,7 @@ This document defines the architecture for implementing an LLM token management 
    - Limit enforcement
    - Rate limiting
 
-4. **Infrastructure Layer** (`iron_state` enhanced)
+4. **Infrastructure Layer** (`iron_runtime_state` enhanced)
    - Database connection management
    - Migration runner
    - Health checks
@@ -322,7 +322,7 @@ impl RateLimiter
 
 **Dependencies:**
 - `iron_types` - Shared type definitions
-- `iron_state` - Database access
+- `iron_runtime_state` - Database access
 - `iron_cost` - Cost calculation (reuse existing)
 - `error_tools` - Error handling (per rulebook)
 - `rand` - Cryptographic randomness
@@ -333,7 +333,7 @@ impl RateLimiter
 - `governor` - Rate limiting
 - `base64` - Token encoding
 
-#### 3.1.2 iron_api (Enhanced)
+#### 3.1.2 iron_control_api (Enhanced)
 
 **Responsibility:** HTTP API server with authentication.
 
@@ -433,7 +433,7 @@ impl RbacAuth
 }
 ```
 
-#### 3.1.3 iron_state (Enhanced)
+#### 3.1.3 iron_runtime_state (Enhanced)
 
 **Responsibility:** Database schema and migrations.
 
@@ -746,7 +746,7 @@ User (Dashboard)
   │    { user_id, project_id, provider }
   │
   ▼
-API Gateway (iron_api)
+API Gateway (iron_control_api)
   │
   │ 2. Authenticate JWT
   │ 3. Authorize (RBAC: User role)
@@ -759,7 +759,7 @@ TokenGenerator (iron_token_manager)
   │ 6. Create ApiToken struct
   │
   ▼
-TokenStorage (iron_state)
+TokenStorage (iron_runtime_state)
   │
   │ 7. INSERT INTO api_tokens
   │    (token_hash, user_id, project_id, provider, ...)
@@ -829,7 +829,7 @@ Client Request
   │    { model, messages, max_tokens: 500 }
   │
   ▼
-API Gateway (iron_api)
+API Gateway (iron_control_api)
   │
   │ 2. Authenticate token
   │ 3. Extract requested_tokens (500)
@@ -1137,7 +1137,7 @@ async fn test_limit_enforcement_allows_grace_period()
 
 ### 7.3 Integration Tests
 
-**Location:** `module/iron_api/tests/`
+**Location:** `module/iron_control_api/tests/`
 
 **Test Cases:**
 
@@ -1307,7 +1307,7 @@ ab -n 5000 -c 50 -H "Authorization: Bearer <jwt>" \
 ### Phase 1: Database Schema + Token Generation (Weeks 1-2)
 
 **Goals:**
-- Extend `iron_state` with token management schema
+- Extend `iron_runtime_state` with token management schema
 - Implement `iron_token_manager::token_generator`
 - Create database migrations
 - Write unit tests
@@ -1363,7 +1363,7 @@ ab -n 5000 -c 50 -H "Authorization: Bearer <jwt>" \
 ### Phase 4: API Endpoints + Authentication (Week 6)
 
 **Goals:**
-- Enhance `iron_api` with token management endpoints
+- Enhance `iron_control_api` with token management endpoints
 - Implement JWT authentication middleware
 - Implement RBAC authorization
 - Write integration tests
@@ -1461,7 +1461,7 @@ This architecture design provides a complete, production-ready blueprint for imp
 ✅ **Modern Frontend** - Vue 3 Composition API, TypeScript, shadcn-vue
 
 **Next Steps (if approved to proceed):**
-1. Extend `iron_state` with database schema
+1. Extend `iron_runtime_state` with database schema
 2. Implement `iron_token_manager::token_generator`
 3. Write unit tests for token generation
 4. Proceed through 10-week implementation plan

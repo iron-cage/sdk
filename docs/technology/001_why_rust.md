@@ -18,6 +18,8 @@ Request --> [Safety: 10ms] --> [Cost: 5ms] --> [Reliability: 5ms] --> LLM
               +---- Must be FAST (Rust) ---------+
 ```
 
+*Note: Latency targets shown (production numbers). See [constraints/004: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) for pilot vs production comparison.*
+
 ## Key Benefits
 
 | Benefit | Why It Matters |
@@ -37,7 +39,7 @@ Request --> [Safety: 10ms] --> [Cost: 5ms] --> [Reliability: 5ms] --> LLM
 
 ## Where Rust Is Used
 
-- iron_api: REST API + WebSocket server
+- iron_control_api: REST API + WebSocket server
 - iron_safety: PII detection, prompt injection blocking
 - iron_cost: Budget tracking, token counting
 - iron_reliability: Circuit breakers, retry logic

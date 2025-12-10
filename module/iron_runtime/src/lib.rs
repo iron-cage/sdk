@@ -40,7 +40,7 @@ mod implementation
   {
     #[allow(dead_code)] // Configuration stored for future use (budget enforcement, etc.)
     config: RuntimeConfig,
-    state: Arc<iron_state::StateManager>,
+    state: Arc<iron_runtime_state::StateManager>,
   }
 
   impl AgentRuntime
@@ -50,7 +50,7 @@ mod implementation
     {
       Self {
         config,
-        state: Arc::new(iron_state::StateManager::new()),
+        state: Arc::new(iron_runtime_state::StateManager::new()),
       }
     }
 
@@ -63,9 +63,9 @@ mod implementation
       iron_telemetry::log_agent_event(&agent_id, "agent_started");
 
       // Save initial state
-      self.state.save_agent_state(iron_state::AgentState {
+      self.state.save_agent_state(iron_runtime_state::AgentState {
         agent_id: agent_id.clone(),
-        status: iron_state::AgentStatus::Running,
+        status: iron_runtime_state::AgentStatus::Running,
         budget_spent: 0.0,
         pii_detections: 0,
       });
@@ -80,7 +80,7 @@ mod implementation
 
       if let Some(mut state) = self.state.get_agent_state(agent_id)
       {
-        state.status = iron_state::AgentStatus::Stopped;
+        state.status = iron_runtime_state::AgentStatus::Stopped;
         self.state.save_agent_state(state);
       }
 
@@ -88,7 +88,7 @@ mod implementation
     }
 
     /// Get agent metrics
-    pub fn get_metrics(&self, agent_id: &str) -> Option<iron_state::AgentState>
+    pub fn get_metrics(&self, agent_id: &str) -> Option<iron_runtime_state::AgentState>
     {
       self.state.get_agent_state(agent_id)
     }
@@ -217,7 +217,7 @@ mod stub
       Ok(())
     }
 
-    pub fn get_metrics(&self, _agent_id: &str) -> Option<iron_state::AgentState>
+    pub fn get_metrics(&self, _agent_id: &str) -> Option<iron_runtime_state::AgentState>
     {
       None
     }

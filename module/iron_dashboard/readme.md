@@ -5,7 +5,7 @@ Web dashboard for real-time Iron Cage agent monitoring and token management.
 ## Scope
 
 **Responsibilities:**
-Provides Vue 3-based web interface for monitoring agent execution, managing API tokens, tracking usage costs, setting budget limits, and viewing request traces. Features real-time WebSocket updates, REST API integration with iron_api backend, and accessible UI components. Supports authentication, session management, and responsive layouts for desktop/mobile. Requires Node.js 20+, modern browsers (Chrome 120+, Firefox 120+, Safari 17+).
+Provides Vue 3-based web interface for monitoring agent execution, managing API tokens, tracking usage costs, setting budget limits, and viewing request traces. Features real-time WebSocket updates, REST API integration with iron_control_api backend, and accessible UI components. Supports authentication, session management, and responsive layouts for desktop/mobile. Requires Node.js 20+, modern browsers (Chrome 120+, Firefox 120+, Safari 17+).
 
 **In Scope:**
 - Authentication and session management (JWT tokens, localStorage)
@@ -17,16 +17,16 @@ Provides Vue 3-based web interface for monitoring agent execution, managing API 
 - Real-time updates (WebSocket integration)
 - Responsive layout (desktop 1920x1080, mobile 390x844)
 - Accessibility (WCAG 2.1 Level AA, keyboard navigation, screen readers)
-- REST API integration (iron_api endpoints)
+- REST API integration (iron_control_api endpoints)
 
 **Out of Scope:**
 - Multi-user management → Pilot is single-user (see spec.md §2.2)
 - Role-based access control → Pilot has no roles (see spec.md §2.2)
 - Advanced analytics → Pilot uses tables only (see spec.md §FR-4)
 - Export functionality → Pilot is view-only (see spec.md §2.2)
-- Backend implementation → Use iron_api module
-- API authentication → Backend responsibility (see iron_api/spec.md)
-- Data persistence → Backend responsibility (see iron_api/spec.md)
+- Backend implementation → Use iron_control_api module
+- API authentication → Backend responsibility (see iron_control_api/spec.md)
+- Data persistence → Backend responsibility (see iron_control_api/spec.md)
 
 ---
 
@@ -36,7 +36,7 @@ Provides Vue 3-based web interface for monitoring agent execution, managing API 
 
 - **Node.js:** 20.0.0 or higher
 - **npm:** 10.0.0 or higher
-- **Backend:** iron_api running on http://localhost:3000
+- **Backend:** iron_control_api running on http://localhost:3000
 
 ### Setup
 
@@ -118,11 +118,11 @@ npm run dev
 
 Starts Vite dev server on **http://localhost:5173** with hot module replacement (HMR).
 
-**Backend Required:** Ensure iron_api is running on http://localhost:3000 before starting frontend.
+**Backend Required:** Ensure iron_control_api is running on http://localhost:3000 before starting frontend.
 
 ```bash
 # Terminal 1: Start backend
-cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_api
+cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
 cargo run
 
 # Terminal 2: Start frontend
@@ -297,7 +297,7 @@ module/iron_dashboard/
 
 **Current Status:** Phase 1 - Documentation Creation
 
-This module was migrated from `dev/frontend/` to `dev/module/iron_dashboard/` to maintain consistency with other Iron Cage modules (iron_api, iron_cli, iron_runtime). The migration follows TDD principles with verification scripts ensuring correctness.
+This module was migrated from `dev/frontend/` to `dev/module/iron_dashboard/` to maintain consistency with other Iron Cage modules (iron_control_api, iron_cli, iron_runtime). The migration follows TDD principles with verification scripts ensuring correctness.
 
 **Migration Plan:** See `./-frontend_migration_plan_refined_tdd.md` for complete plan.
 

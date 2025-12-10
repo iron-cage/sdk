@@ -29,13 +29,15 @@ Understand service dependencies and communication patterns for debugging/operati
 
 | Service | Port | Purpose | Deps |
 |---------|------|---------|------|
-| Safety | 8080 | Input/output validation | PostgreSQL |
-| Cost | 8081 | Budget tracking | PostgreSQL, Redis |
-| Tool Proxy | 8082 | Tool authorization | Redis |
-| Audit | 8083 | Compliance logging | PostgreSQL, S3 |
+| Safety | 8080 | Input/output validation | Database |
+| Cost | 8081 | Budget tracking | Database, Cache |
+| Tool Proxy | 8082 | Tool authorization | Cache |
+| Audit | 8083 | Compliance logging | Database, Object Storage |
 | Gateway | 8084 | Orchestration | All above |
 
-## Call Sequence (Model A)
+*Note: Cache = In-memory (pilot) or Redis (production). Database = SQLite/PostgreSQL. Object Storage = S3/compatible. See [technology/003](../technology/003_infrastructure_choices.md).*
+
+## Call Sequence
 
 1. Agent calls SDK -> SDK calls Gateway
 2. Gateway -> Safety (validate input)
@@ -52,7 +54,7 @@ Understand service dependencies and communication patterns for debugging/operati
 | Safety | BLOCK all (fail-safe) |
 | Cost | ALLOW, track in memory |
 | Tool Proxy | BLOCK tool execution |
-| Audit | ALLOW, buffer in Redis |
+| Audit | ALLOW, buffer in queue (in-memory or cache) |
 
 ---
 

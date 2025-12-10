@@ -6,15 +6,13 @@
 
 ## Directory Responsibilities
 
-| Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|--------|----------------|----------------|-------|--------------|
-| **adr_001_two_repo_split.md** | Document historical two-repository decision (superseded) | Repository organization decision → ADR | Historical: iron_runtime vs iron_cage separation, release cycle rationale, crates.io sharing | NOT implementation (→ module/*/), NOT current package structure (→ adr_006), NOT other decisions (→ other ADRs) |
-| **adr_002_rust_python_boundary.md** | Record decision on Rust-Python interface approach | FFI design decision → ADR | PyO3 choice, alternatives considered (HTTP, gRPC), performance trade-offs, consequences | NOT technology rationale (→ docs/technology/why_pyo3.md), NOT implementation (→ module/iron_runtime/), NOT other decisions (→ other ADRs) |
-| **adr_003_client_side_primary.md** | Explain decision to prioritize client-side execution | Execution model decision → ADR | Client-side primary (95%), server-side optional (5%), governance via SDK interception, rationale | NOT execution architecture (→ docs/architecture/execution_models.md), NOT deployment (→ docs/deployment/), NOT other decisions (→ other ADRs) |
-| **adr_004_crate_renaming.md** | Document decision on crate naming convention | Naming convention decision → ADR | iron_* prefix adoption, migration strategy from old names, impact analysis, consequences | NOT module details (→ module/*/spec.md), NOT repository structure (→ adr_001), NOT other decisions (→ other ADRs) |
-| **adr_005_cli_architecture.md** | Record decision on CLI wrapper pattern | CLI architecture decision → ADR | Wrapper pattern, native vs delegated commands, alternatives considered, consequences | NOT architecture guide (→ docs/features/cli_architecture.md), NOT implementation (→ module/iron_cli_py/spec.md), NOT other decisions (→ other ADRs) |
-| **adr_006_package_consolidation.md** | Document decision to consolidate deployment packages | Package structure decision → ADR | 6→5 packages (merge Package 6 into 5), iron_examples merged into iron_sdk, iron_control_store skeleton created | NOT package definitions (→ docs/deployment/package_model.md), NOT module mappings (→ docs/module_package_matrix.md), NOT other decisions (→ other ADRs) |
-| **adr_007_testing_philosophy.md** | Document decision to reject mocking and remove iron_testing | Testing approach decision → ADR | No mocking principle enforcement, test-per-module approach, real implementations only, iron_testing removal | NOT testing implementation (→ module/*/tests/), NOT other decisions (→ other ADRs) |
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| ADR-002 | **adr_002_rust_python_boundary.md** | Document decision on Rust-Python interface approach (PyO3 chosen over HTTP/gRPC for performance) |
+| ADR-003 | **adr_003_client_side_primary.md** | Document decision to prioritize client-side execution (local 95%, server optional 5%, SDK governance) |
+| ADR-005 | **adr_005_cli_architecture.md** | Document decision on CLI wrapper pattern (iron_cli_py wraps iron_cli binary, native vs delegated commands) |
+| ADR-006 | **adr_006_package_consolidation.md** | Document decision to consolidate deployment packages (6→5 packages, iron_examples merged into iron_sdk) |
+| ADR-007 | **adr_007_testing_philosophy.md** | Document decision to reject mocking (no mocking principle, test-per-module, real implementations, iron_testing removed) |
 
 ---
 
@@ -22,10 +20,8 @@
 
 | ID | Decision | Status | Date |
 |----|----------|--------|------|
-| ADR-001 | [Two-Repository Split](adr_001_two_repo_split.md) | Superseded | 2025-01 |
 | ADR-002 | [Rust-Python Boundary](adr_002_rust_python_boundary.md) | Accepted | 2025-01 |
 | ADR-003 | [Client-Side Primary](adr_003_client_side_primary.md) | Accepted | 2025-01 |
-| ADR-004 | [Crate Renaming](adr_004_crate_renaming.md) | Accepted | 2025-12 |
 | ADR-005 | [CLI Architecture](adr_005_cli_architecture.md) | Accepted | 2025-12 |
 | ADR-006 | [Package Consolidation](adr_006_package_consolidation.md) | Accepted | 2025-12 |
 | ADR-007 | [Testing Philosophy](adr_007_testing_philosophy.md) | Accepted | 2025-12 |

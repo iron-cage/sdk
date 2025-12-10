@@ -18,7 +18,7 @@ Comprehensive guide for setting up iron_dashboard development environment, inclu
 
 **Excluded:**
 - Production deployment → See deployment guide (TBD)
-- Backend setup → See `iron_api/readme.md`
+- Backend setup → See `iron_control_api/readme.md`
 - Architecture details → See `docs/architecture.md`
 - API integration → See `docs/api_integration.md`
 
@@ -61,14 +61,14 @@ nvm alias default 20
 
 ---
 
-### Backend Server (iron_api)
+### Backend Server (iron_control_api)
 
 **Required:** Frontend cannot function without running backend
 
 **Setup:**
 ```bash
-# Terminal 1: Start iron_api backend
-cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_api
+# Terminal 1: Start iron_control_api backend
+cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
 cargo run --release
 
 # Wait for: "Server listening on http://0.0.0.0:3000"
@@ -433,12 +433,12 @@ export default defineConfig({
 
 ### Issue: "Network: ERR_CONNECTION_REFUSED"
 
-**Cause:** Backend (iron_api) not running
+**Cause:** Backend (iron_control_api) not running
 
 **Solution:**
 ```bash
 # Terminal 1: Start backend
-cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_api
+cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
 cargo run
 
 # Wait for server to start, then retry frontend
@@ -496,9 +496,9 @@ npx vue-tsc --noEmit
 **Cause:** Backend not configured to allow frontend origin
 
 **Solution (Backend):**
-Add CORS middleware in `iron_api`:
+Add CORS middleware in `iron_control_api`:
 ```rust
-// In iron_api/src/main.rs
+// In iron_control_api/src/main.rs
 .layer(
   CorsLayer::new()
     .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())

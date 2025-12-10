@@ -39,15 +39,30 @@ response = cage.llm.chat(
 )
 ```
 
-## Fallback Chains
+## IP Selection and Fallback
+
+**Note:** In Pilot, admin binds IPs to agents. Developer selects which bound IP to use. Automatic fallback is future feature.
+
+**Agent-Level IP Configuration (Future):**
 
 ```
-Primary: OpenAI GPT-4
-    | (if rate limited or down)
-Fallback 1: Anthropic Claude 3
-    | (if unavailable)
-Fallback 2: Azure OpenAI GPT-4
+Agent configured with multiple IPs:
+- IP 1: OpenAI (primary, developer default)
+- IP 2: Anthropic (backup, developer selects manually)
+- IP 3: Azure (backup, developer selects manually)
+
+Developer selects IP per request or configures priority.
 ```
+
+**Pilot Scope:**
+- Admin binds IPs to agents (minimal complexity)
+- Developer selects which IP to use
+- No automatic fallback (future feature)
+
+**Developer Control:**
+- Select IP/provider among allowed list
+- Select model among allowed list
+- High level of control for efficient development
 
 ## Cost Normalization
 
