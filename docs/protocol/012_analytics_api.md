@@ -70,7 +70,7 @@ Content-Type: application/json
   "currency": "USD",
   "period": "today",
   "filters": {
-    "agent_id": "agent-abc123",
+    "agent_id": "agent_abc123",
     "provider_id": null
   },
   "calculated_at": "2025-12-10T15:30:00Z"
@@ -127,7 +127,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "agent_id": "agent-abc123",
+      "agent_id": "agent_abc123",
       "agent_name": "Production Agent 1",
       "spending": 456.78,
       "budget": 1000.00,
@@ -135,7 +135,7 @@ Content-Type: application/json
       "request_count": 2341
     },
     {
-      "agent_id": "agent-def456",
+      "agent_id": "agent_def456",
       "agent_name": "Test Agent",
       "spending": 234.56,
       "budget": 500.00,
@@ -216,7 +216,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "agent_id": "agent-abc123",
+      "agent_id": "agent_abc123",
       "agent_name": "Production Agent 1",
       "budget": 1000.00,
       "spent": 956.78,
@@ -226,7 +226,7 @@ Content-Type: application/json
       "risk_level": "critical"
     },
     {
-      "agent_id": "agent-def456",
+      "agent_id": "agent_def456",
       "agent_name": "Test Agent",
       "budget": 500.00,
       "spent": 434.56,
@@ -236,7 +236,7 @@ Content-Type: application/json
       "risk_level": "high"
     },
     {
-      "agent_id": "agent-ghi789",
+      "agent_id": "agent_ghi789",
       "agent_name": "Dev Agent",
       "budget": 100.00,
       "spent": 100.00,
@@ -319,7 +319,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "provider_id": "ip-openai-001",
+      "provider_id": "ip_openai-001",
       "provider_name": "openai",
       "spending": 789.45,
       "request_count": 12456,
@@ -327,7 +327,7 @@ Content-Type: application/json
       "agent_count": 8
     },
     {
-      "provider_id": "ip-anthropic-001",
+      "provider_id": "ip_anthropic-001",
       "provider_name": "anthropic",
       "spending": 456.22,
       "request_count": 9123,
@@ -406,7 +406,7 @@ Content-Type: application/json
   "success_rate": 97.53,
   "period": "today",
   "filters": {
-    "agent_id": "agent-abc123",
+    "agent_id": "agent_abc123",
     "provider_id": null
   },
   "calculated_at": "2025-12-10T15:30:00Z"
@@ -464,7 +464,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "agent_id": "agent-abc123",
+      "agent_id": "agent_abc123",
       "agent_name": "Production Agent 1",
       "input_tokens": 1234567,
       "output_tokens": 567890,
@@ -473,7 +473,7 @@ Content-Type: application/json
       "avg_tokens_per_request": 770
     },
     {
-      "agent_id": "agent-def456",
+      "agent_id": "agent_def456",
       "agent_name": "Test Agent",
       "input_tokens": 789012,
       "output_tokens": 345678,
@@ -552,7 +552,7 @@ Content-Type: application/json
   "data": [
     {
       "model": "gpt-4",
-      "provider_id": "ip-openai-001",
+      "provider_id": "ip_openai-001",
       "provider_name": "openai",
       "request_count": 8945,
       "spending": 567.89,
@@ -563,7 +563,7 @@ Content-Type: application/json
     },
     {
       "model": "claude-3-opus",
-      "provider_id": "ip-anthropic-001",
+      "provider_id": "ip_anthropic-001",
       "provider_name": "anthropic",
       "request_count": 5234,
       "spending": 345.67,
@@ -650,7 +650,7 @@ Content-Type: application/json
   "max_cost_per_request": 0.2345,
   "period": "last-30-days",
   "filters": {
-    "agent_id": "agent-abc123",
+    "agent_id": "agent_abc123",
     "provider_id": null
   },
   "calculated_at": "2025-12-10T15:30:00Z"

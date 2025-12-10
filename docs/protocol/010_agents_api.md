@@ -59,7 +59,7 @@ HTTP 201 Created
 Content-Type: application/json
 
 {
-  "id": "agent-abc123",
+  "id": "agent_abc123",
   "name": "Production Agent 1",
   "budget": 100.00,
   "providers": ["ip-openai-001", "ip-anthropic-001"],
@@ -175,7 +175,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "id": "agent-abc123",
+      "id": "agent_abc123",
       "name": "Production Agent 1",
       "budget": 100.00,
       "spent": 45.75,
@@ -190,7 +190,7 @@ Content-Type: application/json
       "updated_at": "2025-12-10T10:30:45Z"
     },
     {
-      "id": "agent-def456",
+      "id": "agent_def456",
       "name": "Test Agent",
       "budget": 10.00,
       "spent": 10.00,
@@ -282,7 +282,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "agent-abc123",
+  "id": "agent_abc123",
   "name": "Production Agent 1",
   "budget": 100.00,
   "spent": 45.75,
@@ -389,7 +389,7 @@ Content-Type: application/json
 | `description` | string | No | Max 500 chars | Updated description (empty string to clear) |
 | `tags` | array<string> | No | Max 20 tags, 50 chars each | Updated tags (empty array to clear) |
 
-**Important:** At least one field must be provided. To modify budget, use `PUT /api/v1/limits/agents/{id}/budget`. To modify providers, use `PUT /api/v1/agents/{id}/providers`.
+**Important:** At least one field must be provided. To modify budget, admins use `PUT /api/v1/limits/agents/{id}/budget` (see [Protocol 013](013_budget_limits_api.md)); developers create budget change requests (see [Protocol 017](017_budget_requests_api.md)). To modify providers, use `PUT /api/v1/agents/{id}/providers`.
 
 **Success Response:**
 
@@ -398,7 +398,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "agent-abc123",
+  "id": "agent_abc123",
   "name": "Production Agent 1 (Updated)",
   "budget": 100.00,
   "spent": 45.75,
@@ -487,7 +487,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "status": "active",
   "budget": {
     "total": 100.00,
@@ -565,7 +565,7 @@ HTTP 403 Forbidden
 
 ```json
 {
-  "id": "agent-abc123",
+  "id": "agent_abc123",
   "name": "Production Agent 1",
   "budget": 100.00,
   "spent": 45.75,
@@ -591,7 +591,7 @@ HTTP 403 Forbidden
 
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "status": "active",
   "budget": {
     "total": 100.00,
@@ -625,14 +625,18 @@ HTTP 403 Forbidden
 
 - Each agent has exactly one Agent Budget (RESTRICTIVE type)
 - Budget set at agent creation
-- Budget modifiable via `PUT /api/v1/limits/agents/{id}/budget` (full mutability, decreases require force flag)
+- Budget modifiable via admin-only `PUT /api/v1/limits/agents/{id}/budget` (see [Protocol 013](013_budget_limits_api.md))
+- Developers request budget changes via request/approval workflow (see [Protocol 017](017_budget_requests_api.md))
 - Budget enforcement blocks requests when exhausted
 
 ### Agent ↔ Providers (Many-to-Many)
 
 - Agent can have zero or more providers
 - No maximum limit on number of providers
-- Provider assignment via `PUT /api/v1/agents/{id}/providers`
+- **Provider deletion cascades:** Deleting provider automatically removes it from all agent assignments (ON DELETE CASCADE)
+- **Zero providers:** Agents with no providers cannot make inference requests until provider assigned
+- **Multiple providers:** Agents with multiple providers use them in order (primary, fallback, etc.)
+- Provider assignment managed via `PUT /api/v1/agents/{id}/providers` (see Protocol 010) or `DELETE /api/v1/providers/{id}` (cascade deletion, see Protocol 011)
 - Provider usage tracked for analytics
 
 ### Agent ↔ User (Many-to-One)
@@ -786,7 +790,7 @@ Retry-After: 60
   "endpoint": "POST /api/v1/agents",
   "method": "POST",
   "resource_type": "agent",
-  "resource_id": "agent-abc123",
+  "resource_id": "agent_abc123",
   "action": "create",
   "parameters": {
     "name": "Production Agent 1",

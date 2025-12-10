@@ -1,6 +1,9 @@
 # Roles and Permissions
 
 **Purpose:** Define the three access roles in Iron Cage platform.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 

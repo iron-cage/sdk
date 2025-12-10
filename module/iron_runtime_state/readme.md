@@ -43,13 +43,13 @@ use std::sync::Arc;
 let state = Arc::new(StateManager::new("./state.db")?);
 
 // Update agent state (thread-safe)
-state.update_agent("agent-001", AgentState::Running)?;
+state.update_agent("agent_001", AgentState::Running)?;
 
 // Retrieve current state
-let agent = state.get_agent("agent-001")?;
+let agent = state.get_agent("agent_001")?;
 
 // Log audit event
-state.log_event("agent-001", "PII detected and redacted")?;
+state.log_event("agent_001", "PII detected and redacted")?;
 ```
 
 ## License

@@ -1,8 +1,10 @@
-# 015 Projects API
+# Protocol 015: Projects API
 
-**Status**: NICE-TO-HAVE
-**Version**: 1.0
-**Last Updated**: 2025-12-10
+**Status:** NICE-TO-HAVE
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ## Overview
 
@@ -65,7 +67,7 @@ Authorization: Bearer <user-token or api-token>
 {
   "data": [
     {
-      "id": "proj-master-001",
+      "id": "proj_master-001",
       "name": "Master Project",
       "description": "Default project for Iron Control Panel Pilot",
       "user_count": 12,
@@ -140,7 +142,7 @@ Authorization: Bearer <user-token or api-token>
 **Response** (HTTP 200 OK):
 ```json
 {
-  "id": "proj-master-001",
+  "id": "proj_master-001",
   "name": "Master Project",
   "description": "Default project for Iron Control Panel Pilot",
   "user_count": 12,

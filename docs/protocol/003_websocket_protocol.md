@@ -1,4 +1,10 @@
-# Protocol: WebSocket Protocol
+# Protocol 003: WebSocket Protocol
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ### Scope
 
@@ -53,7 +59,7 @@ WebSocket streaming provides:
 {
   "type": "STATE_UPDATE",
   "timestamp": "2025-12-09T09:00:00Z",
-  "agent_id": "agent-001",
+  "agent_id": "agent_001",
   "state": "running",
   "data": {
     "current_lead": 42,
@@ -68,7 +74,7 @@ WebSocket streaming provides:
 {
   "type": "AGENT_EVENT",
   "timestamp": "2025-12-09T09:00:01Z",
-  "agent_id": "agent-001",
+  "agent_id": "agent_001",
   "event": "llm_call",
   "data": {
     "model": "gpt-4",
@@ -84,7 +90,7 @@ WebSocket streaming provides:
 {
   "type": "COST_ALERT",
   "timestamp": "2025-12-09T09:00:02Z",
-  "agent_id": "agent-001",
+  "agent_id": "agent_001",
   "severity": "warning",
   "data": {
     "budget_spent": 9.00,

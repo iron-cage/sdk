@@ -223,7 +223,7 @@ User: iron-py token generate --name foo --scope read
 
 ### Mitigations
 
-- Bundled binary option: `pip install iron-cli-py[binary]`
+- Bundled binary option: `uv pip install iron-cli-py[binary]`
 - Clear error messages for missing binary with installation instructions
 - Binary discovery with multiple fallback locations
 - Batch API for performance-sensitive use cases

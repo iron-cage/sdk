@@ -1,6 +1,9 @@
 # Service Integration
 
 **Purpose:** How the five core services communicate at runtime.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 

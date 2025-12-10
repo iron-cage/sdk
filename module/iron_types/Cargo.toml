@@ -12,12 +12,15 @@ categories = ["data-structures", "development-tools"]
 
 [features]
 default = ["enabled"]
-enabled = ["dep:serde", "dep:thiserror"]
-full = ["enabled"]
+enabled = ["dep:serde", "dep:thiserror", "dep:uuid"]
+telemetry = ["dep:tracing"]
+full = ["enabled", "telemetry"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"

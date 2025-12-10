@@ -1406,7 +1406,7 @@ All sandbox violations must be logged:
 {
   "event_type": "sandbox_violation",
   "timestamp": "2025-01-17T10:34:52Z",
-  "agent_id": "agent-12345",
+  "agent_id": "agent_12345",
   "tenant_id": "tenant-67890",
   "violation_type": "memory_limit_exceeded",
   "limit": "1 GB",

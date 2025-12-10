@@ -41,10 +41,10 @@ use iron_telemetry::{init_logging, log_agent_event, log_pii_detection};
 init_logging()?;
 
 // Log agent lifecycle events
-log_agent_event("agent-001", "Agent started processing leads");
+log_agent_event("agent_001", "Agent started processing leads");
 
 // Log PII detection (specialized format)
-log_pii_detection("agent-001", "email", "john@example.com");
+log_pii_detection("agent_001", "email", "john@example.com");
 
 // Output: [14:32:05] INFO  agent-001 | Agent started processing leads
 // Output: [14:32:06] WARN  agent-001 | PII DETECTED: email redacted

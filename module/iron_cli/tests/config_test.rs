@@ -28,7 +28,7 @@ fn test_config_loads_defaults()
 {
   let config = iron_cli::config::Config::new();
 
-  assert_eq!( config.get( "api_url" ), Some( "https://api.iron.dev".to_string() ) );
+  assert_eq!( config.get( "api_url" ), Some( "https://api.ironcage.ai".to_string() ) );
   assert_eq!( config.get( "format" ), Some( "table".to_string() ) );
 }
 

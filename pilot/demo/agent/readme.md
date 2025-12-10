@@ -179,7 +179,7 @@ DataViz Co,Analytics,dataviz.com,budget_at_85
 cd /home/user1/pro/lib/willbe/module/iron_cage/pilot/demo/agent
 
 # Setup environment
-python3.11 -m venv .venv
+uv venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
 

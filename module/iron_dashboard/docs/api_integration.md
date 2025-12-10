@@ -474,7 +474,7 @@ interface WebSocketMessage {
   "data": {
     "id": 123,
     "token_id": 1,
-    "request_id": "req-abc",
+    "request_id": "req_abc",
     "provider": "openai",
     "model": "gpt-4o",
     "input_tokens": 1234,
@@ -490,7 +490,7 @@ interface WebSocketMessage {
 {
   "type": "agent_status",
   "data": {
-    "agent_id": "agent-001",
+    "agent_id": "agent_001",
     "status": "RUNNING",
     "cost": 12.34,
     "duration_secs": 154

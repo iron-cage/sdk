@@ -1,6 +1,9 @@
 # Service Boundaries
 
 **Purpose:** Separation between Control Plane, Data Plane, and Agent Runtime.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 

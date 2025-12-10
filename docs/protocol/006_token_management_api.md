@@ -1,4 +1,10 @@
-# Protocol: Token Management API
+# Protocol 006: Token Management API
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ### Scope
 
@@ -63,8 +69,8 @@ Response: 200 OK
   "data": [
     {
       "id": "tok-abc123",
-      "agent_id": "agent-xyz789",
-      "project_id": "proj-456",
+      "agent_id": "agent_xyz789",
+      "project_id": "proj_456",
       "status": "active",
       "created_at": "2025-12-09T09:00:00Z",
       "created_by": "user-admin",
@@ -93,8 +99,8 @@ Authorization: Bearer <USER_TOKEN>
 Response: 200 OK
 {
   "id": "tok-abc123",
-  "agent_id": "agent-xyz789",
-  "project_id": "proj-456",
+  "agent_id": "agent_xyz789",
+  "project_id": "proj_456",
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z",
   "created_by": "user-admin",
@@ -137,8 +143,8 @@ Content-Type: application/json
 
 Request:
 {
-  "agent_id": "agent-xyz789",
-  "project_id": "proj-456",
+  "agent_id": "agent_xyz789",
+  "project_id": "proj_456",
   "description": "Production agent for project X" (optional)
 }
 
@@ -146,8 +152,8 @@ Response: 201 Created
 {
   "id": "tok-abc123",
   "token": "ic_abc123def456ghi789...",  // ⚠️ ONLY returned on creation
-  "agent_id": "agent-xyz789",
-  "project_id": "proj-456",
+  "agent_id": "agent_xyz789",
+  "project_id": "proj_456",
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z",
   "created_by": "user-admin",
@@ -160,7 +166,7 @@ Error: 409 Conflict (Agent already has IC Token)
     "code": "RESOURCE_CONFLICT",
     "message": "IC Token already exists for agent",
     "details": {
-      "agent_id": "agent-xyz789",
+      "agent_id": "agent_xyz789",
       "existing_token_id": "tok-old123"
     }
   }
@@ -171,7 +177,7 @@ Error: 400 Bad Request (Invalid agent_id)
   "error": {
     "code": "VALIDATION_INVALID_REFERENCE",
     "message": "Agent not found",
-    "details": {"agent_id": "agent-nonexistent"}
+    "details": {"agent_id": "agent_nonexistent"}
   }
 }
 
@@ -234,8 +240,8 @@ Response: 200 OK
 {
   "id": "tok-abc123",  // Same token ID
   "token": "ic_new456def789ghi012...",  // ⚠️ NEW token value
-  "agent_id": "agent-xyz789",
-  "project_id": "proj-456",
+  "agent_id": "agent_xyz789",
+  "project_id": "proj_456",
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z",  // Original creation date preserved
   "rotated_at": "2025-12-09T14:00:00Z",

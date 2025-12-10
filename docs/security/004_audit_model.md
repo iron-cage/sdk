@@ -90,7 +90,7 @@ CREATE TABLE user_audit_log
 {
   "event_id": "uuid",
   "timestamp": "ISO8601",
-  "agent_id": "agent-123",
+  "agent_id": "agent_123",
   "event_type": "llm_call",
   "data": { "model": "gpt-4", "tokens": 1240, "cost_usd": 0.015 },
   "safety": { "input_clean": true, "output_redacted": false }

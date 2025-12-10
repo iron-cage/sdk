@@ -58,7 +58,7 @@ mod implementation
     pub async fn start_agent(&self, _script_path: &std::path::Path) -> Result<AgentHandle, anyhow::Error>
     {
       // TODO: Implement agent spawning and PyO3 bridge
-      let agent_id = format!("agent-{}", uuid::Uuid::new_v4());
+      let agent_id = iron_types::AgentId::generate().to_string();
 
       iron_telemetry::log_agent_event(&agent_id, "agent_started");
 
@@ -130,7 +130,7 @@ mod implementation
       {
         // Async bridge with pyo3-asyncio not yet implemented
         // For now, return a placeholder
-        Ok("agent-placeholder".to_string())
+        Ok("agent_placeholder".to_string())
       }
 
       /// Stop an agent

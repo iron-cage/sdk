@@ -1,4 +1,10 @@
-# Protocol: Authentication API
+# Protocol 007: Authentication API
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ### Scope
 

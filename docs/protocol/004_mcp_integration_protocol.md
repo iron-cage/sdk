@@ -1,4 +1,10 @@
-# Protocol: MCP Integration Protocol
+# Protocol 004: MCP Integration Protocol
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ### Scope
 

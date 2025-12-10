@@ -107,8 +107,8 @@ NO EXTERNAL DEPENDENCIES:
    cd module/iron_cage/pilot/demo/control panel
    npm run build
    cd ../agent
-   python3 -m venv .venv && source .venv/bin/activate
-   pip install -r requirements.txt
+   uv venv && source .venv/bin/activate
+   uv pip install -r requirements.txt
    ```
 
 2. **Data Preparation**

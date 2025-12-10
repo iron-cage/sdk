@@ -29,7 +29,7 @@ async fn test_start_agent()
 
   assert!(handle.is_ok());
   let handle = handle.unwrap();
-  assert!(handle.agent_id.starts_with("agent-"));
+  assert!(handle.agent_id.starts_with("agent_"));
 }
 
 #[tokio::test]

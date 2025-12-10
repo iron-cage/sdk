@@ -14,8 +14,9 @@ The Budget Limits API provides endpoints for modifying agent budgets after creat
 - **Full mutability:** Budgets can be increased or decreased
 - **Force flag for decreases:** Budget decreases require explicit confirmation to prevent accidental shutdowns
 - **Emergency use case:** Preventing task failure when agent approaches budget limit
-- **Admin + Owner authorization:** Both admin and agent owner can modify budgets
+- **Admin-only authorization:** Only admins can directly modify budgets (developers use request workflow)
 - **Audit logging:** All budget modifications are logged for compliance
+- **Developer path:** See [Protocol 017: Budget Change Requests API](017_budget_requests_api.md) for request/approval workflow
 
 ---
 
@@ -27,10 +28,11 @@ The Budget Limits API provides endpoints for modifying agent budgets after creat
 
 **Description:** Modifies an agent's budget (increase or decrease). Decrease requests require `force: true` confirmation to prevent accidental shutdowns.
 
-**Use Case:** Emergency budget top-up for long-running agents
+**Use Case:** Emergency budget top-up for long-running agents (admin-only direct path)
 - **Scenario:** Agent at 95% budget usage, running multi-hour task
 - **Problem:** Task will fail if budget exhausted
-- **Solution:** Admin or owner increases budget to prevent interruption
+- **Solution:** Admin immediately increases budget to prevent interruption (bypasses request workflow)
+- **Developer alternative:** Use [Budget Change Requests](017_budget_requests_api.md) for planned budget increases
 
 **Request:**
 
@@ -62,7 +64,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "previous_budget": 100.00,
   "new_budget": 150.00,
   "increase_amount": 50.00,
@@ -155,9 +157,8 @@ HTTP 404 Not Found
 ```
 
 **Authorization:**
-- **Agent Owner:** Can increase own agent's budget
-- **Admin:** Can increase any agent's budget
-- **Other Users:** 403 Forbidden
+- **Admin only:** Can modify any agent's budget (increase or decrease)
+- **Non-admin:** 403 Forbidden (use [Budget Change Requests](017_budget_requests_api.md) instead)
 
 **Audit Log:** Yes (mutation operation, includes previous/new budget and reason)
 
@@ -190,7 +191,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "current_budget": 150.00,
   "modifications": [
     {
@@ -258,7 +259,7 @@ Content-Type: application/json
 ```json
 HTTP 200 OK
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "current_budget": 100.00,
   "modifications": [],
   "summary": {
@@ -313,7 +314,7 @@ HTTP 404 Not Found
 
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "previous_budget": 100.00,
   "new_budget": 150.00,
   "increase_amount": 50.00,
@@ -330,7 +331,7 @@ HTTP 404 Not Found
 
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "current_budget": 150.00,
   "modifications": [
     {
@@ -367,13 +368,14 @@ HTTP 404 Not Found
 
 | Operation | Agent Owner | Admin | Other User |
 |-----------|-------------|-------|------------|
-| Increase budget | ✅ (own agents) | ✅ (all agents) | ❌ |
+| Modify budget (direct) | ❌ (use request workflow) | ✅ (all agents) | ❌ |
 | View budget history | ✅ (own agents) | ✅ (all agents) | ❌ |
 
 **Reasoning:**
-- **Owner control:** Developers can manage their own agents without admin intervention
-- **Admin oversight:** Admins can manage all budgets (system-wide visibility)
-- **Safety:** Only authorized users can increase budgets (prevents unauthorized spending)
+- **Admin control:** Only admins can directly modify budgets (full governance)
+- **Developer path:** Developers use [Budget Change Requests](017_budget_requests_api.md) (request/approval workflow)
+- **Admin oversight:** Admins have system-wide visibility and control
+- **Safety:** Budget modifications require admin authorization (prevents unauthorized spending)
 
 ### Force Flag Policy
 
@@ -452,7 +454,7 @@ Content-Type: application/json
   "endpoint": "PUT /api/v1/limits/agents/agent-abc123/budget",
   "method": "PUT",
   "resource_type": "agent_budget",
-  "resource_id": "agent-abc123",
+  "resource_id": "agent_abc123",
   "action": "increase",
   "parameters": {
     "previous_budget": 100.00,

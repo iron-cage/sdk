@@ -1,6 +1,9 @@
 # Execution Models
 
 **Purpose:** Where AI agents execute - Control Panel always manages budget.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 

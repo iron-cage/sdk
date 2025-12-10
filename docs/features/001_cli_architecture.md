@@ -46,6 +46,7 @@ iron_cli_py uses a **wrapper pattern** for operations commands, delegating to ir
 │ - token.*  ─────────┼──────────┐
 │ - usage.*  ─────────┼──────────┤
 │ - limits.* ─────────┼──────────┤
+│ - budget-requests.* ┼──────────┤
 │ - traces.* ─────────┼──────────┤
 │ - auth.*   ─────────┼──────────┤
 │ - health   ─────────┼──────────┤
@@ -61,6 +62,7 @@ iron_cli_py uses a **wrapper pattern** for operations commands, delegating to ir
                     │ - Token CRUD        │
                     │ - Usage reporting   │
                     │ - Limits management │
+                    │ - Budget requests   │
                     │ - Traces inspection │
                     │ - Authentication    │
                     │ - Health/version    │
@@ -76,6 +78,7 @@ iron_cli_py uses a **wrapper pattern** for operations commands, delegating to ir
 | token.* | iron_cli | Native | Wrapper |
 | usage.* | iron_cli | Native | Wrapper |
 | limits.* | iron_cli | Native | Wrapper |
+| budget-requests.* | iron_cli | Native | Wrapper |
 | traces.* | iron_cli | Native | Wrapper |
 | auth.* | iron_cli | Native | Wrapper |
 | health | iron_cli | Native | Wrapper |
@@ -117,6 +120,10 @@ These commands delegate to iron_cli binary, ensuring single source of truth:
 | `iron-py token validate` | Validate token | `iron-py token validate --file token.json` |
 | `iron-py usage show` | Show usage statistics | `iron-py usage show --start-date 2025-01-01` |
 | `iron-py limits list` | List budget limits | `iron-py limits list` |
+| `iron-py budget-requests list` | List budget requests | `iron-py budget-requests list --status pending` |
+| `iron-py budget-requests create` | Create budget request | `iron-py budget-requests create --agent-id abc123 --budget 150` |
+| `iron-py budget-requests approve` | Approve budget request | `iron-py budget-requests approve breq-xyz --budget 140` |
+| `iron-py budget-requests reject` | Reject budget request | `iron-py budget-requests reject breq-xyz --notes "Insufficient justification"` |
 | `iron-py traces list` | List request traces | `iron-py traces list --limit 20` |
 | `iron-py auth login` | Authenticate with API | `iron-py auth login` |
 

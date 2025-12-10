@@ -1,6 +1,9 @@
 # Resource Catalog
 
 **Purpose:** Exhaustive inventory of all REST API resources, their mapping to entities, and authentication patterns.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 > **Note:** This document catalogs REST API resources exposed by the Control Panel. For entity definitions, see [007_entity_model.md](007_entity_model.md).
 
@@ -147,13 +150,16 @@ Understand all available REST API resources, how they map to domain entities, an
 
 | Resource | Configuration Managed | Affects | Auth Type | Certainty | CLI Commands |
 |----------|----------------------|---------|-----------|-----------|--------------|
-| `/api/limits/agents/{agent_id}/budget` | Agent budget modification (full mutability) | Agent Budget | User Token (Owner/Admin) | ✅ MUST-HAVE | `iron limits agent <id> budget` |
+| `/api/limits/agents/{agent_id}/budget` | Agent budget modification (direct, admin-only) | Agent Budget | User Token (Admin) | ✅ MUST-HAVE | `iron limits agent <id> budget` |
+| `/api/budget-requests` | Budget change requests (developer workflow) | Agent Budget | User Token (Owner + Admin) | ✅ MUST-HAVE | `iron budget-requests` |
 | `/api/settings` | System-wide settings | Control Panel | User Token (Admin) | 📋 POST-PILOT | `iron settings` |
 
 **Notes:**
-- Budget Limits API is MUST-HAVE (emergency budget modification, specification complete: [013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
+- Budget Limits API is MUST-HAVE (admin-only direct modification, specification complete: [013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
+- Budget Requests API is MUST-HAVE (request/approval workflow, specification complete: [017_budget_requests_api.md](../protocol/017_budget_requests_api.md))
 - Settings API is POST-PILOT (specification complete for future implementation: [016_settings_api.md](../protocol/016_settings_api.md))
 - Budget modification supports force flag for safe decreases (prevents accidental agent shutdowns)
+- Two paths for budget modification: Admin uses direct PUT, developers use request workflow
 
 ### System Resources
 
@@ -374,8 +380,9 @@ Understand all available REST API resources, how they map to domain entities, an
    - `/api/analytics/usage/models` - Model usage statistics ([012_analytics_api.md](../protocol/012_analytics_api.md))
    - `/api/analytics/spending/avg-per-request` - Average cost per request ([012_analytics_api.md](../protocol/012_analytics_api.md))
 
-3. **Configuration Resources (1):**
-   - `/api/limits/agents/{id}/budget` - Emergency budget modification ([013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
+3. **Configuration Resources (2):**
+   - `/api/limits/agents/{id}/budget` - Emergency budget modification, admin-only ([013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
+   - `/api/budget-requests` - Budget change request/approval workflow ([017_budget_requests_api.md](../protocol/017_budget_requests_api.md))
 
 ### ✅ NICE-TO-HAVE Resources (Specifications Complete)
 
@@ -405,11 +412,11 @@ Understand all available REST API resources, how they map to domain entities, an
 
 **Implementation Status Summary:**
 - ✅ **Certain (Pilot):** 8 resources - Ready for Pilot launch
-- ✅ **MUST-HAVE:** 12 resources - Specifications complete, critical for production
+- ✅ **MUST-HAVE:** 13 resources - Specifications complete, critical for production
 - ✅ **NICE-TO-HAVE:** 1 resource - Specifications complete, enhances user experience
 - 📋 **POST-PILOT:** 1 resource - Specifications prepared, implementation deferred
 
-**Total:** 22 resources with complete specifications across all priority levels.
+**Total:** 23 resources with complete specifications across all priority levels.
 
 ### ❌ Missing Resources (Intentionally Not Exposed)
 

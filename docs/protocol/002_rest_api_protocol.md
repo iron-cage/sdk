@@ -1,4 +1,10 @@
-# Protocol: REST API Protocol
+# Protocol 002: REST API Protocol
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ### Scope
 
@@ -80,10 +86,11 @@ RESTful HTTP API organized by resource type:
 - [010_agents_api.md](010_agents_api.md) - Agent management (✅ MUST-HAVE)
 - [011_providers_api.md](011_providers_api.md) - Provider management (✅ MUST-HAVE)
 - [012_analytics_api.md](012_analytics_api.md) - Usage and spending analytics (✅ MUST-HAVE)
-- [013_budget_limits_api.md](013_budget_limits_api.md) - Budget modification (✅ MUST-HAVE)
+- [013_budget_limits_api.md](013_budget_limits_api.md) - Budget modification, admin-only (✅ MUST-HAVE)
 - [014_api_tokens_api.md](014_api_tokens_api.md) - API token management (✅ MUST-HAVE)
 - [015_projects_api.md](015_projects_api.md) - Project access (✅ NICE-TO-HAVE, Pilot: read-only)
 - [016_settings_api.md](016_settings_api.md) - Settings management (📋 POST-PILOT)
+- [017_budget_requests_api.md](017_budget_requests_api.md) - Budget change requests workflow (✅ MUST-HAVE)
 
 ---
 
@@ -105,6 +112,7 @@ RESTful HTTP API organized by resource type:
 | Analytics | `/api/analytics/*` | [012_analytics_api.md](012_analytics_api.md) | ✅ MUST-HAVE | Yes |
 | **Configuration Resources** | | | | |
 | Budget Limits | `/api/limits/*` | [013_budget_limits_api.md](013_budget_limits_api.md) | ✅ MUST-HAVE | Yes |
+| Budget Requests | `/api/budget-requests/*` | [017_budget_requests_api.md](017_budget_requests_api.md) | ✅ MUST-HAVE | Yes |
 | System Settings | `/api/settings/*` | [016_settings_api.md](016_settings_api.md) | 📋 POST-PILOT | No |
 | **System Resources** | | | | |
 | Health & Version | `/api/health`, `/api/version` | [002_rest_api_protocol.md](#system-resources) | ✅ Certain | Yes |
@@ -349,13 +357,13 @@ Response: 200 OK
     "code": "BUDGET_EXHAUSTED",
     "message": "Agent budget exhausted (allocated: $100, spent: $100)",
     "details": {
-      "agent_id": "agent-abc123",
+      "agent_id": "agent_abc123",
       "budget_allocated": 100.00,
       "budget_spent": 100.00,
       "budget_remaining": 0.00
     },
     "timestamp": "2025-12-09T09:00:00Z",
-    "request_id": "req-xyz789"
+    "request_id": "req_xyz789"
   }
 }
 ```
@@ -407,7 +415,7 @@ X-RateLimit-Reset: 1733754300
       "reset_at": "2025-12-09T14:05:00Z"
     },
     "timestamp": "2025-12-09T14:00:00Z",
-    "request_id": "req-xyz789"
+    "request_id": "req_xyz789"
   }
 }
 ```
@@ -482,7 +490,7 @@ Budget protocol endpoints enable agent runtime to negotiate and report LLM usage
 // 200 OK (GET /api/tokens/tok-123)
 {
   "id": "tok-123",
-  "agent_id": "agent-abc",
+  "agent_id": "agent_abc",
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z"
 }
@@ -491,7 +499,7 @@ Budget protocol endpoints enable agent runtime to negotiate and report LLM usage
 {
   "id": "tok-456",
   "token": "ic_abc123...",
-  "agent_id": "agent-xyz",
+  "agent_id": "agent_xyz",
   "created_at": "2025-12-09T10:00:00Z"
 }
 
@@ -521,7 +529,7 @@ Budget protocol endpoints enable agent runtime to negotiate and report LLM usage
     "code": "BUDGET_EXHAUSTED",
     "message": "Agent budget exhausted",
     "details": {
-      "agent_id": "agent-abc",
+      "agent_id": "agent_abc",
       "budget_allocated": 100.00,
       "budget_remaining": 0.00
     }
@@ -542,7 +550,7 @@ Budget protocol endpoints enable agent runtime to negotiate and report LLM usage
   "error": {
     "code": "RESOURCE_CONFLICT",
     "message": "IC Token already exists for agent",
-    "details": {"agent_id": "agent-abc", "existing_token_id": "tok-123"}
+    "details": {"agent_id": "agent_abc", "existing_token_id": "tok-123"}
   }
 }
 
@@ -689,10 +697,11 @@ Response:
 - [010: Agents API](010_agents_api.md) - Agent management endpoints (✅ MUST-HAVE)
 - [011: Providers API](011_providers_api.md) - Provider management endpoints (✅ MUST-HAVE)
 - [012: Analytics API](012_analytics_api.md) - Usage and spending analytics endpoints (✅ MUST-HAVE)
-- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification endpoints (✅ MUST-HAVE)
+- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification endpoints, admin-only (✅ MUST-HAVE)
 - [014: API Tokens API](014_api_tokens_api.md) - API token management endpoints (✅ MUST-HAVE)
 - [015: Projects API](015_projects_api.md) - Project access endpoints (✅ NICE-TO-HAVE)
 - [016: Settings API](016_settings_api.md) - Settings management endpoints (📋 POST-PILOT)
+- [017: Budget Requests API](017_budget_requests_api.md) - Budget change request/approval workflow endpoints (✅ MUST-HAVE)
 
 **Dependencies:**
 - [protocol/005: Budget Control Protocol](005_budget_control_protocol.md) - Budget handshake/report/refresh protocol

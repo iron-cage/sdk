@@ -33,7 +33,7 @@ except ImportError:
 
         def start_agent(self, script_path: str) -> str:
             print(f"[STUB] Starting agent from {script_path}")
-            return "stub-agent-id"
+            return "agent_00000000-0000-0000-0000-000000000000"
 
         def stop_agent(self, agent_id: str) -> None:
             print(f"[STUB] Stopping agent {agent_id}")

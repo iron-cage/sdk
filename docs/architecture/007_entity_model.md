@@ -1,6 +1,9 @@
 # Entity Model
 
 **Purpose:** Core entities and their relationships in Iron Cage platform.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 > **Note:** "IP" in this document means **Inference Provider** (e.g., OpenAI, Anthropic), NOT IP address.
 
@@ -12,7 +15,7 @@ Understand the main entities (Agent, Project, Inference Provider) and how they r
 
 ## Core Idea
 
-**Six core entities with clear relationships:**
+**Seven core entities with clear relationships:**
 
 ```
 User (person)
@@ -92,6 +95,12 @@ User (person)
 - Has IP Budget (informative, tracks spending per provider)
 - Has IP Token(s): Pilot = 1, Future = multiple
 - Can be assigned to multiple Agents
+- **Deletion cascades:** When provider deleted, automatically removed from all agent assignments (ON DELETE CASCADE)
+
+**Lifecycle:**
+- Created: Admin creates provider via `POST /api/v1/providers`
+- Assigned: Provider assigned to agents via `POST /api/v1/agents` or `PUT /api/v1/agents/{id}/providers`
+- Deleted: Admin deletes provider via `DELETE /api/v1/providers/{id}` - **cascades to remove from all agents**
 
 **Attributes:**
 - ip_id (unique identifier)
@@ -129,6 +138,36 @@ User (person)
 - IC Token can't belong to multiple agents
 
 **Lifecycle:** Created with agent, lives until agent deleted or regenerated (long-lived, no auto-expiration)
+
+## Entity 7: Budget Change Request
+
+**Definition:** Request from developer to admin for modifying agent budget
+
+**Relationships:**
+- Linked to exactly one Agent (1:1 per request)
+- Created by one User (requester, typically developer/agent owner)
+- Reviewed by one User (reviewer, must be admin)
+- Linked to Budget Modification History entry (on approval)
+
+**Attributes:**
+- request_id (unique identifier, breq- prefix)
+- agent_id (target agent)
+- requester_id (user who created request)
+- current_budget (snapshot at request time)
+- requested_budget (desired budget amount)
+- justification (20-500 chars, required)
+- status (pending, approved, rejected, cancelled)
+- reviewed_by (admin user_id, null until reviewed)
+- review_notes (optional on approval, required on rejection)
+
+**State Machine:**
+- Created: `pending`
+- Terminal states: `approved`, `rejected`, `cancelled`
+- Auto-cancel: If agent deleted while request pending
+
+**Lifecycle:** Created via POST, reviewed by admin via PUT (approve/reject), or cancelled by requester via DELETE (before review only)
+
+**See:** [Protocol 017](../protocol/017_budget_requests_api.md)
 
 ## Budget Types
 

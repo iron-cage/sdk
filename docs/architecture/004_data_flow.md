@@ -1,6 +1,9 @@
 # Data Flow
 
 **Purpose:** End-to-end journey of a request through the system.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 

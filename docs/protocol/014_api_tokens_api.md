@@ -68,7 +68,7 @@ HTTP 201 Created
 Content-Type: application/json
 
 {
-  "id": "at-abc123",
+  "id": "at_abc123",
   "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
@@ -130,13 +130,17 @@ HTTP 401 Unauthorized
 
 **Endpoint:** `GET /api/v1/api-tokens`
 
-**Description:** Returns paginated list of user's API tokens. Token values NOT included (only metadata).
+**Description:** Returns paginated list of API tokens. Users see only their own tokens; admins see all tokens. Token values NOT included (only metadata).
 
 **Request:**
 
 ```
 GET /api/v1/api-tokens?page=1&per_page=50&sort=-created_at
 Authorization: Bearer <user-token or api-token>
+
+# Admin filtering by specific user:
+GET /api/v1/api-tokens?user_id=user-xyz789&page=1&per_page=50
+Authorization: Bearer <admin-user-token>
 ```
 
 **Query Parameters:**
@@ -145,6 +149,7 @@ Authorization: Bearer <user-token or api-token>
 |-----------|------|---------|-------------|
 | `page` | integer | 1 | Page number (1-indexed) |
 | `per_page` | integer | 50 | Results per page (max 100) |
+| `user_id` | string | - | Filter by user ID (admin-only, ignored for regular users) |
 | `sort` | string | `-created_at` | Sort field: `name`, `created_at`, `last_used` (prefix `-` for desc) |
 
 **Success Response:**
@@ -156,7 +161,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "id": "at-abc123",
+      "id": "at_abc123",
       "name": "Dashboard Token",
       "description": "Token for production dashboard",
       "user_id": "user-xyz789",
@@ -164,7 +169,7 @@ Content-Type: application/json
       "last_used": "2025-12-10T15:22:10Z"
     },
     {
-      "id": "at-def456",
+      "id": "at_def456",
       "name": "Monitoring Script",
       "description": "Token for budget monitoring automation",
       "user_id": "user-xyz789",
@@ -172,7 +177,7 @@ Content-Type: application/json
       "last_used": "2025-12-10T15:00:00Z"
     },
     {
-      "id": "at-ghi789",
+      "id": "at_ghi789",
       "name": "Old Token",
       "user_id": "user-xyz789",
       "created_at": "2025-11-01T08:15:00Z",
@@ -192,6 +197,7 @@ Content-Type: application/json
 
 - **`data[]`:** Array of token metadata objects (NO token values)
 - Token value NEVER included in list response
+- **Scoping:** Users see only `user_id` matching their own; admins see tokens from all users
 
 **Empty Results:**
 
@@ -224,8 +230,8 @@ HTTP 400 Bad Request
 ```
 
 **Authorization:**
-- **User:** Can list own API tokens
-- **Admin:** Can list own API tokens (NOT all users' tokens - privacy/security)
+- **User:** Can list own API tokens only
+- **Admin:** Can list all API tokens (from all users)
 
 **Audit Log:** No (read operation)
 
@@ -251,7 +257,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "at-abc123",
+  "id": "at_abc123",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
   "user_id": "user-xyz789",
@@ -324,7 +330,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "at-abc123",
+  "id": "at_abc123",
   "name": "Dashboard Token",
   "revoked": true,
   "revoked_at": "2025-12-10T15:30:45Z",
@@ -389,7 +395,7 @@ HTTP 409 Conflict
 
 ```json
 {
-  "id": "at-abc123",
+  "id": "at_abc123",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
   "user_id": "user-xyz789",
@@ -407,7 +413,7 @@ HTTP 409 Conflict
 
 ```json
 {
-  "id": "at-abc123",
+  "id": "at_abc123",
   "token": "apitok_xyz789abc123def456...",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
@@ -481,11 +487,11 @@ HTTP 409 Conflict
 | Operation | Token Owner | Other User | Admin |
 |-----------|-------------|------------|-------|
 | Create token | ✅ | ❌ | ✅ (own) |
-| List tokens | ✅ (own) | ❌ | ✅ (own) |
-| Get token details | ✅ (own) | ❌ | ❌ |
-| Revoke token | ✅ (own) | ❌ | ❌ |
+| List tokens | ✅ (own) | ❌ | ✅ (all) |
+| Get token details | ✅ (own) | ❌ | ✅ (own) |
+| Revoke token | ✅ (own) | ❌ | ✅ (own) |
 
-**Note:** Admins CANNOT view or revoke other users' tokens (privacy/security).
+**Note:** Admins can LIST all users' tokens (metadata only) but can only view details or revoke their own tokens (privacy/security).
 
 ---
 
@@ -556,7 +562,7 @@ HTTP 401 Unauthorized
   "endpoint": "POST /api/v1/api-tokens",
   "method": "POST",
   "resource_type": "api_token",
-  "resource_id": "at-abc123",
+  "resource_id": "at_abc123",
   "action": "create",
   "parameters": {
     "name": "Dashboard Token",
@@ -651,7 +657,7 @@ iron api-tokens revoke at-abc123
 **Dashboard config:**
 ```json
 {
-  "api_endpoint": "https://control-panel.iron.dev/api/v1",
+  "api_endpoint": "https://api.ironcage.ai/v1",
   "api_token": "apitok_xyz789abc123def456..."
 }
 ```
@@ -660,10 +666,10 @@ iron api-tokens revoke at-abc123
 ```bash
 # All requests use same token
 curl -H "Authorization: Bearer apitok_xyz789..." \
-  https://control-panel.iron.dev/api/v1/agents
+  https://api.ironcage.ai/v1/agents
 
 curl -H "Authorization: Bearer apitok_xyz789..." \
-  https://control-panel.iron.dev/api/v1/analytics/spending/total
+  https://api.ironcage.ai/v1/analytics/spending/total
 ```
 
 ---
@@ -678,7 +684,7 @@ curl -H "Authorization: Bearer apitok_xyz789..." \
 # budget-monitor.sh
 
 IRON_API_TOKEN="apitok_monitoring_script_xyz..."
-API_URL="https://control-panel.iron.dev/api/v1"
+API_URL="https://api.ironcage.ai/v1"
 
 # Check budget status
 response=$(curl -s -H "Authorization: Bearer $IRON_API_TOKEN" \

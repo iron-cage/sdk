@@ -1,6 +1,9 @@
 # Runtime Modes
 
 **Purpose:** Two deployment configurations for Iron Cage Runtime - same SDK interface, different internal machinery.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 

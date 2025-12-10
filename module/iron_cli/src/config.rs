@@ -174,7 +174,7 @@ impl ConfigBuilder
   pub fn with_defaults(mut self) -> Self
   {
     let defaults = vec![
-      ( "api_url", "https://api.iron.dev" ),
+      ( "api_url", "https://api.ironcage.ai" ),
       ( "format", "table" ),
     ];
 

@@ -106,7 +106,7 @@ demo/
 
 ```bash
 cd /home/user1/pro/lib/willbe/module/iron_cage/pilot/demo/agent
-python3.11 -m venv .venv
+uv venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
 python lead_gen_agent.py  # Standalone mode (no runtime)

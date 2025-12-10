@@ -1,6 +1,9 @@
-# Budget Control Protocol
+# Protocol 005: Budget Control Protocol
 
 **Purpose:** How runtime and Control Panel communicate to enforce budget limits without exposing provider tokens.
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
 
 ---
 
@@ -87,7 +90,7 @@ Admin (Control Panel)          Developer (Runtime)
 **Claims Schema:**
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "budget_id": "budget-xyz789",
   "issued_at": 1702123456,
   "expires_at": null,
@@ -102,7 +105,7 @@ Admin (Control Panel)          Developer (Runtime)
 
 | Claim | Type | Format | Example | Purpose |
 |-------|------|--------|---------|---------|
-| `agent_id` | string | `^agent-[a-z0-9]{6,32}$` | "agent-abc123" | Unique agent identifier |
+| `agent_id` | string | `^agent_[a-z0-9]{6,32}$` | "agent_abc123" | Unique agent identifier |
 | `budget_id` | string | `^budget-[a-z0-9]{6,32}$` | "budget-xyz789" | Links to budget allocation |
 | `issued_at` | number | Unix timestamp (seconds) | 1702123456 | Token creation time |
 | `expires_at` | number or null | Unix timestamp or null | null | Optional expiration (null = long-lived, no auto-expiration) |
@@ -166,7 +169,7 @@ Content-Type: application/json
   "ip_token": "AES256:YWJjZGVm:c2stcHJval9hYmMxMjM=:MTIzNDU2",
   "budget_granted": 10.00,
   "budget_remaining": 90.00,
-  "lease_id": "lease-001",
+  "lease_id": "lease_001",
   "provider": "openai",
   "provider_model": "gpt-4"
 }
@@ -203,7 +206,7 @@ let tag = base64::decode(parts[3])?;
 
 let cipher = Aes256Gcm::new(&runtime_session_key);
 let plaintext = cipher.decrypt(&iv, &ciphertext, &tag)?;
-// plaintext = "sk-proj-abc123def456..." (provider API key)
+// plaintext = "sk-proj_abc123def456..." (provider API key)
 
 // Store encrypted in memory
 encrypted_memory.store(lease_id, plaintext);
@@ -215,7 +218,7 @@ plaintext.zeroize();
 **Runtime State After Init:**
 - IP Token: Encrypted in memory (AES-256)
 - Budget: $10.00 allocated, $10.00 remaining
-- Lease ID: "lease-001"
+- Lease ID: "lease_001"
 - Ready to process LLM calls
 
 ### Step 2: Request Execution
@@ -241,8 +244,8 @@ Content-Type: application/json
 **Request Schema:**
 ```json
 {
-  "lease_id": "lease-001",
-  "request_id": "req-uuid-123",
+  "lease_id": "lease_001",
+  "request_id": "req_uuid-123",
   "tokens": 1523,
   "cost_usd": 0.0457,
   "model": "gpt-4",
@@ -290,7 +293,7 @@ Content-Type: application/json
 **Request Schema:**
 ```json
 {
-  "lease_id": "lease-001",
+  "lease_id": "lease_001",
   "budget_id": "budget-xyz789",
   "requested_budget": 10.00,
   "current_remaining": 0.85,
@@ -318,7 +321,7 @@ Content-Type: application/json
   "status": "approved",
   "budget_granted": 10.00,
   "budget_remaining": 80.00,
-  "lease_id": "lease-002",
+  "lease_id": "lease_002",
   "total_allocated": 100.00,
   "total_spent": 9.15
 }

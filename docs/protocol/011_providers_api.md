@@ -37,7 +37,7 @@ Content-Type: application/json
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "credentials": {
-    "api_key": "sk-proj-xyz789..."
+    "api_key": "sk-proj_xyz789..."
   },
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
 }
@@ -66,7 +66,7 @@ HTTP 201 Created
 Content-Type: application/json
 
 {
-  "id": "ip-openai-001",
+  "id": "ip_openai-001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -81,7 +81,7 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique provider identifier (ip- prefix) |
+| `id` | string | Unique provider identifier (ip_ prefix) |
 | `name` | string | Provider name |
 | `endpoint` | string | Provider API endpoint |
 | `models` | array<string> | Available models |
@@ -167,7 +167,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai-001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -178,7 +178,7 @@ Content-Type: application/json
       "updated_at": "2025-12-10T10:30:45Z"
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic-001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1",
       "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
@@ -250,7 +250,7 @@ HTTP 400 Bad Request
 **Request:**
 
 ```
-GET /api/v1/providers/ip-openai-001
+GET /api/v1/providers/ip_openai-001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -261,7 +261,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "ip-openai-001",
+  "id": "ip_openai-001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -297,7 +297,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider 'ip-invalid' does not exist"
+    "message": "Provider 'ip_invalid' does not exist"
   }
 }
 ```
@@ -318,14 +318,14 @@ HTTP 404 Not Found
 **Request:**
 
 ```json
-PUT /api/v1/providers/ip-openai-001
+PUT /api/v1/providers/ip_openai-001
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
 {
   "endpoint": "https://api.openai.com/v2",
   "credentials": {
-    "api_key": "sk-proj-new-key-abc123..."
+    "api_key": "sk-proj_new-key-abc123..."
   },
   "models": ["gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-3.5-turbo"]
 }
@@ -350,7 +350,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "ip-openai-001",
+  "id": "ip_openai-001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v2",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-3.5-turbo"],
@@ -401,7 +401,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider 'ip-invalid' does not exist"
+    "message": "Provider 'ip_invalid' does not exist"
   }
 }
 ```
@@ -417,12 +417,12 @@ HTTP 404 Not Found
 
 **Endpoint:** `DELETE /api/v1/providers/{id}`
 
-**Description:** Deletes a provider. Blocked if provider is assigned to any agents (safety mechanism).
+**Description:** Deletes a provider and automatically removes it from all agents. Provider-agent assignments are cascade-deleted. Agents with no remaining providers after deletion cannot make inference requests until a provider is assigned.
 
 **Request:**
 
 ```
-DELETE /api/v1/providers/ip-openai-001
+DELETE /api/v1/providers/ip_openai-001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -433,28 +433,47 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "ip-openai-001",
-  "deleted": true
+  "id": "ip_openai-001",
+  "name": "openai",
+  "deleted": true,
+  "agents_affected": ["agent_abc123", "agent_def456", "agent_ghi789"],
+  "agents_count": 3
 }
 ```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Provider identifier that was deleted |
+| `name` | string | Provider name |
+| `deleted` | boolean | Always true for successful deletion |
+| `agents_affected` | array<string> | List of agent IDs that had this provider assigned |
+| `agents_count` | integer | Number of agents affected by deletion |
+
+**Note:** `agents_affected` shows all agents that had this provider before deletion. Agents with other providers will continue to work. Agents left with zero providers cannot make inference requests until a provider is assigned.
+
+**Edge Cases:**
+
+1. **Agent with Single Provider:**
+   - If agent has only this provider, agent will have zero providers after deletion
+   - Agent status remains `active` (if has budget)
+   - Agent **cannot make inference requests** until provider assigned
+   - Error on request attempt: `PROVIDER_NOT_ASSIGNED` or `NO_PROVIDERS_AVAILABLE`
+
+2. **Agent with Multiple Providers:**
+   - If agent has multiple providers, agent continues working with remaining providers
+   - No service disruption
+
+3. **In-Flight Requests:**
+   - Requests using deleted provider mid-execution will fail
+   - Acceptable failure mode (admin explicitly deleted provider)
+
+4. **Concurrent Agent Creation:**
+   - If agent creation uses deleted provider, creation fails with 404 PROVIDER_NOT_FOUND
+   - Client should retry with different provider
 
 **Error Responses:**
-
-```json
-HTTP 409 Conflict
-{
-  "error": {
-    "code": "PROVIDER_IN_USE",
-    "message": "Cannot delete provider: 3 agents are using this provider",
-    "agents": ["agent-abc123", "agent-def456", "agent-ghi789"]
-  }
-}
-```
-
-**Workflow to delete provider in use:**
-1. Remove provider from all agents: `PUT /api/v1/agents/{agent_id}/providers`
-2. Verify no agents use provider: `GET /api/v1/providers/{id}` (check `agent_count: 0`)
-3. Delete provider: `DELETE /api/v1/providers/{id}`
 
 ```json
 HTTP 403 Forbidden
@@ -471,7 +490,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider 'ip-invalid' does not exist"
+    "message": "Provider 'ip_invalid' does not exist"
   }
 }
 ```
@@ -479,7 +498,26 @@ HTTP 404 Not Found
 **Authorization:**
 - **Admin only:** Only admins can delete providers
 
-**Audit Log:** Yes (mutation operation)
+**Audit Log:** Yes (deletion operation with cascade details)
+
+**Audit Log Entry Example:**
+```json
+{
+  "action": "DELETE_PROVIDER",
+  "provider_id": "ip_openai-001",
+  "provider_name": "openai",
+  "user_id": "user_admin",
+  "agents_affected": ["agent_abc123", "agent_def456", "agent_ghi789"],
+  "agents_count": 3,
+  "cascade": true,
+  "timestamp": "2025-12-10T15:30:00Z"
+}
+```
+
+**Fields:**
+- `cascade: true` indicates cascade deletion occurred
+- `agents_affected` lists all agents that had provider (for audit compliance)
+- `agents_count` shows scale of impact
 
 ---
 
@@ -494,12 +532,12 @@ HTTP 404 Not Found
 **Request:**
 
 ```json
-PUT /api/v1/agents/agent-abc123/providers
+PUT /api/v1/agents/agent_abc123/providers
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
 {
-  "providers": ["ip-openai-001", "ip-anthropic-001"]
+  "providers": ["ip_openai-001", "ip_anthropic-001"]
 }
 ```
 
@@ -516,15 +554,15 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai-001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1"
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic-001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1"
     }
@@ -562,7 +600,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider 'ip-invalid' does not exist"
+    "message": "Provider 'ip_invalid' does not exist"
   }
 }
 ```
@@ -572,7 +610,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -594,7 +632,7 @@ HTTP 404 Not Found
 **Request:**
 
 ```
-GET /api/v1/agents/agent-abc123/providers
+GET /api/v1/agents/agent_abc123/providers
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -605,16 +643,16 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai-001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic-001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1",
       "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
@@ -630,7 +668,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -662,7 +700,7 @@ HTTP 403 Forbidden
 **Request:**
 
 ```
-DELETE /api/v1/agents/agent-abc123/providers/ip-openai-001
+DELETE /api/v1/agents/agent_abc123/providers/ip_openai-001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -673,9 +711,9 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "agent_id": "agent-abc123",
-  "removed_provider": "ip-openai-001",
-  "remaining_providers": ["ip-anthropic-001"]
+  "agent_id": "agent_abc123",
+  "removed_provider": "ip_openai-001",
+  "remaining_providers": ["ip_anthropic-001"]
 }
 ```
 
@@ -686,7 +724,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_ASSIGNED",
-    "message": "Provider 'ip-openai-001' is not assigned to agent 'agent-abc123'"
+    "message": "Provider 'ip_openai-001' is not assigned to agent 'agent_abc123'"
   }
 }
 ```
@@ -705,7 +743,7 @@ HTTP 404 Not Found
 
 ```json
 {
-  "id": "ip-openai-001",
+  "id": "ip_openai-001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -727,10 +765,10 @@ HTTP 404 Not Found
 
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai-001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
@@ -779,7 +817,7 @@ HTTP 404 Not Found
 
 **Reasoning:**
 - **Provider CRUD:** Admin-only (system-wide configuration)
-- **Provider assignment:** Agent owners + admins (agent-level configuration)
+- **Provider assignment:** Agent owners + admins (agent_level configuration)
 
 ---
 
@@ -798,7 +836,6 @@ HTTP 404 Not Found
 | `PROVIDER_NOT_FOUND` | 404 | Provider does not exist |
 | `PROVIDER_NOT_ASSIGNED` | 404 | Provider not assigned to agent |
 | `PROVIDER_EXISTS` | 409 | Provider name already exists |
-| `PROVIDER_IN_USE` | 409 | Cannot delete (agents using provider) |
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
@@ -844,7 +881,7 @@ HTTP 404 Not Found
   "endpoint": "POST /api/v1/providers",
   "method": "POST",
   "resource_type": "provider",
-  "resource_id": "ip-openai-001",
+  "resource_id": "ip_openai-001",
   "action": "create",
   "parameters": {
     "name": "openai",
@@ -868,11 +905,11 @@ HTTP 404 Not Found
 iron providers create \
   --name openai \
   --endpoint https://api.openai.com/v1 \
-  --api-key sk-proj-xyz789... \
+  --api-key sk-proj_xyz789... \
   --models gpt-4,gpt-4-turbo,gpt-3.5-turbo
 
 # Output:
-# Provider created: ip-openai-001
+# Provider created: ip_openai-001
 # Name: openai
 # Endpoint: https://api.openai.com/v1
 # Models: gpt-4, gpt-4-turbo, gpt-3.5-turbo
@@ -888,17 +925,17 @@ iron providers list --status active
 
 # Output:
 # ID               NAME        AGENTS  STATUS
-# ip-openai-001    openai      12      active
-# ip-anthropic-001 anthropic   8       active
+# ip_openai-001    openai      12      active
+# ip_anthropic-001 anthropic   8       active
 ```
 
 ### iron providers get
 
 ```bash
-iron providers get ip-openai-001
+iron providers get ip_openai-001
 
 # Output:
-# ID:       ip-openai-001
+# ID:       ip_openai-001
 # Name:     openai
 # Endpoint: https://api.openai.com/v1
 # Models:   gpt-4, gpt-4-turbo, gpt-3.5-turbo
@@ -915,60 +952,169 @@ iron providers get ip-openai-001
 ### iron providers update
 
 ```bash
-iron providers update ip-openai-001 \
+iron providers update ip_openai-001 \
   --endpoint https://api.openai.com/v2 \
   --models gpt-4,gpt-4-turbo,gpt-4o,gpt-3.5-turbo
 
 # Rotate credentials
-iron providers update ip-openai-001 \
-  --api-key sk-proj-new-key-abc123...
+iron providers update ip_openai-001 \
+  --api-key sk-proj_new-key-abc123...
 
 # Output:
-# Provider updated: ip-openai-001
+# Provider updated: ip_openai-001
 ```
 
 ### iron providers delete
 
 ```bash
-iron providers delete ip-openai-001
+iron providers delete ip_openai-001
 
-# If provider in use:
-# Error: Cannot delete provider: 3 agents are using this provider
-#   - agent-abc123 (Production Agent 1)
-#   - agent-def456 (Test Agent)
-#   - agent-ghi789 (Dev Agent)
-#
-# Suggested workflow:
-#   1. Remove provider from agents:
-#      iron agents update agent-abc123 --remove-provider ip-openai-001
-#   2. Verify provider not in use:
-#      iron providers get ip-openai-001
-#   3. Delete provider:
-#      iron providers delete ip-openai-001
+# Confirmation prompt (if provider has agents):
+# Delete provider 'openai' (ip_openai-001)?
+# This will affect 3 agents:
+#   - agent_abc123 (Production Agent 1)
+#   - agent_def456 (Test Agent)
+#   - agent_ghi789 (Dev Agent)
+# These agents will have this provider removed automatically.
+# Continue? [y/N]
 
-# Success output:
-# Provider deleted: ip-openai-001
+# Output (after confirmation):
+# Provider deleted: ip_openai-001
+# Affected agents: 3
+#   - agent_abc123 (has 2 remaining providers)
+#   - agent_def456 (has 1 remaining provider)
+#   - agent_ghi789 (has 0 providers - cannot make requests until provider assigned)
 ```
 
 ### iron agents assign-providers
 
 ```bash
 # Replace provider list
-iron agents assign-providers agent-abc123 \
-  --providers ip-openai-001,ip-anthropic-001
+iron agents assign-providers agent_abc123 \
+  --providers ip_openai-001,ip_anthropic-001
 
 # Add provider (read current, append new, update)
-iron agents assign-providers agent-abc123 --add ip-anthropic-001
+iron agents assign-providers agent_abc123 --add ip_anthropic-001
 
 # Remove provider
-iron agents assign-providers agent-abc123 --remove ip-openai-001
+iron agents assign-providers agent_abc123 --remove ip_openai-001
 
 # Output:
-# Providers updated for agent-abc123
+# Providers updated for agent_abc123
 # Current providers:
-#   - ip-openai-001 (openai)
-#   - ip-anthropic-001 (anthropic)
+#   - ip_openai-001 (openai)
+#   - ip_anthropic-001 (anthropic)
 ```
+
+---
+
+## Database Schema (Reference)
+
+### providers Table
+
+```sql
+CREATE TABLE providers (
+  id VARCHAR(50) PRIMARY KEY,           -- 'ip_openai-001'
+  name VARCHAR(255) NOT NULL UNIQUE,    -- 'openai'
+  endpoint VARCHAR(500) NOT NULL,       -- 'https://api.openai.com/v1'
+  credentials TEXT NOT NULL,            -- Encrypted JSON (AES-256-GCM)
+  models TEXT NOT NULL,                 -- JSON array ['gpt-4', 'gpt-3.5-turbo']
+  status VARCHAR(20) NOT NULL,          -- 'active', 'inactive'
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+
+  CONSTRAINT chk_status CHECK (status IN ('active', 'inactive'))
+);
+```
+
+### agent_providers Table (Many-to-Many Relationship)
+
+```sql
+CREATE TABLE agent_providers (
+  agent_id VARCHAR(50) NOT NULL,
+  provider_id VARCHAR(50) NOT NULL,
+  assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+  PRIMARY KEY (agent_id, provider_id),
+
+  -- CASCADE deletion: deleting agent OR provider removes assignment
+  CONSTRAINT fk_agent FOREIGN KEY (agent_id)
+    REFERENCES agents(id) ON DELETE CASCADE,
+  CONSTRAINT fk_provider FOREIGN KEY (provider_id)
+    REFERENCES providers(id) ON DELETE CASCADE
+);
+
+-- Indexes for query performance
+CREATE INDEX idx_agent_providers_agent ON agent_providers(agent_id);
+CREATE INDEX idx_agent_providers_provider ON agent_providers(provider_id);
+```
+
+**Cascade Behavior:**
+- **Deleting agent:** Automatically removes all agent-provider assignments for that agent
+- **Deleting provider:** Automatically removes all agent-provider assignments for that provider (CASCADE delete behavior)
+- Both operations are automatic at database level (no application logic required)
+
+**Migration Notes:**
+- If upgrading from BLOCK delete to CASCADE delete, run migration:
+  ```sql
+  ALTER TABLE agent_providers
+  DROP CONSTRAINT fk_provider;
+
+  ALTER TABLE agent_providers
+  ADD CONSTRAINT fk_provider
+  FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE;
+  ```
+
+---
+
+## POST-PILOT Enhancements
+
+### Provider Deletion Impact Preview (Dry-Run)
+
+**Endpoint:** `GET /api/v1/providers/{id}/deletion-impact`
+
+**Description:** Preview the impact of deleting a provider without actually deleting it. Returns list of agents that would be affected.
+
+**Use Case:** Admin can preview impact before deleting, especially useful for large deployments.
+
+**Request:**
+```
+GET /api/v1/providers/ip_openai-001/deletion-impact
+Authorization: Bearer <user-token or api-token>
+```
+
+**Success Response:**
+```json
+HTTP 200 OK
+Content-Type: application/json
+
+{
+  "provider_id": "ip_openai-001",
+  "provider_name": "openai",
+  "agents_affected": ["agent_abc123", "agent_def456", "agent_ghi789"],
+  "agents_count": 3,
+  "warnings": [
+    {
+      "agent_id": "agent_abc123",
+      "agent_name": "Production Agent 1",
+      "warning": "Agent has only this provider - will have zero providers after deletion",
+      "severity": "high"
+    },
+    {
+      "agent_id": "agent_def456",
+      "agent_name": "Test Agent",
+      "warning": "Agent has 2 providers - will continue with 1 remaining",
+      "severity": "low"
+    }
+  ]
+}
+```
+
+**Authorization:** Admin only
+
+**Note:** This is a read-only operation. No changes are made to the database.
+
+**Status:** POST-PILOT enhancement (not in initial release)
 
 ---
 

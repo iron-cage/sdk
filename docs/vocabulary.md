@@ -33,7 +33,7 @@
 | **Local Execution** | Agent runs on developer's machine (primary). Control Panel manages budget via IC Token protocol. See [architecture/001](architecture/001_execution_models.md) |
 | **Server Execution** | Agent runs on Iron Cage servers (future, post-pilot). Control Panel manages budget identically to local execution |
 | **Control Panel** | ALWAYS present standalone admin service. Admin allocates budgets, manages developers, stores IP Tokens, monitors spending. See [architecture/003](architecture/003_service_boundaries.md) |
-| **Gateway** | Central orchestrator that routes requests through processing layers |
+| **Gateway** | Central orchestrator that routes requests through processing layers. See also **API Gateway** (production service at gateway.ironcage.ai) |
 | **Layer Model** | Six processing layers: Safety, Cost, Reliability, Provider, Output Safety, Observability |
 | **Service Boundaries** | Separation between Control Plane, Data Plane, and Agent Runtime |
 | **Data Flow** | End-to-end request journey from user input to LLM response |
@@ -48,12 +48,13 @@
 | **Agent** | AI agent executing on developer's machine. Has exactly one IC Token (1:1), exactly one Agent Budget (1:1, restrictive), can use multiple Inference Providers. Belongs to one Project |
 | **Project** | Collection of agents, Inference Provider assignments, and entities. Has exactly one Project Budget (1:1, informative). Owned by admin or team |
 | **Master Project** | Special project containing ALL resources (all agents, all Inference Providers, all budgets). Admin-only. Has Master Budget (informative). MUST be in Pilot |
-| **IP** | Inference Provider entity (OpenAI, Anthropic, etc.). Has IP Budget (informative), has IP Token(s). Can be assigned to multiple agents |
+| **IP** | Inference Provider entity (OpenAI, Anthropic, etc.). Has IP Budget (informative), has IP Token(s). Can be assigned to multiple agents. Deletion cascades - removing provider automatically unassigns from all agents (ON DELETE CASCADE). See [Protocol 011](protocol/011_providers_api.md) |
 | **Agent Budget** | Restrictive budget (ONLY budget that blocks requests). 1:1 with agent. Hard limit enforcement |
 | **Project Budget** | Informative budget (statistics only, no blocking). 1:1 with project. Shows aggregate agent spending |
 | **IP Budget** | Informative budget (statistics only, no blocking). Per Inference Provider. Shows provider spending |
 | **Master Budget** | Informative budget (statistics only, no blocking). Part of master project. Shows all spending across all projects |
 | **Budget Control** | Agents are the ONLY way to control budget. Agent budget blocks requests (restrictive). All other budgets (project, Inference Provider, master) are informative only (show spending, can't block) |
+| **Budget Change Request** | Developer-initiated request for admin to modify agent budget. Workflow: developer creates request with justification → admin approves/rejects → budget automatically updated on approval. State machine: pending → approved/rejected/cancelled. See [Protocol 017](protocol/017_budget_requests_api.md) |
 
 ### Resources
 
@@ -213,6 +214,26 @@
 | **Real-time Tracking** | Runtime reports usage immediately after each request to maintain accurate budget state |
 | **Minimal Overhead** | Budget tracking adds <1ms latency to LLM requests |
 | **Developer Isolation** | Developer never sees IP Token, only IC Token for authentication |
+
+### URLs & Domains
+
+| Term | Definition |
+|------|------------|
+| **Primary Domain** | ironcage.ai - Official platform domain (NOT iron.dev, which is deprecated legacy domain) |
+| **API Endpoint** | https://api.ironcage.ai/v1 - Control Panel REST API base URL. Used by CLI, dashboard, and external integrations |
+| **Dashboard URL** | https://dashboard.ironcage.ai - Control Panel web UI for monitoring agents, budgets, and analytics |
+| **Gateway Endpoint** | https://gateway.ironcage.ai/v1 - Gateway service for runtime request routing and processing |
+| **Error Type URL** | https://ironcage.ai/errors/{error-type} - RFC 7807 error documentation URLs (e.g., /errors/validation-error, /errors/budget-exceeded) |
+| **Local API** | http://localhost:3000 - Development API server URL for local testing |
+| **Local Dashboard** | http://localhost:5173 - Development UI server URL (Vite dev server) |
+
+### API Patterns
+
+| Term | Definition |
+|------|------------|
+| **Pagination** | Technique for splitting large result sets into pages using `limit` and `offset` query parameters. Standard across all list endpoints (e.g., `GET /agents?limit=50&offset=100`) |
+| **Rate Limiting** | Request frequency control to prevent abuse. Configured per API token with `max_requests_per_minute` and `max_requests_per_day` limits. Enforced at API Gateway layer |
+| **API Gateway** | Production service (gateway.ironcage.ai/v1) that routes runtime agent requests to appropriate providers, enforces budgets, and applies processing layers. Distinct from the general Gateway architectural concept |
 
 ---
 

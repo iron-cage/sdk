@@ -1,4 +1,10 @@
-# Protocol: User Management API
+# Protocol 008: User Management API
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+---
 
 ### Scope
 
