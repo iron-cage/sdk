@@ -10,7 +10,7 @@ name = "iron_runtime"
 crate-type = ["rlib", "cdylib"]
 
 [features]
-default = ["enabled", "integration"]
+default = ["enabled"]
 integration = []
 enabled = [
   "dep:iron_types",

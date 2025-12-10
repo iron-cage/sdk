@@ -78,6 +78,10 @@ except ImportError:
             return self._port
 
         @property
+        def provider(self) -> str:
+            return "unknown"
+
+        @property
         def is_running(self) -> bool:
             return self._running
 
