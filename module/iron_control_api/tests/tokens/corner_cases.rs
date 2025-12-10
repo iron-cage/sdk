@@ -632,7 +632,7 @@ async fn test_create_token_plaintext_never_stored_in_database()
   let plaintext_token = state.generator.generate();
   let token_id = state
     .storage
-    .create_token( &plaintext_token, "user_plaintext_test", None, None )
+    .create_token( &plaintext_token, "user_plaintext_test", None, None, None, None )
     .await
     .expect( "Token creation should succeed" );
 
@@ -713,7 +713,7 @@ async fn test_create_token_uses_sha256_hash()
   let plaintext_token = state.generator.generate();
   let token_id = state
     .storage
-    .create_token( &plaintext_token, "user_sha256_test", None, None )
+    .create_token( &plaintext_token, "user_sha256_test", None, None, None, None )
     .await
     .expect( "Token creation should succeed" );
 

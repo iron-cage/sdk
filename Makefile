@@ -30,11 +30,11 @@ dev: ## Run full stack (API:3000 + Dashboard:5173)
 		cd $(DASHBOARD_DIR) && npm install; \
 	fi
 	@trap 'kill 0' EXIT; \
-		RUST_LOG="trace" cargo run --release --bin iron_api_server & \
+		RUST_LOG="trace" cargo run --release --bin iron_control_api_server & \
 		sleep 2 && cd $(DASHBOARD_DIR) && npm run dev
 
 api: ## Run API server only (port 3000)
-	RUST_LOG="trace" cargo run --release --bin iron_api_server
+	RUST_LOG="trace" cargo run --release --bin iron_control_api_server
 
 dashboard: ## Run dashboard only (port 5173)
 	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \

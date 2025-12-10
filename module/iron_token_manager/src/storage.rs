@@ -130,6 +130,40 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
+    // Migration 006: Enhance users table
+    let migration_006_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_006_completed == 0
+    {
+      let migration_006 = include_str!( "../migrations/006_enhance_users_table.sql" );
+      sqlx::raw_sql( migration_006 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
+    // Migration 007: Create user audit log
+    let migration_007_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_007_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_007_completed == 0
+    {
+      let migration_007 = include_str!( "../migrations/007_create_user_audit_log.sql" );
+      sqlx::raw_sql( migration_007 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),

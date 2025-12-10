@@ -224,7 +224,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |e|crate::error::TokenError)?;
+    .map_err( |_| crate::error::TokenError )?;
 
     Ok( row_to_metadata( &row ) )
   }
@@ -425,7 +425,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .execute( &self.pool )
     .await
-    .map_err( |e| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError )?;
     Ok( key_id )
   }
 }

@@ -322,7 +322,7 @@ function copyToken(token: string) {
                   {{ authStore.username }} (yourself)
                 </SelectItem>
                 <SelectItem 
-                  v-for="user in users || []" 
+                  v-for="user in users?.users || []" 
                   :key="user.username" 
                   :value="user.username"
                 >

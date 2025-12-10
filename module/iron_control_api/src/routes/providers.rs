@@ -247,7 +247,7 @@ pub async fn create_provider_key(
   }
 
   let keys = keys.unwrap();
-  let mut key_id;
+  let key_id;
   if !keys.is_empty()
   {
     key_id = match state.storage.update_key(

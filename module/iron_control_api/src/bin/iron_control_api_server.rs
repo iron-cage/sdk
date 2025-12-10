@@ -49,7 +49,7 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  Router, http::{ Method, header }, routing::{ delete, get, patch, post, put }
+  Router, http::{ Method, header }, routing::{ delete, get, post, put }
 };
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
@@ -385,8 +385,12 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // User management endpoints
     .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
     .route( "/api/users", get( iron_control_api::routes::users::list_users ) )
-    .route( "/api/users/:id/status", patch( iron_control_api::routes::users::update_user_status ) )
+    .route( "/api/users/:id", get( iron_control_api::routes::users::get_user ) )
     .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )
+    .route( "/api/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
+    .route( "/api/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
+    .route( "/api/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
+    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_user_password ) )
 
     // Token management endpoints
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
@@ -425,12 +429,13 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/keys", get( iron_control_api::routes::keys::get_key ) )
 
     // Agent management endpoints
-    .route( "/api/agents", get( iron_api::routes::agents::list_agents ) )
-    .route( "/api/agents", post( iron_api::routes::agents::create_agent ) )
-    .route( "/api/agents/:id", get( iron_api::routes::agents::get_agent ) )
-    .route( "/api/agents/:id", axum::routing::put( iron_api::routes::agents::update_agent ) )
-    .route( "/api/agents/:id", delete( iron_api::routes::agents::delete_agent ) )
-    .route( "/api/agents/:id/tokens", get( iron_api::routes::agents::get_agent_tokens ) )
+    // Agent management endpoints
+    .route( "/api/agents", get( iron_control_api::routes::agents::list_agents ) )
+    .route( "/api/agents", post( iron_control_api::routes::agents::create_agent ) )
+    .route( "/api/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
+    .route( "/api/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
+    .route( "/api/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
+    .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
 
     // Apply combined state to all routes
     .with_state( app_state )

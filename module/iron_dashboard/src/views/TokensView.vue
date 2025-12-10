@@ -15,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const api = useApi()
@@ -27,6 +34,13 @@ const newTokenData = ref<CreateTokenResponse | null>(null)
 const projectId = ref('')
 const description = ref('')
 const createError = ref('')
+const selectedUserId = ref('')
+
+// Fetch users for dropdown
+const { data: usersList } = useQuery({
+  queryKey: ['users-list'],
+  queryFn: () => api.getUsers({ page: 1, page_size: 100 }),
+})
 
 // Fetch tokens
 const { data: tokens, isLoading, error, refetch } = useQuery({
@@ -44,6 +58,7 @@ const createMutation = useMutation({
     showTokenModal.value = true
     projectId.value = ''
     description.value = ''
+    selectedUserId.value = authStore.username || ''
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
@@ -73,7 +88,7 @@ const revokeMutation = useMutation({
 function handleCreateToken() {
   createError.value = ''
   createMutation.mutate({
-    user_id: authStore.username || 'default',
+    user_id: selectedUserId.value || authStore.username || 'default',
     project_id: projectId.value || undefined,
     description: description.value || undefined,
   })
@@ -215,6 +230,24 @@ function copyToken(token: string) {
         </Alert>
 
         <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="user">User</Label>
+            <Select v-model="selectedUserId">
+              <SelectTrigger id="user">
+                <SelectValue placeholder="Select a user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem 
+                  v-for="user in usersList?.users" 
+                  :key="user.id" 
+                  :value="user.username"
+                >
+                  {{ user.username }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div class="space-y-2">
             <Label for="project">Project ID (optional)</Label>
             <Input

@@ -77,7 +77,7 @@ async fn test_record_usage()
 
   // Create token first
   let token_id = storage
-    .create_token( &token, "user_001", None, None )
+    .create_token( &token, "user_001", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -109,7 +109,7 @@ async fn test_record_usage_with_cost()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_002", None, None )
+    .create_token( &token, "user_002", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -136,7 +136,7 @@ async fn test_multiple_usage_records()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_003", None, None )
+    .create_token( &token, "user_003", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -172,7 +172,7 @@ async fn test_get_usage_by_provider()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_004", None, None )
+    .create_token( &token, "user_004", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -205,7 +205,7 @@ async fn test_aggregate_token_usage()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_005", None, None )
+    .create_token( &token, "user_005", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -241,7 +241,7 @@ async fn test_get_usage_in_time_range()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_006", None, None )
+    .create_token( &token, "user_006", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -276,7 +276,7 @@ async fn test_cascade_delete_usage_on_token_delete()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_007", None, None )
+    .create_token( &token, "user_007", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -313,7 +313,7 @@ async fn test_usage_records_have_timestamps()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_008", None, None )
+    .create_token( &token, "user_008", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 

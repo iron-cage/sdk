@@ -28,7 +28,14 @@ CREATE TABLE IF NOT EXISTS users
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user',
   is_active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  email TEXT,
+  last_login INTEGER,
+  suspended_at INTEGER,
+  suspended_by INTEGER,
+  deleted_at INTEGER,
+  deleted_by INTEGER,
+  force_password_change INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -42,6 +49,21 @@ CREATE TABLE IF NOT EXISTS token_blacklist
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+
+-- User audit log for user management tests
+CREATE TABLE IF NOT EXISTS user_audit_log
+(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  operation_type TEXT NOT NULL,
+  target_user_id INTEGER NOT NULL,
+  performed_by INTEGER NOT NULL,
+  timestamp INTEGER NOT NULL,
+  previous_state TEXT,
+  new_state TEXT,
+  reason TEXT,
+  FOREIGN KEY(target_user_id) REFERENCES users(id),
+  FOREIGN KEY(performed_by) REFERENCES users(id)
+);
 "#;
 
 /// Create in-memory SQLite database with test schema applied.
