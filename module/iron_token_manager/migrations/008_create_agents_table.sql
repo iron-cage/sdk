@@ -1,4 +1,4 @@
--- Migration 005: Create agents table and update api_tokens
+-- Migration 008: Create agents table and update api_tokens
 --
 -- This migration:
 -- 1. Creates the agents table to store agent configurations
@@ -26,4 +26,4 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
 -- The application layer will ignore project_id and use agent_id + provider instead
 
 -- Create guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_005_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS _migration_008_completed (id INTEGER PRIMARY KEY);

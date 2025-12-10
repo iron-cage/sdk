@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_i
 CREATE TABLE IF NOT EXISTS user_audit_log
 (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  operation_type TEXT NOT NULL,
+  operation TEXT NOT NULL,
   target_user_id INTEGER NOT NULL,
   performed_by INTEGER NOT NULL,
   timestamp INTEGER NOT NULL,
@@ -73,7 +73,7 @@ pub async fn create_test_database() -> SqlitePool
 {
   let pool = SqlitePoolOptions::new()
     .max_connections( 5 )
-    .connect( "sqlite::memory:" )
+    .connect( "sqlite::memory:?cache=shared" )
     .await
     .expect( "LOUD FAILURE: Failed to create in-memory database" );
 

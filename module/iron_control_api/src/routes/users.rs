@@ -64,7 +64,7 @@ async fn get_admin_id( pool: &Pool< Sqlite >, username: &str ) -> Result< i64, s
 //
 
 /// Request to create a new user
-#[ derive( Debug, Deserialize ) ]
+#[ derive( Debug, Deserialize, Serialize ) ]
 pub struct CreateUserRequest
 {
   pub username: String,

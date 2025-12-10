@@ -26,7 +26,8 @@ async fn create_test_router_with_state() -> ( Router, TokenState )
 
   let router = Router::new()
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
+    // Note: get_token now requires authentication
+    // .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
     .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
     .with_state( token_state.clone() );

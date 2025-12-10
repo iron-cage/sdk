@@ -142,7 +142,7 @@ impl LoginRequest
 }
 
 /// Login response body
-#[ derive( Debug, Serialize ) ]
+#[ derive( Debug, Serialize, Deserialize ) ]
 pub struct LoginResponse
 {
   pub access_token: String,

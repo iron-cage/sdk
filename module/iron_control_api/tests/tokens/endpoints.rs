@@ -72,6 +72,7 @@ async fn test_create_token_valid_request()
   );
 
   let ( status, body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( response ).await;
+  println!( "Status: {:?}, Body: {:?}", status, body );
   assert_eq!( status, StatusCode::CREATED );
   assert_eq!( body.user_id, "user_test" );
   assert_eq!( body.project_id, Some( "project_abc".to_string() ) );
@@ -93,7 +94,7 @@ async fn test_create_token_valid_request()
 async fn test_create_token_minimal_request()
 {
   let router = create_test_router().await;
-
+  
   let request_body = json!({
     "user_id": "user_minimal",
     "project_id": null,
