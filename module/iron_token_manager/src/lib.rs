@@ -15,7 +15,7 @@
 //!
 //! ```rust,ignore
 //! use iron_token_manager::TokenManager;
-//!
+//! 
 //! let manager = TokenManager::new("db.sqlite").await?;
 //!
 //! // Generate token for user/project

@@ -218,7 +218,7 @@ impl ProviderKeyStorage
   {
     let row = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
-       last_used_at, balance_cents, balance_updated_at, user_id \
+       last_used_at, balance_cents, encrypted_api_key, balance_updated_at, user_id \
        FROM ai_provider_keys WHERE id = $1"
     )
     .bind( key_id )
@@ -250,7 +250,7 @@ impl ProviderKeyStorage
     .await
     .map_err( |_| crate::error::TokenError )?;
 
-    Ok( rows.iter().map( row_to_metadata ).collect() )
+    Ok( rows.iter().map( |row| row_to_metadata( row ) ).collect() )
   }
 
   /// Set key enabled/disabled status

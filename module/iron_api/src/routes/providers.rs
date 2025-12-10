@@ -321,7 +321,7 @@ pub async fn list_provider_keys(
       is_enabled: meta.is_enabled,
       created_at: meta.created_at,
       last_used_at: meta.last_used_at,
-      masked_key: "***".to_string(), // Cannot unmask without decrypting
+      masked_key: "***".to_string(),
       assigned_projects,
     } );
   }
