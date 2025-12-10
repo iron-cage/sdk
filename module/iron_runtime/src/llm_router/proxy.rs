@@ -89,7 +89,7 @@ async fn handle_root() -> impl IntoResponse
 }
 
 /// Strip provider prefix from path if present, returns (clean_path, requested_provider)
-fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>)
+pub fn strip_provider_prefix( path: &str ) -> ( String, Option< &'static str > )
 {
   if path.starts_with("/anthropic/") || path.starts_with("/anthropic")
   {
@@ -110,7 +110,7 @@ fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>)
 }
 
 /// Detect requested provider from model name in body
-fn detect_provider_from_model(body: &[u8]) -> Option<&'static str>
+pub fn detect_provider_from_model( body: &[ u8 ] ) -> Option< &'static str >
 {
   if let Ok(json) = serde_json::from_slice::<serde_json::Value>(body)
   {

@@ -9,4 +9,9 @@ mod proxy;
 mod router;
 
 pub use error::LlmRouterError;
+pub use key_fetcher::ProviderKey;
 pub use router::LlmRouter;
+
+// Re-export proxy utilities for testing
+pub use proxy::detect_provider_from_model;
+pub use proxy::strip_provider_prefix;

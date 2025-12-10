@@ -63,6 +63,11 @@ class TestLlmRouterE2E:
             server_url=os.environ["IC_SERVER"],
         )
 
+        # Skip if provider is not OpenAI
+        if router.provider != "openai":
+            router.stop()
+            pytest.skip(f"Skipping: configured provider is '{router.provider}', not 'openai'")
+
         try:
             client = OpenAI(
                 base_url=router.base_url,
