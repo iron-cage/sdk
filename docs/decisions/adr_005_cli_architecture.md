@@ -10,35 +10,52 @@
 ## Context
 
 Iron Cage provides two CLI tools:
-- **iron_cli (Rust):** Production-ready, 288 tests
+- **iron_cli (Rust):** Production-ready, 288 tests, uses **unilang** for command definitions
 - **iron_cli_py (Python):** Developer experience wrapper
 
-Original design called for iron_cli_py to reimplement token management in Python.
+**Unilang Framework:**
+- iron_cli built with unilang (declarative command framework)
+- Commands defined in YAML following unilang standards
+- Enables consistent command structure, validation, help generation
+- Follows unilang recommended CLI architecture patterns
 
-Problem: Duplicate logic creates maintenance burden, feature drift risk, bug duplication.
+**Original design:** iron_cli_py would reimplement token management in Python
+
+**Problem:** Duplicate logic creates maintenance burden, feature drift risk, bug duplication.
 
 ## Decision
 
-Adopt wrapper architecture:
+Adopt wrapper architecture following unilang recommended patterns:
 - iron_cli_py **delegates** operations (token, usage, limits) to iron_cli binary
 - iron_cli_py provides **native** developer experience features (init, config, agent)
+- Leverages unilang's command infrastructure in iron_cli (single source of truth)
+- Python wrapper provides ergonomic interface while preserving unilang command definitions
 
 ## Architecture
 
 ```
 iron_cli_py (Python/Click)
 +-- Native: init, config, agent, secrets
-+-- Wrapper: token.*, usage.*, limits.* --> iron_cli (Rust)
++-- Wrapper: token.*, usage.*, limits.* --> iron_cli (Rust/unilang)
+                                              +-- Command definitions (YAML)
+                                              +-- unilang framework
                                               +-- Single source of truth
 ```
+
+**Unilang Integration:**
+- iron_cli defines commands using unilang YAML format
+- unilang provides command parsing, validation, help generation
+- Wrapper pattern preserves unilang architecture while adding Python ergonomics
+- Follows unilang recommended approach for CLI composition
 
 ## Consequences
 
 **Positive:**
-- Single source of truth for token logic
-- Automatic feature parity (wrapper inherits all features)
-- Reduced maintenance (one implementation)
+- Single source of truth for token logic (unilang command definitions in iron_cli)
+- Automatic feature parity (wrapper inherits all unilang-defined commands)
+- Reduced maintenance (one implementation following unilang patterns)
 - Python-native experience preserved (pip, Click, Rich)
+- Leverages unilang's robust command framework (validation, help, structure)
 
 **Negative:**
 - Requires iron_cli binary installed

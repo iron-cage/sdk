@@ -784,7 +784,7 @@ Agent continues processing requests with new secret
 - OWASP Password Storage Cheat Sheet
 - NIST SP 800-63B (Digital Identity Guidelines)
 - `iron_token_manager/src/token_generator.rs` (SHA-256 implementation with Fix comment)
-- `iron_api/tests/tokens/corner_cases.rs` (hash format validation tests)
+- `iron_control_api/tests/tokens/corner_cases.rs` (hash format validation tests)
 
 ---
 
@@ -959,7 +959,7 @@ The pilot platform consists of **9 internal modules** (8 Rust crates + 1 React a
 ┌──────────────────▼──────────────────────────────────┐
 │  Layer 3: Integration (2 modules)                   │
 │  - iron_runtime: agent management + PyO3 bridge      │
-│  - iron_api: REST + WebSocket server                │
+│  - iron_control_api: REST + WebSocket server                │
 └──────────────────┬──────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────┐
@@ -972,7 +972,7 @@ The pilot platform consists of **9 internal modules** (8 Rust crates + 1 React a
 ┌──────────────────▼──────────────────────────────────┐
 │  Layer 1: Foundation (3 modules)                    │
 │  - iron_types: Shared types + error definitions     │
-│  - iron_state: State management (in-memory + DB)    │
+│  - iron_runtime_state: State management (in-memory + DB)    │
 │  - iron_telemetry: Logging + tracing abstraction    │
 └─────────────────────────────────────────────────────┘
 ```
@@ -1016,7 +1016,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 ---
 
-#### 2. `iron_state` (NEW)
+#### 2. `iron_runtime_state` (NEW)
 
 **Responsibility:** State management (in-memory + persistent storage)
 
@@ -1045,7 +1045,7 @@ impl StateManager {
 
 **File Structure:**
 ```
-iron_state/
+iron_runtime_state/
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs           # Public API
@@ -1289,7 +1289,7 @@ iron_runtime/
 
 ---
 
-#### 8. `iron_api` (NEW)
+#### 8. `iron_control_api` (NEW)
 
 **Responsibility:** REST API + WebSocket server for control panel
 
@@ -1323,7 +1323,7 @@ impl ApiServer {
 
 **File Structure:**
 ```
-iron_api/
+iron_control_api/
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs           # Public API (ApiServer)
@@ -1450,13 +1450,13 @@ demo/control panel/
 ```
 iron_cli ──────────────┐
                        ├──> iron_runtime ──┐
-iron_api ──────────────┘                   │
+iron_control_api ──────────────┘                   │
                                            ├──> iron_safety ──┐
                                            ├──> iron_budget ────┤
                                            └──> iron_reliability ─┤
                                                                   │
                                                                   ├──> iron_types
-                                                                  ├──> iron_state
+                                                                  ├──> iron_runtime_state
                                                                   └──> iron_telemetry
 ```
 
@@ -1474,26 +1474,26 @@ iron_api ──────────────┘                   │
 | #4 | Logging | iron_telemetry | tracing |
 | #5 | Privacy Protection | iron_safety | regex |
 | #6 | Output Redaction | iron_safety | iron_types |
-| #7 | PII Audit | iron_safety | iron_state |
+| #7 | PII Audit | iron_safety | iron_runtime_state |
 | #8 | Policy Enforcement | iron_safety | iron_types |
 | #9 | Token Counting | iron_budget | reqwest |
 | #10 | Budget Limits | iron_budget | iron_types |
 | #11 | Alert System | iron_budget | reqwest |
-| #12 | Cost Attribution | iron_budget | iron_state |
+| #12 | Cost Attribution | iron_budget | iron_runtime_state |
 | #13 | Safety Cutoff | iron_reliability | tokio |
 | #14 | Fallback Chain | iron_reliability | iron_types |
-| #15 | Circuit Metrics | iron_reliability | iron_state |
+| #15 | Circuit Metrics | iron_reliability | iron_runtime_state |
 | #16 | Sample Agent | iron_runtime | langchain (Python) |
 | #17 | Agent Instrumentation | iron_runtime | pyo3 bridge |
 | #18 | Demo Triggers | iron_runtime | Python example |
-| #19 | Live Metrics | iron_control | iron_api |
-| #20 | Budget Panel | iron_control | iron_api |
-| #21 | Protection Panel | iron_control | iron_api |
-| #22 | Performance Panel | iron_control | iron_api |
-| #23 | Event Log | iron_control | iron_api |
-| #24 | Notifications | iron_control | iron_api |
-| #25 | State Management | iron_state | dashmap, sqlx |
-| #26 | API & WebSocket | iron_api | axum, tower |
+| #19 | Live Metrics | iron_control | iron_control_api |
+| #20 | Budget Panel | iron_control | iron_control_api |
+| #21 | Protection Panel | iron_control | iron_control_api |
+| #22 | Performance Panel | iron_control | iron_control_api |
+| #23 | Event Log | iron_control | iron_control_api |
+| #24 | Notifications | iron_control | iron_control_api |
+| #25 | State Management | iron_runtime_state | dashmap, sqlx |
+| #26 | API & WebSocket | iron_control_api | axum, tower |
 | #27 | Demo Testing | (tests in all crates) | tokio-test |
 | #28 | Error Handling | iron_types | thiserror, anyhow |
 
@@ -1510,13 +1510,13 @@ iron_api ──────────────┘                   │
 6. ✅ iron_reliability (exists, complete)
 
 **High Priority (Demo Polish):**
-7. ❌ iron_state (enables control panel)
-8. ❌ iron_api (enables control panel)
+7. ❌ iron_runtime_state (enables control panel)
+8. ❌ iron_control_api (enables control panel)
 9. ❌ iron_control (visual demo)
 10. ❌ iron_runtime Python examples (demo agent - Features #16-18)
 
 **Lower Priority (Can Skip for Conference):**
-- Redis support in iron_state (use in-memory only)
+- Redis support in iron_runtime_state (use in-memory only)
 - Advanced alerting in iron_budget (email can be mocked)
 - Performance optimizations
 
@@ -1532,12 +1532,12 @@ module/
 ├── iron_reliability/    # ✅ EXISTS
 ├── iron_cli/            # ✅ EXISTS (expand)
 ├── iron_telemetry/      # ❌ NEW
-├── iron_state/          # ❌ NEW
+├── iron_runtime_state/          # ❌ NEW
 ├── iron_runtime/        # ❌ NEW (CRITICAL)
 │   └── python/
 │       └── examples/
 │           └── lead_gen_agent.py    # ❌ NEW (Features #16-18)
-└── iron_api/            # ❌ NEW
+└── iron_control_api/            # ❌ NEW
 
 pilot/
 └── demo/
@@ -1546,7 +1546,7 @@ pilot/
 ```
 
 **Total New Work:**
-- 4 new Rust modules (iron_telemetry, iron_state, iron_runtime, iron_api)
+- 4 new Rust modules (iron_telemetry, iron_runtime_state, iron_runtime, iron_control_api)
   - iron_runtime includes Python module + demo agent
 - 1 React/TypeScript application module (iron_control)
 - Expand 3 existing Rust modules (iron_types, iron_safety, iron_budget)
@@ -1561,13 +1561,13 @@ pilot/
 ## Next Steps
 
 1. Create `iron_telemetry` (400 LOC Rust, 1-2 days)
-2. Create `iron_state` (600 LOC Rust, 2-3 days)
+2. Create `iron_runtime_state` (600 LOC Rust, 2-3 days)
 3. Create `iron_runtime` (1500 LOC Rust + 500 LOC Python, 5-6 days) ← CRITICAL PATH
    - Includes PyO3 bridge
    - Includes Python module + demo agent (Features #16-18)
 4. Expand `iron_safety` (+ 900 LOC, 2-3 days)
 5. Expand `iron_budget` (+ 750 LOC, 2-3 days)
-6. Create `iron_api` (800 LOC, 2-3 days)
+6. Create `iron_control_api` (800 LOC, 2-3 days)
 7. Create `iron_control` (2000 LOC TypeScript, 4-5 days)
 
 **With 3 developers:** Can parallelize Steps 1-6, then integrate in Step 7
@@ -1656,11 +1656,11 @@ The pilot platform uses **Pilot/Demo Mode** - a single-process architecture desi
 ```
 Single Rust Process (localhost:8080)
 ├── iron_runtime (agent orchestration)
-│   └── Arc<StateManager> (shared iron_state)
+│   └── Arc<StateManager> (shared iron_runtime_state)
 │         ├── DashMap (in-memory agent state)
-│         └── SQLite (./iron_state.db audit logs)
+│         └── SQLite (./iron_runtime_state.db audit logs)
 │
-├── iron_api (REST + WebSocket server)
+├── iron_control_api (REST + WebSocket server)
 │   ├── REST endpoints (GET /api/agents/:id)
 │   └── WebSocket (/ws) for dashboard streaming
 │       └── Subscribes to shared StateManager broadcasts
@@ -1672,14 +1672,14 @@ Single Rust Process (localhost:8080)
 
 Dashboard (localhost:5173)
 └── Vite dev server (iron_dashboard Vue app)
-    └── Connects via WebSocket to iron_api
+    └── Connects via WebSocket to iron_control_api
 ```
 
 **Key Characteristics:**
 - **Single Process:** All modules run in same Rust binary
-- **Shared State:** iron_state is shared Arc<StateManager> instance accessed by iron_runtime and iron_api
+- **Shared State:** iron_runtime_state is shared Arc<StateManager> instance accessed by iron_runtime and iron_control_api
 - **WebSocket Communication:** ws://localhost:8080/ws for real-time dashboard updates
-- **Single Database:** Single SQLite file (./iron_state.db) for audit logs
+- **Single Database:** Single SQLite file (./iron_runtime_state.db) for audit logs
 - **Localhost Only:** No external network access, CORS allows localhost:5173
 
 **Benefits for Conference Demo:**
@@ -1697,10 +1697,10 @@ After pilot validation, the full platform will use **Production Mode** - a distr
 **Architecture:**
 ```
 Cloud: Control Panel (https://api.example.com)
-├── iron_api (REST API server, Docker container)
+├── iron_control_api (REST API server, Docker container)
 │   ├── Token management endpoints
 │   ├── Telemetry ingestion endpoints
-│   └── iron_control_store (NEW module)
+│   └── iron_control_schema (NEW module)
 │       └── PostgreSQL
 │           ├── users table
 │           ├── api_tokens table
@@ -1712,27 +1712,27 @@ Cloud: Control Panel (https://api.example.com)
 Developer Machines (Local Agent Runtime)
 ├── Machine 1: Alice
 │   ├── iron_runtime (PyPI package: iron-cage)
-│   ├── iron_state (local SQLite: alice_state.db)
+│   ├── iron_runtime_state (local SQLite: alice_state.db)
 │   └── Optional telemetry → HTTPS POST to Control Panel
 │
 ├── Machine 2: Bob
 │   ├── iron_runtime (PyPI package: iron-cage)
-│   ├── iron_state (local SQLite: bob_state.db)
+│   ├── iron_runtime_state (local SQLite: bob_state.db)
 │   └── Optional telemetry → HTTPS POST to Control Panel
 ```
 
 **Key Differences from Pilot:**
 - **Distributed:** Control Panel (cloud) + Agent Runtime (local machines)
 - **Separate Databases:** PostgreSQL (Control Panel) + SQLite per agent (local)
-- **No Shared State:** iron_state exists ONLY in Agent Runtime (not in Control Panel)
+- **No Shared State:** iron_runtime_state exists ONLY in Agent Runtime (not in Control Panel)
 - **HTTPS Communication:** TLS-encrypted, not WebSocket
 - **Multi-Tenant:** Control Panel serves multiple developer organizations
-- **New Module:** iron_control_store replaces iron_state for Control Panel data
+- **New Module:** iron_control_schema replaces iron_runtime_state for Control Panel data
 
 **Migration Path:**
 1. **Pilot (Week 1-8):** Implement single-process architecture for conference demo
 2. **Pilot Validation (Month 3-4):** Gather customer feedback, prove market fit
-3. **Production Refactor (Month 5-6):** Extract iron_control_store, deploy distributed architecture
+3. **Production Refactor (Month 5-6):** Extract iron_control_schema, deploy distributed architecture
 4. **Full Platform Launch (Month 7):** SaaS offering with cloud Control Panel
 
 **See Also:**
@@ -1746,7 +1746,7 @@ Developer Machines (Local Agent Runtime)
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.4.0 | 2025-12-07 | [Team] | Added Deployment Architecture section explaining Pilot/Demo Mode (single process, shared iron_state) vs Production Mode (distributed, iron_control_store). Includes architecture diagrams, migration path, and cross-references to deployment docs. |
+| 1.4.0 | 2025-12-07 | [Team] | Added Deployment Architecture section explaining Pilot/Demo Mode (single process, shared iron_runtime_state) vs Production Mode (distributed, iron_control_schema). Includes architecture diagrams, migration path, and cross-references to deployment docs. |
 | 1.3.0 | 2025-12-06 | [Team] | Updated terminology: "Crate Architecture" → "Module Architecture" to reflect polyglot monorepo (Rust + TypeScript/Vue) |
 | 1.2.0 | 2025-11-25 | [Team] | Added Capability 5 secrets management (Features #29-35, +iron_secrets module, +6 days, +$5.6K) |
 | 1.1.1 | 2025-11-25 | [Team] | Moved demo_agent.py into iron_runtime module (9 modules total, better organization) |

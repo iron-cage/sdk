@@ -7,7 +7,7 @@ members = [
   "module/iron_telemetry",
 
   # Infrastructure layer
-  "module/iron_state",
+  "module/iron_runtime_state",
 
   # Feature layer
   "module/iron_safety",
@@ -15,18 +15,15 @@ members = [
   "module/iron_secrets",
   "module/iron_token_manager",
 
-  # Specialized layer
-  "module/iron_lang",
-
   # Integration layer
-  "module/iron_api",
+  "module/iron_control_api",
   "module/iron_runtime",
 
   # Application layer
   "module/iron_cli",
 
   # Database schemas (spec-only)
-  "module/iron_control_store",
+  "module/iron_control_schema",
 
   # NOTE: Non-Rust modules (not in Cargo workspace):
   # Python: iron_cli_py, iron_sdk, iron_testing
@@ -270,8 +267,8 @@ path = "module/iron_telemetry"
 
 ## Workspace Crates (internal modules)
 
-[workspace.dependencies.iron_state]
-path = "module/iron_state"
+[workspace.dependencies.iron_runtime_state]
+path = "module/iron_runtime_state"
 
 [workspace.dependencies.iron_safety]
 path = "module/iron_safety"
@@ -279,14 +276,11 @@ path = "module/iron_safety"
 [workspace.dependencies.iron_reliability]
 path = "module/iron_reliability"
 
-[workspace.dependencies.iron_api]
-path = "module/iron_api"
+[workspace.dependencies.iron_control_api]
+path = "module/iron_control_api"
 
 [workspace.dependencies.iron_runtime]
 path = "module/iron_runtime"
-
-[workspace.dependencies.iron_lang]
-path = "module/iron_lang"
 
 [workspace.dependencies.iron_secrets]
 path = "module/iron_secrets"
@@ -297,8 +291,8 @@ path = "module/iron_token_manager"
 [workspace.dependencies.iron_cli]
 path = "module/iron_cli"
 
-[workspace.dependencies.iron_control_store]
-path = "module/iron_control_store"
+[workspace.dependencies.iron_control_schema]
+path = "module/iron_control_schema"
 
 ## HTTP Client
 

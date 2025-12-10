@@ -6,7 +6,6 @@
 **Related Documents:**
 - Architecture: [002_token_management.md](002_token_management.md)
 - Implementation Plan: [005_token_management_implementation_plan.md](005_token_management_implementation_plan.md)
-- Validation Framework: [006_token_management_validation_framework.md](006_token_management_validation_framework.md)
 
 ---
 
@@ -938,7 +937,7 @@ step_3_parity_matrix:
     output: "Usage data file"
 
 step_4_implementation:
-  api_code: "iron_api/src/routes/usage.rs"
+  api_code: "iron_control_api/src/routes/usage.rs"
   cli_code: "iron_cli/src/commands/usage.rs"
 
 step_5_testing:
@@ -1051,7 +1050,7 @@ name: CLI/API Parity Validation
 on:
   pull_request:
     paths:
-      - 'module/iron_api/**'
+      - 'module/iron_control_api/**'
       - 'module/iron_cli/**'
   push:
     branches: [main]
@@ -1066,13 +1065,13 @@ jobs:
         uses: actions-rs/toolchain@v1
 
       - name: Build API server
-        run: cargo build --release --bin iron_api
+        run: cargo build --release --bin iron_control_api
 
       - name: Build CLI tool
         run: cargo build --release --bin iron-token
 
       - name: Start API server
-        run: cargo run --release --bin iron_api &
+        run: cargo run --release --bin iron_control_api &
         env:
           DATABASE_URL: sqlite::memory:
 
@@ -1090,7 +1089,7 @@ jobs:
 
       - name: Check operation count
         run: |
-          API_COUNT=$(grep -c "router.route" module/iron_api/src/routes/mod.rs)
+          API_COUNT=$(grep -c "router.route" module/iron_control_api/src/routes/mod.rs)
           CLI_COUNT=$(grep -c "Subcommand" module/iron_cli/src/main.rs)
           if [ "$API_COUNT" != "$CLI_COUNT" ]; then
             echo "❌ Parity violation: $API_COUNT API endpoints vs $CLI_COUNT CLI commands"

@@ -25,7 +25,7 @@ tests/
 Following iron_cage test organization standards (test_organization.rulebook.md):
 
 1. **Manual Testing Required for Pilot** - Frontend UI requires human verification
-2. **No Mocking** - Use real iron_api backend for integration testing
+2. **No Mocking** - Use real iron_control_api backend for integration testing
 3. **Loud Failures** - Tests must fail obviously and loudly
 4. **Complete Flows** - Test entire user journeys (login → action → verification)
 5. **Accessibility Testing** - Keyboard navigation and screen reader compatibility mandatory
@@ -49,7 +49,7 @@ Following iron_cage test organization standards (test_organization.rulebook.md):
 **Execution:**
 ```bash
 # Terminal 1: Start backend
-cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_api
+cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
 cargo run
 
 # Terminal 2: Start frontend

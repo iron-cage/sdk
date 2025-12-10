@@ -52,6 +52,54 @@ def my_agent(prompt: str) -> str:
     return llm.chat(prompt)  # Rust cost tracking
 ```
 
+## Router Mode vs Library Mode
+
+**Question:** If PyO3 is chosen, why does Router mode use HTTP?
+
+**Answer:** PyO3 chosen for SDK default implementation - Router mode exists for different use cases.
+
+### Library Mode (PyO3 - Default)
+
+**For:** iron_sdk users (default deployment)
+
+**Architecture:**
+```
+from iron_sdk import protect_agent → PyO3 FFI → Runtime (in-process)
+```
+
+**Characteristics:**
+- PyO3 FFI (0.1-0.5ms overhead)
+- Single process (runtime embedded)
+- Default SDK behavior
+- Best performance
+
+**This is the PyO3 choice described above.**
+
+### Router Mode (HTTP - Optional)
+
+**For:** Two scenarios where PyO3 isn't suitable
+
+**Scenario 1: Existing Frameworks (LangChain, CrewAI)**
+- Framework doesn't use iron_sdk
+- Can't use PyO3 (no SDK in their code)
+- Runtime exposes OpenAI-compatible HTTP API
+- Framework points to localhost:8080
+- HTTP overhead (5ms) acceptable for compatibility
+
+**Scenario 2: iron_sdk HTTP Deployment (Optional)**
+- iron_sdk users who want HTTP instead of PyO3
+- Same code: `from iron_sdk import protect_agent`
+- SDK configured to use HTTP internally: `export IRON_RUNTIME_URL=http://localhost:8080`
+- Useful for debugging (inspect HTTP) or process isolation
+- HTTP overhead (5ms) acceptable for these use cases
+
+**Summary:**
+- PyO3 is chosen and used by default (Library mode)
+- HTTP exists for frameworks without SDK (Router mode) or optional SDK HTTP deployment
+- iron_sdk users get PyO3 by default, can opt into HTTP if needed
+
+**See:** [architecture/008: Runtime Modes](../architecture/008_runtime_modes.md) for complete comparison.
+
 ---
 
 *Related: [001_why_rust.md](001_why_rust.md)*

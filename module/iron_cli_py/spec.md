@@ -4,6 +4,8 @@
 **Layer:** 6 (Application)
 **Status:** Active
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
+
 ---
 
 ## Responsibility
@@ -23,7 +25,7 @@ Python CLI wrapper providing developer experience layer over iron_cli binary. De
 
 **Out of Scope:**
 - Token logic implementation (see iron_cli)
-- REST API (see iron_api)
+- REST API (see iron_control_api)
 - Agent execution (see iron_runtime)
 
 ---

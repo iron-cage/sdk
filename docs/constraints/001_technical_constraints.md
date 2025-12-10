@@ -53,12 +53,12 @@ Understand what technical constraints limit design options and why.
 
 ## Networking Constraints
 
-**Model A (Client-Side):**
+**Local Execution (Primary):**
 - Runtime runs on developer machine
 - Network access controlled by developer's firewall
 - HTTPS to Control Panel may be blocked
 
-**Model B (Server-Side):**
+**Server Execution (Future, Post-Pilot):**
 - Requires Iron Cage infrastructure
 - Network policies control agent egress
 

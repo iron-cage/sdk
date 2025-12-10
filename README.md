@@ -23,13 +23,12 @@ All modules are located in the `module/` directory.
 | **iron_types** | Shared types, data structures, API contracts | Rust |
 | **iron_cost** | Budget tracking, cost calculation, spending limits | Rust |
 | **iron_telemetry** | Logging, tracing, metrics collection | Rust |
-| **iron_state** | Agent execution state management | Rust |
+| **iron_runtime_state** | Agent execution state management | Rust |
 | **iron_safety** | PII detection and redaction | Rust |
 | **iron_reliability** | Circuit breaker, retry patterns, fault tolerance | Rust |
 | **iron_secrets** | Encrypted secrets storage, access control | Rust |
 | **iron_token_manager** | API token generation, JWT auth, rate limiting | Rust |
-| **iron_lang** | LLM protocol integration, provider routing | Rust |
-| **iron_api** | REST API server, WebSocket endpoints | Rust |
+| **iron_control_api** | REST API server, WebSocket endpoints | Rust |
 | **iron_runtime** | Agent orchestration, PyO3 Python bridge | Rust |
 | **iron_cli** | Command-line interface for API operations (authoritative) | Rust |
 | **iron_cli_py** | Python CLI with wrapper to iron_cli for operations | Python |
@@ -41,10 +40,10 @@ All modules are located in the `module/` directory.
 
 ```
 Foundation:     iron_types, iron_cost, iron_telemetry
-Infrastructure: iron_state
+Infrastructure: iron_runtime_state
 Feature:        iron_safety, iron_reliability, iron_secrets, iron_token_manager
-Specialized:    iron_lang, iron_control_store
-Integration:    iron_api, iron_runtime
+Specialized:    iron_control_schema
+Integration:    iron_control_api, iron_runtime
 Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
 Frontend:       iron_dashboard
 ```

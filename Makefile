@@ -6,7 +6,7 @@
 
 # Configuration
 DASHBOARD_DIR := module/iron_dashboard
-DB_FILE := module/iron_api/iron_api.db
+DB_FILE := module/iron_control_api/iron_control_api.db
 
 #===============================================================================
 # Help
@@ -57,13 +57,13 @@ test-quick: ## Run tests fast (nextest only)
 #===============================================================================
 
 build: ## Build API + Dashboard for production
-	cargo build --release --bin iron_api_server
+	cargo build --release --bin iron_control_api_server
 	cd $(DASHBOARD_DIR) && npm run build
 
 validate: ## Full production validation
 	@echo "=== Rust Tests ===" && w3 .test l::3
 	@echo "=== Dashboard ===" && cd $(DASHBOARD_DIR) && npm run type-check && npm run build
-	@echo "=== Build ===" && cargo build --release --bin iron_api_server
+	@echo "=== Build ===" && cargo build --release --bin iron_control_api_server
 	@echo "✅ Validation complete"
 
 #===============================================================================

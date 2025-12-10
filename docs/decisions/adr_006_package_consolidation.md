@@ -34,7 +34,7 @@ Consolidate to 5 deployment packages:
    - Examples ship with `pip install iron-sdk[examples]`
    - Clearer that examples demonstrate SDK usage
 
-3. **Create iron_control_store skeleton** for consistency
+3. **Create iron_control_schema skeleton** for consistency
    - All 21 modules now have physical directories
    - Spec-only module for PostgreSQL schema documentation
 
@@ -58,13 +58,13 @@ Consolidate to 5 deployment packages:
 - Comprehensive migration guide created (docs/-migration_examples_to_sdk.md)
 - All documentation updated atomically in single change
 - Deprecation notice to be added to iron_examples PyPI package
-- iron_control_store skeleton prevents "missing module" confusion
+- iron_control_schema skeleton prevents "missing module" confusion
 
 ## Implementation
 
 **Changes made:**
 - Moved 6 example directories from iron_examples to iron_sdk/examples/
-- Created iron_control_store skeleton (5 files)
+- Created iron_control_schema skeleton (5 files)
 - Updated 25+ documentation files
 - Updated Cargo.toml workspace (14→15 members)
 - Archived iron_examples to module/-archived_iron_examples/

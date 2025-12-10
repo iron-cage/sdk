@@ -1,9 +1,9 @@
 #!/bin/bash
 # API Integration Verification Script
-# Verifies all 18 API methods work correctly with iron_api_server
+# Verifies all 18 API methods work correctly with iron_control_api_server
 #
 # Prerequisites:
-# - iron_api_server running at http://localhost:3000
+# - iron_control_api_server running at http://localhost:3000
 # - jq installed for JSON parsing
 
 API_URL="http://localhost:3000"

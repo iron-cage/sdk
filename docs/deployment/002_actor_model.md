@@ -14,12 +14,15 @@ Understand system boundaries and who uses which packages.
 
 ## Human Actors
 
+**Note:** All roles use both CLI and Dashboard (equivalent interface).
+
 | Actor | Role | Primary Package |
 |-------|------|-----------------|
-| Developer | Builds AI agents | Agent Runtime |
+| **Admin** | Manages Control Panel (CLI + Dashboard), allocates budgets, oversees all developers | Control Panel (REQUIRED) |
+| **Super User** | Developer + read-only Control Panel dashboard access (CLI + Dashboard, own budgets) | Control Panel + Agent Runtime |
+| **Developer** | Builds AI agents with IC Token (CLI + Dashboard, read-only own usage) | Agent Runtime |
 | Operations | Monitors execution | Control Panel |
 | Security | Implements isolation | Sandbox |
-| Administrator | Manages tokens/secrets | CLI Tools |
 | Visitor | Views marketing | Marketing Site |
 
 ## Software Actors

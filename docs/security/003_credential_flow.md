@@ -52,11 +52,11 @@ Agent --needs key--> Credential Service --fetches--> Vault
 
 ---
 
-## Two-Token Architecture (Model C)
+## Two-Token Architecture
 
-**For Control Panel-Managed deployments, Iron Cage uses dual-token security separating developer-visible credentials from provider credentials.**
+**Iron Cage uses dual-token security separating developer-visible credentials from provider credentials.**
 
-**See:** [architecture/006: Budget Control Protocol](../architecture/006_budget_control_protocol.md) for complete specification.
+**See:** [protocol/005: Budget Control Protocol](../protocol/005_budget_control_protocol.md) for complete specification.
 
 ### Token Separation
 
@@ -96,13 +96,13 @@ Agent --needs key--> Credential Service --fetches--> Vault
 | **CLI Arguments** | ✅ Safe | ❌ NEVER |
 | **Config Files** | ✅ Safe | ❌ NEVER |
 | **Disk Storage** | ✅ OK | ❌ Memory only |
-| **Lifetime** | 24 hours | Session only |
-| **If Stolen** | ⚠️ Limited (24h) | 🚨 Full provider access |
+| **Lifetime** | Until agent deleted (long-lived) | Session only (runtime process) |
+| **If Stolen** | ⚠️ Limited (no provider creds, budget capped, revocable) | 🚨 Full provider access |
 
 **Rationale:** IC Token identifies budget without exposing provider credentials. IP Token managed by Control Panel, delivered to Runtime encrypted, never exposed to developer.
 
-**See:** [architecture/006: Budget Control Protocol](../architecture/006_budget_control_protocol.md) § The Two Tokens for complete specification.
+**See:** [protocol/005: Budget Control Protocol](../protocol/005_budget_control_protocol.md) § The Two Tokens for complete specification.
 
 ---
 
-*Related: [004_audit_model.md](004_audit_model.md) | [002_isolation_layers.md](002_isolation_layers.md) | [architecture/006: Budget Control](../architecture/006_budget_control_protocol.md)*
+*Related: [004_audit_model.md](004_audit_model.md) | [002_isolation_layers.md](002_isolation_layers.md) | [protocol/005: Budget Control](../protocol/005_budget_control_protocol.md)*

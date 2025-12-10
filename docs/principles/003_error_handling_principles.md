@@ -48,7 +48,7 @@ if error { return Err(Error::BudgetExceeded { spent, limit }); }
 **Tools:**
 - Structured logging (tracing crate)
 - Error context (error_tools crate per rulebook)
-- Audit trail (iron_state persistence)
+- Audit trail (iron_runtime_state persistence)
 - Dashboard alerts (WebSocket updates)
 
 ## Proper Fixes Only

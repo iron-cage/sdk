@@ -4,6 +4,8 @@
 **Layer:** 2 (Foundation)
 **Status:** Active
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
+
 ---
 
 ## Responsibility

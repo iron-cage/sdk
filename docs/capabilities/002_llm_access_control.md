@@ -26,20 +26,31 @@ The insight: **Real-time enforcement** (automatic cutoffs) is different from **m
 
 - **Unified API** - Single interface for OpenAI, Anthropic, Azure, etc.
 - **Token Counter** - Real-time usage tracking per request
-- **Budget Engine** - Per-user, per-team, per-project limits with automatic cutoffs
+- **Budget Engine** - Agent budget enforcement (restrictive). Project/IP/Master budgets are informative (statistics only)
 - **Cost Attribution** - Chargeback reporting by cost center
 
 ---
 
-## Budget Allocation Architecture (Model C)
+## Budget Allocation Architecture
 
-**Control Panel-Managed deployments use incremental budget allocation for real-time enforcement.**
+**Iron Cage uses incremental budget allocation for real-time enforcement.**
+
+**Budget Control Design:**
+
+Agents are the ONLY way to control budget:
+- **Agent budget:** Restrictive (blocks requests when exceeded)
+- **Project budget:** Informative (shows project spending, no blocking)
+- **IP budget:** Informative (shows provider spending, no blocking)
+- **Master budget:** Informative (shows all spending, no blocking)
+
+**Why:** Keeps control simple and predictable. Want to limit? Set agent budget. Want to monitor? View informative budgets.
 
 **Admin Workflow:**
-1. Allocate budget per agent ($100) in Control Panel
-2. Assign developer access to budget
-3. Monitor real-time spending in dashboard
-4. Increase/decrease budgets as needed
+1. Create project with project budget (informative)
+2. Create agent with agent budget ($100, restrictive)
+3. Bind IPs to agent
+4. Assign developer to project
+5. Monitor spending (agent, project, IP, master budgets)
 
 **Developer Workflow:**
 1. Login to Control Panel → receive IC Token (developer-visible JWT)
@@ -49,18 +60,26 @@ The insight: **Real-time enforcement** (automatic cutoffs) is different from **m
 
 **Runtime Workflow:**
 1. Initialize with IC Token → receive IP Token (encrypted)
-2. Per request: Translate IC → IP (<1ms overhead)
-3. Report usage to Control Panel (async, 0ms perceived)
+2. Per request: Translate IC → IP (<0.5ms overhead)
+3. Report usage to Control Panel:
+   - **Pilot:** Per-request reporting (5ms, simpler implementation)
+   - **Production:** Batched every 10 requests (0ms async, optimized for scale)
 4. Request more budget when low (<$1 threshold)
 5. If total budget exhausted → stop accepting calls
 
-**Real-Time Enforcement:**
-- Every LLM call reported to Control Panel
-- Admin sees spending within seconds
-- Hard limits enforced (request denied when exhausted)
-- Incremental borrowing prevents full budget exposure
+**Pilot Behavior:**
+- Per-request reporting (simpler to implement)
+- Admin sees spending immediately after each call
+- Higher overhead (5ms) acceptable for demonstration
+- Same hard limits enforced
 
-**See:** [architecture/006: Budget Control Protocol](../architecture/006_budget_control_protocol.md) for complete protocol including:
+**Production Behavior:**
+- Batched reporting (every 10 requests) optimized for scale
+- Admin sees spending with slight delay (~10 requests)
+- Lower overhead (async batching) for high-throughput scenarios
+- Same hard limits enforced, but based on batched data
+
+**See:** [protocol/005: Budget Control Protocol](../protocol/005_budget_control_protocol.md) for complete protocol including:
 - IC Token format (JWT claims)
 - Budget borrowing messages (INIT, REPORT, REFRESH)
 - IP Token encryption (AES-256-GCM)

@@ -4,6 +4,8 @@
 **Layer:** 6 (Application)
 **Status:** Active
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
+
 ---
 
 ## Responsibility
@@ -22,8 +24,8 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 - WebSocket integration for live updates
 
 **Out of Scope:**
-- REST API backend (see iron_api)
-- WebSocket server (see iron_api)
+- REST API backend (see iron_control_api)
+- WebSocket server (see iron_control_api)
 - Token authentication logic (see iron_token_manager)
 - Agent execution (see iron_runtime)
 
@@ -32,7 +34,7 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 ## Dependencies
 
 **Required Modules:**
-- iron_api - REST endpoints and WebSocket server
+- iron_control_api - REST endpoints and WebSocket server
 
 **Required External:**
 - Vue 3 - Frontend framework
@@ -62,7 +64,7 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 - Administrators - Web browser access
 
 **Uses:**
-- iron_api - REST API for data, WebSocket for real-time updates
+- iron_control_api - REST API for data, WebSocket for real-time updates
 
 ---
 

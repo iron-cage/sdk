@@ -4,6 +4,8 @@
 **Layer:** 6 (Application)
 **Status:** Active
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
+
 ---
 
 ## Responsibility
@@ -23,7 +25,7 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 **Out of Scope:**
 - Python CLI wrapper (see iron_cli_py)
-- REST API (see iron_api)
+- REST API (see iron_control_api)
 - Dashboard UI (see iron_dashboard)
 - Agent execution (see iron_runtime)
 
@@ -33,7 +35,7 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 **Required Modules:**
 - iron_token_manager - Token operations
-- iron_state - State persistence
+- iron_runtime_state - State persistence
 - iron_telemetry - Logging
 
 **Required External:**
@@ -63,7 +65,7 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 **Uses:**
 - iron_token_manager - Token CRUD operations
-- iron_state - Data retrieval
+- iron_runtime_state - Data retrieval
 
 ---
 

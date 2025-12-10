@@ -6,40 +6,45 @@ Communication protocols defining message formats, wire protocols, and version co
 
 ## Directory Responsibilities
 
-| ID | Entity | Responsibility | Input → Output | Scope | Out of Scope |
-|----|--------|----------------|----------------|-------|--------------|
-| 001 | **001_ironlang_data_protocol.md** | Define NDJSON data source communication | Data protocol question → Message spec | IronMessage types (READ, WRITE, AUTH, LOG, ERROR), NDJSON streaming, error handling, versioning | NOT REST API (→ 002), NOT WebSocket (→ 003), NOT implementation (→ module/iron_lang/) |
-| 002 | **002_rest_api_protocol.md** | Document HTTP endpoint schemas and contracts | REST question → API protocol | Endpoint schemas (tokens, usage, limits, traces), request/response formats, HTTP status codes, API versioning | NOT WebSocket (→ 003), NOT IronLang (→ 001), NOT implementation (→ module/iron_api/) |
-| 003 | **003_websocket_protocol.md** | Specify real-time dashboard message format | WebSocket question → Message protocol | Message types (STATE_UPDATE, AGENT_EVENT, COST_ALERT), connection lifecycle, heartbeat, reconnection | NOT REST (→ 002), NOT IronLang (→ 001), NOT implementation (→ module/iron_api/) |
-| 004 | **004_mcp_integration_protocol.md** | Define Model Context Protocol implementation | MCP question → Integration protocol | MCP message format, tool discovery, tool invocation, error mapping Iron Cage↔MCP | NOT IronLang (→ 001), NOT REST (→ 002), NOT capability overview (→ capabilities/006) |
+| ID | Entity | Responsibility |
+|----|--------|----------------|
+| 002 | **002_rest_api_protocol.md** | Document HTTP REST API overview (resource organization, authentication architecture, common patterns, status codes, versioning, CLI-API parity) |
+| 003 | **003_websocket_protocol.md** | Specify real-time dashboard WebSocket message format (STATE_UPDATE, AGENT_EVENT, COST_ALERT, connection lifecycle, heartbeat) |
+| 004 | **004_mcp_integration_protocol.md** | Define Model Context Protocol implementation (tool discovery, invocation, error mapping Iron Cage ↔ MCP) |
+| 005 | **005_budget_control_protocol.md** | Document budget enforcement and token management protocol (two-token system, budget borrowing, token handshake) |
+| 006 | **006_token_management_api.md** | Document IC Token lifecycle API (create, list, get, delete, rotate) with permission-based access (admin vs developer) |
+| 007 | **007_authentication_api.md** | Document User authentication API (login, logout, refresh, validate) with JWT-based token lifecycle management |
 
 ---
 
 ## Protocol Collection
 
-| ID | Name | Location | Purpose |
-|----|------|----------|---------|
-| - | [Budget Control Protocol](../architecture/006_budget_control_protocol.md) | architecture/006 | Two-token system (IC/IP), budget borrowing, token handshake, usage reporting |
-| 001 | [IronLang Data Protocol](001_ironlang_data_protocol.md) | protocol/001 | NDJSON agent-data source messages |
-| 002 | [REST API Protocol](002_rest_api_protocol.md) | protocol/002 | HTTP Control Panel endpoint schemas |
-| 003 | [WebSocket Protocol](003_websocket_protocol.md) | protocol/003 | Real-time dashboard message format |
-| 004 | [MCP Integration Protocol](004_mcp_integration_protocol.md) | protocol/004 | Model Context Protocol tool integration |
+### Certain Protocols (✅ Required for Pilot)
 
-**Note:** Budget Control Protocol (IC Token, IP Token, budget borrowing, token translation, cost reporting) is documented in [architecture/006_budget_control_protocol.md](../architecture/006_budget_control_protocol.md) per Anti-Duplication Principle.
+| ID | Name | Purpose |
+|----|------|---------|
+| 002 | [REST API Protocol](002_rest_api_protocol.md) | HTTP REST API overview and common patterns |
+| 003 | [WebSocket Protocol](003_websocket_protocol.md) | Real-time dashboard message format |
+| 004 | [MCP Integration Protocol](004_mcp_integration_protocol.md) | Model Context Protocol tool integration |
+| 005 | [Budget Control Protocol](005_budget_control_protocol.md) | Two-token system (IC/IP), budget borrowing, token handshake |
+| 006 | [Token Management API](006_token_management_api.md) | IC Token CRUD endpoints |
+| 007 | [Authentication API](007_authentication_api.md) | User login/logout/refresh endpoints |
 
 ---
 
 ## Cross-Collection Dependencies
 
 **Protocols depend on:**
-- **Architecture:** [architecture/006](../architecture/006_budget_control_protocol.md) defines budget control protocol (authoritative source for IC/IP tokens, budget borrowing)
 - **Capabilities:** Protocol implementations enable capabilities
 - **Security:** Protocols follow security model
+- **Architecture:** Protocols used in system architecture
 
 **Protocols used by:**
-- **Modules:** iron_lang implements 001, iron_api implements 002+003, iron_runtime uses architecture/006
-- **Architecture:** [architecture/004: Data Flow](../architecture/004_data_flow.md) uses budget control protocol
-- **Capabilities:** [capabilities/002: LLM Access Control](../capabilities/002_llm_access_control.md) enabled by budget protocol
+- **Modules:** iron_control_api implements 002+003+006+007, iron_runtime uses 005, iron_cli uses 006+007
+- **Architecture:** [architecture/004: Data Flow](../architecture/004_data_flow.md) uses budget control protocol (005)
+- **Architecture:** [architecture/009: Resource Catalog](../architecture/009_resource_catalog.md) documents all REST API resources
+- **Capabilities:** [capabilities/002: LLM Access Control](../capabilities/002_llm_access_control.md) enabled by budget protocol (005)
+- **Features:** [features/004: Token Management CLI-API Parity](../features/004_token_management_cli_api_parity.md) uses 006+007
 
 ---
 

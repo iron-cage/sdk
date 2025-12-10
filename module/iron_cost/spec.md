@@ -4,6 +4,8 @@
 **Layer:** 3 (Feature)
 **Status:** Active
 
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
+
 ---
 
 ## Responsibility
@@ -33,7 +35,7 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 
 **Required Modules:**
 - iron_types - Foundation types
-- iron_state - Budget state persistence
+- iron_runtime_state - Budget state persistence
 - iron_telemetry - Warning alerts
 
 **Required External:**
@@ -58,13 +60,13 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 
 **Used by:**
 - iron_runtime - Budget checks before LLM calls
-- iron_api - Cost reporting endpoints
+- iron_control_api - Cost reporting endpoints
 
 **Uses:**
-- iron_state - Persists budget and spending data
+- iron_runtime_state - Persists budget and spending data
 - iron_telemetry - Emits budget warning alerts
 
 ---
 
 *For detailed pricing and algorithms, see spec/-archived_detailed_spec.md*
-*For budget protocol, see docs/architecture/006_budget_control_protocol.md*
+*For budget protocol, see docs/protocol/005_budget_control_protocol.md*

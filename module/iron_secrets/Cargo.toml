@@ -17,7 +17,7 @@ full = ["enabled"]
 [dependencies]
 # Workspace crates
 iron_types = { workspace = true }
-iron_state = { workspace = true }
+iron_runtime_state = { workspace = true }
 
 # Error handling (per rulebook)
 error_tools = { workspace = true }

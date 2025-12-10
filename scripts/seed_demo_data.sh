@@ -3,7 +3,7 @@
 # Seeds the database with demo data for conference presentation
 #
 # Prerequisites:
-# - iron_api_server running at http://localhost:3000
+# - iron_control_api_server running at http://localhost:3000
 # - Empty or fresh database
 
 API_URL="http://localhost:3000"

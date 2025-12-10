@@ -263,7 +263,7 @@
 - **Test:** Create secret "OPENAI_API_KEY" → encrypted in DB → decrypt returns original
 
 **Day 51 (Tuesday): API & Agent Integration**
-- [ ] iron_api endpoints: POST/GET/PUT/DELETE /secrets
+- [ ] iron_control_api endpoints: POST/GET/PUT/DELETE /secrets
 - [ ] iron_runtime integration: secret injection at agent spawn
 - [ ] Environment variable setup: IRON_SECRETS_MASTER_KEY in runtime config
 - [ ] Test: Create secret via API → agent reads from os.environ["OPENAI_API_KEY"]

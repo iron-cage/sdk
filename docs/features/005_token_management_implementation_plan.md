@@ -4,7 +4,6 @@
 **Date:** 2025-12-02
 **Status:** Planning document (TDD enforced, no mocks, CLI/API parity)
 **Architecture:** [002_token_management.md](002_token_management.md)
-**Validation Framework:** [006_token_management_validation_framework.md](006_token_management_validation_framework.md)
 **CLI/API Parity:** [004_token_management_cli_api_parity.md](004_token_management_cli_api_parity.md)
 **Related Task:** [task/backlog/001_implement_llm_token_management_dashboard_and_backend.md](../../../task/backlog/001_implement_llm_token_management_dashboard_and_backend.md)
 
@@ -85,7 +84,7 @@
 
 1. **Search for similar logic:**
    - `grep -r "similar_function_name" module/`
-   - Check `iron_cost`, `iron_state`, `iron_api` for reusable code
+   - Check `iron_cost`, `iron_runtime_state`, `iron_control_api` for reusable code
 
 2. **Consolidate or reference:**
    - If logic exists, use it (add dependency if needed)
@@ -235,8 +234,8 @@ impl TrackedOpenAIClient
 | Crate | Purpose | Current Status | Integration |
 |-------|---------|---------------|-------------|
 | `iron_cost` | Cost tracking, budget management | ✅ Exists | Reuse for pricing calculations |
-| `iron_state` | Database layer, migrations | ✅ Exists | Extend for token tables |
-| `iron_api` | API framework, middleware | ✅ Exists | Add token endpoints |
+| `iron_runtime_state` | Database layer, migrations | ✅ Exists | Extend for token tables |
+| `iron_control_api` | API framework, middleware | ✅ Exists | Add token endpoints |
 | `iron_types` | Shared types | ✅ Exists | Use for common types |
 | `iron_safety` | Safety utilities | ✅ Exists | Input validation |
 | `iron_reliability` | Reliability features | ✅ Exists | Circuit breaker patterns |
@@ -269,7 +268,7 @@ api_gemini = { path = "../../api_llm/dev/api/gemini" }
 
 # iron_cage crates (reuse existing infrastructure)
 iron_cost = { workspace = true }
-iron_state = { workspace = true }
+iron_runtime_state = { workspace = true }
 iron_types = { workspace = true }
 ```
 
@@ -347,8 +346,8 @@ async fn test_real_openai_token_usage() {
 
 **Key Deliverables:**
 1. `iron_token_manager` crate (backend business logic)
-2. Enhanced `iron_api` (REST endpoints + JWT auth)
-3. Enhanced `iron_state` (database schema + migrations)
+2. Enhanced `iron_control_api` (REST endpoints + JWT auth)
+3. Enhanced `iron_runtime_state` (database schema + migrations)
 4. `iron_cli` binary (CLI tool with 24 commands, 100% API parity)
 5. Vue 3 + TypeScript dashboard (4 views)
 6. Comprehensive test suite (60% unit, 30% integration, 10% E2E + CLI/API parity tests)
@@ -442,7 +441,7 @@ Test: [====================================================]
 - [ ] **START:** Run `w3 .test l::3` (verify green baseline)
 - [ ] Design database schema (5 tables: api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
 - [ ] Create ER diagram
-- [ ] **Anti-duplication check:** Search for existing table definitions in `iron_state`
+- [ ] **Anti-duplication check:** Search for existing table definitions in `iron_runtime_state`
 - [ ] Review schema with team
 - [ ] Finalize column types, indexes, constraints
 - [ ] **Write failing tests:** Schema validation tests (tables exist, columns correct, indexes present)
@@ -462,8 +461,8 @@ Test: [====================================================]
 **Day 5: Storage Trait (TDD: RED → GREEN → REFACTOR)**
 - [ ] **START:** Run `w3 .test l::3` (verify green state from Day 4)
 - [ ] **RED:** Write failing tests for `TokenStorage` trait operations
-- [ ] **Anti-duplication check:** Search for similar storage patterns in `iron_state`, `iron_cost`
-- [ ] Define `TokenStorage` trait in `iron_state`
+- [ ] **Anti-duplication check:** Search for similar storage patterns in `iron_runtime_state`, `iron_cost`
+- [ ] Define `TokenStorage` trait in `iron_runtime_state`
 - [ ] **GREEN:** Implement PostgreSQL storage adapter (make tests pass)
 - [ ] **GREEN:** Implement SQLite storage adapter (make tests pass)
 - [ ] Add connection pooling configuration
@@ -472,7 +471,7 @@ Test: [====================================================]
 - [ ] **END:** Run `w3 .test l::3` (mandatory green state)
 
 **Deliverables:**
-- Migration files in `module/iron_state/migrations/`
+- Migration files in `module/iron_runtime_state/migrations/`
 - `TokenStorage` trait implementation
 - 10+ integration tests
 
@@ -496,7 +495,7 @@ Test: [====================================================]
 - [ ] **RED:** Write failing tests for token lookup/verification
 - [ ] **RED:** Write failing tests for rotation logic
 - [ ] **RED:** Write failing tests for revocation logic
-- [ ] **Anti-duplication check:** Check if `iron_state` has similar CRUD patterns
+- [ ] **Anti-duplication check:** Check if `iron_runtime_state` has similar CRUD patterns
 - [ ] **GREEN:** Implement token storage (hash insertion, REAL database)
 - [ ] **GREEN:** Implement token lookup (hash verification, REAL database)
 - [ ] **GREEN:** Implement token rotation logic
@@ -718,7 +717,7 @@ Test: [====================================================]
 #### Week 6, Days 26-30: REST API & Authentication
 
 **Day 26: JWT Authentication**
-- [ ] Add `jsonwebtoken` dependency to `iron_api`
+- [ ] Add `jsonwebtoken` dependency to `iron_control_api`
 - [ ] Implement `JwtAuth` middleware
 - [ ] Add JWT signing/verification logic
 - [ ] Implement access token (1hr) + refresh token (7 days)
@@ -736,7 +735,7 @@ Test: [====================================================]
 **Day 28-29: API Endpoints**
 - [ ] Implement authentication endpoints (login, refresh, logout)
 - [ ] Implement token management endpoints (create, list, get, rotate, revoke)
-- [ ] Implement usage analytics endpoints (aggregate, by-project, by-provider)
+- [ ] Implement analytics endpoints (aggregate, by-project, by-provider)
 - [ ] Implement limits management endpoints (create, list, update, delete)
 - [ ] Implement call tracing endpoints (query, get)
 - [ ] Add health check endpoint
@@ -789,12 +788,12 @@ Test: [====================================================]
 - [ ] Run `w3 .test l::3` and verify all pass
 
 **Deliverables:**
-- `iron_api/src/middleware/jwt_auth.rs`
-- `iron_api/src/middleware/rbac_auth.rs`
-- `iron_api/src/routes/tokens.rs`
-- `iron_api/src/routes/usage.rs`
-- `iron_api/src/routes/limits.rs`
-- `iron_api/src/routes/traces.rs`
+- `iron_control_api/src/middleware/jwt_auth.rs`
+- `iron_control_api/src/middleware/rbac_auth.rs`
+- `iron_control_api/src/routes/tokens.rs`
+- `iron_control_api/src/routes/usage.rs`
+- `iron_control_api/src/routes/limits.rs`
+- `iron_control_api/src/routes/traces.rs`
 - `iron_cli/src/main.rs` (CLI binary)
 - `iron_cli/src/commands/` (24 CLI commands)
 - OpenAPI specification
@@ -887,7 +886,7 @@ Test: [====================================================]
 **Day 45: Testing**
 - [ ] Write component tests (Vitest)
 - [ ] Write E2E tests for token management (Playwright)
-- [ ] Write E2E tests for usage analytics (Playwright)
+- [ ] Write E2E tests for analytics (Playwright)
 - [ ] Test responsive design (mobile, tablet, desktop)
 - [ ] Run accessibility audit (axe-core)
 
@@ -1114,8 +1113,8 @@ Test: [====================================================]
 **Must Complete Before Start:**
 - [ ] Pilot project completed (Dec 17, 2025)
 - [ ] `iron_cost` crate stable
-- [ ] `iron_state` crate supports migrations
-- [ ] `iron_api` crate supports middleware
+- [ ] `iron_runtime_state` crate supports migrations
+- [ ] `iron_control_api` crate supports middleware
 - [ ] Development environment documented
 
 **Nice to Have:**
@@ -1517,8 +1516,8 @@ grep -r "function_name" module/
 
 # Check existing modules for reusable code
 # - iron_cost: pricing, budget tracking
-# - iron_state: database queries, storage traits
-# - iron_api: HTTP clients, middleware patterns
+# - iron_runtime_state: database queries, storage traits
+# - iron_control_api: HTTP clients, middleware patterns
 # - api_llm workspace: LLM provider clients (CRITICAL - always check first!)
 ```
 
@@ -1540,8 +1539,8 @@ grep -r "function_name" module/
 3. **iron_cage workspace** (current project, existing crates):
    - ❌ DO NOT create new crates when existing ones can be extended
    - ✅ EXTEND `iron_cost` for pricing calculations
-   - ✅ EXTEND `iron_state` for token tables/migrations
-   - ✅ EXTEND `iron_api` for token endpoints
+   - ✅ EXTEND `iron_runtime_state` for token tables/migrations
+   - ✅ EXTEND `iron_control_api` for token endpoints
    - ✅ REUSE `iron_types`, `iron_safety`, `iron_telemetry`
 
 **Common duplication pitfalls:**
@@ -1558,8 +1557,8 @@ grep -r "function_name" module/
 | Add chrono for timestamps | Use `time_tools` workspace crate |
 | Implement custom error types | Use `error_tools::err!` macro |
 | Create new cost tracking logic | Extend existing `iron_cost` crate |
-| Create new database tables separately | Extend `iron_state` migrations |
-| Duplicate database query patterns | Reuse `iron_state` storage traits |
+| Create new database tables separately | Extend `iron_runtime_state` migrations |
+| Duplicate database query patterns | Reuse `iron_runtime_state` storage traits |
 | Copy-paste error handling | Use `error_tools` consistently |
 | Duplicate validation logic | Reuse `iron_safety` utilities |
 
@@ -1643,7 +1642,7 @@ async fn test_real_openai_usage_tracking() {
 □ Workspace utility crates used - verified error_tools/former/mod_interface/time_tools in Cargo.toml?
 □ NO external crates when workspace alternatives exist - verified no anyhow/thiserror/chrono?
 □ NO custom LLM HTTP clients - verified no reqwest/HTTP code for OpenAI/Claude/Gemini?
-□ iron_cage crates reused - verified iron_cost/iron_state dependencies?
+□ iron_cage crates reused - verified iron_cost/iron_runtime_state dependencies?
 □ Integration tests use real APIs - checked .env.test usage?
 □ Tests fail loudly if secrets missing - verified .expect() usage?
 □ Green state achieved - blocking gate passed?
@@ -1732,8 +1731,8 @@ async fn test_real_openai_usage_tracking() {
       echo "ERROR: Missing iron_cost dependency - reuse for pricing calculations"
       exit 1
     fi
-    if ! grep -q "iron_state.*workspace.*true" module/iron_token_manager/Cargo.toml; then
-      echo "ERROR: Missing iron_state dependency - extend for token tables"
+    if ! grep -q "iron_runtime_state.*workspace.*true" module/iron_token_manager/Cargo.toml; then
+      echo "ERROR: Missing iron_runtime_state dependency - extend for token tables"
       exit 1
     fi
 
@@ -1766,7 +1765,7 @@ async fn test_real_openai_usage_tracking() {
 | 2025-12-02 | DEFER to post-pilot (Q1 2026) | Timeline conflict (23 days vs 75 days) | Rush implementation for pilot |
 | 2025-12-02 | Use workspace api_llm crates | Anti-duplication, existing tested code | Implement custom HTTP clients |
 | 2025-12-02 | Use workspace wTools utility crates | Anti-duplication, consistent ecosystem | Use external crates (anyhow, chrono, etc.) |
-| 2025-12-02 | Extend existing iron_cage crates | Reuse iron_cost/iron_state infrastructure | Create new crates from scratch |
+| 2025-12-02 | Extend existing iron_cage crates | Reuse iron_cost/iron_runtime_state infrastructure | Create new crates from scratch |
 | 2025-12-02 | No mocks policy (TDD with real APIs) | Production-quality code, user requirement | Mock-based testing |
 | 2025-12-02 | Mandatory `w3 .test l::3` at each phase | Continuous green state enforcement | Test at end only |
 | TBD | PostgreSQL vs MySQL | TBD | PostgreSQL (better JSON support) |
@@ -1813,8 +1812,8 @@ sqlx migrate run
 **Key Directories:**
 ```
 module/iron_token_manager/    # Backend business logic
-module/iron_api/              # REST API
-module/iron_state/            # Database layer
+module/iron_control_api/              # REST API
+module/iron_runtime_state/            # Database layer
 dashboard/                    # Vue.js frontend (separate repo)
 ```
 
@@ -1855,7 +1854,6 @@ task/backlog/001_implement_llm_token_management_dashboard_and_backend.md  # Requ
 
 **Cross-References Verified:**
 - ✅ Architecture document: `002_token_management.md`
-- ✅ Validation framework: `006_token_management_validation_framework.md`
 - ✅ CLI/API parity spec: `004_token_management_cli_api_parity.md`
 - ✅ Task requirements: `task/backlog/001_implement_llm_token_management_dashboard_and_backend.md`
 - ✅ Workspace crates: `api_llm`, `wTools`, `iron_cage` (28 total crates referenced)

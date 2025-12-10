@@ -25,7 +25,7 @@ Provides secure secrets management with AES-256-GCM encryption at rest, Argon2id
 - Secret expiration and auto-rotation (future)
 - Multi-tenancy isolation (future)
 - External secret providers (GitHub Secrets, Azure Key Vault)
-- REST API endpoints (see iron_api)
+- REST API endpoints (see iron_control_api)
 - Dashboard UI (see iron_dashboard)
 
 ## Installation
