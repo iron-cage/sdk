@@ -4,9 +4,13 @@ import json
 from langchain.agents import tool
 from dotenv import load_dotenv
 
+# --- Load Configuration ---
+# Loads environment variables from a .env file.
 load_dotenv()
 APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
 
+# --- Tool for Searching Leads ---
+# Used to find a list of people based on job title, industry, and location.
 @tool
 def search_leads(job_title: str, industry: str | None = None, location: str | None = None, quantity: int = 3):
     """
@@ -19,6 +23,8 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
     """
     url = "https://api.apollo.io/v1/mixed_people/search"
     
+    # --- Prepare and Execute API Request ---
+    # Forms the headers and payload for the request to Apollo.
     headers = {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
@@ -46,6 +52,8 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
             
         data = response.json()
         
+        # --- Process and Clean Results ---
+        # Extracts only the key information from the API response.
         clean_results = []
         for p in data.get('people', []):
             clean_results.append({
@@ -59,11 +67,14 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
         if not clean_results:
             return json.dumps({"message": "0 leads found. Try broader keywords."}, ensure_ascii=False)
 
+        # Returns the cleaned data in JSON format.
         return json.dumps(clean_results, ensure_ascii=False)
         
     except Exception as e:
         return f"System Error: {str(e)}"
 
+# --- Tool for Getting Lead Details ---
+# Used to retrieve complete information about a single person using their ID.
 @tool
 def get_lead_details(apollo_id: str):
     """
@@ -72,6 +83,7 @@ def get_lead_details(apollo_id: str):
     """
     url = f"https://api.apollo.io/v1/people/{apollo_id}"
     
+    # --- Prepare and Execute API Request ---
     headers = {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
@@ -95,9 +107,12 @@ def get_lead_details(apollo_id: str):
         if not person_data:
             return json.dumps({"error": "Lead ID not found or empty response"}, ensure_ascii=False)
 
+        # Returns the full lead data in JSON format.
         return json.dumps(person_data, ensure_ascii=False)
             
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
+# --- List of Available Tools ---
+# Stores all tool functions to be passed to the agent.
 tools_list = [search_leads, get_lead_details]
