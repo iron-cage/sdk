@@ -237,24 +237,56 @@ pub async fn create_provider_key(
   // Create masked key for response
   let masked_key = mask_api_key( &request.api_key );
 
-  // Store in database
-  let key_id = match state.storage.create_key(
-    provider,
-    &encrypted.ciphertext_base64(),
-    &encrypted.nonce_base64(),
-    request.base_url.as_deref(),
-    request.description.as_deref(),
-    &claims.sub,
-  ).await
+  let keys = state.storage.get_keys_by_provider(provider).await;
+  println!("Keys: {:?}", keys);
+  if keys.is_err()
   {
-    Ok( id ) => id,
-    Err( _ ) =>
+    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+      "error": "Failed to get provider keys"
+    }) ) ).into_response();
+  }
+
+  let keys = keys.unwrap();
+  let mut key_id;
+  if !keys.is_empty()
+  {
+    key_id = match state.storage.update_key(
+      keys[0],
+      provider,
+      &encrypted.ciphertext_base64(),
+      &encrypted.nonce_base64(),
+      request.base_url.as_deref(),
+      request.description.as_deref(),
+      &claims.sub,
+    ).await
     {
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "Failed to create provider key"
-      }) ) ).into_response();
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+          "error": "Failed to update provider key"
+        }) ) ).into_response();
+      }
     }
-  };
+  } else {
+    key_id = match state.storage.create_key(
+      provider,
+      &encrypted.ciphertext_base64(),
+      &encrypted.nonce_base64(),
+      request.base_url.as_deref(),
+      request.description.as_deref(),
+      &claims.sub,
+    ).await
+    {
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+          "error": "Failed to create provider key"
+        }) ) ).into_response();
+      }
+    }
+  }
 
   // Get metadata for response
   let metadata = match state.storage.get_key_metadata( key_id ).await

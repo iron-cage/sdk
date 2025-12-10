@@ -224,7 +224,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |e|crate::error::TokenError)?;
 
     Ok( row_to_metadata( &row ) )
   }
@@ -392,6 +392,41 @@ impl ProviderKeyStorage
     .map_err( |_| crate::error::TokenError )?;
 
     Ok( rows.into_iter().map( |r| r.0 ).collect() )
+  }
+
+  /// Get all keys of provider
+  pub async fn get_keys_by_provider( &self, provider : ProviderType ) -> Result< Vec< i64 > >
+  {
+    let rows : Vec< ( i64, ) > = sqlx::query_as(
+      "SELECT id FROM ai_provider_keys WHERE provider = $1"
+    )
+    .bind( provider.as_str() )
+    .fetch_all( &self.pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    Ok( rows.into_iter().map( |r| r.0 ).collect() )
+  }
+
+  /// Update key
+  pub async fn update_key( &self, key_id : i64, provider : ProviderType, encrypted_api_key : &str, encryption_nonce : &str, base_url : Option< &str >, description : Option< &str >, user_id : &str ) -> Result< i64 >
+  {
+    sqlx::query(
+      "UPDATE ai_provider_keys \
+       SET provider = $1, encrypted_api_key = $2, encryption_nonce = $3, base_url = $4, description = $5, user_id = $6 \
+       WHERE id = $7"
+    )
+    .bind( provider.as_str() )
+    .bind( encrypted_api_key )
+    .bind( encryption_nonce )
+    .bind( base_url )
+    .bind( description )
+    .bind( user_id )
+    .bind( key_id )
+    .execute( &self.pool )
+    .await
+    .map_err( |e| crate::error::TokenError )?;
+    Ok( key_id )
   }
 }
 
