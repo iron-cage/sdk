@@ -262,15 +262,14 @@ async fn handle_proxy(
   // 11. Calculate and log request cost
   if status.is_success() {
     if let Some(cost_info) = calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body) {
-      // Add to total spent (convert USD to microdollars)
-      let cost_micros = (cost_info.cost_usd * 1_000_000.0) as u64;
-      state.total_spent_micros.fetch_add(cost_micros, Ordering::Relaxed);
+      // Add to total spent (already in microdollars - no conversion needed)
+      state.total_spent_micros.fetch_add(cost_info.cost_micros, Ordering::Relaxed);
 
       tracing::info!(
         model = %cost_info.model,
         input_tokens = cost_info.input_tokens,
         output_tokens = cost_info.output_tokens,
-        cost_usd = %format!("{:.6}", cost_info.cost_usd),
+        cost_usd = %format!("{:.6}", cost_info.cost_usd()),
         "LLM request completed"
       );
     }
@@ -291,9 +290,17 @@ async fn handle_proxy(
 /// Cost calculation result
 struct CostInfo {
   model: String,
-  input_tokens: u32,
-  output_tokens: u32,
-  cost_usd: f64,
+  input_tokens: u64,
+  output_tokens: u64,
+  /// Cost in microdollars (1 USD = 1,000,000 microdollars)
+  cost_micros: u64,
+}
+
+impl CostInfo {
+  /// Returns cost in USD (for logging/display)
+  fn cost_usd(&self) -> f64 {
+    self.cost_micros as f64 / 1_000_000.0
+  }
 }
 
 /// Calculate request cost from request and response bodies
@@ -314,21 +321,21 @@ fn calculate_request_cost(
   let input_tokens = usage
       .get("prompt_tokens")
       .or_else(|| usage.get("input_tokens"))
-      .and_then(|v| v.as_u64())? as u32;
+      .and_then(|v| v.as_u64())?;
 
   let output_tokens = usage
       .get("completion_tokens")
       .or_else(|| usage.get("output_tokens"))
-      .and_then(|v| v.as_u64())? as u32;
+      .and_then(|v| v.as_u64())?;
 
-  // Get pricing and calculate cost
+  // Get pricing and calculate cost in microdollars (integer arithmetic)
   let pricing = pricing_manager.get(model)?;
-  let cost_usd = pricing.calculate_cost(input_tokens, output_tokens);
+  let cost_micros = pricing.calculate_cost_micros(input_tokens, output_tokens);
 
   Some(CostInfo {
     model: model.to_string(),
     input_tokens,
     output_tokens,
-    cost_usd,
+    cost_micros,
   })
 }

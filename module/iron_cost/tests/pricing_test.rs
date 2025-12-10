@@ -279,6 +279,40 @@ fn calculate_cost_mixed() {
 }
 
 // =============================================================================
+// Model::calculate_cost_micros tests (new integer API)
+// =============================================================================
+
+#[test]
+fn calculate_cost_micros_returns_integer() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.002
+        }
+    }"#;
+
+    manager.load_from_file(json).expect("should parse");
+    let model = manager.get("test-model").expect("should exist");
+
+    // 1000 * 0.001 + 500 * 0.002 = $2.0 = 2,000,000 micros
+    assert_eq!(model.calculate_cost_micros(1000, 500), 2_000_000);
+}
+
+#[test]
+fn calculate_cost_micros_precision() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let model = manager.get("gpt-5.1").expect("gpt-5.1 should exist");
+
+    // Test with values that would cause floating-point errors
+    // 1000 input * $0.00000125 + 500 output * $0.00001 = $0.00125 + $0.005 = $0.00625
+    // = 6250 micros
+    assert_eq!(model.calculate_cost_micros(1000, 500), 6250);
+}
+
+// =============================================================================
 // Model::calculate_max_cost tests
 // =============================================================================
 
@@ -445,4 +479,26 @@ fn real_model_gpt51_calculate_max_cost() {
     // Without request_max_output (uses model max 128000):
     // 0 input + 128000 * 1e-05 = 1.28
     assert_eq!(model.calculate_max_cost(0, None), 1.28);
+}
+
+// =============================================================================
+// Microdollar conversion tests
+// =============================================================================
+
+#[test]
+fn converter_usd_to_micros() {
+    use iron_cost::converter::usd_to_micros;
+
+    assert_eq!(usd_to_micros(1.0), 1_000_000);
+    assert_eq!(usd_to_micros(0.5), 500_000);
+    assert_eq!(usd_to_micros(0.000001), 1);
+}
+
+#[test]
+fn converter_micros_to_usd() {
+    use iron_cost::converter::micros_to_usd;
+
+    assert_eq!(micros_to_usd(1_000_000), 1.0);
+    assert_eq!(micros_to_usd(500_000), 0.5);
+    assert_eq!(micros_to_usd(1), 0.000001);
 }
