@@ -56,7 +56,7 @@ pip install maturin
 maturin develop
 
 # Verify installation
-python -c "from iron_runtime import LlmRouter; print('OK')"
+python -c "from iron_cage import LlmRouter; print('OK')"
 ```
 
 **Build Wheel:**
@@ -67,7 +67,7 @@ maturin build --release
 
 # Wheel will be in target/wheels/
 ls target/wheels/
-# iron_runtime-0.1.0-cp38-abi3-*.whl
+# iron_cage-0.1.0-cp38-abi3-*.whl
 ```
 
 **Install Dependencies for Testing:**
@@ -87,7 +87,7 @@ iron_runtime = { path = "../iron_runtime" }
 
 ```python
 import os
-from iron_runtime import LlmRouter
+from iron_cage import LlmRouter
 from openai import OpenAI
 
 # Set environment variables
@@ -114,7 +114,7 @@ router.stop()
 **With Anthropic:**
 
 ```python
-from iron_runtime import LlmRouter
+from iron_cage import LlmRouter
 from anthropic import Anthropic
 
 router = LlmRouter(api_key=ic_token, server_url=ic_server)

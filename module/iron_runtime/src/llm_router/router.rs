@@ -17,7 +17,7 @@ use crate::llm_router::proxy::{run_proxy, ProxyConfig};
 /// # Example
 ///
 /// ```python
-/// from iron_runtime import LlmRouter
+/// from iron_cage import LlmRouter
 /// from openai import OpenAI
 ///
 /// router = LlmRouter(
