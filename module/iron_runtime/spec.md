@@ -65,6 +65,8 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
   - Forwards requests to provider with real API key
   - Validates provider/model mismatch with clear error messages
   - Supports both OpenAI (`Authorization: Bearer`) and Anthropic (`x-api-key`) auth headers
+  - Calculates and tracks request costs using iron_cost pricing data
+  - Provides `total_spent()` for cumulative cost tracking (in-memory, per session)
 - **AgentRuntime:** Manages agent lifecycle, coordinates policies
 - **PyO3 Bridge:** Exposes Rust runtime to Python agents
 - **Policy Enforcer:** Applies safety/cost/reliability rules
@@ -91,6 +93,9 @@ router.is_running # bool
 # Use with any OpenAI-compatible client
 client = OpenAI(base_url=router.base_url, api_key=router.api_key)
 response = client.chat.completions.create(...)
+
+# Cost tracking (debug)
+print(f"Total spent: ${router.total_spent():.6f}")
 
 # Context manager support
 with LlmRouter(api_key=token, server_url=url) as router:

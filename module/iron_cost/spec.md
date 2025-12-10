@@ -61,7 +61,7 @@ Budget tracking and enforcement for LLM usage. Provides pricing data for multipl
 ## Integration Points
 
 **Used by:**
-- iron_runtime - Cost calculation for LLM requests
+- iron_runtime/LlmRouter - Calculates per-request costs, tracks total_spent()
 - iron_control_api - Cost reporting endpoints
 
 **Uses:**
