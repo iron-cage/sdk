@@ -82,7 +82,7 @@ pip install iron-sdk[examples,all]
 
 **Requirements:**
 - Python 3.8+
-- iron-sdk >=0.1.0 (automatically installed)
+- Iron SDK (installed via commands above)
 
 ---
 

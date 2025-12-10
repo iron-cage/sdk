@@ -36,7 +36,7 @@ Use PyO3 FFI for Rust-Python boundary:
 - <0.1ms overhead for library mode (<1ms for router mode)
 - No network dependency (in-process calls)
 - Type safety across boundary (Rust types in Python)
-- Single `pip install iron-cage` deployment
+- Single `pip install iron-sdk` deployment
 - Enables both router and library modes
 - Data stays on developer platform (competitive advantage)
 - Control Panel communication via HTTPS (budget protocol)

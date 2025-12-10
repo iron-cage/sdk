@@ -217,7 +217,7 @@
   - AutoGPT examples (2+ patterns: goals, constraints)
   - Raw API examples (OpenAI, Anthropic, multi-provider)
   - Pattern examples (cost optimization, PII handling, circuit breakers)
-- **Acceptance Criteria:** All examples run successfully with iron-cage[all] installed
+- **Acceptance Criteria:** All examples run successfully with iron-sdk[all] installed
 - **Demo Usage:** Reference examples during Q&A session
 
 ---
@@ -1711,12 +1711,12 @@ Cloud: Control Panel (https://api.example.com)
 
 Developer Machines (Local Agent Runtime)
 ├── Machine 1: Alice
-│   ├── iron_runtime (PyPI package: iron-cage)
+│   ├── iron_sdk (PyPI: iron-sdk → auto-installs iron-cage → contains iron_runtime)
 │   ├── iron_runtime_state (local SQLite: alice_state.db)
 │   └── Optional telemetry → HTTPS POST to Control Panel
 │
 ├── Machine 2: Bob
-│   ├── iron_runtime (PyPI package: iron-cage)
+│   ├── iron_sdk (PyPI: iron-sdk → auto-installs iron-cage → contains iron_runtime)
 │   ├── iron_runtime_state (local SQLite: bob_state.db)
 │   └── Optional telemetry → HTTPS POST to Control Panel
 ```

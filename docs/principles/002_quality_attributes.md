@@ -61,7 +61,7 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 
 | Aspect | Target | Example |
 |--------|--------|---------|
-| **Installation** | Single command | `pip install iron-cage` |
+| **Installation** | Single command | `pip install iron-sdk` |
 | **Configuration** | Zero config defaults | Works with IC Token only |
 | **API Style** | Pythonic | `@protect_agent` decorator |
 | **Error Messages** | Actionable | "Budget exceeded: $10.50 of $10.00 spent" |

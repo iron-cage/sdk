@@ -35,10 +35,13 @@ Pythonic SDK layer for Iron Cage agent protection. Provides @protect_agent decor
 ## Dependencies
 
 **Required Modules:**
-- iron-cage - PyPI package containing iron_runtime
+- iron-cage - PyPI package containing iron_runtime (Rust runtime binary, automatically installed as pip dependency - users never interact with it directly)
 
 **Required External:**
 - Python 3.8+
+
+**Installation:**
+Users install ONLY `iron-sdk` - the `iron-cage` dependency is automatically installed by pip.
 
 **Optional:**
 - langchain - LangChain integration

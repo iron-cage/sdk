@@ -35,9 +35,21 @@ Understand what ships together and how to deploy each component.
 ## Key Principle
 
 - **Control Panel** = REQUIRED for all deployments (admin service, always standalone)
-- **Agent Runtime** = single `pip install iron-sdk` for all protection features (uses Library mode - runtime embedded via PyO3)
+- **Agent Runtime** = single `pip install iron-sdk` for all protection features
+  - Developers install ONLY `iron-sdk` (user-facing Python package)
+  - The `iron-cage` package (Rust runtime binary) is automatically installed as a dependency
+  - Uses Library mode: runtime embedded via PyO3 (in-process, <0.1ms overhead)
 - **Sandbox** = optional, security-focused teams only
 - **CLI Tools** = binary + Python wrapper, installed together
+
+**Package Hierarchy (Agent Runtime):**
+```
+Developer installs → iron-sdk (PyPI package with decorators, configs)
+    └─ Automatically installs → iron-cage (PyPI wheel with Rust binary)
+        └─ Contains → iron_runtime (Rust crate, internal implementation)
+```
+
+**Key insight:** Developers interact with `iron-sdk` ONLY - never need to know about `iron-cage` or `iron_runtime`.
 
 **Deployment Mode:**
 - **Pilot:** Library mode (runtime embedded in SDK, single process, PyO3)

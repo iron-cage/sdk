@@ -60,7 +60,20 @@ pip install iron-sdk
 
 **Requirements:**
 - Python 3.8+
-- iron-cage >=0.1.0 (automatically installed)
+
+**About Dependencies:**
+
+The `iron-cage` package (containing the Rust runtime) is automatically installed as a dependency - you never need to install or interact with it directly.
+
+**Package Hierarchy:**
+```
+What you install:  pip install iron-sdk
+What you import:   from iron_sdk import protect_agent
+Automatic (internal): iron-cage (Rust runtime, auto-installed)
+Internal (never seen): iron_runtime (Rust crate)
+```
+
+**TL;DR:** Just `pip install iron-sdk` - everything else is automatic.
 
 **Optional dependencies:**
 ```bash

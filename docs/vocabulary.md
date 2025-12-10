@@ -116,7 +116,7 @@
 |------|------------|
 | **Package 1: Control Panel** | Docker image with iron_control_api + iron_dashboard |
 | **Package 2: Marketing Site** | Static website (ironcage.ai) |
-| **Package 3: Agent Runtime** | PyPI wheel (iron-cage) with SDK and core services |
+| **Package 3: Agent Runtime** | PyPI package (iron-sdk - user installs) with Python SDK; automatically includes iron-cage (PyPI wheel with Rust runtime binary, internal dependency) |
 | **Package 4: Sandbox** | PyPI wheel (iron-sandbox) with OS isolation |
 | **Package 5: CLI Tools** | Binary (iron_cli) + PyPI wrapper (iron-cli-py) |
 

@@ -67,6 +67,10 @@ Frontend:       iron_dashboard
 - **[Constraints](docs/constraints/)** (4) - Technical, business, scope, trade-offs
 - **[Decisions](docs/decisions/)** (7) - ADRs (Architecture Decision Records)
 
+**Quick Links:**
+- **[Getting Started](docs/getting_started.md)** - Choose your path: Python Developer, Control Panel Admin, or Platform Contributor
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributor workflow guide
+
 **Key Documentation:**
 - **[Budget Control Protocol](docs/architecture/006_budget_control_protocol.md)** - Two-token system (IC Token, IP Token), budget borrowing, incremental allocation
 - **[Execution Models](docs/architecture/001_execution_models.md)** - Client-Side, Server-Side, Control Panel-Managed
@@ -74,11 +78,55 @@ Frontend:       iron_dashboard
 - **[Protocol Collection](docs/protocol/readme.md)** - Communication protocols
 - **[Vocabulary](docs/vocabulary.md)** - Canonical terminology
 
-**Start Here:** [docs/readme.md](docs/readme.md) - Complete documentation index
+**Complete Index:** [docs/readme.md](docs/readme.md) - All documentation organized by category
 
 ---
 
-## Building
+## Installation & Usage
+
+### For Python Developers (Using Iron SDK)
+
+**99% of users - you just want to protect your AI agents:**
+
+**Prerequisites:**
+- Python 3.8+ (`python --version`)
+- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+
+```bash
+uv pip install iron-sdk
+```
+
+That's it! No Rust compiler, no cargo, no building required.
+
+**Quick Start:**
+```python
+from iron_sdk import protect_agent, BudgetConfig
+
+@protect_agent(budget=BudgetConfig(max_usd=50.0))
+def my_agent(prompt: str) -> str:
+    return llm.chat(prompt)
+```
+
+**Next Steps:**
+- [Getting Started Guide](docs/getting_started.md) - Complete walkthrough for all users
+- [SDK Documentation](module/iron_sdk/readme.md) - Full API reference
+- [Examples](module/iron_sdk/examples/) - Runnable code examples
+
+### For Control Panel Admins
+
+**Deploying the Control Panel service for your team:**
+
+```bash
+# Run Control Panel (manages budgets, users, API keys)
+docker run -p 3000:3000 ironcage/control-panel:latest
+```
+
+See [`pilot/readme.md`](pilot/readme.md) for deployment guide.
+
+### For Platform Contributors
+
+<details>
+<summary>Building from source (click to expand - only needed for contributing to Iron Cage itself)</summary>
 
 ```bash
 # Build all Rust modules
@@ -92,10 +140,13 @@ cd module/iron_dashboard
 npm install
 npm run build
 
-# Install Python SDK
+# Install Python SDK in development mode
 cd module/iron_sdk
-pip install -e .
+uv pip install -e .
 ```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for contributor workflow.
+</details>
 
 ## Status
 

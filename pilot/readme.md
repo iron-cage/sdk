@@ -51,12 +51,32 @@ Minimal viable platform for conference demonstrations and early customer pilots.
 
 ## Quick Start
 
-### Prerequisites
+### For End Users (SDK Demo - Recommended)
+
+**Most users should start here - no build required:**
+
+```bash
+# Install SDK
+pip install iron-sdk
+
+# Run protected agent
+python examples/basic_agent.py
+```
+
+**Prerequisites:**
+- Python 3.8+ (`python --version`)
+
+See [`../module/iron_sdk/readme.md`](../module/iron_sdk/readme.md) for complete SDK documentation.
+
+### For Platform Contributors (Build from Source)
+
+<details>
+<summary>Building Rust runtime from source (click to expand - only needed for contributing to Iron Cage)</summary>
+
+**Prerequisites:**
 - Rust 1.75+ (`rustup update`)
 - Python 3.11+ (`python --version`)
 - Node.js 18+ (`node --version`)
-
-### Build & Run Demo (5 minutes)
 
 ```bash
 cd /home/user1/pro/lib/willbe/module/iron_cage
@@ -74,11 +94,14 @@ uv pip install -r requirements.txt
 ../../../runtime/target/release/iron_cage_runtime lead_gen_agent.py --budget 50
 
 # 4. Open control panel (separate terminal)
-cd ../control panel
+cd ../control_panel
 npm install
 npm start
 # Open http://localhost:3000
 ```
+
+See [`../runtime/PILOT_GUIDE.md`](../runtime/PILOT_GUIDE.md) for detailed build instructions.
+</details>
 
 ---
 

@@ -1,6 +1,11 @@
 # iron_runtime
 
+**Audience:** Platform contributors developing the iron_runtime Rust crate
+**End Users:** See [iron_sdk documentation](../iron_sdk/readme.md) - just `pip install iron-sdk`
+
 Agent orchestration and Python bridge for AI agent execution. Provides **LlmRouter** - a local proxy server for transparent LLM API key management with OpenAI and Anthropic support.
+
+**Package Flow:** This Rust crate → builds to iron-cage PyPI wheel → auto-installed by iron-sdk
 
 ### Scope
 
