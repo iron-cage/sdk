@@ -27,7 +27,7 @@ All modules are located in the `module/` directory.
 | **iron_safety** | PII detection and redaction | Rust |
 | **iron_reliability** | Circuit breaker, retry patterns, fault tolerance | Rust |
 | **iron_secrets** | Encrypted secrets storage, access control | Rust |
-| **iron_token_manager** | API token generation, JWT auth, rate limiting | Rust |
+| **iron_token_manager** | User management, API token generation, JWT auth, rate limiting | Rust |
 | **iron_control_api** | REST API server, WebSocket endpoints | Rust |
 | **iron_runtime** | Agent orchestration, PyO3 Python bridge | Rust |
 | **iron_cli** | Command-line interface for API operations (authoritative) | Rust |
@@ -56,13 +56,13 @@ Frontend:       iron_dashboard
 
 **Collections:**
 - **[Architecture](docs/architecture/)** (6) - Execution models, layers, boundaries, data flow, integration, **budget control protocol**
-- **[Protocol](docs/protocol/)** (4) - IronLang data, REST API, WebSocket, MCP integration
+- **[Protocol](docs/protocol/)** (8) - REST API, WebSocket, MCP integration, budget control, token management, authentication, user management
 - **[Security](docs/security/)** (4) - Threat model, isolation, credential flow, audit
 - **[Capabilities](docs/capabilities/)** (8) - Runtime, LLM control, sandbox, safety, credentials, MCP, observability, data
 - **[Integration](docs/integration/)** (4) - LLM providers, secrets, identity, observability
 - **[Deployment](docs/deployment/)** (5) - Packages, actors, distribution, scaling
 - **[Technology](docs/technology/)** (4) - Rust, PyO3, infrastructure, dependencies
-- **[Features](docs/features/)** (6) - CLI architecture, token management
+- **[Features](docs/features/)** (6) - CLI architecture, token management, user management
 - **[Principles](docs/principles/)** (5) - Design, quality, errors, testing, workflow
 - **[Constraints](docs/constraints/)** (4) - Technical, business, scope, trade-offs
 - **[Decisions](docs/decisions/)** (7) - ADRs (Architecture Decision Records)

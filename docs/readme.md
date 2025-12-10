@@ -50,8 +50,8 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **[security/](security/)** | 4 (001-004) | Security model concepts (threat model, isolation, credential flow, audit) |
 | **[integration/](integration/)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
 | **[technology/](technology/)** | 4 (001-004) | Technology choices (Rust, PyO3, infrastructure, dependencies) |
-| **[protocol/](protocol/)** | 4 (002-005) | Communication protocols (REST API, WebSocket, MCP, budget control) |
-| **[features/](features/)** | 5 (001-005) | Feature documentation (CLI architecture, token management suite) |
+| **[protocol/](protocol/)** | 8 (002-008) | Communication protocols (REST API, WebSocket, MCP, budget control, token management, authentication, user management) |
+| **[features/](features/)** | 6 (001-006) | Feature documentation (CLI architecture, token management, user management) |
 | **[decisions/](decisions/)** | 6 (adr_002-007) | Architecture Decision Records (ADR format) |
 
 ### Reference Documents
@@ -83,6 +83,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **token_management_api_reference.md** | Token API reference |
 | **token_management_cli_api_parity.md** | CLI/API parity matrix |
 | **token_management_implementation_plan.md** | Implementation roadmap |
+| **user_management.md** | User management feature (lifecycle, RBAC, audit logging, admin operations) |
 
 ---
 
@@ -177,7 +178,7 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 | docs/technology/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/integration/ | 4 | ✅ Compliant | ✅ Unique |
 | docs/architecture/ | 6 | ✅ Compliant | ✅ Unique |
-| docs/protocol/ | 4 | ✅ Compliant | ✅ Unique |
+| docs/protocol/ | 8 | ✅ Compliant | ✅ Unique |
 | docs/decisions/ | 7 | ✅ Compliant | ✅ Unique |
 | docs/capabilities/ | 8 | ✅ Compliant | ✅ Unique |
 | docs/deployment/ | 5 | ✅ Compliant | ✅ Unique |

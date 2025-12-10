@@ -73,11 +73,17 @@ RESTful HTTP API organized by resource type:
 
 **Complete Resource Inventory:** See [architecture/009_resource_catalog.md](../architecture/009_resource_catalog.md)
 
-**Resource-Specific Protocols (Certain Resources Only):**
-- [006_token_management_api.md](006_token_management_api.md) - IC Token CRUD (✅ Certain)
-- [007_authentication_api.md](007_authentication_api.md) - User authentication (✅ Certain)
-
-**Note:** Uncertain resources (projects, providers, analytics, API tokens, limits, settings) are documented separately and not included in permanent protocol index.
+**Resource-Specific Protocols:**
+- [006_token_management_api.md](006_token_management_api.md) - IC Token CRUD (✅ Certain, Pilot)
+- [007_authentication_api.md](007_authentication_api.md) - User authentication (✅ Certain, Pilot)
+- [008_user_management_api.md](008_user_management_api.md) - User management (✅ Certain, Pilot)
+- [010_agents_api.md](010_agents_api.md) - Agent management (✅ MUST-HAVE)
+- [011_providers_api.md](011_providers_api.md) - Provider management (✅ MUST-HAVE)
+- [012_analytics_api.md](012_analytics_api.md) - Usage and spending analytics (✅ MUST-HAVE)
+- [013_budget_limits_api.md](013_budget_limits_api.md) - Budget modification (✅ NICE-TO-HAVE)
+- [014_api_tokens_api.md](014_api_tokens_api.md) - API token management (✅ NICE-TO-HAVE)
+- [015_projects_api.md](015_projects_api.md) - Project access (✅ NICE-TO-HAVE, Pilot: read-only)
+- [016_settings_api.md](016_settings_api.md) - Settings management (📋 POST-PILOT)
 
 ---
 
@@ -87,23 +93,27 @@ RESTful HTTP API organized by resource type:
 |-------------------|-----------|-------------------|--------|-------|
 | **Entity Resources** | | | | |
 | IC Tokens | `/api/tokens/*` | [006_token_management_api.md](006_token_management_api.md) | ✅ Certain | Yes |
-| Projects | `/api/projects/*` | (deferred) | ⚠️ Uncertain | No |
-| Providers | `/api/providers/*` | (deferred) | ⚠️ Uncertain | No |
+| Agents | `/api/agents/*` | [010_agents_api.md](010_agents_api.md) | ✅ MUST-HAVE | Yes |
+| Providers | `/api/providers/*` | [011_providers_api.md](011_providers_api.md) | ✅ MUST-HAVE | Yes |
+| Projects | `/api/projects/*` | [015_projects_api.md](015_projects_api.md) | ✅ NICE-TO-HAVE | Yes (read-only) |
 | **Operation Resources** | | | | |
 | Authentication | `/api/auth/*` | [007_authentication_api.md](007_authentication_api.md) | ✅ Certain | Yes |
+| User Management | `/api/users/*` | [008_user_management_api.md](008_user_management_api.md) | ✅ Certain | Yes |
 | Budget Protocol | `/api/budget/*` | [005_budget_control_protocol.md](005_budget_control_protocol.md) | ✅ Certain | Yes |
-| API Tokens | `/api/api-tokens/*` | (deferred) | ⚠️ Uncertain | TBD |
+| API Tokens | `/api/api-tokens/*` | [014_api_tokens_api.md](014_api_tokens_api.md) | ✅ MUST-HAVE | Yes |
 | **Analytics Resources** | | | | |
-| Analytics | `/api/analytics/*` | (deferred) | ⚠️ Uncertain | No |
+| Analytics | `/api/analytics/*` | [012_analytics_api.md](012_analytics_api.md) | ✅ MUST-HAVE | Yes |
 | **Configuration Resources** | | | | |
-| Budget Limits | `/api/limits/*` | (deferred) | ⚠️ Uncertain | No |
-| System Settings | `/api/settings/*` | (deferred) | ⚠️ Uncertain | No |
+| Budget Limits | `/api/limits/*` | [013_budget_limits_api.md](013_budget_limits_api.md) | ✅ MUST-HAVE | Yes |
+| System Settings | `/api/settings/*` | [016_settings_api.md](016_settings_api.md) | 📋 POST-PILOT | No |
 | **System Resources** | | | | |
 | Health & Version | `/api/health`, `/api/version` | [002_rest_api_protocol.md](#system-resources) | ✅ Certain | Yes |
 
 **Legend:**
 - ✅ **Certain:** Required for Pilot, specification complete
-- ⚠️ **Uncertain:** Post-Pilot or design pending, specifications not yet finalized
+- ✅ **MUST-HAVE:** Critical for production operation, specification complete
+- ✅ **NICE-TO-HAVE:** Enhances user experience, specification complete
+- 📋 **POST-PILOT:** Future implementation, specification prepared
 
 ---
 
@@ -672,11 +682,17 @@ Response:
 **Resource Organization:**
 - [architecture/009: Resource Catalog](../architecture/009_resource_catalog.md) - Complete resource inventory and entity mapping
 
-**Resource-Specific Protocols (Certain Resources Only):**
-- [006: Token Management API](006_token_management_api.md) - IC Token CRUD endpoints (✅ Certain)
-- [007: Authentication API](007_authentication_api.md) - User login/logout endpoints (✅ Certain)
-
-**Note:** Uncertain resources (analytics, API tokens, limits, projects, providers, settings) have deferred specifications.
+**Resource-Specific Protocols:**
+- [006: Token Management API](006_token_management_api.md) - IC Token CRUD endpoints (✅ Certain, Pilot)
+- [007: Authentication API](007_authentication_api.md) - User login/logout endpoints (✅ Certain, Pilot)
+- [008: User Management API](008_user_management_api.md) - User management endpoints (✅ Certain, Pilot)
+- [010: Agents API](010_agents_api.md) - Agent management endpoints (✅ MUST-HAVE)
+- [011: Providers API](011_providers_api.md) - Provider management endpoints (✅ MUST-HAVE)
+- [012: Analytics API](012_analytics_api.md) - Usage and spending analytics endpoints (✅ MUST-HAVE)
+- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification endpoints (✅ NICE-TO-HAVE)
+- [014: API Tokens API](014_api_tokens_api.md) - API token management endpoints (✅ NICE-TO-HAVE)
+- [015: Projects API](015_projects_api.md) - Project access endpoints (✅ NICE-TO-HAVE)
+- [016: Settings API](016_settings_api.md) - Settings management endpoints (📋 POST-PILOT)
 
 **Dependencies:**
 - [protocol/005: Budget Control Protocol](005_budget_control_protocol.md) - Budget handshake/report/refresh protocol

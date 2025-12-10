@@ -96,15 +96,18 @@ Understand all available REST API resources, how they map to domain entities, an
 |----------|----------------|--------------|-----------|-----------|-------------------|
 | `/api/tokens` | IC Token (1:1) | GET, POST, DELETE, PUT | User Token | ✅ Certain | `iron tokens` |
 | `/api/users` | User (1:1) | GET, POST, PUT, DELETE | User Token (Admin) | ✅ Certain | `iron users` |
-| `/api/api-tokens` | API Token (1:N per user) | GET, POST, DELETE | User Token | ⚠️ Uncertain | `iron api-tokens` |
-| `/api/projects` | Project (1:1) | GET, POST, PUT, DELETE | User Token | ⚠️ Uncertain | `iron projects` |
-| `/api/providers` | IP (1:1) | GET, POST, PUT, DELETE | User Token | ⚠️ Uncertain | `iron providers` |
+| `/api/agents` | Agent (1:1) | GET, POST, PUT | User Token | ✅ MUST-HAVE | `iron agents` |
+| `/api/providers` | IP (1:1) | GET, POST, PUT, DELETE | User Token | ✅ MUST-HAVE | `iron providers` |
+| `/api/projects` | Project (1:1) | GET | User Token | ✅ NICE-TO-HAVE | `iron projects` |
+| `/api/api-tokens` | API Token (1:N per user) | GET, POST, DELETE | User Token | ✅ MUST-HAVE | `iron api-tokens` |
 
 **Notes:**
 - IC Token is certain (required for Pilot)
 - User management is certain (admin functionality, RBAC enforcement with audit logging)
-- API Token uncertain (external integrations, not Pilot-critical)
-- Project and IP management uncertain (design pending)
+- Agents are MUST-HAVE (core entity for agent lifecycle management, specification complete: [010_agents_api.md](../protocol/010_agents_api.md))
+- Providers are MUST-HAVE (AI provider integration, specification complete: [011_providers_api.md](../protocol/011_providers_api.md))
+- Projects are NICE-TO-HAVE (read-only in Pilot, full CRUD post-Pilot, specification complete: [015_projects_api.md](../protocol/015_projects_api.md))
+- API Tokens are MUST-HAVE (dashboard authentication, specification complete: [014_api_tokens_api.md](../protocol/014_api_tokens_api.md))
 
 ### Operation Resources
 
@@ -124,25 +127,33 @@ Understand all available REST API resources, how they map to domain entities, an
 
 | Resource | Data Provided | Source Entities | Auth Type | Certainty | CLI Commands |
 |----------|---------------|-----------------|-----------|-----------|--------------|
-| `/api/analytics` | Usage, cost, and performance metrics | Agent, Project, IP, Budget | User Token | ⚠️ Uncertain | `iron analytics`, `iron usage`, `iron spending` |
+| `/api/analytics/spending/total` | Total spending across agents/providers | Agent, Budget, Provider | User Token | ✅ MUST-HAVE | `iron analytics spending total` |
+| `/api/analytics/spending/by-agent` | Spending breakdown by agent | Agent, Budget | User Token | ✅ MUST-HAVE | `iron analytics spending by-agent` |
+| `/api/analytics/budget/status` | Budget status with risk levels | Agent, Budget | User Token | ✅ MUST-HAVE | `iron analytics budget status` |
+| `/api/analytics/spending/by-provider` | Spending breakdown by provider | Provider, Budget | User Token | ✅ MUST-HAVE | `iron analytics spending by-provider` |
+| `/api/analytics/usage/requests` | Request count statistics | Request logs | User Token | ✅ MUST-HAVE | `iron analytics usage requests` |
+| `/api/analytics/usage/tokens/by-agent` | Token usage by agent | Agent, Request logs | User Token | ✅ MUST-HAVE | `iron analytics usage tokens` |
+| `/api/analytics/usage/models` | Model usage statistics | Request logs | User Token | ✅ MUST-HAVE | `iron analytics usage models` |
+| `/api/analytics/spending/avg-per-request` | Average cost per request | Budget, Request logs | User Token | ✅ MUST-HAVE | `iron analytics spending avg` |
 
 **Notes:**
 - Analytics resources consolidated under single `/api/analytics` namespace
-- Endpoints: `/api/analytics/usage`, `/api/analytics/spending`, `/api/analytics/metrics`
-- All uncertain (not required for Pilot)
-- Design decisions pending: aggregation levels, time ranges, filtering
-- CLI commands may use legacy patterns (`iron usage`, `iron spending`) or consolidated (`iron analytics`)
+- 8 critical use cases specified for budget visibility and cost analysis
+- All MUST-HAVE (specification complete: [012_analytics_api.md](../protocol/012_analytics_api.md))
+- Support filtering by agent_id, provider_id, and time period (today, yesterday, last-7-days, last-30-days, all-time)
+- CLI commands use consistent `iron analytics {category} {subcategory}` pattern
 
 ### Configuration Resources
 
 | Resource | Configuration Managed | Affects | Auth Type | Certainty | CLI Commands |
 |----------|----------------------|---------|-----------|-----------|--------------|
-| `/api/limits` | Agent Budget limits | Agent Budget | User Token (Admin) | ⚠️ Uncertain | `iron limits set` |
-| `/api/settings` | System settings | Control Panel | User Token (Admin) | ⚠️ Uncertain | `iron settings update` |
+| `/api/limits/agents/{agent_id}/budget` | Agent budget modification (increase-only) | Agent Budget | User Token (Owner/Admin) | ✅ MUST-HAVE | `iron limits agent <id> budget` |
+| `/api/settings` | System-wide settings | Control Panel | User Token (Admin) | 📋 POST-PILOT | `iron settings` |
 
 **Notes:**
-- Configuration resources uncertain (admin tooling, not Pilot-critical)
-- Agent Budget limits set during agent creation in Pilot
+- Budget Limits API is MUST-HAVE (emergency budget modification, specification complete: [013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
+- Settings API is POST-PILOT (specification complete for future implementation: [016_settings_api.md](../protocol/016_settings_api.md))
+- Budget modification supports increase-only policy (prevents accidental agent shutdowns)
 
 ### System Resources
 
@@ -314,7 +325,7 @@ Understand all available REST API resources, how they map to domain entities, an
 
 ## Certainty Status
 
-### ✅ Certain Resources (Ready to Implement)
+### ✅ Certain Resources (Pilot Required)
 
 **Criteria:**
 - Required for Pilot launch
@@ -322,68 +333,97 @@ Understand all available REST API resources, how they map to domain entities, an
 - No major design questions
 - Dependencies resolved
 
-**Resources (10 total):**
+**Resources (8 total):**
 
 1. **Entity Resources (2):**
-   - `/api/tokens` - IC Token CRUD
-   - `/api/users` - User account management CRUD
+   - `/api/tokens` - IC Token CRUD ([006_token_management_api.md](../protocol/006_token_management_api.md))
+   - `/api/users` - User account management CRUD ([008_user_management_api.md](../protocol/008_user_management_api.md))
 
 2. **Operation Resources (4):**
-   - `/api/auth` - User authentication
-   - `/api/budget/handshake` - Budget negotiation
-   - `/api/budget/report` - Usage reporting
-   - `/api/budget/refresh` - Budget refresh
+   - `/api/auth` - User authentication ([007_authentication_api.md](../protocol/007_authentication_api.md))
+   - `/api/budget/handshake` - Budget negotiation ([005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md))
+   - `/api/budget/report` - Usage reporting ([005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md))
+   - `/api/budget/refresh` - Budget refresh ([005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md))
 
 3. **System Resources (2):**
-   - `/api/health` - Health check
-   - `/api/version` - API version
+   - `/api/health` - Health check ([002_rest_api_protocol.md](../protocol/002_rest_api_protocol.md))
+   - `/api/version` - API version ([002_rest_api_protocol.md](../protocol/002_rest_api_protocol.md))
 
-4. **Analytics Resources (0):**
-   - (None certain)
-
-5. **Configuration Resources (0):**
-   - (None certain)
-
-### ⚠️ Uncertain Resources (Drafts Only)
+### ✅ MUST-HAVE Resources (Specifications Complete)
 
 **Criteria:**
-- Not critical for Pilot
-- Implementation unclear
-- Design decisions pending
-- Specifications deferred
+- Critical for production operation
+- Full specifications written
+- Ready for implementation
+- All design questions resolved
 
-**Resources (11 total):**
+**Resources (13 total):**
 
-1. **Entity Resources (2):**
-   - `/api/projects` - Project management
-   - `/api/providers` - IP management
+1. **Entity Resources (3):**
+   - `/api/agents` - Agent lifecycle management ([010_agents_api.md](../protocol/010_agents_api.md))
+   - `/api/providers` - Provider integration ([011_providers_api.md](../protocol/011_providers_api.md))
+   - `/api/api-tokens` - API token management ([014_api_tokens_api.md](../protocol/014_api_tokens_api.md))
 
-2. **Operation Resources (0):**
-   - (All operations certain)
+2. **Analytics Resources (8):**
+   - `/api/analytics/spending/total` - Total spending ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/spending/by-agent` - Agent spending breakdown ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/budget/status` - Budget risk monitoring ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/spending/by-provider` - Provider spending breakdown ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/usage/requests` - Request statistics ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/usage/tokens/by-agent` - Token usage by agent ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/usage/models` - Model usage statistics ([012_analytics_api.md](../protocol/012_analytics_api.md))
+   - `/api/analytics/spending/avg-per-request` - Average cost per request ([012_analytics_api.md](../protocol/012_analytics_api.md))
 
-3. **Analytics Resources (3):**
-   - `/api/usage` - Usage metrics
-   - `/api/spending` - Cost analysis
-   - `/api/metrics` - Performance metrics
+3. **Configuration Resources (1):**
+   - `/api/limits/agents/{id}/budget` - Emergency budget modification ([013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
 
-4. **Configuration Resources (2):**
-   - `/api/limits` - Budget limits config
-   - `/api/settings` - System settings
+### ✅ NICE-TO-HAVE Resources (Specifications Complete)
 
-**Note:** Uncertain resources have deferred specifications pending design decisions and Pilot feedback.
+**Criteria:**
+- Enhances user experience
+- Full specifications written
+- Can be prioritized for implementation
+- All design questions resolved
+
+**Resources (1 total):**
+
+1. **Entity Resources (1):**
+   - `/api/projects` - Project access (read-only in Pilot) ([015_projects_api.md](../protocol/015_projects_api.md))
+
+### 📋 POST-PILOT Resources (Specifications Prepared)
+
+**Criteria:**
+- Future implementation
+- Full specifications written for completeness
+- Design documented for reference
+- Implementation deferred (cost-benefit analysis: 48:1 ratio)
+
+**Resources (1 total):**
+
+1. **Configuration Resources (1):**
+   - `/api/settings` - System-wide settings management ([016_settings_api.md](../protocol/016_settings_api.md))
+
+**Implementation Status Summary:**
+- ✅ **Certain (Pilot):** 8 resources - Ready for Pilot launch
+- ✅ **MUST-HAVE:** 12 resources - Specifications complete, critical for production
+- ✅ **NICE-TO-HAVE:** 1 resource - Specifications complete, enhances user experience
+- 📋 **POST-PILOT:** 1 resource - Specifications prepared, implementation deferred
+
+**Total:** 22 resources with complete specifications across all priority levels.
 
 ### ❌ Missing Resources (Intentionally Not Exposed)
 
 **Entities Without Direct API:**
 
-1. **Agent** - Created via agent registration, not direct CRUD
-2. **Master Project** - Admin view only, no separate API
-3. **User Token** - Managed via authentication lifecycle, not CRUD
-4. **IP Token** - Vault-managed, never exposed via API
+1. **User Token** - Managed via authentication lifecycle (`/api/auth`), not direct CRUD
+2. **IP Token** - Vault-managed, never exposed via API (obtained via `/api/budget/handshake`)
 
-**Reason:** These entities managed indirectly or through specialized operations.
+**Reason:** These entities are managed indirectly through specialized operations for security and lifecycle control.
 
-**Note:** User entity now has direct CRUD API at `/api/users` (admin-only access with RBAC).
+**Note:** Previously missing entities now have direct APIs:
+- **Agent** - Now has direct CRUD API at `/api/agents` (MUST-HAVE, [010_agents_api.md](../protocol/010_agents_api.md))
+- **User** - Now has direct CRUD API at `/api/users` (Certain, admin-only access with RBAC, [008_user_management_api.md](../protocol/008_user_management_api.md))
+- **Master Project** - Now has read-only API at `/api/projects` (NICE-TO-HAVE, returns single Master Project in Pilot, [015_projects_api.md](../protocol/015_projects_api.md))
 
 ## Transition Criteria
 
@@ -406,4 +446,4 @@ Understand all available REST API resources, how they map to domain entities, an
 
 *Related: [007_entity_model.md](007_entity_model.md) (entities) | [../protocol/002_rest_api_protocol.md](../protocol/002_rest_api_protocol.md) (API protocol) | [../protocol/005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md) (budget protocol)*
 
-**Last Updated:** 2025-12-09
+**Last Updated:** 2025-12-10

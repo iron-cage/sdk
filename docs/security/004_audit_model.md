@@ -20,6 +20,69 @@ Prove compliance, debug incidents, attribute actions to agents.
 | Tool Invocation | Tool name, parameters, result, duration | 90 days |
 | Credential Access | Secret name, agent ID, timestamp | 1 year |
 | Safety Violation | Input/output, violation type, action taken | 1 year |
+| **User Management** | Action, user_id, admin_id, old_value, new_value, reason, timestamp | **Permanent** |
+
+### User Management Audit Log
+
+All administrative user operations are logged to an **append-only** `user_audit_log` table:
+
+**Logged Actions:**
+- User creation (captures initial role, email)
+- User suspension/activation (captures reason if provided)
+- User deletion (soft delete, captures deleted_by admin)
+- Role changes (captures old_role → new_role)
+- Password resets (captures force_change flag)
+
+**Log Structure:**
+```sql
+CREATE TABLE user_audit_log
+(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  admin_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  action TEXT NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  reason TEXT,
+  created_at INTEGER NOT NULL
+);
+```
+
+**Immutability Guarantee:**
+- Foreign key constraints with `ON DELETE RESTRICT` prevent audit log deletion
+- User accounts cannot be deleted if they appear in audit log (as user or admin)
+- Soft delete pattern preserves user records indefinitely
+- Append-only design (no UPDATE or DELETE operations on audit log)
+
+**Example Audit Entries:**
+```json
+{
+  "action": "user_created",
+  "user_id": 1001,
+  "admin_id": 1,
+  "new_value": "role=user,email=john@example.com",
+  "created_at": 1702345678
+}
+
+{
+  "action": "user_suspended",
+  "user_id": 1001,
+  "admin_id": 1,
+  "old_value": "is_active=true",
+  "new_value": "is_active=false",
+  "reason": "Violates acceptable use policy",
+  "created_at": 1702456789
+}
+
+{
+  "action": "role_changed",
+  "user_id": 1001,
+  "admin_id": 1,
+  "old_value": "user",
+  "new_value": "admin",
+  "created_at": 1702567890
+}
+```
 
 ## Log Structure
 
