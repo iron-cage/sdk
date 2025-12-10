@@ -15,10 +15,13 @@ use arc_swap::ArcSwap;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+use crate::converter::{
+    micros_to_usd, usd_per_token_to_micros_per_mtok, micros_per_mtok_to_usd_per_token,
+    TOKENS_PER_MILLION,
+};
+
 const PRICING_JSON: &str = include_str!("../asset/pricing.json");
 const MAX_OUTPUT_TOKENS: u64 = 128000;
-const MICROS_PER_USD: u64 = 1_000_000;
-const TOKENS_PER_MILLION: u64 = 1_000_000;
 
 /// Manages LLM model pricing data with thread-safe concurrent access.
 ///
@@ -198,67 +201,5 @@ impl PricingManager {
     /// Returns pricing for the specified model, if available.
     pub fn get(&self, model_id: &str) -> Option<Model> {
         self.pricing.load().get(model_id).cloned()
-    }
-}
-
-// =============================================================================
-// Conversion functions
-// =============================================================================
-
-/// Convert USD per token (f64) to microdollars per million tokens (u64)
-///
-/// Example: $0.00000125/token = $1.25/M tokens = 1,250,000 micros/M tokens
-fn usd_per_token_to_micros_per_mtok(usd_per_token: f64) -> u64 {
-    // USD/token * 1M tokens/M * 1M micros/USD = micros/M
-    let micros = usd_per_token * (TOKENS_PER_MILLION as f64) * (MICROS_PER_USD as f64);
-    micros.round().max(0.0) as u64
-}
-
-/// Convert microdollars per million tokens (u64) to USD per token (f64)
-fn micros_per_mtok_to_usd_per_token(micros_per_mtok: u64) -> f64 {
-    (micros_per_mtok as f64) / (TOKENS_PER_MILLION as f64) / (MICROS_PER_USD as f64)
-}
-
-/// Convert microdollars to USD
-pub fn micros_to_usd(micros: u64) -> f64 {
-    micros as f64 / MICROS_PER_USD as f64
-}
-
-/// Convert USD to microdollars
-pub fn usd_to_micros(usd: f64) -> u64 {
-    (usd * MICROS_PER_USD as f64).round().max(0.0) as u64
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_usd_per_token_to_micros_per_mtok() {
-        // $0.00000125/token = $1.25/M = 1,250,000 micros/M
-        assert_eq!(usd_per_token_to_micros_per_mtok(0.00000125), 1_250_000);
-
-        // $0.00001/token = $10/M = 10,000,000 micros/M
-        assert_eq!(usd_per_token_to_micros_per_mtok(0.00001), 10_000_000);
-
-        // $0.001/token = $1000/M = 1,000,000,000 micros/M
-        assert_eq!(usd_per_token_to_micros_per_mtok(0.001), 1_000_000_000);
-    }
-
-    #[test]
-    fn test_micros_per_mtok_to_usd_per_token() {
-        // 1,250,000 micros/M = $1.25/M = $0.00000125/token
-        assert_eq!(micros_per_mtok_to_usd_per_token(1_250_000), 0.00000125);
-
-        // 10,000,000 micros/M = $10/M = $0.00001/token
-        assert_eq!(micros_per_mtok_to_usd_per_token(10_000_000), 0.00001);
-    }
-
-    #[test]
-    fn test_roundtrip_conversion() {
-        let original = 0.00000125;
-        let micros = usd_per_token_to_micros_per_mtok(original);
-        let back = micros_per_mtok_to_usd_per_token(micros);
-        assert_eq!(original, back);
     }
 }
