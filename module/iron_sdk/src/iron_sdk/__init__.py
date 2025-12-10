@@ -6,4 +6,7 @@ for protecting AI agents with budget tracking, PII detection, and reliability pa
 
 __version__ = "0.1.0"
 
-# Placeholder - implementation to be added in future phases
+# Re-export from iron_runtime
+from iron_runtime import LlmRouter, Runtime
+
+__all__ = ["LlmRouter", "Runtime"]

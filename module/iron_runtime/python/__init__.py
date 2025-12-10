@@ -1,10 +1,10 @@
 """
-Iron Runtime - Python bindings for Iron Cage AI agent runtime
+Iron Cage - Python bindings for Iron Cage AI agent runtime
 
 Provides safety and cost controls for AI agents via Rust backend.
 
 Example:
-    from iron_runtime import Runtime
+    from iron_cage import Runtime
 
     runtime = Runtime(budget=50.0, verbose=True)
     agent_id = runtime.start_agent("my_agent.py")
@@ -20,7 +20,7 @@ __all__ = ["Runtime"]
 
 try:
     # When compiled as a Python extension, import from the Rust module
-    from .iron_runtime import Runtime
+    from .iron_cage import Runtime
 except ImportError:
     # Fallback for development/testing without compilation
     class Runtime:

@@ -29,6 +29,15 @@ wheels/
 MANIFEST
 *.whl
 
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Maturin builds
+target/wheels/
+
 # Node.js (for iron_dashboard)
 node_modules/
 npm-debug.log*

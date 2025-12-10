@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "iron-cage>=0.1.0",  # Depends on Agent Runtime package
+  "iron-runtime>=0.1.0",  # Depends on Iron Runtime package with LlmRouter
 ]
 
 [project.optional-dependencies]
