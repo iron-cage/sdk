@@ -69,19 +69,15 @@ RESTful HTTP API organized by resource type:
 
 **Certainty Classification:**
 - ✅ **Certain:** Required for Pilot, design complete, documented in permanent protocol docs
-- ⚠️ **Uncertain:** Not Pilot-critical or design pending, documented in `-draft_*.md` protocol docs
+- ⚠️ **Uncertain:** Not Pilot-critical or design pending, specifications deferred
 
 **Complete Resource Inventory:** See [architecture/009_resource_catalog.md](../architecture/009_resource_catalog.md)
 
-**Resource-Specific Protocols:**
+**Resource-Specific Protocols (Certain Resources Only):**
 - [006_token_management_api.md](006_token_management_api.md) - IC Token CRUD (✅ Certain)
 - [007_authentication_api.md](007_authentication_api.md) - User authentication (✅ Certain)
-- [-draft_analytics_api.md](-draft_analytics_api.md) - Analytics (usage, spending, metrics) (⚠️ Uncertain)
-- [-draft_api_token_management.md](-draft_api_token_management.md) - API Token CRUD (⚠️ Uncertain)
-- [-draft_limits_management_api.md](-draft_limits_management_api.md) - Budget limits (⚠️ Uncertain)
-- [-draft_project_management_api.md](-draft_project_management_api.md) - Project management (⚠️ Uncertain)
-- [-draft_provider_management_api.md](-draft_provider_management_api.md) - IP management (⚠️ Uncertain)
-- [-draft_settings_management_api.md](-draft_settings_management_api.md) - System settings (⚠️ Uncertain)
+
+**Note:** Uncertain resources (projects, providers, analytics, API tokens, limits, settings) are documented separately and not included in permanent protocol index.
 
 ---
 
@@ -91,23 +87,23 @@ RESTful HTTP API organized by resource type:
 |-------------------|-----------|-------------------|--------|-------|
 | **Entity Resources** | | | | |
 | IC Tokens | `/api/tokens/*` | [006_token_management_api.md](006_token_management_api.md) | ✅ Certain | Yes |
-| Projects | `/api/projects/*` | [-draft_project_management_api.md](-draft_project_management_api.md) | ⚠️ Uncertain | No |
-| Providers | `/api/providers/*` | [-draft_provider_management_api.md](-draft_provider_management_api.md) | ⚠️ Uncertain | No |
+| Projects | `/api/projects/*` | (deferred) | ⚠️ Uncertain | No |
+| Providers | `/api/providers/*` | (deferred) | ⚠️ Uncertain | No |
 | **Operation Resources** | | | | |
 | Authentication | `/api/auth/*` | [007_authentication_api.md](007_authentication_api.md) | ✅ Certain | Yes |
 | Budget Protocol | `/api/budget/*` | [005_budget_control_protocol.md](005_budget_control_protocol.md) | ✅ Certain | Yes |
-| API Tokens | `/api/api-tokens/*` | [-draft_api_token_management.md](-draft_api_token_management.md) | ⚠️ Uncertain | TBD |
+| API Tokens | `/api/api-tokens/*` | (deferred) | ⚠️ Uncertain | TBD |
 | **Analytics Resources** | | | | |
-| Analytics | `/api/analytics/*` | [-draft_analytics_api.md](-draft_analytics_api.md) | ⚠️ Uncertain | No |
+| Analytics | `/api/analytics/*` | (deferred) | ⚠️ Uncertain | No |
 | **Configuration Resources** | | | | |
-| Budget Limits | `/api/limits/*` | [-draft_limits_management_api.md](-draft_limits_management_api.md) | ⚠️ Uncertain | No |
-| System Settings | `/api/settings/*` | [-draft_settings_management_api.md](-draft_settings_management_api.md) | ⚠️ Uncertain | No |
+| Budget Limits | `/api/limits/*` | (deferred) | ⚠️ Uncertain | No |
+| System Settings | `/api/settings/*` | (deferred) | ⚠️ Uncertain | No |
 | **System Resources** | | | | |
 | Health & Version | `/api/health`, `/api/version` | [002_rest_api_protocol.md](#system-resources) | ✅ Certain | Yes |
 
 **Legend:**
 - ✅ **Certain:** Required for Pilot, specification complete
-- ⚠️ **Uncertain:** Post-Pilot or design pending
+- ⚠️ **Uncertain:** Post-Pilot or design pending, specifications not yet finalized
 
 ---
 
@@ -676,15 +672,11 @@ Response:
 **Resource Organization:**
 - [architecture/009: Resource Catalog](../architecture/009_resource_catalog.md) - Complete resource inventory and entity mapping
 
-**Resource-Specific Protocols:**
+**Resource-Specific Protocols (Certain Resources Only):**
 - [006: Token Management API](006_token_management_api.md) - IC Token CRUD endpoints (✅ Certain)
 - [007: Authentication API](007_authentication_api.md) - User login/logout endpoints (✅ Certain)
-- [-draft_analytics_api.md](-draft_analytics_api.md) - Analytics endpoints (usage, spending, metrics) (⚠️ Uncertain)
-- [-draft_api_token_management.md](-draft_api_token_management.md) - API Token CRUD endpoints (⚠️ Uncertain)
-- [-draft_limits_management_api.md](-draft_limits_management_api.md) - Budget limits endpoints (⚠️ Uncertain)
-- [-draft_project_management_api.md](-draft_project_management_api.md) - Project management endpoints (⚠️ Uncertain)
-- [-draft_provider_management_api.md](-draft_provider_management_api.md) - IP management endpoints (⚠️ Uncertain)
-- [-draft_settings_management_api.md](-draft_settings_management_api.md) - System settings endpoints (⚠️ Uncertain)
+
+**Note:** Uncertain resources (analytics, API tokens, limits, projects, providers, settings) have deferred specifications.
 
 **Dependencies:**
 - [protocol/005: Budget Control Protocol](005_budget_control_protocol.md) - Budget handshake/report/refresh protocol

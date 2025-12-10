@@ -299,10 +299,6 @@ module/iron_dashboard/
 
 This module was migrated from `dev/frontend/` to `dev/module/iron_dashboard/` to maintain consistency with other Iron Cage modules (iron_control_api, iron_cli, iron_runtime). The migration follows TDD principles with verification scripts ensuring correctness.
 
-**Migration Plan:** See `./-frontend_migration_plan_refined_tdd.md` for complete plan.
-
-**Verification:** Run `./scripts/verify_frontend_migration.sh` to check migration status.
-
 ---
 
 ## License

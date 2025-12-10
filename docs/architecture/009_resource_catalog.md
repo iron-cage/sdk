@@ -339,7 +339,7 @@ Understand all available REST API resources, how they map to domain entities, an
 - Not critical for Pilot
 - Implementation unclear
 - Design decisions pending
-- Marked with `-draft_` prefix
+- Specifications deferred
 
 **Resources (11 total):**
 
@@ -359,7 +359,7 @@ Understand all available REST API resources, how they map to domain entities, an
    - `/api/limits` - Budget limits config
    - `/api/settings` - System settings
 
-**Note:** Uncertain resources documented in `-draft_*.md` protocol files for future consideration.
+**Note:** Uncertain resources have deferred specifications pending design decisions and Pilot feedback.
 
 ### ❌ Missing Resources (Intentionally Not Exposed)
 
@@ -381,7 +381,7 @@ Understand all available REST API resources, how they map to domain entities, an
 2. Implementation approach designed
 3. Dependencies identified and resolved
 4. CLI-API parity defined
-5. Move from `-draft_*.md` to permanent protocol doc
+5. Create permanent protocol specification document
 
 **When to Keep Uncertain:**
 
