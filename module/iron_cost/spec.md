@@ -10,24 +10,23 @@
 
 ## Responsibility
 
-Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, calculates costs based on provider pricing, enforces spending limits with automatic cutoffs and threshold warnings.
+Budget tracking and enforcement for LLM usage. Provides pricing data for multiple LLM providers, calculates costs based on token usage, and enforces spending limits with pre-reservation to prevent budget overshoot.
 
 ---
 
 ## Scope
 
 **In Scope:**
-- Token counting for OpenAI models (tiktoken integration)
+- Multi-provider pricing data (LiteLLM pricing source)
 - Cost calculation (tokens → USD)
-- Budget enforcement with hard limits
-- Threshold warnings (90% alert for demo)
-- Per-agent cost attribution
+- Pre-reservation for budget enforcement
+- Per-model pricing with input/output token rates
 
 **Out of Scope:**
-- Multi-currency support (pilot: USD only)
-- Multi-provider pricing (pilot: OpenAI only)
+- Token counting (handled by LLM response)
+- Multi-currency support (USD only)
 - Cost forecasting (see analytics features)
-- Budget allocation per-agent (pilot: global budget)
+- Budget persistence (runtime uses in-memory tracking)
 
 ---
 
@@ -35,11 +34,10 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 
 **Required Modules:**
 - iron_types - Foundation types
-- iron_runtime_state - Budget state persistence
-- iron_telemetry - Warning alerts
 
 **Required External:**
-- tiktoken - Token counting for OpenAI models
+- arc_swap - Lock-free concurrent access to pricing data
+- serde/serde_json - Pricing data serialization
 
 **Optional:**
 - None
@@ -49,22 +47,25 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 ## Core Concepts
 
 **Key Components:**
-- **Token Counter:** Counts tokens using tiktoken library
-- **Cost Calculator:** Converts token counts to USD amounts
-- **Budget Enforcer:** Blocks requests when spending limit exceeded
-- **Threshold Detector:** Triggers warnings at configurable percentage
+- **PricingManager:** Thread-safe pricing data store with lock-free reads (ArcSwap)
+- **Model:** Pricing info for single LLM model with cost calculation methods
+- **Embedded Pricing:** LiteLLM pricing JSON embedded at compile time as fallback
+
+**Cost Calculation:**
+- Actual cost: `input_tokens * input_rate + output_tokens * output_rate`
+- Max cost (pre-reservation): `input_tokens * input_rate + max_output * output_rate`
+- Default max_output_tokens: 128000 (when model has no limit info)
 
 ---
 
 ## Integration Points
 
 **Used by:**
-- iron_runtime - Budget checks before LLM calls
+- iron_runtime - Cost calculation for LLM requests
 - iron_control_api - Cost reporting endpoints
 
 **Uses:**
-- iron_runtime_state - Persists budget and spending data
-- iron_telemetry - Emits budget warning alerts
+- Embedded LiteLLM pricing data (asset/pricing.json)
 
 ---
 

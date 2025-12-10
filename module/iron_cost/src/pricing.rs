@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 const PRICING_JSON: &str = include_str!("../asset/pricing.json");
+const MAX_OUTPUT_TOKENS: u32 = 128000;
 
 /// Manages LLM model pricing data with thread-safe concurrent access.
 ///
@@ -68,7 +69,7 @@ impl Model {
     /// Uses `request_max_output` if provided, otherwise model's max output limit.
     /// Result is used to reserve budget before sending LLM request.
     pub fn calculate_max_cost(&self, input_len: u32, request_max_output: Option<u32>) -> f64 {
-        let max_output = self.max_output_tokens().unwrap_or(4096);
+        let max_output = self.max_output_tokens().unwrap_or(MAX_OUTPUT_TOKENS);
         let output_limit = request_max_output
             .unwrap_or(max_output)
             .min(max_output);
@@ -112,18 +113,15 @@ impl PricingManager {
                 continue;
             }
 
-            match serde_json::from_value::<Model>(value) {
-                Ok(mut model) => {
-                    if !model.has_valid_pricing() {
-                        continue;
-                    }
+            if let Ok(mut model) = serde_json::from_value::<Model>(value) {
+                if !model.has_valid_pricing() {
+                    continue;
+                }
 
-                    if model.name.is_empty() {
-                        model.name = key.clone();
-                    }
-                    new_map.insert(key, model);
-                },
-                Err(_) => {}
+                if model.name.is_empty() {
+                    model.name = key.clone();
+                }
+                new_map.insert(key, model);
             }
         }
 
