@@ -7,6 +7,7 @@ mod error;
 mod key_fetcher;
 mod proxy;
 mod router;
+mod translator;
 
 pub use error::LlmRouterError;
 pub use key_fetcher::ProviderKey;

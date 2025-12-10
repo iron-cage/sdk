@@ -14,6 +14,7 @@ use tokio::sync::oneshot;
 
 use crate::llm_router::error::LlmRouterError;
 use crate::llm_router::key_fetcher::KeyFetcher;
+use crate::llm_router::translator::{translate_anthropic_to_openai, translate_openai_to_anthropic};
 
 /// Shared state for proxy handlers
 #[derive(Clone)]
@@ -178,49 +179,47 @@ async fn handle_proxy(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-  // 4. Use auto-detected provider from key format
-  let configured_provider = provider_key.provider.as_str();
+  // 4. Detect provider from model name in request
   let (clean_path, path_provider) = strip_provider_prefix(&orig_path);
   let model_provider = detect_provider_from_model(&body_bytes);
+  let target_provider = path_provider.or(model_provider).unwrap_or("openai");
 
-  // 5. Check for provider mismatch - give clear error to user
-  let requested_provider = path_provider.or(model_provider);
-  if let Some(requested) = requested_provider
+  // 5. Detect if translation is needed
+  // OpenAI format (path=/v1/chat/completions) + Claude model → translate
+  let is_openai_format = clean_path.contains("/chat/completions");
+  let needs_translation = is_openai_format && target_provider == "anthropic";
+
+  // 6. Prepare request body (translate if needed)
+  let (request_body, request_path) = if needs_translation
   {
-    if requested != configured_provider
-    {
-      return Err((
-        StatusCode::BAD_REQUEST,
-        format!(
-          "Provider mismatch: you requested '{}' but your Iron Cage token has '{}' key configured. \
-           Please configure a '{}' provider key in your Iron Cage dashboard.",
-          requested, configured_provider, requested
-        ),
-      ));
-    }
+    let translated = translate_openai_to_anthropic(&body_bytes)
+      .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {}", e)))?;
+    (translated, "/v1/messages".to_string())
   }
+  else
+  {
+    (body_bytes.to_vec(), clean_path)
+  };
 
-  let provider = configured_provider;
-
-  // 5. Build target URL
+  // 7. Build target URL
   let base_url = provider_key.base_url.as_deref().unwrap_or_else(|| {
-    match provider
+    match target_provider
     {
       "anthropic" => "https://api.anthropic.com",
       _ => "https://api.openai.com",
     }
   });
 
-  let target_url = format!("{}{}{}", base_url, clean_path, query);
+  let target_url = format!("{}{}{}", base_url, request_path, query);
 
-  // 6. Build forwarded request with real API key
+  // 8. Build forwarded request with real API key
   let mut req_builder = state
     .http_client
     .request(method, &target_url)
     .header(header::CONTENT_TYPE, "application/json");
 
   // Set provider-specific auth headers
-  if provider == "anthropic"
+  if target_provider == "anthropic"
   {
     req_builder = req_builder
       .header("x-api-key", &provider_key.api_key)
@@ -232,20 +231,31 @@ async fn handle_proxy(
       req_builder.header(header::AUTHORIZATION, format!("Bearer {}", provider_key.api_key));
   }
 
-  // 7. Send request to provider
+  // 9. Send request to provider
   let provider_response = req_builder
-    .body(body_bytes.to_vec())
+    .body(request_body)
     .send()
     .await
     .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Forward error: {}", e)))?;
 
-  // 8. Build response (pass through as-is)
+  // 10. Read and translate response if needed
   let status = provider_response.status();
   let resp_headers = provider_response.headers().clone();
   let resp_body = provider_response
     .bytes()
     .await
     .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Response read error: {}", e)))?;
+
+  // Translate response back to OpenAI format if we translated the request
+  let final_body = if needs_translation && status.is_success()
+  {
+    translate_anthropic_to_openai(&resp_body)
+      .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Response translation error: {}", e)))?
+  }
+  else
+  {
+    resp_body.to_vec()
+  };
 
   let mut response = Response::builder().status(status);
 
@@ -256,6 +266,6 @@ async fn handle_proxy(
   }
 
   response
-    .body(Body::from(resp_body))
+    .body(Body::from(final_body))
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }

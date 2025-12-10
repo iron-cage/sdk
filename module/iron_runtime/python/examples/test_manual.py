@@ -10,6 +10,9 @@ Usage:
 
     # Test Anthropic (requires Anthropic key configured in dashboard)
     python examples/test_manual.py anthropic
+
+    # Test Gateway mode: OpenAI client → Claude model (requires Anthropic key)
+    python examples/test_manual.py gateway
 """
 
 import os
@@ -52,6 +55,31 @@ def test_anthropic(router):
     print(f"   Tokens: {response.usage.input_tokens} in, {response.usage.output_tokens} out")
 
 
+def test_gateway(router):
+    """Test gateway mode: OpenAI client calling Claude model!
+
+    This demonstrates the unified API - same OpenAI client works for both
+    OpenAI and Anthropic models, just change the model name.
+    """
+    from openai import OpenAI
+
+    print("\n[Gateway Test: OpenAI client → Claude model]")
+    client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+
+    # Use OpenAI SDK to call Claude!
+    response = client.chat.completions.create(
+        model="claude-sonnet-4-20250514",  # Claude model with OpenAI client!
+        messages=[
+            {"role": "system", "content": "You respond in exactly 4 words."},
+            {"role": "user", "content": "Say hello"}
+        ],
+        max_tokens=50
+    )
+    print(f"   Response: {response.choices[0].message.content}")
+    print(f"   Tokens: {response.usage.prompt_tokens} in, {response.usage.completion_tokens} out")
+    print(f"   (OpenAI format response from Claude!)")
+
+
 def main():
     # Check env vars
     ic_token = os.environ.get("IC_TOKEN")
@@ -82,10 +110,13 @@ def main():
             test_openai(router)
         elif provider == "anthropic":
             test_anthropic(router)
+        elif provider == "gateway":
+            test_gateway(router)
         else:
-            print("\nERROR: Please specify provider: 'openai' or 'anthropic'")
-            print("  python test_manual.py openai")
-            print("  python test_manual.py anthropic")
+            print("\nERROR: Please specify provider: 'openai', 'anthropic', or 'gateway'")
+            print("  python test_manual.py openai     # Test OpenAI API")
+            print("  python test_manual.py anthropic  # Test Anthropic API")
+            print("  python test_manual.py gateway    # Test OpenAI client → Claude model")
             sys.exit(1)
     finally:
         print("\n3. Stopping router...")
