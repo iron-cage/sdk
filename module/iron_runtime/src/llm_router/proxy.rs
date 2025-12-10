@@ -8,7 +8,9 @@ use axum::{
   routing::any,
   Router,
 };
+use iron_cost::pricing::PricingManager;
 use reqwest::Client;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -25,6 +27,10 @@ pub struct ProxyState {
   pub key_fetcher: Arc<KeyFetcher>,
   /// HTTP client for forwarding requests
   pub http_client: Client,
+  /// Pricing manager for cost calculation
+  pub pricing_manager: Arc<PricingManager>,
+  /// Total spent in microdollars (1 USD = 1_000_000 microdollars)
+  pub total_spent_micros: Arc<AtomicU64>,
 }
 
 /// Proxy server configuration
@@ -33,6 +39,8 @@ pub struct ProxyConfig {
   pub ic_token: String,
   pub server_url: String,
   pub cache_ttl_seconds: u64,
+  /// Shared counter for total spent (microdollars)
+  pub total_spent_micros: Arc<AtomicU64>,
 }
 
 /// Run the proxy server
@@ -51,10 +59,16 @@ pub async fn run_proxy(
       .build()
       .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
 
+  let pricing_manager = Arc::new(
+    PricingManager::new().map_err(LlmRouterError::ServerStart)?
+  );
+
   let state = ProxyState {
     ic_token: config.ic_token,
     key_fetcher,
     http_client,
+    pricing_manager,
+    total_spent_micros: config.total_spent_micros,
   };
 
   let app = Router::new()
@@ -245,6 +259,23 @@ async fn handle_proxy(
     resp_body.to_vec()
   };
 
+  // 11. Calculate and log request cost
+  if status.is_success() {
+    if let Some(cost_info) = calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body) {
+      // Add to total spent (convert USD to microdollars)
+      let cost_micros = (cost_info.cost_usd * 1_000_000.0) as u64;
+      state.total_spent_micros.fetch_add(cost_micros, Ordering::Relaxed);
+
+      tracing::info!(
+        model = %cost_info.model,
+        input_tokens = cost_info.input_tokens,
+        output_tokens = cost_info.output_tokens,
+        cost_usd = %format!("{:.6}", cost_info.cost_usd),
+        "LLM request completed"
+      );
+    }
+  }
+
   let mut response = Response::builder().status(status);
 
   // Copy content-type header
@@ -255,4 +286,49 @@ async fn handle_proxy(
   response
       .body(Body::from(final_body))
       .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+/// Cost calculation result
+struct CostInfo {
+  model: String,
+  input_tokens: u32,
+  output_tokens: u32,
+  cost_usd: f64,
+}
+
+/// Calculate request cost from request and response bodies
+fn calculate_request_cost(
+  pricing_manager: &PricingManager,
+  request_body: &[u8],
+  response_body: &[u8],
+) -> Option<CostInfo> {
+  // Extract model from request
+  let request_json: serde_json::Value = serde_json::from_slice(request_body).ok()?;
+  let model = request_json.get("model")?.as_str()?;
+
+  // Extract usage from response (OpenAI format)
+  let response_json: serde_json::Value = serde_json::from_slice(response_body).ok()?;
+  let usage = response_json.get("usage")?;
+
+  // OpenAI: prompt_tokens/completion_tokens, Anthropic: input_tokens/output_tokens
+  let input_tokens = usage
+      .get("prompt_tokens")
+      .or_else(|| usage.get("input_tokens"))
+      .and_then(|v| v.as_u64())? as u32;
+
+  let output_tokens = usage
+      .get("completion_tokens")
+      .or_else(|| usage.get("output_tokens"))
+      .and_then(|v| v.as_u64())? as u32;
+
+  // Get pricing and calculate cost
+  let pricing = pricing_manager.get(model)?;
+  let cost_usd = pricing.calculate_cost(input_tokens, output_tokens);
+
+  Some(CostInfo {
+    model: model.to_string(),
+    input_tokens,
+    output_tokens,
+    cost_usd,
+  })
 }

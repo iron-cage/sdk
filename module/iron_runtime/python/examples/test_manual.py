@@ -26,14 +26,37 @@ def test_openai(router):
     print("\n[OpenAI Test]")
     client = OpenAI(base_url=router.base_url, api_key=router.api_key)
 
+    # First request
+    print("\n   Request 1:")
+    spent_before = router.total_spent()
     response = client.chat.completions.create(
         model="gpt-5-nano",
         messages=[{"role": "user", "content": "Say 'Hello from LlmRouter!' in exactly 4 words"}],
         max_completion_tokens=500,
         reasoning_effort="low",
     )
+    spent_after_1 = router.total_spent()
     print(f"   Response: {response.choices[0].message.content}")
     print(f"   Tokens: {response.usage.prompt_tokens} in, {response.usage.completion_tokens} out")
+    print(f"   Cost: ${spent_after_1 - spent_before:.6f} (total: ${spent_after_1:.6f})")
+
+    # Second request
+    print("\n   Request 2:")
+    response = client.chat.completions.create(
+        model="gpt-5-nano",
+        messages=[{"role": "user", "content": "What is 2+2? Answer with just the number."}],
+        max_completion_tokens=100,
+        reasoning_effort="low",
+    )
+    spent_after_2 = router.total_spent()
+    print(f"   Response: {response.choices[0].message.content}")
+    print(f"   Tokens: {response.usage.prompt_tokens} in, {response.usage.completion_tokens} out")
+    print(f"   Cost: ${spent_after_2 - spent_after_1:.6f} (total: ${spent_after_2:.6f})")
+
+    # Verify spending increased
+    assert spent_after_1 > spent_before, "Spending should increase after first request"
+    assert spent_after_2 > spent_after_1, "Spending should increase after second request"
+    print(f"\n   ✓ Total spent: ${spent_after_2:.6f}")
 
 
 def test_anthropic(router):
@@ -46,13 +69,35 @@ def test_anthropic(router):
 
     client = Anthropic(base_url=anthropic_base, api_key=router.api_key)
 
+    # First request
+    print("\n   Request 1:")
+    spent_before = router.total_spent()
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=100,
         messages=[{"role": "user", "content": "Say 'Hello from LlmRouter!' in exactly 4 words"}],
     )
+    spent_after_1 = router.total_spent()
     print(f"   Response: {response.content[0].text}")
     print(f"   Tokens: {response.usage.input_tokens} in, {response.usage.output_tokens} out")
+    print(f"   Cost: ${spent_after_1 - spent_before:.6f} (total: ${spent_after_1:.6f})")
+
+    # Second request
+    print("\n   Request 2:")
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=100,
+        messages=[{"role": "user", "content": "What is 2+2? Answer with just the number."}],
+    )
+    spent_after_2 = router.total_spent()
+    print(f"   Response: {response.content[0].text}")
+    print(f"   Tokens: {response.usage.input_tokens} in, {response.usage.output_tokens} out")
+    print(f"   Cost: ${spent_after_2 - spent_after_1:.6f} (total: ${spent_after_2:.6f})")
+
+    # Verify spending increased
+    assert spent_after_1 > spent_before, "Spending should increase after first request"
+    assert spent_after_2 > spent_after_1, "Spending should increase after second request"
+    print(f"\n   ✓ Total spent: ${spent_after_2:.6f}")
 
 
 def test_gateway(router):
@@ -66,7 +111,9 @@ def test_gateway(router):
     print("\n[Gateway Test: OpenAI client → Claude model]")
     client = OpenAI(base_url=router.base_url, api_key=router.api_key)
 
-    # Use OpenAI SDK to call Claude!
+    # First request
+    print("\n   Request 1:")
+    spent_before = router.total_spent()
     response = client.chat.completions.create(
         model="claude-sonnet-4-20250514",  # Claude model with OpenAI client!
         messages=[
@@ -75,9 +122,28 @@ def test_gateway(router):
         ],
         max_tokens=50
     )
+    spent_after_1 = router.total_spent()
     print(f"   Response: {response.choices[0].message.content}")
     print(f"   Tokens: {response.usage.prompt_tokens} in, {response.usage.completion_tokens} out")
+    print(f"   Cost: ${spent_after_1 - spent_before:.6f} (total: ${spent_after_1:.6f})")
     print(f"   (OpenAI format response from Claude!)")
+
+    # Second request
+    print("\n   Request 2:")
+    response = client.chat.completions.create(
+        model="claude-sonnet-4-20250514",
+        messages=[{"role": "user", "content": "What is 2+2? Answer with just the number."}],
+        max_tokens=50
+    )
+    spent_after_2 = router.total_spent()
+    print(f"   Response: {response.choices[0].message.content}")
+    print(f"   Tokens: {response.usage.prompt_tokens} in, {response.usage.completion_tokens} out")
+    print(f"   Cost: ${spent_after_2 - spent_after_1:.6f} (total: ${spent_after_2:.6f})")
+
+    # Verify spending increased
+    assert spent_after_1 > spent_before, "Spending should increase after first request"
+    assert spent_after_2 > spent_after_1, "Spending should increase after second request"
+    print(f"\n   ✓ Total spent: ${spent_after_2:.6f}")
 
 
 def main():
