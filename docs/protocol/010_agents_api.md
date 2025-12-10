@@ -626,7 +626,7 @@ HTTP 403 Forbidden
 
 - Each agent has exactly one Agent Budget (RESTRICTIVE type)
 - Budget set at agent creation
-- Budget modifiable via `PUT /api/v1/limits/agents/{id}/budget` (increase only)
+- Budget modifiable via `PUT /api/v1/limits/agents/{id}/budget` (full mutability, decreases require force flag)
 - Budget enforcement blocks requests when exhausted
 
 ### Agent ↔ Providers (Many-to-Many)

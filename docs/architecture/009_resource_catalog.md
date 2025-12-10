@@ -147,13 +147,13 @@ Understand all available REST API resources, how they map to domain entities, an
 
 | Resource | Configuration Managed | Affects | Auth Type | Certainty | CLI Commands |
 |----------|----------------------|---------|-----------|-----------|--------------|
-| `/api/limits/agents/{agent_id}/budget` | Agent budget modification (increase-only) | Agent Budget | User Token (Owner/Admin) | ✅ MUST-HAVE | `iron limits agent <id> budget` |
+| `/api/limits/agents/{agent_id}/budget` | Agent budget modification (full mutability) | Agent Budget | User Token (Owner/Admin) | ✅ MUST-HAVE | `iron limits agent <id> budget` |
 | `/api/settings` | System-wide settings | Control Panel | User Token (Admin) | 📋 POST-PILOT | `iron settings` |
 
 **Notes:**
 - Budget Limits API is MUST-HAVE (emergency budget modification, specification complete: [013_budget_limits_api.md](../protocol/013_budget_limits_api.md))
 - Settings API is POST-PILOT (specification complete for future implementation: [016_settings_api.md](../protocol/016_settings_api.md))
-- Budget modification supports increase-only policy (prevents accidental agent shutdowns)
+- Budget modification supports force flag for safe decreases (prevents accidental agent shutdowns)
 
 ### System Resources
 

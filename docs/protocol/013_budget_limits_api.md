@@ -8,23 +8,24 @@
 
 ## Overview
 
-The Budget Limits API provides endpoints for modifying agent budgets after creation. The primary use case is emergency budget increases for long-running agents approaching their limits. Budget modifications are increase-only to prevent accidental agent shutdowns.
+The Budget Limits API provides endpoints for modifying agent budgets after creation. The primary use case is emergency budget increases for long-running agents approaching their limits. Budget modifications support full mutability with force flag protection for decreases to prevent accidental agent shutdowns.
 
 **Key characteristics:**
-- **Increase-only:** Budgets can only be increased (never decreased)
+- **Full mutability:** Budgets can be increased or decreased
+- **Force flag for decreases:** Budget decreases require explicit confirmation to prevent accidental shutdowns
 - **Emergency use case:** Preventing task failure when agent approaches budget limit
-- **Admin + Owner authorization:** Both admin and agent owner can increase budgets
+- **Admin + Owner authorization:** Both admin and agent owner can modify budgets
 - **Audit logging:** All budget modifications are logged for compliance
 
 ---
 
 ## Endpoints
 
-### Increase Agent Budget
+### Modify Agent Budget
 
 **Endpoint:** `PUT /api/v1/limits/agents/{agent_id}/budget`
 
-**Description:** Increases an agent's budget. Decrease requests are rejected (400 Bad Request).
+**Description:** Modifies an agent's budget (increase or decrease). Decrease requests require `force: true` confirmation to prevent accidental shutdowns.
 
 **Use Case:** Emergency budget top-up for long-running agents
 - **Scenario:** Agent at 95% budget usage, running multi-hour task
@@ -48,10 +49,11 @@ Content-Type: application/json
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
-| `budget` | number | Yes | >= 0.01, >= current budget | New budget amount in USD (2 decimal places) |
+| `budget` | number | Yes | >= 0.01 | New budget amount in USD (2 decimal places) |
+| `force` | boolean | No | Default: false | Required for budget decreases (safety confirmation) |
 | `reason` | string | No | Max 500 chars | Optional explanation for audit trail |
 
-**Important:** New budget must be **greater than** current budget. Equal or lower values are rejected.
+**Important:** Budget decreases require `force: true` to prevent accidental agent shutdowns. Increases dont require force flag.
 
 **Success Response:**
 
@@ -94,10 +96,13 @@ Content-Type: application/json
 HTTP 400 Bad Request
 {
   "error": {
-    "code": "BUDGET_DECREASE_NOT_ALLOWED",
-    "message": "Budget can only be increased. Current budget: $100.00, requested: $80.00",
+    "code": "BUDGET_DECREASE_REQUIRES_CONFIRMATION",
+    "message": "Budget decrease requires 'force: true' confirmation. Current budget: $100.00, requested: $80.00. WARNING: Decreasing budget may immediately exhaust agent mid-task.",
     "current_budget": 100.00,
-    "requested_budget": 80.00
+    "requested_budget": 80.00,
+    "decrease_amount": 20.00,
+    "current_spent": 45.00,
+    "new_remaining_if_applied": 35.00
   }
 }
 ```
@@ -107,7 +112,7 @@ HTTP 400 Bad Request
 {
   "error": {
     "code": "BUDGET_UNCHANGED",
-    "message": "New budget must be greater than current budget. Current budget: $100.00",
+    "message": "New budget must be different from current budget. Current budget: $100.00",
     "current_budget": 100.00,
     "requested_budget": 100.00
   }
@@ -370,20 +375,33 @@ HTTP 404 Not Found
 - **Admin oversight:** Admins can manage all budgets (system-wide visibility)
 - **Safety:** Only authorized users can increase budgets (prevents unauthorized spending)
 
-### Increase-Only Policy
+### Force Flag Policy
 
-**Why increase-only?**
+**Why require force flag for decreases?**
 1. **Prevent accidental shutdowns:** Decreasing budget could immediately exhaust agent mid-task
-2. **Safety first:** Easier to add budget than to handle unexpected task failures
-3. **Audit trail:** All increases logged, no possibility of hiding budget reductions
-4. **Simplicity:** No complex rules about when decreases are allowed
+2. **Admin control with safety:** Admin has full control but must explicitly confirm dangerous operations
+3. **Informative errors:** Decrease attempt without force shows impact (current spent, remaining if applied)
+4. **Audit trail:** All modifications logged with force flag status
 
-**Workaround for budget decreases:**
-- If budget truly needs reduction (e.g., misconfiguration), admin can:
-  1. Create new agent with correct budget
-  2. Migrate tasks to new agent
-  3. Deactivate old agent (future feature)
-  - Budget decrease not supported in Pilot (safety priority)
+**Budget decrease workflow:**
+1. Admin attempts decrease without force flag
+2. API returns `BUDGET_DECREASE_REQUIRES_CONFIRMATION` with impact analysis
+3. Admin reviews impact (current spent, new remaining)
+4. Admin retries with `force: true` to confirm
+5. Budget decreased, modification logged
+
+**Example decrease request:**
+```json
+PUT /api/v1/limits/agents/agent-abc123/budget
+Authorization: Bearer <user-token>
+Content-Type: application/json
+
+{
+  "budget": 80.00,
+  "force": true,
+  "reason": "Correcting budget misconfiguration"
+}
+```
 
 ---
 
@@ -394,7 +412,7 @@ HTTP 404 Not Found
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
 | `VALIDATION_ERROR` | 400 | Field validation failed |
-| `BUDGET_DECREASE_NOT_ALLOWED` | 400 | Requested budget < current budget |
+| `BUDGET_DECREASE_REQUIRES_CONFIRMATION` | 400 | Budget decrease attempted without force flag |
 | `BUDGET_UNCHANGED` | 400 | Requested budget = current budget |
 | `UNAUTHORIZED` | 401 | Missing/invalid authentication |
 | `TOKEN_EXPIRED` | 401 | Authentication token expired |

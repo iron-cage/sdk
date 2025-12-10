@@ -80,8 +80,8 @@ RESTful HTTP API organized by resource type:
 - [010_agents_api.md](010_agents_api.md) - Agent management (✅ MUST-HAVE)
 - [011_providers_api.md](011_providers_api.md) - Provider management (✅ MUST-HAVE)
 - [012_analytics_api.md](012_analytics_api.md) - Usage and spending analytics (✅ MUST-HAVE)
-- [013_budget_limits_api.md](013_budget_limits_api.md) - Budget modification (✅ NICE-TO-HAVE)
-- [014_api_tokens_api.md](014_api_tokens_api.md) - API token management (✅ NICE-TO-HAVE)
+- [013_budget_limits_api.md](013_budget_limits_api.md) - Budget modification (✅ MUST-HAVE)
+- [014_api_tokens_api.md](014_api_tokens_api.md) - API token management (✅ MUST-HAVE)
 - [015_projects_api.md](015_projects_api.md) - Project access (✅ NICE-TO-HAVE, Pilot: read-only)
 - [016_settings_api.md](016_settings_api.md) - Settings management (📋 POST-PILOT)
 
@@ -689,8 +689,8 @@ Response:
 - [010: Agents API](010_agents_api.md) - Agent management endpoints (✅ MUST-HAVE)
 - [011: Providers API](011_providers_api.md) - Provider management endpoints (✅ MUST-HAVE)
 - [012: Analytics API](012_analytics_api.md) - Usage and spending analytics endpoints (✅ MUST-HAVE)
-- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification endpoints (✅ NICE-TO-HAVE)
-- [014: API Tokens API](014_api_tokens_api.md) - API token management endpoints (✅ NICE-TO-HAVE)
+- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification endpoints (✅ MUST-HAVE)
+- [014: API Tokens API](014_api_tokens_api.md) - API token management endpoints (✅ MUST-HAVE)
 - [015: Projects API](015_projects_api.md) - Project access endpoints (✅ NICE-TO-HAVE)
 - [016: Settings API](016_settings_api.md) - Settings management endpoints (📋 POST-PILOT)
 

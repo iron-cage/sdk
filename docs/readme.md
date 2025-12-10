@@ -31,8 +31,8 @@ Root-level reference documents in docs/:
 | Entity | Responsibility |
 |--------|----------------|
 | **vocabulary.md** | Define canonical project terminology (glossary, naming conventions, project-specific terms) |
-| **module_package_matrix.md** | Map modules to deployment packages (20 modules across 5 packages, distribution analysis) |
 | **deployment_guide.md** | Document operational deployment procedures (configuration, environment setup, troubleshooting) |
+| **post_pilot_roadmap.md** | Track POST-PILOT features deferred from Pilot (prioritized backlog with effort estimates, dependencies) |
 
 ---
 
