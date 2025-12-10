@@ -1,112 +1,233 @@
-# POST-PILOT Abilities
+# Iron Cage Features
 
-**Purpose:** What users can do after Pilot (capabilities only, no timelines)
+**Purpose:** Complete feature catalog with unique codes across Pilot and POST-PILOT phases
 
 **Last Updated:** 2025-12-10
 
+**Coding Scheme:** F-XYY where X=Actor (1=Admin, 2=Developer, 3=Advanced User, 4=System, 5=All Users), YY=Sequential
+
 ---
 
-## Admin Abilities
+## Feature Summary
 
-### Policy Management (Firewall-like Control)
-- Set system-wide policies that Developers cannot override
-- Define allowed models per provider (whitelist: gpt-4, claude-3-5-sonnet)
-- Set max budget caps per agent (hard limit: e.g., $500)
-- Block domains/IP ranges (security restrictions)
-- Require safety guardrails (content filtering, prompt injection prevention)
-- View audit trail of all policy changes and violations
+| Code | Feature | Actor | Phase | Specification |
+|------|---------|-------|-------|---------------|
+| F-101 | User Management | Admin | PILOT | [Protocol 008](protocol/008_user_management_api.md) |
+| F-102 | Agent Management | Admin | PILOT | [Protocol 010](protocol/010_agents_api.md) |
+| F-103 | Budget Management | Admin | PILOT | [Protocol 013](protocol/013_budget_limits_api.md) |
+| F-104 | Provider Management | Admin | PILOT | [Protocol 011](protocol/011_providers_api.md) |
+| F-105 | Analytics | Admin | PILOT | [Protocol 012](protocol/012_analytics_api.md) |
+| F-106 | Projects | Admin | PILOT | [Protocol 015](protocol/015_projects_api.md) |
+| F-107 | Policy Management | Admin | POST-PILOT | Not yet specified |
+| F-108 | Settings Management | Admin | POST-PILOT | [Protocol 016](protocol/016_settings_api.md) |
+| F-109 | Project Management | Admin | POST-PILOT | [Protocol 015](protocol/015_projects_api.md) |
+| F-110 | Fine-Grained Permissions | Admin | POST-PILOT | Not yet specified |
+| F-111 | Provider Failover Config | Admin | POST-PILOT | Not yet specified |
+| F-201 | Agent Operations | Developer | PILOT | [Protocol 010](protocol/010_agents_api.md) |
+| F-202 | API Tokens | Developer | PILOT | [Protocol 014](protocol/014_api_tokens_api.md) |
+| F-203 | Analytics | Developer | PILOT | [Protocol 012](protocol/012_analytics_api.md) |
+| F-204 | Agent Lifecycle | Developer | POST-PILOT | [Protocol 010](protocol/010_agents_api.md) |
+| F-205 | Provider Failover | Developer | POST-PILOT | Not yet specified |
+| F-206 | Policy Configuration | Developer | POST-PILOT | Not yet specified |
+| F-207 | Multi-Project Operations | Developer | POST-PILOT | [Protocol 015](protocol/015_projects_api.md) |
+| F-301 | Cross-Project Visibility | Advanced User | POST-PILOT | Not yet specified |
+| F-302 | Reporting | Advanced User | POST-PILOT | Not yet specified |
+| F-401 | Concurrent Execution | System | PILOT | [Requirements](../spec/requirements.md) |
+| F-402 | Provider Integration | System | PILOT | [Protocol 005](protocol/005_budget_control_protocol.md) |
+| F-403 | Provider Resilience | System | POST-PILOT | Not yet specified |
+| F-404 | Multi-Tenancy | System | POST-PILOT | [Protocol 015](protocol/015_projects_api.md) |
+| F-405 | Configuration | System | POST-PILOT | [Protocol 016](protocol/016_settings_api.md) |
+| F-501 | Authentication | All Users | PILOT | [Protocol 007](protocol/007_authentication_api.md) |
 
-### System Configuration
-- Modify settings without restarting Control Panel backend (hot-reload)
-- Create, update, delete projects
-- Manage users across all projects (add/remove, change roles)
+**Total:** 26 features (13 PILOT, 13 POST-PILOT)
+
+---
+
+## F-101: User Management (PILOT, Admin)
+[Protocol 008](protocol/008_user_management_api.md)
+
+- Create/suspend/activate/delete users (soft delete preserves audit trail)
+- Change roles (Admin/User/Viewer), reset passwords
+- List with filters (role, status, search by name/email)
+- Self-modification prevention
+
+## F-102: Agent Management (PILOT, Admin)
+[Protocol 010](protocol/010_agents_api.md)
+
+- Create agents (name, budget, providers, description, tags)
+- List agents, get details and status (budget/spending/active state)
+- Update metadata (name, description, tags)
+
+## F-103: Budget Management (PILOT, Admin)
+[Protocol 013](protocol/013_budget_limits_api.md)
+
+- Modify agent budgets (full mutability with force flag for decreases)
+- Emergency budget top-ups
+- View modification history
+
+## F-104: Provider Management (PILOT, Admin)
+[Protocol 011](protocol/011_providers_api.md)
+
+- Full CRUD operations (create, list, get, update, delete)
+- Configure provider credentials (IP tokens stored in vault)
+- Assign providers to agents
+
+## F-105: Analytics (PILOT, Admin)
+[Protocol 012](protocol/012_analytics_api.md)
+
+- 8 endpoints: spending/total, by-agent, by-provider, budget status, usage requests, tokens, models, avg-per-request
+- Time ranges: today, yesterday, last-7-days, last-30-days, all-time
+
+## F-106: Projects (PILOT, Admin)
+[Protocol 015](protocol/015_projects_api.md)
+
+- List and view projects (read-only, single Master Project)
+
+## F-107: Policy Management (POST-PILOT, Admin)
+Not yet specified
+
+- Set system-wide policies (firewall-like control): allowed models, budget caps, blocked domains, safety guardrails
+- Policy validation engine (conflict detection, admin-wins resolution)
+- View policy audit trail (changes, violations)
+
+## F-108: Settings Management (POST-PILOT, Admin)
+[Protocol 016](protocol/016_settings_api.md)
+
+- Hot-reload settings without service restart
+- Configure 3-level hierarchy (system/project/user with inheritance)
+- Operational: default budget, max agents, auto-pause thresholds
+- Notifications: email alerts, webhooks, frequency
+- Display: UI theme, dashboard layout, currency format
+- Security: session timeout, API token expiration, IP whitelist, 2FA
+
+## F-109: Project Management (POST-PILOT, Admin)
+[Protocol 015](protocol/015_projects_api.md)
+
+- Full CRUD (create, update, delete projects)
+- Manage project users (add, remove, change roles)
+- Configure project-level budgets
+- Project-scoped API tokens
+
+## F-110: Fine-Grained Permissions (POST-PILOT, Admin)
+Not yet specified
+
+- Create custom roles beyond Admin/User/Viewer
+- Set resource-level permissions (agent read/write, provider access)
+- Granular access controls (read-only users, restricted agents)
+
+## F-111: Provider Failover Configuration (POST-PILOT, Admin)
+Not yet specified
+
 - Configure provider failover priority for all agents
-- View all projects and cross-project analytics
+- Provider health monitoring and circuit breaker
 
----
+## F-201: Agent Operations (PILOT, Developer)
+[Protocol 010](protocol/010_agents_api.md)
 
-## Developer Abilities
+- Create/list/update agents with tags
+- View agent status (budget, spending, active state)
 
-### Agent Management
-- Assign multiple fallback providers to agents (primary, fallback1, fallback2)
-- Create and manage multiple projects
-- Delete agents safely (ARCHIVE strategy preserves audit trail)
-- Temporarily disable agents without deletion (activate/deactivate)
+## F-202: API Tokens (PILOT, Developer)
+[Protocol 014](protocol/014_api_tokens_api.md)
 
-### Policy Configuration (Must Not Contradict Admin)
+- Create/revoke tokens (SAME-AS-USER scope, shown once on creation)
+- List and view owned tokens
+
+## F-203: Analytics (PILOT, Developer)
+[Protocol 012](protocol/012_analytics_api.md)
+
+- View metrics for owned agents
+- Same 8 endpoints as Admin (scoped to own resources)
+
+## F-204: Agent Lifecycle (POST-PILOT, Developer)
+[Protocol 010](protocol/010_agents_api.md)
+
+- Delete agents (ARCHIVE strategy preserves audit trail)
+- Activate/deactivate agents (temporary disable without deletion)
+
+## F-205: Provider Failover (POST-PILOT, Developer)
+Not yet specified
+
+- Assign multiple fallback providers (primary, fallback1, fallback2)
+- Automatic failover on errors (rate limits, outages, timeouts)
+- Configurable retry logic with backoff
+
+## F-206: Policy Configuration (POST-PILOT, Developer)
+Not yet specified
+
+- Set agent-level policies (validated against admin policies, no contradictions)
 - Ad-hoc model replacement for testing (gpt-4 → gpt-4-turbo)
 - Override temperature/max_tokens for development
-- Enable debug logging (verbose mode)
-- Set provider preference ordering (prefer Anthropic over OpenAI)
+- Enable debug logging, set provider preference ordering
 
-### Project Management
-- Create multiple projects
+## F-207: Multi-Project Operations (POST-PILOT, Developer)
+[Protocol 015](protocol/015_projects_api.md)
+
+- Create and manage multiple projects
 - Switch between projects
 - Add/remove team members from owned projects
-- Configure project-level budgets and settings
+- Configure project-level settings
 
----
+## F-301: Cross-Project Visibility (POST-PILOT, Advanced User)
+Not yet specified
 
-## Advanced User Abilities
-
-### Cross-Project Visibility
 - View all projects they belong to (multi-project dashboard)
 - Access advanced analytics (provider performance, cost trends, model comparison)
 - See system health metrics (not just own agents)
 
-### Reporting
+## F-302: Reporting (POST-PILOT, Advanced User)
+Not yet specified
+
 - Export audit logs and spending reports
 - Generate cross-project analytics
 - Track usage patterns across teams
 
----
+## F-401: Concurrent Execution (PILOT, System)
+[Requirements](../spec/requirements.md)
 
-## System Abilities (Runtime & Infrastructure)
+- Run 100-1000+ concurrent agents per runtime
+- <5% CPU overhead per agent at 1000 concurrent
 
-### Concurrent Execution
-- Run 100-1000+ concurrent agents per runtime instance
-- Handle Python GIL efficiently for concurrent agents
-- <5% CPU overhead per agent at 1000 concurrent agents
+## F-402: Provider Integration (PILOT, System)
+[Protocol 005](protocol/005_budget_control_protocol.md)
 
-### Provider Resilience
-- Automatic failover when primary provider fails (rate limits, outages, timeouts)
+- IP tokens (provider credentials) managed in Control Panel vault
+- Token translation (IC Token → IP Token) for inference requests
+- Budget handshake protocol for credential delivery
+
+## F-403: Provider Resilience (POST-PILOT, System)
+Not yet specified
+
+- Automatic failover when primary provider fails
 - Configurable retry logic with backoff strategy
 - Provider health monitoring and circuit breaker
 - Track which provider was used for each request (fallback statistics)
 
-### Multi-Tenancy
+## F-404: Multi-Tenancy (POST-PILOT, System)
+[Protocol 015](protocol/015_projects_api.md)
+
 - Project-level resource isolation (agents, providers, budgets)
 - Cross-project resource sharing (shared providers)
 - Users belong to multiple projects
 - Project-scoped API tokens
 
-### Configuration
-- Hot-reload settings without service restart (operational, display, security settings)
-- Configuration change notifications to connected clients (WebSocket/SSE)
+## F-405: Configuration (POST-PILOT, System)
+[Protocol 016](protocol/016_settings_api.md)
 
----
+- Hot-reload settings without service restart
+- Configuration change notifications (WebSocket/SSE to connected clients)
 
-## Role Hierarchy
+## F-501: Authentication (PILOT, All Users)
+[Protocol 007](protocol/007_authentication_api.md)
 
-```
-Developer
-  - Single project view
-  - Basic analytics
-  - Own agents only
-  ↓
-Advanced User
-  - Multi-project view
-  - Advanced analytics
-  - Team visibility
-  ↓
-Admin
-  - All projects
-  - Full control
-  - Policy management
-```
+- Login with email/password (receive User Token, JWT, 30-day lifetime)
+- Logout (invalidate User Token)
+- Refresh User Token (extend expiration before it expires)
+- Validate User Token (check if valid and not expired)
 
 ---
 
 **Related Documents:**
 - Current Pilot scope: [spec/requirements.md](../spec/requirements.md)
 - API specifications: [docs/protocol/](protocol/)
+- REST API decisions: [-rest_api_questions_complete.md](-rest_api_questions_complete.md)

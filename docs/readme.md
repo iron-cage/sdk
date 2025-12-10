@@ -32,7 +32,7 @@ Root-level reference documents in docs/:
 |--------|----------------|
 | **vocabulary.md** | Define canonical project terminology (glossary, naming conventions, project-specific terms) |
 | **deployment_guide.md** | Document operational deployment procedures (configuration, environment setup, troubleshooting) |
-| **post_pilot_abilities.md** | List user abilities available after Pilot (what users CAN DO, organized by role - no timelines/estimates) |
+| **post_pilot_abilities.md** | Complete feature catalog with unique codes (F-XYY format) across Pilot and POST-PILOT phases, grouped by actor |
 
 ---
 
