@@ -27,6 +27,8 @@ use iron_token_manager::user_service::
 {
   CreateUserParams, ListUsersFilters, User, UserService,
 };
+use crate::jwt_auth::AuthenticatedUser;
+use std::str::FromStr;
 
 /// State for user management endpoints
 #[ derive( Clone ) ]
@@ -47,12 +49,22 @@ impl UserManagementState
   }
 }
 
+/// Helper to get admin ID from username
+async fn get_admin_id( pool: &Pool< Sqlite >, username: &str ) -> Result< i64, sqlx::Error >
+{
+  let row: ( i64, ) = sqlx::query_as( "SELECT id FROM users WHERE username = ?" )
+    .bind( username )
+    .fetch_one( pool )
+    .await?;
+  Ok( row.0 )
+}
+
 //
 // Request/Response types
 //
 
 /// Request to create a new user
-#[ derive( Debug, Deserialize ) ]
+#[ derive( Debug, Deserialize, Serialize ) ]
 pub struct CreateUserRequest
 {
   pub username: String,
@@ -277,6 +289,7 @@ impl ResetPasswordRequest
 /// Requires: Admin role
 pub async fn create_user(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Json( request ): Json< CreateUserRequest >,
 ) -> impl IntoResponse
 {
@@ -289,14 +302,12 @@ pub async fn create_user(
     }) ) ).into_response();
   }
 
-  // TODO: Extract admin_id from JWT token
-  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
-  let admin_id = 999i64;
+  // Get admin ID from claims
+  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
 
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -340,13 +351,13 @@ pub async fn create_user(
 /// Requires: Admin role
 pub async fn list_users(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Query( query ): Query< ListUsersQuery >,
 ) -> impl IntoResponse
 {
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -401,13 +412,13 @@ pub async fn list_users(
 /// Requires: Admin role
 pub async fn get_user(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Path( user_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -442,6 +453,7 @@ pub async fn get_user(
 /// Requires: Admin role
 pub async fn suspend_user(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Path( user_id ): Path< i64 >,
   Json( request ): Json< SuspendUserRequest >,
 ) -> impl IntoResponse
@@ -455,14 +467,12 @@ pub async fn suspend_user(
     }) ) ).into_response();
   }
 
-  // TODO: Extract admin_id from JWT token
-  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
-  let admin_id = 999i64;
+  // Get admin ID from claims
+  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
 
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -497,17 +507,16 @@ pub async fn suspend_user(
 /// Requires: Admin role
 pub async fn activate_user(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Path( user_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  // TODO: Extract admin_id from JWT token
-  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
-  let admin_id = 999i64;
+  // Get admin ID from claims
+  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
 
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -542,17 +551,16 @@ pub async fn activate_user(
 /// Requires: Admin role
 pub async fn delete_user(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Path( user_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  // TODO: Extract admin_id from JWT token
-  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
-  let admin_id = 999i64;
+  // Get admin ID from claims
+  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
 
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -587,6 +595,7 @@ pub async fn delete_user(
 /// Requires: Admin role
 pub async fn change_user_role(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Path( user_id ): Path< i64 >,
   Json( request ): Json< ChangeRoleRequest >,
 ) -> impl IntoResponse
@@ -600,14 +609,12 @@ pub async fn change_user_role(
     }) ) ).into_response();
   }
 
-  // TODO: Extract admin_id from JWT token
-  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
-  let admin_id = 999i64;
+  // Get admin ID from claims
+  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
 
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({
@@ -642,6 +649,7 @@ pub async fn change_user_role(
 /// Requires: Admin role
 pub async fn reset_password(
   State( state ): State< UserManagementState >,
+  AuthenticatedUser( claims ): AuthenticatedUser,
   Path( user_id ): Path< i64 >,
   Json( request ): Json< ResetPasswordRequest >,
 ) -> impl IntoResponse
@@ -655,14 +663,12 @@ pub async fn reset_password(
     }) ) ).into_response();
   }
 
-  // TODO: Extract admin_id from JWT token
-  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
-  let admin_id = 999i64;
+  // Get admin ID from claims
+  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
 
   // Check RBAC permission
-  // TODO: Get role from JWT token
-  let admin_role = Role::Admin;
-  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
+  if !state.permission_checker.has_permission( role, Permission::ManageUsers )
   {
     return ( StatusCode::FORBIDDEN, Json( serde_json::json!
     ({

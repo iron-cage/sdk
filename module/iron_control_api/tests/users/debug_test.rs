@@ -1,7 +1,8 @@
 //! Debug test to see actual error messages
 
-use crate::common::extract_response;
-use iron_control_api::routes::users::UserManagementState;
+use crate::common::{extract_json_response, extract_response};
+use hyper::StatusCode;
+use iron_control_api::routes::{auth::LoginResponse, users::UserManagementState};
 use iron_control_api::rbac::PermissionChecker;
 use axum::
 {
@@ -14,6 +15,27 @@ use tower::ServiceExt;
 use serde_json::json;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 use std::sync::Arc;
+use axum::extract::FromRef;
+use iron_control_api::routes::auth::AuthState;
+use iron_control_api::jwt_auth::JwtSecret;
+
+#[derive(Clone)]
+struct TestAppState {
+    auth: AuthState,
+    users: UserManagementState,
+}
+
+impl FromRef<TestAppState> for AuthState {
+    fn from_ref(state: &TestAppState) -> Self {
+        state.auth.clone()
+    }
+}
+
+impl FromRef<TestAppState> for UserManagementState {
+    fn from_ref(state: &TestAppState) -> Self {
+        state.users.clone()
+    }
+}
 
 /// Create test database with users table and migrations
 async fn create_test_database() -> SqlitePool
@@ -108,7 +130,17 @@ async fn create_test_router() -> Router
   let db_pool = create_test_database().await;
   let permission_checker = Arc::new( PermissionChecker::new() );
 
-  let state = UserManagementState::new( db_pool, permission_checker );
+  let auth_state = AuthState {
+    db_pool: db_pool.clone(),
+    jwt_secret: Arc::new(JwtSecret::new("test_secret".to_string())),
+  };
+
+  let user_state = UserManagementState::new( db_pool, permission_checker );
+
+  let state = TestAppState {
+    auth: auth_state,
+    users: user_state,
+  };
 
   Router::new()
     .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
@@ -116,72 +148,25 @@ async fn create_test_router() -> Router
     .with_state( state )
 }
 
-#[ tokio::test ]
-async fn debug_suspend_user_error()
+/// Get Admin Authentication Bearer Token
+async fn get_admin_bearer_token(router: &Router) -> String
 {
-  let router = create_test_router().await;
-
-  // Also create a direct connection to test UserService directly
-  let pool = create_test_database().await;
-
-  // Create user
-  let create_request_body = json!({
-    "username": "testuser",
-    "password": "testpassword123",
-    "email": "test@example.com",
-    "role": "user",
+  let admin_login_body = json!({
+    "username": "test_admin",
+    "password": "admin_password",
   });
 
-  let create_request = Request::builder()
+  let admin_login_request = Request::builder()
     .method( "POST" )
-    .uri( "/api/users" )
+    .uri( "/api/auth/login" )
     .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
+    .body( Body::from( serde_json::to_string( &admin_login_body ).unwrap() ) )
     .unwrap();
 
-  let create_response = ServiceExt::< Request< Body > >::oneshot( router.clone(), create_request )
-    .await
-    .unwrap();
+  let admin_login_response = router.clone().oneshot( admin_login_request ).await.unwrap();
 
-  let ( create_status, create_body ) = extract_response( create_response ).await;
-  println!( "Create response status: {}", create_status );
-  println!( "Create response body: {}", create_body );
-
-  // Parse user ID from response
-  let create_json: serde_json::Value = serde_json::from_str( &create_body ).unwrap();
-  let user_id = create_json[ "id" ].as_i64().unwrap();
-  println!( "Created user ID: {}", user_id );
-
-  // Try to suspend user
-  let suspend_request_body = json!({
-    "reason": "Test suspension",
-  });
-
-  let suspend_request = Request::builder()
-    .method( "PUT" )
-    .uri( format!( "/api/users/{}/suspend", user_id ) )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &suspend_request_body ).unwrap() ) )
-    .unwrap();
-
-  let suspend_response = ServiceExt::< Request< Body > >::oneshot( router, suspend_request )
-    .await
-    .unwrap();
-
-  let ( suspend_status, suspend_body ) = extract_response( suspend_response ).await;
-  println!( "Suspend response status: {}", suspend_status );
-  println!( "Suspend response body: {}", suspend_body );
-
-  // Test UserService directly
-  println!( "\nTesting UserService directly:" );
-  let user_service = iron_token_manager::user_service::UserService::new( pool.clone() );
-
-  // Try to suspend the user directly
-  let suspend_result = user_service.suspend_user( user_id, 999, Some( "Direct test".to_string() ) ).await;
-  match suspend_result {
-    Ok( _user ) => println!( "UserService suspend succeeded" ),
-    Err( e ) => println!( "UserService suspend failed: {:?}", e ),
-  }
+  let ( _status, admin_login_body ): ( StatusCode, LoginResponse ) = extract_json_response( admin_login_response ).await;
+  admin_login_body.access_token
 }
 
 #[ tokio::test ]

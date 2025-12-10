@@ -78,7 +78,7 @@ async fn test_create_token_stores_hash_not_plaintext()
 
   // Store token
   let token_id = storage
-    .create_token( &plaintext_token, "user_001", Some( "project_123" ), Some( "Test Token" ) )
+    .create_token( &plaintext_token, "user_001", Some( "project_123" ), Some( "Test Token" ), None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -111,6 +111,8 @@ async fn test_create_token_with_metadata()
       "user_002",
       Some( "project_456" ),
       Some( "Development Token" ),
+      None,
+      None,
     )
     .await
     .expect( "Failed to create token" );
@@ -135,7 +137,7 @@ async fn test_verify_token_returns_token_id()
   let token = generator.generate();
 
   let created_id = storage
-    .create_token( &token, "user_003", None, None )
+    .create_token( &token, "user_003", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -156,7 +158,7 @@ async fn test_verify_token_fails_for_invalid_token()
 
   // Create valid token
   storage
-    .create_token( &generator.generate(), "user_004", None, None )
+    .create_token( &generator.generate(), "user_004", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -175,7 +177,7 @@ async fn test_deactivate_token()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_005", None, None )
+    .create_token( &token, "user_005", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -198,17 +200,17 @@ async fn test_list_user_tokens()
 
   // Create multiple tokens for same user
   storage
-    .create_token( &generator.generate(), "user_006", None, Some( "Token 1" ) )
+    .create_token( &generator.generate(), "user_006", None, Some( "Token 1" ), None, None )
     .await
     .expect( "Failed to create token 1" );
 
   storage
-    .create_token( &generator.generate(), "user_006", None, Some( "Token 2" ) )
+    .create_token( &generator.generate(), "user_006", None, Some( "Token 2" ), None, None )
     .await
     .expect( "Failed to create token 2" );
 
   storage
-    .create_token( &generator.generate(), "user_007", None, Some( "Other User Token" ) )
+    .create_token( &generator.generate(), "user_007", None, Some( "Other User Token" ), None, None )
     .await
     .expect( "Failed to create token 3" );
 
@@ -229,7 +231,7 @@ async fn test_update_last_used_timestamp()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_008", None, None )
+    .create_token( &token, "user_008", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 
@@ -262,7 +264,7 @@ async fn test_delete_token()
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_009", None, None )
+    .create_token( &token, "user_009", None, None, None, None )
     .await
     .expect( "Failed to create token" );
 

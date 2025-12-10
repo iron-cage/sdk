@@ -49,9 +49,7 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  routing::{ get, post, delete },
-  Router,
-  http::{ Method, header },
+  Router, http::{ Method, header }, routing::{ delete, get, post, put }
 };
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
@@ -73,6 +71,9 @@ enum DeploymentMode
 
   /// Explicit production deployment (IRON_DEPLOYMENT_MODE=production set)
   Production,
+
+  /// Explicit development deployment (IRON_DEPLOYMENT_MODE=development set)
+  Development,
 }
 
 /// Detect deployment mode using environment signals
@@ -93,6 +94,7 @@ fn detect_deployment_mode() -> DeploymentMode
   // Check for explicit deployment mode setting
   match env::var( "IRON_DEPLOYMENT_MODE" ).as_deref()
   {
+    Ok( "development" ) => return DeploymentMode::Development,
     Ok( "production" ) => return DeploymentMode::Production,
     Ok( "pilot" ) => return DeploymentMode::Pilot,
     _ => {}
@@ -149,6 +151,8 @@ struct AppState
   traces: iron_control_api::routes::traces::TracesState,
   providers: iron_control_api::routes::providers::ProvidersState,
   keys: iron_control_api::routes::keys::KeysState,
+  users: iron_control_api::routes::users::UserManagementState,
+  agents: sqlx::SqlitePool,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -221,6 +225,24 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::keys::Keys
   }
 }
 
+/// Enable user management routes to access UserManagementState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::users::UserManagementState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.users.clone()
+  }
+}
+
+/// Enable agent routes to access SqlitePool from combined AppState
+impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.agents.clone()
+  }
+}
+
 /// Enable API token authentication extractor to access ApiTokenState from combined AppState
 impl axum::extract::FromRef< AppState > for iron_control_api::token_auth::ApiTokenState
 {
@@ -266,6 +288,22 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     {
       eprintln!( "✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)" );
     }
+    DeploymentMode::Development =>
+    {
+      eprintln!( "✓ Development mode (clearing iron.db)" );
+      if std::path::Path::new( "iron.db" ).exists()
+      {
+        if let Err( e ) = std::fs::remove_file( "iron.db" )
+        {
+          eprintln!( "⚠️  Failed to delete iron.db: {}", e );
+        }
+        else
+        {
+          eprintln!( "✓ Cleared iron.db" );
+        }
+      }
+    }
+
     DeploymentMode::Pilot =>
     {
       eprintln!( "✓ Pilot mode (localhost only)" );
@@ -328,6 +366,16 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     rate_limiter: key_rate_limiter,
   };
 
+  // Initialize user management state
+  let permission_checker = std::sync::Arc::new( iron_control_api::rbac::PermissionChecker::new() );
+  let user_management_state = iron_control_api::routes::users::UserManagementState::new(
+    auth_state.db_pool.clone(),
+    permission_checker,
+  );
+
+  // Get database pool for agents (before moving token_state)
+  let agents_pool = token_state.storage.pool().clone();
+
   // Create combined app state
   let app_state = AppState
   {
@@ -338,6 +386,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     traces: traces_state,
     providers: providers_state,
     keys: keys_state,
+    users: user_management_state,
+    agents: agents_pool,
   };
 
   // Build router with all endpoints
@@ -350,12 +400,23 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
     .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
 
+    // User management endpoints
+    .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
+    .route( "/api/users", get( iron_control_api::routes::users::list_users ) )
+    .route( "/api/users/:id", get( iron_control_api::routes::users::get_user ) )
+    .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )
+    .route( "/api/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
+    .route( "/api/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
+    .route( "/api/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
+    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
+
     // Token management endpoints
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
     .route( "/api/tokens", get( iron_control_api::routes::tokens::list_tokens ) )
     .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
     .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/tokens/:id", put( iron_control_api::routes::tokens::update_token ) )
 
     // Usage analytics endpoints
     .route( "/api/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
@@ -385,6 +446,15 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Key fetch endpoint (API token authentication)
     .route( "/api/keys", get( iron_control_api::routes::keys::get_key ) )
 
+    // Agent management endpoints
+    // Agent management endpoints
+    .route( "/api/agents", get( iron_control_api::routes::agents::list_agents ) )
+    .route( "/api/agents", post( iron_control_api::routes::agents::create_agent ) )
+    .route( "/api/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
+    .route( "/api/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
+    .route( "/api/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
+    .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
+
     // Apply combined state to all routes
     .with_state( app_state )
 
@@ -399,7 +469,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
           "http://localhost:5174".parse::<axum::http::HeaderValue>().unwrap(),
           "http://localhost:5175".parse::<axum::http::HeaderValue>().unwrap(),
         ] )
-        .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE ] )
+        .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH ] )
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
     );
 
@@ -412,6 +482,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  POST /api/auth/login" );
   tracing::info!( "  POST /api/auth/refresh" );
   tracing::info!( "  POST /api/auth/logout" );
+  tracing::info!( "  POST /api/users" );
+  tracing::info!( "  GET  /api/users" );
   tracing::info!( "  GET  /api/tokens" );
   tracing::info!( "  POST /api/tokens" );
   tracing::info!( "  GET  /api/tokens/:id" );

@@ -32,11 +32,11 @@ dev: ## Run full stack (API:3000 + Dashboard:5173)
 		cd $(DASHBOARD_DIR) && npm install; \
 	fi
 	@trap 'kill 0' EXIT; \
-		cargo run --release --bin iron_control_api_server & \
+		RUST_LOG="trace" cargo run --release --bin iron_control_api_server & \
 		sleep 2 && cd $(DASHBOARD_DIR) && npm run dev
 
 api: ## Run API server only (port 3000)
-	cargo run --release --bin iron_control_api_server
+	RUST_LOG="trace" cargo run --release --bin iron_control_api_server
 
 dashboard: ## Run dashboard only (port 5173)
 	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \
@@ -93,6 +93,12 @@ status: ## Show installation status
 db-seed: ## Create demo user (demo/testpass)
 	@sqlite3 iron.db "INSERT OR IGNORE INTO users (username, password_hash, role, is_active, created_at) VALUES ('demo', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'user', 1, strftime('%s', 'now'));"
 	@echo "✅ Demo user created (demo/testpass)"
+
+db-seed-admin: ## Create admin user
+	@sqlite3 iron.db "INSERT OR IGNORE INTO users (username, password_hash, role, is_active, created_at) VALUES ('admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now'));"
+	@echo "✅ Admin user created (admin/testpass)"
+
+
 
 db-reset: ## Reset database (deletes all data)
 	rm -f iron.db $(DB_FILE)

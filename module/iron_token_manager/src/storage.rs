@@ -19,6 +19,10 @@ pub struct TokenMetadata
   pub project_id: Option< String >,
   /// Optional human-friendly name
   pub name: Option< String >,
+  /// Optional agent ID
+  pub agent_id: Option< i64 >,
+  /// Optional provider
+  pub provider: Option< String >,
   /// Whether token is active
   pub is_active: bool,
   /// Creation timestamp (milliseconds since epoch)
@@ -143,6 +147,8 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
+
+
     // Migration 006: Create user audit log table
     let migration_006_completed : i64 = sqlx::query_scalar(
       "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'"
@@ -160,6 +166,22 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
+    // Migration 008: Create agents table
+    let migration_008_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_008_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_008_completed == 0
+    {
+      let migration_008 = include_str!( "../migrations/008_create_agents_table.sql" );
+      sqlx::raw_sql( migration_008 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),
@@ -188,19 +210,23 @@ impl TokenStorage
     user_id: &str,
     project_id: Option< &str >,
     name: Option< &str >,
+    agent_id: Option< i64 >,
+    provider: Option< &str >,
   ) -> Result< i64 >
   {
     let now_ms = current_time_ms();
     let token_hash = self.generator.hash_token( plaintext_token );
 
     let result = sqlx::query(
-      "INSERT INTO api_tokens (token_hash, user_id, project_id, name, created_at) \
-       VALUES ($1, $2, $3, $4, $5)"
+      "INSERT INTO api_tokens (token_hash, user_id, project_id, name, agent_id, provider, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7)"
     )
     .bind( &token_hash )
     .bind( user_id )
     .bind( project_id )
     .bind( name )
+    .bind( agent_id )
+    .bind( provider )
     .bind( now_ms )
     .execute( &self.pool )
     .await
@@ -330,7 +356,7 @@ impl TokenStorage
   pub async fn get_token_metadata( &self, token_id: i64 ) -> Result< TokenMetadata >
   {
     let row = sqlx::query(
-      "SELECT id, user_id, project_id, name, is_active, created_at, last_used_at, expires_at \
+      "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at \
        FROM api_tokens WHERE id = $1"
     )
     .bind( token_id )
@@ -343,6 +369,8 @@ impl TokenStorage
       user_id: row.get( "user_id" ),
       project_id: row.get( "project_id" ),
       name: row.get( "name" ),
+      agent_id: row.get( "agent_id" ),
+      provider: row.get( "provider" ),
       is_active: row.get::< bool, _ >( "is_active" ),
       created_at: row.get( "created_at" ),
       last_used_at: row.get( "last_used_at" ),
@@ -414,7 +442,7 @@ impl TokenStorage
   pub async fn list_user_tokens( &self, user_id: &str ) -> Result< Vec< TokenMetadata > >
   {
     let rows = sqlx::query(
-      "SELECT id, user_id, project_id, name, is_active, created_at, last_used_at, expires_at \
+      "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at \
        FROM api_tokens WHERE user_id = $1 ORDER BY created_at DESC"
     )
     .bind( user_id )
@@ -428,6 +456,8 @@ impl TokenStorage
         user_id: row.get( "user_id" ),
         project_id: row.get( "project_id" ),
         name: row.get( "name" ),
+        agent_id: row.get( "agent_id" ),
+        provider: row.get( "provider" ),
         is_active: row.get::< bool, _ >( "is_active" ),
         created_at: row.get( "created_at" ),
         last_used_at: row.get( "last_used_at" ),
@@ -449,6 +479,33 @@ impl TokenStorage
   {
     let result = sqlx::query( "DELETE FROM api_tokens WHERE id = $1" )
       .bind( token_id )
+      .execute( &self.pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+
+    if result.rows_affected() == 0
+    {
+      return Err( crate::error::TokenError );
+    }
+
+    Ok( () )
+  }
+
+  /// Update token provider
+  ///
+  /// # Arguments
+  ///
+  /// * `token_id` - Database ID of token to update
+  /// * `provider` - New provider for token
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails or token not found (0 rows affected)
+  pub async fn update_token_provider( &self, token_id: i64, provider: &str ) -> Result< () >
+  {
+    let result = sqlx::query( "UPDATE api_tokens SET provider = $2 WHERE id = $1" )
+      .bind( token_id )
+      .bind( provider )
       .execute( &self.pool )
       .await
       .map_err( |_| crate::error::TokenError )?;

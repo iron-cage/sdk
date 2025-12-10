@@ -156,7 +156,9 @@ async fn test_usage_persists_across_restart()
       &token,
       "persistence-test-user",
       Some( "persistence-proj" ),
-      Some( "Persistence test token" )
+      Some( "Persistence test token" ),
+      None,
+      None
     )
     .await
     .expect( "LOUD FAILURE: Failed to create token" );
@@ -290,6 +292,8 @@ async fn test_usage_persists_across_multiple_restarts()
       &token,
       "multi-restart-user",
       None,
+      None,
+      None,
       None
     )
     .await
@@ -315,6 +319,8 @@ async fn test_usage_persists_across_multiple_restarts()
     let token_id = token_state.storage.create_token(
       &token,
       "multi-restart-user-2",
+      None,
+      None,
       None,
       None
     )

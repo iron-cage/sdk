@@ -22,9 +22,15 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/tokens',
-      name: 'tokens',
-      component: () => import('../views/TokensView.vue'),
+      path: '/agents',
+      name: 'agents',
+      component: () => import('../views/AgentsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/agents/:agentId/tokens',
+      name: 'agent-tokens',
+      component: () => import('../views/AgentTokensView.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -49,6 +55,12 @@ const router = createRouter({
       path: '/providers',
       name: 'providers',
       component: () => import('../views/ProvidersView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/users',
+      name: 'users',
+      component: () => import('../views/UsersView.vue'),
       meta: { requiresAuth: true },
     },
   ],

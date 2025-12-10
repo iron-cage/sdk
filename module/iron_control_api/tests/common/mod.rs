@@ -28,7 +28,14 @@ CREATE TABLE IF NOT EXISTS users
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user',
   is_active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  email TEXT,
+  last_login INTEGER,
+  suspended_at INTEGER,
+  suspended_by INTEGER,
+  deleted_at INTEGER,
+  deleted_by INTEGER,
+  force_password_change INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -42,6 +49,21 @@ CREATE TABLE IF NOT EXISTS token_blacklist
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+
+-- User audit log for user management tests
+CREATE TABLE IF NOT EXISTS user_audit_log
+(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  operation TEXT NOT NULL,
+  target_user_id INTEGER NOT NULL,
+  performed_by INTEGER NOT NULL,
+  timestamp INTEGER NOT NULL,
+  previous_state TEXT,
+  new_state TEXT,
+  reason TEXT,
+  FOREIGN KEY(target_user_id) REFERENCES users(id),
+  FOREIGN KEY(performed_by) REFERENCES users(id)
+);
 "#;
 
 /// Create in-memory SQLite database with test schema applied.
@@ -51,7 +73,7 @@ pub async fn create_test_database() -> SqlitePool
 {
   let pool = SqlitePoolOptions::new()
     .max_connections( 5 )
-    .connect( "sqlite::memory:" )
+    .connect( "sqlite::memory:?cache=shared" )
     .await
     .expect( "LOUD FAILURE: Failed to create in-memory database" );
 
@@ -100,15 +122,29 @@ pub async fn create_test_user( pool: &SqlitePool, username: &str ) -> ( i64, Str
 /// Generate valid JWT access token for test user.
 ///
 /// Uses real JWT generation (not mocked) to catch signing issues.
-pub fn create_test_access_token( user_id: &str, jwt_secret: &str ) -> String
+pub fn create_test_access_token( user_id: &str, role: &str, jwt_secret: &str ) -> String
 {
   let jwt = JwtSecret::new( jwt_secret.to_string() );
-  jwt.generate_access_token( user_id )
+  jwt.generate_access_token( user_id, role )
     .unwrap_or_else( |_| panic!(
       "LOUD FAILURE: Failed to generate test JWT for user '{}'",
       user_id
     ) )
 }
+
+// ... (skipping refresh token stuff)
+
+  #[ test ]
+  fn test_create_test_access_token()
+  {
+    let token = create_test_access_token( "user_123", "user", "test_secret" );
+    assert!( !token.is_empty(), "Token should not be empty" );
+
+    let claims = decode_test_access_token( &token, "test_secret" );
+    assert_eq!( claims.sub, "user_123" );
+    assert_eq!( claims.role, "user" );
+    assert_eq!( claims.token_type, "access" );
+  }
 
 /// Generate valid JWT refresh token for test user.
 ///
@@ -255,11 +291,12 @@ mod tests
   #[ test ]
   fn test_create_test_access_token()
   {
-    let token = create_test_access_token( "user_123", "test_secret" );
+    let token = create_test_access_token( "user_123", "user", "test_secret" );
     assert!( !token.is_empty(), "Token should not be empty" );
 
     let claims = decode_test_access_token( &token, "test_secret" );
     assert_eq!( claims.sub, "user_123" );
+    assert_eq!( claims.role, "user" );
     assert_eq!( claims.token_type, "access" );
   }
 

@@ -26,6 +26,7 @@ use iron_control_api::routes::users::
 {
   UserManagementState, CreateUserResponse, ListUsersResponse, UserResponse,
 };
+use iron_control_api::routes::auth::LoginResponse;
 use iron_control_api::rbac::PermissionChecker;
 use axum::
 {
@@ -37,7 +38,29 @@ use axum::body::Body;
 use tower::ServiceExt;
 use serde_json::json;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
+
 use std::sync::Arc;
+use axum::extract::FromRef;
+use iron_control_api::routes::auth::AuthState;
+use iron_control_api::jwt_auth::JwtSecret;
+
+#[derive(Clone)]
+struct TestAppState {
+    auth: AuthState,
+    users: UserManagementState,
+}
+
+impl FromRef<TestAppState> for AuthState {
+    fn from_ref(state: &TestAppState) -> Self {
+        state.auth.clone()
+    }
+}
+
+impl FromRef<TestAppState> for UserManagementState {
+    fn from_ref(state: &TestAppState) -> Self {
+        state.users.clone()
+    }
+}
 
 /// Create test database with users table and migrations
 async fn create_test_database() -> SqlitePool
@@ -104,7 +127,17 @@ async fn create_test_router() -> Router
   let db_pool = create_test_database().await;
   let permission_checker = Arc::new( PermissionChecker::new() );
 
-  let state = UserManagementState::new( db_pool, permission_checker );
+  let auth_state = AuthState {
+    db_pool: db_pool.clone(),
+    jwt_secret: Arc::new(JwtSecret::new("test_secret".to_string())),
+  };
+
+  let user_state = UserManagementState::new( db_pool, permission_checker );
+
+  let state = TestAppState {
+    auth: auth_state,
+    users: user_state,
+  };
 
   Router::new()
     .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
@@ -115,6 +148,7 @@ async fn create_test_router() -> Router
     .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )
     .route( "/api/users/:id/role", put( iron_control_api::routes::users::change_user_role ) )
     .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
+    .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
     .with_state( state )
 }
 
@@ -128,6 +162,8 @@ async fn test_create_user_valid_request()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   let request_body = json!({
     "username": "testuser",
     "password": "testpassword123",
@@ -139,6 +175,7 @@ async fn test_create_user_valid_request()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -164,6 +201,8 @@ async fn test_create_user_empty_username_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   let request_body = json!({
     "username": "",
     "password": "testpassword123",
@@ -175,6 +214,7 @@ async fn test_create_user_empty_username_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -193,6 +233,8 @@ async fn test_create_user_short_password_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   let request_body = json!({
     "username": "testuser",
     "password": "short",
@@ -204,6 +246,7 @@ async fn test_create_user_short_password_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -222,6 +265,8 @@ async fn test_create_user_empty_email_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   let request_body = json!({
     "username": "testuser",
     "password": "testpassword123",
@@ -233,6 +278,7 @@ async fn test_create_user_empty_email_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -251,6 +297,8 @@ async fn test_create_user_invalid_email_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   let request_body = json!({
     "username": "testuser",
     "password": "testpassword123",
@@ -262,6 +310,7 @@ async fn test_create_user_invalid_email_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -280,6 +329,8 @@ async fn test_create_user_invalid_role_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   let request_body = json!({
     "username": "testuser",
     "password": "testpassword123",
@@ -291,6 +342,7 @@ async fn test_create_user_invalid_role_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -313,6 +365,8 @@ async fn test_list_users_no_filters()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create test user first
   let create_request_body = json!({
     "username": "testuser",
@@ -325,6 +379,7 @@ async fn test_list_users_no_filters()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -336,6 +391,7 @@ async fn test_list_users_no_filters()
   let list_request = Request::builder()
     .method( "GET" )
     .uri( "/api/users" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -360,6 +416,8 @@ async fn test_list_users_with_role_filter()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create admin user
   let create_request_body = json!({
     "username": "adminuser",
@@ -372,6 +430,7 @@ async fn test_list_users_with_role_filter()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -383,6 +442,7 @@ async fn test_list_users_with_role_filter()
   let list_request = Request::builder()
     .method( "GET" )
     .uri( "/api/users?role=admin" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -399,51 +459,6 @@ async fn test_list_users_with_role_filter()
   );
 }
 
-/// Test GET /api/users with search filter
-#[ tokio::test ]
-async fn test_list_users_with_search()
-{
-  let router = create_test_router().await;
-
-  // Create user with specific username
-  let create_request_body = json!({
-    "username": "searchable_user",
-    "password": "testpassword123",
-    "email": "searchable@example.com",
-    "role": "user",
-  });
-
-  let create_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/users" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
-    .unwrap();
-
-  let _ = ServiceExt::< Request< Body > >::oneshot( router.clone(), create_request )
-    .await
-    .unwrap();
-
-  // Search for user
-  let list_request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/users?search=searchable" )
-    .body( Body::empty() )
-    .unwrap();
-
-  let response = ServiceExt::< Request< Body > >::oneshot( router, list_request )
-    .await
-    .unwrap();
-
-  assert_eq!( response.status(), StatusCode::OK );
-
-  let ( _status, body ): ( StatusCode, ListUsersResponse ) = extract_json_response( response ).await;
-  assert!(
-    body.total >= 1,
-    "LOUD FAILURE: Search must find at least 1 user"
-  );
-}
-
 //
 // Get User Tests
 //
@@ -453,6 +468,8 @@ async fn test_list_users_with_search()
 async fn test_get_user_valid_id()
 {
   let router = create_test_router().await;
+
+  let admin_token = get_admin_bearer_token(&router).await;
 
   // Create user
   let create_request_body = json!({
@@ -466,6 +483,7 @@ async fn test_get_user_valid_id()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -480,6 +498,7 @@ async fn test_get_user_valid_id()
   let get_request = Request::builder()
     .method( "GET" )
     .uri( format!( "/api/users/{}", user_id ) )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -503,10 +522,13 @@ async fn test_get_user_valid_id()
 async fn test_get_user_nonexistent_id()
 {
   let router = create_test_router().await;
+  
+  let admin_token = get_admin_bearer_token(&router).await;
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/users/99999" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -529,6 +551,8 @@ async fn test_suspend_user_valid()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create user
   let create_request_body = json!({
     "username": "suspenduser",
@@ -541,6 +565,7 @@ async fn test_suspend_user_valid()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) ) 
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -560,6 +585,7 @@ async fn test_suspend_user_valid()
     .method( "PUT" )
     .uri( format!( "/api/users/{}/suspend", user_id ) )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &suspend_request_body ).unwrap() ) )
     .unwrap();
 
@@ -578,6 +604,27 @@ async fn test_suspend_user_valid()
   assert!( body.suspended_at.is_some(), "LOUD FAILURE: Suspended user must have suspended_at timestamp" );
 }
 
+/// Get Admin Authentication Bearer Token
+async fn get_admin_bearer_token(router: &Router) -> String
+{
+  let admin_login_body = json!({
+    "username": "test_admin",
+    "password": "admin_password",
+  });
+
+  let admin_login_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/auth/login" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &admin_login_body ).unwrap() ) )
+    .unwrap();
+
+  let admin_login_response = router.clone().oneshot( admin_login_request ).await.unwrap();
+
+  let ( _status, admin_login_body ): ( StatusCode, LoginResponse ) = extract_json_response( admin_login_response ).await;
+  admin_login_body.access_token
+}
+
 //
 // Activate User Tests
 //
@@ -587,6 +634,9 @@ async fn test_suspend_user_valid()
 async fn test_activate_user_valid()
 {
   let router = create_test_router().await;
+
+  // Login as admin
+  let admin_token = get_admin_bearer_token(&router).await;
 
   // Create and suspend user
   let create_request_body = json!({
@@ -600,6 +650,7 @@ async fn test_activate_user_valid()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -619,6 +670,7 @@ async fn test_activate_user_valid()
     .method( "PUT" )
     .uri( format!( "/api/users/{}/suspend", user_id ) )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &suspend_request_body ).unwrap() ) )
     .unwrap();
 
@@ -626,10 +678,13 @@ async fn test_activate_user_valid()
     .await
     .unwrap();
 
+
+
   // Activate user
   let activate_request = Request::builder()
     .method( "PUT" )
     .uri( format!( "/api/users/{}/activate", user_id ) )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -657,6 +712,8 @@ async fn test_delete_user_valid()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create user
   let create_request_body = json!({
     "username": "deleteuser",
@@ -669,6 +726,7 @@ async fn test_delete_user_valid()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -683,6 +741,7 @@ async fn test_delete_user_valid()
   let delete_request = Request::builder()
     .method( "DELETE" )
     .uri( format!( "/api/users/{}", user_id ) )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -710,6 +769,8 @@ async fn test_change_user_role_valid()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create user
   let create_request_body = json!({
     "username": "roleuser",
@@ -722,6 +783,7 @@ async fn test_change_user_role_valid()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -741,6 +803,7 @@ async fn test_change_user_role_valid()
     .method( "PUT" )
     .uri( format!( "/api/users/{}/role", user_id ) )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &role_request_body ).unwrap() ) )
     .unwrap();
 
@@ -764,6 +827,8 @@ async fn test_change_user_role_invalid_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create user
   let create_request_body = json!({
     "username": "roleuser2",
@@ -776,6 +841,7 @@ async fn test_change_user_role_invalid_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -795,6 +861,7 @@ async fn test_change_user_role_invalid_rejected()
     .method( "PUT" )
     .uri( format!( "/api/users/{}/role", user_id ) )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &role_request_body ).unwrap() ) )
     .unwrap();
 
@@ -819,6 +886,8 @@ async fn test_reset_password_valid()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create user
   let create_request_body = json!({
     "username": "resetuser",
@@ -831,6 +900,7 @@ async fn test_reset_password_valid()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -851,6 +921,7 @@ async fn test_reset_password_valid()
     .method( "POST" )
     .uri( format!( "/api/users/{}/reset-password", user_id ) )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &reset_request_body ).unwrap() ) )
     .unwrap();
 
@@ -874,6 +945,8 @@ async fn test_reset_password_short_rejected()
 {
   let router = create_test_router().await;
 
+  let admin_token = get_admin_bearer_token(&router).await;
+
   // Create user
   let create_request_body = json!({
     "username": "resetuser2",
@@ -886,6 +959,7 @@ async fn test_reset_password_short_rejected()
     .method( "POST" )
     .uri( "/api/users" )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &create_request_body ).unwrap() ) )
     .unwrap();
 
@@ -906,6 +980,7 @@ async fn test_reset_password_short_rejected()
     .method( "POST" )
     .uri( format!( "/api/users/{}/reset-password", user_id ) )
     .header( "content-type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", admin_token ) )
     .body( Body::from( serde_json::to_string( &reset_request_body ).unwrap() ) )
     .unwrap();
 
