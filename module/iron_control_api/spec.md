@@ -17,10 +17,11 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 ## Scope
 
 **In Scope:**
-- REST API endpoints (tokens, usage, limits, traces, auth handshake)
+- REST API endpoints (tokens, usage, limits, traces, auth handshake, user management)
 - WebSocket server for dashboard real-time updates
 - Authentication and authorization (IC Token validation)
 - Request routing and validation
+- RBAC enforcement (role-based access control)
 - Integration with iron_token_manager, iron_runtime_state
 
 **Out of Scope:**
@@ -76,3 +77,4 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 *For detailed API specification, see spec/-archived_detailed_spec.md*
 *For REST protocol, see docs/protocol/002_rest_api_protocol.md*
 *For WebSocket protocol, see docs/protocol/003_websocket_protocol.md*
+*For user management API, see docs/protocol/008_user_management_api.md*

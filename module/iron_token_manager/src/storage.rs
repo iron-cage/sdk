@@ -109,6 +109,57 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
+    // Migration 004: AI provider keys table
+    let migration_004_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_004_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_004_completed == 0
+    {
+      let migration_004 = include_str!( "../migrations/004_create_ai_provider_keys.sql" );
+      sqlx::raw_sql( migration_004 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
+    // Migration 005: Enhance users table for user management
+    let migration_005_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_005_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_005_completed == 0
+    {
+      let migration_005 = include_str!( "../migrations/005_enhance_users_table.sql" );
+      sqlx::raw_sql( migration_005 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
+    // Migration 006: Create user audit log table
+    let migration_006_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_006_completed == 0
+    {
+      let migration_006 = include_str!( "../migrations/006_create_user_audit_log.sql" );
+      sqlx::raw_sql( migration_006 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),

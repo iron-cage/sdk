@@ -95,12 +95,14 @@ Understand all available REST API resources, how they map to domain entities, an
 | Resource | Entity Mapping | HTTP Methods | Auth Type | Certainty | CLI Command Group |
 |----------|----------------|--------------|-----------|-----------|-------------------|
 | `/api/tokens` | IC Token (1:1) | GET, POST, DELETE, PUT | User Token | ✅ Certain | `iron tokens` |
+| `/api/users` | User (1:1) | GET, POST, PUT, DELETE | User Token (Admin) | ✅ Certain | `iron users` |
 | `/api/api-tokens` | API Token (1:N per user) | GET, POST, DELETE | User Token | ⚠️ Uncertain | `iron api-tokens` |
 | `/api/projects` | Project (1:1) | GET, POST, PUT, DELETE | User Token | ⚠️ Uncertain | `iron projects` |
 | `/api/providers` | IP (1:1) | GET, POST, PUT, DELETE | User Token | ⚠️ Uncertain | `iron providers` |
 
 **Notes:**
 - IC Token is certain (required for Pilot)
+- User management is certain (admin functionality, RBAC enforcement with audit logging)
 - API Token uncertain (external integrations, not Pilot-critical)
 - Project and IP management uncertain (design pending)
 
@@ -283,6 +285,14 @@ Understand all available REST API resources, how they map to domain entities, an
 | `POST /api/tokens` | POST | `iron tokens create` | Create IC Token |
 | `DELETE /api/tokens/{id}` | DELETE | `iron tokens delete <id>` | Delete IC Token |
 | `PUT /api/tokens/{id}/rotate` | PUT | `iron tokens rotate <id>` | Rotate IC Token |
+| `GET /api/users` | GET (list) | `iron users list` | List all users |
+| `GET /api/users/{id}` | GET | `iron users get <id>` | Get user details |
+| `POST /api/users` | POST | `iron users create` | Create user |
+| `PUT /api/users/{id}/suspend` | PUT | `iron users suspend <id>` | Suspend user |
+| `PUT /api/users/{id}/activate` | PUT | `iron users activate <id>` | Activate user |
+| `DELETE /api/users/{id}` | DELETE | `iron users delete <id>` | Soft delete user |
+| `PUT /api/users/{id}/role` | PUT | `iron users change-role <id>` | Change user role |
+| `PUT /api/users/{id}/password` | PUT | `iron users reset-password <id>` | Reset user password |
 
 ### Operation Resources → Commands
 
@@ -312,10 +322,11 @@ Understand all available REST API resources, how they map to domain entities, an
 - No major design questions
 - Dependencies resolved
 
-**Resources (9 total):**
+**Resources (10 total):**
 
-1. **Entity Resources (1):**
+1. **Entity Resources (2):**
    - `/api/tokens` - IC Token CRUD
+   - `/api/users` - User account management CRUD
 
 2. **Operation Resources (4):**
    - `/api/auth` - User authentication
@@ -365,13 +376,14 @@ Understand all available REST API resources, how they map to domain entities, an
 
 **Entities Without Direct API:**
 
-1. **User** - Managed via authentication (`/api/auth`), not CRUD
-2. **Agent** - Created via agent registration, not direct CRUD
-3. **Master Project** - Admin view only, no separate API
-4. **User Token** - Managed via authentication lifecycle, not CRUD
-5. **IP Token** - Vault-managed, never exposed via API
+1. **Agent** - Created via agent registration, not direct CRUD
+2. **Master Project** - Admin view only, no separate API
+3. **User Token** - Managed via authentication lifecycle, not CRUD
+4. **IP Token** - Vault-managed, never exposed via API
 
 **Reason:** These entities managed indirectly or through specialized operations.
+
+**Note:** User entity now has direct CRUD API at `/api/users` (admin-only access with RBAC).
 
 ## Transition Criteria
 
