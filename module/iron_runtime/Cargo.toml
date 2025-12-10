@@ -11,6 +11,7 @@ crate-type = ["rlib", "cdylib"]
 
 [features]
 default = ["enabled"]
+integration = []
 enabled = [
   "dep:iron_types",
   "dep:iron_runtime_state",
@@ -26,6 +27,10 @@ enabled = [
   "dep:serde_json",
   "dep:uuid",
   "dep:anyhow",
+  # LlmRouter dependencies
+  "dep:axum",
+  "dep:reqwest",
+  "dep:tracing",
 ]
 full = ["enabled"]
 pyo3 = ["dep:pyo3"]
@@ -53,11 +58,20 @@ serde_json = { workspace = true, optional = true }
 
 # Error handling
 anyhow = { workspace = true, optional = true }
-thiserror = { workspace = true, optional = true }
+
 
 # Utilities
 uuid = { workspace = true, features = ["v4"], optional = true }
 
+# HTTP server (LlmRouter)
+axum = { workspace = true, optional = true }
+
+# HTTP client (LlmRouter)
+reqwest = { workspace = true, features = ["json"], optional = true }
+
+# Logging
+tracing = { workspace = true, optional = true }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
-tokio-test = "0.4"
+

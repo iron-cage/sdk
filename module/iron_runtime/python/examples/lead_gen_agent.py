@@ -20,9 +20,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from iron_runtime import Runtime
+    from iron_cage import Runtime
 except ImportError:
-    print("ERROR: iron_runtime not found. Compile Rust extension first:")
+    print("ERROR: iron_cage not found. Compile Rust extension first:")
     print("  cd /home/user1/pro/lib/willbe/module/iron_runtime")
     print("  maturin develop")
     sys.exit(1)

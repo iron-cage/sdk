@@ -1,4 +1,4 @@
-//! Iron Cage Runtime - Agent lifecycle management + PyO3 bridge
+//! Iron Cage Runtime - Agent lifecycle management + LLM Router + PyO3 bridge
 //!
 //! Core runtime for AI agent execution with safety and cost controls.
 //! Provides Python bindings via PyO3 for LangChain/CrewAI integration.
@@ -6,9 +6,14 @@
 //! Features:
 //! - #1: Agent Lifecycle Management
 //! - #2: Python-Rust Integration (PyO3)
+//! - #3: LLM Router - Local proxy for OpenAI/Anthropic API requests
 //! - #16-18: Demo agent (in python/examples/)
 
 #![cfg_attr(not(feature = "enabled"), allow(unused_variables, dead_code))]
+
+// LLM Router module
+#[cfg(feature = "enabled")]
+pub mod llm_router;
 
 #[cfg(feature = "enabled")]
 #[allow(clippy::useless_conversion)] // PyO3 macros generate useless conversions in PyResult return types
@@ -156,9 +161,10 @@ mod implementation
 
     /// Python module definition
     #[pymodule]
-    fn iron_runtime(m: &Bound<'_, PyModule>) -> PyResult<()>
+    fn iron_cage(m: &Bound<'_, PyModule>) -> PyResult<()>
     {
       m.add_class::<Runtime>()?;
+      m.add_class::<crate::llm_router::LlmRouter>()?;
       Ok(())
     }
   }
