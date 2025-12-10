@@ -19,6 +19,8 @@ async fn test_valid_minimal_request()
     user_id: "user_test".to_string(),
     project_id: None,
     description: None,
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -38,6 +40,8 @@ async fn test_valid_complete_request()
     user_id: "user_test".to_string(),
     project_id: Some( "project_abc".to_string() ),
     description: Some( "Production API key".to_string() ),
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -57,6 +61,8 @@ async fn test_empty_user_id_rejected()
     user_id: "".to_string(),
     project_id: None,
     description: None,
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -82,6 +88,8 @@ async fn test_empty_project_id_rejected()
     user_id: "user_test".to_string(),
     project_id: Some( "".to_string() ),
     description: None,
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -108,6 +116,8 @@ async fn test_description_too_long_rejected()
     user_id: "user_test".to_string(),
     project_id: None,
     description: Some( long_description ),
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -134,6 +144,8 @@ async fn test_description_max_length_accepted()
     user_id: "user_test".to_string(),
     project_id: None,
     description: Some( max_description ),
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -153,6 +165,8 @@ async fn test_single_char_user_id_accepted()
     user_id: "a".to_string(),
     project_id: None,
     description: None,
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -172,6 +186,8 @@ async fn test_whitespace_user_id_rejected()
     user_id: "   ".to_string(),
     project_id: None,
     description: None,
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();
@@ -197,6 +213,8 @@ async fn test_whitespace_project_id_rejected()
     user_id: "user_test".to_string(),
     project_id: Some( "   ".to_string() ),
     description: None,
+    agent_id: None,
+    provider: None,
   };
 
   let result = request.validate();

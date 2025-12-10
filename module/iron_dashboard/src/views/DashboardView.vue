@@ -186,7 +186,7 @@ function navigateToLimits() {
                     ID
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Project
+                    Provider
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Description
@@ -205,7 +205,7 @@ function navigateToLimits() {
                     {{ token.id }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ token.project_id || '-' }}
+                    {{ token.provider || '-' }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ token.name || '-' }}

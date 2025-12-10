@@ -145,7 +145,7 @@ iron_cli_py translates Click-style arguments to iron_cli's unilang syntax:
 iron_cli_py locates the iron_cli binary using this search order:
 
 1. `IRON_CLI_PATH` environment variable (explicit override)
-2. Bundled binary in pip package (`pip install iron-cli-py[binary]`)
+2. Bundled binary in pip package (`uv pip install iron-cli-py[binary]`)
 3. System PATH (`which iron-token`)
 4. `~/.cargo/bin/iron-token`
 5. `/usr/local/bin/iron-token`
@@ -155,8 +155,8 @@ iron_cli_py locates the iron_cli binary using this search order:
 
 | Option | Command | Binary Source |
 |--------|---------|---------------|
-| Bundled | `pip install iron-cli-py[binary]` | Downloaded during install |
-| System | `pip install iron-cli-py` | Must be in PATH |
+| Bundled | `uv pip install iron-cli-py[binary]` | Downloaded during install |
+| System | `uv pip install iron-cli-py` | Must be in PATH |
 | Cargo | `cargo install iron-cli` | Built from source |
 | Manual | Download from releases | Set IRON_CLI_PATH |
 

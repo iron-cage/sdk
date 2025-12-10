@@ -10,24 +10,25 @@
 
 ## Responsibility
 
-Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, calculates costs based on provider pricing, enforces spending limits with automatic cutoffs and threshold warnings.
+LLM pricing data and cost calculation. Provides pricing data for multiple LLM providers, calculates costs based on token usage using integer arithmetic (microdollars) to avoid floating-point precision errors.
 
 ---
 
 ## Scope
 
 **In Scope:**
-- Token counting for OpenAI models (tiktoken integration)
-- Cost calculation (tokens → USD)
-- Budget enforcement with hard limits
-- Threshold warnings (90% alert for demo)
-- Per-agent cost attribution
+- Multi-provider pricing data (LiteLLM pricing source)
+- Cost calculation (tokens → microdollars, with USD conversion)
+- Pre-reservation cost estimation for budget enforcement
+- Per-model pricing with input/output token rates
+- Currency conversion utilities (USD ↔ microdollars)
 
 **Out of Scope:**
-- Multi-currency support (pilot: USD only)
-- Multi-provider pricing (pilot: OpenAI only)
+- Token counting (handled by LLM response)
+- Multi-currency support (USD only)
 - Cost forecasting (see analytics features)
-- Budget allocation per-agent (pilot: global budget)
+- Budget persistence (runtime uses in-memory tracking)
+- Budget tracking/enforcement (application-level concern)
 
 ---
 
@@ -35,11 +36,10 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 
 **Required Modules:**
 - iron_types - Foundation types
-- iron_runtime_state - Budget state persistence
-- iron_telemetry - Warning alerts
 
 **Required External:**
-- tiktoken - Token counting for OpenAI models
+- arc_swap - Lock-free concurrent access to pricing data
+- serde/serde_json - Pricing data serialization
 
 **Optional:**
 - None
@@ -49,22 +49,39 @@ Budget tracking and enforcement for LLM usage. Counts tokens using tiktoken, cal
 ## Core Concepts
 
 **Key Components:**
-- **Token Counter:** Counts tokens using tiktoken library
-- **Cost Calculator:** Converts token counts to USD amounts
-- **Budget Enforcer:** Blocks requests when spending limit exceeded
-- **Threshold Detector:** Triggers warnings at configurable percentage
+- **PricingManager:** Thread-safe pricing data store with lock-free reads (ArcSwap)
+- **Model:** Pricing info for single LLM model with cost calculation methods
+- **Converter:** USD ↔ microdollars conversion utilities
+- **Embedded Pricing:** LiteLLM pricing JSON embedded at compile time
+
+**Microdollar Precision:**
+- 1 USD = 1,000,000 microdollars
+- Per-token costs stored as "microdollars per million tokens" (u64)
+- All cost calculations use integer arithmetic to avoid floating-point errors
+- Example: $0.00000125/token = 1,250,000 micros/million tokens
+
+**Cost Calculation:**
+- Actual cost (micros): `(input_tokens * input_micros_per_M + output_tokens * output_micros_per_M) / 1,000,000`
+- Max cost (pre-reservation): Same formula using max_output_tokens limit
+- Default max_output_tokens: 128,000 (when model has no limit info)
+
+**API Surface:**
+- `calculate_cost_micros(input, output) -> u64` - Primary integer API
+- `calculate_cost(input, output) -> f64` - Convenience USD wrapper
+- `calculate_max_cost_micros(input, max_output) -> u64` - Budget pre-reservation
+- `converter::usd_to_micros(f64) -> u64` - Currency conversion
+- `converter::micros_to_usd(u64) -> f64` - Currency conversion
 
 ---
 
 ## Integration Points
 
 **Used by:**
-- iron_runtime - Budget checks before LLM calls
+- iron_runtime/LlmRouter - Calculates per-request costs in microdollars, tracks total_spent
 - iron_control_api - Cost reporting endpoints
 
 **Uses:**
-- iron_runtime_state - Persists budget and spending data
-- iron_telemetry - Emits budget warning alerts
+- Embedded LiteLLM pricing data (asset/pricing.json)
 
 ---
 

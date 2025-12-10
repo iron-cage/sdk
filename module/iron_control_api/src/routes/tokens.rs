@@ -51,6 +51,8 @@ pub struct CreateTokenRequest
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
+  pub agent_id: Option< i64 >,
+  pub provider: Option< String >,
 }
 
 impl CreateTokenRequest
@@ -143,6 +145,45 @@ impl CreateTokenRequest
   }
 }
 
+/// Update token request
+#[ derive( Debug, Serialize, Deserialize ) ]
+pub struct UpdateTokenRequest
+{
+  pub provider: String,
+}
+
+impl UpdateTokenRequest
+{
+  /// Maximum length of provider (DoS protection)
+  const MAX_PROVIDER_LENGTH: usize = 64;
+
+  fn validate( &self ) -> Result< (), String >
+  {
+    // Validate provider if provided
+    if self.provider.trim().is_empty()
+    {
+      return Err( "provider cannot be empty".to_string() );
+    }
+
+    // Validate provider length (DoS protection)
+    if self.provider.len() > Self::MAX_PROVIDER_LENGTH
+    {
+      return Err( format!(
+        "provider too long (max {} characters)",
+        Self::MAX_PROVIDER_LENGTH
+      ) );
+    }
+
+    // Validate provider doesnt contain NULL bytes
+    if self.provider.contains( '\0' )
+    {
+      return Err( "provider contains invalid NULL byte".to_string() );
+    }
+
+    Ok( () )
+  }
+}
+
 /// Create token response
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct CreateTokenResponse
@@ -152,6 +193,8 @@ pub struct CreateTokenResponse
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
+  pub agent_id: Option< i64 >,
+  pub provider: Option< String >,
   pub created_at: i64,
 }
 
@@ -163,6 +206,8 @@ pub struct TokenListItem
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
+  pub agent_id: Option< i64 >,
+  pub provider: Option< String >,
   pub created_at: i64,
   pub last_used_at: Option< i64 >,
   pub is_active: bool,
@@ -206,6 +251,8 @@ pub async fn create_token(
       &request.user_id,
       request.project_id.as_deref(),
       request.description.as_deref(),
+      request.agent_id,
+      request.provider.as_deref(),
     )
     .await
   {
@@ -241,6 +288,8 @@ pub async fn create_token(
     user_id: metadata.user_id,
     project_id: metadata.project_id,
     description: metadata.name,
+    agent_id: metadata.agent_id,
+    provider: metadata.provider,
     created_at: metadata.created_at,
   } ) )
     .into_response()
@@ -288,6 +337,8 @@ pub async fn list_tokens(
       user_id: t.user_id,
       project_id: t.project_id,
       description: t.name,
+      agent_id: t.agent_id,
+      provider: t.provider,
       created_at: t.created_at,
       last_used_at: t.last_used_at,
       is_active: t.is_active,
@@ -335,6 +386,83 @@ pub async fn get_token(
     user_id: metadata.user_id,
     project_id: metadata.project_id,
     description: metadata.name,
+    agent_id: metadata.agent_id,
+    provider: metadata.provider,
+    created_at: metadata.created_at,
+    last_used_at: metadata.last_used_at,
+    is_active: metadata.is_active,
+  };
+
+  ( StatusCode::OK, Json( item ) ).into_response()
+}
+
+/// PUT /api/tokens/:id
+/// 
+/// Update token details
+///
+/// # Arguments
+///
+/// * `state` - Token generator state
+/// * `token_id` - Token ID from path
+///
+/// # Returns
+///
+/// - 200 OK with updated token details
+/// - 404 Not Found if token doesn't exist
+pub async fn update_token(
+  State( state ): State< TokenState >,
+  Path( token_id ): Path< i64 >,
+  crate::error::JsonBody( request ): crate::error::JsonBody< UpdateTokenRequest >,
+) -> impl IntoResponse
+{
+  // TODO: Extract user_id from JWT claims and verify ownership
+  if let Err( validation_error ) = request.validate()
+  {
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
+      "error": validation_error
+    }) ) ).into_response();
+  }
+
+  let token_id = match state
+    .storage
+    .update_token_provider(
+      token_id,
+      &request.provider,
+    )
+    .await
+  {
+    Ok( () ) => token_id,
+    Err( _ ) =>
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to update token" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  let metadata = match state.storage.get_token_metadata( token_id ).await
+  {
+    Ok( metadata ) => metadata,
+    Err( _ ) =>
+    {
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Token not found" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  let item = TokenListItem
+  {
+    id: metadata.id,
+    user_id: metadata.user_id,
+    project_id: metadata.project_id,
+    description: metadata.name,
+    agent_id: metadata.agent_id,
+    provider: metadata.provider,
     created_at: metadata.created_at,
     last_used_at: metadata.last_used_at,
     is_active: metadata.is_active,
@@ -407,6 +535,8 @@ pub async fn rotate_token(
       &existing_metadata.user_id,
       existing_metadata.project_id.as_deref(),
       existing_metadata.name.as_deref(),
+      existing_metadata.agent_id,
+      existing_metadata.provider.as_deref(),
     )
     .await
   {
@@ -442,6 +572,8 @@ pub async fn rotate_token(
     user_id: new_metadata.user_id,
     project_id: new_metadata.project_id,
     description: new_metadata.name,
+    agent_id: new_metadata.agent_id,
+    provider: new_metadata.provider,
     created_at: new_metadata.created_at,
   } ) )
     .into_response()

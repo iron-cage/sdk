@@ -82,7 +82,7 @@ async fn test_jwt_token_infrastructure()
   // Generate access token
   let access_token = auth_state
     .jwt_secret
-    .generate_access_token( "user_testuser" )
+    .generate_access_token( "user_testuser", "user" )
     .expect( "LOUD FAILURE: Should generate access token" );
 
   assert!(

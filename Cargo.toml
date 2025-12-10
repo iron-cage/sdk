@@ -321,3 +321,6 @@ features = ["full"]
 
 [workspace.dependencies.http-body-util]
 version = "0.1"
+
+[workspace.dependencies.arc-swap]
+version = "1.7.1"

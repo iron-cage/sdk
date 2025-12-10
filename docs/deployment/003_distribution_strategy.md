@@ -16,9 +16,9 @@ Know where to get each package and how updates are delivered.
 |---------|---------|-----|
 | Control Panel | Docker Hub | `ironcage/control-panel` |
 | Marketing Site | CDN | `ironcage.ai` |
-| Agent Runtime | PyPI | `pip install iron-sdk` |
-| Sandbox | PyPI | `pip install iron-sandbox` |
-| CLI Tools | GitHub + PyPI | Binary + `pip install iron-cli` |
+| Agent Runtime | PyPI | `uv pip install iron-sdk` |
+| Sandbox | PyPI | `uv pip install iron-sandbox` |
+| CLI Tools | GitHub + PyPI | Binary + `uv pip install iron-cli` |
 
 ## Channel Characteristics
 
@@ -26,7 +26,7 @@ Know where to get each package and how updates are delivered.
 |---------|-------------|------------|----------|
 | Docker Hub | Pull latest | Tags | Yes |
 | CDN | Automatic | Immutable | CDN cache |
-| PyPI | `pip install --upgrade` | Semantic | Pin version |
+| PyPI | `uv pip install --upgrade` | Semantic | Pin version |
 | GitHub + PyPI | Manual + pip | Releases + Semantic | Download older / Pin |
 
 ## Version Compatibility

@@ -63,7 +63,7 @@ iron_cli_py (Python/Click)
 - Binary distribution complexity
 
 **Mitigations:**
-- Bundled binary option: `pip install iron-cli-py[binary]`
+- Bundled binary option: `uv pip install iron-cli-py[binary]`
 - Clear error messages for missing binary
 - Binary discovery with multiple fallback locations
 

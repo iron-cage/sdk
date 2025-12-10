@@ -2,6 +2,7 @@
 
 use pyo3::prelude::*;
 use std::net::TcpListener;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -44,6 +45,8 @@ pub struct LlmRouter {
   runtime: tokio::runtime::Runtime,
   /// Shutdown channel
   shutdown_tx: Option<oneshot::Sender<()>>,
+  /// Total spent in microdollars (shared with proxy)
+  total_spent_micros: Arc<AtomicU64>,
 }
 
 #[pymethods]
@@ -106,6 +109,12 @@ impl LlmRouter {
   #[getter]
   fn is_running(&self) -> bool {
     self.running()
+  }
+
+  /// Get total spent in USD (debug purposes)
+  fn total_spent(&self) -> f64 {
+    let micros = self.total_spent_micros.load(Ordering::Relaxed);
+    micros as f64 / 1_000_000.0
   }
 
   /// Stop the proxy server
@@ -197,12 +206,16 @@ impl LlmRouter {
     // Create shutdown channel
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
+    // Create shared counter for total spent
+    let total_spent_micros = Arc::new(AtomicU64::new(0));
+
     // Create config
     let config = ProxyConfig {
       port,
       ic_token: api_key.clone(),
       server_url: server_url.clone(),
       cache_ttl_seconds,
+      total_spent_micros: total_spent_micros.clone(),
     };
 
     // Spawn proxy server
@@ -222,6 +235,7 @@ impl LlmRouter {
       provider,
       runtime,
       shutdown_tx: Some(shutdown_tx),
+      total_spent_micros,
     })
   }
 

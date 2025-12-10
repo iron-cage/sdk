@@ -38,7 +38,7 @@ Understand system boundaries and who uses which packages.
 ## Interaction Patterns
 
 ```
-Developer --pip install--> Agent Runtime --HTTPS--> LLM APIs
+Developer --uv pip install--> Agent Runtime --HTTPS--> LLM APIs
                                 |
 Operations --browser--> Control Panel --WebSocket--+
                                 |

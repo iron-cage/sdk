@@ -98,10 +98,10 @@ iron_cli_py uses a **wrapper pattern** for operations commands, delegating to ir
 
 ```bash
 # Install CLI with bundled binary (recommended)
-pip install iron-cli-py[binary]
+uv pip install iron-cli-py[binary]
 
 # Or install CLI only (requires iron_cli in PATH)
-pip install iron-cli-py
+uv pip install iron-cli-py
 
 # Initialize new project from template (NATIVE)
 iron-py init --template langchain --name my-agent
@@ -122,25 +122,26 @@ iron-py agent start --config iron.toml
 
 ```bash
 # Option 1: Bundled binary (recommended)
-pip install iron-cli-py[binary]
+uv pip install iron-cli-py[binary]
 
 # Option 2: System binary (requires iron_cli in PATH)
-pip install iron-cli-py
+uv pip install iron-cli-py
 cargo install iron-cli  # or download from releases
 
 # Option 3: Custom path
 export IRON_CLI_PATH=/path/to/iron-token
-pip install iron-cli-py
+uv pip install iron-cli-py
 
 # With secure credential storage
-pip install iron-cli-py[keyring]
+uv pip install iron-cli-py[keyring]
 
 # With .env file support
-pip install iron-cli-py[dotenv]
+uv pip install iron-cli-py[dotenv]
 ```
 
 **Requirements:**
 - Python 3.8+
+- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - iron_cli binary (for wrapper commands)
 
 **Binary Discovery Order:**

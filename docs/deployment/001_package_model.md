@@ -18,9 +18,9 @@ Understand what ships together and how to deploy each component.
 |---------|----------|----------|---------|
 | **1. Control Panel** | API + Dashboard | Docker image | `docker pull` |
 | **2. Marketing Site** | Static website | HTML/CSS/JS | CDN deploy |
-| **3. Agent Runtime** | SDK + core services | PyPI wheel | `pip install iron-sdk` |
-| **4. Sandbox** | OS isolation | PyPI wheel | `pip install` |
-| **5. CLI Tools** | Token management + wrapper | Binary + PyPI | Download + pip |
+| **3. Agent Runtime** | SDK + core services | PyPI wheel | `uv pip install iron-sdk` |
+| **4. Sandbox** | OS isolation | PyPI wheel | `uv pip install` |
+| **5. CLI Tools** | Token management + wrapper | Binary + PyPI | Download + uv pip |
 
 ## Package Characteristics
 
@@ -35,7 +35,7 @@ Understand what ships together and how to deploy each component.
 ## Key Principle
 
 - **Control Panel** = REQUIRED for all deployments (admin service, always standalone)
-- **Agent Runtime** = single `pip install iron-sdk` for all protection features
+- **Agent Runtime** = single `uv pip install iron-sdk` for all protection features
   - Developers install ONLY `iron-sdk` (user-facing Python package)
   - The `iron-cage` package (Rust runtime binary) is automatically installed as a dependency
   - Uses Library mode: runtime embedded via PyO3 (in-process, <0.1ms overhead)

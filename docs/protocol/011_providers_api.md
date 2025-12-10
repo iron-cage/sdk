@@ -507,7 +507,7 @@ Content-Type: application/json
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
-| `providers` | array<string> | Yes | Min 1, Max unlimited | Provider IDs to assign |
+| `providers` | array<string> | Yes | Min 0, Max unlimited | Provider IDs to assign (can be empty to remove all providers) |
 
 **Success Response:**
 
@@ -682,16 +682,6 @@ Content-Type: application/json
 **Error Responses:**
 
 ```json
-HTTP 409 Conflict
-{
-  "error": {
-    "code": "LAST_PROVIDER",
-    "message": "Cannot remove last provider. Agent must have at least one provider."
-  }
-}
-```
-
-```json
 HTTP 404 Not Found
 {
   "error": {
@@ -809,7 +799,6 @@ HTTP 404 Not Found
 | `PROVIDER_NOT_ASSIGNED` | 404 | Provider not assigned to agent |
 | `PROVIDER_EXISTS` | 409 | Provider name already exists |
 | `PROVIDER_IN_USE` | 409 | Cannot delete (agents using provider) |
-| `LAST_PROVIDER` | 409 | Cannot remove last provider from agent |
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 

@@ -48,7 +48,7 @@ Content-Type: application/json
 |-------|------|----------|-------------|-------------|
 | `name` | string | Yes | 1-100 chars | Human-readable agent name |
 | `budget` | number | Yes | >= 0.01 | Initial agent budget in USD (decimal, 2 places) |
-| `providers` | array<string> | Yes | Min 1, Max unlimited | Provider IDs agent can use |
+| `providers` | array<string> | No | Max unlimited | Provider IDs agent can use (optional, can be empty) |
 | `description` | string | No | Max 500 chars | Optional agent description |
 | `tags` | array<string> | No | Max 20 tags, 50 chars each | Optional tags for organization |
 
@@ -109,7 +109,6 @@ HTTP 400 Bad Request
     "code": "VALIDATION_ERROR",
     "fields": {
       "budget": "Must be >= 0.01",
-      "providers": "At least one provider required",
       "name": "Required field"
     }
   }
@@ -631,8 +630,8 @@ HTTP 403 Forbidden
 
 ### Agent ↔ Providers (Many-to-Many)
 
-- Agent must have at least one provider
-- Agent can use unlimited providers
+- Agent can have zero or more providers
+- No maximum limit on number of providers
 - Provider assignment via `PUT /api/v1/agents/{id}/providers`
 - Provider usage tracked for analytics
 

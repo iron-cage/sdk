@@ -8,6 +8,7 @@
 
 - **Rust:** 1.75+ (`rustup update`)
 - **Python:** 3.11+ (`python --version`)
+- **uv:** Latest (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - **Node.js:** 18+ (`node --version`)
 - **Git:** Latest stable
 - **PostgreSQL:** 14+ (for Control Panel development)
@@ -40,7 +41,7 @@ cd ../..
 
 ```bash
 cd module/iron_sdk
-pip install -e .[dev,all]  # Include dev tools and all framework integrations
+uv pip install -e .[dev,all]  # Include dev tools and all framework integrations
 cd ../..
 ```
 
@@ -113,7 +114,7 @@ Developer writes code:
     ↓
   [Python] iron-sdk (PyPI)  ← User-facing package
     ↓
-  User runs: pip install iron-sdk
+  User runs: uv pip install iron-sdk
     ↓
   User imports: from iron_sdk import protect_agent
 ```
@@ -132,7 +133,7 @@ The iron-cage package is built from iron_runtime using maturin:
 cd module/iron_runtime
 
 # Install maturin
-pip install maturin
+uv pip install maturin
 
 # Build wheel
 maturin build --release
@@ -140,7 +141,7 @@ maturin build --release
 # Built wheel appears in: target/wheels/iron_cage-*.whl
 ```
 
-This wheel is then published to PyPI and automatically installed when users run `pip install iron-sdk`.
+This wheel is then published to PyPI and automatically installed when users run `uv pip install iron-sdk`.
 
 ---
 

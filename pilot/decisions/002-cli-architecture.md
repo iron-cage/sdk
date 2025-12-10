@@ -42,7 +42,7 @@ Should iron_cli_py reimplement operations commands or delegate to iron_cli?
 1. **Single Source of Truth** - Token logic should exist in one place only
 2. **Automatic Feature Parity** - Python CLI should inherit all Rust CLI features
 3. **Reduced Maintenance** - One implementation to maintain
-4. **Python Developer Experience** - pip install, Click syntax, Rich output
+4. **Python Developer Experience** - uv pip install, Click syntax, Rich output
 5. **Programmatic API** - Python library usage for scripting
 6. **No Duplication** - Follows Anti-Duplication Principle from organizational_principles.rulebook.md
 
@@ -179,7 +179,7 @@ User: iron-py token generate --name foo --scope read
 ### Binary Discovery Order
 
 1. `IRON_CLI_PATH` environment variable (explicit override)
-2. Bundled binary in pip package (`pip install iron-cli-py[binary]`)
+2. Bundled binary in pip package (`uv pip install iron-cli-py[binary]`)
 3. System PATH (`which iron-token`)
 4. `~/.cargo/bin/iron-token`
 5. `/usr/local/bin/iron-token`
@@ -189,8 +189,8 @@ User: iron-py token generate --name foo --scope read
 
 | Option | Command | Binary Source |
 |--------|---------|---------------|
-| Bundled | `pip install iron-cli-py[binary]` | Downloaded during install |
-| System | `pip install iron-cli-py` | Must be in PATH |
+| Bundled | `uv pip install iron-cli-py[binary]` | Downloaded during install |
+| System | `uv pip install iron-cli-py` | Must be in PATH |
 | Cargo | `cargo install iron-cli` | Built from source |
 | Manual | Download from releases | Set IRON_CLI_PATH |
 
@@ -212,7 +212,7 @@ User: iron-py token generate --name foo --scope read
 - Automatic feature parity (wrapper inherits all features)
 - Reduced maintenance burden (one implementation)
 - Consistent behavior across CLIs
-- Python-native experience preserved (pip, Click, Rich)
+- Python-native experience preserved (uv pip, Click, Rich)
 - Programmatic API available for scripting
 
 ### Negative

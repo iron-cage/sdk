@@ -29,7 +29,7 @@ Option B (PyO3): Python --FFI--> Rust    ~0.1ms per call
 ## Why PyO3 Won
 
 1. **Every LLM call goes through SDK** - 50x latency matters
-2. **Single pip install** - No sidecar services to manage
+2. **Single uv pip install** - No sidecar services to manage
 3. **Type safety** - Rust types exposed to Python
 4. **Zero-copy** - Large data (prompts) not serialized
 

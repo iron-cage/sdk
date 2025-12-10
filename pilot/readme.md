@@ -55,16 +55,17 @@ Minimal viable platform for conference demonstrations and early customer pilots.
 
 **Most users should start here - no build required:**
 
+**Prerequisites:**
+- Python 3.8+ (`python --version`)
+- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+
 ```bash
 # Install SDK
-pip install iron-sdk
+uv pip install iron-sdk
 
 # Run protected agent
 python examples/basic_agent.py
 ```
-
-**Prerequisites:**
-- Python 3.8+ (`python --version`)
 
 See [`../module/iron_sdk/readme.md`](../module/iron_sdk/readme.md) for complete SDK documentation.
 
@@ -76,6 +77,7 @@ See [`../module/iron_sdk/readme.md`](../module/iron_sdk/readme.md) for complete 
 **Prerequisites:**
 - Rust 1.75+ (`rustup update`)
 - Python 3.11+ (`python --version`)
+- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Node.js 18+ (`node --version`)
 
 ```bash

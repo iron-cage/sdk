@@ -145,7 +145,7 @@ impl UserService
   {
     // Hash password with BCrypt
     let password_hash = bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |e| { println!( "Error hashing password: {}", e ); crate::error::TokenError } )?;
 
     let now_ms = current_time_ms();
 
@@ -161,7 +161,7 @@ impl UserService
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |e| { println!( "Error creating user: {}", e ); crate::error::TokenError } )?;
 
     let user_id = result.last_insert_rowid();
 
@@ -178,6 +178,7 @@ impl UserService
       } ).to_string() ),
       None,
     ).await?;
+    println!( "Hello" );
 
     // Return created user
     self.get_user_by_id( user_id ).await
@@ -607,7 +608,7 @@ impl UserService
     .bind( reason )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |e| { println!( "Error logging audit: {}", e ); crate::error::TokenError } )?;
 
     Ok( () )
   }

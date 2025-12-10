@@ -84,7 +84,7 @@ Agent Code → iron_sdk → PyO3 → Runtime (in-process) → Control Panel → 
 **Default deployment for iron_sdk users.**
 
 **Integration:**
-- Install SDK: `pip install iron-sdk`
+- Install SDK: `uv pip install iron-sdk`
 - Use in code: `from iron_sdk import protect_agent`
 - **No separate runtime process needed** (embedded via PyO3)
 
@@ -97,7 +97,7 @@ Agent Code → iron_sdk → PyO3 → Runtime (in-process) → Control Panel → 
 
 **Benefits:**
 - Default SDK behavior (no configuration needed)
-- Single `pip install` (no separate runtime process)
+- Single `uv pip install` (no separate runtime process)
 - Lowest overhead (PyO3 FFI ~0.1-0.5ms)
 - Simpler deployment (one process, not two)
 
