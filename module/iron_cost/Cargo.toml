@@ -12,7 +12,7 @@ categories = ["development-tools", "algorithms"]
 
 [features]
 default = ["enabled"]
-enabled = ["dep:iron_types", "dep:tokio", "dep:dashmap", "dep:serde", "dep:tracing"]
+enabled = ["dep:iron_types", "dep:tokio", "dep:dashmap", "dep:serde", "dep:serde_json", "dep:tracing","dep:arc-swap"]
 full = ["enabled"]
 
 [dependencies]
@@ -20,4 +20,6 @@ iron_types = { workspace = true, features = ["full"], optional = true }
 tokio = { workspace = true, features = ["full"], optional = true }
 dashmap = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+arc-swap = {workspace = true, optional = true}
 tracing = { workspace = true, optional = true }
