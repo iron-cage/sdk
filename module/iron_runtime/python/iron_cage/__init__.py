@@ -1,12 +1,12 @@
 """
-Iron Runtime - Python bindings for Iron Cage AI agent runtime
+Iron Cage - Python bindings for Iron Cage AI agent runtime
 
 Provides:
 - Runtime: Agent lifecycle management with safety and cost controls
 - LlmRouter: Local proxy for OpenAI/Anthropic API requests
 
 Example:
-    from iron_runtime import LlmRouter
+    from iron_cage import LlmRouter
     from openai import OpenAI
 
     router = LlmRouter(
@@ -23,7 +23,7 @@ __all__ = ["Runtime", "LlmRouter"]
 
 try:
     # When compiled as a Python extension, import from the Rust module
-    from iron_runtime.iron_runtime import Runtime, LlmRouter
+    from iron_cage.iron_cage import Runtime, LlmRouter
 except ImportError:
     # Fallback for development/testing without compilation
     class Runtime:

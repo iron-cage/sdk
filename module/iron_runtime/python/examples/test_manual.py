@@ -71,7 +71,7 @@ def main():
     print(f"Provider: {provider}")
 
     # Import and create router
-    from iron_runtime import LlmRouter
+    from iron_cage import LlmRouter
 
     print("\n1. Creating LlmRouter...")
     router = LlmRouter(api_key=ic_token, server_url=ic_server)

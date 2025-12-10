@@ -1,4 +1,4 @@
-"""Type stubs for Iron Runtime Python bindings"""
+"""Type stubs for Iron Cage Python bindings"""
 
 from typing import Optional
 

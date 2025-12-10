@@ -72,7 +72,7 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 
 **LlmRouter Python API:**
 ```python
-from iron_runtime import LlmRouter
+from iron_cage import LlmRouter
 from openai import OpenAI
 
 # Create router (starts local proxy)

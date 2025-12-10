@@ -1,4 +1,4 @@
-"""Type stubs for iron_runtime."""
+"""Type stubs for iron_cage."""
 
 from typing import Optional, Any
 
@@ -53,7 +53,7 @@ class LlmRouter:
     requests to the actual provider.
 
     Example:
-        >>> from iron_runtime import LlmRouter
+        >>> from iron_cage import LlmRouter
         >>> from openai import OpenAI
         >>>
         >>> router = LlmRouter(

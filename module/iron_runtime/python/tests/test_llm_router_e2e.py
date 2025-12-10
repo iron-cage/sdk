@@ -12,7 +12,7 @@ Run:
 
 import os
 import pytest
-from iron_runtime import LlmRouter
+from iron_cage import LlmRouter
 
 
 # Skip if credentials not available
