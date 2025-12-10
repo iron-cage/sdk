@@ -735,7 +735,7 @@ Test: [====================================================]
 **Day 28-29: API Endpoints**
 - [ ] Implement authentication endpoints (login, refresh, logout)
 - [ ] Implement token management endpoints (create, list, get, rotate, revoke)
-- [ ] Implement usage analytics endpoints (aggregate, by-project, by-provider)
+- [ ] Implement analytics endpoints (aggregate, by-project, by-provider)
 - [ ] Implement limits management endpoints (create, list, update, delete)
 - [ ] Implement call tracing endpoints (query, get)
 - [ ] Add health check endpoint
@@ -886,7 +886,7 @@ Test: [====================================================]
 **Day 45: Testing**
 - [ ] Write component tests (Vitest)
 - [ ] Write E2E tests for token management (Playwright)
-- [ ] Write E2E tests for usage analytics (Playwright)
+- [ ] Write E2E tests for analytics (Playwright)
 - [ ] Test responsive design (mobile, tablet, desktop)
 - [ ] Run accessibility audit (axe-core)
 

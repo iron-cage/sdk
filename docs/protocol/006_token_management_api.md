@@ -327,9 +327,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - Agent must be updated with new token immediately
 
 **Rate Limiting:**
-- Create: 10 tokens/hour per user
-- Rotate: 5 rotations/hour per token
-- List/Get: 100 requests/minute per user
+- See [002: Rate Limiting](002_rest_api_protocol.md#rate-limiting) for standard limits and response format
 
 ---
 
@@ -377,5 +375,6 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ---
 
 **Last Updated:** 2025-12-09
-**Protocol Version:** v1
+**Document Version:** 1.0
+**API Version:** v1 (`/api/v1/`)
 **Status:** ✅ Certain (required for Pilot)

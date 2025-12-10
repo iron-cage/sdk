@@ -14,9 +14,6 @@ Communication protocols defining message formats, wire protocols, and version co
 | 005 | **005_budget_control_protocol.md** | Document budget enforcement and token management protocol (two-token system, budget borrowing, token handshake) |
 | 006 | **006_token_management_api.md** | Document IC Token lifecycle API (create, list, get, delete, rotate) with permission-based access (admin vs developer) |
 | 007 | **007_authentication_api.md** | Document User authentication API (login, logout, refresh, validate) with JWT-based token lifecycle management |
-| -draft_usage_analytics_api.md | **-draft_usage_analytics_api.md** | DRAFT: Usage analytics API (request counts, token usage, cost analysis) - Uncertain, not Pilot-critical |
-| -draft_limits_management_api.md | **-draft_limits_management_api.md** | DRAFT: Agent Budget limits configuration API (view, update, bulk operations) - Uncertain, admin tooling |
-| -draft_provider_management_api.md | **-draft_provider_management_api.md** | DRAFT: Inference Provider (IP) management API (add, configure, test, remove IPs) - Uncertain, vault integration pending |
 
 ---
 
@@ -32,14 +29,6 @@ Communication protocols defining message formats, wire protocols, and version co
 | 005 | [Budget Control Protocol](005_budget_control_protocol.md) | Two-token system (IC/IP), budget borrowing, token handshake |
 | 006 | [Token Management API](006_token_management_api.md) | IC Token CRUD endpoints |
 | 007 | [Authentication API](007_authentication_api.md) | User login/logout/refresh endpoints |
-
-### Uncertain Protocols (⚠️ Drafts, Not for Implementation)
-
-| Name | Purpose | Reason for Uncertainty |
-|------|---------|------------------------|
-| [-draft_usage_analytics_api.md](-draft_usage_analytics_api.md) | Usage metrics and cost analysis | Not Pilot-critical, aggregation design pending |
-| [-draft_limits_management_api.md](-draft_limits_management_api.md) | Agent Budget limits configuration | Admin tooling, grace period design pending |
-| [-draft_provider_management_api.md](-draft_provider_management_api.md) | Inference Provider management | Vault integration pending, multi-token design unclear |
 
 ---
 

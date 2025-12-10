@@ -7,7 +7,7 @@ HTTP REST API endpoint schemas for all Control Panel operations organized by res
 **In Scope:**
 - **Entity Resources:** IC Token CRUD, Project management, IP management
 - **Operation Resources:** Authentication (login/logout), Budget protocol (handshake/report/refresh)
-- **Analytics Resources:** Usage metrics, spending analysis, performance data
+- **Analytics Resources:** Analytics (usage metrics, spending analysis, performance data)
 - **Configuration Resources:** Budget limits, system settings
 - **System Resources:** Health check, API version
 - HTTP status codes and error responses
@@ -18,7 +18,7 @@ HTTP REST API endpoint schemas for all Control Panel operations organized by res
 
 **Out of Scope:**
 - WebSocket protocol (see [003_websocket_protocol.md](003_websocket_protocol.md))
-- IronLang data protocol (see [001_ironlang_data_protocol.md](001_ironlang_data_protocol.md))
+- IronLang data protocol (archived, not in use for Control Panel API)
 - Implementation details (see `module/iron_control_api/spec.md`)
 - Individual resource-specific protocols (see [006_token_management_api.md](006_token_management_api.md), [007_authentication_api.md](007_authentication_api.md))
 
@@ -76,9 +76,38 @@ RESTful HTTP API organized by resource type:
 **Resource-Specific Protocols:**
 - [006_token_management_api.md](006_token_management_api.md) - IC Token CRUD (✅ Certain)
 - [007_authentication_api.md](007_authentication_api.md) - User authentication (✅ Certain)
-- [-draft_usage_analytics_api.md](-draft_usage_analytics_api.md) - Usage metrics (⚠️ Uncertain)
+- [-draft_analytics_api.md](-draft_analytics_api.md) - Analytics (usage, spending, metrics) (⚠️ Uncertain)
+- [-draft_api_token_management.md](-draft_api_token_management.md) - API Token CRUD (⚠️ Uncertain)
 - [-draft_limits_management_api.md](-draft_limits_management_api.md) - Budget limits (⚠️ Uncertain)
+- [-draft_project_management_api.md](-draft_project_management_api.md) - Project management (⚠️ Uncertain)
 - [-draft_provider_management_api.md](-draft_provider_management_api.md) - IP management (⚠️ Uncertain)
+- [-draft_settings_management_api.md](-draft_settings_management_api.md) - System settings (⚠️ Uncertain)
+
+---
+
+### Complete Protocol Reference
+
+| Resource Category | Resources | Protocol Document | Status | Pilot |
+|-------------------|-----------|-------------------|--------|-------|
+| **Entity Resources** | | | | |
+| IC Tokens | `/api/tokens/*` | [006_token_management_api.md](006_token_management_api.md) | ✅ Certain | Yes |
+| Projects | `/api/projects/*` | [-draft_project_management_api.md](-draft_project_management_api.md) | ⚠️ Uncertain | No |
+| Providers | `/api/providers/*` | [-draft_provider_management_api.md](-draft_provider_management_api.md) | ⚠️ Uncertain | No |
+| **Operation Resources** | | | | |
+| Authentication | `/api/auth/*` | [007_authentication_api.md](007_authentication_api.md) | ✅ Certain | Yes |
+| Budget Protocol | `/api/budget/*` | [005_budget_control_protocol.md](005_budget_control_protocol.md) | ✅ Certain | Yes |
+| API Tokens | `/api/api-tokens/*` | [-draft_api_token_management.md](-draft_api_token_management.md) | ⚠️ Uncertain | TBD |
+| **Analytics Resources** | | | | |
+| Analytics | `/api/analytics/*` | [-draft_analytics_api.md](-draft_analytics_api.md) | ⚠️ Uncertain | No |
+| **Configuration Resources** | | | | |
+| Budget Limits | `/api/limits/*` | [-draft_limits_management_api.md](-draft_limits_management_api.md) | ⚠️ Uncertain | No |
+| System Settings | `/api/settings/*` | [-draft_settings_management_api.md](-draft_settings_management_api.md) | ⚠️ Uncertain | No |
+| **System Resources** | | | | |
+| Health & Version | `/api/health`, `/api/version` | [002_rest_api_protocol.md](#system-resources) | ✅ Certain | Yes |
+
+**Legend:**
+- ✅ **Certain:** Required for Pilot, specification complete
+- ⚠️ **Uncertain:** Post-Pilot or design pending
 
 ---
 
@@ -181,6 +210,47 @@ GET /api/tokens?search=agent-name
 ```http
 GET /api/tokens?fields=id,name,status
 ```
+
+---
+
+### Example Data Standards
+
+**Use these standard values in all protocol documentation examples for consistency:**
+
+**IDs:**
+- Agent ID: `agent-abc123`
+- IC Token ID: `tok-def456`
+- Project ID: `proj-ghi789`
+- Provider ID: `ip-openai-001`, `ip-anthropic-001`
+- User ID: `user-jkl012`
+- User Token ID: `ut-mno345`
+- API Token ID: `at-pqr678`
+
+**Tokens:**
+- IC Token: `ic_abc123def456ghi789...`
+- User Token: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+- API Token: `apitok_abc123def456ghi789...`
+
+**Names:**
+- Agent: `Production Agent 1`, `Development Agent 2`
+- Project: `My Project`, `Production Project`
+- User: `john.doe@example.com`, `admin@example.com`
+
+**Timestamps:**
+- Created: `2025-12-01T09:00:00Z`
+- Updated: `2025-12-09T14:00:00Z`
+- Last Used: `2025-12-09T12:30:00Z`
+
+**Costs:**
+- Budget Allocated: `$100.00`
+- Budget Spent: `$42.35`
+- Budget Remaining: `$57.65`
+- Budget Portion: `$10.00`
+
+**Request IDs:**
+- Request ID: `req-xyz789`
+
+**Purpose:** Consistent examples help readers recognize patterns across documentation and make cross-references clearer.
 
 ---
 
@@ -298,77 +368,78 @@ Response: 200 OK
 
 ---
 
-### Protocol Definition
+### Rate Limiting
 
-### Token Handshake
+**Standard Rate Limits:**
 
-```
-POST /api/v1/auth/handshake
-Authorization: Bearer <IC_TOKEN>
+| Endpoint Category | Limit | Window | Scope |
+|-------------------|-------|--------|-------|
+| Authentication | 5 attempts | 5 minutes | Per IP address |
+| Token Create/Delete | 10 operations | 1 hour | Per user |
+| Token Rotate | 5 operations | 1 hour | Per token |
+| List/Get Operations | 100 requests | 1 minute | Per user |
+| Analytics Queries | 20 requests | 1 minute | Per user |
+| Settings Updates | 30 operations | 1 hour | Per user (admin) |
 
-Request:
+**Rate Limit Response:**
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 300
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1733754300
+
 {
-  "requested_budget": 10.00
-}
-
-Response: 200 OK
-{
-  "ip_token": "sk-proj-...", (encrypted)
-  "budget_granted": 10.00,
-  "budget_remaining": 90.00,
-  "lease_id": "lease-001"
-}
-```
-
-### Budget Reporting
-
-```
-POST /api/v1/budget/report
-Authorization: Bearer <IC_TOKEN>
-
-Request:
-{
-  "lease_id": "lease-001",
-  "tokens": 500,
-  "cost_usd": 0.015,
-  "timestamp": "2025-12-09T09:00:00Z"
-}
-
-Response: 204 No Content
-```
-
-**Implementation Variants:**
-- **Pilot:** Runtime reports per-request (simpler implementation, 5ms overhead)
-- **Production:** Runtime batches reports (every 10 requests, 0.5ms avg overhead, optimized for scale)
-
-**See:** [protocol/005: Budget Control Protocol](005_budget_control_protocol.md#implementation-variants) for complete details.
-
-### Budget Refresh
-
-```
-POST /api/v1/budget/refresh
-Authorization: Bearer <IC_TOKEN>
-
-Request:
-{
-  "lease_id": "lease-001",
-  "requested_budget": 10.00
-}
-
-Response: 200 OK / 403 Forbidden
-{
-  "budget_granted": 10.00,
-  "budget_remaining": 80.00,
-  "lease_id": "lease-002"
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Rate limit exceeded (max 100 req/min)",
+    "details": {
+      "limit": 100,
+      "window_seconds": 60,
+      "retry_after_seconds": 300,
+      "reset_at": "2025-12-09T14:05:00Z"
+    },
+    "timestamp": "2025-12-09T14:00:00Z",
+    "request_id": "req-xyz789"
+  }
 }
 ```
 
-### Authentication
+**Headers:**
+- `X-RateLimit-Limit`: Maximum requests in window
+- `X-RateLimit-Remaining`: Requests remaining in current window
+- `X-RateLimit-Reset`: Unix timestamp when limit resets
 
-**All endpoints require IC Token:**
-```
-Authorization: Bearer ic_abc123...
-```
+**Implementation:**
+- Token bucket algorithm with distributed tracking (Redis)
+- Per-user tracking for authenticated endpoints
+- Per-IP tracking for public endpoints (health, version, auth)
+
+---
+
+### Budget Protocol Summary
+
+Budget protocol endpoints enable agent runtime to negotiate and report LLM usage. These are agent-facing endpoints (not exposed via CLI).
+
+**Endpoints:**
+
+| Endpoint | Purpose | Request | Response |
+|----------|---------|---------|----------|
+| `POST /api/v1/budget/handshake` | Negotiate budget and get IP Token | `{requested_budget: float}` | `{ip_token, budget_granted, lease_id}` |
+| `POST /api/v1/budget/report` | Report usage (tokens, cost) | `{lease_id, tokens, cost_usd}` | 204 No Content |
+| `POST /api/v1/budget/refresh` | Refresh budget during execution | `{lease_id, requested_budget}` | `{budget_granted, lease_id}` |
+
+**Authentication:** IC Token (agent authentication)
+
+**Complete Specification:** See [protocol/005: Budget Control Protocol](005_budget_control_protocol.md) for:
+- Full request/response schemas
+- Error responses and retry logic
+- Implementation variants (per-request vs batched reporting)
+- Sequence diagrams and state transitions
+- Security considerations
+
+---
 
 ### HTTP Status Codes
 
@@ -554,6 +625,9 @@ Response:
 | `POST /api/tokens` | `iron tokens create` | User Token | ✅ Certain |
 | `DELETE /api/tokens/{id}` | `iron tokens delete <id>` | User Token | ✅ Certain |
 | `PUT /api/tokens/{id}/rotate` | `iron tokens rotate <id>` | User Token | ✅ Certain |
+| `GET /api/api-tokens` | `iron api-tokens list` | User Token | ⚠️ Uncertain |
+| `POST /api/api-tokens` | `iron api-tokens create` | User Token | ⚠️ Uncertain |
+| `DELETE /api/api-tokens/{id}` | `iron api-tokens revoke <id>` | User Token | ⚠️ Uncertain |
 | `GET /api/projects` | `iron projects list` | User Token | ⚠️ Uncertain |
 | `GET /api/providers` | `iron providers list` | User Token | ⚠️ Uncertain |
 
@@ -571,11 +645,29 @@ Response:
 
 | API Endpoint | CLI Command | Auth | Status |
 |--------------|-------------|------|--------|
-| `GET /api/usage` | `iron usage report` | User Token | ⚠️ Uncertain |
-| `GET /api/spending` | `iron spending show` | User Token | ⚠️ Uncertain |
-| `GET /api/metrics` | `iron metrics view` | User Token | ⚠️ Uncertain |
+| `GET /api/analytics/usage` | `iron usage report` or `iron analytics usage` | User Token | ⚠️ Uncertain |
+| `GET /api/analytics/spending` | `iron spending show` or `iron analytics spending` | User Token | ⚠️ Uncertain |
+| `GET /api/analytics/metrics` | `iron metrics view` or `iron analytics metrics` | User Token | ⚠️ Uncertain |
 
 **Parity Details:** See [features/004_token_management_cli_api_parity.md](../features/004_token_management_cli_api_parity.md) for complete 24-operation mapping.
+
+---
+
+### Version Terminology
+
+**API Version (`/api/v1/`):**
+- URL path segment indicating API iteration
+- Breaking changes require new API version (e.g., `/api/v2/`)
+- Current API version: **v1**
+- Appears in all endpoint URLs
+
+**Document Version (1.0, 1.1, 2.0):**
+- Protocol documentation iteration
+- Major version: Breaking documentation changes or restructuring
+- Minor version: Clarifications, additions, non-breaking updates
+- Current document version: **1.0**
+
+**Independence:** API version and document version evolve independently. API v1 docs may be at document version 1.2 after clarifications and additions.
 
 ---
 
@@ -587,9 +679,12 @@ Response:
 **Resource-Specific Protocols:**
 - [006: Token Management API](006_token_management_api.md) - IC Token CRUD endpoints (✅ Certain)
 - [007: Authentication API](007_authentication_api.md) - User login/logout endpoints (✅ Certain)
-- [-draft_usage_analytics_api.md](-draft_usage_analytics_api.md) - Usage metrics endpoints (⚠️ Uncertain)
+- [-draft_analytics_api.md](-draft_analytics_api.md) - Analytics endpoints (usage, spending, metrics) (⚠️ Uncertain)
+- [-draft_api_token_management.md](-draft_api_token_management.md) - API Token CRUD endpoints (⚠️ Uncertain)
 - [-draft_limits_management_api.md](-draft_limits_management_api.md) - Budget limits endpoints (⚠️ Uncertain)
+- [-draft_project_management_api.md](-draft_project_management_api.md) - Project management endpoints (⚠️ Uncertain)
 - [-draft_provider_management_api.md](-draft_provider_management_api.md) - IP management endpoints (⚠️ Uncertain)
+- [-draft_settings_management_api.md](-draft_settings_management_api.md) - System settings endpoints (⚠️ Uncertain)
 
 **Dependencies:**
 - [protocol/005: Budget Control Protocol](005_budget_control_protocol.md) - Budget handshake/report/refresh protocol
@@ -616,5 +711,6 @@ Response:
 ---
 
 **Last Updated:** 2025-12-09
-**Protocol Version:** v1
+**Document Version:** 1.0
+**API Version:** v1 (`/api/v1/`)
 **Status:** Overview complete, resource-specific protocols in progress

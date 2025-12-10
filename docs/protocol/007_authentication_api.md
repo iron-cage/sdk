@@ -308,9 +308,7 @@ Response: 200 OK (Blacklisted token)
 - Blacklist checked on every authenticated request
 
 **Rate Limiting:**
-- Login: 5 attempts per 5 minutes per IP
-- Refresh: 10 requests per hour per user
-- Validate: 100 requests per minute per user
+- See [002: Rate Limiting](002_rest_api_protocol.md#rate-limiting) for standard limits and response format
 
 **Session Management:**
 - Multiple User Tokens per user allowed (multi-device support)
@@ -368,5 +366,6 @@ Response: 200 OK (Blacklisted token)
 ---
 
 **Last Updated:** 2025-12-09
-**Protocol Version:** v1
+**Document Version:** 1.0
+**API Version:** v1 (`/api/v1/`)
 **Status:** ✅ Certain (required for Pilot)

@@ -62,7 +62,7 @@
 | **Resource** | REST API endpoint or endpoint group exposed by Control Panel. Maps to domain entities or operations. See [architecture/009](architecture/009_resource_catalog.md) |
 | **Entity Resource** | REST resource with 1:1 or 1:N mapping to domain entity, supporting CRUD operations. Plural names (/api/tokens, /api/projects). Example: /api/tokens → IC Token entity |
 | **Operation Resource** | REST resource exposing operations/actions not mapping directly to single entity CRUD. Action-oriented, often POST-only. Example: /api/auth → login/logout operations |
-| **Analytics Resource** | Read-only REST resource providing aggregated/derived metrics from multiple entities. GET-only, statistical nature. Example: /api/usage → usage statistics |
+| **Analytics Resource** | Read-only REST resource providing aggregated/derived metrics from multiple entities. GET-only, statistical nature. Example: /api/analytics → usage, spending, and performance metrics |
 | **Configuration Resource** | REST resource managing system-level configuration and constraints. Admin-only access, affects multiple entities. Example: /api/limits → Agent Budget limits |
 | **Resource Catalog** | Exhaustive inventory of all REST API resources with entity mapping, authentication patterns, and certainty classification. See [architecture/009](architecture/009_resource_catalog.md) |
 | **User-Facing Resource** | REST resource accessible via CLI and Control Panel dashboard. Requires User Token authentication. Has CLI-API parity |

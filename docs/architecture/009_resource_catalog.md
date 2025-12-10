@@ -61,12 +61,14 @@ Understand all available REST API resources, how they map to domain entities, an
 - Names reflect data type (`/api/usage`, `/api/metrics`)
 
 **Examples:**
-- `/api/usage` → Usage statistics across agents/projects
-- `/api/spending` → Cost analysis by provider/project
+- `/api/analytics` → Usage, cost, and performance metrics
+- `/api/analytics/usage` → Usage statistics across agents/projects
+- `/api/analytics/spending` → Cost analysis by provider/project
+- `/api/analytics/metrics` → Performance and latency metrics
 
 **CLI Mapping:** Maps to CLI reporting commands
-- `/api/usage` → `iron usage report`
-- `/api/spending` → `iron spending show`
+- `/api/analytics/usage` → `iron usage report` or `iron analytics usage`
+- `/api/analytics/spending` → `iron spending show` or `iron analytics spending`
 
 ### 4. Configuration Resources (System Config)
 
@@ -93,11 +95,13 @@ Understand all available REST API resources, how they map to domain entities, an
 | Resource | Entity Mapping | HTTP Methods | Auth Type | Certainty | CLI Command Group |
 |----------|----------------|--------------|-----------|-----------|-------------------|
 | `/api/tokens` | IC Token (1:1) | GET, POST, DELETE, PUT | User Token | ✅ Certain | `iron tokens` |
+| `/api/api-tokens` | API Token (1:N per user) | GET, POST, DELETE | User Token | ⚠️ Uncertain | `iron api-tokens` |
 | `/api/projects` | Project (1:1) | GET, POST, PUT, DELETE | User Token | ⚠️ Uncertain | `iron projects` |
 | `/api/providers` | IP (1:1) | GET, POST, PUT, DELETE | User Token | ⚠️ Uncertain | `iron providers` |
 
 **Notes:**
 - IC Token is certain (required for Pilot)
+- API Token uncertain (external integrations, not Pilot-critical)
 - Project and IP management uncertain (design pending)
 
 ### Operation Resources
@@ -118,13 +122,14 @@ Understand all available REST API resources, how they map to domain entities, an
 
 | Resource | Data Provided | Source Entities | Auth Type | Certainty | CLI Commands |
 |----------|---------------|-----------------|-----------|-----------|--------------|
-| `/api/usage` | Usage metrics | Agent, Project, IP | User Token | ⚠️ Uncertain | `iron usage report` |
-| `/api/spending` | Cost analysis | Agent, Project, IP Budget | User Token | ⚠️ Uncertain | `iron spending show` |
-| `/api/metrics` | Performance metrics | Agent, Request logs | User Token | ⚠️ Uncertain | `iron metrics view` |
+| `/api/analytics` | Usage, cost, and performance metrics | Agent, Project, IP, Budget | User Token | ⚠️ Uncertain | `iron analytics`, `iron usage`, `iron spending` |
 
 **Notes:**
-- All analytics resources uncertain (not required for Pilot)
+- Analytics resources consolidated under single `/api/analytics` namespace
+- Endpoints: `/api/analytics/usage`, `/api/analytics/spending`, `/api/analytics/metrics`
+- All uncertain (not required for Pilot)
 - Design decisions pending: aggregation levels, time ranges, filtering
+- CLI commands may use legacy patterns (`iron usage`, `iron spending`) or consolidated (`iron analytics`)
 
 ### Configuration Resources
 
@@ -291,8 +296,9 @@ Understand all available REST API resources, how they map to domain entities, an
 
 | API Resource | HTTP Method | CLI Command | Notes |
 |--------------|-------------|-------------|-------|
-| `GET /api/usage` | GET | `iron usage report` | Usage statistics |
-| `GET /api/spending` | GET | `iron spending show` | Cost analysis |
+| `GET /api/analytics/usage` | GET | `iron usage report` or `iron analytics usage` | Usage statistics |
+| `GET /api/analytics/spending` | GET | `iron spending show` or `iron analytics spending` | Cost analysis |
+| `GET /api/analytics/metrics` | GET | `iron metrics view` or `iron analytics metrics` | Performance metrics |
 
 **Parity Details:** See [../features/004_token_management_cli_api_parity.md](../features/004_token_management_cli_api_parity.md) for complete mapping.
 

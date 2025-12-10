@@ -341,7 +341,7 @@ impl RateLimiter
 - Add JWT authentication middleware
 - Add RBAC authorization
 - Add token management endpoints
-- Add usage analytics endpoints
+- Add analytics endpoints
 
 **New Endpoints:**
 

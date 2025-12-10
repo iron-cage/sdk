@@ -142,5 +142,5 @@ WebSocket streaming provides:
 ---
 
 **Last Updated:** 2025-12-09
-**Protocol Version:** 1.0
+**Document Version:** 1.0
 **Status:** Specification complete
