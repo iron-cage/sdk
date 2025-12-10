@@ -89,6 +89,10 @@ except ImportError:
             self._running = False
             print("[STUB] LlmRouter stopped")
 
+        def total_spent(self) -> float:
+            """Get total spent in USD (debug purposes)"""
+            return 0.0
+
         def __enter__(self):
             return self
 

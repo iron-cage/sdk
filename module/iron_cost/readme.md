@@ -1,20 +1,20 @@
 # iron_cage_cost
 
-Budget tracking and cost enforcement for LLM-powered agents.
+LLM model pricing data and cost calculation.
 
 ### Scope
 
 **Responsibilities:**
-Tracks and enforces per-agent budget limits for LLM API costs (OpenAI, Anthropic, etc.) preventing runaway spending through real-time cost accumulation and budget exhaustion detection. Provides configurable cost limits per agent with automatic enforcement before API calls. Requires Rust 1.75+, all platforms supported, integrates with iron_runtime for enforcement.
+Provides pricing data for various LLM models (OpenAI, Anthropic, Google, etc.) loaded from LiteLLM pricing JSON. Supports cost calculation for budget enforcement and pre-reservation. Requires Rust 1.75+, all platforms supported.
 
 **In Scope:**
-- Per-agent cost tracking
-- Budget enforcement and alerts
-- Token counting for LLM calls
-- Real-time spending metrics
-- Threshold-based notifications
+- Model pricing lookup
+- Cost calculation (input/output tokens)
+- Max cost estimation for budget pre-reservation
+- Thread-safe concurrent access
 
 **Out of Scope:**
+- Budget tracking (application-level concern)
 - PII detection (see iron_cage_safety)
 - Circuit breaker logic (see iron_cage_reliability)
 - Agent lifecycle (see iron_cage_cli)
@@ -29,35 +29,32 @@ iron_cage_cost = { version = "0.1", features = ["full"] }
 
 ## Features
 
-- `enabled` (default): Full budget tracking functionality
+- `enabled` (default): Full pricing functionality
 - `full`: All functionality (currently same as `enabled`)
 
 ## Example
 
 ```rust
-use iron_cage_cost::BudgetTracker;
+use iron_cost::pricing::PricingManager;
 
-// Initialize tracker with $100 budget
-let tracker = BudgetTracker::new(100.0);
+// Initialize pricing manager with embedded LiteLLM data
+let pricing = PricingManager::new().expect("Failed to load pricing");
 
-// Record agent API call cost
-tracker.record_cost("agent_1", 2.50)?;
+// Look up model pricing
+if let Some(model) = pricing.get("gpt-4-turbo") {
+    // Calculate actual cost for token usage
+    let cost = model.calculate_cost(1000, 500); // 1000 input, 500 output tokens
+    println!("Cost: ${:.6}", cost);
 
-// Check remaining budget
-println!("Remaining: ${:.2}", tracker.remaining());
-// Output: "Remaining: $97.50"
-
-// Tracker automatically enforces budget limits
-match tracker.record_cost("agent_2", 150.0) {
-    Err(e) => println!("Budget exceeded: {}", e),
-    Ok(_) => unreachable!(),
+    // Calculate max cost for budget pre-reservation
+    let max_cost = model.calculate_max_cost(1000, Some(4096));
+    println!("Max possible cost: ${:.6}", max_cost);
 }
 ```
 
 ## Documentation
 
 - [API Reference](https://docs.rs/iron_cage_cost)
-- [Budget Strategies](docs/strategies.md)
 
 ## License
 
