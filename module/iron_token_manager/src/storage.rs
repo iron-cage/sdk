@@ -113,7 +113,24 @@ impl TokenStorage
         .map_err( |_| crate::error::TokenError )?;
     }
 
-    // Migration 005: Agents table and token updates
+    // Migration 004: AI provider keys table
+    let migration_004_completed : i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_004_completed'"
+    )
+    .fetch_one( &pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    if migration_004_completed == 0
+    {
+      let migration_004 = include_str!( "../migrations/004_create_ai_provider_keys.sql" );
+      sqlx::raw_sql( migration_004 )
+        .execute( &pool )
+        .await
+        .map_err( |_| crate::error::TokenError )?;
+    }
+
+    // Migration 005: Enhance users table for user management
     let migration_005_completed : i64 = sqlx::query_scalar(
       "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_005_completed'"
     )
@@ -123,14 +140,16 @@ impl TokenStorage
 
     if migration_005_completed == 0
     {
-      let migration_005 = include_str!( "../migrations/005_create_agents_table.sql" );
+      let migration_005 = include_str!( "../migrations/005_enhance_users_table.sql" );
       sqlx::raw_sql( migration_005 )
         .execute( &pool )
         .await
         .map_err( |_| crate::error::TokenError )?;
     }
 
-    // Migration 006: Enhance users table
+
+
+    // Migration 006: Create user audit log table
     let migration_006_completed : i64 = sqlx::query_scalar(
       "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'"
     )
@@ -140,30 +159,12 @@ impl TokenStorage
 
     if migration_006_completed == 0
     {
-      let migration_006 = include_str!( "../migrations/006_enhance_users_table.sql" );
+      let migration_006 = include_str!( "../migrations/006_create_user_audit_log.sql" );
       sqlx::raw_sql( migration_006 )
         .execute( &pool )
         .await
         .map_err( |_| crate::error::TokenError )?;
     }
-
-    // Migration 007: Create user audit log
-    let migration_007_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_007_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
-
-    if migration_007_completed == 0
-    {
-      let migration_007 = include_str!( "../migrations/007_create_user_audit_log.sql" );
-      sqlx::raw_sql( migration_007 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
-    }
-
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),
@@ -485,7 +486,7 @@ impl TokenStorage
   /// Returns error if database update fails or token not found (0 rows affected)
   pub async fn update_token_provider( &self, token_id: i64, provider: &str ) -> Result< () >
   {
-    let result = sqlx::query( "UPDATE api_tokens SET provider = $2 WHERE id = $1 AND provider = $2" )
+    let result = sqlx::query( "UPDATE api_tokens SET provider = $2 WHERE id = $1" )
       .bind( token_id )
       .bind( provider )
       .execute( &self.pool )

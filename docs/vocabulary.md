@@ -84,7 +84,7 @@
 | **User Token** | Control Panel CLI/Dashboard authentication token. Different from IC Token (agent auth). Users can have multiple active User Tokens. Developer can regenerate own, admin can regenerate any. Lifetime: 30 days default |
 | **IP Token** | Inference Provider Token - LLM provider API key (sk-proj-, sk-ant-). Stored in Control Panel vault, NEVER exposed to developer. Runtime receives encrypted copy from Control Panel. Session-only lifetime. See [protocol/005](protocol/005_budget_control_protocol.md) |
 | **Token Translation** | Process where Runtime replaces IC Token with IP Token in LLM requests. Latency: <1ms. IP Token decrypted, used, then zeroed. See [protocol/005](protocol/005_budget_control_protocol.md) |
-| **API Token** | Control Panel REST API authentication token (opaque Base64 string). Different from IC Token (which is for Runtime/agents). For: Control Panel API calls. NOT for: Agent execution. |
+| **API Token** | Persistent authentication token for Control Panel dashboard and automation scripts. Format: `apitok_` prefix (e.g., `apitok_xyz789abc123...`). SAME-AS-USER scope (inherits user permissions). Primary use: Dashboard access. Secondary use: Admin automation. Token value shown only once at creation (GitHub pattern). Different from IC Token (agent auth) and User Token (session auth). See [protocol/014](protocol/014_api_tokens_api.md) |
 
 ### Budget Management
 
@@ -216,4 +216,4 @@
 
 ---
 
-*Last Updated: 2025-12-09*
+*Last Updated: 2025-12-10*

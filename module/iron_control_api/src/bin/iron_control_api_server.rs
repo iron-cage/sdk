@@ -151,6 +151,7 @@ struct AppState
   traces: iron_control_api::routes::traces::TracesState,
   providers: iron_control_api::routes::providers::ProvidersState,
   keys: iron_control_api::routes::keys::KeysState,
+  users: iron_control_api::routes::users::UserManagementState,
   agents: sqlx::SqlitePool,
 }
 
@@ -221,6 +222,15 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::keys::Keys
   fn from_ref( state: &AppState ) -> Self
   {
     state.keys.clone()
+  }
+}
+
+/// Enable user management routes to access UserManagementState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::users::UserManagementState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.users.clone()
   }
 }
 
@@ -356,6 +366,13 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     rate_limiter: key_rate_limiter,
   };
 
+  // Initialize user management state
+  let permission_checker = std::sync::Arc::new( iron_control_api::rbac::PermissionChecker::new() );
+  let user_management_state = iron_control_api::routes::users::UserManagementState::new(
+    auth_state.db_pool.clone(),
+    permission_checker,
+  );
+
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
 
@@ -369,6 +386,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     traces: traces_state,
     providers: providers_state,
     keys: keys_state,
+    users: user_management_state,
     agents: agents_pool,
   };
 
@@ -390,7 +408,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
     .route( "/api/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
     .route( "/api/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
-    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_user_password ) )
+    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
 
     // Token management endpoints
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )

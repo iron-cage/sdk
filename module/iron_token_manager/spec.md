@@ -13,7 +13,7 @@
 ## Scope
 
 **Responsibility:**
-Manages API token lifecycle for Iron Cage with secure generation, SHA-256 hashing, SQLite storage, JWT authentication, usage tracking, quota enforcement, and token bucket rate limiting. Provides complete authentication and authorization infrastructure for API access control.
+Manages API token lifecycle and user account management for Iron Cage with secure generation, SHA-256 hashing, SQLite storage, JWT authentication, usage tracking, quota enforcement, and token bucket rate limiting. Provides complete authentication, authorization, and user management infrastructure for API access control.
 
 **In Scope:**
 - Cryptographic token generation (Base64, high-entropy)
@@ -24,6 +24,9 @@ Manages API token lifecycle for Iron Cage with secure generation, SHA-256 hashin
 - Quota enforcement (daily limits, cost caps, hard cutoffs)
 - Token bucket rate limiting (requests per second)
 - JWT authentication and validation
+- User management (create, suspend, activate, delete, role change, password reset)
+- User audit logging (comprehensive operation tracking)
+- BCrypt password hashing (cost factor 12)
 - SQLite persistence with migrations
 - Token metadata (name, created_at, last_used, owner)
 
@@ -146,6 +149,35 @@ let stats = tracker.get_daily_usage("token-123").await?;
 println!("Tokens: {}, Cost: ${}", stats.tokens, stats.cost_usd);
 ```
 
+### User Management
+
+```rust
+use iron_token_manager::user_service::{UserService, CreateUserParams};
+
+// Create user service
+let pool = SqlitePool::connect("./users.db").await?;
+let user_service = UserService::new(pool);
+
+// Create new user
+let params = CreateUserParams {
+  username: "john_doe".to_string(),
+  password: "SecurePass123!".to_string(),
+  email: "john.doe@example.com".to_string(),
+  role: "user".to_string(),
+};
+let user = user_service.create_user(params, admin_id).await?;
+
+// Suspend user
+let reason = Some("Violation of terms".to_string());
+let suspended = user_service.suspend_user(user.id, admin_id, reason).await?;
+
+// Change role
+let updated = user_service.change_user_role(user.id, admin_id, "admin".to_string()).await?;
+
+// Reset password
+let reset = user_service.reset_password(user.id, admin_id, "NewPass456!".to_string(), true).await?;
+```
+
 ---
 
 ## Architecture
@@ -158,6 +190,7 @@ iron_token_manager/
 │   ├── lib.rs                  # Public API, TokenManager
 │   ├── token_generator.rs      # Cryptographic token generation
 │   ├── storage.rs              # SQLite persistence layer
+│   ├── user_service.rs         # User management service (CRUD, audit logging)
 │   ├── usage_tracker.rs        # Usage tracking and quota enforcement
 │   ├── rate_limiter.rs         # Token bucket rate limiting
 │   ├── limit_enforcer.rs       # Quota enforcement logic
@@ -166,6 +199,8 @@ iron_token_manager/
 │   ├── provider_adapter.rs     # Adapter for external providers
 │   └── error.rs                # Error types
 ├── migrations/                 # SQLite schema migrations
+│   ├── 005_enhance_users_table.sql        # User management fields
+│   └── 006_create_user_audit_log.sql      # Audit logging
 ├── tests/                      # Integration tests
 ├── Cargo.toml
 └── readme.md
@@ -203,6 +238,13 @@ iron_token_manager/
 - Hard cutoffs (blocks when limit exceeded)
 - Daily reset at midnight UTC
 
+**UserService:**
+- User account management (create, suspend, activate, delete)
+- Role management (change user roles)
+- Password management (BCrypt hashing, reset, force change)
+- Audit logging (all operations tracked)
+- Self-modification prevention (can't delete/change own role)
+
 ---
 
 ## Database Schema
@@ -232,6 +274,37 @@ iron_token_manager/
 | cost_usd | REAL | NOT NULL | Cost in USD |
 | model | TEXT | NULL | LLM model used |
 
+### users Table
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Unique user ID |
+| username | TEXT | NOT NULL, UNIQUE | Username (login identifier) |
+| password_hash | TEXT | NOT NULL | BCrypt hashed password |
+| email | TEXT | NULL | User email address |
+| role | TEXT | NOT NULL, DEFAULT 'user' | User role (viewer, user, admin) |
+| is_active | INTEGER | NOT NULL, DEFAULT 1 | 0=inactive, 1=active |
+| created_at | INTEGER | NOT NULL | Unix epoch milliseconds |
+| last_login | INTEGER | NULL | Last login timestamp |
+| suspended_at | INTEGER | NULL | Suspension timestamp |
+| suspended_by | INTEGER | FOREIGN KEY (users.id) | Admin who suspended |
+| deleted_at | INTEGER | NULL | Soft deletion timestamp |
+| deleted_by | INTEGER | FOREIGN KEY (users.id) | Admin who deleted |
+| force_password_change | INTEGER | NOT NULL, DEFAULT 0 | Force password change flag |
+
+### user_audit_log Table
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Audit log entry ID |
+| operation | TEXT | NOT NULL, CHECK | Operation type (create, suspend, activate, delete, role_change, password_reset) |
+| target_user_id | INTEGER | NOT NULL, FOREIGN KEY (users.id) | User affected by operation |
+| performed_by | INTEGER | NOT NULL, FOREIGN KEY (users.id) | Admin who performed operation |
+| timestamp | INTEGER | NOT NULL | Unix epoch milliseconds |
+| previous_state | TEXT | NULL | Previous state (JSON) |
+| new_state | TEXT | NULL | New state (JSON) |
+| reason | TEXT | NULL | Optional reason |
+
 ### Indexes
 
 ```sql
@@ -239,6 +312,14 @@ CREATE INDEX idx_usage_token_id ON usage(token_id);
 CREATE INDEX idx_usage_timestamp ON usage(timestamp DESC);
 CREATE INDEX idx_tokens_hash ON tokens(hash);
 CREATE INDEX idx_tokens_owner ON tokens(owner);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_is_active ON users(is_active);
+CREATE INDEX idx_users_username_search ON users(username);
+CREATE INDEX idx_user_audit_target ON user_audit_log(target_user_id);
+CREATE INDEX idx_user_audit_performer ON user_audit_log(performed_by);
+CREATE INDEX idx_user_audit_timestamp ON user_audit_log(timestamp);
+CREATE INDEX idx_user_audit_operation ON user_audit_log(operation);
 ```
 
 ---
@@ -256,7 +337,10 @@ CREATE INDEX idx_tokens_owner ON tokens(owner);
 - ✅ Quota enforcement (daily limits)
 - ✅ Rate limiting (token bucket algorithm)
 - ✅ Integration with iron_runtime_state for audit
-- ✅ Integration tests (288 tests)
+- ✅ User management (create, suspend, activate, delete, role change, password reset)
+- ✅ User audit logging (comprehensive operation tracking)
+- ✅ BCrypt password hashing (cost factor 12)
+- ✅ Integration tests (288 token tests + 40 user tests)
 
 **Pending:**
 - 📋 PostgreSQL migration for production mode

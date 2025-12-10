@@ -13,7 +13,7 @@
 | 003 | **003_service_boundaries.md** | Define three plane separation (Control, Data, Runtime) and communication patterns |
 | 004 | **004_data_flow.md** | Trace end-to-end request journey through eleven processing steps with latency analysis |
 | 005 | **005_service_integration.md** | Explain how five core services communicate (Gateway orchestrates Safety, Cost, Tool Proxy, Audit) |
-| 006 | **006_roles_and_permissions.md** | Define three access roles (Admin, Super User, Developer) and their permission boundaries |
+| 006 | **006_roles_and_permissions.md** | Define three access roles (Admin, User, Viewer) with RBAC, user management, and permission boundaries |
 | 007 | **007_entity_model.md** | Document core entities (Agent, Project, IP, IC Token, budgets) and their 1:1 relationships |
 | 008 | **008_runtime_modes.md** | Explain runtime deployment configurations (Router vs Library, same SDK code, different internal machinery) |
 | 009 | **009_resource_catalog.md** | Exhaustive inventory of REST API resources, entity mapping, authentication patterns, certainty classification |

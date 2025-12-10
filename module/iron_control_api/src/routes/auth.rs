@@ -57,7 +57,7 @@ impl AuthState
         .await?;
     }
 
-    // Migration 006: Enhance users table
+    // Migration 006: Create user audit log table
     let migration_006_completed : i64 = sqlx::query_scalar(
       "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'"
     )
@@ -66,23 +66,8 @@ impl AuthState
 
     if migration_006_completed == 0
     {
-      let migration_006 = include_str!( "../../../iron_token_manager/migrations/006_enhance_users_table.sql" );
+      let migration_006 = include_str!( "../../../iron_token_manager/migrations/006_create_user_audit_log.sql" );
       sqlx::raw_sql( migration_006 )
-        .execute( &db_pool )
-        .await?;
-    }
-
-    // Migration 007: Create user audit log
-    let migration_007_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_007_completed'"
-    )
-    .fetch_one( &db_pool )
-    .await?;
-
-    if migration_007_completed == 0
-    {
-      let migration_007 = include_str!( "../../../iron_token_manager/migrations/007_create_user_audit_log.sql" );
-      sqlx::raw_sql( migration_007 )
         .execute( &db_pool )
         .await?;
     }

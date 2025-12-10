@@ -14,6 +14,7 @@ Communication protocols defining message formats, wire protocols, and version co
 | 005 | **005_budget_control_protocol.md** | Document budget enforcement and token management protocol (two-token system, budget borrowing, token handshake) |
 | 006 | **006_token_management_api.md** | Document IC Token lifecycle API (create, list, get, delete, rotate) with permission-based access (admin vs developer) |
 | 007 | **007_authentication_api.md** | Document User authentication API (login, logout, refresh, validate) with JWT-based token lifecycle management |
+| 008 | **008_user_management_api.md** | Document User account management API (create, list, get, suspend, activate, delete, role change, password reset) with admin-only RBAC and audit logging |
 
 ---
 
@@ -29,6 +30,7 @@ Communication protocols defining message formats, wire protocols, and version co
 | 005 | [Budget Control Protocol](005_budget_control_protocol.md) | Two-token system (IC/IP), budget borrowing, token handshake |
 | 006 | [Token Management API](006_token_management_api.md) | IC Token CRUD endpoints |
 | 007 | [Authentication API](007_authentication_api.md) | User login/logout/refresh endpoints |
+| 008 | [User Management API](008_user_management_api.md) | Admin user account management endpoints |
 
 ---
 
