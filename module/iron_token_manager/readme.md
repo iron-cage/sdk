@@ -1,13 +1,17 @@
 # iron_token_manager
 
-API token management, authentication, and rate limiting.
+User management, API token management, authentication, and rate limiting.
 
 ### Scope
 
 **Responsibilities:**
-Manages API token lifecycle with secure generation, SHA-256 hashing, and SQLite storage. Provides JWT authentication, usage tracking, quota enforcement, and token bucket rate limiting for API access control.
+Manages user accounts with RBAC (admin/user/viewer roles) and comprehensive audit logging. Handles API token lifecycle with secure generation, SHA-256 hashing, and SQLite storage. Provides JWT authentication, usage tracking, quota enforcement, and token bucket rate limiting for API access control.
 
 **In Scope:**
+- **User Management:** Account lifecycle (create, suspend, activate, delete with soft delete)
+- **RBAC:** Three roles (admin, user, viewer) with permission-based access control
+- **Audit Logging:** Append-only user_audit_log with immutability guarantees
+- **Password Security:** BCrypt hashing (cost 12), secure password reset
 - Cryptographic token generation (Base64, high-entropy)
 - SHA-256 token hashing (never store plaintext)
 - Token CRUD operations (create, verify, revoke, list)
@@ -57,6 +61,39 @@ iron_token_manager = { path = "../iron_token_manager" }
 ```
 
 ## Example
+
+### User Management
+
+```rust
+use iron_token_manager::UserService;
+
+// Create user service with SQLite storage
+let service = UserService::new("./users.db")?;
+
+// Create a new user account
+let user = service.create_user(
+  "john_doe",
+  "SecurePass123!",
+  "john@example.com",
+  "user",
+  1 // admin_id performing the action
+)?;
+
+// Suspend user account
+service.suspend_user(
+  user.id,
+  1, // admin_id
+  Some("Violates acceptable use policy")
+)?;
+
+// Change user role
+service.change_user_role(user.id, "admin", 1)?;
+
+// Get audit log for user
+let audit_entries = service.get_user_audit_log(user.id)?;
+```
+
+### Token Management
 
 ```rust
 use iron_token_manager::{TokenManager, RateLimiter};

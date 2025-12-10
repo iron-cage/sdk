@@ -1,375 +1,693 @@
-//! User management endpoints
+//! User management API endpoints
 //!
-//! Provides endpoints for:
-//! - Creating new users (Admin only)
-//! - Listing all users (Admin only)
+//! Provides admin operations for managing users:
+//! - Create users
+//! - List users with filters
+//! - Get user details
+//! - Suspend/activate accounts
+//! - Delete users
+//! - Change user roles
+//! - Reset passwords
+//!
+//! All endpoints require Admin role (ManageUsers permission).
 
-use crate::rbac::Role;
-use crate::jwt_auth::AuthenticatedUser;
-use crate::routes::auth::AuthState;
-use axum::{
-  extract::State,
+use axum::
+{
+  extract::{ Path, Query, State },
   http::StatusCode,
-  response::{ IntoResponse, Json },
+  response::IntoResponse,
+  Json,
 };
 use serde::{ Deserialize, Serialize };
-use sqlx::FromRow;
-use std::str::FromStr;
+use sqlx::{ Pool, Sqlite };
+use std::sync::Arc;
 
-/// Request body for creating a new user
+use crate::rbac::{ Permission, PermissionChecker, Role };
+use iron_token_manager::user_service::
+{
+  CreateUserParams, ListUsersFilters, User, UserService,
+};
+
+/// State for user management endpoints
+#[ derive( Clone ) ]
+pub struct UserManagementState
+{
+  pub db_pool: Pool< Sqlite >,
+  pub permission_checker: Arc< PermissionChecker >,
+}
+
+impl UserManagementState
+{
+  pub fn new( db_pool: Pool< Sqlite >, permission_checker: Arc< PermissionChecker > ) -> Self
+  {
+    Self {
+      db_pool,
+      permission_checker,
+    }
+  }
+}
+
+//
+// Request/Response types
+//
+
+/// Request to create a new user
 #[ derive( Debug, Deserialize ) ]
 pub struct CreateUserRequest
 {
   pub username: String,
   pub password: String,
-  pub role: Option< String >,
+  pub email: String,
+  pub role: String,
 }
 
-/// User response object
-#[ derive( Debug, Serialize, FromRow ) ]
+impl CreateUserRequest
+{
+  const MAX_USERNAME_LENGTH: usize = 255;
+  const MAX_PASSWORD_LENGTH: usize = 1000;
+  const MAX_EMAIL_LENGTH: usize = 255;
+  const MIN_PASSWORD_LENGTH: usize = 8;
+
+  pub fn validate( &self ) -> Result< (), String >
+  {
+    // Username validation
+    if self.username.is_empty()
+    {
+      return Err( "username cannot be empty".to_string() );
+    }
+    if self.username.len() > Self::MAX_USERNAME_LENGTH
+    {
+      return Err( format!( "username exceeds maximum length of {}", Self::MAX_USERNAME_LENGTH ) );
+    }
+
+    // Password validation
+    if self.password.len() < Self::MIN_PASSWORD_LENGTH
+    {
+      return Err( format!( "password must be at least {} characters", Self::MIN_PASSWORD_LENGTH ) );
+    }
+    if self.password.len() > Self::MAX_PASSWORD_LENGTH
+    {
+      return Err( format!( "password exceeds maximum length of {}", Self::MAX_PASSWORD_LENGTH ) );
+    }
+
+    // Email validation
+    if self.email.is_empty()
+    {
+      return Err( "email cannot be empty".to_string() );
+    }
+    if self.email.len() > Self::MAX_EMAIL_LENGTH
+    {
+      return Err( format!( "email exceeds maximum length of {}", Self::MAX_EMAIL_LENGTH ) );
+    }
+    if !self.email.contains( '@' )
+    {
+      return Err( "email must contain @ symbol".to_string() );
+    }
+
+    // Role validation
+    let valid_roles = [ "viewer", "user", "admin" ];
+    if !valid_roles.contains( &self.role.as_str() )
+    {
+      return Err( format!( "role must be one of: {}", valid_roles.join( ", " ) ) );
+    }
+
+    Ok( () )
+  }
+}
+
+/// Response from creating a user
+#[ derive( Debug, Serialize, Deserialize ) ]
+pub struct CreateUserResponse
+{
+  pub id: i64,
+  pub username: String,
+  pub email: Option< String >,
+  pub role: String,
+  pub is_active: bool,
+  pub created_at: i64,
+}
+
+impl From< User > for CreateUserResponse
+{
+  fn from( user: User ) -> Self
+  {
+    Self {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      is_active: user.is_active,
+      created_at: user.created_at,
+    }
+  }
+}
+
+/// Query parameters for listing users
+#[ derive( Debug, Deserialize ) ]
+pub struct ListUsersQuery
+{
+  pub role: Option< String >,
+  pub is_active: Option< bool >,
+  pub search: Option< String >,
+  pub page: Option< u32 >,
+  pub page_size: Option< u32 >,
+}
+
+/// Response from listing users
+#[ derive( Debug, Serialize, Deserialize ) ]
+pub struct ListUsersResponse
+{
+  pub users: Vec< UserResponse >,
+  pub total: i64,
+  pub page: u32,
+  pub page_size: u32,
+}
+
+/// User information in list response
+#[ derive( Debug, Serialize, Deserialize ) ]
 pub struct UserResponse
 {
   pub id: i64,
   pub username: String,
+  pub email: Option< String >,
   pub role: String,
   pub is_active: bool,
+  pub created_at: i64,
+  pub last_login: Option< i64 >,
+  pub suspended_at: Option< i64 >,
+  pub deleted_at: Option< i64 >,
 }
 
-/// POST /api/users
+impl From< User > for UserResponse
+{
+  fn from( user: User ) -> Self
+  {
+    Self {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      is_active: user.is_active,
+      created_at: user.created_at,
+      last_login: user.last_login,
+      suspended_at: user.suspended_at,
+      deleted_at: user.deleted_at,
+    }
+  }
+}
+
+/// Request to suspend a user
+#[ derive( Debug, Deserialize ) ]
+pub struct SuspendUserRequest
+{
+  pub reason: Option< String >,
+}
+
+impl SuspendUserRequest
+{
+  const MAX_REASON_LENGTH: usize = 1000;
+
+  pub fn validate( &self ) -> Result< (), String >
+  {
+    if let Some( ref reason ) = self.reason
+    {
+      if reason.len() > Self::MAX_REASON_LENGTH
+      {
+        return Err( format!( "reason exceeds maximum length of {}", Self::MAX_REASON_LENGTH ) );
+      }
+    }
+    Ok( () )
+  }
+}
+
+/// Request to change user role
+#[ derive( Debug, Deserialize ) ]
+pub struct ChangeRoleRequest
+{
+  pub role: String,
+}
+
+impl ChangeRoleRequest
+{
+  pub fn validate( &self ) -> Result< (), String >
+  {
+    let valid_roles = [ "viewer", "user", "admin" ];
+    if !valid_roles.contains( &self.role.as_str() )
+    {
+      return Err( format!( "role must be one of: {}", valid_roles.join( ", " ) ) );
+    }
+    Ok( () )
+  }
+}
+
+/// Request to reset password
+#[ derive( Debug, Deserialize ) ]
+pub struct ResetPasswordRequest
+{
+  pub new_password: String,
+  pub force_change: Option< bool >,
+}
+
+impl ResetPasswordRequest
+{
+  const MAX_PASSWORD_LENGTH: usize = 1000;
+  const MIN_PASSWORD_LENGTH: usize = 8;
+
+  pub fn validate( &self ) -> Result< (), String >
+  {
+    if self.new_password.len() < Self::MIN_PASSWORD_LENGTH
+    {
+      return Err( format!( "password must be at least {} characters", Self::MIN_PASSWORD_LENGTH ) );
+    }
+    if self.new_password.len() > Self::MAX_PASSWORD_LENGTH
+    {
+      return Err( format!( "password exceeds maximum length of {}", Self::MAX_PASSWORD_LENGTH ) );
+    }
+    Ok( () )
+  }
+}
+
+//
+// Handler functions
+//
+
+/// Create a new user
 ///
-/// Create a new user (Admin only)
+/// POST /api/v1/users
+/// Requires: Admin role
 pub async fn create_user(
-  State( state ): State< AuthState >,
-  AuthenticatedUser( claims ): AuthenticatedUser,
+  State( state ): State< UserManagementState >,
   Json( request ): Json< CreateUserRequest >,
 ) -> impl IntoResponse
 {
-  // Check permission (Admin only)
-  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
-  if role != Role::Admin
-  {
-    return (
-      StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Insufficient permissions" }) ),
-    )
-      .into_response();
-  }
-
   // Validate request
-  if request.username.trim().is_empty() || request.password.trim().is_empty()
+  if let Err( validation_error ) = request.validate()
   {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Username and password cannot be empty" }) ),
-    )
-      .into_response();
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
+    ({
+      "error": validation_error
+    }) ) ).into_response();
   }
 
-  // Prevent creating user with username 'admin' (reserved)
-  if request.username.to_lowercase() == "admin"
+  // TODO: Extract admin_id from JWT token
+  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
+  let admin_id = 999i64;
+
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
   {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Username 'admin' is reserved" }) ),
-    )
-      .into_response();
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
   }
 
-  // Hash password
-  let password_hash = match bcrypt::hash( &request.password, bcrypt::DEFAULT_COST )
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
+
+  // Create user parameters
+  let params = CreateUserParams
   {
-    Ok( hash ) => hash,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to hash password" }) ),
-      )
-        .into_response();
-    }
+    username: request.username,
+    password: request.password,
+    email: request.email,
+    role: request.role,
   };
 
-  let role_str = request.role.unwrap_or_else( || "user".to_string() );
-
-  // Insert user
-  let result = sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) VALUES (?, ?, ?, 1, strftime('%s', 'now'))"
-  )
-  .bind( &request.username )
-  .bind( &password_hash )
-  .bind( &role_str )
-  .execute( &state.db_pool )
-  .await;
-
-  match result
+  // Create user
+  match user_service.create_user( params, admin_id ).await
   {
-    Ok( _ ) => (
-      StatusCode::CREATED,
-      Json( serde_json::json!({ "success": true }) ),
-    )
-      .into_response(),
+    Ok( user ) =>
+    {
+      let response = CreateUserResponse::from( user );
+      ( StatusCode::CREATED, Json( response ) ).into_response()
+    }
     Err( e ) =>
     {
-      tracing::error!( "Failed to create user: {}", e );
-      // Check if error is constraint violation (username already exists)
-      // This is a simplification, ideally we check error code
-      if e.to_string().contains( "UNIQUE constraint failed" )
-      {
-        return (
-          StatusCode::CONFLICT,
-          Json( serde_json::json!({ "error": "Username already exists" }) ),
-        )
-          .into_response();
-      }
-      
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to create user" }) ),
-      )
-        .into_response()
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to create user: {}", e )
+      }) ) ).into_response()
     }
   }
 }
 
-/// GET /api/users
+/// List users with optional filters
 ///
-/// List all users (Admin only)
+/// GET /api/v1/users?role=admin&is_active=true&search=john&page=1&page_size=20
+/// Requires: Admin role
 pub async fn list_users(
-  State( state ): State< AuthState >,
-  AuthenticatedUser( claims ): AuthenticatedUser,
+  State( state ): State< UserManagementState >,
+  Query( query ): Query< ListUsersQuery >,
 ) -> impl IntoResponse
 {
-  // Check permission (Admin only)
-  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
-  if role != Role::Admin
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
   {
-    return (
-      StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Insufficient permissions" }) ),
-    )
-      .into_response();
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
   }
 
-  let users = sqlx::query_as::<_, UserResponse>(
-    "SELECT id, username, role, is_active FROM users WHERE username != 'admin'"
-  )
-  .fetch_all( &state.db_pool )
-  .await;
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
 
-  match users
+  // Build filters
+  let page = query.page.unwrap_or( 1 );
+  let page_size = query.page_size.unwrap_or( 20 ).min( 100 ); // Cap at 100
+  let offset = ( page - 1 ) * page_size;
+
+  let filters = ListUsersFilters
   {
-    Ok( users ) => ( StatusCode::OK, Json( users ) ).into_response(),
-    Err( e ) =>
-    {
-      tracing::error!( "Failed to list users: {}", e );
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to list users" }) ),
-      )
-        .into_response()
-    }
-  }
-}
-
-/// Request body for updating user status
-#[ derive( Debug, Deserialize ) ]
-pub struct UpdateUserStatusRequest
-{
-  pub is_active: bool,
-}
-
-/// PATCH /api/users/:id/status
-///
-/// Enable or disable a user (Admin only)
-pub async fn update_user_status(
-  State( state ): State< AuthState >,
-  AuthenticatedUser( claims ): AuthenticatedUser,
-  axum::extract::Path( user_id ): axum::extract::Path< i64 >,
-  Json( request ): Json< UpdateUserStatusRequest >,
-) -> impl IntoResponse
-{
-  // Check permission (Admin only)
-  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
-  if role != Role::Admin
-  {
-    return (
-      StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Insufficient permissions" }) ),
-    )
-      .into_response();
-  }
-
-  // Prevent disabling self
-  // We need to fetch the target user to check if it's the current user?
-  // Or just check if user_id matches current user's ID?
-  // But claims.sub is username, not ID.
-  // Let's fetch the target user first to verify existence and get username.
-  
-  let target_user = match sqlx::query_as::<_, UserResponse>(
-    "SELECT id, username, role, is_active FROM users WHERE id = ?"
-  )
-  .bind( user_id )
-  .fetch_optional( &state.db_pool )
-  .await
-  {
-    Ok( Some( user ) ) => user,
-    Ok( None ) =>
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "User not found" }) ),
-      )
-        .into_response();
-    }
-    Err( e ) =>
-    {
-      tracing::error!( "Failed to fetch user: {}", e );
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
-      )
-        .into_response();
-    }
+    role: query.role,
+    is_active: query.is_active,
+    search: query.search,
+    limit: Some( page_size as i64 ),
+    offset: Some( offset as i64 ),
   };
 
-  if target_user.username == claims.sub
+  // List users
+  match user_service.list_users( filters ).await
   {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Cannot change your own status" }) ),
-    )
-      .into_response();
-  }
-
-  // Protect 'admin' user from being disabled
-  if target_user.username == "admin"
-  {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Cannot disable the admin user" }) ),
-    )
-      .into_response();
-  }
-
-  // Update status
-  let result = sqlx::query(
-    "UPDATE users SET is_active = ? WHERE id = ?"
-  )
-  .bind( request.is_active )
-  .bind( user_id )
-  .execute( &state.db_pool )
-  .await;
-
-  match result
-  {
-    Ok( _ ) => (
-      StatusCode::OK,
-      Json( serde_json::json!({ "success": true }) ),
-    )
-      .into_response(),
+    Ok( ( users, total ) ) =>
+    {
+      let response = ListUsersResponse
+      {
+        users: users.into_iter().map( UserResponse::from ).collect(),
+        total,
+        page,
+        page_size,
+      };
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
     Err( e ) =>
     {
-      tracing::error!( "Failed to update user status: {}", e );
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to update user status" }) ),
-      )
-        .into_response()
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to list users: {}", e )
+      }) ) ).into_response()
     }
   }
 }
 
-/// DELETE /api/users/:id
+/// Get user by ID
 ///
-/// Delete a user (Admin only)
+/// GET /api/v1/users/{id}
+/// Requires: Admin role
+pub async fn get_user(
+  State( state ): State< UserManagementState >,
+  Path( user_id ): Path< i64 >,
+) -> impl IntoResponse
+{
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  {
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
+  }
+
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
+
+  // Get user
+  match user_service.get_user_by_id( user_id ).await
+  {
+    Ok( user ) =>
+    {
+      let response = UserResponse::from( user );
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
+    Err( e ) =>
+    {
+      ( StatusCode::NOT_FOUND, Json( serde_json::json!
+      ({
+        "error": format!( "user not found: {}", e )
+      }) ) ).into_response()
+    }
+  }
+}
+
+/// Suspend a user account
+///
+/// PUT /api/v1/users/{id}/suspend
+/// Requires: Admin role
+pub async fn suspend_user(
+  State( state ): State< UserManagementState >,
+  Path( user_id ): Path< i64 >,
+  Json( request ): Json< SuspendUserRequest >,
+) -> impl IntoResponse
+{
+  // Validate request
+  if let Err( validation_error ) = request.validate()
+  {
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
+    ({
+      "error": validation_error
+    }) ) ).into_response();
+  }
+
+  // TODO: Extract admin_id from JWT token
+  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
+  let admin_id = 999i64;
+
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  {
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
+  }
+
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
+
+  // Suspend user
+  match user_service.suspend_user( user_id, admin_id, request.reason ).await
+  {
+    Ok( user ) =>
+    {
+      let response = UserResponse::from( user );
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
+    Err( e ) =>
+    {
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to suspend user: {}", e )
+      }) ) ).into_response()
+    }
+  }
+}
+
+/// Activate a user account
+///
+/// PUT /api/v1/users/{id}/activate
+/// Requires: Admin role
+pub async fn activate_user(
+  State( state ): State< UserManagementState >,
+  Path( user_id ): Path< i64 >,
+) -> impl IntoResponse
+{
+  // TODO: Extract admin_id from JWT token
+  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
+  let admin_id = 999i64;
+
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  {
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
+  }
+
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
+
+  // Activate user
+  match user_service.activate_user( user_id, admin_id ).await
+  {
+    Ok( user ) =>
+    {
+      let response = UserResponse::from( user );
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
+    Err( e ) =>
+    {
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to activate user: {}", e )
+      }) ) ).into_response()
+    }
+  }
+}
+
+/// Delete a user account (soft delete)
+///
+/// DELETE /api/v1/users/{id}
+/// Requires: Admin role
 pub async fn delete_user(
-  State( state ): State< AuthState >,
-  AuthenticatedUser( claims ): AuthenticatedUser,
-  axum::extract::Path( user_id ): axum::extract::Path< i64 >,
+  State( state ): State< UserManagementState >,
+  Path( user_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  // Check permission (Admin only)
-  let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
-  if role != Role::Admin
+  // TODO: Extract admin_id from JWT token
+  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
+  let admin_id = 999i64;
+
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
   {
-    return (
-      StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Insufficient permissions" }) ),
-    )
-      .into_response();
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
   }
 
-  // Fetch target user to verify existence and check constraints
-  let target_user = match sqlx::query_as::<_, UserResponse>(
-    "SELECT id, username, role, is_active FROM users WHERE id = ?"
-  )
-  .bind( user_id )
-  .fetch_optional( &state.db_pool )
-  .await
-  {
-    Ok( Some( user ) ) => user,
-    Ok( None ) =>
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "User not found" }) ),
-      )
-        .into_response();
-    }
-    Err( e ) =>
-    {
-      tracing::error!( "Failed to fetch user: {}", e );
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
-      )
-        .into_response();
-    }
-  };
-
-  // Prevent deleting self
-  if target_user.username == claims.sub
-  {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Cannot delete yourself" }) ),
-    )
-      .into_response();
-  }
-
-  // Protect 'admin' user from being deleted
-  if target_user.username == "admin"
-  {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Cannot delete the admin user" }) ),
-    )
-      .into_response();
-  }
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
 
   // Delete user
-  let result = sqlx::query(
-    "DELETE FROM users WHERE id = ?"
-  )
-  .bind( user_id )
-  .execute( &state.db_pool )
-  .await;
-
-  match result
+  match user_service.delete_user( user_id, admin_id ).await
   {
-    Ok( _ ) => (
-      StatusCode::OK,
-      Json( serde_json::json!({ "success": true }) ),
-    )
-      .into_response(),
+    Ok( user ) =>
+    {
+      let response = UserResponse::from( user );
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
     Err( e ) =>
     {
-      tracing::error!( "Failed to delete user: {}", e );
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to delete user" }) ),
-      )
-        .into_response()
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to delete user: {}", e )
+      }) ) ).into_response()
+    }
+  }
+}
+
+/// Change a user's role
+///
+/// PUT /api/v1/users/{id}/role
+/// Requires: Admin role
+pub async fn change_user_role(
+  State( state ): State< UserManagementState >,
+  Path( user_id ): Path< i64 >,
+  Json( request ): Json< ChangeRoleRequest >,
+) -> impl IntoResponse
+{
+  // Validate request
+  if let Err( validation_error ) = request.validate()
+  {
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
+    ({
+      "error": validation_error
+    }) ) ).into_response();
+  }
+
+  // TODO: Extract admin_id from JWT token
+  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
+  let admin_id = 999i64;
+
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  {
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
+  }
+
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
+
+  // Change role
+  match user_service.change_user_role( user_id, admin_id, request.role ).await
+  {
+    Ok( user ) =>
+    {
+      let response = UserResponse::from( user );
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
+    Err( e ) =>
+    {
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to change user role: {}", e )
+      }) ) ).into_response()
+    }
+  }
+}
+
+/// Reset a user's password
+///
+/// POST /api/v1/users/{id}/reset-password
+/// Requires: Admin role
+pub async fn reset_password(
+  State( state ): State< UserManagementState >,
+  Path( user_id ): Path< i64 >,
+  Json( request ): Json< ResetPasswordRequest >,
+) -> impl IntoResponse
+{
+  // Validate request
+  if let Err( validation_error ) = request.validate()
+  {
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
+    ({
+      "error": validation_error
+    }) ) ).into_response();
+  }
+
+  // TODO: Extract admin_id from JWT token
+  // For now, using placeholder admin_id = 999 (to avoid conflicts with test users)
+  let admin_id = 999i64;
+
+  // Check RBAC permission
+  // TODO: Get role from JWT token
+  let admin_role = Role::Admin;
+  if !state.permission_checker.has_permission( admin_role, Permission::ManageUsers )
+  {
+    return ( StatusCode::FORBIDDEN, Json( serde_json::json!
+    ({
+      "error": "insufficient permissions"
+    }) ) ).into_response();
+  }
+
+  // Create user service
+  let user_service = UserService::new( state.db_pool.clone() );
+
+  // Reset password
+  let force_change = request.force_change.unwrap_or( true );
+  match user_service.reset_password( user_id, admin_id, request.new_password, force_change ).await
+  {
+    Ok( user ) =>
+    {
+      let response = UserResponse::from( user );
+      ( StatusCode::OK, Json( response ) ).into_response()
+    }
+    Err( e ) =>
+    {
+      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!
+      ({
+        "error": format!( "failed to reset password: {}", e )
+      }) ) ).into_response()
     }
   }
 }

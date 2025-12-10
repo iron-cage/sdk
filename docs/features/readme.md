@@ -13,6 +13,7 @@
 | 003 | **003_token_management_api_reference.md** | Document token management API endpoints (request/response schemas, error codes, authentication) |
 | 004 | **004_token_management_cli_api_parity.md** | Define CLI and API parity requirements (command mapping, coverage gaps, implementation status) |
 | 005 | **005_token_management_implementation_plan.md** | Provide token management implementation roadmap (TDD phases, milestones, technical approach) |
+| 006 | **006_user_management.md** | Document user management feature architecture (lifecycle, RBAC, audit logging, admin operations) |
 
 ---
 

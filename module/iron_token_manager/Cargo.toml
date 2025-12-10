@@ -38,6 +38,7 @@ sha2 = "0.10"
 blake3 = "1.5"
 hex = "0.4"
 base64 = { workspace = true }
+bcrypt = "0.15"
 
 # Database
 sqlx = { workspace = true }
