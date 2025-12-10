@@ -97,7 +97,6 @@ function formatDate(timestamp: number): string {
 
 function copyToken(token: string) {
   navigator.clipboard.writeText(token)
-  alert('Token copied to clipboard!')
 }
 </script>
 

@@ -33,7 +33,7 @@
 //! **Precondition Violations:** Not applicable
 
 use iron_api::routes::tokens::TokenState;
-use axum::{ Router, routing::{ post, get, delete }, http::{ Request, StatusCode } };
+use axum::{ Router, http::{ Request, StatusCode }, routing::{ delete, get, post, put } };
 use axum::body::Body;
 use tower::ServiceExt;
 
@@ -49,6 +49,7 @@ async fn create_test_router() -> Router
     .route( "/api/tokens/:id", get( iron_api::routes::tokens::get_token ) )
     .route( "/api/tokens/:id", delete( iron_api::routes::tokens::revoke_token ) )
     .route( "/api/tokens/:id/rotate", post( iron_api::routes::tokens::rotate_token ) )
+    .route( "/api/tokens/:id", put( iron_api::routes::tokens::update_token ) )
     .with_state( token_state )
 }
 

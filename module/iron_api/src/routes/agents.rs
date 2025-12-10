@@ -4,7 +4,7 @@ use axum::{
     response::Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 
 use crate::jwt_auth::AuthenticatedUser;
 
@@ -177,7 +177,7 @@ pub async fn create_agent(
             format!("JSON error: {}", e),
         )
     })?;
-    let created_at = chrono::Utc::now().timestamp();
+    let created_at = chrono::Utc::now().timestamp_millis();
 
     let result = sqlx::query(
         r#"
@@ -334,4 +334,110 @@ pub async fn delete_agent(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Token list item for agent tokens endpoint
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AgentTokenItem {
+    pub id: i64,
+    pub user_id: String,
+    pub provider: Option<String>,
+    pub name: Option<String>,
+    pub created_at: i64,
+    pub last_used_at: Option<i64>,
+    pub is_active: bool,
+}
+
+/// Get all tokens for an agent (filtered by user role)
+pub async fn get_agent_tokens(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<i64>,
+    user: AuthenticatedUser,
+) -> Result<Json<Vec<AgentTokenItem>>, (StatusCode, String)> {
+    // Check if agent exists
+    let agent_exists: Option<i64> = sqlx::query_scalar("SELECT id FROM agents WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?;
+
+    if agent_exists.is_none() {
+        return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
+    }
+
+    // Get tokens based on user role
+    let rows = if user.0.role == "admin" {
+        // Admin sees all tokens for this agent
+        sqlx::query(
+            r#"
+            SELECT 
+                id,
+                user_id,
+                provider,
+                name,
+                created_at,
+                last_used_at,
+                is_active
+            FROM api_tokens
+            WHERE agent_id = ?
+            ORDER BY created_at DESC
+            "#
+        )
+        .bind(id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?
+    } else {
+        // Regular users only see their own tokens for this agent
+        sqlx::query(
+            r#"
+            SELECT 
+                id,
+                user_id,
+                provider,
+                name,
+                created_at,
+                last_used_at,
+                is_active
+            FROM api_tokens
+            WHERE agent_id = ? AND user_id = ?
+            ORDER BY created_at DESC
+            "#
+        )
+        .bind(id)
+        .bind(&user.0.sub)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?
+    };
+
+    let tokens: Vec<AgentTokenItem> = rows
+        .iter()
+        .map(|row| AgentTokenItem {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            provider: row.get("provider"),
+            name: row.get("name"),
+            created_at: row.get("created_at"),
+            last_used_at: row.get("last_used_at"),
+            is_active: row.get("is_active"),
+        })
+        .collect();
+
+    Ok(Json(tokens))
 }

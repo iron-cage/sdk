@@ -49,9 +49,7 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  routing::{ get, post, delete, patch },
-  Router,
-  http::{ Method, header },
+  Router, http::{ Method, header }, routing::{ delete, get, patch, post, put }
 };
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
@@ -153,6 +151,7 @@ struct AppState
   traces: iron_api::routes::traces::TracesState,
   providers: iron_api::routes::providers::ProvidersState,
   keys: iron_api::routes::keys::KeysState,
+  agents: sqlx::SqlitePool,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -222,6 +221,15 @@ impl axum::extract::FromRef< AppState > for iron_api::routes::keys::KeysState
   fn from_ref( state: &AppState ) -> Self
   {
     state.keys.clone()
+  }
+}
+
+/// Enable agent routes to access SqlitePool from combined AppState
+impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.agents.clone()
   }
 }
 
@@ -348,6 +356,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     rate_limiter: key_rate_limiter,
   };
 
+  // Get database pool for agents (before moving token_state)
+  let agents_pool = token_state.storage.pool().clone();
+
   // Create combined app state
   let app_state = AppState
   {
@@ -358,6 +369,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     traces: traces_state,
     providers: providers_state,
     keys: keys_state,
+    agents: agents_pool,
   };
 
   // Build router with all endpoints
@@ -382,6 +394,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/tokens/:id", get( iron_api::routes::tokens::get_token ) )
     .route( "/api/tokens/:id/rotate", post( iron_api::routes::tokens::rotate_token ) )
     .route( "/api/tokens/:id", delete( iron_api::routes::tokens::revoke_token ) )
+    .route( "/api/tokens/:id", put( iron_api::routes::tokens::update_token ) )
 
     // Usage analytics endpoints
     .route( "/api/usage/aggregate", get( iron_api::routes::usage::get_aggregate_usage ) )
@@ -410,6 +423,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
     // Key fetch endpoint (API token authentication)
     .route( "/api/keys", get( iron_api::routes::keys::get_key ) )
+
+    // Agent management endpoints
+    .route( "/api/agents", get( iron_api::routes::agents::list_agents ) )
+    .route( "/api/agents", post( iron_api::routes::agents::create_agent ) )
+    .route( "/api/agents/:id", get( iron_api::routes::agents::get_agent ) )
+    .route( "/api/agents/:id", axum::routing::put( iron_api::routes::agents::update_agent ) )
+    .route( "/api/agents/:id", delete( iron_api::routes::agents::delete_agent ) )
+    .route( "/api/agents/:id/tokens", get( iron_api::routes::agents::get_agent_tokens ) )
 
     // Apply combined state to all routes
     .with_state( app_state )

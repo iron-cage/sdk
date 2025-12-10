@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const api = useApi()
 const queryClient = useQueryClient()

@@ -55,6 +55,13 @@ const { data: tokens, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getAgentTokens(agentId),
 })
 
+// Fetch users list (for admin dropdown)
+const { data: users } = useQuery({
+  queryKey: ['users'],
+  queryFn: () => api.getUsers(),
+  enabled: authStore.isAdmin, // Only fetch if user is admin
+})
+
 // Create token mutation
 const createMutation = useMutation({
   mutationFn: (data: { agent_id: number; user_id: string; provider: string; description?: string }) =>
@@ -164,7 +171,6 @@ function formatDate(timestamp: number): string {
 
 function copyToken(token: string) {
   navigator.clipboard.writeText(token)
-  alert('Token copied to clipboard!')
 }
 </script>
 
@@ -307,14 +313,25 @@ function copyToken(token: string) {
         <div class="space-y-4 py-4">
           <div v-if="authStore.isAdmin" class="space-y-2">
             <Label for="targetUser">User (Admin only)</Label>
-            <Input
-              id="targetUser"
-              v-model="targetUserId"
-              placeholder="Leave empty for yourself"
-              :disabled="createMutation.isPending.value"
-            />
+            <Select v-model="targetUserId" :disabled="createMutation.isPending.value">
+              <SelectTrigger>
+                <SelectValue placeholder="Select user (or leave empty for yourself)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="authStore.username">
+                  {{ authStore.username }} (yourself)
+                </SelectItem>
+                <SelectItem 
+                  v-for="user in users || []" 
+                  :key="user.username" 
+                  :value="user.username"
+                >
+                  {{ user.username }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <p class="text-xs text-gray-500">
-              Specify a username to create the token for another user.
+              Select a user to create the token for.
             </p>
           </div>
 

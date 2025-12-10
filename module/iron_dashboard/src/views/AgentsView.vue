@@ -33,10 +33,12 @@ const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
+const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviders = ref<string[]>([])
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
+const agentToDelete = ref<Agent | null>(null)
 
 // Fetch agents
 const { data: agents, isLoading, error, refetch } = useQuery({
@@ -66,11 +68,10 @@ const createMutation = useMutation({
   },
 })
 
-// Update agent mutation (MOCKED)
+// Update agent mutation
 const updateMutation = useMutation({
   mutationFn: (data: { id: number; name: string; providers: string[] }) =>
-    // api.updateAgent(data) // TODO: Implement updateAgent in useApi
-    Promise.resolve(data), // Mock success
+    api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
@@ -127,8 +128,15 @@ function handleUpdateAgent() {
 }
 
 function handleDeleteAgent(agent: Agent) {
-  if (confirm(`Delete agent ${agent.name}? This action cannot be undone.`)) {
-    deleteMutation.mutate(agent.id)
+  agentToDelete.value = agent
+  showDeleteModal.value = true
+}
+
+function confirmDelete() {
+  if (agentToDelete.value) {
+    deleteMutation.mutate(agentToDelete.value.id)
+    showDeleteModal.value = false
+    agentToDelete.value = null
   }
 }
 
@@ -362,6 +370,35 @@ function toggleProvider(providerType: string) {
             :disabled="updateMutation.isPending.value"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Delete Confirmation Modal -->
+    <Dialog v-model:open="showDeleteModal">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete Agent</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete "{{ agentToDelete?.name }}"? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogFooter>
+          <Button
+            @click="showDeleteModal = false"
+            :disabled="deleteMutation.isPending.value"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button
+            @click="confirmDelete"
+            :disabled="deleteMutation.isPending.value"
+            variant="destructive"
+          >
+            {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
           </Button>
         </DialogFooter>
       </DialogContent>
