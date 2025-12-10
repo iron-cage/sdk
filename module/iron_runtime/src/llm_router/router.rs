@@ -70,7 +70,7 @@ impl LlmRouter
   fn new( api_key: String, server_url: String, cache_ttl_seconds: u64 ) -> PyResult< Self >
   {
     Self::create_inner( api_key, server_url, cache_ttl_seconds )
-      .map_err( | e | PyErr::new::< pyo3::exceptions::PyRuntimeError, _ >( e ) )
+      .map_err( PyErr::new::< pyo3::exceptions::PyRuntimeError, _ > )
   }
 
   /// Get the base URL for the OpenAI client

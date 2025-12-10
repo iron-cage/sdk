@@ -16,11 +16,13 @@ use std::env;
 // Helper functions
 // =============================================================================
 
-fn get_test_credentials() -> Option< ( String, String ) >
+fn get_test_credentials() -> ( String, String )
 {
-  let token = env::var( "IC_TOKEN" ).ok()?;
-  let server = env::var( "IC_SERVER" ).ok()?;
-  Some( ( token, server ) )
+  let token = env::var( "IC_TOKEN" )
+    .expect( "IC_TOKEN environment variable required for integration tests" );
+  let server = env::var( "IC_SERVER" )
+    .expect( "IC_SERVER environment variable required for integration tests" );
+  ( token, server )
 }
 
 // =============================================================================
@@ -30,12 +32,7 @@ fn get_test_credentials() -> Option< ( String, String ) >
 #[test]
 fn test_router_starts_and_stops()
 {
-  let Some( ( token, server ) ) = get_test_credentials()
-  else
-  {
-    eprintln!( "Skipping: IC_TOKEN and IC_SERVER not set" );
-    return;
-  };
+  let ( token, server ) = get_test_credentials();
 
   let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
 
@@ -59,12 +56,7 @@ fn test_router_starts_and_stops()
 #[test]
 fn test_router_provider_detection()
 {
-  let Some( ( token, server ) ) = get_test_credentials()
-  else
-  {
-    eprintln!( "Skipping: IC_TOKEN and IC_SERVER not set" );
-    return;
-  };
+  let ( token, server ) = get_test_credentials();
 
   let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
 
@@ -84,12 +76,7 @@ fn test_router_provider_detection()
 #[test]
 fn test_router_base_url_format()
 {
-  let Some( ( token, server ) ) = get_test_credentials()
-  else
-  {
-    eprintln!( "Skipping: IC_TOKEN and IC_SERVER not set" );
-    return;
-  };
+  let ( token, server ) = get_test_credentials();
 
   let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
 
@@ -110,12 +97,7 @@ fn test_router_base_url_format()
 #[test]
 fn test_router_api_key_passthrough()
 {
-  let Some( ( token, server ) ) = get_test_credentials()
-  else
-  {
-    eprintln!( "Skipping: IC_TOKEN and IC_SERVER not set" );
-    return;
-  };
+  let ( token, server ) = get_test_credentials();
 
   let mut router = LlmRouter::create( token.clone(), server, 300 ).expect( "Failed to create router" );
 
@@ -128,12 +110,7 @@ fn test_router_api_key_passthrough()
 #[test]
 fn test_router_custom_cache_ttl()
 {
-  let Some( ( token, server ) ) = get_test_credentials()
-  else
-  {
-    eprintln!( "Skipping: IC_TOKEN and IC_SERVER not set" );
-    return;
-  };
+  let ( token, server ) = get_test_credentials();
 
   // Create with custom cache TTL
   let mut router = LlmRouter::create( token, server, 60 ).expect( "Failed to create router" );

@@ -202,13 +202,13 @@ async fn handle_proxy(
   };
 
   // 7. Build target URL
-  let base_url = provider_key.base_url.as_deref().unwrap_or_else(|| {
+  let base_url = provider_key.base_url.as_deref().unwrap_or(
     match target_provider
     {
       "anthropic" => "https://api.anthropic.com",
       _ => "https://api.openai.com",
     }
-  });
+  );
 
   let target_url = format!("{}{}{}", base_url, request_path, query);
 

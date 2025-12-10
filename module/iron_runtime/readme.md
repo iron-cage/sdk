@@ -135,6 +135,36 @@ print(response.content[0].text)
 router.stop()
 ```
 
+**Gateway Mode (OpenAI client for Claude):**
+
+Use the same OpenAI client for both OpenAI and Claude models - just change the model name:
+
+```python
+from iron_cage import LlmRouter
+from openai import OpenAI
+
+router = LlmRouter(api_key=ic_token, server_url=ic_server)
+client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+
+# Same client works for both providers!
+response = client.chat.completions.create(
+    model="claude-sonnet-4-20250514",  # Claude model with OpenAI client!
+    messages=[
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello!"}
+    ],
+    max_tokens=100
+)
+print(response.choices[0].message.content)  # OpenAI format response
+
+router.stop()
+```
+
+The router automatically:
+1. Detects Claude model → routes to Anthropic API
+2. Translates request (OpenAI → Anthropic format)
+3. Translates response (Anthropic → OpenAI format)
+
 **Context Manager:**
 
 ```python
@@ -192,8 +222,9 @@ export IC_SERVER=http://localhost:3000
 python -m pytest python/tests/ -v
 
 # Manual testing
-python python/examples/test_manual.py openai
-python python/examples/test_manual.py anthropic
+python python/examples/test_manual.py openai     # Test OpenAI API
+python python/examples/test_manual.py anthropic  # Test Anthropic API
+python python/examples/test_manual.py gateway    # Test OpenAI client → Claude
 ```
 
 ## Example (Rust)

@@ -111,6 +111,15 @@ class LlmRouter:
         """Check if the proxy server is running."""
         ...
 
+    @property
+    def provider(self) -> str:
+        """Get the auto-detected provider.
+
+        Returns:
+            Provider name ("openai", "anthropic", or "unknown")
+        """
+        ...
+
     def stop(self) -> None:
         """Stop the proxy server."""
         ...
