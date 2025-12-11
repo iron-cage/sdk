@@ -467,7 +467,9 @@ pub async fn suspend_user(
   }
 
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub.parse::< i64 >().unwrap_or( 0 );
+
+  tracing::info!( "admin_id: {}", admin_id );
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -511,7 +513,7 @@ pub async fn activate_user(
 ) -> impl IntoResponse
 {
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub.parse::< i64 >().unwrap_or( 0 );
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -609,7 +611,7 @@ pub async fn change_user_role(
   }
 
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub.parse::< i64 >().unwrap_or( 0 );
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -663,7 +665,7 @@ pub async fn reset_password(
   }
 
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub.parse::< i64 >().unwrap_or( 0 );
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
