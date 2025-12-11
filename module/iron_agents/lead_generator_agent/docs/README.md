@@ -4,9 +4,8 @@ User guides and configuration documentation for iron_cage agent.
 
 ## Organization
 
-- `guide.md` - User guide for CLI usage
-- `configuration.md` - Configuration reference
-- Future ADRs will be added as needed
+- `spec.md` - Specification of this module
+- `README.md` - Description how to use this module
 
 ## Purpose
 
