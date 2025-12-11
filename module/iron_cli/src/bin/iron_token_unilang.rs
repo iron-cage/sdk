@@ -20,7 +20,6 @@
 //! - ⏳ Handlers implementation
 
 use unilang::prelude::*;
-use tracing::info;
 
 fn main() -> Result< (), Box< dyn std::error::Error > >
 {
@@ -28,28 +27,28 @@ fn main() -> Result< (), Box< dyn std::error::Error > >
 
   if args.is_empty()
   {
-    info!( "iron-token-unilang v0.1.0 (Phase 1 - under construction)" );
-    info!( "Using unilang CLI framework" );
-    info!( "" );
-    info!( "This is a stub binary to verify unilang dependencies." );
-    info!( "Full implementation coming in subsequent phases." );
-    info!( "" );
-    info!( "Unilang types available:" );
+    println!( "iron-token-unilang v0.1.0 (Phase 1 - under construction)" );
+    println!( "Using unilang CLI framework" );
+    println!();
+    println!( "This is a stub binary to verify unilang dependencies." );
+    println!( "Full implementation coming in subsequent phases." );
+    println!();
+    println!( "Unilang types available:" );
 
     // Verify unilang types are accessible
     #[ allow( deprecated ) ]
     let registry = CommandRegistry::new();
     let _pipeline = Pipeline::new( registry );
 
-    info!( "  ✓ CommandRegistry" );
-    info!( "  ✓ Pipeline" );
-    info!( "" );
-    info!( "Dependencies verified successfully!" );
+    println!( "  ✓ CommandRegistry" );
+    println!( "  ✓ Pipeline" );
+    println!();
+    println!( "Dependencies verified successfully!" );
   }
   else
   {
-    info!( "Command execution not yet implemented." );
-    info!( "Current phase: Project structure setup" );
+    println!( "Command execution not yet implemented." );
+    println!( "Current phase: Project structure setup" );
   }
 
   Ok( () )
