@@ -76,12 +76,18 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Login failed' }))
-      throw new Error(error.error || 'Login failed')
+      let msg: string;
+      try {
+        const error = await response.json();
+        msg = error.error.message
+      } catch (error) {
+        msg = 'Log  in failed'
+      }
+      throw new Error(msg)
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, credentials.username)
+    saveTokens(tokens, credentials.email)
   }
 
   // Refresh access token

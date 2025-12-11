@@ -27,7 +27,7 @@ async function handleLogin() {
     })
     router.push('/dashboard')
   } catch (err) {
-    error.value = "Error"
+    error.value = err.message || "Unexpected error"
   } finally {
     loading.value = false
   }
