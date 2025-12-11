@@ -8,9 +8,10 @@ use axum::{
   routing::any,
   Router,
 };
+use iron_cost::budget::CostController;
+use iron_cost::error::CostError;
 use iron_cost::pricing::PricingManager;
 use reqwest::Client;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -29,8 +30,8 @@ pub struct ProxyState {
   pub http_client: Client,
   /// Pricing manager for cost calculation
   pub pricing_manager: Arc<PricingManager>,
-  /// Total spent in microdollars (1 USD = 1_000_000 microdollars)
-  pub total_spent_micros: Arc<AtomicU64>,
+  /// Cost controller for budget enforcement and spending tracking (None = no budget)
+  pub cost_controller: Option<Arc<CostController>>,
 }
 
 /// Proxy server configuration
@@ -39,8 +40,10 @@ pub struct ProxyConfig {
   pub ic_token: String,
   pub server_url: String,
   pub cache_ttl_seconds: u64,
-  /// Shared counter for total spent (microdollars)
-  pub total_spent_micros: Arc<AtomicU64>,
+  /// Cost controller for budget enforcement and spending tracking (None = no budget)
+  pub cost_controller: Option<Arc<CostController>>,
+  /// Direct provider API key (bypasses Iron Cage server when set)
+  pub provider_key: Option<String>,
 }
 
 /// Run the proxy server
@@ -48,11 +51,16 @@ pub async fn run_proxy(
   config: ProxyConfig,
   shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), LlmRouterError> {
-  let key_fetcher = Arc::new(KeyFetcher::new(
-    config.server_url,
-    config.ic_token.clone(),
-    config.cache_ttl_seconds,
-  ));
+  // Create key fetcher - static if provider_key given, otherwise fetch from server
+  let key_fetcher = Arc::new(if let Some(ref pk) = config.provider_key {
+    KeyFetcher::new_static(pk.clone(), None)
+  } else {
+    KeyFetcher::new(
+      config.server_url,
+      config.ic_token.clone(),
+      config.cache_ttl_seconds,
+    )
+  });
 
   let http_client = Client::builder()
       .timeout(std::time::Duration::from_secs(300)) // 5 min timeout for LLM requests
@@ -68,7 +76,7 @@ pub async fn run_proxy(
     key_fetcher,
     http_client,
     pricing_manager,
-    total_spent_micros: config.total_spent_micros,
+    cost_controller: config.cost_controller,
   };
 
   let app = Router::new()
@@ -97,6 +105,57 @@ pub async fn run_proxy(
 /// Root handler (health check)
 async fn handle_root() -> impl IntoResponse {
   "LlmRouter OK"
+}
+
+/// Create an OpenAI-compatible error response
+fn create_openai_error_response(
+  status: StatusCode,
+  message: &str,
+  error_type: &str,
+  code: &str,
+) -> Response<Body> {
+  let error_json = serde_json::json!({
+    "error": {
+      "message": message,
+      "type": error_type,
+      "param": serde_json::Value::Null,
+      "code": code
+    }
+  });
+
+  Response::builder()
+    .status(status)
+    .header(header::CONTENT_TYPE, "application/json")
+    .body(Body::from(error_json.to_string()))
+    .unwrap_or_else(|_| {
+      Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(Body::from("Internal error"))
+        .unwrap()
+    })
+}
+
+/// Check if budget limit is exceeded using CostController
+fn check_budget(state: &ProxyState) -> Result<(), Response<Body>> {
+  // Skip check if no budget is set
+  let Some(ref controller) = state.cost_controller else {
+    return Ok(());
+  };
+
+  // Use CostController's check_budget method
+  if let Err(CostError::BudgetExceeded { spent_usd, limit_usd }) = controller.check_budget() {
+    return Err(create_openai_error_response(
+      StatusCode::PAYMENT_REQUIRED, // 402 - distinct from 429 rate limit
+      &format!(
+        "Iron Cage budget limit exceeded. Spent: ${:.2}, Limit: ${:.2}. \
+         Increase budget with router.set_budget() or check your pricing calculations.",
+        spent_usd, limit_usd
+      ),
+      "iron_cage_budget_exceeded", // Unique type - never from OpenAI
+      "budget_exceeded",
+    ));
+  }
+  Ok(())
 }
 
 /// Strip provider prefix from path if present, returns (clean_path, requested_provider)
@@ -162,6 +221,11 @@ async fn handle_proxy(
 
   if !is_valid {
     return Err((StatusCode::UNAUTHORIZED, "Invalid API key".to_string()));
+  }
+
+  // 1.5 Check budget before processing request
+  if let Err(error_response) = check_budget(&state) {
+    return Ok(error_response);
   }
 
   // 2. Read request body
@@ -262,8 +326,10 @@ async fn handle_proxy(
   // 11. Calculate and log request cost
   if status.is_success() {
     if let Some(cost_info) = calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body) {
-      // Add to total spent (already in microdollars - no conversion needed)
-      state.total_spent_micros.fetch_add(cost_info.cost_micros, Ordering::Relaxed);
+      // Add to total spent using CostController if budget is set
+      if let Some(ref controller) = state.cost_controller {
+        controller.add_spend_micros(cost_info.cost_micros);
+      }
 
       tracing::info!(
         model = %cost_info.model,

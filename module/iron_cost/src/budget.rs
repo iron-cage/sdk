@@ -37,10 +37,26 @@ impl CostController {
         Ok(())
     }
 
-    /// Add cost after a request finishes
+    /// Add cost after a request finishes (USD)
     pub fn add_spend(&self, cost_usd: f64) {
         let cost = usd_to_micros(cost_usd);
         self.total_spent_micros.fetch_add(cost, Ordering::Relaxed);
+    }
+
+    /// Add cost after a request finishes (microdollars)
+    /// Use when cost is already calculated in micros to avoid conversion.
+    pub fn add_spend_micros(&self, cost_micros: u64) {
+        self.total_spent_micros.fetch_add(cost_micros, Ordering::Relaxed);
+    }
+
+    /// Get total spent in USD
+    pub fn total_spent(&self) -> f64 {
+        micros_to_usd(self.total_spent_micros.load(Ordering::Relaxed))
+    }
+
+    /// Get budget limit in USD
+    pub fn budget_limit(&self) -> f64 {
+        micros_to_usd(self.budget_limit_micros.load(Ordering::Relaxed))
     }
 
     /// Update the strict limit (e.g. from Python)
