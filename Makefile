@@ -336,7 +336,7 @@ deploy: check_gcp_keys check_env_variables build_image
 	@docker run --rm \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-v $(CURDIR):/app \
-	-e HOME=/app \
+	-e HOME=/app/.gcloud-home \
 	-e SECRET_STATE_ARCHIVE_KEY="$(SECRET_STATE_ARCHIVE_KEY)" \
 	-e TF_VAR_HETZNER_CLOUD_TOKEN="$(SECRET_HETZNER_CLOUD_TOKEN)" \
 	-e TF_VAR_BUCKET_NAME="$(TF_VAR_BUCKET_NAME)" \

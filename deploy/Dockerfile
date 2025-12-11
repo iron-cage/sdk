@@ -1,6 +1,7 @@
 FROM google/cloud-sdk:548.0.0-slim
 ENV TF_VERSION=1.7.4
 
+ENV HOME=/app/.gcloud-home
 WORKDIR /
 
 # Install docker
@@ -15,6 +16,9 @@ RUN apt update --allow-releaseinfo-change \
     && unzip terraform_${TF_VERSION}_linux_amd64.zip \
     && chmod 755 /usr/lib/terraform/${TF_VERSION}/terraform \
     && ln -s /usr/lib/terraform/${TF_VERSION}/terraform /usr/bin/terraform
+
+RUN mkdir -p $HOME/.config/gcloud \
+    && chmod -R 777 $HOME
 
 WORKDIR /app
 
