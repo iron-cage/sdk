@@ -2,51 +2,81 @@
 
 Lock-free event-based analytics for Python LlmRouter.
 
+## Overview
+
+This crate provides high-performance analytics storage for LLM request tracking. Designed for async contexts with concurrent LLM calls, it uses lock-free data structures to ensure non-blocking operation.
+
+## Features
+
+- **Lock-free storage** - crossbeam ArrayQueue for bounded event buffer
+- **Atomic counters** - O(1) stats access without locks
+- **Per-model/provider stats** - DashMap for concurrent aggregation
+- **High-level recording API** - automatic provider inference and cost calculation
+- **Protocol 012 compatible** - field compatibility with analytics API
+
 ## Pilot Strategy
 
-Simple, predictable behavior for the pilot:
+Simple, predictable behavior:
 
 1. **Fixed Memory:** Bounded buffer (default 10,000 slots, ~2-5MB)
 2. **Non-Blocking:** Drop new events when buffer full (never block)
 3. **Observability:** `dropped_count()` tracks lost events
 
-### Scope
-
-**Responsibilities:**
-Provides lock-free event storage for LLM request analytics. Events are stored in a bounded buffer with atomic counters for O(1) stats access. Designed for high-throughput concurrent LLM calls in async contexts. Full compatibility with Protocol 012 Analytics API.
-
-**In Scope:**
-- Lock-free event buffer (crossbeam ArrayQueue)
-- Atomic running totals (AtomicU64)
-- Per-model/provider stats (DashMap)
-- Dropped event counter for observability
-- Event streaming via channels
-- Protocol 012 field compatibility
-- PyO3 bindings for Python access
-
-**Out of Scope:**
-- Server-side event persistence (see iron_control_api)
-- Dashboard WebSocket streaming (see iron_control_api)
-- Agent name/budget lookups (server-side enrichment)
-- Min/max/median computation (server computes from synced events)
-
 ## Installation
 
-```toml
+```toml,ignore
 [dependencies]
 iron_runtime_analytics = { path = "../iron_runtime_analytics" }
+iron_cost = { path = "../iron_cost" }  # For pricing
 ```
 
-## Example
+## Quick Start
 
-```rust
-use iron_runtime_analytics::event_storage::EventStore;
-use iron_runtime_analytics::event::*;
+### High-Level API (Recommended)
 
-// Create event store with default capacity (10,000 events)
+The high-level API handles provider inference and cost calculation automatically:
+
+```rust,ignore
+use iron_runtime_analytics::EventStore;
+use iron_cost::pricing::PricingManager;
+
+let store = EventStore::new();
+let pricing = PricingManager::new().unwrap();
+
+// Record successful LLM request - provider inferred from model name
+store.record_llm_completed(&pricing, "gpt-4", 150, 50, None, None);
+
+// Record with agent attribution
+store.record_llm_completed(
+    &pricing,
+    "claude-3-opus-20240229",
+    200,
+    100,
+    Some("agent_123"),      // agent_id
+    Some("ip_anthropic-001"), // provider_id
+);
+
+// Record failed request
+store.record_llm_failed("gpt-4", None, None, Some("rate_limit"), None);
+
+// Record budget threshold
+store.record_budget_threshold(80, 80_000_000, 100_000_000, None);
+
+// Lifecycle events
+store.record_router_started(8080);
+store.record_router_stopped();  // Captures final stats automatically
+```
+
+### Low-Level API
+
+For full control over event construction:
+
+```rust,ignore
+use iron_runtime_analytics::{EventStore, AnalyticsEvent, EventPayload};
+use iron_runtime_analytics::event::{LlmUsageData, LlmModelMeta};
+
 let store = EventStore::new();
 
-// Record LLM request completion - lock-free, O(1)
 store.record(AnalyticsEvent::new(EventPayload::LlmRequestCompleted(LlmUsageData {
     meta: LlmModelMeta {
         provider_id: Some("ip_openai-001".into()),
@@ -55,18 +85,90 @@ store.record(AnalyticsEvent::new(EventPayload::LlmRequestCompleted(LlmUsageData 
     },
     input_tokens: 150,
     output_tokens: 50,
-    cost_micros: 6000,
+    cost_micros: 6000,  // $0.006
 })));
+```
 
-// Get stats - O(1) for totals
+### Accessing Statistics
+
+```rust,ignore
 let stats = store.stats();
-println!("Total cost: ${:.4}", stats.total_cost_usd());
 
-// Check for dropped events (observability)
-if store.dropped_count() > 0 {
-    println!("Warning: {} events dropped (buffer full)", store.dropped_count());
+// Totals (O(1) access)
+println!("Requests: {}", stats.total_requests);
+println!("Cost: ${:.4}", stats.total_cost_usd());
+println!("Success rate: {:.1}%", stats.success_rate() * 100.0);
+
+// Per-model breakdown
+for (model, model_stats) in &stats.by_model {
+    println!("{}: {} requests, ${:.4}", model, model_stats.request_count, model_stats.cost_usd());
+}
+
+// Per-provider breakdown
+for (provider, provider_stats) in &stats.by_provider {
+    println!("{}: {} tokens", provider, provider_stats.input_tokens + provider_stats.output_tokens);
 }
 ```
+
+### Observability
+
+```rust,ignore
+// Check for dropped events (buffer overflow)
+if store.dropped_count() > 0 {
+    eprintln!("Warning: {} events dropped (buffer full)", store.dropped_count());
+}
+
+// Check unsynced events (pending server sync)
+println!("Unsynced events: {}", store.unsynced_count());
+```
+
+### Event Streaming
+
+```rust,ignore
+use std::thread;
+
+// Create store with streaming channel
+let (store, receiver) = EventStore::with_streaming(10_000, 100);
+
+// Spawn consumer thread
+thread::spawn(move || {
+    while let Ok(event) = receiver.recv() {
+        // Process event (e.g., send to server)
+        println!("Event: {:?}", event.event_id());
+    }
+});
+
+// Events are automatically sent to channel when recorded
+store.record_llm_completed(&pricing, "gpt-4", 100, 50, None, None);
+```
+
+## Module Structure
+
+```text
+src/
+├── lib.rs           # Re-exports
+├── event.rs         # AnalyticsEvent, EventPayload, LlmUsageData
+├── event_storage.rs # EventStore (lock-free buffer + atomic counters)
+├── stats.rs         # AtomicModelStats, ModelStats, ComputedStats
+├── recording.rs     # High-level record_* methods
+└── helpers.rs       # Provider enum, infer_provider, current_time_ms
+```
+
+## Scope
+
+**In Scope:**
+- Lock-free event buffer (crossbeam ArrayQueue)
+- Atomic running totals (AtomicU64)
+- Per-model/provider stats (DashMap)
+- Dropped event counter for observability
+- Event streaming via channels
+- Protocol 012 field compatibility
+
+**Out of Scope:**
+- Server-side event persistence (see iron_control_api)
+- Dashboard WebSocket streaming (see iron_control_api)
+- Agent name/budget lookups (server-side enrichment)
+- Min/max/median computation (server computes from synced events)
 
 ## License
 

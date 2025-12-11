@@ -6,14 +6,22 @@ rust-version.workspace = true
 license.workspace = true
 
 [features]
-default = ["enabled"]
-enabled = []
-full = ["enabled"]
+default = [ "enabled" ]
+enabled = [
+  "dep:serde",
+  "dep:uuid",
+  "dep:iron_cost",
+  "dep:crossbeam",
+  "dep:dashmap",
+]
+full = [ "enabled" ]
 
 [dependencies]
-serde = { workspace = true, features = ["derive","rc"] }
-uuid = { workspace = true, features = ["v4","serde"] }
-iron_cost = { workspace = true}
-crossbeam = { workspace = true }
-dashmap = {workspace = true}
+serde = { workspace = true, features = [ "derive", "rc" ], optional = true }
+uuid = { workspace = true, features = [ "v4", "serde" ], optional = true }
+iron_cost = { workspace = true, optional = true }
+crossbeam = { workspace = true, optional = true }
+dashmap = { workspace = true, optional = true }
+
 [dev-dependencies]
+iron_cost = { workspace = true }
