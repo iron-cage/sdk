@@ -6,11 +6,11 @@
 
 ## User Need
 
-Deploy Control Panel (API + Dashboard) for pilot/development use with production-grade database (PostgreSQL) but minimal operational complexity.
+Deploy Control Panel (API + Dashboard) for pilot/development use with minimal operational complexity and persistent data storage.
 
 ## Core Idea
 
-**3-service architecture** (PostgreSQL → Backend API → Frontend nginx) provides production-readiness without Kubernetes complexity.
+**2-service architecture** (Backend API + Frontend nginx) with persistent SQLite storage provides production-ready deployment without database server complexity.
 
 ## Architecture Overview
 
@@ -32,15 +32,15 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 │  Backend (iron_control_api_server)      │
 │  - REST API (50 endpoints)              │
 │  - JWT authentication                   │
+│  - SQLite database                      │
 │  Port: 3000 (internal)                  │
 └────────────────┬────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────────┐
-│  PostgreSQL 16                          │
-│  - Token management database            │
-│  - Persistent volume                    │
-│  Port: 5432 (internal)                  │
+│  Persistent Volume (sqlite_data)        │
+│  - /app/data/iron.db                    │
+│  - Docker-managed volume                │
 └─────────────────────────────────────────┘
 ```
 
@@ -49,31 +49,15 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 1. **User → Frontend**: Browser hits `http://localhost:8080`
 2. **Frontend → User**: nginx serves Vue static files (index.html, *.js, *.css)
 3. **Frontend → Backend**: nginx proxies `/api/*` requests to `http://backend:3000`
-4. **Backend → Database**: API connects to `postgresql://postgres:5432/iron_tokens`
+4. **Backend → SQLite**: API connects to `sqlite:///app/data/iron.db?mode=rwc`
 
 ## Service Breakdown
 
-### 1. PostgreSQL (Database)
+### 1. Backend API (iron_control_api)
 
-**Image**: `postgres:16-alpine` (official, 250MB compressed)
+**Build**: Multi-stage Dockerfile (rust:1-slim-bookworm → debian:bookworm-slim)
 
-**Purpose**: Production database for token management, usage tracking, authentication
-
-**Why PostgreSQL**:
-- Production-ready (ACID guarantees, concurrent writes)
-- SQLite limitations (file locking, no concurrent writes, pilot-only)
-- Industry standard for Control Panel deployments
-
-**Key Features**:
-- Health check: `pg_isready -U iron_user`
-- Persistent volume: `postgres_data:/var/lib/postgresql/data`
-- Automatic restart: `restart: unless-stopped`
-
-### 2. Backend API (iron_control_api)
-
-**Build**: Multi-stage Dockerfile (rust:1.75-slim-bookworm → debian:bookworm-slim)
-
-**Purpose**: REST API server for Control Panel backend
+**Purpose**: REST API server for Control Panel backend with embedded SQLite database
 
 **Why Multi-Stage Build**:
 - Small runtime image (~50MB vs ~2GB with build tools)
@@ -83,9 +67,16 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 **Key Features**:
 - Health check: `curl http://localhost:3000/api/health`
 - Non-root user (UID 1000)
-- Depends on PostgreSQL (waits for DB health check)
+- Persistent SQLite volume: `sqlite_data:/app/data`
+- Automatic restart: `restart: unless-stopped`
 
-### 3. Frontend (iron_dashboard)
+**Database Configuration**:
+- **Type**: SQLite (embedded, ACID-compliant)
+- **Location**: `/app/data/iron.db` (persistent Docker volume)
+- **Connection**: `sqlite:///app/data/iron.db?mode=rwc`
+- **Persistence**: Data survives container restarts via named volume
+
+### 2. Frontend (iron_dashboard)
 
 **Build**: Multi-stage Dockerfile (node:20-alpine → nginx:1.27-alpine)
 
@@ -111,7 +102,8 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 | Decision | Rationale | Alternative Rejected |
 |----------|-----------|---------------------|
 | **nginx as reverse proxy** | Single entry point, SSL termination, static file serving | Direct backend exposure (CORS complexity, no SSL, no static serving) |
-| **PostgreSQL instead of SQLite** | Production-ready, concurrent writes, ACID guarantees | SQLite (pilot only, no concurrent writes, file locking issues) |
+| **SQLite for all deployment modes** | Embedded database, zero configuration, ACID guarantees, sufficient for pilot scale | PostgreSQL (requires separate service, more complex, overkill for pilot workloads) |
+| **Persistent Docker volume** | Data survives container restarts, Docker-managed backups | Ephemeral storage (data loss on restart) or bind mounts (permission issues) |
 | **Multi-stage Docker builds** | Smaller images (~50MB runtime vs ~2GB with build tools) | Single-stage (bloated images with build dependencies) |
 | **No Redis** | Not currently used in codebase (premature optimization) | Add Redis now (YAGNI violation, extra complexity) |
 | **Bridge network** | Simple, predictable DNS, isolated from host | Host network (breaks container portability) |
@@ -119,39 +111,73 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 | **Health checks** | Automated recovery, orchestration readiness | Manual monitoring (no automated restart) |
 | **Non-root user** | Security best practice (principle of least privilege) | Root user (security risk if container compromised) |
 
+### SQLite Design Choice
+
+**Why SQLite for Pilot Deployment**:
+
+| Aspect | SQLite Advantage | PostgreSQL Disadvantage |
+|--------|------------------|------------------------|
+| **Setup Complexity** | Zero configuration (embedded) | Requires separate service, credentials, health checks |
+| **Resource Usage** | ~50MB total (no DB server) | +250MB for postgres container, +512MB RAM |
+| **Operational Burden** | No DB server to manage | Database backups, connection pooling, version upgrades |
+| **Deployment Simplicity** | 2 services instead of 3 | Additional service dependency, startup ordering |
+| **Pilot Scale Sufficiency** | Handles <100 concurrent users | Overkill for pilot workloads |
+| **ACID Guarantees** | Full ACID compliance | Same (no advantage) |
+| **Data Persistence** | Docker volume (same as PostgreSQL) | Same (no advantage) |
+
+**When SQLite is Sufficient**:
+- Pilot/development deployments
+- <100 concurrent users
+- <1000 requests/second
+- Small teams (<50 users)
+- Single backend instance
+
+**When to Migrate to PostgreSQL** (Future):
+- >100 concurrent users
+- Need for horizontal backend scaling (multiple instances)
+- >10GB database size
+- Replication requirements
+- Advanced query optimization needs
+
 ### Simplifications Made
 
 **What's Missing (Intentionally)**:
 
-1. **No Redis**: Code doesnt use Redis yet (WebSocket stub only)
-2. **No Secrets Manager**: Uses `.env` file (acceptable for pilot/small deployments)
-3. **No Load Balancer**: Single backend instance (scaling requires Kubernetes)
-4. **No Monitoring**: No Prometheus/Grafana (add later if needed)
-5. **No Log Aggregation**: Uses Docker logs (ELK stack is overkill for pilot)
-6. **No HTTPS**: HTTP-only (add Let's Encrypt before production)
+1. **No PostgreSQL**: SQLite is sufficient for pilot scale (add PostgreSQL when scaling requirements emerge)
+2. **No Redis**: Code doesnt use Redis yet (WebSocket stub only)
+3. **No Secrets Manager**: Uses `.env` file (acceptable for pilot/small deployments)
+4. **No Load Balancer**: Single backend instance (scaling requires Kubernetes)
+5. **No Monitoring**: No Prometheus/Grafana (add later if needed)
+6. **No Log Aggregation**: Uses Docker logs (ELK stack is overkill for pilot)
+7. **No HTTPS**: HTTP-only (add Let's Encrypt before production)
 
 ## Resource Requirements
 
 ### Minimum (Development)
 
+- **CPU**: 1 core
+- **RAM**: 2GB
+- **Disk**: 5GB
+
+### Recommended (Pilot Production)
+
 - **CPU**: 2 cores
 - **RAM**: 4GB
-- **Disk**: 10GB
-
-### Recommended (Production)
-
-- **CPU**: 4 cores
-- **RAM**: 8GB
-- **Disk**: 50GB (including PostgreSQL data growth)
+- **Disk**: 20GB (including SQLite data growth)
 
 ### Per-Service Breakdown
 
 | Service | CPU | RAM | Disk | Notes |
 |---------|-----|-----|------|-------|
-| PostgreSQL | 0.5 core | 512MB | 5GB | Grows with usage data |
-| Backend | 1 core | 1GB | 100MB | Rust binary is efficient |
+| Backend | 1 core | 1GB | 5GB | Includes SQLite database storage |
 | Frontend | 0.1 core | 128MB | 50MB | nginx is lightweight |
-| **Total** | **1.6 cores** | **1.6GB** | **5.15GB** | Minimal viable setup |
+| **Total** | **1.1 cores** | **1.1GB** | **5GB** | Minimal viable setup |
+
+**Comparison to PostgreSQL Architecture** (Not Implemented):
+- **CPU Savings**: -0.5 core (no postgres process)
+- **RAM Savings**: -512MB (no database server)
+- **Disk Savings**: Minimal (SQLite file vs postgres data dir)
+- **Complexity Savings**: -1 service (simpler deployment)
 
 ## Security Considerations
 
@@ -160,9 +186,9 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 - ✅ Non-root user in containers (UID 1000)
 - ✅ Environment variable secrets (not hardcoded)
 - ✅ Health checks for automated recovery
-- ✅ Internal network (services not exposed to host except frontend)
-- ✅ PostgreSQL credentials via env vars
+- ✅ Internal network (backend not exposed to host, only frontend)
 - ✅ nginx security headers (X-Frame-Options, X-Content-Type-Options)
+- ✅ SQLite database in persistent volume (data integrity)
 
 ### Missing (Future Work)
 
@@ -171,48 +197,57 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 - ❌ **Container Scanning**: No vulnerability scanning in CI/CD (add Trivy/Snyk)
 - ❌ **Network Policies**: Docker bridge network not segmented (add in Kubernetes)
 - ❌ **Rate Limiting**: nginx doesnt have rate limiting (add `limit_req` directive)
+- ❌ **SQLite Encryption**: Database file not encrypted at rest (add SQLCipher extension if needed)
 
 ## Deployment Modes Comparison
 
-### Pilot SQLite (Current Development)
+### Native SQLite (Local Development)
 
 - **Database**: SQLite file (`./iron.db`)
 - **Concurrency**: Single process only
 - **Deployment**: `cargo run --bin iron_control_api_server`
 - **Use Case**: Local development, testing
-- **Limitation**: File locking prevents concurrent access
+- **Limitation**: File locking prevents concurrent backend instances
 
-### Docker Compose PostgreSQL (This Architecture)
+### Docker Compose SQLite (Pilot Deployment)
 
-- **Database**: PostgreSQL 16 (container)
-- **Concurrency**: 100+ concurrent connections
+- **Database**: SQLite file in Docker volume (`/app/data/iron.db`)
+- **Concurrency**: Single backend instance (sufficient for <100 users)
 - **Deployment**: `docker compose up -d`
 - **Use Case**: Pilot deployment, small teams (<50 users)
-- **Limitation**: Single backend instance (no load balancing)
+- **Limitation**: Single backend instance (no horizontal scaling)
+- **Persistence**: Data survives container restarts via named volume
 
-### Kubernetes (Future Production)
+### Kubernetes + PostgreSQL (Future Production)
 
 - **Database**: Managed PostgreSQL (RDS, Cloud SQL)
-- **Concurrency**: Unlimited (horizontal scaling)
+- **Concurrency**: Unlimited (horizontal pod autoscaling)
 - **Deployment**: `kubectl apply -f manifests/`
 - **Use Case**: Production (>100 users, high availability)
-- **Limitation**: Operational complexity (requires K8s expertise)
+- **Limitation**: Operational complexity (requires K8s expertise, PostgreSQL expertise)
+- **Migration Required**: Code refactoring to support PostgreSQL (currently SQLite-only)
+
+**Current Status**: Backend codebase is SQLite-only (68 hardcoded `Pool<Sqlite>` references). PostgreSQL support requires code refactoring.
 
 ## Scaling Limitations
 
 | Metric | Current Limit | Bottleneck | Solution |
 |--------|---------------|------------|----------|
-| **Concurrent Users** | ~100 | Single backend instance | Add load balancer + horizontal pod autoscaling (K8s) |
-| **Requests/Second** | ~1000 | Backend CPU | Add more backend replicas |
-| **Database Connections** | ~100 | PostgreSQL max_connections | Add connection pooler (PgBouncer) |
-| **Storage** | ~50GB | PostgreSQL volume size | Increase volume size or add read replicas |
+| **Concurrent Users** | ~100 | SQLite + single backend instance | Migrate to PostgreSQL + add load balancer (requires code refactoring) |
+| **Requests/Second** | ~500 | Single backend instance | Add backend replicas (requires PostgreSQL migration first) |
+| **Database Connections** | ~100 | SQLite serialized writes | Migrate to PostgreSQL with connection pooler (PgBouncer) |
+| **Storage** | ~10GB practical | SQLite performance degrades >10GB | Migrate to PostgreSQL or partition data |
+| **Write Throughput** | ~1000 writes/sec | SQLite serialized transactions | Migrate to PostgreSQL for concurrent writes |
 
-**When to Upgrade to Kubernetes**:
+**When to Upgrade Architecture**:
 - More than 100 concurrent users
-- More than 1000 requests/second
+- More than 500 requests/second sustained
+- Database size exceeds 5GB
+- Need for multiple backend instances (horizontal scaling)
 - Need for 99.9%+ uptime (HA requirements)
 - Multi-region deployment
-- Compliance requirements (audit logging, encryption at rest)
+
+**Migration Path**: Pilot SQLite → PostgreSQL migration (requires backend code refactoring) → Kubernetes orchestration
 
 ## Trade-offs
 
@@ -220,26 +255,46 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with production
 
 | Aspect | Simplicity Choice | Production Choice | Current Decision |
 |--------|-------------------|-------------------|------------------|
-| **Database** | SQLite | PostgreSQL cluster | ✅ PostgreSQL (production-ready) |
+| **Database** | SQLite (embedded) | PostgreSQL cluster | ✅ SQLite (simple, sufficient for pilot) |
 | **Secrets** | .env file | HashiCorp Vault | ✅ .env (simple) |
 | **Monitoring** | Docker logs | Prometheus + Grafana | ✅ Docker logs (simple) |
 | **HTTPS** | HTTP only | Let's Encrypt + certbot | ✅ HTTP (simple, add HTTPS before prod) |
 | **Load Balancing** | Single instance | Multiple instances + LB | ✅ Single instance (simple) |
 | **Orchestration** | Docker Compose | Kubernetes | ✅ Docker Compose (simple) |
 
-**Philosophy**: Start simple (Docker Compose), add complexity only when needed (metrics show bottlenecks).
+**Philosophy**: Start simple (Docker Compose + SQLite), migrate only when metrics show bottlenecks (>100 users, >5GB data).
 
 ## Relationship to Existing Documentation
 
 - **Extends**: [001_package_model.md](001_package_model.md) - Implements Package #1 deployment
-- **Complements**: [deployment_guide.md](../deployment_guide.md) - This is pilot deployment, guide describes future K8s
+- **Complements**: [deployment_guide.md](../deployment_guide.md) - This is pilot deployment, guide describes operational procedures
 - **Referenced By**: [getting_started.md](../getting_started.md) - Quickstart links here for architecture details
 
 ## Operational Procedures
 
 For step-by-step deployment instructions, see:
 - [Getting Started Guide](../getting_started.md) § Deploy Control Panel - 5-minute quickstart
-- [Deployment Guide](../deployment_guide.md) § Pilot Deployment - Complete operational procedures (coming soon)
+- [Deployment Guide](../deployment_guide.md) § Pilot Deployment - Complete operational procedures
+
+## Future Considerations
+
+### PostgreSQL Migration (When Needed)
+
+**Code Changes Required**:
+1. Replace `Pool<Sqlite>` with generic database pool in all route states (13 files)
+2. Replace SQLite-specific queries (`sqlite_master` checks) with database-agnostic migrations
+3. Update `iron_token_manager` module (55 SQLite references)
+4. Add PostgreSQL feature flag to Cargo.toml
+5. Create database abstraction layer
+
+**Infrastructure Changes**:
+1. Add postgres service to docker-compose.yml
+2. Add PostgreSQL credentials to .env
+3. Update backend DATABASE_URL to PostgreSQL
+4. Add database migration tooling
+5. Create backup/restore procedures for PostgreSQL
+
+**Estimated Effort**: 3-5 days of development + testing
 
 ---
 

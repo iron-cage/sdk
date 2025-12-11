@@ -87,12 +87,12 @@ Iron Cage supports three deployment modes, each optimized for different use case
 ## 2. Pilot Deployment (Current Implementation)
 
 **Status:** Currently implemented and operational
-**Architecture:** Docker Compose with PostgreSQL database
+**Architecture:** Docker Compose with SQLite database
 **Audience:** Control Panel administrators, operations staff, DevOps engineers
 
 ### 2.1 Architecture
 
-The Control Panel Pilot Deployment uses a 3-service Docker Compose stack:
+The Control Panel Pilot Deployment uses a 2-service Docker Compose stack with persistent SQLite storage:
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -101,17 +101,16 @@ The Control Panel Pilot Deployment uses a 3-service Docker Compose stack:
 │  ┌─────────────────────────────────────────────────────────────┐  │
 │  │              Docker Compose Network (iron_network)           │  │
 │  │                                                               │  │
-│  │  ┌─────────────────┐                                         │  │
-│  │  │   PostgreSQL    │                                         │  │
-│  │  │   :5432         │                                         │  │
-│  │  │   (postgres:16) │                                         │  │
-│  │  └────────┬────────┘                                         │  │
-│  │           │ SQL                                              │  │
-│  │  ┌────────┴─────────┐                                        │  │
-│  │  │  Backend API     │                                        │  │
-│  │  │  :3000           │                                        │  │
-│  │  │  (Rust/Axum)     │                                        │  │
-│  │  └────────┬─────────┘                                        │  │
+│  │  ┌───────────────────────────────────────────────────────┐  │  │
+│  │  │  Backend API                                          │  │  │
+│  │  │  :3000                                                │  │  │
+│  │  │  (Rust/Axum + SQLite)                                │  │  │
+│  │  │                                                        │  │  │
+│  │  │  ┌─────────────────────────────────────────────────┐ │  │  │
+│  │  │  │ SQLite: /app/data/iron.db                       │ │  │  │
+│  │  │  │ Volume: sqlite_data:/app/data                   │ │  │  │
+│  │  │  └─────────────────────────────────────────────────┘ │  │  │
+│  │  └────────┬──────────────────────────────────────────────┘  │  │
 │  │           │ HTTP/WS                                          │  │
 │  │  ┌────────┴──────────────────────────────────────────────┐  │  │
 │  │  │         Frontend (nginx)                              │  │  │
@@ -134,6 +133,12 @@ The Control Panel Pilot Deployment uses a 3-service Docker Compose stack:
                         │ localhost:8080  │
                         └─────────────────┘
 ```
+
+**Key Architecture Decisions:**
+- **SQLite Database:** Embedded in backend container, persisted via Docker volume
+- **2-Service Stack:** Backend (Rust + SQLite) + Frontend (nginx), no separate database server
+- **Zero-Configuration:** No database credentials, connection pooling, or migration tooling required
+- **Sufficient Scale:** Handles <100 concurrent users, <1000 requests/second
 
 **Design Rationale:** See [Docker Compose Architecture](deployment/006_docker_compose_deployment.md) for complete design decisions, trade-offs, and scaling limitations.
 
@@ -169,18 +174,17 @@ cd iron_runtime/dev
 cp .env.example .env
 
 # Generate strong secrets (32+ characters each)
-echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)" >> .env
 echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
 echo "IRON_SECRETS_MASTER_KEY=$(openssl rand -base64 32)" >> .env
 
 # Verify secrets were added
-grep -E "^(POSTGRES_PASSWORD|JWT_SECRET|IRON_SECRETS_MASTER_KEY)=" .env
+grep -E "^(JWT_SECRET|IRON_SECRETS_MASTER_KEY)=" .env
 ```
 
 **Step 3: Start Services**
 
 ```bash
-# Build and start all services (first run takes 5-10 minutes)
+# Build and start all services (first run takes 2-5 minutes)
 docker compose up -d
 
 # Watch logs until all services are healthy (30-60 seconds)
@@ -194,7 +198,6 @@ docker compose ps
 
 ```
 NAME                IMAGE                      STATUS         PORTS
-iron_postgres       postgres:16-alpine         Up (healthy)   5432/tcp
 iron_backend        dev-backend:latest         Up (healthy)   3000/tcp
 iron_frontend       dev-frontend:latest        Up (healthy)   0.0.0.0:8080->80/tcp
 ```

@@ -40,7 +40,7 @@ use crate::error::Result;
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-008, skipping 007).
+/// Migrations are applied in order (001-010, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -85,6 +85,12 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
 
   // Migration 008: Agents table
   apply_migration_008( pool ).await?;
+
+  // Migration 009: Budget leases (Protocol 005)
+  apply_migration_009( pool ).await?;
+
+  // Migration 010: Agent budgets (Protocol 005)
+  apply_migration_010( pool ).await?;
 
   Ok( () )
 }
