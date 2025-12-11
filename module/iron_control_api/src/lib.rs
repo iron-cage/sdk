@@ -214,7 +214,7 @@ mod stub
 
     pub async fn start(self) -> Result<(), anyhow::Error>
     {
-      println!("Stub API server would listen on {}", self.addr);
+      tracing::info!("Stub API server would listen on {}", self.addr);
       Ok(())
     }
   }

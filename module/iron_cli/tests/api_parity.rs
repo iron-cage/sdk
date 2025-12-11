@@ -7,6 +7,8 @@
 //! - Operation parity: Commands perform same operations
 //! - Structure parity: Command structure matches API structure
 
+use tracing::info;
+
 /// API endpoint inventory
 ///
 /// This documents all REST API endpoints that must have CLI equivalents.
@@ -131,16 +133,16 @@ fn test_count_parity()
     }
   }
 
-  println!( "\nAPI Endpoints by Category:" );
+  info!( "\nAPI Endpoints by Category:" );
   for ( category, count ) in &api_counts
   {
-    println!( "  {}: {}", category, count );
+    info!( "  {}: {}", category, count );
   }
 
-  println!( "\nCLI Commands by Category (unique API mappings):" );
+  info!( "\nCLI Commands by Category (unique API mappings):" );
   for ( category, count ) in &cli_counts
   {
-    println!( "  {}: {}", category, count );
+    info!( "  {}: {}", category, count );
   }
 
   // Verify each category has parity
@@ -154,7 +156,7 @@ fn test_count_parity()
     );
   }
 
-  println!( "\n✓ Count parity verified: {} API endpoints = {} unique CLI commands", api_endpoints.len(), cli_counts.values().sum::< i32 >() );
+  info!( "\n✓ Count parity verified: {} API endpoints = {} unique CLI commands", api_endpoints.len(), cli_counts.values().sum::< i32 >() );
 }
 
 #[ test ]
@@ -180,8 +182,8 @@ fn test_operation_parity()
     }
   }
 
-  println!( "\nAPI Operations: {:?}", api_operations );
-  println!( "\nCLI Operations: {:?}", cli_operations );
+  info!( "\nAPI Operations: {:?}", api_operations );
+  info!( "\nCLI Operations: {:?}", cli_operations );
 
   // Verify all API operations have CLI equivalents
   for operation in &api_operations
@@ -203,7 +205,7 @@ fn test_operation_parity()
     );
   }
 
-  println!( "\n✓ Operation parity verified: {} operations have CLI/API parity", api_operations.len() );
+  info!( "\n✓ Operation parity verified: {} operations have CLI/API parity", api_operations.len() );
 }
 
 #[ test ]
@@ -228,7 +230,7 @@ fn test_command_structure_parity()
     }
   }
 
-  println!( "\n✓ Command structure parity verified: All commands follow 'iron-token <category> <operation>' pattern" );
+  info!( "\n✓ Command structure parity verified: All commands follow 'iron-token <category> <operation>' pattern" );
 }
 
 #[ test ]
@@ -247,7 +249,7 @@ fn test_api_coverage()
       .push( command.command );
   }
 
-  println!( "\nAPI Endpoint Coverage:" );
+  info!( "\nAPI Endpoint Coverage:" );
   for endpoint in &api_endpoints
   {
     let endpoint_key = format!( "{} {}", endpoint.method, endpoint.path );
@@ -257,10 +259,10 @@ fn test_api_coverage()
     {
       Some( cmds ) =>
       {
-        println!( "  {} {} -> {} CLI command(s)", endpoint.method, endpoint.path, cmds.len() );
+        info!( "  {} {} -> {} CLI command(s)", endpoint.method, endpoint.path, cmds.len() );
         for cmd in cmds
         {
-          println!( "    - {}", cmd );
+          info!( "    - {}", cmd );
         }
       }
       None =>
@@ -270,7 +272,7 @@ fn test_api_coverage()
     }
   }
 
-  println!( "\n✓ API coverage verified: All {} API endpoints have CLI commands", api_endpoints.len() );
+  info!( "\n✓ API coverage verified: All {} API endpoints have CLI commands", api_endpoints.len() );
 }
 
 #[ test ]
@@ -295,5 +297,5 @@ fn test_category_completeness()
     assert!( cli_has_category, "CLI missing category: {}", category );
   }
 
-  println!( "\n✓ Category completeness verified: All {} categories present in API and CLI", expected_categories.len() );
+  info!( "\n✓ Category completeness verified: All {} categories present in API and CLI", expected_categories.len() );
 }

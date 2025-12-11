@@ -6,6 +6,7 @@
 use core::fmt::Write as _;
 use sqlx::{ SqlitePool, Row };
 use crate::error::Result;
+use tracing::error;
 
 /// User data returned from database
 #[ derive( Debug, Clone ) ]
@@ -147,7 +148,7 @@ impl UserService
   {
     // Hash password with BCrypt
     let password_hash = bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )
-      .map_err( |e| { println!( "Error hashing password: {e}" ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error hashing password: {}", e ); crate::error::TokenError } )?;
 
     let now_ms = current_time_ms();
 
@@ -168,7 +169,7 @@ impl UserService
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |e| { println!( "Error creating user: {e}" ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error creating user: {}", e ); crate::error::TokenError } )?;
 
     let user_id = user_prefix;
 
@@ -614,7 +615,7 @@ impl UserService
     .bind( reason )
     .execute( &self.pool )
     .await
-    .map_err( |e| { println!( "Error logging audit: {e}" ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error logging audit: {}", e ); crate::error::TokenError } )?;
 
     Ok( () )
   }

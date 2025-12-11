@@ -5,6 +5,7 @@ use axum::extract::FromRef;
 use iron_control_api::routes::auth::AuthState;
 use sqlx::sqlite::SqlitePool;
 use sqlx::sqlite::SqlitePoolOptions;
+use tracing::{info, debug};
 
 #[derive(Clone)]
 struct TestAppState {
@@ -80,8 +81,8 @@ async fn create_test_database() -> SqlitePool
   .await;
 
   match admin_result {
-    Ok( _ ) => println!( "Admin user created successfully with ID=999" ),
-    Err( e ) => println!( "Failed to create admin user: {:?}", e ),
+    Ok( _ ) => info!( "Admin user created successfully with ID=999" ),
+    Err( e ) => info!( "Failed to create admin user: {:?}", e ),
   }
 
   // Verify admin user exists
@@ -92,8 +93,8 @@ async fn create_test_database() -> SqlitePool
   .await;
 
   match admin_check {
-    Ok( count ) => println!( "Admin user count: {}", count ),
-    Err( e ) => println!( "Failed to check admin user: {:?}", e ),
+    Ok( count ) => info!( "Admin user count: {}", count ),
+    Err( e ) => info!( "Failed to check admin user: {:?}", e ),
   }
 
   // Check if user_audit_log table exists
@@ -104,8 +105,8 @@ async fn create_test_database() -> SqlitePool
   .await;
 
   match audit_table_check {
-    Ok( count ) => println!( "user_audit_log table exists: {}", count == 1 ),
-    Err( e ) => println!( "Failed to check audit table: {:?}", e ),
+    Ok( count ) => info!( "user_audit_log table exists: {}", count == 1 ),
+    Err( e ) => info!( "Failed to check audit table: {:?}", e ),
   }
 
   pool
@@ -128,17 +129,17 @@ async fn debug_direct_suspend()
 
   let create_result = user_service.create_user( params, 999 ).await;
   match &create_result {
-    Ok( user ) => println!( "Created user ID: {}", user.id ),
-    Err( e ) => println!( "Failed to create user: {:?}", e ),
+    Ok( user ) => debug!( "Created user ID: {}", user.id ),
+    Err( e ) => debug!( "Failed to create user: {:?}", e ),
   }
 
   if let Ok( user ) = create_result {
     // Try to suspend
-    println!( "Attempting to suspend user {}...", user.id );
+    debug!( "Attempting to suspend user {}...", user.id );
     let suspend_result = user_service.suspend_user( user.id, 999, Some( "Test".to_string() ) ).await;
     match suspend_result {
-      Ok( _suspended_user ) => println!( "Successfully suspended user" ),
-      Err( e ) => println!( "Failed to suspend user: {:?}", e ),
+      Ok( _suspended_user ) => debug!( "Successfully suspended user" ),
+      Err( e ) => debug!( "Failed to suspend user: {:?}", e ),
     }
   }
 }

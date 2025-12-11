@@ -300,20 +300,20 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   {
     DeploymentMode::ProductionUnconfirmed =>
     {
-      eprintln!( "⚠️  WARNING: Production environment detected but IRON_DEPLOYMENT_MODE not set" );
-      eprintln!( "⚠️  Set IRON_DEPLOYMENT_MODE=production to confirm production deployment" );
-      eprintln!( "⚠️  See docs/production_deployment.md for security checklist" );
-      eprintln!();
-      eprintln!( "Sleeping 10 seconds to ensure this warning is visible..." );
+      tracing::warn!( "⚠️  WARNING: Production environment detected but IRON_DEPLOYMENT_MODE not set" );
+      tracing::warn!( "⚠️  Set IRON_DEPLOYMENT_MODE=production to confirm production deployment" );
+      tracing::warn!( "⚠️  See docs/production_deployment.md for security checklist" );
+      tracing::warn!( "" );
+      tracing::warn!( "Sleeping 10 seconds to ensure this warning is visible..." );
       std::thread::sleep( std::time::Duration::from_secs( 10 ) );
     }
     DeploymentMode::Production =>
     {
-      eprintln!( "✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)" );
+      tracing::info!( "✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)" );
     }
     DeploymentMode::Development =>
     {
-      eprintln!( "✓ Development mode (clearing database)" );
+      tracing::info!( "✓ Development mode (clearing database)" );
 
       // Extract database path from DATABASE_URL and delete it for clean state
       if let Some( db_path ) = extract_sqlite_path( &database_url )
@@ -322,27 +322,27 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
         {
           if let Err( e ) = std::fs::remove_file( &db_path )
           {
-            eprintln!( "⚠️  Failed to delete {}: {}", db_path, e );
+            tracing::warn!( "⚠️  Failed to delete {}: {}", db_path, e );
           }
           else
           {
-            eprintln!( "✓ Cleared {}", db_path );
+            tracing::info!( "✓ Cleared {}", db_path );
           }
         }
         else
         {
-          eprintln!( "✓ Database file doesn't exist (will be created fresh)" );
+          tracing::info!( "✓ Database file doesn't exist (will be created fresh)" );
         }
       }
       else
       {
-        eprintln!( "⚠️  Non-SQLite database detected - database wiping only works with SQLite URLs" );
+        tracing::warn!( "⚠️  Non-SQLite database detected - database wiping only works with SQLite URLs" );
       }
     }
 
     DeploymentMode::Pilot =>
     {
-      eprintln!( "✓ Pilot mode (localhost only)" );
+      tracing::info!( "✓ Pilot mode (localhost only)" );
     }
   }
 

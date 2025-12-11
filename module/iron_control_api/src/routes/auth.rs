@@ -178,7 +178,7 @@ impl LoginRequest {
 /// Per Protocol 007:
 /// ```json
 /// {
-///   "id": "user-abc123",
+///   "id": "user_abc123",
 ///   "email": "developer@example.com",
 ///   "role": "developer",
 ///   "name": "John Doe"
@@ -201,7 +201,7 @@ impl UserInfo {
   /// * `user` - Database user record
   pub fn from_claims_and_user(claims: &crate::jwt_auth::AccessTokenClaims, user: &crate::user_auth::User) -> Self {
     Self {
-      id: format!("user-{}", user.id),
+      id: format!("{}", user.id),
       email: user.username.clone(),
       role: claims.role.clone(),
       name: user.username.clone(), // TODO: Add name field to users table
@@ -215,7 +215,7 @@ impl UserInfo {
   /// * `user` - Database user record
   pub fn from_user(user: &crate::user_auth::User) -> Self {
     Self {
-      id: format!("user-{}", user.id),
+      id: format!("{}", user.id),
       email: user.email.clone(),
       role: user.role.clone(),
       name: user.username.clone(), // TODO: Add name field to users table
@@ -366,7 +366,7 @@ pub async fn login(
           code: "AUTH_ACCOUNT_DISABLED".to_string(),
           message: "Account has been disabled".to_string(),
           details: Some(serde_json::json!({
-            "user_id": format!("user-{}", user.id)
+            "user_id": format!("{}", user.id)
           })),
         },
       }),
@@ -1589,8 +1589,8 @@ mod tests {
     use http_body_util::BodyExt;
     let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
     let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    println!("{}", body_str);
+
+    tracing::debug!("{}", body_str);
     // Verify response indicates token is revoked
     assert!(body_str.contains("\"valid\":false"));
     assert!(body_str.contains("TOKEN_REVOKED"));
