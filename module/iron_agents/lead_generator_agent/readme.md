@@ -1,5 +1,7 @@
 # Apollo Lead Generation Agent
 
+Agent for searching, generating, and enriching information about leads
+
 ### Overview
 
 This module is a Python-based AI agent designed to automate lead generation using the Apollo.io API and OpenAI's GPT-4o. It functions as an intelligent proxy that accepts natural language queries, translates them into API calls, and returns enriched lead data in a raw JSON format.
