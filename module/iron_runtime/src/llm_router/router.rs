@@ -2,12 +2,25 @@
 
 use pyo3::prelude::*;
 use std::net::TcpListener;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use tokio::sync::oneshot;
 
 use iron_cost::budget::CostController;
+use iron_telemetry::{init_logging, LogLevel};
+
+/// Initialize logging once
+static LOGGING_INIT: Once = Once::new();
+
+fn ensure_logging() {
+  LOGGING_INIT.call_once(|| {
+    let _ = init_logging(LogLevel::Info);
+  });
+}
 use crate::llm_router::key_fetcher::KeyFetcher;
 use crate::llm_router::proxy::{run_proxy, ProxyConfig};
+
+#[cfg(feature = "analytics")]
+use iron_runtime_analytics::EventStore;
 
 /// LLM Router - Local proxy server for OpenAI/Anthropic API requests
 ///
@@ -47,6 +60,17 @@ pub struct LlmRouter {
   shutdown_tx: Option<oneshot::Sender<()>>,
   /// Cost controller for budget enforcement and spending tracking (None = no budget)
   cost_controller: Option<Arc<CostController>>,
+  /// Analytics event store
+  #[cfg(feature = "analytics")]
+  event_store: Arc<EventStore>,
+  /// Agent ID for analytics attribution
+  #[cfg(feature = "analytics")]
+  #[allow(dead_code)]
+  agent_id: Option<Arc<str>>,
+  /// Provider ID for analytics attribution
+  #[cfg(feature = "analytics")]
+  #[allow(dead_code)]
+  provider_id: Option<Arc<str>>,
 }
 
 #[pymethods]
@@ -257,6 +281,9 @@ impl LlmRouter {
     budget: Option<f64>,
     provider_key: Option<String>,
   ) -> Result<Self, String> {
+    // Initialize logging
+    ensure_logging();
+
     // Find free port
     let port = find_free_port().map_err(|e| format!("Failed to find free port: {}", e))?;
 
@@ -292,6 +319,18 @@ impl LlmRouter {
     // Create cost controller only if budget is specified
     let cost_controller = budget.map(|budget_usd| Arc::new(CostController::new(budget_usd)));
 
+    // Create analytics event store (feature-gated)
+    #[cfg(feature = "analytics")]
+    let event_store = Arc::new(EventStore::new());
+    #[cfg(feature = "analytics")]
+    let agent_id_arc: Option<Arc<str>> = None; // Can be extended to accept from Python
+    #[cfg(feature = "analytics")]
+    let provider_id_arc: Option<Arc<str>> = None;
+
+    // Record router started event
+    #[cfg(feature = "analytics")]
+    event_store.record_router_started(port);
+
     // Create config
     let config = ProxyConfig {
       port,
@@ -300,6 +339,12 @@ impl LlmRouter {
       cache_ttl_seconds,
       cost_controller: cost_controller.clone(),
       provider_key: provider_key.clone(),
+      #[cfg(feature = "analytics")]
+      event_store: event_store.clone(),
+      #[cfg(feature = "analytics")]
+      agent_id: agent_id_arc.clone(),
+      #[cfg(feature = "analytics")]
+      provider_id: provider_id_arc.clone(),
     };
 
     // Spawn proxy server
@@ -320,11 +365,20 @@ impl LlmRouter {
       runtime,
       shutdown_tx: Some(shutdown_tx),
       cost_controller,
+      #[cfg(feature = "analytics")]
+      event_store,
+      #[cfg(feature = "analytics")]
+      agent_id: agent_id_arc,
+      #[cfg(feature = "analytics")]
+      provider_id: provider_id_arc,
     })
   }
 
   fn stop_inner(&mut self) {
     if let Some(tx) = self.shutdown_tx.take() {
+      #[cfg(feature = "analytics")]
+      self.event_store.record_router_stopped();
+
       let _ = tx.send(());
     }
   }
