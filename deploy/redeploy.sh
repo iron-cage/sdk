@@ -60,7 +60,7 @@ done
 
 # Stop and remove previous container if it exists
 __msg_info "Removing old docker compose"
-docker rm -f "hypeproxies-db-test" 2>/dev/null || true
+docker volume rm sqlite_data || true
 docker compose down -v || echo "Nothing to remove"
 
 
