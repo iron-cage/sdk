@@ -11,5 +11,7 @@ enabled = []
 full = ["enabled"]
 
 [dependencies]
-
+serde = { workspace = true, features = ["derive","rc"] }
+uuid = { workspace = true, features = ["v4","serde"] }
+iron_cost = { workspace = true}
 [dev-dependencies]

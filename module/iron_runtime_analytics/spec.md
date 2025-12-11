@@ -54,11 +54,12 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 - **AtomicModelStats:** Per-model statistics with atomic operations
 - **ComputedStats:** Snapshot of aggregated statistics
 
-**Design Decisions:**
-- Lock-free for async safety (no blocking in async contexts)
-- Bounded buffer with eviction (oldest events evicted when full)
+**Design Decisions (Pilot Strategy):**
+- **Fixed Memory:** Bounded buffer (default 10,000 slots, ~2-5MB)
+- **Non-Blocking:** Drop new events when full (never block main thread)
+- **Observability:** `dropped_count` counter tracks lost events
 - Atomic counters for O(1) total stats
-- Events as source of truth (aggregations computed on-demand)
+- Events stored for sync to server
 
 ---
 

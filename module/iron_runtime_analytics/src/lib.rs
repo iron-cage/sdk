@@ -3,5 +3,6 @@
 
 #![cfg_attr(not(feature = "enabled"), allow(unused_variables, dead_code))]
 
-// Implementation will be added here
-// See docs/features/007_python_analytics_implementation.md for design
+pub mod event;
+pub mod helpers;
+mod stats;

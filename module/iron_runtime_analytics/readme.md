@@ -2,15 +2,24 @@
 
 Lock-free event-based analytics for Python LlmRouter.
 
+## Pilot Strategy
+
+Simple, predictable behavior for the pilot:
+
+1. **Fixed Memory:** Bounded buffer (default 10,000 slots, ~2-5MB)
+2. **Non-Blocking:** Drop new events when buffer full (never block)
+3. **Observability:** `dropped_count()` tracks lost events
+
 ### Scope
 
 **Responsibilities:**
-Provides lock-free event storage for LLM request analytics. Events are stored in a bounded ring buffer with atomic counters for O(1) stats access. Designed for high-throughput concurrent LLM calls in async contexts. Full compatibility with Protocol 012 Analytics API.
+Provides lock-free event storage for LLM request analytics. Events are stored in a bounded buffer with atomic counters for O(1) stats access. Designed for high-throughput concurrent LLM calls in async contexts. Full compatibility with Protocol 012 Analytics API.
 
 **In Scope:**
 - Lock-free event buffer (crossbeam ArrayQueue)
 - Atomic running totals (AtomicU64)
 - Per-model/provider stats (DashMap)
+- Dropped event counter for observability
 - Event streaming via channels
 - Protocol 012 field compatibility
 - PyO3 bindings for Python access
@@ -53,6 +62,11 @@ store.record(AnalyticsEvent::LlmRequestCompleted {
 // Get stats - O(1) for totals
 let stats = store.get_stats();
 println!("Total cost: ${:.4}", stats.total_cost_usd());
+
+// Check for dropped events (observability)
+if store.dropped_count() > 0 {
+    println!("Warning: {} events dropped (buffer full)", store.dropped_count());
+}
 ```
 
 ## License
