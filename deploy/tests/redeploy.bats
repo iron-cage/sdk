@@ -1,64 +1,50 @@
 #!/usr/bin/env bats
 
-# NOTE:
-# This test uses a mocked version of the `docker` binary to simulate specific behaviors
-# during redeployment without launching actual containers. This is done for the following reasons:
-#
-# 1. **Speed & Simplicity**: Spinning up real Docker containers for each test case would introduce
-#    significant overhead and complexity, especially when running in CI environments.
-#
-# 2. **Controlled Behavior**: By mocking Docker, we can simulate specific scenarios (e.g., build failures,
-#    container exits, or unexpected outputs) that would be difficult or slow to reproduce reliably using real containers.
-#
-# 3. **Environment Isolation**: Not all CI environments have Docker fully configured or enabled. This mock allows
-#    tests to run even in constrained or sandboxed environments without requiring privileged access.
-#
-# 4. **Purpose of Test**: This script is meant to test **deployment logic and script behavior**, not Docker's internal workings.
-#    The correctness of actual container builds and execution is covered elsewhere in integration and e2e tests.
-#
-# ⚠️ If you're modifying this script or running it locally and wish to validate real Docker behavior,
-# you can disable the mock and use the real binary.
+env_without() {
+  local var="$1"
+  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
+  sed -i "/^$var=/d" "$TEST_DIR/etc-environment"
+}
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-
-  # Directory where this .bats file lives
-  TEST_FILE_DIR="$(dirname "$BATS_TEST_FILENAME")"
-
-  # Path to redeploy.sh (one level above deploy/tests => deploy/)
-  SCRIPT_ORIG="$TEST_FILE_DIR/../redeploy.sh"
+  SCRIPT_ORIG="$(dirname "$BATS_TEST_FILENAME")/../redeploy.sh"
   SCRIPT_UNDER_TEST="$TEST_DIR/redeploy.sh"
-
-  if [[ ! -f "$SCRIPT_ORIG" ]]
-  then
-    echo "ERROR: redeploy.sh not found at $SCRIPT_ORIG" >&2
-    exit 1
-  fi
-
   cp "$SCRIPT_ORIG" "$SCRIPT_UNDER_TEST"
-
   tr -d '\r' < "$SCRIPT_UNDER_TEST" > "$SCRIPT_UNDER_TEST.tmp"
   mv "$SCRIPT_UNDER_TEST.tmp" "$SCRIPT_UNDER_TEST"
   chmod +x "$SCRIPT_UNDER_TEST"
 
-  # fake /etc/environment (minimal)
-  cat > "$TEST_DIR/etc-environment" <<'EOF'
-DOCKER_IMAGE=dummy/image
+  FULL_ENV="$TEST_DIR/full-env"
+  cat > "$FULL_ENV" <<'EOF'
+JWT_SECRET=dummy-jwt
+IRON_SECRETS_MASTER_KEY=secret_jwt_master_key
+DATABASE_URL=postgres://u:p@db/test_db
+DOCKER_IMAGE=example.com/app
 EOF
 
-  # patch script to use test env file
+  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
+
   sed -i "s#/etc/environment#$TEST_DIR/etc-environment#g" "$SCRIPT_UNDER_TEST"
 
-  # mock docker
+  # stub docker setup
   DOCKER_CALLS="$TEST_DIR/docker-calls.log"
   mkdir -p "$TEST_DIR/bin"
-
   cat > "$TEST_DIR/bin/docker" <<EOF
 #!/bin/bash
 echo "docker \$*" >> "$DOCKER_CALLS"
+case "\$1" in
+  rm|rmi|pull) exit 0 ;;
+  compose)
+    shift
+    if [[ "\$1" == "down" ]] || [[ "\$1" == "up" ]]; then exit 0; fi
+    ;;
+esac
 exit 0
 EOF
 
+  tr -d '\r' < "$TEST_DIR/bin/docker" > "$TEST_DIR/bin/docker.tmp"
+  mv "$TEST_DIR/bin/docker.tmp" "$TEST_DIR/bin/docker"
   chmod +x "$TEST_DIR/bin/docker"
   PATH="$TEST_DIR/bin:$PATH"
 }
@@ -67,39 +53,50 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
+@test "succeeds with valid inputs" {
+  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
+  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  
+  echo "$output"
+  echo "Status: $status"
+
+  [ "$status" -eq 0 ]
+}
+
 @test "fails when DOCKER_IMAGE is not set" {
-  # empty env file (no DOCKER_IMAGE)
-  echo "" > "$TEST_DIR/etc-environment"
-  run bash "$SCRIPT_UNDER_TEST"
+  env_without "DOCKER_IMAGE"
+  run bash -c "set -a && source '$TEST_DIR/etc-environment' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -ne 0 ]
   [[ "$output" == *"DOCKER_IMAGE is not set in the environment"* ]]
 }
 
-@test "succeeds when DOCKER_IMAGE is set" {
-  run bash "$SCRIPT_UNDER_TEST"
+@test "cleanup commands are called" {
+  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
+  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Deployment successful!"* ]]
+
+  calls="$(cat "$DOCKER_CALLS")"
+  [[ "$calls" == *"docker volume rm sqlite_data"* ]]
+  [[ "$calls" == *"docker compose down"* ]]
 }
 
-@test "docker commands are called in correct order" {
-  # Simulate existing container
-  echo "cgtools-frontend-app" > "$TEST_DIR/fake-container"
-  cat > "$TEST_DIR/bin/docker" <<EOF
-#!/bin/bash
-if [[ "\$*" == *"ps -a"* ]]; then
-  echo "cgtools-frontend-app"
-  exit 0
-fi
-echo "docker \$*" >> "$DOCKER_CALLS"
-exit 0
-EOF
-  chmod +x "$TEST_DIR/bin/docker"
+@test "missing JWT_SECRET" {
+  env_without "JWT_SECRET"
+  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"JWT_SECRET is not set in the environment"* ]]
+}
 
-  run bash "$SCRIPT_UNDER_TEST"
-  [ "$status" -eq 0 ]
-  calls="$(cat "$DOCKER_CALLS")"
-  [[ "$calls" == *"docker rm -f cgtools-frontend-app"* ]]
-  [[ "$calls" == *"docker rmi dummy/image"* ]]
-  [[ "$calls" == *"docker pull dummy/image"* ]]
-  [[ "$calls" == *"docker run -d --name cgtools-frontend-app -p 80:80 dummy/image"* ]]
+@test "missing IRON_SECRETS_MASTER_KEY" {
+  env_without "IRON_SECRETS_MASTER_KEY"
+  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"IRON_SECRETS_MASTER_KEY is not set in the environment"* ]]
+}
+
+@test "missing DATABASE_URL" {
+  env_without "DATABASE_URL"
+  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"DATABASE_URL is not set in the environment"* ]]
 }

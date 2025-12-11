@@ -249,8 +249,6 @@ DOT_ENV ?= ./.env
 
 ifneq ("$(wildcard $(DOT_ENV))","")
 	include $(DOT_ENV)
-else
-	$(error "File $(DOT_ENV) not found")
 endif
 
 strip_quotes = $(subst ",,$(1))
