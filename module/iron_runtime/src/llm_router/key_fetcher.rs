@@ -51,6 +51,8 @@ pub struct KeyFetcher
   /// Single cached key (auto-detected provider)
   cache: Arc<RwLock<Option<CachedKey>>>,
   cache_ttl: Duration,
+  /// Static key mode - if set, always return this key without fetching
+  static_key: Option<ProviderKey>,
 }
 
 impl KeyFetcher
@@ -75,6 +77,32 @@ impl KeyFetcher
       client,
       cache: Arc::new(RwLock::new(None)),
       cache_ttl: Duration::from_secs(cache_ttl_seconds),
+      static_key: None,
+    }
+  }
+
+  /// Create a KeyFetcher with a static API key (bypasses server)
+  ///
+  /// # Arguments
+  ///
+  /// * `api_key` - The provider API key (e.g., sk-xxx for OpenAI, sk-ant-xxx for Anthropic)
+  /// * `base_url` - Optional custom base URL for the provider
+  pub fn new_static(api_key: String, base_url: Option<String>) -> Self
+  {
+    let provider = ProviderKey::detect_provider_from_key(&api_key).to_string();
+    let static_key = ProviderKey {
+      provider,
+      api_key,
+      base_url,
+    };
+
+    Self {
+      server_url: String::new(),
+      ic_token: String::new(),
+      client: Client::new(),
+      cache: Arc::new(RwLock::new(None)),
+      cache_ttl: Duration::from_secs(0),
+      static_key: Some(static_key),
     }
   }
 
@@ -82,6 +110,11 @@ impl KeyFetcher
   /// Provider is auto-detected from API key format
   pub async fn get_key(&self) -> Result<ProviderKey, LlmRouterError>
   {
+    // Return static key if set (bypass server)
+    if let Some(ref key) = self.static_key {
+      return Ok(key.clone());
+    }
+
     // Check cache first
     {
       let cache = self.cache.read().await;
