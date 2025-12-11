@@ -1078,6 +1078,8 @@ WHERE agent_id = ? AND status = 'pending';
 - **[Protocol 010: Agents API](010_agents_api.md)** - Agent management (request references agents)
 - **[Protocol 013: Budget Limits API](013_budget_limits_api.md)** - Direct budget modification (admin path)
 - **[Protocol 008: User Management API](008_user_management_api.md)** - User roles (admin authorization)
-- **[Protocol 002: REST API Protocol](002_rest_api_protocol.md)** - Standard patterns (pagination, errors)
+- **[Protocol 002: REST API Protocol](002_rest_api_protocol.md)** - Cross-cutting standards (audit logging, CLI parity, system resources, rate limiting)
+- **[API Design Standards](../standards/api_design_standards.md)** - Pagination, sorting, filtering patterns
+- **[Error Format Standards](../standards/error_format_standards.md)** - Error response format, HTTP status codes
 - **[Resource Catalog](009_resource_catalog.md)** - Complete resource inventory
 - **[Vocabulary](../vocabulary.md)** - Terminology definitions

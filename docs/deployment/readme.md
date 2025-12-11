@@ -13,7 +13,7 @@
 | 003 | **003_distribution_strategy.md** | Explain package distribution channels (Docker Hub, CDN, PyPI, GitHub Releases, versioning, compatibility) |
 | 004 | **004_scaling_patterns.md** | Describe horizontal scaling approach (stateless services, shared state, load balancing, K8s HPA) |
 | 005 | **005_module_distribution.md** | Map modules to deployment packages (which modules in which packages, runtime dependencies) |
-| 006 | **006_docker_compose_deployment.md** | Docker Compose architecture for pilot Control Panel deployment (3 services: PostgreSQL, Backend API, Frontend nginx) |
+| 006 | **006_docker_compose_deployment.md** | Docker Compose architecture for pilot Control Panel deployment (2 services: Backend API with SQLite, Frontend nginx) |
 
 ---
 

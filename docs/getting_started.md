@@ -74,7 +74,6 @@ cd iron_runtime/dev
 cp .env.example .env
 
 # Generate secrets (required for production)
-openssl rand -hex 32    # Copy output for POSTGRES_PASSWORD
 openssl rand -hex 32    # Copy output for JWT_SECRET
 openssl rand -base64 32 # Copy output for IRON_SECRETS_MASTER_KEY
 
@@ -86,13 +85,13 @@ nano .env
 ### Step 3: Start Services
 
 ```bash
-# Start all services (PostgreSQL + Backend + Frontend)
+# Start all services (Backend + Frontend with SQLite database)
 docker compose up -d
 
 # View logs to verify startup
 docker compose logs -f
 
-# Check service status
+# Check service status (all should show "healthy")
 docker compose ps
 ```
 

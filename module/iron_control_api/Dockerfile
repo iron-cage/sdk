@@ -35,8 +35,10 @@ RUN apt-get update && apt-get install -y \
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/iron_control_api_server /app/
 
-# Create non-root user for security
-RUN useradd -m -u 1000 iron && chown -R iron:iron /app
+# Create non-root user and data directory for SQLite
+RUN useradd -m -u 1000 iron && \
+  mkdir -p /app/data && \
+  chown -R iron:iron /app
 USER iron
 
 # Expose API port

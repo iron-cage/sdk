@@ -273,6 +273,27 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     Err( _ ) => tracing::debug!( "No .env file loaded (not required)" ),
   }
 
+  // Database URL (SQLite for pilot, canonical path iron.db)
+  // Load this BEFORE deployment mode actions (needed for database wiping)
+  let database_url = std::env::var( "DATABASE_URL" )
+    .unwrap_or_else( |_| "sqlite://./iron.db?mode=rwc".to_string() );
+
+  // Extract database file path from SQLite URL for development mode wiping
+  let extract_sqlite_path = | url: &str | -> Option< String >
+  {
+    if url.starts_with( "sqlite://" )
+    {
+      // Remove "sqlite://" prefix and query parameters
+      let path_with_query = &url[ 9.. ]; // Skip "sqlite://"
+      let path = path_with_query.split( '?' ).next()?;
+      Some( path.to_string() )
+    }
+    else
+    {
+      None
+    }
+  };
+
   // Detect deployment mode before starting server
   let mode = detect_deployment_mode();
   match mode
@@ -292,17 +313,30 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     }
     DeploymentMode::Development =>
     {
-      eprintln!( "✓ Development mode (clearing iron.db)" );
-      if std::path::Path::new( "iron.db" ).exists()
+      eprintln!( "✓ Development mode (clearing database)" );
+
+      // Extract database path from DATABASE_URL and delete it for clean state
+      if let Some( db_path ) = extract_sqlite_path( &database_url )
       {
-        if let Err( e ) = std::fs::remove_file( "iron.db" )
+        if std::path::Path::new( &db_path ).exists()
         {
-          eprintln!( "⚠️  Failed to delete iron.db: {}", e );
+          if let Err( e ) = std::fs::remove_file( &db_path )
+          {
+            eprintln!( "⚠️  Failed to delete {}: {}", db_path, e );
+          }
+          else
+          {
+            eprintln!( "✓ Cleared {}", db_path );
+          }
         }
         else
         {
-          eprintln!( "✓ Cleared iron.db" );
+          eprintln!( "✓ Database file doesn't exist (will be created fresh)" );
         }
+      }
+      else
+      {
+        eprintln!( "⚠️  Non-SQLite database detected - database wiping only works with SQLite URLs" );
       }
     }
 
@@ -311,10 +345,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
       eprintln!( "✓ Pilot mode (localhost only)" );
     }
   }
-
-  // Database URL (SQLite for pilot, canonical path iron.db)
-  let database_url = std::env::var( "DATABASE_URL" )
-    .unwrap_or_else( |_| "sqlite://./iron.db?mode=rwc".to_string() );
 
   // JWT secret for authentication
   let jwt_secret = std::env::var( "JWT_SECRET" )
@@ -475,8 +505,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
     );
 
-  // Server address
-  let addr = SocketAddr::from( ( [127, 0, 0, 1], 3000 ) );
+  // Server address (0.0.0.0 for Docker container networking)
+  let addr = SocketAddr::from( ( [0, 0, 0, 0], 3000 ) );
   
   tracing::info!( "API server listening on http://{}", addr );
   tracing::info!( "Endpoints:" );
