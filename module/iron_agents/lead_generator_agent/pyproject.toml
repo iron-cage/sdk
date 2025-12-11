@@ -1,7 +1,7 @@
 [project]
 name = "iron-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Required dependencies for the lead search agent to work"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
