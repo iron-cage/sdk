@@ -136,7 +136,7 @@ fn create_openai_error_response(
 }
 
 /// Check if budget limit is exceeded using CostController
-fn check_budget(state: &ProxyState) -> Result<(), Response<Body>> {
+fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   // Skip check if no budget is set
   let Some(ref controller) = state.cost_controller else {
     return Ok(());
@@ -144,7 +144,7 @@ fn check_budget(state: &ProxyState) -> Result<(), Response<Body>> {
 
   // Use CostController's check_budget method
   if let Err(CostError::BudgetExceeded { spent_usd, limit_usd }) = controller.check_budget() {
-    return Err(create_openai_error_response(
+    return Err(Box::new(create_openai_error_response(
       StatusCode::PAYMENT_REQUIRED, // 402 - distinct from 429 rate limit
       &format!(
         "Iron Cage budget limit exceeded. Spent: ${:.2}, Limit: ${:.2}. \
@@ -153,7 +153,7 @@ fn check_budget(state: &ProxyState) -> Result<(), Response<Body>> {
       ),
       "iron_cage_budget_exceeded", // Unique type - never from OpenAI
       "budget_exceeded",
-    ));
+    )));
   }
   Ok(())
 }
@@ -225,7 +225,7 @@ async fn handle_proxy(
 
   // 1.5 Check budget before processing request
   if let Err(error_response) = check_budget(&state) {
-    return Ok(error_response);
+    return Ok(*error_response);
   }
 
   // 2. Read request body
