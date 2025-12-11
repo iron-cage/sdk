@@ -46,6 +46,37 @@ pub struct TokenStorage
 
 impl TokenStorage
 {
+  /// Create new token storage from existing pool
+  ///
+  /// Preferred constructor for test environments using `iron_test_db`.
+  /// Does NOT apply migrations - caller is responsible for schema setup.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - Existing database connection pool
+  ///
+  /// # Returns
+  ///
+  /// Initialized storage using provided pool
+  ///
+  /// # Examples
+  ///
+  /// ```rust,ignore
+  /// use iron_test_db::TestDatabaseBuilder;
+  /// use iron_token_manager::storage::TokenStorage;
+  ///
+  /// let db = TestDatabaseBuilder::new().in_memory().build().await?;
+  /// let storage = TokenStorage::from_pool( db.pool().clone() );
+  /// ```
+  #[ must_use ]
+  pub fn from_pool( pool: SqlitePool ) -> Self
+  {
+    Self {
+      pool,
+      generator: TokenGenerator::new(),
+    }
+  }
+
   /// Create new token storage
   ///
   /// # Arguments

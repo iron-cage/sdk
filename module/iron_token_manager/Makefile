@@ -9,6 +9,9 @@ help: ## Show this help message
 	@echo "Database Management:"
 	@grep -E '^db-[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
+	@echo "Validation:"
+	@grep -E '^validate[a-zA-Z_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
 	@echo "Testing:"
 	@grep -E '^test[a-zA-Z_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
@@ -19,7 +22,7 @@ help: ## Show this help message
 # Database Management
 # ============================================================================
 
-DB_PATH ?= ./dev_tokens.db
+DB_PATH ?= ./iron.db
 
 .PHONY: db-reset
 db-reset: ## Reset database to clean state (creates backup)
@@ -69,6 +72,63 @@ db-clean: ## Delete database and all backups (DESTRUCTIVE)
 	@rm -f $(DB_PATH)
 	@rm -rf ./backups
 	@echo "Database and backups deleted"
+
+# ============================================================================
+# Validation
+# ============================================================================
+
+.PHONY: validate
+validate: validate-paths validate-schema validate-seed ## Run all validators
+
+.PHONY: validate-paths
+validate-paths: ## Validate database path consistency
+	@./scripts/validate_db_paths.sh
+
+.PHONY: validate-schema
+validate-schema: ## Validate database schema correctness
+	@./scripts/validate_db_schema.sh $(DB_PATH)
+
+.PHONY: validate-seed
+validate-seed: ## Validate seed data completeness
+	@./scripts/validate_seed_data.sh $(DB_PATH)
+
+# ============================================================================
+# Git Hooks
+# ============================================================================
+
+.PHONY: install-hooks
+install-hooks: ## Install git pre-commit hook for validation
+	@echo "Installing pre-commit hook..."
+	@mkdir -p ../../.git/hooks
+	@cp scripts/pre-commit.hook ../../.git/hooks/pre-commit
+	@chmod +x ../../.git/hooks/pre-commit
+	@echo "✓ Pre-commit hook installed"
+	@echo "  The hook will validate database paths before each commit"
+
+.PHONY: uninstall-hooks
+uninstall-hooks: ## Uninstall git pre-commit hook
+	@if [ -f ../../.git/hooks/pre-commit ]; then \
+		rm ../../.git/hooks/pre-commit; \
+		echo "✓ Pre-commit hook uninstalled"; \
+	else \
+		echo "No pre-commit hook found"; \
+	fi
+
+# ============================================================================
+# Development Workflows
+# ============================================================================
+
+.PHONY: dev-fresh
+dev-fresh: ## Fresh development environment (reset + seed + validate)
+	@./scripts/dev_fresh.sh
+
+.PHONY: dev-fresh-test
+dev-fresh-test: ## Fresh environment with full test suite
+	@./scripts/dev_fresh.sh --test
+
+.PHONY: dev-fresh-quick
+dev-fresh-quick: ## Quick fresh environment (no validation)
+	@./scripts/dev_fresh.sh --quick
 
 # ============================================================================
 # Testing

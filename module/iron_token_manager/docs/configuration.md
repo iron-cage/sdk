@@ -68,7 +68,7 @@ sqlite:///{path}?mode=rwc
 ```
 
 - Absolute path: `sqlite:///./data/tokens.db?mode=rwc`
-- Relative path: `sqlite:///./dev_tokens.db?mode=rwc`
+- Relative path: `sqlite:///./iron.db?mode=rwc`
 - In-memory: `sqlite:///:memory:?mode=rwc`
 
 ### Section: `[development]` (optional)
@@ -184,7 +184,7 @@ let storage = TokenStorage::from_config_object(&config).await?;
 use iron_token_manager::storage::TokenStorage;
 
 // Direct URL (hardcoded max_connections = 5)
-let storage = TokenStorage::new("sqlite:///dev_tokens.db?mode=rwc").await?;
+let storage = TokenStorage::new("sqlite:///iron.db?mode=rwc").await?;
 ```
 
 **Note:** Method 4 is maintained for backward compatibility but lacks configuration flexibility.

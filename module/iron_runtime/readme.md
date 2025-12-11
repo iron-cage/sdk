@@ -1,7 +1,7 @@
 # iron_runtime
 
 **Audience:** Platform contributors developing the iron_runtime Rust crate
-**End Users:** See [iron_sdk documentation](../iron_sdk/readme.md) - just `uv pip install iron-sdk`
+**End Users:** See [iron_sdk documentation](../iron_sdk/readme.md) - just `pip install iron-sdk`
 
 Agent orchestration and Python bridge for AI agent execution. Provides **LlmRouter** - a local proxy server for transparent LLM API key management with OpenAI and Anthropic support.
 
@@ -40,46 +40,34 @@ Bridges Python AI agents with Rust-based safety, cost, and reliability infrastru
 The Python library is built using [maturin](https://github.com/PyO3/maturin) and PyO3.
 
 **Prerequisites:**
-- Python 3.8+
+- Python 3.9+
 - Rust toolchain (rustup)
 - uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- maturin (`uv pip install maturin`)
 
 **Development Install:**
 
 ```bash
 cd module/iron_runtime
 
-# Create virtual environment
-uv venv
-source .venv/bin/activate  # Linux/macOS
-# .venv\Scripts\activate   # Windows
-
-# Install maturin
-uv pip install maturin
+# Install dependencies and setup environment
+uv sync  # Automatically creates .venv and installs all dev dependencies
 
 # Build and install in development mode
-maturin develop
+uv run maturin develop
 
 # Verify installation
-python -c "from iron_cage import LlmRouter; print('OK')"
+uv run python -c "from iron_cage import LlmRouter; print('OK')"
 ```
 
 **Build Wheel:**
 
 ```bash
 # Build wheel for distribution
-maturin build --release
+uv run maturin build --release
 
 # Wheel will be in target/wheels/
 ls target/wheels/
 # iron_cage-0.1.0-cp38-abi3-*.whl
-```
-
-**Install Dependencies for Testing:**
-
-```bash
-uv pip install pytest openai anthropic
 ```
 
 ### Rust Crate

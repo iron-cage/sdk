@@ -51,6 +51,34 @@ pub struct LimitEnforcer
 
 impl LimitEnforcer
 {
+  /// Create new limit enforcer from existing pool
+  ///
+  /// Preferred constructor for test environments using `iron_test_db`.
+  /// Does NOT apply migrations - caller is responsible for schema setup.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - Existing database connection pool
+  ///
+  /// # Returns
+  ///
+  /// Initialized enforcer using provided pool
+  ///
+  /// # Examples
+  ///
+  /// ```rust,ignore
+  /// use iron_test_db::TestDatabaseBuilder;
+  /// use iron_token_manager::limit_enforcer::LimitEnforcer;
+  ///
+  /// let db = TestDatabaseBuilder::new().in_memory().build().await?;
+  /// let enforcer = LimitEnforcer::from_pool( db.pool().clone() );
+  /// ```
+  #[ must_use ]
+  pub fn from_pool( pool: SqlitePool ) -> Self
+  {
+    Self { pool }
+  }
+
   /// Create new limit enforcer
   ///
   /// # Arguments

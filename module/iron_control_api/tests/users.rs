@@ -23,9 +23,6 @@
 #[ path = "common/mod.rs" ]
 mod common;
 
-#[ path = "users/debug_test.rs" ]
-mod debug_test;
-
 use axum::{
     body::Body,
     http::{Request, StatusCode, header},

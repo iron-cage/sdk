@@ -68,7 +68,7 @@ make test
 
 | File | Purpose |
 |------|---------|
-| `dev_tokens.db` | Development database (default) |
+| `iron.db` | Development database (default) |
 | `config.dev.toml` | Development configuration |
 | `config.test.toml` | Test configuration |
 | `config.prod.toml.example` | Production config template |
@@ -186,7 +186,7 @@ cargo test      # Test DB auto-updates
 ### Seed script fails
 ```bash
 # Check schema matches migrations
-sqlite3 dev_tokens.db .schema users
+sqlite3 iron.db .schema users
 grep "INSERT INTO users" scripts/seed_dev_data.sh
 ```
 
@@ -197,7 +197,7 @@ grep "INSERT INTO users" scripts/seed_dev_data.sh
 make db-inspect
 
 # Or manually:
-sqlite3 dev_tokens.db
+sqlite3 iron.db
 
 sqlite> SELECT COUNT(*) FROM users;
 sqlite> SELECT username, role FROM users;
@@ -217,7 +217,7 @@ sqlite> .quit
 - Share databases between tests
 - Mock database interactions
 - Skip migrations
-- Commit `dev_tokens.db` to git
+- Commit `iron.db` to git
 
 ## 📚 Full Documentation
 

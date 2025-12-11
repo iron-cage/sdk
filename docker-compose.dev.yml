@@ -1,0 +1,75 @@
+version: '3.8'
+
+# Development Docker Compose - mounts source code for live reload
+# Usage: docker compose -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: iron_postgres_dev
+    environment:
+      POSTGRES_DB: iron_tokens
+      POSTGRES_USER: iron_user
+      POSTGRES_PASSWORD: devpassword123
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - iron_network
+    ports:
+      - "5432:5432"  # Expose for local tools (DBeaver, psql)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iron_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: rust:1.75-slim-bookworm
+    container_name: iron_backend_dev
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - cargo_cache:/usr/local/cargo/registry
+      - target_cache:/app/target
+    environment:
+      DATABASE_URL: postgresql://iron_user:devpassword123@postgres:5432/iron_tokens
+      JWT_SECRET: dev-secret-change-in-production
+      IRON_DEPLOYMENT_MODE: development
+      RUST_LOG: debug
+    command: >
+      sh -c "apt-get update && apt-get install -y pkg-config libssl-dev curl &&
+             cargo run -p iron_control_api"
+    ports:
+      - "3000:3000"  # Expose for direct API access
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - iron_network
+
+  frontend:
+    image: node:20-alpine
+    container_name: iron_frontend_dev
+    working_dir: /app
+    volumes:
+      - ./module/iron_dashboard:/app
+      - node_modules_cache:/app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:3000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - iron_network
+
+networks:
+  iron_network:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+  cargo_cache:
+  target_cache:
+  node_modules_cache:

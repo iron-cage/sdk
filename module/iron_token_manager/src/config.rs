@@ -285,7 +285,7 @@ impl Config
     {
       database: DatabaseConfig
       {
-        url: "sqlite:///./dev_tokens.db?mode=rwc".to_string(),
+        url: "sqlite:///./iron.db?mode=rwc".to_string(),
         max_connections: 5,
         auto_migrate: true,
         foreign_keys: true,
@@ -338,7 +338,7 @@ mod tests
   fn test_default_dev_config()
   {
     let config = Config::default_dev();
-    assert_eq!( config.database.url, "sqlite:///./dev_tokens.db?mode=rwc" );
+    assert_eq!( config.database.url, "sqlite:///./iron.db?mode=rwc" );
     assert_eq!( config.database.max_connections, 5 );
     assert!( config.database.auto_migrate );
     assert!( config.database.foreign_keys );
@@ -362,7 +362,7 @@ mod tests
     assert!( config.is_ok(), "Should load dev config file" );
 
     let config = config.unwrap();
-    assert!( config.database.url.contains( "dev_tokens.db" ) );
+    assert!( config.database.url.contains( "iron.db" ) );
     assert_eq!( config.database.max_connections, 5 );
   }
 

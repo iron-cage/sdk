@@ -30,6 +30,10 @@ enabled = [
   "dep:async-trait",
   "dep:bcrypt",
   "dep:reqwest",
+  "dep:aes-gcm",
+  "dep:rand",
+  "dep:zeroize",
+  "dep:base64",
 ]
 full = ["enabled"]
 
@@ -80,6 +84,12 @@ reqwest = { workspace = true, optional = true }
 
 # Environment variable loading from .env files
 dotenvy = { workspace = true }
+
+# Cryptography for IP Token encryption (Protocol 005)
+aes-gcm = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+zeroize = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

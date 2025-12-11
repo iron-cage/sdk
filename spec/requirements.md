@@ -1070,9 +1070,9 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
     - Permissions: Admin creates tokens, developers list/rotate own tokens
     - Protocol: See `/docs/protocol/006_token_management_api.md`
   - **API Tokens:**
-    - Format: `at_<base64_32chars>` (Pending: Q29)
-    - Permissions: Role-based (inherit user role) (Pending: Q30)
-    - Revocation: Soft delete with audit trail (Pending: Q31)
+    - Format: `at_<base64_32chars>` (Decision: Q31 - Create, List, Get, Revoke operations)
+    - Permissions: SAME-AS-USER (inherit user role and permissions) (Decision: Q15, ADR-009)
+    - Revocation: Soft delete with revoked_at timestamp (audit trail preserved) (Decision: Q31, ADR-009)
 
 - **Role-Based Access Control (RBAC):**
   - **Roles:**
@@ -1096,10 +1096,9 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ IC token rotation preserves old token for grace period (24 hours)
 - ✅ Session expires after inactivity (30 minutes default)
 
-**Pending Decisions:**
-- Q29: API token format (Recommended: `at_<random_base64_32chars>`)
-- Q30: API token permissions (Recommended: Role-based, inherit user role)
-- Q31: API token revocation (Recommended: Soft delete with audit trail)
+**REST API Design Complete:** All API design questions resolved (2025-12-11)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 014: API Tokens API](../docs/protocol/014_api_tokens_api.md) for implementation specifications
 
 **References:**
 - `/docs/protocol/006_token_management_api.md` - IC Token CRUD endpoints
@@ -1114,15 +1113,15 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 **Requirements:**
 - **Create Agent:** `POST /api/v1/agents`
   - **Required fields:**
-    - `name` (string, 1-100 chars, unique within project) (Pending: Q20, Q23)
+    - `name` (string, 1-100 chars, unique within project) (Decision: Q20, Q23, ADR-009)
     - `budget` (decimal, >= 0.01 USD)
   - **Optional fields:**
     - `description` (string, max 500 chars)
-    - `providers` (array of provider IDs, can be empty) (Pending: Q20)
+    - `providers` (array of provider IDs, can be empty - zero allowed) (Decision: Q20, Q26, ADR-009)
     - `tags` (array of strings)
     - `settings` (object, agent-specific configuration)
   - **Response:** 201 Created with full agent object
-  - **Errors:** 409 Conflict if name duplicate (Pending: Q23)
+  - **Errors:** 409 Conflict if name duplicate (Decision: Q23, ADR-009)
 
 - **List Agents:** `GET /api/v1/agents`
   - **Pagination:** Offset-based (`?page=1&per_page=50`)
@@ -1135,16 +1134,16 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - **Errors:** 404 Not Found if agent doesn't exist
 
 - **Update Agent:** `PATCH /api/v1/agents/{id}`
-  - **Mutable fields:** `name`, `budget`, `description`, `tags`, `settings` (Pending: Q21)
+  - **Mutable fields:** `name`, `budget`, `description`, `tags`, `settings` (Decision: Q21, Q22, ADR-009)
   - **Immutable fields:** `id`, `created_at`, `updated_at`, `spent`
-  - **Semantics:** Partial updates (only specified fields updated) (Pending: Q22)
+  - **Semantics:** Partial updates (only specified fields updated) (Decision: Q22, ADR-009)
   - **Response:** 200 OK with updated agent object
 
-- **Delete Agent:** `DELETE /api/v1/agents/{id}`
-  - **Behavior:** Immediate deletion with cascade (Pending: Q24)
-  - **Cascade:** Deletes budget requests, leases associated with agent
-  - **Confirmation:** No API-level confirmation required (CLI can prompt) (Pending: Q24)
-  - **Response:** 200 OK with deletion summary (cascade counts)
+- **Delete Agent:** `DELETE /api/v1/agents/{id}` **[POST-PILOT]**
+  - **Status:** Deferred to POST-PILOT (Decision: Q24, ADR-009)
+  - **Behavior:** Soft delete (archive pattern) recommended (preserves audit trail)
+  - **Pilot Workaround:** Remove all providers to effectively disable agent
+  - **Response:** TBD POST-PILOT
 
 - **Get Agent Status:** `GET /api/v1/agents/{id}/status`
   - **Response:** Real-time budget status (spent, remaining, percentage used)
@@ -1157,12 +1156,11 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ DELETE cascades to budget requests and leases
 - ✅ Status endpoint shows real-time budget usage
 
-**Pending Decisions:**
-- Q20: Create agent required fields (Recommended: Minimal - name + budget)
-- Q21: Update agent mutable fields (Recommended: Most fields except system fields)
-- Q22: Partial update support (Recommended: Yes, standard PATCH semantics)
-- Q23: Agent name uniqueness (Recommended: Unique within project)
-- Q24: Delete confirmation requirement (Recommended: No API-level confirmation)
+**REST API Design Complete:** All agent API questions resolved (2025-12-11)
+- Agent creation: name + budget required (Decision: Q23, ADR-009)
+- Agent deletion: Deferred to POST-PILOT (Decision: Q24, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 010: Agents API](../docs/protocol/010_agents_api.md) for implementation specifications
 
 **References:**
 - `/docs/protocol/010_agents_api.md` - Complete agent API specification (to be created)
@@ -1182,7 +1180,7 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - **Optional fields:**
     - `base_url` (for custom endpoints, Azure OpenAI)
     - `organization_id` (for OpenAI organizations)
-  - **Validation:** Format validation only (no API test call) (Pending: Q25)
+  - **Validation:** Format validation only, no API test call (Decision: Q25, ADR-009)
   - **Response:** 201 Created (API key never returned in responses)
 
 - **List Providers:** `GET /api/v1/providers`
@@ -1194,12 +1192,12 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 
 - **Update Provider:** `PATCH /api/v1/providers/{id}`
   - **Mutable fields:** `name`, `api_key`, `base_url`
-  - **API key rotation:** Direct PATCH with new key (Pending: Q26)
-  - **Validation:** Same as create (format only) (Pending: Q27)
+  - **API key rotation:** Direct PATCH with new key (Decision: Q26, ADR-009)
+  - **Validation:** Format validation only, no API test (Decision: Q27, ADR-009)
 
 - **Delete Provider:** `DELETE /api/v1/providers/{id}`
   - **Cascade:** Removes provider from all agents (ON DELETE CASCADE)
-  - **Warning:** Response includes affected agents list (Pending: Q28)
+  - **Warning:** Response includes affected agents list (Decision: Q28, ADR-009)
   - **Response:** 200 OK with affected agents details
 
 **Acceptance Criteria:**
@@ -1209,11 +1207,11 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ DELETE cascades to agent-provider assignments
 - ✅ DELETE response shows affected agents with remaining provider counts
 
-**Pending Decisions:**
-- Q25: Provider credential validation on create (Recommended: No validation for Pilot)
-- Q26: API key update method (Recommended: Direct PATCH)
-- Q27: Credential validation on update (Recommended: Same as create - no validation if Q25=A)
-- Q28: Provider deletion warning (Recommended: Include affected agents in response)
+**REST API Design Complete:** All provider API questions resolved (2025-12-11)
+- Provider credentials: No validation on create/update (Decision: Q25-Q27, ADR-009)
+- Provider deletion: Warning with affected agents (Decision: Q28, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 011: Providers API](../docs/protocol/011_providers_api.md) for implementation specifications
 
 **References:**
 - `/docs/protocol/011_providers_api.md` - Complete provider API specification (to be created)
@@ -1231,15 +1229,15 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - **Optional fields:**
     - `expires_at` (ISO 8601 timestamp, null = no expiration)
   - **Token generation:**
-    - Format: `at_<random_base64_32chars>` (Pending: Q29)
-    - Returned only on creation (never retrievable again)
-    - Stored as hash in database
-  - **Permissions:** Inherit creating user's role (Pending: Q30)
-  - **Response:** 201 Created with token value (only time shown)
+    - Format: `at_<base64_32chars>` (Decision: Q31, ADR-009)
+    - Returned only on creation, never retrievable again (Decision: Q32, ADR-009)
+    - Stored as bcrypt hash in database (irreversible)
+  - **Permissions:** SAME-AS-USER - inherit user's role and permissions (Decision: Q15, Q30, ADR-009)
+  - **Response:** 201 Created with token value (shown ONCE, never again)
 
 - **List API Tokens:**
-  - Admin: `GET /api/v1/api-tokens` (all tokens, all users)
-  - User: `GET /api/v1/api-tokens/me` (own tokens only)
+  - Admin: `GET /api/v1/api-tokens?all=true` (all tokens, all users)
+  - User: `GET /api/v1/api-tokens` (own tokens only)
   - **Response:** Array of token metadata (not token value, only prefix shown)
 
 - **Get API Token:** `GET /api/v1/api-tokens/{id}`
@@ -1247,7 +1245,7 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - **Never includes:** Token value (not retrievable after creation)
 
 - **Revoke API Token:** `DELETE /api/v1/api-tokens/{id}`
-  - **Behavior:** Soft delete (mark as revoked, preserve audit trail) (Pending: Q31)
+  - **Behavior:** Soft delete with revoked_at timestamp (preserves audit trail) (Decision: Q31, ADR-009)
   - **Response:** 200 OK with revoked_at timestamp
   - **Effect:** Token immediately invalid (401 on subsequent use)
 
@@ -1258,10 +1256,12 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ Revoked tokens preserved in database for audit trail
 - ✅ List endpoint filters out revoked tokens by default (opt-in to include revoked)
 
-**Pending Decisions:**
-- Q29: API token format (Recommended: `at_<random_base64_32chars>`)
-- Q30: API token permissions (Recommended: Role-based, inherit user role)
-- Q31: API token revocation (Recommended: Soft delete with audit trail)
+**REST API Design Complete:** All API token questions resolved (2025-12-11)
+- Token format: `at_<base64_32chars>` (Decision: Q31, ADR-009)
+- Token permissions: SAME-AS-USER (inherit user role) (Decision: Q15, ADR-009)
+- Token visibility: Show once at creation only (Decision: Q32, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 014: API Tokens API](../docs/protocol/014_api_tokens_api.md) for implementation specifications
 
 **References:**
 - `/docs/protocol/014_api_tokens_api.md` - API token management endpoints (to be created)
@@ -1462,10 +1462,11 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - `RESOURCE_NOT_FOUND`: Requested resource doesn't exist
   - `PROVIDER_IN_USE`: Cannot delete provider with active agents
 
-- **Rate Limiting:**
-  - **Scope:** Per-user (all tokens from same user share limit) (Pending: Q32)
-  - **Limits:**
-    - Authenticated: 100 requests/minute, 1000/hour (Pending: Q33)
+- **Rate Limiting:** **[POST-PILOT]**
+  - **Status:** Deferred to POST-PILOT (Decision: Q32, Q33, ADR-009)
+  - **Proposed Scope:** Per-user (all tokens from same user share limit)
+  - **Proposed Limits:**
+    - Authenticated: 100 requests/minute, 1000/hour
     - Unauthenticated: 20 requests/minute, 100/hour
     - Burst: 10 requests instant
   - **Headers:**
@@ -1481,9 +1482,11 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ 429 responses include `Retry-After` header (seconds)
 - ✅ Authentication errors distinguish expired vs invalid vs revoked tokens
 
-**Pending Decisions:**
-- Q32: Rate limit scope (Recommended: Per-user across all tokens)
-- Q33: Rate limit values (Recommended: 100/min authenticated, 20/min unauth)
+**REST API Design Complete:** All error handling questions resolved (2025-12-11)
+- Error format: Simple custom format with field-level errors (Decision: Q37, Q39, Q40, ADR-009)
+- HTTP status: 400 for validation errors (Decision: Q38, ADR-009)
+- Rate limits: Deferred to POST-PILOT (Decision: Q32, Q33)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
 
 **References:**
 - `/docs/standards/error_format_standards.md` - Error response specification
@@ -1545,8 +1548,8 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 
 **Requirements:**
 - **Logged Operations:**
-  - Mutation-only: POST, PUT, PATCH, DELETE (Pending: Q35)
-  - Not logged: GET (read operations)
+  - Mutation-only: POST, PUT, PATCH, DELETE (Decision: Q35, ADR-009)
+  - Not logged: GET (read operations - performance optimization)
 
 - **Audit Log Fields:**
   - User ID (who performed action)
@@ -1581,8 +1584,10 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ Audit log access restricted by role (admin sees all, user sees own)
 - ✅ Sensitive data never appears in audit logs
 
-**Pending Decisions:**
-- Q35: Audit logging scope (Recommended: Mutation-only for performance)
+**REST API Design Complete:** All audit logging questions resolved (2025-12-11)
+- Audit logging scope: Mutation-only (POST, PUT, DELETE) for performance (Decision: Q35, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 002: Cross-Cutting Standards](../docs/protocol/002_rest_api_protocol.md#audit-logging) for implementation specifications
 
 **References:**
 - `/docs/protocol/027_audit_logging.md` - Centralized audit logging specification (POST-PILOT enhancement)
@@ -1626,8 +1631,11 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - ✅ CLI exit codes follow conventions (0 = success, non-zero = error)
 - ✅ CLI help text explains all options (`--help`)
 
-**Pending Decisions:**
-- Q36: CLI-API parity policy (Recommended: User-facing only, not agent-facing endpoints)
+**REST API Design Complete:** All CLI-API parity questions resolved (2025-12-11)
+- CLI-API parity policy: User-facing only, not agent-facing endpoints (Decision: Q36, ADR-009)
+- 100% parity: 46 user-facing endpoints = 46 CLI commands
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 002: Cross-Cutting Standards](../docs/protocol/002_rest_api_protocol.md#cli-api-parity) for CLI-API mapping
 
 **References:**
 - `/docs/features/004_token_management_cli_api_parity.md` - CLI-API parity implementation
@@ -1781,6 +1789,257 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - Pin major versions, allow minor/patch updates
   - Security audits via `cargo audit` weekly
 - **Validation:** Run `cargo deny check`, verify zero vulnerabilities
+
+### 2.6 Testing (MUST)
+
+### NFR-2.6.1: Database Test Isolation
+- **Requirement:** Every test must use isolated database instance
+- **Implementation:**
+  - Each test creates independent database (in-memory or tempfile)
+  - No shared database connections between tests
+  - Tests can run in parallel without conflicts
+  - Each test applies migrations independently
+- **Acceptance Criteria:**
+  - Tests pass when run in parallel: `cargo nextest run -j8`
+  - Zero race conditions over 100 repeated runs
+  - Test order doesn't affect results
+- **Validation:** Run `cargo nextest run --test-threads 8`, verify all tests pass
+
+### NFR-2.6.2: Automatic Cleanup Mechanisms
+- **Requirement:** All test databases must clean up automatically
+- **Forbidden:** Manual cleanup, cleanup scripts, shared cleanup functions
+- **Required Patterns:**
+  - **TempDir Drop (File-Based):** Use Rust Drop trait for automatic deletion
+    ```rust
+    pub async fn create_test_db() -> (SqlitePool, TempDir) {
+      let temp_dir = TempDir::new()?;
+      let db_path = temp_dir.path().join("test.db");
+      // temp_dir returned, dropped after test completes → automatic cleanup
+      (pool, temp_dir)
+    }
+    ```
+  - **Connection Pool Drop (In-Memory):** Memory database destroyed when pool dropped
+    ```rust
+    pub async fn create_test_database() -> SqlitePool {
+      SqlitePoolOptions::new()
+        .connect("sqlite::memory:?cache=shared")
+        .await?
+      // pool dropped after test → automatic cleanup
+    }
+    ```
+- **Acceptance Criteria:**
+  - No test database files left after test suite completes
+  - Cleanup works even if test panics
+  - Zero manual cleanup commands required
+- **Validation:** Run tests, verify `ls /tmp/test_*` shows zero files
+
+### NFR-2.6.3: Seed Data Standards
+- **Requirement:** All seed data operations must be idempotent and documented
+- **Idempotency Contract:**
+  - Seed functions safe to run multiple times
+  - Use `INSERT OR IGNORE` pattern for SQLite
+  - Check existence before creation for PostgreSQL
+  - Seed functions return Result, not panic
+- **Seed Data Structure (Test Contract):**
+  | Entity | Count | Purpose | Required Fields |
+  |--------|-------|---------|----------------|
+  | users | 3 | Admin, normal, read-only for permission testing | username, password_hash, role |
+  | api_tokens | 5 | Valid, expired, revoked, low-limit, high-limit | token_hash, user_id, status, expires_at |
+  | provider_keys | 2 | OpenAI, Anthropic for multi-provider testing | provider_name, api_key_encrypted, status |
+  | usage_limits | 3 | Default, custom, zero for quota testing | max_usd, max_tokens, time_window |
+  | usage_records | 10 | Recent usage for analytics testing | token_id, tokens_used, cost_usd, timestamp |
+  | project_assignments | 7 | User-token-project relationships | user_id, token_id, project_id, role |
+- **Organization Pattern:**
+  ```rust
+  pub async fn seed_all(pool: &SqlitePool) -> Result<()> {
+    // Call in dependency order (base entities first)
+    seed_users(pool).await?;              // No dependencies
+    seed_provider_keys(pool).await?;      // No dependencies
+    seed_api_tokens(pool).await?;         // Depends on users
+    seed_usage_limits(pool).await?;       // Depends on api_tokens
+    seed_usage_records(pool).await?;      // Depends on api_tokens
+    seed_project_assignments(pool).await?; // Depends on users + api_tokens
+    Ok(())
+  }
+
+  async fn seed_users(pool: &SqlitePool) -> Result<()> {
+    sqlx::query(
+      "INSERT OR IGNORE INTO users (username, password_hash, role)
+       VALUES (?, ?, ?)"
+    )
+    .bind("admin").bind("admin_hash").bind("admin")
+    .execute(pool).await?;
+
+    sqlx::query(
+      "INSERT OR IGNORE INTO users (username, password_hash, role)
+       VALUES (?, ?, ?)"
+    )
+    .bind("normal").bind("normal_hash").bind("user")
+    .execute(pool).await?;
+
+    sqlx::query(
+      "INSERT OR IGNORE INTO users (username, password_hash, role)
+       VALUES (?, ?, ?)"
+    )
+    .bind("readonly").bind("readonly_hash").bind("readonly")
+    .execute(pool).await?;
+
+    Ok(())
+  }
+  ```
+- **Wipe Pattern (Manual Testing Only):**
+  ```rust
+  pub async fn wipe_database(pool: &SqlitePool) -> Result<()> {
+    // Delete in REVERSE dependency order (dependents first)
+    sqlx::query("DELETE FROM project_assignments").execute(pool).await?;
+    sqlx::query("DELETE FROM usage_records").execute(pool).await?;
+    sqlx::query("DELETE FROM usage_limits").execute(pool).await?;
+    sqlx::query("DELETE FROM api_tokens").execute(pool).await?;
+    sqlx::query("DELETE FROM provider_keys").execute(pool).await?;
+    sqlx::query("DELETE FROM users").execute(pool).await?;
+    Ok(())
+  }
+  ```
+- **Acceptance Criteria:**
+  - Running seed_all() twice produces identical database state
+  - Seed functions never panic, return Result
+  - Wipe respects foreign key constraints
+  - All seed data documented in tests/readme.md
+- **Validation:** Run seed_all() twice, verify second run succeeds with zero changes
+
+### NFR-2.6.4: Test Database Selection
+- **Requirement:** Use appropriate database type for each test scenario
+- **Decision Matrix:**
+  | Scenario | Database Type | Pattern | Rationale |
+  |----------|--------------|---------|-----------|
+  | Fast unit tests | In-memory SQLite | `sqlite::memory:?cache=shared` | Fastest, no I/O, automatic cleanup |
+  | Integration tests | Tempfile SQLite | `TempDir + sqlite://{path}` | Inspectable, migration testing |
+  | CI/CD pipelines | In-memory SQLite | `sqlite::memory:` | Fast, no disk space issues |
+  | Debug/manual testing | Config-based SQLite | `config.dev.toml` | Persistent, inspectable between runs |
+  | Production tests | PostgreSQL | Environment variable | Real production database |
+- **Configuration Examples:**
+  ```toml
+  # config.dev.toml (manual testing only)
+  [database]
+  url = "sqlite:///./dev_tokens.db?mode=rwc"
+  auto_migrate = true
+  foreign_keys = true
+
+  [development]
+  debug = true
+  auto_seed = false        # Manual seed only
+  wipe_and_seed = true     # Automatic wipe+seed on startup
+  ```
+- **Acceptance Criteria:**
+  - Automated tests never use config-based databases
+  - Manual testing databases persist for inspection
+  - CI tests complete in <5 minutes (in-memory only)
+- **Validation:** Verify automated tests use `:memory:` or `TempDir`, manual testing uses `dev_*.db`
+
+### NFR-2.6.5: Manual Testing Database Setup
+- **Requirement:** Provide unified commands for manual testing database preparation
+- **Required Makefile Targets:**
+  ```makefile
+  # Fresh database with seed data
+  db-reset-seed:
+    rm -f dev_*.db
+    cargo run --config config.dev.toml
+
+  # Delete development databases
+  db-reset:
+    rm -f dev_*.db
+    @echo "Development databases deleted"
+
+  # Populate seed data (assumes db exists)
+  db-seed:
+    cargo run --bin seed-db --config config.dev.toml
+
+  # Interactive database inspection
+  db-inspect:
+    @echo "Opening dev_tokens.db (press Ctrl+D to exit)"
+    sqlite3 ./dev_tokens.db
+
+  # Complete debug setup (reset + build + seed)
+  debug-setup: db-reset-seed
+    cargo build --workspace
+    @echo "Debug environment ready"
+  ```
+- **Developer Workflow:**
+  ```bash
+  # Day 1: Fresh start
+  make debug-setup        # Clean database + build + seed
+  cargo run --config config.dev.toml
+
+  # Day 2: Continue with existing data
+  cargo run --config config.dev.toml
+
+  # Day 3: Corrupted data, need fresh start
+  make db-reset-seed      # Wipe + seed, keep build
+  cargo run --config config.dev.toml
+
+  # During debugging: inspect state
+  make db-inspect
+  # SQL> SELECT * FROM users;
+  # SQL> SELECT token_prefix, status FROM api_tokens;
+  ```
+- **Database Path Conventions:**
+  - **Development:** `./dev_{module}.db` (e.g., `dev_tokens.db`, `dev_runtime.db`)
+  - **Test (Tempfile):** `{tempdir}/test.db` (automatic cleanup)
+  - **Test (In-Memory):** `:memory:?cache=shared` (no file)
+  - **Production:** `DATABASE_URL` environment variable
+- **Acceptance Criteria:**
+  - `make db-reset-seed` completes in <5 seconds
+  - `make db-inspect` opens SQLite shell successfully
+  - Development databases never committed to git (in .gitignore)
+  - Seed data provides realistic test scenarios
+- **Validation:** Run `make db-reset-seed`, verify database created with seed data
+
+### NFR-2.6.6: Bug Reproducer Tests
+- **Requirement:** Every bug fix must include reproducer test with comprehensive documentation
+- **Test Format:**
+  ```rust
+  /// Reproduces [specific bug description] (issue-NNN).
+  ///
+  /// ### Root Cause
+  /// [Specific technical explanation of WHY bug occurred]
+  ///
+  /// ### Why Not Caught Initially
+  /// [Explanation of what was missing in original test coverage]
+  ///
+  /// ### Fix Applied
+  /// [Specific technical description of fix implementation]
+  ///
+  /// ### Prevention
+  /// [What practices would have prevented this bug]
+  ///
+  /// ### Pitfall to Avoid
+  /// [Specific technical lesson learned for future development]
+  // test_kind: bug_reproducer(issue-NNN)
+  #[test]
+  fn test_specific_bug_description() {
+    // Test must FAIL before fix applied
+    // Test must PASS after fix applied
+  }
+  ```
+- **Source Code Fix Comment:**
+  ```rust
+  // Fix(issue-NNN): [One sentence summary]
+  // Root cause: [Specific technical explanation]
+  // Pitfall: [Specific lesson learned]
+  pub fn fixed_function() { /* ... */ }
+  ```
+- **Documentation Quality Standards:**
+  - **Specific:** Name exact functions, types, conditions (not "fixed bug")
+  - **Technical:** Include code snippets, SQL, algorithms (not "be careful")
+  - **Actionable:** Clear guidance for preventing recurrence (not generic advice)
+  - **Traceable:** Reference issue-NNN for full context
+  - **Concise:** Focus on critical insights only (3-10 sentences per section)
+- **Acceptance Criteria:**
+  - Bug reproducer test exists with 5-section documentation
+  - Source code has 3-field fix comment
+  - Documentation is specific, technical, actionable
+  - Test passes after fix applied
+- **Validation:** Search codebase for `bug_reproducer(issue-`, verify all have 5 sections + 3-field comments
 
 ---
 

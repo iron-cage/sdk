@@ -905,7 +905,7 @@ This ensures that ID format violations are caught before code review, maintainin
 
 ### Contributing Documentation
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for complete contributor guidelines including:
+See [contributing.md](../../contributing.md) for complete contributor guidelines including:
 - Documentation standards
 - ID format requirements
 - Canonical example usage

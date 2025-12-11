@@ -3,7 +3,8 @@
 
 [database]
 # Database URL (SQLite with read-write-create mode)
-url = "sqlite:///./dev_tokens.db?mode=rwc"
+# Canonical path: ./iron.db for development database
+url = "sqlite:///./iron.db?mode=rwc"
 
 # Maximum number of concurrent connections
 max_connections = 5

@@ -49,7 +49,7 @@ make check                  # Fast compilation check
 
 ### Default Database Location
 
-Development database: `./dev_tokens.db`
+Development database: `./iron.db`
 
 Override with environment variable:
 ```bash
@@ -64,7 +64,7 @@ make db-reset-seed
 ```
 
 **What it does:**
-1. Creates backup: `./backups/dev_tokens_backup_YYYYMMDD_HHMMSS.db`
+1. Creates backup: `./backups/iron_backup_YYYYMMDD_HHMMSS.db`
 2. Deletes current database
 3. Applies all migrations (001-008, skipping 007)
 4. Populates test data:
@@ -116,7 +116,7 @@ make db-seed
 
 ```bash
 # Open SQLite shell
-sqlite3 dev_tokens.db
+sqlite3 iron.db
 
 # Count tables
 sqlite> SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND substr(name,1,1) != '_';
@@ -140,11 +140,11 @@ sqlite> .quit
 
 All backups saved to: `./backups/`
 
-**Format:** `dev_tokens_backup_YYYYMMDD_HHMMSS.db`
+**Format:** `iron_backup_YYYYMMDD_HHMMSS.db`
 
 **Restore backup:**
 ```bash
-cp ./backups/dev_tokens_backup_20241211_143000.db ./dev_tokens.db
+cp ./backups/iron_backup_20241211_143000.db ./iron.db
 ```
 
 ---
@@ -544,7 +544,7 @@ make test
 **Solution:** Verify seed script matches migration files:
 ```bash
 # Check actual schema
-sqlite3 dev_tokens.db .schema users
+sqlite3 iron.db .schema users
 
 # Compare with seed script
 grep "INSERT INTO users" scripts/seed_dev_data.sh
@@ -564,7 +564,7 @@ migrations::apply_all_migrations( &pool ).await?; // Safe to call multiple times
 If still failing:
 ```bash
 # Drop guard table manually
-sqlite3 dev_tokens.db "DROP TABLE IF EXISTS _migration_XXX_completed;"
+sqlite3 iron.db "DROP TABLE IF EXISTS _migration_XXX_completed;"
 
 # Run migration again
 make db-reset
@@ -606,7 +606,7 @@ tracker.record_usage( token_id, "openai", "gpt-4", 100, 50, 150 ).await?;
 
 **Verification:**
 ```bash
-sqlite3 dev_tokens.db \
+sqlite3 iron.db \
   "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%';"
 ```
 

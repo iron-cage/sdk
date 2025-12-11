@@ -7,12 +7,12 @@
 # Usage:
 #   ./scripts/reset_dev_db.sh [database_path]
 #
-# Default database: ./dev_tokens.db
+# Default database: ./iron.db (canonical path)
 
 set -euo pipefail
 
 # Configuration
-DB_PATH="${1:-./dev_tokens.db}"
+DB_PATH="${1:-./iron.db}"
 BACKUP_DIR="./backups"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -54,7 +54,7 @@ mkdir -p "$BACKUP_DIR"
 # Backup existing database
 if [ -f "$DB_PATH" ]; then
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-  BACKUP_PATH="$BACKUP_DIR/dev_tokens_backup_$TIMESTAMP.db"
+  BACKUP_PATH="$BACKUP_DIR/iron_backup_$TIMESTAMP.db"
 
   log_info "Creating backup: $BACKUP_PATH"
   cp "$DB_PATH" "$BACKUP_PATH"
@@ -79,7 +79,7 @@ sqlite3 "$DB_PATH" "PRAGMA foreign_keys = ON;"
 
 # Apply migrations in order
 MIGRATIONS_DIR="$PROJECT_ROOT/migrations"
-for migration_num in 001 002 003 004 005 006 008; do
+for migration_num in 001 002 003 004 005 006 008 009 010; do
   migration_file="$MIGRATIONS_DIR/${migration_num}_*.sql"
   if ls $migration_file 1> /dev/null 2>&1; then
     for file in $migration_file; do

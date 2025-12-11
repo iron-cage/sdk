@@ -13,6 +13,8 @@
 //! # Configuration
 //!
 //! - **DATABASE_URL**: SQLite connection string (default: `sqlite://./iron.db?mode=rwc`)
+//!   - Canonical path: `iron.db` for standalone module use
+//!   - Project Makefile overrides with module-specific paths (dev_control.db)
 //!   - The `?mode=rwc` parameter is REQUIRED for SQLite to create the database file
 //!   - Production should use PostgreSQL: `postgres://user:pass@host/database`
 //! - **JWT_SECRET**: Secret key for JWT signing (default: dev-secret-change-in-production)
@@ -310,7 +312,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     }
   }
 
-  // Database URL (SQLite for pilot)
+  // Database URL (SQLite for pilot, canonical path iron.db)
   let database_url = std::env::var( "DATABASE_URL" )
     .unwrap_or_else( |_| "sqlite://./iron.db?mode=rwc".to_string() );
 

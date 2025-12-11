@@ -140,7 +140,7 @@ uv pip install iron-cli-py[dotenv]
 ```
 
 **Requirements:**
-- Python 3.8+
+- Python 3.9+
 - uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - iron_cli binary (for wrapper commands)
 

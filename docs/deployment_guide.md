@@ -41,13 +41,14 @@
 ## Table of Contents
 
 1. [Deployment Modes Overview](#1-deployment-modes-overview)
-2. [Local Development Deployment](#2-local-development-deployment)
-3. [On-Premise Enterprise Deployment](#3-on-premise-enterprise-deployment)
-4. [SaaS Multi-Tenant Deployment](#4-saas-multi-tenant-deployment)
-5. [System Components](#5-system-components)
-6. [Execution Models](#6-execution-models)
-7. [Infrastructure Requirements](#7-infrastructure-requirements)
-8. [Network Architecture](#8-network-architecture)
+2. [Pilot Deployment (Current Implementation)](#2-pilot-deployment-current-implementation)
+3. [Local Development Deployment](#3-local-development-deployment)
+4. [On-Premise Enterprise Deployment](#4-on-premise-enterprise-deployment)
+5. [SaaS Multi-Tenant Deployment](#5-saas-multi-tenant-deployment)
+6. [System Components](#6-system-components)
+7. [Execution Models](#7-execution-models)
+8. [Infrastructure Requirements](#8-infrastructure-requirements)
+9. [Network Architecture](#9-network-architecture)
 
 ---
 
@@ -83,9 +84,554 @@ Iron Cage supports three deployment modes, each optimized for different use case
 
 ---
 
-## 2. Local Development Deployment
+## 2. Pilot Deployment (Current Implementation)
+
+**Status:** Currently implemented and operational
+**Architecture:** Docker Compose with PostgreSQL database
+**Audience:** Control Panel administrators, operations staff, DevOps engineers
 
 ### 2.1 Architecture
+
+The Control Panel Pilot Deployment uses a 3-service Docker Compose stack:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                         HOST MACHINE                                │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │              Docker Compose Network (iron_network)           │  │
+│  │                                                               │  │
+│  │  ┌─────────────────┐                                         │  │
+│  │  │   PostgreSQL    │                                         │  │
+│  │  │   :5432         │                                         │  │
+│  │  │   (postgres:16) │                                         │  │
+│  │  └────────┬────────┘                                         │  │
+│  │           │ SQL                                              │  │
+│  │  ┌────────┴─────────┐                                        │  │
+│  │  │  Backend API     │                                        │  │
+│  │  │  :3000           │                                        │  │
+│  │  │  (Rust/Axum)     │                                        │  │
+│  │  └────────┬─────────┘                                        │  │
+│  │           │ HTTP/WS                                          │  │
+│  │  ┌────────┴──────────────────────────────────────────────┐  │  │
+│  │  │         Frontend (nginx)                              │  │  │
+│  │  │         :80 → :8080                                   │  │  │
+│  │  │  ┌────────────────────────────────────────────────┐   │  │  │
+│  │  │  │  Static Files:  Vue.js Dashboard              │   │  │  │
+│  │  │  └────────────────────────────────────────────────┘   │  │  │
+│  │  │  ┌────────────────────────────────────────────────┐   │  │  │
+│  │  │  │  Reverse Proxy: /api → backend:3000           │   │  │  │
+│  │  │  │                  /ws  → backend:3000           │   │  │  │
+│  │  │  └────────────────────────────────────────────────┘   │  │  │
+│  │  └───────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                               │                                    │
+│                               │ Port 8080                          │
+└───────────────────────────────┼────────────────────────────────────┘
+                                │
+                        ┌───────┴────────┐
+                        │   Web Browser   │
+                        │ localhost:8080  │
+                        └─────────────────┘
+```
+
+**Design Rationale:** See [Docker Compose Architecture](deployment/006_docker_compose_deployment.md) for complete design decisions, trade-offs, and scaling limitations.
+
+### 2.2 Prerequisites
+
+**Required:**
+- Docker 24.0+ with Compose V2 (`docker compose` not `docker-compose`)
+- 4GB RAM minimum (8GB recommended)
+- 10GB disk space minimum
+- Linux, macOS, or Windows with WSL2
+
+**Verify Installation:**
+
+```bash
+docker --version          # Should show 24.0 or higher
+docker compose version    # Should show v2.x.x
+docker info | grep -i memory  # Check available RAM
+```
+
+### 2.3 Quick Start
+
+**Step 1: Clone Repository**
+
+```bash
+git clone https://github.com/iron-cage/iron_runtime.git
+cd iron_runtime/dev
+```
+
+**Step 2: Configure Secrets**
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Generate strong secrets (32+ characters each)
+echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)" >> .env
+echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+echo "IRON_SECRETS_MASTER_KEY=$(openssl rand -base64 32)" >> .env
+
+# Verify secrets were added
+grep -E "^(POSTGRES_PASSWORD|JWT_SECRET|IRON_SECRETS_MASTER_KEY)=" .env
+```
+
+**Step 3: Start Services**
+
+```bash
+# Build and start all services (first run takes 5-10 minutes)
+docker compose up -d
+
+# Watch logs until all services are healthy (30-60 seconds)
+docker compose logs -f
+
+# Check service status (all should show "healthy")
+docker compose ps
+```
+
+**Expected Output:**
+
+```
+NAME                IMAGE                      STATUS         PORTS
+iron_postgres       postgres:16-alpine         Up (healthy)   5432/tcp
+iron_backend        dev-backend:latest         Up (healthy)   3000/tcp
+iron_frontend       dev-frontend:latest        Up (healthy)   0.0.0.0:8080->80/tcp
+```
+
+**Step 4: Access Dashboard**
+
+Open http://localhost:8080 in your browser.
+
+**Default Admin Credentials:**
+- Username: `admin`
+- Password: Check backend logs: `docker compose logs backend | grep "Admin password"`
+
+**First Login:**
+1. Login with admin credentials
+2. Change admin password immediately
+3. Create team user accounts
+4. Distribute API tokens to developers
+
+### 2.4 Configuration
+
+#### 2.4.1 Database Configuration
+
+**Connection String (PostgreSQL):**
+
+```bash
+# In .env file
+DATABASE_URL=postgresql://iron_user:${POSTGRES_PASSWORD}@postgres:5432/iron_tokens
+```
+
+**Database Initialization:**
+
+Database schema is initialized automatically on first backend startup. No manual migrations required.
+
+**Verify Database:**
+
+```bash
+# Connect to PostgreSQL
+docker compose exec postgres psql -U iron_user -d iron_tokens
+
+# Check tables
+\dt
+
+# Exit
+\q
+```
+
+#### 2.4.2 Authentication Configuration
+
+**JWT Settings:**
+
+```bash
+# In .env file
+JWT_SECRET=your-secret-min-32-chars      # Required (generate with: openssl rand -hex 32)
+JWT_ACCESS_TOKEN_TTL=900                 # Optional (default: 15 minutes)
+JWT_REFRESH_TOKEN_TTL=604800             # Optional (default: 7 days)
+```
+
+**Security Requirements:**
+- `JWT_SECRET` must be 32+ characters
+- Change default admin password on first login
+- Rotate JWT_SECRET every 90 days (requires user re-login)
+
+#### 2.4.3 Secrets Management
+
+**Master Key:**
+
+```bash
+# In .env file
+IRON_SECRETS_MASTER_KEY=base64-encoded-32-bytes  # Required (generate with: openssl rand -base64 32)
+```
+
+**Key Rotation Procedure:**
+1. Generate new master key: `openssl rand -base64 32`
+2. Update .env with new key
+3. Restart backend: `docker compose restart backend`
+4. All stored secrets are automatically re-encrypted on first access
+
+### 2.5 Service Management
+
+**Start Services:**
+
+```bash
+docker compose up -d                    # Start all services (detached)
+docker compose up -d frontend           # Start single service
+docker compose up --build -d            # Rebuild and start
+```
+
+**Stop Services:**
+
+```bash
+docker compose down                     # Stop all services (keeps volumes)
+docker compose stop backend             # Stop single service
+docker compose down -v                  # Stop and DELETE volumes (DESTRUCTIVE)
+```
+
+**View Logs:**
+
+```bash
+docker compose logs -f                  # Follow all logs
+docker compose logs -f backend          # Follow backend logs only
+docker compose logs -f --tail=100       # Last 100 lines from all services
+docker compose logs backend | grep ERROR # Search for errors
+```
+
+**Service Status:**
+
+```bash
+docker compose ps                       # Show running services
+docker compose ps -a                    # Show all services (including stopped)
+docker stats $(docker compose ps -q)    # Show resource usage
+```
+
+**Restart Services:**
+
+```bash
+docker compose restart                  # Restart all services
+docker compose restart backend          # Restart single service
+docker compose up -d --force-recreate   # Recreate all containers
+```
+
+### 2.6 Database Management
+
+#### 2.6.1 Backup Database
+
+**Create Backup:**
+
+```bash
+# Backup to timestamped file
+docker compose exec postgres pg_dump -U iron_user -d iron_tokens \
+  > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Verify backup
+ls -lh backup_*.sql
+```
+
+**Automated Backup Script:**
+
+```bash
+#!/bin/bash
+# scripts/backup_db.sh
+BACKUP_DIR=/backups
+mkdir -p "$BACKUP_DIR"
+docker compose exec postgres pg_dump -U iron_user -d iron_tokens \
+  | gzip > "$BACKUP_DIR/iron_tokens_$(date +%Y%m%d_%H%M%S).sql.gz"
+```
+
+#### 2.6.2 Restore Database
+
+**Restore from Backup:**
+
+```bash
+# Stop backend to prevent writes
+docker compose stop backend
+
+# Restore database
+cat backup_20250311_120000.sql | \
+  docker compose exec -T postgres psql -U iron_user -d iron_tokens
+
+# Restart backend
+docker compose start backend
+```
+
+**Full Reset (DESTRUCTIVE):**
+
+```bash
+# WARNING: Deletes all data
+docker compose down -v           # Delete volumes
+docker compose up -d             # Recreate from scratch
+```
+
+### 2.7 Troubleshooting
+
+#### 2.7.1 Services Not Starting
+
+**Symptom:** `docker compose ps` shows services as "unhealthy" or "exited"
+
+**Diagnosis:**
+
+```bash
+# Check logs for errors
+docker compose logs backend
+docker compose logs postgres
+
+# Check service dependencies
+docker compose ps
+```
+
+**Common Causes:**
+- **Port 8080 already in use:** Change `ports: "8080:80"` in docker-compose.yml
+- **Missing .env secrets:** Verify all required variables are set
+- **Database connection failed:** Check DATABASE_URL format and POSTGRES_PASSWORD
+
+#### 2.7.2 Cannot Access Dashboard
+
+**Symptom:** Browser shows "Connection Refused" at localhost:8080
+
+**Diagnosis:**
+
+```bash
+# Verify frontend is running and healthy
+docker compose ps frontend
+
+# Check nginx logs
+docker compose logs frontend
+
+# Test port binding
+curl http://localhost:8080/health
+```
+
+**Solutions:**
+- **Frontend not running:** `docker compose up -d frontend`
+- **Port conflict:** Change port in docker-compose.yml `ports: "9090:80"`
+- **Firewall blocking:** Allow port 8080 in firewall
+
+#### 2.7.3 API Requests Failing
+
+**Symptom:** Dashboard loads but API calls return 502 Bad Gateway
+
+**Diagnosis:**
+
+```bash
+# Check backend health
+docker compose ps backend
+curl http://localhost:8080/api/health
+
+# Check backend logs
+docker compose logs backend | tail -50
+```
+
+**Common Causes:**
+- **Backend not healthy:** Check logs for startup errors
+- **Database connection failed:** Verify DATABASE_URL and postgres health
+- **JWT_SECRET too short:** Must be 32+ characters
+
+#### 2.7.4 Database Connection Errors
+
+**Symptom:** Backend logs show "Connection refused" or "Authentication failed"
+
+**Diagnosis:**
+
+```bash
+# Verify postgres is healthy
+docker compose ps postgres
+
+# Test connection manually
+docker compose exec postgres psql -U iron_user -d iron_tokens -c "SELECT 1;"
+```
+
+**Solutions:**
+- **Wrong password:** Check POSTGRES_PASSWORD matches in .env
+- **Database not initialized:** Restart backend to trigger initialization
+- **Network issue:** Recreate containers: `docker compose up -d --force-recreate`
+
+#### 2.7.5 High Memory Usage
+
+**Symptom:** System slows down, Docker reports high memory usage
+
+**Diagnosis:**
+
+```bash
+# Check resource usage by service
+docker stats $(docker compose ps -q)
+
+# Check container logs for memory warnings
+docker compose logs | grep -i memory
+```
+
+**Solutions:**
+- **Increase Docker memory limit:** Docker Desktop → Settings → Resources → Memory (8GB recommended)
+- **Reduce backend concurrency:** Add `TOKIO_WORKER_THREADS=2` to .env
+- **Clear old volumes:** `docker system prune -a --volumes`
+
+#### 2.7.6 Slow Build Times
+
+**Symptom:** `docker compose build` takes >10 minutes
+
+**Solutions:**
+- **Use BuildKit:** Set `DOCKER_BUILDKIT=1` environment variable
+- **Cache dependencies:** BuildKit caches npm/cargo dependencies automatically
+- **Increase Docker CPU:** Docker Desktop → Settings → Resources → CPUs (4+ recommended)
+
+### 2.8 Security Hardening
+
+**Production Deployment Checklist:**
+
+- [ ] **Strong Secrets:** All secrets are 32+ characters from `openssl rand`
+- [ ] **Change Default Admin Password:** On first login
+- [ ] **HTTPS/TLS:** Use reverse proxy (nginx, Caddy) with Let's Encrypt certificates
+- [ ] **Firewall:** Only expose port 8080 (or 443 with HTTPS), block internal ports 3000, 5432
+- [ ] **Regular Backups:** Automate daily database backups with 30-day retention
+- [ ] **Update Policy:** Apply security updates monthly (rebuild images)
+- [ ] **Secrets Rotation:** Rotate JWT_SECRET and master key every 90 days
+- [ ] **Monitoring:** Set up log aggregation and alerting
+
+**HTTPS Setup (Production):**
+
+```bash
+# Use Caddy as reverse proxy with automatic HTTPS
+# docker-compose.prod.yml
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    restart: unless-stopped
+
+  frontend:
+    # Remove port 8080 exposure (accessed via Caddy)
+    expose:
+      - "80"
+```
+
+**Caddyfile:**
+
+```
+your-domain.com {
+  reverse_proxy frontend:80
+
+  # Security headers
+  header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  header X-Content-Type-Options "nosniff"
+  header X-Frame-Options "DENY"
+}
+```
+
+### 2.9 Monitoring
+
+**Health Check Endpoints:**
+
+```bash
+# Frontend health
+curl http://localhost:8080/health
+# Expected: "healthy"
+
+# Backend API health
+curl http://localhost:8080/api/health
+# Expected: {"status":"ok","database":"connected"}
+
+# Database health
+docker compose exec postgres pg_isready -U iron_user
+# Expected: "accepting connections"
+```
+
+**Resource Monitoring:**
+
+```bash
+# Real-time stats
+docker stats $(docker compose ps -q)
+
+# Disk usage
+docker system df
+
+# Volume usage
+docker volume ls -q | xargs docker volume inspect | grep -E "Name|Mountpoint|Size"
+```
+
+**Log Aggregation (Production):**
+
+```yaml
+# docker-compose.prod.yml
+services:
+  backend:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+**Alerting Recommendations:**
+- **Service Down:** Alert if health check fails for >2 minutes
+- **High Memory:** Alert if container uses >80% of limit
+- **Disk Full:** Alert if volume usage >85%
+- **Failed Logins:** Alert on 10+ failed admin logins in 5 minutes
+
+### 2.10 Upgrading
+
+**Upgrade Procedure:**
+
+```bash
+# Step 1: Backup database BEFORE upgrading
+./scripts/backup_db.sh
+
+# Step 2: Pull latest code
+git fetch origin
+git checkout v1.2.0  # Replace with target version tag
+
+# Step 3: Rebuild images with new code
+docker compose build --no-cache
+
+# Step 4: Stop old containers
+docker compose down
+
+# Step 5: Start new containers
+docker compose up -d
+
+# Step 6: Verify health
+docker compose ps
+curl http://localhost:8080/api/health
+
+# Step 7: Check logs for errors
+docker compose logs -f --tail=100
+```
+
+**Rollback Procedure (if upgrade fails):**
+
+```bash
+# Step 1: Stop failed deployment
+docker compose down
+
+# Step 2: Restore previous code version
+git checkout v1.1.0  # Previous working version
+
+# Step 3: Rebuild with old code
+docker compose build --no-cache
+
+# Step 4: Restore database backup
+cat backup_20250311_120000.sql | \
+  docker compose exec -T postgres psql -U iron_user -d iron_tokens
+
+# Step 5: Start services
+docker compose up -d
+```
+
+**Zero-Downtime Upgrade (Advanced):**
+
+For production environments requiring zero downtime, see [Scaling Patterns](deployment/004_scaling_patterns.md) for blue-green deployment strategies with Kubernetes.
+
+---
+
+## 3. Local Development Deployment
+
+### 3.1 Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -118,7 +664,7 @@ Iron Cage supports three deployment modes, each optimized for different use case
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Installation Steps
+### 3.2 Installation Steps
 
 ### Prerequisites
 - Docker 24+ with Docker Compose
@@ -287,7 +833,7 @@ open http://localhost:3000  # Grafana (admin/admin)
 docker-compose down
 ```
 
-### 2.3 Local Development Best Practices
+### 3.3 Local Development Best Practices
 
 - **Data Persistence:** Docker volumes persist data across restarts
 - **Configuration:** Mount `./config` for custom guardrail rules
@@ -296,9 +842,9 @@ docker-compose down
 
 ---
 
-## 3. On-Premise Enterprise Deployment
+## 4. On-Premise Enterprise Deployment
 
-### 3.1 Architecture
+### 4.1 Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -338,7 +884,7 @@ docker-compose down
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Installation Steps
+### 4.2 Installation Steps
 
 ### Prerequisites
 - Kubernetes 1.24+ cluster
@@ -767,7 +1313,7 @@ kubectl get ingress -n iron_cage
 kubectl logs -f deployment/iron_cage-runtime -n iron_cage
 ```
 
-### 3.3 On-Premise Best Practices
+### 4.3 On-Premise Best Practices
 
 - **High Availability:** Run 3+ replicas across availability zones
 - **Backups:** Configure automated PostgreSQL backups (pg_dump + WAL archiving)
@@ -779,9 +1325,9 @@ kubectl logs -f deployment/iron_cage-runtime -n iron_cage
 
 ---
 
-## 4. SaaS Multi-Tenant Deployment
+## 5. SaaS Multi-Tenant Deployment
 
-### 4.1 Architecture
+### 5.1 Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -822,7 +1368,7 @@ kubectl logs -f deployment/iron_cage-runtime -n iron_cage
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Tenant Isolation Strategy
+### 5.2 Tenant Isolation Strategy
 
 Iron Cage uses **namespace-based isolation** for multi-tenancy:
 
@@ -834,7 +1380,7 @@ Iron Cage uses **namespace-based isolation** for multi-tenancy:
 | **Data (PostgreSQL)** | Schema per tenant | `CREATE SCHEMA tenant_acme_corp` |
 | **API** | JWT claim `tenant_id` validated on every request | `{"tenant_id": "acme-corp"}` |
 
-### 4.3 Multi-Tenant Configuration
+### 5.3 Multi-Tenant Configuration
 
 ```yaml
 # Tenant-aware deployment configuration
@@ -871,7 +1417,7 @@ data:
           sla_uptime: 99.9
 ```
 
-### 4.4 SaaS Deployment Best Practices
+### 5.4 SaaS Deployment Best Practices
 
 - **Tenant Isolation:** Strict namespace isolation in Redis/PostgreSQL
 - **Rate Limiting:** Per-tenant quotas enforced at API gateway
@@ -883,7 +1429,7 @@ data:
 
 ---
 
-## 5. System Components
+## 6. System Components
 
 All deployment modes share these core components:
 
@@ -896,7 +1442,7 @@ All deployment modes share these core components:
 | **grafana** | Metrics visualization | Grafana | Single instance |
 | **jaeger** | Distributed tracing | Jaeger | Collector + query service |
 
-### 5.1 Component Responsibilities
+### 6.1 Component Responsibilities
 
 **iron_cage-runtime:**
 - agent management management (Start/Stop/Pause/Resume)
@@ -932,11 +1478,11 @@ All deployment modes share these core components:
 
 ---
 
-## 6. Execution Models
+## 7. Execution Models
 
 Iron Cage supports two execution models depending on where the Python agent runs:
 
-### 6.1 Local Execution (Client-Side, Most Common)
+### 7.1 Local Execution (Client-Side, Most Common)
 
 **Agent runs on user's infrastructure, calls Iron Cage API for safety/monitoring:**
 
@@ -969,7 +1515,7 @@ Data Flow:
 - Data stays on user's infrastructure
 - User controls when agent runs
 
-### 6.2 Server Execution (Enterprise 24/7)
+### 7.2 Server Execution (Enterprise 24/7)
 
 **Agent uploaded to Iron Cage, runs 24/7 in Iron Cage's infrastructure:**
 
@@ -1007,7 +1553,7 @@ Data Flow:
 - Maximum safety (all traffic monitored)
 - Managed infrastructure (no ops required)
 
-### 6.3 Execution Model Comparison
+### 7.3 Execution Model Comparison
 
 | Aspect | Local Execution | Server Execution |
 |--------|----------------------|----------------------|
@@ -1020,9 +1566,9 @@ Data Flow:
 
 ---
 
-## 7. Infrastructure Requirements
+## 8. Infrastructure Requirements
 
-### 7.1 Hardware Requirements
+### 8.1 Hardware Requirements
 
 ### Local Development
 - **CPU:** 4 cores (Intel/AMD x86_64 or ARM64)
@@ -1042,7 +1588,7 @@ Data Flow:
 - **Cache:** ElastiCache r6g.xlarge (4 vCPU, 26 GB RAM, cluster mode)
 - **Storage:** EBS gp3 (3000 IOPS, 125 MB/s throughput)
 
-### 7.2 Software Requirements
+### 8.2 Software Requirements
 
 ### All Deployments
 - **Operating System:** Linux (Ubuntu 22.04 LTS, RHEL 8+, or Debian 12)
@@ -1054,7 +1600,7 @@ Data Flow:
 - **Python:** 3.9+ (for running agents)
 - **Rust:** 1.61+ (for building Iron Cage from source)
 
-### 7.3 Network Requirements
+### 8.3 Network Requirements
 
 | Port | Protocol | Component | Purpose |
 |------|----------|-----------|---------|
@@ -1070,7 +1616,7 @@ Data Flow:
 - Outbound: Allow 443 (HTTPS) for LLM API calls (OpenAI, Anthropic, etc.)
 - Internal: Allow all traffic within K8s cluster (pod-to-pod)
 
-### 7.4 Sandboxing Requirements (Server-Side Agents)
+### 8.4 Sandboxing Requirements (Server-Side Agents)
 
 For **server execution**, Iron Cage requires Linux kernel features to isolate and secure agent tool execution. These requirements ONLY apply when agents are uploaded to Iron Cage and run on Iron Cage infrastructure (not required for local execution).
 
@@ -1418,9 +1964,9 @@ All sandbox violations must be logged:
 
 ---
 
-## 8. Network Architecture
+## 9. Network Architecture
 
-### 8.1 Local Development Network Flow
+### 9.1 Local Development Network Flow
 
 ```
 ┌────────────────┐
@@ -1444,7 +1990,7 @@ All sandbox violations must be logged:
 └────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 On-Premise Enterprise Network Flow
+### 9.2 On-Premise Enterprise Network Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1477,7 +2023,7 @@ All sandbox violations must be logged:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 8.3 SaaS Multi-Tenant Network Flow
+### 9.3 SaaS Multi-Tenant Network Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

@@ -324,6 +324,119 @@ CREATE INDEX idx_user_audit_operation ON user_audit_log(operation);
 
 ---
 
+## Testing Standards
+
+### Database Path Standards
+
+All database paths follow strict conventions to ensure portability and proper cleanup:
+
+**Test Databases:**
+- In-memory: `:memory:` (preferred for unit/integration tests)
+- Temporary files: `/tmp/iron_token_manager_test_*.db`
+- CI/CD: `./target/test_db_{unique}.db`
+
+**Development Database:**
+- Standard path: `./iron.db` (relative to crate root)
+- Git-ignored by default
+
+**Validation:**
+- Pre-commit hook validates all database paths
+- CI/CD validates paths before test execution
+- Manual validation via `scripts/validate_db_paths.sh`
+
+### Test Database Lifecycle
+
+**v2 Helpers (Recommended):**
+
+The module provides ergonomic test helpers via `iron_test_db` crate:
+
+```rust
+use common::{create_test_db_v2, create_test_db_with_seed};
+
+#[tokio::test]
+async fn my_test() {
+  // Basic test database with migrations applied
+  let db = create_test_db_v2().await;
+  // Automatic cleanup via RAII
+}
+
+#[tokio::test]
+async fn my_test_with_data() {
+  // Database with comprehensive seed data
+  let db = create_test_db_with_seed().await;
+  // 5 users, 8 tokens, usage records, limits
+}
+```
+
+**Benefits:**
+- No manual TempDir management
+- Shared pool across components
+- Automatic cleanup via Drop trait
+- Consistent initialization
+- Complete test isolation
+
+### Seed Data Management
+
+**Two-Tier Approach:**
+
+**Tier 1: Bash Seed (Simple)**
+- Script: `scripts/seed_dev_data.sh`
+- Contents: 3 users, 3 tokens, 7 usage records, 3 limits
+- Use case: Manual testing, quick development
+
+**Tier 2: Rust Seed (Comprehensive)**
+- Implementation: `src/seed.rs`
+- Contents: 5 users, 8 tokens, 10+ usage records, 3 limits
+- Edge cases: Expired tokens, users without tokens, unlimited users
+- Use case: Automated tests, edge case validation
+
+**Validation:**
+- Script: `scripts/validate_seed_data.sh`
+- Accepts both implementations (bash: 3/3/7, Rust: 5/8/10+)
+- Validates core users, optional users, foreign keys
+
+**Documentation:**
+- Complete reference: [docs/seed_data_reference.md](./docs/seed_data_reference.md)
+- User profiles, token catalog, usage patterns
+- Manual testing guide with examples
+
+### Validation and Enforcement
+
+**Three-Layer Enforcement:**
+
+1. **Pre-commit Hooks** - Catch violations before commit
+   - Database path compliance
+   - Seed data completeness
+   - Schema validation
+
+2. **CI/CD Pipeline** - Enforce in automation
+   - All pre-commit checks
+   - Full test suite (120 tests)
+   - Clippy warnings as errors
+
+3. **Manual Validation** - On-demand verification
+   - `scripts/validate_db_paths.sh`
+   - `scripts/validate_db_schema.sh`
+   - `scripts/validate_seed_data.sh`
+
+### Test Organization
+
+**Standards:**
+- All tests in `tests/` directory (no `#[cfg(test)]` modules in `src/`)
+- Shared helpers in `tests/common/mod.rs`
+- One test file per major component
+- Loud failures with descriptive messages
+- Foreign key integrity validation
+- Test isolation (each test gets independent database)
+
+**Documentation:**
+- Comprehensive standards: [docs/testing_standards.md](./docs/testing_standards.md)
+- Best practices and anti-patterns
+- Troubleshooting guide
+- Performance considerations
+
+---
+
 ## Development Status
 
 **Current Phase:** Implemented (v0.1.0)
@@ -340,7 +453,11 @@ CREATE INDEX idx_user_audit_operation ON user_audit_log(operation);
 - ✅ User management (create, suspend, activate, delete, role change, password reset)
 - ✅ User audit logging (comprehensive operation tracking)
 - ✅ BCrypt password hashing (cost factor 12)
-- ✅ Integration tests (288 token tests + 40 user tests)
+- ✅ Integration tests (120 tests - token + user + database)
+- ✅ Database path standardization (validation + enforcement)
+- ✅ Comprehensive seed data (two-tier approach with edge cases)
+- ✅ Testing infrastructure (v2 helpers, validation scripts, pre-commit hooks)
+- ✅ Testing standards documentation
 
 **Pending:**
 - 📋 PostgreSQL migration for production mode
@@ -422,6 +539,14 @@ CREATE INDEX idx_user_audit_operation ON user_audit_log(operation);
 ---
 
 ## Revision History
+
+- **2025-12-11 (v0.1.1):** Database testing infrastructure
+  - Database path standardization (test, dev, CI/CD paths)
+  - Comprehensive seed data (two-tier approach: bash 3/3/7, Rust 5/8/10+)
+  - Three-layer validation enforcement (pre-commit, CI/CD, manual)
+  - Testing standards documentation (testing_standards.md, seed_data_reference.md)
+  - v2 test helpers for ergonomic database lifecycle management
+  - 120 tests (all passing)
 
 - **2025-12-09 (v0.1.0):** Initial specification - comprehensive token management with 288 tests
 

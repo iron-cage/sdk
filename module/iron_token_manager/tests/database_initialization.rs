@@ -250,7 +250,7 @@ async fn test_seed_data_creates_expected_records()
 
   // Verify 3 users created
   let user_count: i64 = query_scalar(
-    "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'project_manager', 'viewer')"
+    "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'developer', 'viewer')"
   )
   .fetch_one( &pool )
   .await
@@ -344,13 +344,13 @@ async fn test_wipe_and_seed_integration_with_config()
     .fetch_one( pool )
     .await
     .expect( "Failed to count users" );
-  assert_eq!( user_count, 3, "Should have 3 users after first init" );
+  assert_eq!( user_count, 5, "Should have 5 users after first init" );
 
   let token_count: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( pool )
     .await
     .expect( "Failed to count tokens" );
-  assert_eq!( token_count, 5, "Should have 5 tokens after first init" );
+  assert_eq!( token_count, 8, "Should have 8 tokens after first init" );
 
   let provider_count: i64 = query_scalar( "SELECT COUNT(*) FROM ai_provider_keys" )
     .fetch_one( pool )
@@ -371,7 +371,7 @@ async fn test_wipe_and_seed_integration_with_config()
     .fetch_one( pool )
     .await
     .expect( "Failed to count users" );
-  assert_eq!( user_count, 4, "Should have 4 users after manual insert" );
+  assert_eq!( user_count, 6, "Should have 6 users after manual insert (5 seeded + 1 manual)" );
 
   // Test wipe-and-seed by calling the functions directly
   // This simulates what happens on app restart with wipe_and_seed=true
@@ -396,13 +396,13 @@ async fn test_wipe_and_seed_integration_with_config()
     .fetch_one( pool )
     .await
     .expect( "Failed to count users after re-seed" );
-  assert_eq!( user_count, 3, "Should have 3 users after re-seed (manual insert removed)" );
+  assert_eq!( user_count, 5, "Should have 5 users after re-seed (manual insert removed)" );
 
   let token_count: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( pool )
     .await
     .expect( "Failed to count tokens after re-seed" );
-  assert_eq!( token_count, 5, "Should have 5 tokens after re-seed" );
+  assert_eq!( token_count, 8, "Should have 8 tokens after re-seed" );
 
   // Verify specific seed data exists
   let admin_exists: i64 = query_scalar(

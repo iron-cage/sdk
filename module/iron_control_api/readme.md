@@ -142,3 +142,95 @@ w3 .test l::3
 **Verification:** All 11 fixes complete (3 Phase 1 issues + 8 implementation bugs), 0 clippy warnings, 0 regressions
 
 **Next Steps:** Post-pilot (API authentication, rate limiting, distributed deployment, telemetry ingestion)
+
+## Docker Deployment
+
+### Build Backend Docker Image
+
+```bash
+# From workspace root
+docker build -f module/iron_control_api/Dockerfile -t iron-backend:latest .
+
+# Check image size
+docker images iron-backend:latest
+# Expected: ~50-60MB compressed
+```
+
+### Run Backend Container (Standalone)
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e DATABASE_URL="postgresql://iron_user:password@postgres:5432/iron_tokens" \
+  -e JWT_SECRET="your-secret-min-32-chars" \
+  -e IRON_DEPLOYMENT_MODE="production" \
+  -e RUST_LOG=info \
+  --name iron-backend \
+  iron-backend:latest
+```
+
+### Run with Docker Compose
+
+See `../../docker-compose.yml` for full stack deployment (PostgreSQL + Backend + Frontend).
+
+```bash
+# Start all services
+docker compose up -d
+
+# View backend logs
+docker compose logs -f backend
+
+# Check backend status
+docker compose ps backend
+```
+
+### Health Check
+
+```bash
+curl http://localhost:3000/api/health
+
+# Expected response:
+# {"status":"healthy","database":"connected"}
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | Yes | - | PostgreSQL or SQLite connection string |
+| `JWT_SECRET` | Yes | `dev-secret-change-in-production` | JWT signing key (32+ chars) |
+| `IRON_DEPLOYMENT_MODE` | No | auto-detect | `production`, `development`, or `pilot` |
+| `RUST_LOG` | No | `info` | Log level (`error`, `warn`, `info`, `debug`, `trace`) |
+| `IRON_SECRETS_MASTER_KEY` | No | - | AES-256-GCM key for provider key encryption (base64, 32 bytes) |
+
+### Troubleshooting
+
+**Issue:** Container exits immediately
+**Solution:** Check `DATABASE_URL` is valid and database is accessible. Run `docker logs iron-backend` to see startup errors.
+
+**Issue:** Health check fails
+**Solution:** Ensure database migrations have run. Check database connectivity with `docker exec iron-backend curl localhost:3000/api/health`.
+
+**Issue:** Permission denied errors
+**Solution:** Container runs as non-root user (UID 1000). Ensure any mounted volumes have correct permissions.
+
+### Multi-Stage Build Details
+
+The Dockerfile uses multi-stage builds for security and efficiency:
+
+**Stage 1 (Builder):** `rust:1.75-slim-bookworm`
+- Installs build dependencies (pkg-config, libssl-dev)
+- Copies workspace and builds release binary
+- Output: `/app/target/release/iron_control_api_server`
+
+**Stage 2 (Runtime):** `debian:bookworm-slim`
+- Installs only runtime dependencies (ca-certificates, libssl3, curl)
+- Copies binary from builder stage
+- Creates non-root user (UID 1000)
+- Final image: ~50MB (vs ~2GB with build tools)
+
+### Related Documentation
+
+- [Docker Compose Architecture](../../docs/deployment/006_docker_compose_deployment.md) - Design details
+- [Getting Started Guide](../../docs/getting_started.md) § Deploy Control Panel - Quickstart
+- [Deployment Guide](../../docs/deployment_guide.md) - Production procedures

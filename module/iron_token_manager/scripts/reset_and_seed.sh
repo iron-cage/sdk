@@ -7,12 +7,12 @@
 # Usage:
 #   ./scripts/reset_and_seed.sh [database_path]
 #
-# Default database: ./dev_tokens.db
+# Default database: ./iron.db (canonical path)
 
 set -euo pipefail
 
 # Configuration
-DB_PATH="${1:-./dev_tokens.db}"
+DB_PATH="${1:-./iron.db}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Colors for output

@@ -1,308 +1,303 @@
-# Contributing to Iron Cage
+# Contributing to Iron Runtime
 
-**Note:** This guide is for platform contributors developing Iron Cage itself. If you're a Python developer using Iron Cage to protect your agents, see [Getting Started](docs/getting_started.md) instead.
+Thank you for your interest in contributing to Iron Runtime! This guide will help you understand our development workflow and standards.
 
----
+## Table of Contents
 
-## Prerequisites
+- [Getting Started](#getting-started)
+- [Development Workflow](#development-workflow)
+- [Documentation Standards](#documentation-standards)
+- [Testing Requirements](#testing-requirements)
+- [Python Development Workflow](#python-development-workflow)
+- [Submitting Changes](#submitting-changes)
 
-- **Rust:** 1.75+ (`rustup update`)
-- **Python:** 3.11+ (`python --version`)
-- **uv:** Latest (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- **Node.js:** 18+ (`node --version`)
-- **Git:** Latest stable
-- **PostgreSQL:** 14+ (for Control Panel development)
+## Getting Started
 
----
+### Prerequisites
 
-## Development Setup
+- Rust 1.70+ (`rustup update`)
+- Node.js 18+ (`node --version`)
+- cargo-nextest (`cargo install cargo-nextest`)
+- SQLite 3 (`sqlite3 --version`)
 
-### 1. Clone Repository
+### Initial Setup
 
 ```bash
+# Clone the repository
 git clone https://github.com/iron-cage/iron_runtime.git
-cd iron_runtime
+cd iron_runtime/dev
+
+# Install dependencies
+make setup
+
+# Run tests to verify setup
+make test
+
+# Start development servers
+make dev
 ```
 
-### 2. Build All Modules
+## Development Workflow
+
+### Daily Commands
 
 ```bash
-# Build all Rust crates
-cargo build --release --workspace
-
-# Build Control Panel UI
-cd module/iron_dashboard
-npm install
-npm run build
-cd ../..
+make dev          # Run full stack (API + Dashboard)
+make test         # Run all tests
+make lint-docs    # Check documentation compliance
+make validate     # Full validation before PR
 ```
 
-### 3. Install Python SDK in Dev Mode
+### Code Standards
+
+- Follow Rust conventions (rustfmt, clippy)
+- Write tests for all new features
+- Update documentation when changing APIs
+- Run `make validate` before submitting PRs
+
+## Documentation Standards
+
+### ID Format Standards
+
+**Critical Rule:** All entity IDs in documentation MUST use underscore format (`prefix_identifier`).
+
+#### Format Requirements
+
+| Entity Type | Correct Format | Incorrect Format |
+|-------------|----------------|------------------|
+| Provider ID | `ip_openai_001` | ~~`ip-openai-001`~~ |
+| User ID | `user_xyz789` | ~~`user-xyz789`~~ |
+| Project ID | `proj_master` | ~~`proj-master`~~ |
+| Agent ID | `agent_abc123` | ~~`agent-abc123`~~ |
+| IC Token ID | `ic_def456` | ~~`ic-def456`~~ |
+| IP Token ID | `ip_ghi789` | ~~`ip-ghi789`~~ |
+
+#### Why This Matters
+
+1. **Consistency**: Uniform format across all documentation
+2. **Searchability**: Easy to grep and find all instances
+3. **Code Generation**: Documentation examples directly translate to code
+4. **API Standards**: Matches actual API implementation
+
+#### Edge Cases (NOT Entity IDs)
+
+These terms use hyphens because they're descriptive, not entity IDs:
+- `user-token` (token type descriptor)
+- `user-facing` (adjective)
+- `user-level` (scope descriptor)
+
+### Checking Compliance
+
+Before submitting documentation changes:
 
 ```bash
-cd module/iron_sdk
-uv pip install -e .[dev,all]  # Include dev tools and all framework integrations
-cd ../..
+# Run the lint check
+make lint-docs
+
+# Should output:
+# ✓ No ID format violations found
 ```
 
-### 4. Run Full Test Suite
+If violations are found, the script will show:
+- File paths and line numbers
+- The specific violations
+- Expected format for each entity type
+
+### Canonical Examples
+
+All documentation examples should use canonical values from `docs/standards/canonical_examples.md`:
+
+```markdown
+**Primary User:** `user_xyz789`
+**Primary Providers:** `["ip_openai_001", "ip_anthropic_001"]`
+**Primary Project:** `proj_master`
+**Primary Agent:** `agent_abc123`
+```
+
+Using canonical examples ensures:
+- Consistency across all documentation
+- Easy cross-referencing between documents
+- Recognizable patterns for users
+
+### Documentation Files
+
+- **Protocol Specs** (`docs/protocol/*.md`) - API endpoint specifications
+- **Standards** (`docs/standards/*.md`) - Format and design standards
+- **Architecture** (`docs/architecture/*.md`) - System design documents
+- **Features** (`docs/features/*.md`) - Feature documentation
+
+## Testing Requirements
+
+### Test Levels
 
 ```bash
-# Rust unit tests
+# Level 1: Fast unit tests
 cargo nextest run --all-features
 
-# Rust doctests
-cargo test --doc --all-features
+# Level 3: Full validation (unit + doc + clippy)
+make test  # Runs w3 .test l::3
 
-# Clippy lints
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Python SDK tests
-cd module/iron_sdk
-pytest
-cd ../..
+# Documentation lint
+make lint-docs
 ```
 
----
+### Pre-Submission Checklist
 
-## Module Structure
+Before submitting a PR, ensure:
 
-Iron Cage is organized into modules by layer:
+- [ ] All tests pass (`make test`)
+- [ ] Documentation lint passes (`make lint-docs`)
+- [ ] Python tooling compliant (`make lint-python`)
+- [ ] New features have tests
+- [ ] API changes are documented
+- [ ] Commit messages are clear and descriptive
 
-**Foundation Layer (crates.io published):**
-- `iron_types` - Shared types, Result types, error definitions
-- `iron_cost` - Budget tracking, token counting
-- `iron_telemetry` - Logging, tracing, metrics
+## Python Development Workflow
 
-**Infrastructure Layer:**
-- `iron_runtime_state` - Agent execution state (SQLite)
+### Prerequisites
 
-**Feature Layer:**
-- `iron_safety` - PII detection, prompt injection blocking
-- `iron_reliability` - Circuit breakers, retry logic
-- `iron_secrets` - Encrypted secrets storage
-- `iron_token_manager` - JWT token management, user auth
+- Python 3.9+ (auto-managed by uv)
+- uv (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
-**Integration Layer:**
-- `iron_control_api` - REST API + WebSocket server
-- `iron_runtime` - Agent orchestrator + PyO3 bridge
-
-**Application Layer:**
-- `iron_cli` - Command-line interface (Rust, authoritative)
-- `iron_cli_py` - Python CLI wrapper
-- `iron_sdk` - Pythonic SDK (Python)
-- `iron_testing` - Test utilities
-
-**Frontend Layer:**
-- `iron_dashboard` - Control Panel web UI (Vue.js)
-
----
-
-## Packaging Flow
-
-Understanding how code becomes user-installable packages:
-
-```
-Developer writes code:
-  [Rust] iron_runtime crate (src/)
-    ↓
-  maturin build (PyO3 compilation)
-    ↓
-  [Wheel] iron-cage (PyPI)  ← Contains compiled Rust binary
-    ↓
-  Declared as dependency in iron-sdk's pyproject.toml
-    ↓
-  [Python] iron-sdk (PyPI)  ← User-facing package
-    ↓
-  User runs: uv pip install iron-sdk
-    ↓
-  User imports: from iron_sdk import protect_agent
-```
-
-**Key Insight:**
-- **End users see:** Only iron-sdk (never know about iron-cage or iron_runtime)
-- **Contributors work with:** All layers (iron_runtime crate → iron-cage wheel → iron-sdk package)
-
----
-
-## Building iron-cage Wheel (PyO3 Package)
-
-The iron-cage package is built from iron_runtime using maturin:
+### Setup
 
 ```bash
-cd module/iron_runtime
+# Navigate to module
+cd module/iron_sdk  # or iron_runtime, iron_cli_py
 
-# Install maturin
-uv pip install maturin
+# Install dependencies (one command!)
+uv sync
 
-# Build wheel
-maturin build --release
-
-# Built wheel appears in: target/wheels/iron_cage-*.whl
+# This automatically:
+# - Downloads correct Python version
+# - Creates .venv directory
+# - Installs all dependencies
+# - Creates uv.lock file
 ```
 
-This wheel is then published to PyPI and automatically installed when users run `uv pip install iron-sdk`.
-
----
-
-## Running the Control Panel Locally
+### Adding Dependencies
 
 ```bash
-# 1. Start PostgreSQL
-docker run -d -p 5432:5432 \
-  -e POSTGRES_PASSWORD=dev \
-  -e POSTGRES_DB=iron_control \
-  postgres:14
+# Runtime dependency
+uv add requests
 
-# 2. Run migrations
-cd module/iron_control_api
-sqlx migrate run
+# Development dependency
+uv add --dev pytest
 
-# 3. Start API server
-cargo run --bin iron_control_api_server
-
-# 4. Start dashboard (separate terminal)
-cd module/iron_dashboard
-npm run dev
-
-# Open http://localhost:3000
+# This automatically:
+# - Adds to pyproject.toml
+# - Updates uv.lock
+# - Installs the package
 ```
 
----
-
-## Testing Guidelines
-
-### Unit Tests
-
-Place tests in the same file as the code:
-
-```rust
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_budget_calculation()
-  {
-    // Test implementation
-  }
-}
-```
-
-### Integration Tests
-
-Place in `tests/` directory of the relevant crate:
-
-```
-module/iron_runtime/
-  tests/
-    budget_integration_test.rs
-```
-
-### Python Tests
-
-Use pytest for SDK tests:
+### Running Code
 
 ```bash
-cd module/iron_sdk
-pytest tests/ -v
+# Run script
+uv run python main.py
+
+# Run tests
+uv run pytest
+
+# No need to activate virtualenv!
 ```
 
----
+### Python Pre-Commit Checklist
 
-## Code Style
+Before submitting PRs with Python changes:
 
-### Rust
+- [ ] Tests pass (`uv run pytest` or `make py-test`)
+- [ ] Python tooling compliant (`make lint-python`)
+- [ ] No `.python-version` or `requirements.txt` files
+- [ ] `uv.lock` committed if dependencies changed
 
-- **DO NOT** use `cargo fmt` - the project uses custom formatting rules
-- Use 2-space indentation
-- Follow conventions in existing code
-- Run `cargo clippy` before committing
+### Python DON'Ts
 
-### Python
+❌ Never create `.python-version` files
+❌ Never create `requirements.txt` files
+❌ Never run `pip install` (use `uv add`)
+❌ Never manually edit dependencies in `pyproject.toml`
+❌ Never commit without running `make lint-python`
 
-- Follow PEP 8
-- Use type hints
-- Document all public APIs
-
-### Documentation
-
-- All public APIs must have doc comments
-- Use examples in doc comments where helpful
-- Keep docs up-to-date with code changes
-
----
+For complete Python workflow documentation, see [Python Tooling Standards](docs/standards/python_tooling_standards.md).
 
 ## Submitting Changes
 
-### 1. Create Feature Branch
+### Pull Request Process
 
-```bash
-git checkout -b feature/your-feature-name
-```
+1. **Create a feature branch**
+   ```bash
+   git checkout -b feature/my-new-feature
+   ```
 
-### 2. Make Changes
+2. **Make your changes**
+   - Write code
+   - Add tests
+   - Update documentation
 
-- Write code following style guidelines
-- Add tests for new functionality
-- Update documentation
+3. **Validate locally**
+   ```bash
+   make validate      # Full validation
+   make lint-docs     # Documentation check
+   ```
 
-### 3. Run Full Test Suite
+4. **Commit with clear messages**
+   ```bash
+   git add .
+   git commit -m "feat: add new authentication endpoint"
+   ```
 
-```bash
-# Rust tests (Level 3)
-cargo nextest run --all-features
-cargo test --doc --all-features
-cargo clippy --all-targets --all-features -- -D warnings
+5. **Push and create PR**
+   ```bash
+   git push origin feature/my-new-feature
+   # Create PR via GitHub
+   ```
 
-# Python tests
-cd module/iron_sdk && pytest
-```
+### Commit Message Format
 
-### 4. Commit Changes
+Use conventional commits format:
 
-```bash
-git add .
-git commit -m "feat: Add budget allocation API"
-```
-
-Use conventional commit format:
 - `feat:` - New feature
 - `fix:` - Bug fix
 - `docs:` - Documentation only
-- `test:` - Test changes
+- `test:` - Adding or updating tests
 - `refactor:` - Code refactoring
+- `chore:` - Maintenance tasks
 
-### 5. Push and Create PR
-
-```bash
-git push origin feature/your-feature-name
+Examples:
+```
+feat: add budget request approval workflow
+fix: handle null provider response correctly
+docs: update authentication API examples
+test: add integration tests for token rotation
 ```
 
-Create pull request on GitHub with:
-- Clear description of changes
-- References to related issues
-- Test results
+### PR Review Process
+
+1. Automated checks run (tests, lint)
+2. Maintainer reviews code and documentation
+3. Address review feedback
+4. PR merged after approval
+
+## Need Help?
+
+- **Questions?** Open a GitHub issue with the `question` label
+- **Bug Reports?** Use the bug report template
+- **Feature Requests?** Use the feature request template
+
+## Additional Resources
+
+- [Getting Started Guide](docs/getting_started.md)
+- [Architecture Overview](docs/architecture/)
+- [API Protocol Specs](docs/protocol/)
+- [ID Format Standards](docs/standards/id_format_standards.md)
+- [Python Tooling Standards](docs/standards/python_tooling_standards.md)
+- [Canonical Examples](docs/standards/canonical_examples.md)
+
+## License
+
+By contributing to Iron Runtime, you agree that your contributions will be licensed under the Apache-2.0 License.
 
 ---
 
-## Architecture Resources
-
-- [Architecture Overview](docs/architecture/readme.md)
-- [Layer Model](docs/architecture/002_layer_model.md)
-- [Data Flow](docs/architecture/004_data_flow.md)
-- [Budget Control Protocol](docs/architecture/006_budget_control_protocol.md)
-- [Vocabulary](docs/vocabulary.md)
-
----
-
-## Getting Help
-
-- **Documentation:** [docs/readme.md](docs/readme.md)
-- **Module Specs:** Each module has `spec.md` defining responsibility
-- **Questions:** Open a discussion on GitHub
-
----
-
-*Last Updated: 2025-12-10*
+Thank you for contributing to Iron Runtime! 🦀

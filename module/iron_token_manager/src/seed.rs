@@ -109,11 +109,20 @@ pub async fn wipe_database( pool: &SqlitePool ) -> Result< () >
 /// Seed all tables with sample data
 ///
 /// Populates database with realistic development data:
-/// - 3 sample users (admin, developer, viewer)
+/// - 5 sample users (admin, developer, viewer, tester, guest)
 /// - 2 AI provider keys (`OpenAI`, `Anthropic`)
-/// - 5 API tokens (various scopes and states)
-/// - 3 usage limits (different tiers)
+/// - 8 API tokens (various scopes and states)
+/// - 3 usage limits (different tiers, some users have no limits)
 /// - 2 project-provider assignments
+/// - 10+ usage records (various patterns)
+///
+/// Edge cases covered:
+/// - Expired tokens, expiring soon tokens, never-expiring tokens
+/// - Active and inactive tokens
+/// - Users with no tokens (guest)
+/// - Users with no limits (tester)
+/// - Tokens near usage limits
+/// - Tokens with zero usage
 ///
 /// # Arguments
 ///
@@ -133,21 +142,25 @@ pub async fn seed_all( pool: &SqlitePool ) -> Result< () >
   seed_api_tokens( pool ).await?;
   seed_usage_limits( pool ).await?;
   seed_project_assignments( pool ).await?;
+  seed_token_usage( pool ).await?;
 
   Ok( () )
 }
 
 /// Seed users table with sample accounts
 ///
-/// Creates 3 users:
+/// Creates 5 users with various edge cases:
 /// - `admin` (role: admin, active)
 /// - `developer` (role: user, active)
 /// - `viewer` (role: user, inactive)
+/// - `tester` (role: user, active, no usage limits)
+/// - `guest` (role: user, active, no tokens)
 ///
 /// Passwords are bcrypt hashed "password123" (DO NOT use in production!)
 async fn seed_users( pool: &SqlitePool ) -> Result< () >
 {
   let now_ms = crate::storage::current_time_ms();
+  let day_ms = 24 * 60 * 60 * 1000;
 
   // Bcrypt hash of "password123" (cost = 4, for fast dev testing)
   let password_hash = "$2b$04$xQa5kFZZhNGwPDXqJvw9XuXUdQEPAqXwNMOqQcU6MqWxPLxOVyJqO";
@@ -194,6 +207,34 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .await
   .map_err( |_| crate::error::TokenError )?;
 
+  // Tester user (no usage limits - unlimited testing)
+  sqlx::query(
+    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( "tester" )
+  .bind( password_hash )
+  .bind( "user" )
+  .bind( 1 )
+  .bind( now_ms - ( 7 * day_ms ) )  // Created a week ago
+  .execute( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  // Guest user (no tokens - just registered)
+  sqlx::query(
+    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5)"
+  )
+  .bind( "guest" )
+  .bind( password_hash )
+  .bind( "user" )
+  .bind( 1 )
+  .bind( now_ms - ( 60 * 60 * 1000 ) )  // Created 1 hour ago
+  .execute( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
   Ok( () )
 }
 
@@ -226,7 +267,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .bind( 5000 )  // $50.00 balance
   .bind( now_ms )
-  .bind( "user_admin" )
+  .bind( "admin" )
   .execute( pool )
   .await
   .map_err( |_| crate::error::TokenError )?;
@@ -249,7 +290,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .bind( 10000 )  // $100.00 balance
   .bind( now_ms )
-  .bind( "user_admin" )
+  .bind( "admin" )
   .execute( pool )
   .await
   .map_err( |_| crate::error::TokenError )?;
@@ -265,6 +306,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
 /// - Active project token
 /// - Inactive token
 /// - Expired token
+#[ allow( clippy::too_many_lines ) ]
 async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
 {
   let now_ms = crate::storage::current_time_ms();
@@ -278,7 +320,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_1 )
-  .bind( "user_admin" )
+  .bind( "admin" )
   .bind::< Option< &str > >( None )
   .bind( "Admin Master Token" )
   .bind( 1 )
@@ -296,7 +338,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_2 )
-  .bind( "user_developer" )
+  .bind( "developer" )
   .bind::< Option< &str > >( None )
   .bind( "Developer Token" )
   .bind( 1 )
@@ -314,7 +356,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_3 )
-  .bind( "user_developer" )
+  .bind( "developer" )
   .bind( "project_alpha" )
   .bind( "Project Alpha Token" )
   .bind( 1 )
@@ -332,7 +374,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_4 )
-  .bind( "user_viewer" )
+  .bind( "viewer" )
   .bind::< Option< &str > >( None )
   .bind( "Inactive Token" )
   .bind( 0 )  // Inactive
@@ -350,7 +392,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_5 )
-  .bind( "user_developer" )
+  .bind( "developer" )
   .bind::< Option< &str > >( None )
   .bind( "Expired Token" )
   .bind( 1 )
@@ -359,6 +401,62 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .execute( pool )
   .await
   .map_err( |_| crate::error::TokenError )?;
+
+  // Token 6: Expiring soon (within 7 days)
+  let token_hash_6 = "expiring_soon_token_hash_placeholder_fff666";
+  sqlx::query(
+    "INSERT INTO api_tokens \
+     (token_hash, user_id, project_id, name, is_active, created_at, expires_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
+  )
+  .bind( token_hash_6 )
+  .bind( "developer" )
+  .bind( "project_beta" )
+  .bind( "Expiring Soon Token" )
+  .bind( 1 )
+  .bind( now_ms - ( 23 * day_ms ) )  // Created 23 days ago
+  .bind( now_ms + ( 7 * day_ms ) )  // Expires in 7 days
+  .execute( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  // Token 7: Tester token (unlimited user, short expiry)
+  let token_hash_7 = "tester_token_hash_placeholder_ggg777";
+  sqlx::query(
+    "INSERT INTO api_tokens \
+     (token_hash, user_id, project_id, name, is_active, created_at, expires_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
+  )
+  .bind( token_hash_7 )
+  .bind( "tester" )
+  .bind::< Option< &str > >( None )
+  .bind( "Tester Token" )
+  .bind( 1 )
+  .bind( now_ms - ( 7 * day_ms ) )  // Created when user was created
+  .bind( now_ms + ( 14 * day_ms ) )  // Expires in 14 days
+  .execute( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  // Token 8: Second tester token (for rotation testing)
+  let token_hash_8 = "tester_token_2_hash_placeholder_hhh888";
+  sqlx::query(
+    "INSERT INTO api_tokens \
+     (token_hash, user_id, project_id, name, is_active, created_at, expires_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
+  )
+  .bind( token_hash_8 )
+  .bind( "tester" )
+  .bind( "project_alpha" )
+  .bind( "Tester Token 2" )
+  .bind( 1 )
+  .bind( now_ms - ( 2 * day_ms ) )  // Created 2 days ago
+  .bind::< Option< i64 > >( None )  // Never expires
+  .execute( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  // Note: guest user deliberately has NO tokens (edge case testing)
 
   Ok( () )
 }
@@ -381,7 +479,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
       current_cost_cents_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
-  .bind( "user_admin" )
+  .bind( "admin" )
   .bind::< Option< &str > >( None )
   .bind::< Option< i64 > >( None )  // Unlimited tokens
   .bind::< Option< i64 > >( None )  // Unlimited requests
@@ -403,7 +501,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
       current_cost_cents_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
-  .bind( "user_developer" )
+  .bind( "developer" )
   .bind::< Option< &str > >( None )
   .bind( 1_000_000 )  // 1M tokens/day
   .bind( 60 )  // 60 requests/minute
@@ -425,7 +523,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
       current_cost_cents_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
-  .bind( "user_viewer" )
+  .bind( "viewer" )
   .bind::< Option< &str > >( None )
   .bind( 100_000 )  // 100k tokens/day
   .bind( 10 )  // 10 requests/minute
@@ -498,6 +596,197 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
+/// Seed token usage records with realistic patterns
+///
+/// Creates diverse usage patterns for manual testing:
+/// - High usage tokens (near limits)
+/// - Low usage tokens
+/// - Zero usage tokens (newly created)
+/// - Usage across multiple days
+/// - Different providers and models
+///
+/// This helps test quota enforcement, rate limiting, and usage reporting.
+#[ allow( clippy::too_many_lines ) ]
+async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
+{
+  let now_ms = crate::storage::current_time_ms();
+  let day_ms = 24 * 60 * 60 * 1000;
+
+  // Get token IDs
+  let admin_token_id: Option< i64 > = sqlx::query_scalar(
+    "SELECT id FROM api_tokens WHERE token_hash = 'admin_token_hash_placeholder_aaa111' LIMIT 1"
+  )
+  .fetch_optional( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  let dev_token_id: Option< i64 > = sqlx::query_scalar(
+    "SELECT id FROM api_tokens WHERE token_hash = 'dev_token_hash_placeholder_bbb222' LIMIT 1"
+  )
+  .fetch_optional( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  let project_token_id: Option< i64 > = sqlx::query_scalar(
+    "SELECT id FROM api_tokens WHERE token_hash = 'project_token_hash_placeholder_ccc333' LIMIT 1"
+  )
+  .fetch_optional( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  let tester_token_id: Option< i64 > = sqlx::query_scalar(
+    "SELECT id FROM api_tokens WHERE token_hash = 'tester_token_hash_placeholder_ggg777' LIMIT 1"
+  )
+  .fetch_optional( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  // Pattern 1: Admin token - moderate usage over 7 days
+  if let Some( token_id ) = admin_token_id
+  {
+    for day_offset in 0..7
+    {
+      sqlx::query(
+        "INSERT INTO token_usage \
+         (token_id, provider, model, input_tokens, output_tokens, total_tokens, \
+          requests_count, cost_cents, recorded_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+      )
+      .bind( token_id )
+      .bind( "openai" )
+      .bind( "gpt-4" )
+      .bind( 500 + ( day_offset * 50 ) )  // Gradually increasing usage
+      .bind( 300 + ( day_offset * 30 ) )
+      .bind( 800 + ( day_offset * 80 ) )
+      .bind( 10 + day_offset )
+      .bind( 80 + ( day_offset * 8 ) )
+      .bind( now_ms - ( day_offset * day_ms ) )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+    }
+  }
+
+  // Pattern 2: Developer token - high usage (near limit testing)
+  if let Some( token_id ) = dev_token_id
+  {
+    for day_offset in 0..5
+    {
+      sqlx::query(
+        "INSERT INTO token_usage \
+         (token_id, provider, model, input_tokens, output_tokens, total_tokens, \
+          requests_count, cost_cents, recorded_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+      )
+      .bind( token_id )
+      .bind( "anthropic" )
+      .bind( "claude-3-5-sonnet" )
+      .bind( 8000 + ( day_offset * 1000 ) )  // High usage
+      .bind( 2000 + ( day_offset * 500 ) )
+      .bind( 10000 + ( day_offset * 1500 ) )
+      .bind( 50 + ( day_offset * 10 ) )
+      .bind( 500 + ( day_offset * 75 ) )
+      .bind( now_ms - ( day_offset * day_ms ) )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+    }
+  }
+
+  // Pattern 3: Project token - sporadic usage
+  if let Some( token_id ) = project_token_id
+  {
+    // Day 0 - high usage
+    sqlx::query(
+      "INSERT INTO token_usage \
+       (token_id, provider, model, input_tokens, output_tokens, total_tokens, \
+        requests_count, cost_cents, recorded_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+    )
+    .bind( token_id )
+    .bind( "openai" )
+    .bind( "gpt-3.5-turbo" )
+    .bind( 3000 )
+    .bind( 1000 )
+    .bind( 4000 )
+    .bind( 25 )
+    .bind( 120 )
+    .bind( now_ms )
+    .execute( pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    // Day 3 - low usage
+    sqlx::query(
+      "INSERT INTO token_usage \
+       (token_id, provider, model, input_tokens, output_tokens, total_tokens, \
+        requests_count, cost_cents, recorded_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+    )
+    .bind( token_id )
+    .bind( "openai" )
+    .bind( "gpt-3.5-turbo" )
+    .bind( 200 )
+    .bind( 100 )
+    .bind( 300 )
+    .bind( 2 )
+    .bind( 15 )
+    .bind( now_ms - ( 3 * day_ms ) )
+    .execute( pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+  }
+
+  // Pattern 4: Tester token - mixed provider usage
+  if let Some( token_id ) = tester_token_id
+  {
+    // OpenAI usage
+    sqlx::query(
+      "INSERT INTO token_usage \
+       (token_id, provider, model, input_tokens, output_tokens, total_tokens, \
+        requests_count, cost_cents, recorded_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+    )
+    .bind( token_id )
+    .bind( "openai" )
+    .bind( "gpt-4" )
+    .bind( 1500 )
+    .bind( 800 )
+    .bind( 2300 )
+    .bind( 15 )
+    .bind( 230 )
+    .bind( now_ms - ( 2 * day_ms ) )
+    .execute( pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    // Anthropic usage
+    sqlx::query(
+      "INSERT INTO token_usage \
+       (token_id, provider, model, input_tokens, output_tokens, total_tokens, \
+        requests_count, cost_cents, recorded_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+    )
+    .bind( token_id )
+    .bind( "anthropic" )
+    .bind( "claude-3-5-haiku" )
+    .bind( 5000 )
+    .bind( 1000 )
+    .bind( 6000 )
+    .bind( 30 )
+    .bind( 180 )
+    .bind( now_ms - day_ms )
+    .execute( pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+  }
+
+  // Note: Some tokens deliberately have ZERO usage (newly created tokens, inactive tokens, etc.)
+  // This is important for testing edge cases in usage reporting and quota enforcement
+
+  Ok( () )
+}
+
 #[ cfg( test ) ]
 mod tests
 {
@@ -550,7 +839,7 @@ mod tests
       .fetch_one( &pool )
       .await
       .unwrap();
-    assert_eq!( user_count, 3, "Should create 3 users" );
+    assert_eq!( user_count, 5, "Should create 5 users (admin, developer, viewer, tester, guest)" );
 
     // Verify provider keys created
     let provider_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM ai_provider_keys" )
@@ -564,7 +853,7 @@ mod tests
       .fetch_one( &pool )
       .await
       .unwrap();
-    assert_eq!( token_count, 5, "Should create 5 tokens" );
+    assert_eq!( token_count, 8, "Should create 8 tokens (guest user has none)" );
 
     // Verify usage limits created
     let limit_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM usage_limits" )
@@ -581,6 +870,13 @@ mod tests
     .await
     .unwrap();
     assert_eq!( assignment_count, 2, "Should create 2 project assignments" );
+
+    // Verify usage records created
+    let usage_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM token_usage" )
+      .fetch_one( &pool )
+      .await
+      .unwrap();
+    assert!( usage_count >= 10, "Should create at least 10 usage records, got {}", usage_count );
   }
 
   #[ tokio::test ]
