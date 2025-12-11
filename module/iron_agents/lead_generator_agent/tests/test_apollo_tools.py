@@ -50,3 +50,4 @@ def test_get_lead_details_success(mock_get):
     data = json.loads(result)
     
     assert data["email"] == "taras@example.com"
+    
