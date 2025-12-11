@@ -2,16 +2,21 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 interface LoginCredentials {
-  username: string
+  email: string
   password: string
 }
 
 interface AuthTokens {
-  access_token: string
+  user_token: string
   refresh_token: string
   token_type: string
   expires_in: number
-  role: string
+  user: {
+    id: number
+    email: string
+    role: string
+    name: string
+  }
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -41,15 +46,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Save tokens to localStorage
   function saveTokens(tokens: AuthTokens, user: string) {
-    accessToken.value = tokens.access_token
+    accessToken.value = tokens.user_token
     refreshToken.value = tokens.refresh_token
     username.value = user
-    role.value = tokens.role
+    role.value = tokens.user.role
 
-    localStorage.setItem('access_token', tokens.access_token)
+    localStorage.setItem('access_token', tokens.user_token)
     localStorage.setItem('refresh_token', tokens.refresh_token)
     localStorage.setItem('username', user)
-    localStorage.setItem('role', tokens.role)
+    localStorage.setItem('role', tokens.user.role)
   }
 
   // Clear tokens from localStorage
@@ -58,16 +63,11 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = null
     username.value = null
     role.value = null
-
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('username')
-    localStorage.removeItem('role')
   }
 
   // Login
   async function login(credentials: LoginCredentials) {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,12 +76,18 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Login failed' }))
-      throw new Error(error.error || 'Login failed')
+      let msg: string;
+      try {
+        const error = await response.json();
+        msg = error.error.message
+      } catch (error) {
+        msg = 'Log  in failed'
+      }
+      throw new Error(msg)
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, credentials.username)
+    saveTokens(tokens, credentials.email)
   }
 
   // Refresh access token
@@ -90,7 +96,7 @@ export const useAuthStore = defineStore('auth', () => {
       throw new Error('No refresh token available')
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +117,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     if (refreshToken.value) {
       try {
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -9,9 +9,6 @@
 --
 -- Adds indexes for performance on email, role, is_active searches
 
--- Add email field (unique, optional initially for backwards compatibility)
-ALTER TABLE users ADD COLUMN email TEXT;
-
 -- Add last_login timestamp (Unix epoch milliseconds)
 ALTER TABLE users ADD COLUMN last_login INTEGER;
 

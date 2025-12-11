@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const username = ref('')
+const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -22,12 +22,12 @@ async function handleLogin() {
 
   try {
     await authStore.login({
-      username: username.value,
+      email: email.value,
       password: password.value,
     })
     router.push('/dashboard')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Login failed'
+    error.value = err.message || "Unexpected error"
   } finally {
     loading.value = false
   }
@@ -50,10 +50,10 @@ async function handleLogin() {
           </Alert>
 
           <div class="space-y-2">
-            <Label for="username">Username</Label>
+            <Label for="email">Email</Label>
             <Input
-              id="username"
-              v-model="username"
+              id="email"
+              v-model="email"
               type="text"
               required
               :disabled="loading"

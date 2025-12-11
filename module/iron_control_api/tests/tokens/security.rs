@@ -322,7 +322,7 @@ async fn test_sql_injection_in_project_id()
   let malicious_project_id = "proj'; DROP TABLE tokens; --";
 
   let request_body = json!({
-    "user_id": "test-user",
+    "user_id": "user_1",
     "project_id": malicious_project_id,
     "description": "Test token"
   });
@@ -366,7 +366,7 @@ async fn test_sql_injection_in_project_id()
     .uri( "/api/tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &json!({
-      "user_id": "test-user-2",
+      "user_id": "user_2",
       "project_id": "safe-project"
     }) ).unwrap() ) )
     .unwrap();

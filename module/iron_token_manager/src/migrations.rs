@@ -86,11 +86,11 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 008: Agents table
   apply_migration_008( pool ).await?;
 
-  // Migration 009: Budget leases (Protocol 005)
-  apply_migration_009( pool ).await?;
+  // // Migration 009: Budget leases (Protocol 005)
+  // apply_migration_009( pool ).await?;
 
-  // Migration 010: Agent budgets (Protocol 005)
-  apply_migration_010( pool ).await?;
+  // // Migration 010: Agent budgets (Protocol 005)
+  // apply_migration_010( pool ).await?;
 
   Ok( () )
 }
