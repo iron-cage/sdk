@@ -9,8 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
 
+if not APOLLO_API_KEY:
+    raise ValueError("CRITICAL ERROR: APOLLO_API_KEY is missing in environment variables (.env).")
+
 # --- Tool for Searching Leads ---
-# Used to find a list of people based on job title, industry, and location.
 @tool
 def search_leads(job_title: str, industry: str | None = None, location: str | None = None, quantity: int = 3):
     """
@@ -53,7 +55,6 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
         data = response.json()
         
         # --- Process and Clean Results ---
-        # Extracts only the key information from the API response.
         clean_results = []
         for p in data.get('people', []):
             clean_results.append({
@@ -72,10 +73,9 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
         
     # Returns Timeout and General Errors.
     except requests.exceptions.Timeout:
-        return "Error: The request timed out"
+        return "Error: The search request timed out"
     except requests.exceptions.RequestException as e:
-        return f"Error: An error occurred: {e}"
-        
+        return f"Error: An error occurred during search: {e}"
     except Exception as e:
         return f"System Error: {str(e)}"
 
@@ -102,7 +102,7 @@ def get_lead_details(apollo_id: str):
     }
     
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=30)
         
         if response.status_code != 200:
              return f"Details Error {response.status_code}: {response.text}"
@@ -115,7 +115,12 @@ def get_lead_details(apollo_id: str):
 
         # Returns the full lead data in JSON format.
         return json.dumps(person_data, ensure_ascii=False)
-            
+    
+    # Error Handling
+    except requests.exceptions.Timeout:
+        return "Error: The details request timed out (30s limit)."
+    except requests.exceptions.RequestException as e:
+        return f"Error: Network error while fetching details: {e}"
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
