@@ -328,3 +328,6 @@ version = "0.1"
 
 [workspace.dependencies.arc-swap]
 version = "1.7.1"
+
+[workspace.dependencies.crossbeam]
+version = "0.8.4"

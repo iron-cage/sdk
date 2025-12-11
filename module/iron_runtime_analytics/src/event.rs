@@ -15,8 +15,6 @@ impl Default for EventId {
     fn default() -> Self { Self::new() }
 }
 
-/// The main event structure.
-/// serialization: "flattens" header and payload into one single JSON object.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyticsEvent {
     #[serde(flatten)]
@@ -27,7 +25,6 @@ pub struct AnalyticsEvent {
 }
 
 impl AnalyticsEvent {
-    /// Convenience constructor
     pub fn new(payload: EventPayload) -> Self {
         Self {
             metadata: EventMetadata::default(),
@@ -38,6 +35,7 @@ impl AnalyticsEvent {
     pub fn event_id(&self) -> EventId {
         self.metadata.event_id
     }
+
     pub fn timestamp_ms(&self) -> u64 {
         self.metadata.timestamp_ms
     }
@@ -58,16 +56,16 @@ impl AnalyticsEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EventMetadata {
     #[serde(default = "EventId::new")]
-    pub event_id: EventId,
+    event_id: EventId,
 
     #[serde(skip)]
-    pub synced: bool,
+    synced: bool,
 
     #[serde(default = "current_time_ms")]
-    pub timestamp_ms: u64,
+    timestamp_ms: u64,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_id: Option<Arc<str>>,
+    agent_id: Option<Arc<str>>,
 }
 
 impl Default for EventMetadata {
@@ -81,26 +79,40 @@ impl Default for EventMetadata {
     }
 }
 
+// === DRY Refactor: Extracted Common Fields ===
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmModelMeta {
+    pub provider_id: Option<Arc<str>>,
+    pub provider: Arc<str>,
+    pub model: Arc<str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmUsageData {
+    #[serde(flatten)]
+    pub meta: LlmModelMeta,
+
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cost_micros: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmFailureData {
+    #[serde(flatten)]
+    pub meta: LlmModelMeta,
+
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event_type")]
 pub enum EventPayload {
-    LlmRequestCompleted {
-        provider_id: Option<Arc<str>>,
-        provider: Arc<str>,
-        model: Arc<str>,
-        input_tokens: u64,
-        output_tokens: u64,
-        cost_micros: u64,
-    },
+    LlmRequestCompleted(LlmUsageData),
 
-    LlmRequestFailed {
-        provider_id: Option<Arc<str>>,
-        provider: Arc<str>,
-        model: Arc<str>,
-        error_code: Option<String>,
-        error_message: Option<String>,
-    },
+    LlmRequestFailed(LlmFailureData),
 
     BudgetThresholdReached {
         threshold_percent: u8,

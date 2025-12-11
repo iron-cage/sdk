@@ -40,27 +40,26 @@ iron_runtime_analytics = { path = "../iron_runtime_analytics" }
 ## Example
 
 ```rust
-use iron_runtime_analytics::EventStore;
+use iron_runtime_analytics::event_storage::EventStore;
+use iron_runtime_analytics::event::*;
 
 // Create event store with default capacity (10,000 events)
 let store = EventStore::new();
 
 // Record LLM request completion - lock-free, O(1)
-store.record(AnalyticsEvent::LlmRequestCompleted {
-    event_id: Uuid::nil(),
-    synced: false,
-    timestamp_ms: 1734000000000,
-    agent_id: Some("agent_abc123".into()),
-    provider_id: Some("ip_openai-001".into()),
-    provider: "openai".into(),
-    model: "gpt-4".into(),
+store.record(AnalyticsEvent::new(EventPayload::LlmRequestCompleted(LlmUsageData {
+    meta: LlmModelMeta {
+        provider_id: Some("ip_openai-001".into()),
+        provider: "openai".into(),
+        model: "gpt-4".into(),
+    },
     input_tokens: 150,
     output_tokens: 50,
     cost_micros: 6000,
-});
+})));
 
 // Get stats - O(1) for totals
-let stats = store.get_stats();
+let stats = store.stats();
 println!("Total cost: ${:.4}", stats.total_cost_usd());
 
 // Check for dropped events (observability)

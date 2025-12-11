@@ -5,4 +5,5 @@
 
 pub mod event;
 pub mod helpers;
-mod stats;
+pub mod stats;
+pub mod event_storage;

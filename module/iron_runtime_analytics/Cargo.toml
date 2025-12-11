@@ -14,4 +14,6 @@ full = ["enabled"]
 serde = { workspace = true, features = ["derive","rc"] }
 uuid = { workspace = true, features = ["v4","serde"] }
 iron_cost = { workspace = true}
+crossbeam = { workspace = true }
+dashmap = {workspace = true}
 [dev-dependencies]
