@@ -116,6 +116,7 @@ User (person)
 - Owns/creates multiple Agents (1:N)
 - Belongs to Project(s) (N:M)
 - Has multiple User Tokens (1:N)
+- **Deletion reassigns agents:** When user deleted, all owned agents automatically transferred to admin in "Orphaned Agents" project
 
 **Attributes:**
 - user_id (unique identifier)
@@ -126,6 +127,29 @@ User (person)
 - Can regenerate own IC Tokens (for owned agents)
 - Can regenerate own User Tokens
 - Admin can regenerate ANY tokens (all users, all agents)
+
+**Lifecycle:**
+- Created: Admin creates user via `POST /api/v1/users`
+- Active: User can login, create agents, use platform
+- Suspended: Admin suspends via `PUT /api/v1/users/{id}/suspend` - user cannot login
+- Activated: Admin reactivates via `PUT /api/v1/users/{id}/activate` - user can login again
+- Deleted: Admin deletes via `DELETE /api/v1/users/{id}` - **soft delete + agent reassignment**
+
+**Deletion Behavior:**
+- User soft-deleted (deleted_at timestamp set, cannot login)
+- All owned agents reassigned to admin (`owner_id` changed)
+- All agents moved to "Orphaned Agents" project (`proj-orphaned`)
+- Pending budget requests auto-cancelled
+- All API tokens revoked
+- Agents continue working (IC Tokens valid, budgets active)
+- Audit trail preserved with full reassignment details
+
+**Orphaned Agents Project:**
+- Special project containing all deleted users' agents
+- Admin can reassign agents to new users or delete
+- Agents remain operational (budgets, IC Tokens, providers unchanged)
+
+**See:** [Protocol 008](../protocol/008_user_management_api.md) (User Management API)
 
 ## Entity 6: IC Token
 

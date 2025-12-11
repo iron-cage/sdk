@@ -315,6 +315,49 @@ else
 fi
 echo ""
 
+# Test 9: No uppercase documentation files (lowercase_snake_case naming)
+echo "Test 9: Documentation file naming (lowercase_snake_case)"
+echo "------------------------------------------------------"
+
+UPPERCASE_DOCS=0
+# Check dev directory for uppercase .md files (excluding temporary files starting with -)
+for file in "$DOCS_DIR"/../*.md; do
+  if [ -f "$file" ]; then
+    filename=$(basename "$file")
+    # Skip temporary files (starting with -)
+    if [[ "$filename" =~ ^- ]]; then
+      continue
+    fi
+    # Check if filename contains uppercase letters
+    if echo "$filename" | grep -q '[A-Z]'; then
+      echo "  ❌ $filename: Should use lowercase_snake_case (not $filename)"
+      UPPERCASE_DOCS=$((UPPERCASE_DOCS + 1))
+    fi
+  fi
+done
+
+# Check docs directory recursively
+find "$DOCS_DIR" -name "*.md" -type f ! -name "-*" | while read -r file; do
+  filename=$(basename "$file")
+  # Skip readme.md (standard lowercase name)
+  if [ "$filename" = "readme.md" ]; then
+    continue
+  fi
+  # Check if filename contains uppercase letters (excluding standard tooling files)
+  if echo "$filename" | grep -q '[A-Z]'; then
+    echo "  ❌ $(realpath --relative-to="$DOCS_DIR/.." "$file"): Should use lowercase_snake_case"
+    UPPERCASE_DOCS=$((UPPERCASE_DOCS + 1))
+  fi
+done
+
+if [ "$UPPERCASE_DOCS" -eq 0 ]; then
+  run_test "All documentation files use lowercase naming" 0
+else
+  echo "  Found $UPPERCASE_DOCS files with uppercase letters"
+  run_test "All documentation files use lowercase naming" 1
+fi
+echo ""
+
 # Summary
 echo "=================================="
 echo "Summary"

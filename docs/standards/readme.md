@@ -33,6 +33,12 @@ This directory contains canonical standards that define how Iron Cage components
 |----------|------|---------|--------|
 | **API Design** | [api_design_standards.md](api_design_standards.md) | REST conventions, pagination, versioning | ✅ Normative |
 
+### Documentation Standards
+
+| Standard | File | Purpose | Status |
+|----------|------|---------|--------|
+| **Canonical Examples** | [canonical_examples.md](canonical_examples.md) | Standard example values for documentation consistency | ℹ️ Informative |
+
 ---
 
 ## Standard Categories
@@ -130,6 +136,30 @@ Defines REST API conventions and patterns.
 
 ---
 
+### 6. Canonical Examples (canonical_examples.md)
+
+Defines standard example values for documentation consistency.
+
+**Scope:**
+- Primary agent: `agent_abc123` with budget `100.00` USD
+- Standard users: `user-xyz789` (developer), `user-admin` (admin)
+- Standard providers: `ip-openai-001`, `ip-anthropic-001`
+- Standard budget values: 0.01, 10.00, 50.00, 100.00, 500.00, 1000.00
+- Standard timestamps and token values
+
+**Applies to:**
+- Protocol documentation examples
+- Specification requirement examples
+- README files and tutorials
+- Documentation that spans multiple files
+
+**Does NOT apply to:**
+- Unit tests (use varied test data)
+- Integration tests (use dedicated fixtures)
+- Implementation code (use actual data)
+
+---
+
 ## Using These Standards
 
 ### For Developers
@@ -186,6 +216,7 @@ Standards follow semantic versioning:
 - Data Format Standards: 1.0.0
 - URL Format Standards: 1.0.0
 - API Design Standards: 1.0.0
+- Canonical Examples: 1.0.0 (informative)
 
 ### Change Process
 
@@ -322,6 +353,6 @@ fn send_to_external_api(id: &AgentId) {
 
 ---
 
-**Document Version:** 1.0.0
-**Last Updated:** 2025-12-10
+**Document Version:** 1.1.0
+**Last Updated:** 2025-12-11
 **Status:** Normative (must follow)

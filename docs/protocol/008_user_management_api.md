@@ -277,13 +277,23 @@ Error: 500 Internal Server Error (Already active)
 - Audit log entry created
 - User can authenticate again
 
-### Delete User (Soft Delete)
+### Delete User (Soft Delete + Agent Reassignment)
 
+**Endpoint:** `DELETE /api/v1/users/{id}`
+
+**Description:** Soft-deletes a user and automatically reassigns all owned agents to admin in the "Orphaned Agents" special project. Deleting a user sets deleted_at timestamp (user cannot login), reassigns agent ownership, cancels pending budget requests, and revokes all API tokens. Agents continue working normally with existing IC Tokens and budgets.
+
+**Request:**
 ```http
 DELETE /api/v1/users/1001
 Authorization: Bearer <USER_TOKEN>
+```
 
-Response: 200 OK
+**Success Response (User with Agents):**
+```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "id": 1001,
   "username": "john_doe",
@@ -293,28 +303,153 @@ Response: 200 OK
   "created_at": 1733740800000,
   "last_login": 1733745000000,
   "suspended_at": null,
-  "deleted_at": 1733755000000
+  "deleted_at": 1733755000000,
+  "agents_affected": [
+    {
+      "agent_id": "agent_abc123",
+      "name": "Production Agent 1",
+      "new_owner_id": "admin_001",
+      "new_project_id": "proj-orphaned",
+      "budget": 100.00,
+      "providers": ["ip-openai-001", "ip-anthropic-001"]
+    },
+    {
+      "agent_id": "agent_def456",
+      "name": "Test Agent",
+      "new_owner_id": "admin_001",
+      "new_project_id": "proj-orphaned",
+      "budget": 10.00,
+      "providers": ["ip-openai-001"]
+    }
+  ],
+  "agents_count": 2,
+  "budget_requests_cancelled": 3,
+  "api_tokens_revoked": 2
 }
+```
 
-Error: 500 Internal Server Error (Self-deletion)
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `agents_affected` | array | List of agents reassigned with new ownership details |
+| `agents_count` | integer | Number of agents reassigned to admin |
+| `budget_requests_cancelled` | integer | Number of pending budget requests auto-cancelled |
+| `api_tokens_revoked` | integer | Number of API tokens revoked |
+
+**Success Response (User with No Agents):**
+```json
+HTTP 200 OK
+{
+  "id": 1002,
+  "username": "jane_doe",
+  "deleted_at": 1733755100000,
+  "agents_count": 0,
+  "budget_requests_cancelled": 0,
+  "api_tokens_revoked": 1
+}
+```
+
+**Behavior Note:** Response format changes based on whether user owned agents. If `agents_count > 0`, response includes `agents_affected` array with full details.
+
+**Error Responses:**
+
+```json
+HTTP 500 Internal Server Error (Self-deletion)
 {
   "error": "failed to delete user: Token management error"
 }
 ```
 
+```json
+HTTP 400 Bad Request (Last admin)
+{
+  "error": "Cannot delete last admin user"
+}
+```
+
 **Side Effects:**
+
+**User Record:**
 - `is_active` set to 0 (false)
 - `deleted_at` set to current timestamp
 - `deleted_by` set to admin user ID
-- Audit log entry created
-- User cannot authenticate
-- Existing User Tokens remain valid (not automatically revoked)
+- User cannot authenticate (login blocked)
 - User record preserved (soft delete, not hard delete)
-- Audit trail preserved (foreign keys with ON DELETE RESTRICT)
+
+**Owned Agents (if any):**
+- All agents reassigned to admin (`owner_id` changed)
+- All agents moved to "Orphaned Agents" project (`project_id` = `proj-orphaned`)
+- Tags added to each agent: `orphaned`, `original-owner:{user_id}`
+- IC Tokens remain valid (agents continue working)
+- Budgets remain active (no service disruption)
+- Provider access unchanged (agents can still make requests)
+
+**Budget Change Requests:**
+- Pending requests: Auto-cancelled (status = `cancelled`, review_notes = "Auto-cancelled: user deleted")
+- Historical requests: Preserved (requester_id set to NULL if user deleted)
+
+**API Tokens:**
+- All user's API tokens revoked (`revoked_at` set, `revoked_by` = admin_id)
+- Existing requests with these tokens fail with 401 Unauthorized
+
+**User Tokens (Session):**
+- Existing sessions remain valid until natural expiration
+- Authentication layer checks `deleted_at IS NULL`, blocking new logins
+
+**Audit Log:**
+- User deletion logged with full reassignment details
+- Includes: agents_affected list, budget_requests_cancelled count, api_tokens_revoked count
 
 **Self-Deletion Prevention:**
 - Admin cannot delete their own account
 - Prevents accidental lockout
+- Error: 500 Internal Server Error
+
+**Last Admin Prevention:**
+- Cannot delete last active admin user
+- At least one admin must exist in system
+- Error: 400 Bad Request
+
+**Orphaned Agents Project:**
+- Special project `proj-orphaned` ("Orphaned Agents")
+- Contains all deleted users' agents
+- Owned by system admin
+- Admin can view all orphaned agents, reassign to new users, or delete
+- Agents continue running normally (budgets active, IC Tokens valid)
+
+**Edge Cases:**
+
+1. **User with Zero Agents:**
+   - Normal soft delete
+   - No agent reassignment
+   - `agents_count: 0`, `agents_affected: []`
+
+2. **User with Many Agents (100+):**
+   - All agents reassigned in single transaction
+   - Bulk UPDATE efficient (<100ms for 100 agents)
+   - Response includes all agents in `agents_affected` array
+
+3. **Pending Budget Requests:**
+   - All auto-cancelled with reason "Auto-cancelled: user deleted"
+   - Requester gone, approval context lost
+
+4. **Agent Service Continuity:**
+   - NO SERVICE DISRUPTION
+   - IC Tokens remain valid
+   - Budgets continue working
+   - Agents can make requests to providers
+
+5. **Concurrent Agent Creation:**
+   - If user deleted during agent creation for that user
+   - Agent creation fails with 404 USER_NOT_FOUND
+
+**Authorization:**
+- Requires Admin role with ManageUsers permission
+- Self-deletion always prevented (even for admins)
+- Last admin deletion prevented (system integrity)
+
+**Audit Log:** Yes (comprehensive mutation operation with reassignment details)
 
 ### Change User Role
 

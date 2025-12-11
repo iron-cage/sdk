@@ -1585,7 +1585,9 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - Q35: Audit logging scope (Recommended: Mutation-only for performance)
 
 **References:**
-- `/docs/protocol/027_audit_logging.md` - Audit logging specification (to be created)
+- `/docs/protocol/027_audit_logging.md` - Centralized audit logging specification (POST-PILOT enhancement)
+
+**Note:** Audit logging is currently implemented as cross-cutting concern in all mutation APIs (see protocols 008, 010, 011, 013, 014, 017). Centralized specification deferred to POST-PILOT.
 
 ---
 
