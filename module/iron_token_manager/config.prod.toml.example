@@ -1,0 +1,52 @@
+# Production Configuration Template
+# Copy this file to config.prod.toml and customize for your environment
+# IMPORTANT: config.prod.toml is gitignored - never commit production credentials
+
+[database]
+# Production database URL
+# Replace with your actual database path
+url = "sqlite:///./data/tokens.db?mode=rwc"
+
+# Maximum number of concurrent connections
+# Tune based on your workload
+max_connections = 10
+
+# Automatically apply migrations on startup
+# Set to false if you prefer manual migration control
+auto_migrate = true
+
+# Enable foreign key constraints (strongly recommended)
+foreign_keys = true
+
+[production]
+# Disable debug logging in production
+debug = false
+
+# Never auto-seed in production
+auto_seed = false
+
+[security]
+# Token hashing algorithm (SHA-256 is used)
+# This is informational - changing this requires code changes
+hash_algorithm = "SHA-256"
+
+# Minimum token length (bytes, before base64 encoding)
+# 32 bytes = 256 bits of entropy
+min_token_bytes = 32
+
+[monitoring]
+# Enable performance metrics
+metrics = true
+
+# Log slow queries (milliseconds)
+slow_query_threshold_ms = 1000
+
+[backup]
+# Enable automatic backups before migrations
+backup_before_migration = true
+
+# Backup directory
+backup_dir = "./backups"
+
+# Keep backups for N days
+backup_retention_days = 30

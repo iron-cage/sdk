@@ -905,7 +905,7 @@ HTTP 404 Not Found
 ```json
 {
   "timestamp": "2025-12-10T10:30:45Z",
-  "user_id": "user-admin-001",
+  "user_id": "user_admin_001",
   "endpoint": "POST /api/v1/providers",
   "method": "POST",
   "resource_type": "provider",

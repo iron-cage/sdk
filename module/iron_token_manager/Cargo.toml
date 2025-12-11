@@ -51,6 +51,10 @@ async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+# Configuration
+config = "0.14"
+toml = "0.8"
+
 # Time & UUID
 chrono = { workspace = true }
 uuid = { workspace = true }

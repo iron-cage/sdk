@@ -795,6 +795,124 @@ let id = AgentId::parse(untrusted_input);
 
 ---
 
+## Documentation Compliance
+
+### Automated Lint Checking
+
+The Iron Runtime development environment includes an automated lint checker to ensure all documentation follows ID format standards.
+
+**Run the lint check:**
+
+```bash
+# From dev/ directory
+make lint-docs
+
+# Or run the script directly
+./scripts/lint_id_formats.sh
+```
+
+**What it checks:**
+
+The lint script validates that all documentation uses the correct underscore format:
+- Provider IDs: `ip_<identifier>` (not `ip-<identifier>`)
+- User IDs: `user_<identifier>` (not `user-<identifier>`)
+- Project IDs: `proj_<identifier>` (not `proj-<identifier>`)
+- Agent IDs: `agent_<identifier>` (not `agent-<identifier>`)
+- Token IDs: `ic_<identifier>` or `ip_<identifier>` (not hyphen format)
+
+**Edge cases automatically excluded:**
+- `user-token` (token type descriptor, not entity ID)
+- `user-facing` (adjective, not entity ID)
+- `user-level` (scope descriptor, not entity ID)
+- Temporary files (prefixed with `-`)
+
+**Success output:**
+
+```
+========================================
+  ID Format Lint Check
+========================================
+
+Checking: Provider ID violations...
+✓ Provider ID violations: OK
+Checking: User ID violations...
+✓ User ID violations: OK
+Checking: Project ID violations...
+✓ Project ID violations: OK
+Checking: Agent ID violations...
+✓ Agent ID violations: OK
+Checking: Token ID violations...
+✓ Token ID violations: OK
+Verifying underscore format compliance...
+✓ Found 161 properly formatted IDs
+
+========================================
+✓ No ID format violations found
+========================================
+```
+
+**Failure output:**
+
+When violations are detected, the script shows file paths, line numbers, and the specific violations:
+
+```
+✗ Provider ID violations
+    docs/protocol/010_agents_api.md:45: "providers": ["ip-openai-001"]
+    docs/protocol/011_providers_api.md:78: "id": "ip-anthropic-001"
+
+✗ Found 2 violation(s)
+========================================
+
+ID Format Standards:
+  Provider IDs:  ip_openai_001   (NOT ip-openai-001)
+  User IDs:      user_xyz789     (NOT user-xyz789)
+  Project IDs:   proj_master     (NOT proj-master)
+  Agent IDs:     agent_abc123    (NOT agent-abc123)
+  Token IDs:     ic_def456       (NOT ic-def456)
+
+See docs/standards/id_format_standards.md for details
+```
+
+### Pre-Submission Checklist
+
+Before submitting documentation changes:
+
+1. **Run the lint check:**
+   ```bash
+   make lint-docs
+   ```
+
+2. **Fix any violations** using the guidance in the output
+
+3. **Verify compliance:**
+   ```bash
+   make lint-docs  # Should show 0 violations
+   ```
+
+4. **Use canonical examples** from [canonical_examples.md](canonical_examples.md)
+
+### CI Integration
+
+The lint check will be integrated into CI/CD pipelines to automatically validate all documentation changes:
+
+```yaml
+# Planned CI integration
+- name: Lint Documentation
+  run: make lint-docs
+```
+
+This ensures that ID format violations are caught before code review, maintaining consistency across all documentation.
+
+### Contributing Documentation
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for complete contributor guidelines including:
+- Documentation standards
+- ID format requirements
+- Canonical example usage
+- Pull request process
+
+---
+
 ## References
 
 ### Related Documentation

@@ -152,7 +152,7 @@ Retrieves detailed information about a specific project.
 
 **Request**:
 ```http
-GET /api/v1/projects/proj-master-001
+GET /api/v1/projects/proj_master_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -286,13 +286,13 @@ The following features are planned for POST-PILOT implementation:
 - All users automatically belong to Master Project
 - No project creation or deletion
 - No multi-project switching
-- Project ID is constant: `proj-master-001`
+- Project ID is constant: `proj_master_001`
 
 ### Database Schema (Reference)
 ```sql
 -- Pilot: Single row in projects table
 CREATE TABLE projects (
-  id VARCHAR(50) PRIMARY KEY,        -- 'proj-master-001'
+  id VARCHAR(50) PRIMARY KEY,        -- 'proj_master_001'
   name VARCHAR(255) NOT NULL,        -- 'Master Project'
   description TEXT,
   created_at TIMESTAMP NOT NULL,

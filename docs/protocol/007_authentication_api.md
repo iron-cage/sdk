@@ -100,7 +100,7 @@ Response: 200 OK
   "expires_at": "2026-01-08T09:00:00Z",
   "refresh_token": "refresh_abc123def456...",  (optional, future)
   "user": {
-    "id": "user-abc123",
+    "id": "user_abc123",
     "email": "developer@example.com",
     "role": "developer",
     "name": "John Doe"
@@ -120,7 +120,7 @@ Error: 403 Forbidden (Account disabled)
   "error": {
     "code": "AUTH_ACCOUNT_DISABLED",
     "message": "Account has been disabled",
-    "details": {"user_id": "user-abc123"}
+    "details": {"user_id": "user_abc123"}
   }
 }
 
@@ -141,7 +141,7 @@ Error: 429 Too Many Requests (Rate limit)
 **User Token Format (JWT):**
 ```json
 {
-  "sub": "user-abc123",      // User ID
+  "sub": "user_abc123",      // User ID
   "email": "dev@example.com",
   "role": "developer",
   "iat": 1733740800,         // Issued at (Unix timestamp)
@@ -197,7 +197,7 @@ Response: 200 OK
   "expires_in": 2592000,  // 30 days from now
   "expires_at": "2026-01-08T15:00:00Z",
   "user": {
-    "id": "user-abc123",
+    "id": "user_abc123",
     "email": "developer@example.com",
     "role": "developer",
     "name": "John Doe"
@@ -237,7 +237,7 @@ Response: 200 OK
 {
   "valid": true,
   "user": {
-    "id": "user-abc123",
+    "id": "user_abc123",
     "email": "developer@example.com",
     "role": "developer"
   },

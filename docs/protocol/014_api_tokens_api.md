@@ -98,7 +98,7 @@ Content-Type: application/json
   "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": null,
   "message": "⚠️  Save this token now. You won't be able to see it again."
@@ -165,7 +165,7 @@ GET /api/v1/api-tokens?page=1&per_page=50&sort=-created_at
 Authorization: Bearer <user-token or api-token>
 
 # Admin filtering by specific user:
-GET /api/v1/api-tokens?user_id=user-xyz789&page=1&per_page=50
+GET /api/v1/api-tokens?user_id=user_xyz789&page=1&per_page=50
 Authorization: Bearer <admin-user-token>
 ```
 
@@ -190,7 +190,7 @@ Content-Type: application/json
       "id": "at_abc123",
       "name": "Dashboard Token",
       "description": "Token for production dashboard",
-      "user_id": "user-xyz789",
+      "user_id": "user_xyz789",
       "created_at": "2025-12-10T10:30:45Z",
       "last_used": "2025-12-10T15:22:10Z"
     },
@@ -198,14 +198,14 @@ Content-Type: application/json
       "id": "at_def456",
       "name": "Monitoring Script",
       "description": "Token for budget monitoring automation",
-      "user_id": "user-xyz789",
+      "user_id": "user_xyz789",
       "created_at": "2025-12-09T14:20:30Z",
       "last_used": "2025-12-10T15:00:00Z"
     },
     {
       "id": "at_ghi789",
       "name": "Old Token",
-      "user_id": "user-xyz789",
+      "user_id": "user_xyz789",
       "created_at": "2025-11-01T08:15:00Z",
       "last_used": null
     }
@@ -286,7 +286,7 @@ Content-Type: application/json
   "id": "at_abc123",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": "2025-12-10T15:22:10Z",
   "usage_stats": {
@@ -424,7 +424,7 @@ HTTP 409 Conflict
   "id": "at_abc123",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": "2025-12-10T15:22:10Z",
   "usage_stats": {
@@ -443,7 +443,7 @@ HTTP 409 Conflict
   "token": "apitok_xyz789abc123def456...",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": null,
   "message": "⚠️  Save this token now. You won't be able to see it again."
@@ -584,7 +584,7 @@ HTTP 401 Unauthorized
 ```json
 {
   "timestamp": "2025-12-10T10:30:45Z",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "endpoint": "POST /api/v1/api-tokens",
   "method": "POST",
   "resource_type": "api_token",
@@ -645,7 +645,7 @@ iron api-tokens get at-abc123
 # ID:          at-abc123
 # Name:        Dashboard Token
 # Description: Token for production dashboard
-# User:        user-xyz789
+# User:        user_xyz789
 # Created:     2025-12-10 10:30:45
 # Last Used:   2025-12-10 15:22:10
 #

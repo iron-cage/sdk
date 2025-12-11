@@ -75,6 +75,84 @@ impl TokenStorage
     } )
   }
 
+  /// Create new token storage from configuration file
+  ///
+  /// This is the preferred initialization method for production use.
+  /// Supports configuration files and environment variable overrides.
+  ///
+  /// # Returns
+  ///
+  /// Initialized storage with database schema applied according to config
+  ///
+  /// # Errors
+  ///
+  /// Returns error if config loading fails, database connection fails, or migration fails
+  ///
+  /// # Examples
+  ///
+  /// ```rust,ignore
+  /// use iron_token_manager::storage::TokenStorage;
+  ///
+  /// // Load from default environment (IRON_ENV or "development")
+  /// let storage = TokenStorage::from_config().await?;
+  ///
+  /// // Override via environment variable
+  /// std::env::set_var("IRON_ENV", "production");
+  /// let storage = TokenStorage::from_config().await?;
+  /// ```
+  pub async fn from_config() -> Result< Self >
+  {
+    let config = crate::config::Config::load()
+      .map_err( |_| crate::error::TokenError )?;
+    Self::from_config_object( &config ).await
+  }
+
+  /// Create new token storage from configuration object
+  ///
+  /// # Arguments
+  ///
+  /// * `config` - Configuration object
+  ///
+  /// # Returns
+  ///
+  /// Initialized storage with database schema applied according to config
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database connection fails or migration fails
+  pub async fn from_config_object( config: &crate::config::Config ) -> Result< Self >
+  {
+    let pool = SqlitePoolOptions::new()
+      .max_connections( config.database.max_connections )
+      .connect( &config.database.url )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+
+    // Apply migrations if configured
+    if config.database.auto_migrate
+    {
+      crate::migrations::apply_all_migrations( &pool ).await?;
+    }
+
+    // Wipe and seed if configured (development/test only)
+    let should_wipe_and_seed = config.development
+      .as_ref()
+      .map( |d| d.wipe_and_seed )
+      .or_else( || config.test.as_ref().map( |t| t.wipe_and_seed ) )
+      .unwrap_or( false );
+
+    if should_wipe_and_seed
+    {
+      crate::seed::wipe_database( &pool ).await?;
+      crate::seed::seed_all( &pool ).await?;
+    }
+
+    Ok( Self {
+      pool,
+      generator: TokenGenerator::new(),
+    } )
+  }
+
   /// Create new token in database
   ///
   /// # Arguments
@@ -443,7 +521,7 @@ impl TokenStorage
 
 /// Get current time in milliseconds since UNIX epoch
 #[ allow( clippy::cast_possible_truncation ) ]
-fn current_time_ms() -> i64
+pub( crate ) fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )

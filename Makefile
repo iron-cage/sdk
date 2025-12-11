@@ -1,7 +1,7 @@
 # Iron Runtime Development Makefile
 # Minimal commands for daily development workflow
 
-.PHONY: help dev api dashboard test clean setup status db-reset db-seed ports validate build
+.PHONY: help dev api dashboard test clean setup status db-reset db-seed ports validate build lint-docs
 .PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-clean
 .DEFAULT_GOAL := help
 
@@ -67,6 +67,9 @@ validate: ## Full production validation
 	@echo "=== Dashboard ===" && cd $(DASHBOARD_DIR) && npm run type-check && npm run build
 	@echo "=== Build ===" && cargo build --release --bin iron_control_api_server
 	@echo "✅ Validation complete"
+
+lint-docs: ## Check documentation ID format compliance
+	@scripts/lint_id_formats.sh
 
 #===============================================================================
 # Setup & Maintenance

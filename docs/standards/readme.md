@@ -142,8 +142,8 @@ Defines standard example values for documentation consistency.
 
 **Scope:**
 - Primary agent: `agent_abc123` with budget `100.00` USD
-- Standard users: `user-xyz789` (developer), `user-admin` (admin)
-- Standard providers: `ip-openai-001`, `ip-anthropic-001`
+- Standard users: `user_xyz789` (developer), `user_admin` (admin)
+- Standard providers: `ip_openai_001`, `ip_anthropic_001`
 - Standard budget values: 0.01, 10.00, 50.00, 100.00, 500.00, 1000.00
 - Standard timestamps and token values
 

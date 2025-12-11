@@ -1,0 +1,30 @@
+# Test Configuration
+# This config is used for automated tests
+# NOTE: Tests use isolated temporary databases - this is just the default template
+
+[database]
+# Test database URL (temporary databases created per test)
+url = "sqlite:///:memory:?mode=rwc"
+
+# Maximum number of concurrent connections
+max_connections = 5
+
+# Automatically apply migrations on startup
+auto_migrate = true
+
+# Enable foreign key constraints (required for tests)
+foreign_keys = true
+
+[test]
+# Use in-memory databases for speed
+use_memory = true
+
+# No debug logging in tests (keeps output clean)
+debug = false
+
+# Never auto-seed in tests (tests create their own data)
+auto_seed = false
+
+# Wipe and re-seed on every startup (safe with in-memory DB)
+# Ensures clean state for each test run
+wipe_and_seed = true

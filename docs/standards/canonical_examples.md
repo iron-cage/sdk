@@ -15,8 +15,8 @@
 Use these canonical values in documentation examples to create consistent, recognizable patterns:
 
 **Primary Agent:** `agent_abc123` with budget `100.00` USD
-**Primary User:** `user-xyz789`
-**Primary Providers:** `["ip-openai-001", "ip-anthropic-001"]`
+**Primary User:** `user_xyz789`
+**Primary Providers:** `["ip_openai_001", "ip_anthropic_001"]`
 
 ---
 
@@ -54,9 +54,9 @@ Use these canonical values in documentation examples to create consistent, recog
 - **Budget Allocated:** `100.00` USD
 - **Budget Spent:** `45.75` USD (when showing usage/analytics)
 - **Budget Remaining:** `54.25` USD (calculated: 100.00 - 45.75)
-- **Owner ID:** `user-xyz789`
-- **Project ID:** `proj-master` (Master Project in Pilot)
-- **Providers:** `["ip-openai-001", "ip-anthropic-001"]`
+- **Owner ID:** `user_xyz789`
+- **Project ID:** `proj_master` (Master Project in Pilot)
+- **Providers:** `["ip_openai_001", "ip_anthropic_001"]`
 - **Status:** `"active"` (default state)
 - **IC Token ID:** `ic_def456ghi789`
 
@@ -68,9 +68,9 @@ Use these canonical values in documentation examples to create consistent, recog
   "id": "agent_abc123",
   "name": "production-agent-1",
   "budget": 100.00,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "status": "active"
 }
 ```
@@ -82,7 +82,7 @@ Use these canonical values in documentation examples to create consistent, recog
   "budget": 100.00,
   "spent": 45.75,
   "remaining": 54.25,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "status": "active"
 }
 ```
@@ -117,8 +117,8 @@ Use these canonical values in documentation examples to create consistent, recog
 - **Agent ID:** `agent_xyz789`
 - **Name:** `"development-agent-2"` or `"Development Agent"`
 - **Budget:** `50.00` USD (smaller budget for dev/testing)
-- **Owner ID:** `user-xyz789` (same owner as Production Agent 1)
-- **Providers:** `["ip-openai-001"]` (single provider)
+- **Owner ID:** `user_xyz789` (same owner as Production Agent 1)
+- **Providers:** `["ip_openai_001"]` (single provider)
 - **Status:** `"active"`
 
 **Usage Contexts:**
@@ -136,8 +136,8 @@ Use these canonical values in documentation examples to create consistent, recog
 - **Agent ID:** `agent_def456`
 - **Name:** `"testing-agent-3"` or `"Testing Agent"`
 - **Budget:** `10.00` USD (minimal budget)
-- **Owner ID:** `user-abc456` (different owner)
-- **Providers:** `["ip-anthropic-001"]` (different single provider)
+- **Owner ID:** `user_abc456` (different owner)
+- **Providers:** `["ip_anthropic_001"]` (different single provider)
 - **Status:** `"active"`
 
 **Usage Contexts:**
@@ -171,7 +171,7 @@ Use these canonical values in documentation examples to create consistent, recog
 **Use Case:** Primary LLM provider example
 
 **Canonical Values:**
-- **Provider ID:** `ip-openai-001`
+- **Provider ID:** `ip_openai_001`
 - **Type:** Infrastructure Provider (OpenAI)
 - **Status:** `"active"`
 
@@ -187,7 +187,7 @@ Use these canonical values in documentation examples to create consistent, recog
 **Use Case:** Secondary LLM provider example
 
 **Canonical Values:**
-- **Provider ID:** `ip-anthropic-001`
+- **Provider ID:** `ip_anthropic_001`
 - **Type:** Infrastructure Provider (Anthropic)
 - **Status:** `"active"`
 
@@ -205,7 +205,7 @@ Use these canonical values in documentation examples to create consistent, recog
 **Use Case:** Primary user example (agent owner)
 
 **Canonical Values:**
-- **User ID:** `user-xyz789`
+- **User ID:** `user_xyz789`
 - **Email:** `developer@example.com`
 - **Role:** `"user"` (standard developer role)
 - **Owns Agents:** Production Agent 1, Development Agent 2
@@ -222,7 +222,7 @@ Use these canonical values in documentation examples to create consistent, recog
 **Use Case:** Admin user example
 
 **Canonical Values:**
-- **User ID:** `user-admin`
+- **User ID:** `user_admin`
 - **Email:** `admin@example.com`
 - **Role:** `"admin"`
 
@@ -238,7 +238,7 @@ Use these canonical values in documentation examples to create consistent, recog
 **Use Case:** Different owner for multi-user scenarios
 
 **Canonical Values:**
-- **User ID:** `user-abc456`
+- **User ID:** `user_abc456`
 - **Email:** `developer2@example.com`
 - **Role:** `"user"`
 - **Owns Agents:** Testing Agent 3
@@ -256,7 +256,7 @@ Use these canonical values in documentation examples to create consistent, recog
 **Use Case:** Default project in Pilot scope
 
 **Canonical Values:**
-- **Project ID:** `proj-master`
+- **Project ID:** `proj_master`
 - **Name:** `"Master Project"` (Pilot default)
 
 **Usage Contexts:**
@@ -349,7 +349,7 @@ POST /api/v1/agents
 {
   "name": "production-agent-1",
   "budget": 100.00,
-  "providers": ["ip-openai-001", "ip-anthropic-001"]
+  "providers": ["ip_openai_001", "ip_anthropic_001"]
 }
 ```
 
@@ -466,7 +466,7 @@ Use when: Making examples readable in protocol documentation
    - Out-of-range values: `999999.99`
 
 2. **Demonstrating variety:**
-   - Different owner scenarios: Use user-abc456 for Testing Agent 3
+   - Different owner scenarios: Use user_abc456 for Testing Agent 3
    - Different providers: Single-provider vs multi-provider agents
    - Different budget tiers: 10.00, 50.00, 100.00, 500.00
 
@@ -514,14 +514,14 @@ grep -r "agent_abc123" docs/protocol/*.md docs/standards/*.md spec/*.md
 grep -r "agent_abc123" docs/ | grep -E "(100\.00|45\.75|54\.25)"
 
 # Check provider consistency
-grep -r "agent_abc123" docs/ | grep -E "ip-(openai|anthropic)-001"
+grep -r "agent_abc123" docs/ | grep -E "ip_(openai|anthropic)_001"
 ```
 
 **Expected:**
 - agent_abc123 appears with budget 100.00 in all contexts
 - Spent amount is 45.75 when showing analytics
 - Remaining is 54.25 when showing analytics
-- Providers are ["ip-openai-001", "ip-anthropic-001"]
+- Providers are ["ip_openai_001", "ip_anthropic_001"]
 
 ---
 

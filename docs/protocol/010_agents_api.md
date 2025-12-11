@@ -67,7 +67,7 @@ Content-Type: application/json
 {
   "name": "Production Agent 1",
   "budget": 100.00,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Main production agent for customer requests",
   "tags": ["production", "customer-facing"]
 }
@@ -93,11 +93,11 @@ Content-Type: application/json
   "id": "agent_abc123",
   "name": "Production Agent 1",
   "budget": 100.00,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Main production agent for customer requests",
   "tags": ["production", "customer-facing"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
     "token": "ic_xyz789abc123def456...",
@@ -211,11 +211,11 @@ Content-Type: application/json
       "budget": 100.00,
       "spent": 45.75,
       "remaining": 54.25,
-      "providers": ["ip-openai-001", "ip-anthropic-001"],
+      "providers": ["ip_openai_001", "ip_anthropic_001"],
       "description": "Main production agent",
       "tags": ["production", "customer-facing"],
-      "owner_id": "user-xyz789",
-      "project_id": "proj-master",
+      "owner_id": "user_xyz789",
+      "project_id": "proj_master",
       "status": "active",
       "created_at": "2025-12-10T10:30:45Z",
       "updated_at": "2025-12-10T10:30:45Z"
@@ -226,9 +226,9 @@ Content-Type: application/json
       "budget": 10.00,
       "spent": 10.00,
       "remaining": 0.00,
-      "providers": ["ip-openai-001"],
-      "owner_id": "user-xyz789",
-      "project_id": "proj-master",
+      "providers": ["ip_openai_001"],
+      "owner_id": "user_xyz789",
+      "project_id": "proj_master",
       "status": "exhausted",
       "created_at": "2025-12-09T14:20:30Z",
       "updated_at": "2025-12-09T18:45:12Z"
@@ -321,20 +321,20 @@ Content-Type: application/json
   "percent_used": 45.75,
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1"
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1"
     }
   ],
   "description": "Main production agent for customer requests",
   "tags": ["production", "customer-facing"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
     "created_at": "2025-12-10T10:30:45Z",
@@ -434,11 +434,11 @@ Content-Type: application/json
   "budget": 100.00,
   "spent": 45.75,
   "remaining": 54.25,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Updated description",
   "tags": ["production", "customer-facing", "high-priority"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "status": "active",
   "created_at": "2025-12-10T10:30:45Z",
   "updated_at": "2025-12-10T15:22:10Z"
@@ -512,7 +512,7 @@ HTTP 404 Not Found
 **Body:**
 ```json
 {
-  "providers": ["ip-openai-001", "ip-anthropic-001"]
+  "providers": ["ip_openai_001", "ip_anthropic_001"]
 }
 ```
 
@@ -530,13 +530,13 @@ HTTP 404 Not Found
   "agent_id": "agent-abc123",
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-3.5-turbo"]
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1",
       "models": ["claude-3-opus", "claude-3-sonnet"]
@@ -641,15 +641,15 @@ Response: 200 OK
 ```json
 PUT /api/v1/agents/agent-abc123/providers
 {
-  "providers": ["ip-openai-001", "ip-openai-001", "ip-anthropic-001"]
+  "providers": ["ip_openai_001", "ip_openai_001", "ip_anthropic_001"]
 }
 
 Response: 200 OK
 {
   "agent_id": "agent-abc123",
   "providers": [
-    {"id": "ip-openai-001", "name": "openai", "endpoint": "https://api.openai.com/v1", "models": ["gpt-4", "gpt-3.5-turbo"]},
-    {"id": "ip-anthropic-001", "name": "anthropic", "endpoint": "https://api.anthropic.com/v1", "models": ["claude-3-opus", "claude-3-sonnet"]}
+    {"id": "ip_openai_001", "name": "openai", "endpoint": "https://api.openai.com/v1", "models": ["gpt-4", "gpt-3.5-turbo"]},
+    {"id": "ip_anthropic_001", "name": "anthropic", "endpoint": "https://api.anthropic.com/v1", "models": ["claude-3-opus", "claude-3-sonnet"]}
   ],
   "updated_at": "2025-12-11T10:35:00Z"
 }
@@ -685,14 +685,14 @@ Authorization: Bearer <user-token or api-token>
   "agent_id": "agent-abc123",
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-3.5-turbo"],
       "status": "active"
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1",
       "models": ["claude-3-opus", "claude-3-sonnet"],
@@ -768,23 +768,23 @@ Response: 200 OK
 **Request:**
 
 ```
-DELETE /api/v1/agents/agent-abc123/providers/ip-openai-001
+DELETE /api/v1/agents/agent-abc123/providers/ip_openai_001
 Authorization: Bearer <user-token or api-token>
 ```
 
 **Path Parameters:**
 - `agent_id` (string, required) - Agent ID (e.g., agent-abc123)
-- `provider_id` (string, required) - Provider ID to remove (e.g., ip-openai-001)
+- `provider_id` (string, required) - Provider ID to remove (e.g., ip_openai_001)
 
 **Success Response: 200 OK**
 ```json
 {
   "agent_id": "agent-abc123",
-  "provider_id": "ip-openai-001",
+  "provider_id": "ip_openai_001",
   "removed": true,
   "remaining_providers": [
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic"
     }
   ],
@@ -806,7 +806,7 @@ Authorization: Bearer <user-token or api-token>
 {
   "error": {
     "code": "PROVIDER_NOT_ASSIGNED",
-    "message": "Provider ip-openai-001 is not assigned to agent agent-abc123"
+    "message": "Provider ip_openai_001 is not assigned to agent agent-abc123"
   }
 }
 ```
@@ -853,12 +853,12 @@ Authorization: Bearer <user-token or api-token>
 
 **Edge Case - Removing Last Provider:**
 ```json
-DELETE /api/v1/agents/agent-abc123/providers/ip-openai-001
+DELETE /api/v1/agents/agent-abc123/providers/ip_openai_001
 
 Response: 200 OK
 {
   "agent_id": "agent-abc123",
-  "provider_id": "ip-openai-001",
+  "provider_id": "ip_openai_001",
   "removed": true,
   "remaining_providers": [],
   "count": 0,
@@ -981,11 +981,11 @@ HTTP 403 Forbidden
   "spent": 45.75,
   "remaining": 54.25,
   "percent_used": 45.75,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Main production agent",
   "tags": ["production", "customer-facing"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
     "created_at": "2025-12-10T10:30:45Z",
@@ -1059,7 +1059,7 @@ HTTP 403 Forbidden
 ### Agent ↔ Project (Many-to-One)
 
 - Each agent belongs to exactly one project
-- Pilot uses Master Project only (project_id defaults to "proj-master")
+- Pilot uses Master Project only (project_id defaults to "proj_master")
 - Post-Pilot supports multi-project assignment
 
 ---
@@ -1196,7 +1196,7 @@ Retry-After: 60
 ```json
 {
   "timestamp": "2025-12-10T10:30:45Z",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "endpoint": "POST /api/v1/agents",
   "method": "POST",
   "resource_type": "agent",
@@ -1205,7 +1205,7 @@ Retry-After: 60
   "parameters": {
     "name": "Production Agent 1",
     "budget": 100.00,
-    "providers": ["ip-openai-001", "ip-anthropic-001"]
+    "providers": ["ip_openai_001", "ip_anthropic_001"]
   },
   "status": "success",
   "ip_address": "203.0.113.42",
@@ -1227,7 +1227,7 @@ Retry-After: 60
 iron agents create \
   --name "Production Agent 1" \
   --budget 100.00 \
-  --providers ip-openai-001,ip-anthropic-001 \
+  --providers ip_openai_001,ip_anthropic_001 \
   --description "Main production agent" \
   --tags production,customer-facing
 
@@ -1259,11 +1259,11 @@ iron agents get agent-abc123
 # Output:
 # ID:          agent-abc123
 # Name:        Production Agent 1
-# Owner:       user-xyz789
+# Owner:       user_xyz789
 # Budget:      $100.00
 # Spent:       $45.75 (45.75%)
 # Remaining:   $54.25
-# Providers:   ip-openai-001 (openai), ip-anthropic-001 (anthropic)
+# Providers:   ip_openai_001 (openai), ip_anthropic_001 (anthropic)
 # IC Token:    ic_def456ghi789 (last used: 2025-12-10 14:22:10)
 # Status:      active
 # Created:     2025-12-10 10:30:45
@@ -1327,7 +1327,7 @@ iron agents status agent-abc123
 
 **Changes:**
 - `project_id` becomes user-selectable (not defaulted to Master Project)
-- Add `?project_id=proj-abc` filter to `GET /api/v1/agents`
+- Add `?project_id=proj_abc` filter to `GET /api/v1/agents`
 - Project-level budget limits
 
 ---

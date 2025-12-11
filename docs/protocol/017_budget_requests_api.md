@@ -137,7 +137,7 @@ Content-Type: application/json
   "id": "breq_xyz789",
   "agent_id": "agent_abc123",
   "agent_name": "Production Agent 1",
-  "requester_id": "user-dev123",
+  "requester_id": "user_dev123",
   "requester_name": "John Developer",
   "current_budget": 100.00,
   "requested_budget": 150.00,
@@ -252,7 +252,7 @@ Content-Type: application/json
       "id": "breq_xyz789",
       "agent_id": "agent_abc123",
       "agent_name": "Production Agent 1",
-      "requester_id": "user-dev123",
+      "requester_id": "user_dev123",
       "requester_name": "John Developer",
       "current_budget": 100.00,
       "requested_budget": 150.00,
@@ -269,7 +269,7 @@ Content-Type: application/json
       "id": "breq_abc456",
       "agent_id": "agent_def456",
       "agent_name": "Test Agent",
-      "requester_id": "user-dev123",
+      "requester_id": "user_dev123",
       "requester_name": "John Developer",
       "current_budget": 50.00,
       "requested_budget": 75.00,
@@ -277,7 +277,7 @@ Content-Type: application/json
       "status": "approved",
       "created_at": "2025-12-09T14:00:00Z",
       "reviewed_at": "2025-12-09T16:30:00Z",
-      "reviewed_by": "user-admin001",
+      "reviewed_by": "user_admin001",
       "reviewed_by_name": "Admin User",
       "review_notes": "Approved as requested",
       "approved_budget": 75.00
@@ -365,7 +365,7 @@ Content-Type: application/json
   "agent_spent": 94.50,
   "agent_remaining": 5.50,
   "agent_status": "active",
-  "requester_id": "user-dev123",
+  "requester_id": "user_dev123",
   "requester_name": "John Developer",
   "current_budget": 100.00,
   "requested_budget": 150.00,
@@ -461,7 +461,7 @@ Content-Type: application/json
   "status": "approved",
   "approved_budget": 140.00,
   "reviewed_at": "2025-12-10T16:00:00Z",
-  "reviewed_by": "user-admin001",
+  "reviewed_by": "user_admin001",
   "reviewed_by_name": "Admin User",
   "review_notes": "Approved with 10% reduction...",
   "budget_updated": true,
@@ -518,7 +518,7 @@ HTTP 409 Conflict
     "code": "REQUEST_ALREADY_REVIEWED",
     "message": "Request has already been approved",
     "current_status": "approved",
-    "reviewed_by": "user-admin-xyz",
+    "reviewed_by": "user_admin_xyz",
     "reviewed_by_name": "Other Admin",
     "reviewed_at": "2025-12-10T15:00:00Z"
   }
@@ -585,7 +585,7 @@ Content-Type: application/json
   "id": "breq_xyz789",
   "status": "rejected",
   "reviewed_at": "2025-12-10T16:00:00Z",
-  "reviewed_by": "user-admin001",
+  "reviewed_by": "user_admin001",
   "reviewed_by_name": "Admin User",
   "review_notes": "Cannot approve at this time due to budget constraints...",
   "agent": {
@@ -634,7 +634,7 @@ HTTP 409 Conflict
     "code": "REQUEST_ALREADY_REVIEWED",
     "message": "Request has already been rejected",
     "current_status": "rejected",
-    "reviewed_by": "user-admin-xyz",
+    "reviewed_by": "user_admin_xyz",
     "reviewed_by_name": "Other Admin",
     "reviewed_at": "2025-12-10T15:00:00Z"
   }
@@ -689,7 +689,7 @@ Content-Type: application/json
   "id": "breq_xyz789",
   "status": "cancelled",
   "cancelled_at": "2025-12-10T16:00:00Z",
-  "cancelled_by": "user-dev123",
+  "cancelled_by": "user_dev123",
   "cancelled_by_name": "John Developer"
 }
 ```
@@ -703,7 +703,7 @@ HTTP 400 Bad Request
     "code": "CANNOT_CANCEL_REVIEWED",
     "message": "Cannot cancel request that has been reviewed",
     "current_status": "approved",
-    "reviewed_by": "user-admin001",
+    "reviewed_by": "user_admin001",
     "reviewed_at": "2025-12-10T15:00:00Z"
   }
 }
@@ -753,7 +753,7 @@ HTTP 403 Forbidden
   "id": "breq_xyz789",
   "agent_id": "agent_abc123",
   "agent_name": "Production Agent 1",
-  "requester_id": "user-dev123",
+  "requester_id": "user_dev123",
   "requester_name": "John Developer",
   "current_budget": 100.00,
   "requested_budget": 150.00,
@@ -946,7 +946,7 @@ When request is approved, system creates budget modification history entry with 
   "agent_id": "agent_abc123",
   "previous_budget": 100.00,
   "new_budget": 150.00,
-  "modified_by": "user-admin001",
+  "modified_by": "user_admin001",
   "modified_by_name": "Admin User",
   "modified_at": "2025-12-10T16:00:00Z",
   "change_type": "increase",

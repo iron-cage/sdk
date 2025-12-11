@@ -314,3 +314,187 @@ async fn test_seed_data_is_idempotent()
 
   pool.close().await;
 }
+
+#[ tokio::test ]
+async fn test_wipe_and_seed_integration_with_config()
+{
+  // Test wipe-and-seed functionality with config integration
+  // Uses in-memory database for speed and to avoid file locking issues
+  // Tests that: (1) config wipe_and_seed flag works (2) wipe removes all data (3) re-seed restores seed data
+  let db_url = "sqlite::memory:?mode=rwc".to_string();
+
+  // Create config with wipe_and_seed enabled
+  let mut config = iron_token_manager::config::Config::default_dev();
+  config.database.url = db_url.clone();
+  config.database.auto_migrate = true;
+  if let Some( ref mut dev ) = config.development
+  {
+    dev.wipe_and_seed = true;
+  }
+
+  // First initialization: should create schema and seed data
+  let storage = iron_token_manager::storage::TokenStorage::from_config_object( &config )
+    .await
+    .expect( "First init should succeed" );
+
+  // Verify seed data exists
+  let pool = storage.pool();
+
+  let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count users" );
+  assert_eq!( user_count, 3, "Should have 3 users after first init" );
+
+  let token_count: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count tokens" );
+  assert_eq!( token_count, 5, "Should have 5 tokens after first init" );
+
+  let provider_count: i64 = query_scalar( "SELECT COUNT(*) FROM ai_provider_keys" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count providers" );
+  assert_eq!( provider_count, 2, "Should have 2 provider keys after first init" );
+
+  // Add extra data manually to simulate existing data from previous runs
+  sqlx::query(
+    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
+     VALUES ('manual_user', 'hash', 'user', 1, 0)"
+  )
+  .execute( pool )
+  .await
+  .expect( "Failed to insert manual user" );
+
+  let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count users" );
+  assert_eq!( user_count, 4, "Should have 4 users after manual insert" );
+
+  // Test wipe-and-seed by calling the functions directly
+  // This simulates what happens on app restart with wipe_and_seed=true
+  iron_token_manager::seed::wipe_database( pool )
+    .await
+    .expect( "Wipe should succeed" );
+
+  // Verify wipe removed all data including manual insert
+  let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count users after wipe" );
+  assert_eq!( user_count, 0, "Should have 0 users after wipe" );
+
+  // Now seed again
+  iron_token_manager::seed::seed_all( pool )
+    .await
+    .expect( "Seed should succeed" );
+
+  // Verify seed data restored (manual insert gone)
+  let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count users after re-seed" );
+  assert_eq!( user_count, 3, "Should have 3 users after re-seed (manual insert removed)" );
+
+  let token_count: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count tokens after re-seed" );
+  assert_eq!( token_count, 5, "Should have 5 tokens after re-seed" );
+
+  // Verify specific seed data exists
+  let admin_exists: i64 = query_scalar(
+    "SELECT COUNT(*) FROM users WHERE username = 'admin' AND role = 'admin'"
+  )
+  .fetch_one( pool )
+  .await
+  .expect( "Failed to check admin" );
+  assert_eq!( admin_exists, 1, "Admin user should exist with correct role" );
+
+  let manual_user_exists: i64 = query_scalar(
+    "SELECT COUNT(*) FROM users WHERE username = 'manual_user'"
+  )
+  .fetch_one( pool )
+  .await
+  .expect( "Failed to check manual user" );
+  assert_eq!( manual_user_exists, 0, "Manual user should be wiped" );
+
+  let openai_key_exists: i64 = query_scalar(
+    "SELECT COUNT(*) FROM ai_provider_keys WHERE provider = 'openai'"
+  )
+  .fetch_one( pool )
+  .await
+  .expect( "Failed to check OpenAI key" );
+  assert_eq!( openai_key_exists, 1, "OpenAI provider key should exist after re-seed" );
+}
+
+#[ tokio::test ]
+async fn test_wipe_and_seed_disabled_preserves_data()
+{
+  // Create a temporary database file
+  let temp_dir = tempfile::TempDir::new().expect( "Failed to create temp dir" );
+  let db_path = temp_dir.path().join( "test_preserve.db" );
+  let db_url = format!( "sqlite:///{}?mode=rwc", db_path.display() );
+
+  // Create config with wipe_and_seed disabled
+  let mut config = iron_token_manager::config::Config::default_dev();
+  config.database.url = db_url.clone();
+  config.database.auto_migrate = true;
+  if let Some( ref mut dev ) = config.development
+  {
+    dev.wipe_and_seed = false;
+  }
+
+  // First initialization
+  let storage = iron_token_manager::storage::TokenStorage::from_config_object( &config )
+    .await
+    .expect( "First init should succeed" );
+
+  let pool = storage.pool();
+
+  // Manually insert a user
+  sqlx::query(
+    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
+     VALUES ('persistent_user', 'hash', 'user', 1, 0)"
+  )
+  .execute( pool )
+  .await
+  .expect( "Failed to insert user" );
+
+  let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( pool )
+    .await
+    .expect( "Failed to count users" );
+  assert_eq!( user_count, 1, "Should have 1 user after manual insert" );
+
+  // Close pool before re-initializing
+  storage.pool().close().await;
+  drop( storage );
+
+  // Delay to ensure database file and WAL are fully released
+  tokio::time::sleep( tokio::time::Duration::from_millis( 200 ) ).await;
+
+  // Second initialization: should NOT wipe
+  let storage2 = iron_token_manager::storage::TokenStorage::from_config_object( &config )
+    .await
+    .expect( "Second init should succeed" );
+
+  let pool2 = storage2.pool();
+
+  // Verify data persisted
+  let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( pool2 )
+    .await
+    .expect( "Failed to count users" );
+  assert_eq!( user_count, 1, "User should persist when wipe_and_seed is false" );
+
+  let persistent_exists: i64 = query_scalar(
+    "SELECT COUNT(*) FROM users WHERE username = 'persistent_user'"
+  )
+  .fetch_one( pool2 )
+  .await
+  .expect( "Failed to check persistent user" );
+  assert_eq!( persistent_exists, 1, "Persistent user should still exist" );
+}

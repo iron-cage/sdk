@@ -97,7 +97,7 @@ Content-Type: application/json
   "current_spent": 95.75,
   "new_remaining": 54.25,
   "reason": "Emergency top-up: agent running critical customer task",
-  "modified_by": "user-admin-001",
+  "modified_by": "user_admin_001",
   "modified_at": "2025-12-10T15:30:45Z"
 }
 ```
@@ -165,8 +165,8 @@ HTTP 403 Forbidden
   "error": {
     "code": "FORBIDDEN",
     "message": "Insufficient permissions. Only admin or agent owner can modify budget.",
-    "agent_owner": "user-xyz789",
-    "requesting_user": "user-other-001"
+    "agent_owner": "user_xyz789",
+    "requesting_user": "user_other_001"
   }
 }
 ```
@@ -225,7 +225,7 @@ Content-Type: application/json
       "increase_amount": 50.00,
       "increase_percent": 50.00,
       "reason": "Emergency top-up: agent running critical customer task",
-      "modified_by": "user-admin-001",
+      "modified_by": "user_admin_001",
       "modified_by_name": "Admin User",
       "modified_at": "2025-12-10T15:30:45Z"
     },
@@ -235,7 +235,7 @@ Content-Type: application/json
       "increase_amount": 50.00,
       "increase_percent": 100.00,
       "reason": "Initial budget adjustment after testing",
-      "modified_by": "user-xyz789",
+      "modified_by": "user_xyz789",
       "modified_by_name": "Agent Owner",
       "modified_at": "2025-12-09T10:15:20Z"
     }
@@ -347,7 +347,7 @@ HTTP 404 Not Found
   "current_spent": 95.75,
   "new_remaining": 54.25,
   "reason": "Emergency top-up: agent running critical customer task",
-  "modified_by": "user-admin-001",
+  "modified_by": "user_admin_001",
   "modified_at": "2025-12-10T15:30:45Z"
 }
 ```
@@ -365,7 +365,7 @@ HTTP 404 Not Found
       "increase_amount": 50.00,
       "increase_percent": 50.00,
       "reason": "Emergency top-up",
-      "modified_by": "user-admin-001",
+      "modified_by": "user_admin_001",
       "modified_by_name": "Admin User",
       "modified_at": "2025-12-10T15:30:45Z"
     }
@@ -475,7 +475,7 @@ Content-Type: application/json
 ```json
 {
   "timestamp": "2025-12-10T15:30:45Z",
-  "user_id": "user-admin-001",
+  "user_id": "user_admin_001",
   "endpoint": "PUT /api/v1/limits/agents/agent-abc123/budget",
   "method": "PUT",
   "resource_type": "agent_budget",
@@ -511,7 +511,7 @@ iron limits agent-budget increase agent-abc123 150.00 \
 # Previous: $100.00 → New: $150.00 (+ $50.00, +50%)
 # Current spent: $95.75
 # New remaining: $54.25
-# Modified by: user-admin-001
+# Modified by: user_admin_001
 # Modified at: 2025-12-10 15:30:45
 ```
 
