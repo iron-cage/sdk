@@ -53,6 +53,31 @@ JWT-based authentication with token lifecycle management:
 
 ---
 
+### Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `user_id`: `user_<uuid>` (e.g., `user_550e8400-e29b-41d4-a716-446655440000`)
+- `session_id`: `session_<uuid>` (if applicable)
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Token lifetime: Integer seconds (e.g., `2592000` for 30 days)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `INVALID_CREDENTIALS`, `TOKEN_EXPIRED`, `TOKEN_INVALID`, `UNAUTHORIZED`
+- HTTP status codes: 200, 400, 401
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- URL structure: `/api/v1/auth/login`, `/api/v1/auth/logout`, `/api/v1/auth/refresh`
+- Standard HTTP methods: POST for all authentication operations
+
+---
+
 ### Protocol Definition
 
 ### Login

@@ -37,6 +37,26 @@ Admin (Control Panel)          Developer (Runtime)
          +--------- + $10 more --------->|
 ```
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `agent_id`: `agent_<uuid>` (e.g., `agent_550e8400-e29b-41d4-a716-446655440000`)
+- `budget_id`: `budget_<uuid>` (e.g., `budget_7c9e6679-7425-40de-944b-e07fc1f90ae7`)
+- `lease_id`: `lease_<uuid>` (e.g., `lease_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d`)
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Currency amounts: Decimal with exactly 2 decimal places (e.g., `10.00`, `9.15`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Unix timestamps: Seconds since epoch for `issued_at`, `expires_at` claims
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Budget errors follow standard error response format
+- Machine-readable error codes: `BUDGET_EXCEEDED`, `INVALID_TOKEN`, `HANDSHAKE_FAILED`
+- Consistent JSON structure with `error.code` and `error.message` fields
+
 ## When This Protocol Applies
 
 **Universal Application:** This protocol is used in ALL deployment scenarios. Control Panel is always present as standalone admin service managing developer budgets. There is no "self-managed" mode without Control Panel.

@@ -33,6 +33,32 @@ The API Tokens API manages persistent authentication tokens for accessing the Ir
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `token_id`: `apitoken_<uuid>` (e.g., `apitoken_550e8400-e29b-41d4-a716-446655440000`)
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Token format: `at_<random_base64_32chars>` (e.g., `at_rY8xKpQm3nZ5vD9wF2sL7h`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `TOKEN_REVOKED`
+- HTTP status codes: 200, 201, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `status`
+- URL structure: `/api/v1/tokens/api`, `/api/v1/tokens/api/{id}`
+
+---
+
 ## Endpoints
 
 ### Create API Token

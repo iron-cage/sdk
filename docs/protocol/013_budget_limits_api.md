@@ -20,6 +20,31 @@ The Budget Limits API provides endpoints for modifying agent budgets after creat
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `agent_id`: `agent_<uuid>`
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `BUDGET_DECREASED_WITHOUT_FORCE`
+- HTTP status codes: 200, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- URL structure: `/api/v1/agents/{id}/budget`
+- Standard HTTP methods: PATCH for budget modifications
+
+---
+
 ## Endpoints
 
 ### Modify Agent Budget

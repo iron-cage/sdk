@@ -61,6 +61,39 @@ RESTful HTTP API organized by resource type:
 
 ---
 
+### Standards Compliance
+
+All REST API endpoints and protocols adhere to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- Examples: `agent_<uuid>`, `provider_<uuid>`, `token_<uuid>`, `user_<uuid>`
+- See standard for complete entity prefix list and validation rules
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Currency: Decimal with exactly 2 decimal places (e.g., `100.50`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Nulls: Omit optional fields when empty (not `null`)
+- Arrays: Empty array `[]` when no items (not `null`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes (e.g., `VALIDATION_ERROR`, `UNAUTHORIZED`)
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409, 429, 500, 503
+- Field-level validation details in `error.fields` object
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Sorting: Optional `?sort=field` (ascending) or `?sort=-field` (descending)
+- Filtering: Resource-specific query parameters
+- Versioning: URL-based `/api/v1/`, `/api/v2/`
+- Deprecation: 6-month notice with `X-API-Deprecation` headers
+
+**Note:** Resource-specific protocols (006-017) inherit these standards and add domain-specific constraints.
+
+---
+
 ### Resource Organization
 
 **Four Resource Categories:**

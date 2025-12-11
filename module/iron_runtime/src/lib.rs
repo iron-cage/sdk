@@ -32,7 +32,7 @@ mod implementation
   /// Agent runtime handle
   pub struct AgentHandle
   {
-    pub agent_id: String,
+    pub agent_id: iron_types::AgentId,
   }
 
   /// Main agent runtime
@@ -58,9 +58,9 @@ mod implementation
     pub async fn start_agent(&self, _script_path: &std::path::Path) -> Result<AgentHandle, anyhow::Error>
     {
       // TODO: Implement agent spawning and PyO3 bridge
-      let agent_id = iron_types::AgentId::generate().to_string();
+      let agent_id = iron_types::AgentId::generate();
 
-      iron_telemetry::log_agent_event(&agent_id, "agent_started");
+      iron_telemetry::log_agent_event(agent_id.as_str(), "agent_started");
 
       // Save initial state
       self.state.save_agent_state(iron_runtime_state::AgentState {
@@ -147,7 +147,7 @@ mod implementation
         {
           Some(state) => {
             let json = serde_json::json!({
-              "agent_id": state.agent_id,
+              "agent_id": state.agent_id.as_str(),
               "status": format!("{:?}", state.status),
               "budget_spent": state.budget_spent,
               "pii_detections": state.pii_detections,
@@ -189,7 +189,7 @@ mod stub
   /// Stub agent handle
   pub struct AgentHandle
   {
-    pub agent_id: String,
+    pub agent_id: iron_types::AgentId,
   }
 
   /// Stub runtime
@@ -208,7 +208,7 @@ mod stub
     pub async fn start_agent(&self, _script_path: &Path) -> Result<AgentHandle, anyhow::Error>
     {
       Ok(AgentHandle {
-        agent_id: "stub-agent".to_string(),
+        agent_id: iron_types::AgentId::generate(),
       })
     }
 

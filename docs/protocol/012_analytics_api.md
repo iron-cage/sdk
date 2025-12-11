@@ -19,6 +19,33 @@ The Analytics API provides insights into agent spending, provider usage, budget 
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `agent_id`: `agent_<uuid>`
+- `provider_id`: `provider_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Date ranges: `today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time`
+- Counts: Integer (e.g., `1500`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`
+- HTTP status codes: 200, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `agent_id`, `provider_id`, `period`
+- URL structure: `/api/v1/analytics/*`
+
+---
+
 ## Use Cases
 
 The Analytics API answers 8 critical questions:

@@ -84,6 +84,30 @@ Authorization varies by settings scope:
 - **Project Settings**: Owner or Admin
 - **User Settings**: Any authenticated user (own settings only)
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `setting_id`: `setting_<uuid>` (e.g., `setting_550e8400-e29b-41d4-a716-446655440000`)
+- `project_id`: `project_<uuid>`
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Settings values: Type varies by setting (string, number, boolean, object)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_SETTING_VALUE`
+- HTTP status codes: 200, 201, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- URL structure: `/api/v1/settings/user`, `/api/v1/settings/project`, `/api/v1/settings/system`
+- Standard HTTP methods: GET for retrieval, PUT/PATCH for updates
+
 ## Endpoints
 
 ### 1. Get User Settings

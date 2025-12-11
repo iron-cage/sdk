@@ -60,6 +60,34 @@ RESTful API with comprehensive CRUD operations:
 
 ---
 
+### Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `user_id`: `user_<uuid>` (e.g., `user_550e8400-e29b-41d4-a716-446655440000`)
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Nulls: Omit optional fields when empty (not `null`)
+- Arrays: Empty array `[]` when no items (not `null`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `DUPLICATE_EMAIL`
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409
+- Field-level validation details in `error.fields` object
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `role`, `status`, `search`
+- Sorting: Optional `?sort=created_at` or `?sort=-created_at`
+- URL structure: `/api/v1/users`, `/api/v1/users/{id}`
+
+---
+
 ### Protocol Definition
 
 ### Create User

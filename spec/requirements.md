@@ -1014,6 +1014,624 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 
 ---
 
+### 1.8 REST API & Control Plane (MUST)
+
+### FR-1.8.1: API Architecture & Standards
+
+**Description:** Production-grade REST API for managing Iron Cage platform resources
+
+**Requirements:**
+- **HTTP Protocol:**
+  - RESTful design following standard HTTP semantics
+  - JSON request/response bodies
+  - Standard HTTP methods (GET, POST, PATCH, DELETE)
+  - Standard HTTP status codes (200, 201, 400, 401, 403, 404, 409, 429, 500, 503)
+
+- **Base URL Structure:**
+  - API versioning via URL path: `/api/v1/`
+  - Resource-oriented endpoints: `/api/v1/agents`, `/api/v1/providers`
+  - Sub-resources: `/api/v1/agents/{id}/status`
+
+- **Standards Compliance:**
+  - ID Format: All entity IDs use `prefix_uuid` format (see [ID Format Standards](../docs/standards/id_format_standards.md))
+  - Error Format: Consistent error responses (see [Error Format Standards](../docs/standards/error_format_standards.md))
+  - Data Types: ISO 8601 timestamps, decimal currency (see [Data Format Standards](../docs/standards/data_format_standards.md))
+  - API Design: Pagination, sorting, filtering (see [API Design Standards](../docs/standards/api_design_standards.md))
+
+**Acceptance Criteria:**
+- ✅ All endpoints follow REST conventions
+- ✅ All entity IDs use `prefix_uuid` format with underscore separator
+- ✅ All errors return consistent JSON structure with machine-readable codes
+- ✅ All timestamps use ISO 8601 with Z suffix (UTC)
+- ✅ All list endpoints support pagination (offset-based, 50 items default)
+
+**References:**
+- `/docs/standards/id_format_standards.md` - Entity ID format specification
+- `/docs/standards/error_format_standards.md` - Error response format
+- `/docs/standards/data_format_standards.md` - Data type conventions
+- `/docs/standards/api_design_standards.md` - Pagination, sorting, versioning
+
+---
+
+### FR-1.8.2: Authentication & Authorization
+
+**Description:** Secure authentication and role-based access control
+
+**Requirements:**
+- **Authentication Methods:**
+  - User authentication: JWT-based tokens (login/logout/refresh)
+  - API tokens: Long-lived tokens for automation and CI/CD
+  - IC tokens: Agent-facing tokens for budget handshake protocol
+
+- **Token Management:**
+  - **IC Tokens:**
+    - Format: `ic_<base64_32chars>` (Stripe-style prefix)
+    - Lifecycle: Create, list, get, delete, rotate
+    - Permissions: Admin creates tokens, developers list/rotate own tokens
+    - Protocol: See `/docs/protocol/006_token_management_api.md`
+  - **API Tokens:**
+    - Format: `at_<base64_32chars>` (Pending: Q29)
+    - Permissions: Role-based (inherit user role) (Pending: Q30)
+    - Revocation: Soft delete with audit trail (Pending: Q31)
+
+- **Role-Based Access Control (RBAC):**
+  - **Roles:**
+    - Admin: Full access (user management, budget administration)
+    - Developer: Resource management (agents, providers, analytics)
+  - **Enforcement:**
+    - Middleware validates role on every request
+    - Admin-only endpoints return 403 Forbidden for non-admin users
+    - Users can only access their own resources (unless admin)
+
+- **Session Management:**
+  - JWT access tokens (short-lived, 1 hour)
+  - Refresh tokens (long-lived, 30 days)
+  - Automatic token refresh before expiration
+  - Secure token storage (HttpOnly cookies for web, keychain for CLI)
+
+**Acceptance Criteria:**
+- ✅ JWT tokens validated on every protected endpoint
+- ✅ Admin-only endpoints correctly reject non-admin requests (403)
+- ✅ API tokens inherit user permissions (cannot escalate privileges)
+- ✅ IC token rotation preserves old token for grace period (24 hours)
+- ✅ Session expires after inactivity (30 minutes default)
+
+**Pending Decisions:**
+- Q29: API token format (Recommended: `at_<random_base64_32chars>`)
+- Q30: API token permissions (Recommended: Role-based, inherit user role)
+- Q31: API token revocation (Recommended: Soft delete with audit trail)
+
+**References:**
+- `/docs/protocol/006_token_management_api.md` - IC Token CRUD endpoints
+- `/docs/protocol/007_authentication_api.md` - User authentication endpoints
+
+---
+
+### FR-1.8.3: Agent Management API
+
+**Description:** Full CRUD operations for AI agent lifecycle management
+
+**Requirements:**
+- **Create Agent:** `POST /api/v1/agents`
+  - **Required fields:**
+    - `name` (string, 1-100 chars, unique within project) (Pending: Q20, Q23)
+    - `budget` (decimal, >= 0.01 USD)
+  - **Optional fields:**
+    - `description` (string, max 500 chars)
+    - `providers` (array of provider IDs, can be empty) (Pending: Q20)
+    - `tags` (array of strings)
+    - `settings` (object, agent-specific configuration)
+  - **Response:** 201 Created with full agent object
+  - **Errors:** 409 Conflict if name duplicate (Pending: Q23)
+
+- **List Agents:** `GET /api/v1/agents`
+  - **Pagination:** Offset-based (`?page=1&per_page=50`)
+  - **Filtering:** By name (partial match), status, tags
+  - **Sorting:** `-created_at` (newest first, default)
+  - **Response:** Array of agent objects with pagination metadata
+
+- **Get Agent:** `GET /api/v1/agents/{id}`
+  - **Response:** Full agent object including budget status
+  - **Errors:** 404 Not Found if agent doesn't exist
+
+- **Update Agent:** `PATCH /api/v1/agents/{id}`
+  - **Mutable fields:** `name`, `budget`, `description`, `tags`, `settings` (Pending: Q21)
+  - **Immutable fields:** `id`, `created_at`, `updated_at`, `spent`
+  - **Semantics:** Partial updates (only specified fields updated) (Pending: Q22)
+  - **Response:** 200 OK with updated agent object
+
+- **Delete Agent:** `DELETE /api/v1/agents/{id}`
+  - **Behavior:** Immediate deletion with cascade (Pending: Q24)
+  - **Cascade:** Deletes budget requests, leases associated with agent
+  - **Confirmation:** No API-level confirmation required (CLI can prompt) (Pending: Q24)
+  - **Response:** 200 OK with deletion summary (cascade counts)
+
+- **Get Agent Status:** `GET /api/v1/agents/{id}/status`
+  - **Response:** Real-time budget status (spent, remaining, percentage used)
+  - **Use case:** Dashboard budget monitoring, CLI status display
+
+**Acceptance Criteria:**
+- ✅ Agent creation requires explicit budget (no default budget)
+- ✅ Agent names unique within project (409 Conflict on duplicate)
+- ✅ PATCH supports partial updates (omitted fields unchanged)
+- ✅ DELETE cascades to budget requests and leases
+- ✅ Status endpoint shows real-time budget usage
+
+**Pending Decisions:**
+- Q20: Create agent required fields (Recommended: Minimal - name + budget)
+- Q21: Update agent mutable fields (Recommended: Most fields except system fields)
+- Q22: Partial update support (Recommended: Yes, standard PATCH semantics)
+- Q23: Agent name uniqueness (Recommended: Unique within project)
+- Q24: Delete confirmation requirement (Recommended: No API-level confirmation)
+
+**References:**
+- `/docs/protocol/010_agents_api.md` - Complete agent API specification (to be created)
+
+---
+
+### FR-1.8.4: Provider Management API
+
+**Description:** CRUD operations for LLM provider credential management
+
+**Requirements:**
+- **Create Provider:** `POST /api/v1/providers`
+  - **Required fields:**
+    - `name` (string, 1-100 chars)
+    - `type` (enum: `openai`, `anthropic`, `azure_openai`, `google`)
+    - `api_key` (string, encrypted at rest)
+  - **Optional fields:**
+    - `base_url` (for custom endpoints, Azure OpenAI)
+    - `organization_id` (for OpenAI organizations)
+  - **Validation:** Format validation only (no API test call) (Pending: Q25)
+  - **Response:** 201 Created (API key never returned in responses)
+
+- **List Providers:** `GET /api/v1/providers`
+  - **Filtering:** By name, type, status
+  - **Response:** Array of provider objects (api_key masked: `sk-***`)
+
+- **Get Provider:** `GET /api/v1/providers/{id}`
+  - **Response:** Provider object with masked API key
+
+- **Update Provider:** `PATCH /api/v1/providers/{id}`
+  - **Mutable fields:** `name`, `api_key`, `base_url`
+  - **API key rotation:** Direct PATCH with new key (Pending: Q26)
+  - **Validation:** Same as create (format only) (Pending: Q27)
+
+- **Delete Provider:** `DELETE /api/v1/providers/{id}`
+  - **Cascade:** Removes provider from all agents (ON DELETE CASCADE)
+  - **Warning:** Response includes affected agents list (Pending: Q28)
+  - **Response:** 200 OK with affected agents details
+
+**Acceptance Criteria:**
+- ✅ API keys encrypted at rest in database
+- ✅ API keys never returned in GET/PATCH responses (always masked)
+- ✅ Provider creation accepts credentials without validation (fast creation)
+- ✅ DELETE cascades to agent-provider assignments
+- ✅ DELETE response shows affected agents with remaining provider counts
+
+**Pending Decisions:**
+- Q25: Provider credential validation on create (Recommended: No validation for Pilot)
+- Q26: API key update method (Recommended: Direct PATCH)
+- Q27: Credential validation on update (Recommended: Same as create - no validation if Q25=A)
+- Q28: Provider deletion warning (Recommended: Include affected agents in response)
+
+**References:**
+- `/docs/protocol/011_providers_api.md` - Complete provider API specification (to be created)
+
+---
+
+### FR-1.8.5: API Token Management
+
+**Description:** Long-lived tokens for automation and external tool integration
+
+**Requirements:**
+- **Create API Token:** `POST /api/v1/api-tokens`
+  - **Required fields:**
+    - `name` (string, 1-100 chars, descriptive label)
+  - **Optional fields:**
+    - `expires_at` (ISO 8601 timestamp, null = no expiration)
+  - **Token generation:**
+    - Format: `at_<random_base64_32chars>` (Pending: Q29)
+    - Returned only on creation (never retrievable again)
+    - Stored as hash in database
+  - **Permissions:** Inherit creating user's role (Pending: Q30)
+  - **Response:** 201 Created with token value (only time shown)
+
+- **List API Tokens:**
+  - Admin: `GET /api/v1/api-tokens` (all tokens, all users)
+  - User: `GET /api/v1/api-tokens/me` (own tokens only)
+  - **Response:** Array of token metadata (not token value, only prefix shown)
+
+- **Get API Token:** `GET /api/v1/api-tokens/{id}`
+  - **Response:** Token metadata (name, created_at, expires_at, last_used_at, status)
+  - **Never includes:** Token value (not retrievable after creation)
+
+- **Revoke API Token:** `DELETE /api/v1/api-tokens/{id}`
+  - **Behavior:** Soft delete (mark as revoked, preserve audit trail) (Pending: Q31)
+  - **Response:** 200 OK with revoked_at timestamp
+  - **Effect:** Token immediately invalid (401 on subsequent use)
+
+**Acceptance Criteria:**
+- ✅ Token value shown only once (on creation)
+- ✅ Token inherits user role (cannot escalate privileges)
+- ✅ Revoked tokens return 401 Unauthorized with TOKEN_REVOKED code
+- ✅ Revoked tokens preserved in database for audit trail
+- ✅ List endpoint filters out revoked tokens by default (opt-in to include revoked)
+
+**Pending Decisions:**
+- Q29: API token format (Recommended: `at_<random_base64_32chars>`)
+- Q30: API token permissions (Recommended: Role-based, inherit user role)
+- Q31: API token revocation (Recommended: Soft delete with audit trail)
+
+**References:**
+- `/docs/protocol/014_api_tokens_api.md` - API token management endpoints (to be created)
+
+---
+
+### FR-1.8.6: Analytics & Monitoring API
+
+**Description:** Real-time and historical analytics for agent activity and cost tracking
+
+**Requirements:**
+- **Supported Analytics Queries:**
+  - Spending over time (by agent, by provider, by project, by user)
+  - Token usage over time (input tokens, output tokens, total)
+  - Request volume (requests per hour/day/week)
+  - Error rates (by error type, by agent, by provider)
+  - Top agents by cost/usage
+  - Cost breakdown by provider
+  - Budget utilization (percentage used per agent)
+  - Historical trends (7-day, 30-day, 90-day)
+
+- **Time Ranges:**
+  - Last 24 hours (hourly granularity)
+  - Last 7 days (daily granularity)
+  - Last 30 days (daily granularity)
+  - Last 90 days (weekly granularity)
+  - Custom range (start_date, end_date)
+
+- **Aggregation:**
+  - Group by: agent, provider, project, user, hour, day, week
+  - Metrics: sum, avg, min, max, count
+  - Filters: agent_id, provider_id, date range, status
+
+- **Pagination:**
+  - Offset-based (`?page=1&per_page=50`)
+  - Default: 50 results per page, max 100
+  - Total count included in response metadata
+
+- **Endpoints:**
+  - `GET /api/v1/analytics/spending`
+  - `GET /api/v1/analytics/usage`
+  - `GET /api/v1/analytics/requests`
+  - `GET /api/v1/analytics/errors`
+  - `GET /api/v1/analytics/agents/top`
+  - `GET /api/v1/analytics/providers/breakdown`
+  - `GET /api/v1/analytics/budget-utilization`
+  - `GET /api/v1/analytics/trends`
+
+**Acceptance Criteria:**
+- ✅ Analytics queries complete in <500ms (p95)
+- ✅ Real-time data available within 30 seconds of event
+- ✅ Historical data retained for 90 days minimum
+- ✅ All analytics endpoints support time range filtering
+- ✅ Dashboard can render 8 analytics widgets without pagination
+
+**References:**
+- `/docs/protocol/012_analytics_api.md` - Analytics endpoints specification
+
+---
+
+### FR-1.8.7: Budget Control API
+
+**Description:** Budget limit enforcement and budget request workflow
+
+**Requirements:**
+- **Get Budget Limits:** `GET /api/v1/limits/agents/{agent_id}/budget`
+  - **Response:** Current budget, spent, remaining, status
+
+- **Update Budget Limit:** `PUT /api/v1/limits/agents/{agent_id}/budget`
+  - **Required:** `budget` (decimal, >= 0.01)
+  - **Authorization:** Admin only
+  - **Response:** Updated budget status
+  - **Effect:** Immediately enforced (agents blocked if over budget)
+
+- **Budget Request Workflow:**
+  - **Create Request:** `POST /api/v1/budget-requests`
+    - Developer requests budget increase
+    - Required: `agent_id`, `requested_budget`, `justification`
+    - Status: `pending`
+  - **List Requests:**
+    - Admin: `GET /api/v1/budget-requests` (all requests)
+    - User: `GET /api/v1/budget-requests/me` (own requests)
+  - **Approve Request:** `PUT /api/v1/budget-requests/{id}/approve`
+    - Admin only
+    - Applies budget change to agent
+    - Status: `approved`
+  - **Deny Request:** `PUT /api/v1/budget-requests/{id}/deny`
+    - Admin only
+    - Requires `reason`
+    - Status: `denied`
+
+- **Budget Handshake Protocol:**
+  - Agent-facing endpoint: `POST /api/budget/handshake`
+  - IC Token authentication required
+  - Returns: IP Token (short-lived provider access token)
+  - Protocol: See `/docs/protocol/005_budget_control_protocol.md`
+  - Two-token system: IC Token (agent) → IP Token (provider access)
+
+**Acceptance Criteria:**
+- ✅ Budget enforcement happens immediately after limit update
+- ✅ Budget request workflow supports approval/denial with audit trail
+- ✅ Budget handshake returns IP Token within 100ms (p95)
+- ✅ IP Token expires after agent completes inference request
+- ✅ Budget exceeded agents receive 429 Too Many Requests
+
+**References:**
+- `/docs/protocol/005_budget_control_protocol.md` - Two-token budget handshake
+- `/docs/protocol/013_budget_limits_api.md` - Budget limit management
+- `/docs/protocol/017_budget_requests_api.md` - Budget request workflow (to be created)
+
+---
+
+### FR-1.8.8: Data Format Standards
+
+**Description:** Consistent data type representation across all API responses
+
+**Requirements:**
+- **Timestamps:**
+  - Format: ISO 8601 with Z suffix (UTC timezone)
+  - Precision: Milliseconds included
+  - Example: `"created_at": "2025-12-10T10:30:45.123Z"`
+
+- **Currency:**
+  - Format: Decimal with exactly 2 decimal places
+  - Precision: Hundredths (cents)
+  - Example: `"budget": 100.50`
+  - No currency symbol (always USD for Pilot)
+
+- **Entity IDs:**
+  - Format: `prefix_uuid` (underscore-separated)
+  - Prefixes: `agent_`, `ip_` (provider), `ic_` (IC token), `at_` (API token), `br_` (budget request), `user_`, `proj_`, `lease_`
+  - Example: `"id": "agent_550e8400-e29b-41d4-a716-446655440000"`
+
+- **Booleans:**
+  - Format: JSON boolean (`true` or `false`)
+  - Never use integers (0/1) or strings ("true"/"false")
+
+- **Null Handling:**
+  - **Optional fields:** Omit from response if null/empty (don't include `"field": null`)
+  - **Empty arrays:** Return `[]` not `null`
+  - **Exception:** Explicitly nullable fields must include `null` value
+
+- **Enums:**
+  - Format: lowercase strings with underscores
+  - Example: `"status": "active"`, `"type": "azure_openai"`
+
+**Acceptance Criteria:**
+- ✅ All timestamps parseable by ISO 8601 libraries
+- ✅ All currency values have exactly 2 decimal places (no rounding errors)
+- ✅ All entity IDs use `prefix_uuid` format (validated at API layer)
+- ✅ Null optional fields omitted from JSON responses
+- ✅ All enums documented in API specification
+
+**References:**
+- `/docs/standards/data_format_standards.md` - Complete data format specification
+- `/docs/standards/id_format_standards.md` - Entity ID format details
+
+---
+
+### FR-1.8.9: Error Handling & Rate Limiting
+
+**Description:** Consistent error responses and abuse prevention
+
+**Requirements:**
+- **Error Response Format:**
+  ```json
+  {
+    "error": {
+      "code": "VALIDATION_ERROR",      // Machine-readable error code
+      "message": "Budget must be at least 0.01",  // Human-readable message
+      "fields": {                       // Optional field-level details
+        "budget": "Must be >= 0.01",
+        "name": "Required field"
+      }
+    }
+  }
+  ```
+
+- **HTTP Status Codes:**
+  - 400 Bad Request: Validation errors, malformed requests
+  - 401 Unauthorized: Missing or invalid authentication
+  - 403 Forbidden: Insufficient permissions
+  - 404 Not Found: Resource doesn't exist
+  - 409 Conflict: Resource conflict (duplicate name, concurrent modification)
+  - 429 Too Many Requests: Rate limit exceeded, budget exceeded
+  - 500 Internal Server Error: Unexpected errors
+  - 503 Service Unavailable: Service temporarily down
+
+- **Error Codes:**
+  - `VALIDATION_ERROR`: Field validation failed
+  - `INVALID_TOKEN`: Authentication token invalid
+  - `TOKEN_EXPIRED`: Authentication token expired
+  - `TOKEN_REVOKED`: API token was revoked
+  - `INSUFFICIENT_PERMISSIONS`: User lacks required role
+  - `DUPLICATE_NAME`: Resource name already exists
+  - `BUDGET_EXCEEDED`: Agent over budget
+  - `RATE_LIMIT_EXCEEDED`: Too many requests
+  - `RESOURCE_NOT_FOUND`: Requested resource doesn't exist
+  - `PROVIDER_IN_USE`: Cannot delete provider with active agents
+
+- **Rate Limiting:**
+  - **Scope:** Per-user (all tokens from same user share limit) (Pending: Q32)
+  - **Limits:**
+    - Authenticated: 100 requests/minute, 1000/hour (Pending: Q33)
+    - Unauthenticated: 20 requests/minute, 100/hour
+    - Burst: 10 requests instant
+  - **Headers:**
+    - `X-RateLimit-Limit`: Total allowed requests
+    - `X-RateLimit-Remaining`: Requests remaining in window
+    - `X-RateLimit-Reset`: Unix timestamp when limit resets
+  - **Response:** 429 Too Many Requests with `Retry-After` header
+
+**Acceptance Criteria:**
+- ✅ All error responses use consistent JSON structure
+- ✅ Field-level validation errors include specific field names
+- ✅ Rate limit headers present in all responses (even success)
+- ✅ 429 responses include `Retry-After` header (seconds)
+- ✅ Authentication errors distinguish expired vs invalid vs revoked tokens
+
+**Pending Decisions:**
+- Q32: Rate limit scope (Recommended: Per-user across all tokens)
+- Q33: Rate limit values (Recommended: 100/min authenticated, 20/min unauth)
+
+**References:**
+- `/docs/standards/error_format_standards.md` - Error response specification
+
+---
+
+### FR-1.8.10: API Versioning & Deprecation
+
+**Description:** Backward-compatible API evolution and deprecation policy
+
+**Requirements:**
+- **Versioning Strategy:**
+  - URL-based versioning: `/api/v1/`, `/api/v2/`
+  - Major version increments for breaking changes
+  - Minor/patch changes deployed without version change
+
+- **Breaking Changes:**
+  - Removing endpoints
+  - Removing request/response fields
+  - Changing field types (string → integer)
+  - Changing error codes
+  - Changing authentication methods
+
+- **Non-Breaking Changes:**
+  - Adding new endpoints
+  - Adding optional request fields
+  - Adding response fields
+  - Adding new error codes (alongside existing)
+
+- **Deprecation Policy:**
+  - **Notice period:** 6 months minimum before removal
+  - **Communication:**
+    - Deprecation headers: `X-API-Deprecation: true`, `X-API-Sunset: 2026-06-10T00:00:00Z`
+    - Changelog updates (docs.ironcage.dev/changelog)
+    - Email notification to API users
+  - **Support:** Deprecated endpoints remain functional until sunset date
+  - **Documentation:** Deprecated endpoints clearly marked in API docs
+
+- **Migration Support:**
+  - Migration guides for each breaking change
+  - Dual support period (old + new versions run concurrently)
+  - Automated migration tools for common patterns
+
+**Acceptance Criteria:**
+- ✅ Version in URL path for all API endpoints
+- ✅ Deprecated endpoints return `X-API-Deprecation` header
+- ✅ Deprecation notice sent 6+ months before removal
+- ✅ Migration guide available for all breaking changes
+- ✅ Old versions supported for minimum 6 months after new version release
+
+**References:**
+- `/docs/standards/api_design_standards.md` - Versioning policy details
+
+---
+
+### FR-1.8.11: Audit Logging
+
+**Description:** Compliance-ready audit trail of all API operations
+
+**Requirements:**
+- **Logged Operations:**
+  - Mutation-only: POST, PUT, PATCH, DELETE (Pending: Q35)
+  - Not logged: GET (read operations)
+
+- **Audit Log Fields:**
+  - User ID (who performed action)
+  - Endpoint (what endpoint was called)
+  - HTTP method (POST, PUT, PATCH, DELETE)
+  - Request parameters (sanitized - no sensitive data)
+  - Response status code (200, 400, 500, etc.)
+  - Timestamp (ISO 8601, microsecond precision)
+  - IP address (source of request)
+  - User agent (CLI, dashboard, API client)
+  - Resource ID (agent ID, provider ID, etc.)
+
+- **Retention:**
+  - 90 days minimum (compliance standard)
+  - Auto-purge logs older than retention period
+  - Long-term archival to S3/GCS (optional, admin-configurable)
+
+- **Access Control:**
+  - Admin: `GET /api/v1/audit-logs` (view all logs)
+  - User: `GET /api/v1/audit-logs/me` (view own actions only)
+  - Filtering: By user, resource type, date range, action type
+
+- **Sensitive Data:**
+  - API keys: Never logged (masked: `sk-***`)
+  - Passwords: Never logged
+  - Personal data: Redacted per GDPR/HIPAA requirements
+
+**Acceptance Criteria:**
+- ✅ All mutation operations logged (POST, PUT, PATCH, DELETE)
+- ✅ Read operations (GET) not logged (performance optimization)
+- ✅ Audit logs retained for 90 days minimum
+- ✅ Audit log access restricted by role (admin sees all, user sees own)
+- ✅ Sensitive data never appears in audit logs
+
+**Pending Decisions:**
+- Q35: Audit logging scope (Recommended: Mutation-only for performance)
+
+**References:**
+- `/docs/protocol/027_audit_logging.md` - Audit logging specification (to be created)
+
+---
+
+### FR-1.8.12: CLI-API Parity
+
+**Description:** Ensure critical API operations accessible via both REST API and CLI
+
+**Requirements:**
+- **CLI Required (User-Facing Operations):**
+  - ✅ IC Tokens: `iron tokens list/create/delete/rotate`
+  - ✅ Authentication: `iron login/logout`
+  - ✅ Agents: `iron agents list/create/get/update/delete/status`
+  - ✅ Providers: `iron providers list/create/update/delete`
+  - ✅ Analytics: `iron analytics spending/usage/errors`
+  - ✅ API Tokens: `iron api-tokens list/create/revoke`
+  - ✅ Budget Limits: `iron limits agent-budget increase`
+  - ✅ Budget Requests: `iron budget-requests create/approve/deny`
+  - ✅ Projects: `iron projects list/get`
+
+- **CLI Not Required (Agent-Facing / System Operations):**
+  - ❌ Budget Handshake: `POST /api/budget/handshake` (agent-facing only)
+  - ❌ Health Check: `GET /api/health` (monitoring systems)
+  - ❌ Version: `GET /api/version` (system metadata)
+
+- **CLI Implementation:**
+  - Built in Rust (same codebase as runtime)
+  - Uses REST API internally (no direct database access)
+  - Interactive prompts for destructive operations (delete, revoke)
+  - Pretty-printed output (tables, colors, progress bars)
+  - JSON output mode for scripting (`--json` flag)
+
+**Acceptance Criteria:**
+- ✅ All user-facing operations have CLI commands
+- ✅ CLI uses REST API (no direct database access)
+- ✅ Destructive operations prompt for confirmation (unless `--force`)
+- ✅ CLI exit codes follow conventions (0 = success, non-zero = error)
+- ✅ CLI help text explains all options (`--help`)
+
+**Pending Decisions:**
+- Q36: CLI-API parity policy (Recommended: User-facing only, not agent-facing endpoints)
+
+**References:**
+- `/docs/features/004_token_management_cli_api_parity.md` - CLI-API parity implementation
+
+---
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Performance (MUST)
