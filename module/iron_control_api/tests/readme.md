@@ -63,6 +63,9 @@ tests/
 | `protocol_005_enforcement_simple.rs` | Test Protocol 005 multi-layer enforcement | Enforcement checks → Security validation | NOT budget flow (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT metrics (protocol_005_migration_metrics.rs) |
 | `protocol_005_migration_metrics.rs` | Test Protocol 005 migration completeness metrics | Migration metrics → Quantitative validation | NOT enforcement (protocol_005_enforcement_simple.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT types (budget_routes.rs) |
 | `protocol_005_rollback_verification.rs` | Test Protocol 005 rollback impossibility | Rollback attempts → Prevention validation | NOT enforcement checks (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types (budget_routes.rs) |
+| `budget_database_state.rs` | Test Protocol 005 database state corner cases | Database state scenarios → Enforcement validation | NOT enforcement layers (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types/crypto (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs) |
+| `auth_endpoints.rs` | Test authentication endpoint JWT token lifecycle | JWT scenarios → Token validation | NOT auth flows (auth/), NOT user management (users.rs), NOT RBAC (rbac.rs), NOT integration (integration_tests.rs) |
+| `users.rs` | Test user management CRUD endpoints | User management scenarios → CRUD validation | NOT auth (auth/, auth_endpoints.rs), NOT tokens (tokens/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
 
 ## Test Coverage Summary
 

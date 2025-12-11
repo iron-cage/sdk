@@ -50,6 +50,7 @@ impl UserManagementState
 }
 
 /// Helper to get admin ID from username
+#[ allow( dead_code ) ]
 async fn get_admin_id( pool: &Pool< Sqlite >, username: &str ) -> Result< i64, sqlx::Error >
 {
   let row: ( i64, ) = sqlx::query_as( "SELECT id FROM users WHERE username = ?" )
@@ -131,7 +132,7 @@ impl CreateUserRequest
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct CreateUserResponse
 {
-  pub id: i64,
+  pub id: String,
   pub username: String,
   pub email: Option< String >,
   pub role: String,
@@ -179,7 +180,7 @@ pub struct ListUsersResponse
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct UserResponse
 {
-  pub id: i64,
+  pub id: String,
   pub username: String,
   pub email: Option< String >,
   pub role: String,
@@ -302,9 +303,6 @@ pub async fn create_user(
     }) ) ).into_response();
   }
 
-  // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
-
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
   if !state.permission_checker.has_permission( role, Permission::ManageUsers )
@@ -327,8 +325,10 @@ pub async fn create_user(
     role: request.role,
   };
 
+  let admin_id = claims.sub;
+
   // Create user
-  match user_service.create_user( params, admin_id ).await
+  match user_service.create_user( params, &admin_id ).await
   {
     Ok( user ) =>
     {
@@ -413,7 +413,7 @@ pub async fn list_users(
 pub async fn get_user(
   State( state ): State< UserManagementState >,
   AuthenticatedUser( claims ): AuthenticatedUser,
-  Path( user_id ): Path< i64 >,
+  Path( user_id ): Path< String >,
 ) -> impl IntoResponse
 {
   // Check RBAC permission
@@ -430,7 +430,7 @@ pub async fn get_user(
   let user_service = UserService::new( state.db_pool.clone() );
 
   // Get user
-  match user_service.get_user_by_id( user_id ).await
+  match user_service.get_user_by_id( &user_id ).await
   {
     Ok( user ) =>
     {
@@ -454,7 +454,7 @@ pub async fn get_user(
 pub async fn suspend_user(
   State( state ): State< UserManagementState >,
   AuthenticatedUser( claims ): AuthenticatedUser,
-  Path( user_id ): Path< i64 >,
+  Path( user_id ): Path< String >,
   Json( request ): Json< SuspendUserRequest >,
 ) -> impl IntoResponse
 {
@@ -468,7 +468,7 @@ pub async fn suspend_user(
   }
 
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub;
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -484,7 +484,7 @@ pub async fn suspend_user(
   let user_service = UserService::new( state.db_pool.clone() );
 
   // Suspend user
-  match user_service.suspend_user( user_id, admin_id, request.reason ).await
+  match user_service.suspend_user( &user_id, &admin_id, request.reason ).await
   {
     Ok( user ) =>
     {
@@ -508,11 +508,11 @@ pub async fn suspend_user(
 pub async fn activate_user(
   State( state ): State< UserManagementState >,
   AuthenticatedUser( claims ): AuthenticatedUser,
-  Path( user_id ): Path< i64 >,
+  Path( user_id ): Path< String >,
 ) -> impl IntoResponse
 {
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub;
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -528,7 +528,7 @@ pub async fn activate_user(
   let user_service = UserService::new( state.db_pool.clone() );
 
   // Activate user
-  match user_service.activate_user( user_id, admin_id ).await
+  match user_service.activate_user( &user_id, &admin_id ).await
   {
     Ok( user ) =>
     {
@@ -552,11 +552,11 @@ pub async fn activate_user(
 pub async fn delete_user(
   State( state ): State< UserManagementState >,
   AuthenticatedUser( claims ): AuthenticatedUser,
-  Path( user_id ): Path< i64 >,
+  Path( user_id ): Path< String >,
 ) -> impl IntoResponse
 {
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub;
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -572,7 +572,7 @@ pub async fn delete_user(
   let user_service = UserService::new( state.db_pool.clone() );
 
   // Delete user
-  match user_service.delete_user( user_id, admin_id ).await
+  match user_service.delete_user( &user_id, &admin_id ).await
   {
     Ok( user ) =>
     {
@@ -596,7 +596,7 @@ pub async fn delete_user(
 pub async fn change_user_role(
   State( state ): State< UserManagementState >,
   AuthenticatedUser( claims ): AuthenticatedUser,
-  Path( user_id ): Path< i64 >,
+  Path( user_id ): Path< String >,
   Json( request ): Json< ChangeRoleRequest >,
 ) -> impl IntoResponse
 {
@@ -610,7 +610,7 @@ pub async fn change_user_role(
   }
 
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub;
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -626,7 +626,7 @@ pub async fn change_user_role(
   let user_service = UserService::new( state.db_pool.clone() );
 
   // Change role
-  match user_service.change_user_role( user_id, admin_id, request.role ).await
+  match user_service.change_user_role( &user_id, &admin_id, request.role ).await
   {
     Ok( user ) =>
     {
@@ -650,7 +650,7 @@ pub async fn change_user_role(
 pub async fn reset_password(
   State( state ): State< UserManagementState >,
   AuthenticatedUser( claims ): AuthenticatedUser,
-  Path( user_id ): Path< i64 >,
+  Path( user_id ): Path< String >,
   Json( request ): Json< ResetPasswordRequest >,
 ) -> impl IntoResponse
 {
@@ -664,7 +664,7 @@ pub async fn reset_password(
   }
 
   // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
+  let admin_id = claims.sub;
 
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
@@ -681,7 +681,7 @@ pub async fn reset_password(
 
   // Reset password
   let force_change = request.force_change.unwrap_or( true );
-  match user_service.reset_password( user_id, admin_id, request.new_password, force_change ).await
+  match user_service.reset_password( &user_id, &admin_id, request.new_password, force_change ).await
   {
     Ok( user ) =>
     {

@@ -78,7 +78,7 @@ mod tests
     let auth_state = create_test_auth_state().await;
 
     // Verify JWT generation works (implicitly validates TEST_JWT_SECRET is valid)
-    let token = auth_state.jwt_secret.generate_access_token( "test_user", "user" );
+    let token = auth_state.jwt_secret.generate_access_token( "user_123", "test_user@mail.com", "user", "token_id_001" );
     assert!( token.is_ok() );
   }
 

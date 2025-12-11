@@ -40,7 +40,7 @@ use crate::error::Result;
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-010, skipping 007).
+/// Migrations are applied in order (001-012, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -95,7 +95,7 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 011: Budget requests (Protocol 012)
   apply_migration_011( pool ).await?;
 
-  // Migration 012: Budget history (Protocol 017)
+  // Migration 012: Budget history (Protocol 012)
   apply_migration_012( pool ).await?;
 
   Ok( () )
@@ -275,6 +275,7 @@ async fn apply_migration_008( pool: &SqlitePool ) -> Result< () >
 
 
 /// Migration 009: Budget leases (Protocol 005)
+#[ allow( dead_code ) ]
 async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -298,6 +299,7 @@ async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 010: Agent budgets (Protocol 005)
+#[ allow( dead_code ) ]
 async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -321,6 +323,7 @@ async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 011: Budget requests (Protocol 012)
+#[ allow( dead_code ) ]
 async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -343,7 +346,8 @@ async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 012: Budget modification history (Protocol 017)
+/// Migration 012: Budget history (Protocol 012)
+#[ allow( dead_code ) ]
 async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(

@@ -17,6 +17,7 @@ enabled = [
   "dep:iron_token_manager",
   "dep:iron_secrets",
   "dep:tokio",
+  "dep:axum-extra",
   "dep:axum",
   "dep:tower",
   "dep:tower-http",
@@ -48,6 +49,7 @@ iron_secrets = { workspace = true, features = ["full"], optional = true }
 
 # Web framework
 axum = { workspace = true, features = ["ws"], optional = true }
+axum-extra = { workspace = true, optional = true, features = ["typed-header"] }
 tower = { workspace = true, optional = true }
 tower-http = { workspace = true, features = ["cors", "trace"], optional = true }
 

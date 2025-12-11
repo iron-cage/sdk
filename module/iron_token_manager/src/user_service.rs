@@ -6,13 +6,14 @@
 use core::fmt::Write as _;
 use sqlx::{ SqlitePool, Row };
 use crate::error::Result;
+use tracing::error;
 
 /// User data returned from database
 #[ derive( Debug, Clone ) ]
 pub struct User
 {
   /// Database ID
-  pub id: i64,
+  pub id: String,
   /// Username (unique)
   pub username: String,
   /// Email address (unique, optional)
@@ -30,11 +31,11 @@ pub struct User
   /// Suspension timestamp (milliseconds since epoch)
   pub suspended_at: Option< i64 >,
   /// Admin who suspended this user
-  pub suspended_by: Option< i64 >,
+  pub suspended_by: Option< String >,
   /// Deletion timestamp (milliseconds since epoch, soft delete)
   pub deleted_at: Option< i64 >,
   /// Admin who deleted this user
-  pub deleted_by: Option< i64 >,
+  pub deleted_by: Option< String >,
   /// Force password change on next login
   pub force_password_change: bool,
 }
@@ -90,9 +91,9 @@ pub struct UserAuditLog
   /// Operation type
   pub operation: String,
   /// Target user ID
-  pub target_user_id: i64,
+  pub target_user_id: String,
   /// Admin who performed operation
-  pub performed_by: i64,
+  pub performed_by: String,
   /// Operation timestamp (milliseconds since epoch)
   pub timestamp: i64,
   /// Previous state (JSON)
@@ -143,19 +144,24 @@ impl UserService
   /// - Email already exists (unique constraint violation)
   /// - Password hashing fails
   /// - Database insert fails
-  pub async fn create_user( &self, params: CreateUserParams, admin_id: i64 ) -> Result< User >
+  pub async fn create_user( &self, params: CreateUserParams, admin_id: &str ) -> Result< User >
   {
     // Hash password with BCrypt
     let password_hash = bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )
-      .map_err( |e| { println!( "Error hashing password: {e}" ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error hashing password: {}", e ); crate::error::TokenError } )?;
 
     let now_ms = current_time_ms();
 
+    let mut user_prefix = "user_".to_string();
+    let user_id = uuid::Uuid::new_v4().to_string();
+    user_prefix.push_str( &user_id );
+
     // Insert user
-    let result = sqlx::query(
-      "INSERT INTO users (username, password_hash, email, role, is_active, created_at) \
-       VALUES ($1, $2, $3, $4, 1, $5)"
+    let _result = sqlx::query(
+      "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+       VALUES ($1, $2, $3, $4, $5, 1, $6)"
     )
+    .bind( &user_prefix )
     .bind( &params.username )
     .bind( &password_hash )
     .bind( &params.email )
@@ -163,14 +169,14 @@ impl UserService
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |e| { println!( "Error creating user: {e}" ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error creating user: {}", e ); crate::error::TokenError } )?;
 
-    let user_id = result.last_insert_rowid();
+    let user_id = user_prefix;
 
     // Audit log
     self.log_audit(
       "create",
-      user_id,
+      &user_id,
       admin_id,
       None,
       Some( serde_json::json!( {
@@ -180,10 +186,9 @@ impl UserService
       } ).to_string() ),
       None,
     ).await?;
-    println!( "Hello" );
 
     // Return created user
-    self.get_user_by_id( user_id ).await
+    self.get_user_by_id( &user_id ).await
   }
 
   /// List users with optional filters
@@ -277,7 +282,7 @@ impl UserService
   /// # Errors
   ///
   /// Returns error if user not found or database query fails
-  pub async fn get_user_by_id( &self, user_id: i64 ) -> Result< User >
+  pub async fn get_user_by_id( &self, user_id: &str ) -> Result< User >
   {
     let row = sqlx::query(
       "SELECT id, username, email, password_hash, role, is_active, created_at, \
@@ -324,7 +329,7 @@ impl UserService
   /// - User not found
   /// - User already suspended
   /// - Database update fails
-  pub async fn suspend_user( &self, user_id: i64, admin_id: i64, reason: Option< String > ) -> Result< User >
+  pub async fn suspend_user( &self, user_id: &str, admin_id: &str, reason: Option< String > ) -> Result< User >
   {
     let now_ms = current_time_ms();
 
@@ -378,7 +383,7 @@ impl UserService
   /// - User not found
   /// - User already active
   /// - Database update fails
-  pub async fn activate_user( &self, user_id: i64, admin_id: i64 ) -> Result< User >
+  pub async fn activate_user( &self, user_id: &str, admin_id: &str ) -> Result< User >
   {
     // Get current user state
     let user = self.get_user_by_id( user_id ).await?;
@@ -428,7 +433,7 @@ impl UserService
   /// - User not found
   /// - Trying to delete self
   /// - Database update fails
-  pub async fn delete_user( &self, user_id: i64, admin_id: i64 ) -> Result< User >
+  pub async fn delete_user( &self, user_id: &str, admin_id: &str ) -> Result< User >
   {
     // Prevent deleting self
     if user_id == admin_id
@@ -480,7 +485,7 @@ impl UserService
   /// - User not found
   /// - Trying to change own role
   /// - Database update fails
-  pub async fn change_user_role( &self, user_id: i64, admin_id: i64, new_role: String ) -> Result< User >
+  pub async fn change_user_role( &self, user_id: &str, admin_id: &str, new_role: String ) -> Result< User >
   {
     // Prevent changing own role
     if user_id == admin_id
@@ -534,8 +539,8 @@ impl UserService
   /// - Database update fails
   pub async fn reset_password(
     &self,
-    user_id: i64,
-    admin_id: i64,
+    user_id: &str,
+    admin_id: &str,
     new_password: String,
     force_change: bool,
   ) -> Result< User >
@@ -587,20 +592,22 @@ impl UserService
   async fn log_audit(
     &self,
     operation: &str,
-    target_user_id: i64,
-    performed_by: i64,
+    target_user_id: &str,
+    performed_by: &str,
     previous_state: Option< String >,
     new_state: Option< String >,
     reason: Option< String >,
   ) -> Result< () >
   {
     let now_ms = current_time_ms();
+    let audit_id = format!( "audit_{}", uuid::Uuid::new_v4() );
 
     sqlx::query(
       "INSERT INTO user_audit_log \
-       (operation, target_user_id, performed_by, timestamp, previous_state, new_state, reason) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7)"
+       (id, operation, target_user_id, performed_by, timestamp, previous_state, new_state, reason) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
     )
+    .bind( &audit_id )
     .bind( operation )
     .bind( target_user_id )
     .bind( performed_by )
@@ -610,7 +617,7 @@ impl UserService
     .bind( reason )
     .execute( &self.pool )
     .await
-    .map_err( |e| { println!( "Error logging audit: {e}" ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error logging audit: {}", e ); crate::error::TokenError } )?;
 
     Ok( () )
   }

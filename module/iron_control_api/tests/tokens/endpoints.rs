@@ -72,7 +72,7 @@ async fn test_create_token_valid_request()
   );
 
   let ( status, body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( response ).await;
-  println!( "Status: {:?}, Body: {:?}", status, body );
+  tracing::debug!( "Status: {:?}, Body: {:?}", status, body );
   assert_eq!( status, StatusCode::CREATED );
   assert_eq!( body.user_id, "user_test" );
   assert_eq!( body.project_id, Some( "project_abc".to_string() ) );

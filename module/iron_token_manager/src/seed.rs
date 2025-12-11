@@ -167,11 +167,13 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
 
   // Admin user
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
+  .bind( "user_admin" )
   .bind( "admin" )
   .bind( password_hash )
+  .bind( "admin@example.com" )
   .bind( "admin" )
   .bind( 1 )
   .bind( now_ms )
@@ -181,11 +183,13 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
 
   // Developer user
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
+  .bind( "user_developer" )
   .bind( "developer" )
   .bind( password_hash )
+  .bind( "developer@example.com" )
   .bind( "user" )
   .bind( 1 )
   .bind( now_ms )
@@ -195,11 +199,13 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
 
   // Inactive viewer user
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
+  .bind( "user_viewer" )
   .bind( "viewer" )
   .bind( password_hash )
+  .bind( "viewer@example.com" )
   .bind( "user" )
   .bind( 0 )
   .bind( now_ms )
@@ -209,11 +215,13 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
 
   // Tester user (no usage limits - unlimited testing)
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
+  .bind( "user_tester" )
   .bind( "tester" )
   .bind( password_hash )
+  .bind( "tester@example.com" )
   .bind( "user" )
   .bind( 1 )
   .bind( now_ms - ( 7 * day_ms ) )  // Created a week ago
@@ -223,11 +231,13 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
 
   // Guest user (no tokens - just registered)
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
+  .bind( "user_guest" )
   .bind( "guest" )
   .bind( password_hash )
+  .bind( "guest@example.com" )
   .bind( "user" )
   .bind( 1 )
   .bind( now_ms - ( 60 * 60 * 1000 ) )  // Created 1 hour ago
