@@ -11,11 +11,12 @@
 CREATE TABLE IF NOT EXISTS users
 (
   -- Primary key
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 255),
 
   -- Authentication fields
   username TEXT NOT NULL UNIQUE CHECK (LENGTH(username) > 0 AND LENGTH(username) <= 255),
   password_hash TEXT NOT NULL CHECK (LENGTH(password_hash) > 0 AND LENGTH(password_hash) <= 255),
+  email TEXT NOT NULL UNIQUE CHECK (LENGTH(email) > 0 AND LENGTH(email) <= 255),
 
   -- Authorization
   role TEXT NOT NULL DEFAULT 'user' CHECK (LENGTH(role) > 0 AND LENGTH(role) <= 50),
@@ -31,20 +32,23 @@ CREATE TABLE IF NOT EXISTS users
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Token blacklist for logout functionality (JWT revocation)
-CREATE TABLE IF NOT EXISTS token_blacklist
+CREATE TABLE IF NOT EXISTS blacklist
 (
   -- JWT ID (jti claim)
   jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
 
   -- User who owned the token
-  user_id TEXT NOT NULL CHECK (LENGTH(user_id) > 0 AND LENGTH(user_id) <= 500),
+  user_id TEXT NOT NULL CHECK (LENGTH(user_id) > 0 AND LENGTH(user_id) <= 255),
 
   -- When the token was blacklisted (Unix epoch seconds)
-  blacklisted_at INTEGER NOT NULL
+  blacklisted_at INTEGER NOT NULL,
+
+  -- When the token expires (Unix epoch seconds)
+  expires_at INTEGER NOT NULL
 );
 
 -- Index for looking up blacklisted tokens by user
-CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+CREATE INDEX IF NOT EXISTS idx_blacklist_user_id ON blacklist(user_id);
 
 -- Create guard table to mark migration as completed
 CREATE TABLE IF NOT EXISTS _migration_003_completed (applied_at INTEGER NOT NULL);
