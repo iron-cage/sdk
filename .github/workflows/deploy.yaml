@@ -2,13 +2,13 @@ name: Deploy CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "feat/deploy" ]
 
   workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: amd
+    runs-on: iron_sdk
     steps:
     - uses: actions/checkout@v4
     
@@ -23,6 +23,9 @@ jobs:
           echo "PROJECT_NAME=${{ secrets.PROJECT_NAME }}"
           echo "SECRET_HETZNER_CLOUD_TOKEN=${{ secrets.SECRET_HETZNER_CLOUD_TOKEN }}"
           echo "TF_VAR_PROJECT_ID=${{ secrets.TF_VAR_PROJECT_ID }}"
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+          echo "IRON_SECRETS_MASTER_KEY=${{ secrets.IRON_SECRETS_MASTER_KEY }}"
         } > .secret/-secret.sh
 
     - name: Create key files

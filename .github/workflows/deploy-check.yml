@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy-tests:
-    runs-on: arm-iron
+    runs-on: iron_sdk
 
     steps:
     - name: Checkout code
@@ -22,7 +22,7 @@ jobs:
         bats deploy/tests/redeploy.bats
 
   terraform-validate-gar:
-    runs-on: arm-iron
+    runs-on: iron_sdk
 
     defaults:
       run:
@@ -48,32 +48,9 @@ jobs:
           hashicorp/terraform:1.7.4 \
           validate
 
-  terraform-validate-aws:
-    name: Validate deploy/aws
-    runs-on: arm-iron
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Terraform validate in Docker
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/aws \
-            hashicorp/terraform:1.7.4 \
-            init -backend=false -input=false
-
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/aws \
-            hashicorp/terraform:1.7.4 \
-            validate
-
   terraform-validate-hetzner:
     name: Validate deploy/hetzner
-    runs-on: arm-iron
+    runs-on: iron_sdk
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -91,28 +68,5 @@ jobs:
             --user "$(id -u):$(id -g)" \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace/deploy/hetzner \
-            hashicorp/terraform:1.7.4 \
-            validate
-
-  terraform-validate-gce:
-    name: Validate deploy/gce
-    runs-on: arm-iron
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Terraform validate in Docker
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/gce \
-            hashicorp/terraform:1.7.4 \
-            init -backend=false -input=false
-
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/gce \
             hashicorp/terraform:1.7.4 \
             validate
