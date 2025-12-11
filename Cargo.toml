@@ -5,6 +5,7 @@ members = [
   "module/iron_types",
   "module/iron_cost",
   "module/iron_telemetry",
+  "module/iron_runtime_analytics",
 
   # Infrastructure layer
   "module/iron_runtime_state",
@@ -293,6 +294,9 @@ path = "module/iron_cli"
 
 [workspace.dependencies.iron_control_schema]
 path = "module/iron_control_schema"
+
+[workspace.dependencies.iron_runtime_analytics]
+path = "module/iron_runtime_analytics"
 
 ## HTTP Client
 

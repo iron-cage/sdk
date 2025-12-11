@@ -1,0 +1,15 @@
+[package]
+name = "iron_runtime_analytics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["enabled"]
+enabled = []
+full = ["enabled"]
+
+[dependencies]
+
+[dev-dependencies]
