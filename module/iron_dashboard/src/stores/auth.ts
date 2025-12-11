@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 interface LoginCredentials {
-  username: string
+  email: string
   password: string
 }
 

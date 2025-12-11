@@ -115,6 +115,10 @@ features = ["derive"]
 [workspace.dependencies.axum]
 version = "0.7"
 
+[workspace.dependencies.axum-extra]
+version = "0.9"
+features = ["typed-header"]
+
 [workspace.dependencies.tower]
 version = "0.5"
 

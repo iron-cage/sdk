@@ -304,11 +304,12 @@ pub async fn login(
     }
   };
 
-  let user_id = &user.username;
+  let user_id = &user.id;
   let user_role = &user.role;
 
   // Generate tokens
-  let access_token = match state.jwt_secret.generate_access_token( user_id, user_role )
+  let access_token_id = format!( "access_{}_{}", user_id, chrono::Utc::now().timestamp() );
+  let access_token = match state.jwt_secret.generate_access_token( 1, user_role, &access_token_id )
   {
     Ok( token ) => token,
     Err( _ ) =>
@@ -323,7 +324,7 @@ pub async fn login(
 
   // Generate unique refresh token ID
   let refresh_token_id = format!( "refresh_{}_{}", user_id, chrono::Utc::now().timestamp() );
-  let refresh_token = match state.jwt_secret.generate_refresh_token( user_id, &refresh_token_id )
+  let refresh_token = match state.jwt_secret.generate_refresh_token( 1, &refresh_token_id )
   {
     Ok( token ) => token,
     Err( _ ) =>
@@ -394,7 +395,7 @@ pub async fn refresh(
   let user_id = &claims.sub;
 
   // Fetch user to get role
-  let user = match user_auth::get_user_by_username( &state.db_pool, user_id ).await
+  let user = match user_auth::get_user_by_id( &state.db_pool, user_id ).await
   {
     Ok( Some( user ) ) => user,
     _ =>
@@ -408,7 +409,8 @@ pub async fn refresh(
   };
 
   // Generate new access token
-  let access_token = match state.jwt_secret.generate_access_token( user_id, &user.role )
+  let access_token_id = format!( "access_{}_{}", user_id, chrono::Utc::now().timestamp() );
+  let access_token = match state.jwt_secret.generate_access_token( 1, &user.role, &access_token_id )
   {
     Ok( token ) => token,
     Err( _ ) =>
@@ -423,7 +425,7 @@ pub async fn refresh(
 
   // Generate new refresh token (token rotation)
   let new_refresh_token_id = format!( "refresh_{}_{}", user_id, chrono::Utc::now().timestamp() );
-  let refresh_token = match state.jwt_secret.generate_refresh_token( user_id, &new_refresh_token_id )
+  let refresh_token = match state.jwt_secret.generate_refresh_token( 1, &new_refresh_token_id )
   {
     Ok( token ) => token,
     Err( _ ) =>
