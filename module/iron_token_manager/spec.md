@@ -29,6 +29,14 @@ Manages API token lifecycle and user account management for Iron Cage with secur
 - BCrypt password hashing (cost factor 12)
 - SQLite persistence with migrations
 - Token metadata (name, created_at, last_used, owner)
+- Budget lease management (Protocol 005)
+- Agent budget tracking (1:1 with agents)
+- IC Token generation and validation (JWT with agent_id, budget_id)
+- IP Token encryption/decryption (AES-256-GCM)
+- Budget request workflow (Protocol 012)
+- Budget change request CRUD (create, get, list, approve, reject)
+- Budget modification history tracking
+- Atomic budget application with transaction guarantees
 
 **Out of Scope:**
 - OAuth2/OIDC integration (future enhancement)
@@ -37,7 +45,6 @@ Manages API token lifecycle and user account management for Iron Cage with secur
 - Token analytics and reporting UI (see iron_dashboard)
 - REST API endpoints (see iron_control_api)
 - Cost calculation logic (see iron_cost)
-- Budget tracking implementation (see iron_cost)
 
 ## Deployment Context
 
@@ -178,6 +185,97 @@ let updated = user_service.change_user_role(user.id, admin_id, "admin".to_string
 let reset = user_service.reset_password(user.id, admin_id, "NewPass456!".to_string(), true).await?;
 ```
 
+### Budget Lease Management (Protocol 005)
+
+```rust
+use iron_token_manager::{ LeaseManager, AgentBudgetManager };
+use sqlx::SqlitePool;
+
+// Create lease manager
+let pool = SqlitePool::connect( "./tokens.db" ).await?;
+let lease_mgr = LeaseManager::from_pool( pool.clone() );
+
+// Create budget lease
+lease_mgr.create_lease(
+  "lease_abc123",     // lease_id (format: lease_<uuid>)
+  42,                 // agent_id
+  42,                 // budget_id (1:1 with agent)
+  10.0,               // budget_granted (USD)
+  None                // expires_at (optional)
+).await?;
+
+// Record usage
+lease_mgr.record_usage( "lease_abc123", 2.5 ).await?;
+
+// Get lease status
+let lease = lease_mgr.get_lease( "lease_abc123" ).await?;
+println!( "Spent: ${}, Remaining: ${}", lease.budget_spent, lease.budget_granted - lease.budget_spent );
+
+// Create agent budget
+let budget_mgr = AgentBudgetManager::from_pool( pool );
+budget_mgr.create_budget( 42, 100.0 ).await?;
+
+// Check budget availability
+let has_budget = budget_mgr.has_sufficient_budget( 42, 10.0 ).await?;
+
+// Record spending (updates budget_remaining)
+budget_mgr.record_spending( 42, 2.5 ).await?;
+
+// Get budget status
+let budget = budget_mgr.get_budget( 42 ).await?;
+println!( "Total: ${}, Spent: ${}, Remaining: ${}",
+  budget.total_allocated, budget.total_spent, budget.budget_remaining );
+```
+
+### Budget Request Workflow (Protocol 012)
+
+```rust
+use iron_token_manager::budget_request;
+use sqlx::SqlitePool;
+
+// Create pool
+let pool = SqlitePool::connect( "./tokens.db" ).await?;
+
+// Create budget request
+let request_id = "breq_550e8400-e29b-41d4-a716-446655440000";
+let now_ms = chrono::Utc::now().timestamp_millis();
+
+budget_request::create_budget_request(
+  &pool,
+  request_id,
+  1,                      // agent_id
+  "user-123",             // requester_id
+  100_000_000,            // current_budget_micros ($100)
+  250_000_000,            // requested_budget_micros ($250)
+  "Need increased budget for expanded testing",
+  now_ms
+).await?;
+
+// Get request by ID
+let request = budget_request::get_budget_request( &pool, request_id ).await?;
+println!( "Status: {}, Current: ${}, Requested: ${}",
+  request.status, request.current_budget_usd, request.requested_budget_usd );
+
+// List all pending requests
+let pending = budget_request::list_budget_requests( &pool, None, Some( "pending" ) ).await?;
+println!( "Pending requests: {}", pending.len() );
+
+// Approve request (atomically updates budget and records history)
+budget_request::approve_budget_request(
+  &pool,
+  request_id,
+  "admin-approver",       // approver_id
+  chrono::Utc::now().timestamp_millis()
+).await?;
+
+// Reject request
+budget_request::reject_budget_request(
+  &pool,
+  request_id,
+  chrono::Utc::now().timestamp_millis()
+).await?;
+```
+
 ---
 
 ## Architecture
@@ -197,10 +295,17 @@ iron_token_manager/
 │   ├── cost_calculator.rs      # Cost calculation (uses iron_cost)
 │   ├── trace_storage.rs        # Trace storage for debugging
 │   ├── provider_adapter.rs     # Adapter for external providers
+│   ├── lease_manager.rs        # Budget lease management (Protocol 005)
+│   ├── agent_budget.rs         # Agent budget tracking (Protocol 005)
+│   ├── budget_request.rs       # Budget request workflow (Protocol 012)
 │   └── error.rs                # Error types
 ├── migrations/                 # SQLite schema migrations
 │   ├── 005_enhance_users_table.sql        # User management fields
-│   └── 006_create_user_audit_log.sql      # Audit logging
+│   ├── 006_create_user_audit_log.sql      # Audit logging
+│   ├── 009_create_budget_leases.sql       # Budget leases table (Protocol 005)
+│   ├── 010_create_agent_budgets.sql       # Agent budgets table (Protocol 005)
+│   ├── 011_create_budget_requests.sql     # Budget change requests (Protocol 012)
+│   └── 012_create_budget_history.sql      # Budget modification history (Protocol 012)
 ├── tests/                      # Integration tests
 ├── Cargo.toml
 └── readme.md
@@ -244,6 +349,29 @@ iron_token_manager/
 - Password management (BCrypt hashing, reset, force change)
 - Audit logging (all operations tracked)
 - Self-modification prevention (can't delete/change own role)
+
+**LeaseManager (Protocol 005):**
+- Budget lease CRUD operations
+- Temporary budget allocations per agent session
+- Usage tracking per lease (budget_spent updates)
+- Lease status management (active, expired, revoked)
+- Foreign key enforcement (agent_id, budget_id)
+
+**AgentBudgetManager (Protocol 005):**
+- Per-agent total budget tracking (1:1 with agents)
+- Budget invariant maintenance (allocated = spent + remaining)
+- Spending records with automatic budget_remaining updates
+- Sufficient budget checks before lease creation
+- Integrates with LeaseManager for session-level tracking
+
+**budget_request Module (Protocol 012):**
+- Budget change request workflow (create → approve/reject)
+- Request CRUD operations (create, get by ID, list with filters)
+- Atomic approval with budget application and history recording
+- Optimistic locking for concurrent modification prevention
+- Request status management (pending → approved/rejected)
+- Budget modification history tracking with full audit trail
+- Database transaction guarantees for consistency
 
 ---
 
@@ -305,6 +433,87 @@ iron_token_manager/
 | new_state | TEXT | NULL | New state (JSON) |
 | reason | TEXT | NULL | Optional reason |
 
+### budget_leases Table (Protocol 005)
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| id | TEXT | PRIMARY KEY | Lease ID (format: lease_<uuid>) |
+| agent_id | INTEGER | NOT NULL, FOREIGN KEY (agents.id) | Agent database ID |
+| budget_id | INTEGER | NOT NULL, FOREIGN KEY (agent_budgets.agent_id) | Budget database ID (1:1 with agent) |
+| budget_granted | REAL | NOT NULL | USD allocated for this lease |
+| budget_spent | REAL | NOT NULL, DEFAULT 0.0 | USD consumed in this lease |
+| lease_status | TEXT | NOT NULL | Lease status (active, expired, revoked) |
+| created_at | INTEGER | NOT NULL | Creation timestamp (milliseconds since epoch) |
+| expires_at | INTEGER | NULL | Expiration timestamp (milliseconds, NULL = no expiration) |
+
+**Foreign Keys:**
+```sql
+FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+FOREIGN KEY (budget_id) REFERENCES agent_budgets(agent_id) ON DELETE CASCADE
+```
+
+### agent_budgets Table (Protocol 005)
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| agent_id | INTEGER | PRIMARY KEY, FOREIGN KEY (agents.id) | Agent database ID (1:1 relationship) |
+| total_allocated | REAL | NOT NULL | Total USD budget allocated to agent |
+| total_spent | REAL | NOT NULL, DEFAULT 0.0 | Total USD spent by agent across all leases |
+| budget_remaining | REAL | NOT NULL | Remaining budget (invariant: allocated = spent + remaining) |
+| created_at | INTEGER | NOT NULL | Creation timestamp (milliseconds since epoch) |
+| updated_at | INTEGER | NOT NULL | Last update timestamp (milliseconds since epoch) |
+
+**Foreign Keys:**
+```sql
+FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+```
+
+**Invariant:** The budget_remaining column maintains the invariant: `total_allocated = total_spent + budget_remaining`. This is enforced by application logic in `AgentBudgetManager::record_spending()`.
+
+### budget_change_requests Table (Protocol 012)
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| id | TEXT | PRIMARY KEY | Request ID (format: breq_<uuid>) |
+| agent_id | INTEGER | NOT NULL, FOREIGN KEY (agents.id) | Agent database ID |
+| requester_id | TEXT | NOT NULL | User who created the request |
+| current_budget_micros | INTEGER | NOT NULL | Budget at time of request creation (microdollars) |
+| requested_budget_micros | INTEGER | NOT NULL | Requested budget amount (microdollars) |
+| justification | TEXT | NOT NULL, CHECK (LENGTH >= 20 AND <= 500) | Request justification |
+| status | TEXT | NOT NULL, CHECK IN ('pending', 'approved', 'rejected', 'cancelled') | Current status |
+| created_at | INTEGER | NOT NULL | Creation timestamp (milliseconds since epoch) |
+| updated_at | INTEGER | NOT NULL | Last update timestamp (milliseconds since epoch) |
+
+**Foreign Keys:**
+```sql
+FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+```
+
+**Optimistic Locking:** Status transitions use `WHERE status='pending'` clause to prevent concurrent modifications. Only pending requests can be approved or rejected.
+
+### budget_modification_history Table (Protocol 012)
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| id | TEXT | PRIMARY KEY | History record ID (format: bhist_<uuid>) |
+| agent_id | INTEGER | NOT NULL, FOREIGN KEY (agents.id) | Agent database ID |
+| modification_type | TEXT | NOT NULL, CHECK IN ('increase', 'decrease', 'reset') | Type of budget change |
+| old_budget_micros | INTEGER | NOT NULL | Budget before change (microdollars) |
+| new_budget_micros | INTEGER | NOT NULL | Budget after change (microdollars) |
+| change_amount_micros | INTEGER | NOT NULL | Delta amount (new - old, microdollars) |
+| modifier_id | TEXT | NOT NULL | User/system who made the change |
+| reason | TEXT | NOT NULL, CHECK (LENGTH >= 10 AND <= 500) | Reason for change |
+| related_request_id | TEXT | FOREIGN KEY (budget_change_requests.id) | Associated request (nullable) |
+| created_at | INTEGER | NOT NULL | Change timestamp (milliseconds since epoch) |
+
+**Foreign Keys:**
+```sql
+FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+FOREIGN KEY (related_request_id) REFERENCES budget_change_requests(id) ON DELETE SET NULL
+```
+
+**Audit Trail:** All budget modifications are recorded in this table, including manual changes and request-driven changes. The `related_request_id` links history records to their originating requests.
+
 ### Indexes
 
 ```sql
@@ -320,6 +529,9 @@ CREATE INDEX idx_user_audit_target ON user_audit_log(target_user_id);
 CREATE INDEX idx_user_audit_performer ON user_audit_log(performed_by);
 CREATE INDEX idx_user_audit_timestamp ON user_audit_log(timestamp);
 CREATE INDEX idx_user_audit_operation ON user_audit_log(operation);
+CREATE INDEX idx_budget_requests_status ON budget_change_requests(status);
+CREATE INDEX idx_budget_requests_agent ON budget_change_requests(agent_id);
+CREATE INDEX idx_budget_history_agent ON budget_modification_history(agent_id);
 ```
 
 ---
@@ -458,6 +670,21 @@ async fn my_test_with_data() {
 - ✅ Comprehensive seed data (two-tier approach with edge cases)
 - ✅ Testing infrastructure (v2 helpers, validation scripts, pre-commit hooks)
 - ✅ Testing standards documentation
+- ✅ Protocol 005: Budget Control Protocol
+  - ✅ Budget lease management (LeaseManager)
+  - ✅ Agent budget tracking (AgentBudgetManager)
+  - ✅ IC Token generation (JWT with agent_id, budget_id)
+  - ✅ IP Token encryption (AES-256-GCM)
+  - ✅ Multi-layer enforcement (database + schema + API)
+  - ✅ 26 Protocol 005 tests (all passing)
+- ✅ Protocol 012: Budget Request Workflow
+  - ✅ Budget change request CRUD operations (create, get, list)
+  - ✅ Approval/rejection workflow with optimistic locking
+  - ✅ Atomic budget application with transaction guarantees
+  - ✅ Budget modification history tracking
+  - ✅ Database schema (budget_change_requests, budget_modification_history)
+  - ✅ 19 Protocol 012 API tests (all passing)
+  - ✅ 15 Protocol 012 storage tests (all passing)
 
 **Pending:**
 - 📋 PostgreSQL migration for production mode
@@ -539,6 +766,24 @@ async fn my_test_with_data() {
 ---
 
 ## Revision History
+
+- **2025-12-11 (v0.1.3):** Protocol 012 (Budget Request Workflow)
+  - Budget change request CRUD operations (create, get by ID, list with filters)
+  - Approval/rejection workflow with optimistic locking
+  - Atomic budget application with transaction guarantees (approve updates budget + status + history)
+  - Budget modification history tracking with full audit trail
+  - Database schema: budget_change_requests and budget_modification_history tables
+  - Microdollar precision for budget calculations
+  - 19 Protocol 012 API tests + 15 storage tests (all passing)
+
+- **2025-12-11 (v0.1.2):** Protocol 005 (Budget Control Protocol)
+  - Budget lease management (LeaseManager API)
+  - Agent budget tracking (AgentBudgetManager API, 1:1 with agents)
+  - IC Token generation and validation (JWT with agent_id, budget_id)
+  - IP Token encryption/decryption (AES-256-GCM)
+  - Database schema: budget_leases and agent_budgets tables
+  - Multi-layer enforcement (database + schema + API)
+  - 26 Protocol 005 tests (all passing)
 
 - **2025-12-11 (v0.1.1):** Database testing infrastructure
   - Database path standardization (test, dev, CI/CD paths)

@@ -276,12 +276,16 @@ async fn test_all_indexes_created()
   .await
   .expect( "Failed to count indexes" );
 
-  // Expected: All migrations create 32 indexes total
+  // Expected: All migrations create 36 indexes total
   // Migration 001: 15 indexes (api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
   // Migration 003: 2 indexes (users, token_blacklist)
   // Migration 004: 4 indexes (ai_provider_keys, project_key_assignments)
   // Migration 005: 4 indexes (users enhancements)
   // Migration 006: 4 indexes (user_audit_log)
   // Migration 008: 3 indexes (agents, api_tokens agent_id)
-  assert_eq!( index_count, 32, "Expected 32 indexes to be created across all migrations" );
+  // Migration 009: 3 indexes (budget_leases)
+  // Migration 010: 1 index (agent_budgets)
+  // Migration 011: 2 indexes (budget_change_requests)
+  // Migration 012: 1 index (budget_modification_history)
+  assert_eq!( index_count, 39, "Expected 39 indexes to be created across all migrations" );
 }

@@ -876,7 +876,7 @@ mod tests
       .fetch_one( &pool )
       .await
       .unwrap();
-    assert!( usage_count >= 10, "Should create at least 10 usage records, got {}", usage_count );
+    assert!( usage_count >= 10, "Should create at least 10 usage records, got {usage_count}" );
   }
 
   #[ tokio::test ]

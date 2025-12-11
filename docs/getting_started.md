@@ -58,16 +58,47 @@ python my_agent.py
 
 **You are:** Platform admin / DevOps engineer
 **You need:** Control Panel server
-**Time to start:** 5 minutes
+**Time to start:** 2 minutes (dev mode) or 5 minutes (production)
 
-### Step 1: Clone Repository
+### Quick Start: Development Mode (Recommended for Testing)
+
+**Best for:** Testing, debugging, or first-time exploration with automatic database reset.
+
+```bash
+# Clone repository
+git clone https://github.com/iron-cage/iron_runtime.git
+cd iron_runtime/dev
+
+# Start development mode (single command, no configuration needed)
+docker compose -f docker-compose.dev.yml up
+
+# Access:
+# - Frontend: http://localhost:5173
+# - Backend: http://localhost:3000/api/health
+```
+
+**What happens:**
+- Database automatically wiped on every restart (fresh state)
+- Hot reload enabled (edit code, see changes instantly)
+- No .env file required (development secrets hardcoded)
+- First startup: 2-5 min (compiles from source)
+
+**⚠️ WARNING:** Development mode **deletes all data on startup**. Use only for testing.
+
+---
+
+### Production Deployment (Data Persistence)
+
+**Best for:** Production deployment where data must persist across restarts.
+
+#### Step 1: Clone Repository
 
 ```bash
 git clone https://github.com/iron-cage/iron_runtime.git
 cd iron_runtime/dev
 ```
 
-### Step 2: Configure Secrets
+#### Step 2: Configure Secrets
 
 ```bash
 # Copy environment template
@@ -82,7 +113,7 @@ nano .env
 # Or use your preferred editor (vim, code, etc.)
 ```
 
-### Step 3: Start Services
+#### Step 3: Start Services
 
 ```bash
 # Start all services (Backend + Frontend with SQLite database)
@@ -95,7 +126,7 @@ docker compose logs -f
 docker compose ps
 ```
 
-### Step 4: Access Dashboard
+#### Step 4: Access Dashboard
 
 Open http://localhost:8080
 

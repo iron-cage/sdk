@@ -246,10 +246,9 @@ pub async fn create_provider_key(
   }
 
   let keys = keys.unwrap();
-  let key_id;
-  if !keys.is_empty()
+  let key_id = if !keys.is_empty()
   {
-    key_id = match state.storage.update_key(
+    match state.storage.update_key(
       keys[0],
       provider,
       &encrypted.ciphertext_base64(),
@@ -268,7 +267,7 @@ pub async fn create_provider_key(
       }
     }
   } else {
-    key_id = match state.storage.create_key(
+    match state.storage.create_key(
       provider,
       &encrypted.ciphertext_base64(),
       &encrypted.nonce_base64(),
@@ -285,7 +284,7 @@ pub async fn create_provider_key(
         }) ) ).into_response();
       }
     }
-  }
+  };
 
   // Get metadata for response
   let metadata = match state.storage.get_key_metadata( key_id ).await

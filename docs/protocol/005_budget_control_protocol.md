@@ -401,6 +401,134 @@ if local_budget_remaining < estimated_cost:
 - Memory dump attack: IP Token encrypted, key unavailable outside process
 - Disk forensics: No IP Token on disk
 
+## Protocol Exclusivity: Enforcement Strategy
+
+**Critical Requirement:** Protocol 005 must be the ONLY way for agents to access LLM provider credentials. Any bypass path violates the budget control guarantee.
+
+### Multi-Layer Enforcement
+
+The system enforces Protocol 005 exclusivity through three complementary layers:
+
+#### Layer 1: Database Constraints
+
+Foreign key constraints in the database schema prevent orphaned budget data and enforce the agent-budget-lease relationship:
+
+```sql
+-- budget_leases table (migration 009)
+CREATE TABLE budget_leases (
+  agent_id INTEGER NOT NULL,
+  budget_id INTEGER NOT NULL,
+  -- ...
+  FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+  FOREIGN KEY (budget_id) REFERENCES agent_budgets(agent_id) ON DELETE CASCADE
+);
+
+-- agent_budgets table (migration 010)
+CREATE TABLE agent_budgets (
+  agent_id INTEGER PRIMARY KEY,
+  -- ...
+  FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+);
+```
+
+**Guarantees:**
+- Budget leases can only exist for valid agents
+- Leases can only reference existing agent budgets
+- Deleting an agent cascades to budgets and leases
+- Orphaned budget data is impossible at database level
+
+#### Layer 2: Token Distinguishability
+
+The `api_tokens` table includes an `agent_id` column (nullable) that distinguishes agent tokens from user tokens:
+
+```sql
+-- api_tokens table
+CREATE TABLE api_tokens (
+  id INTEGER PRIMARY KEY,
+  -- ...
+  agent_id INTEGER,  -- NULL = user token, NOT NULL = agent token
+  FOREIGN KEY (agent_id) REFERENCES agents(id)
+);
+```
+
+**Token Types:**
+- **User tokens:** `agent_id = NULL` - Full API access including `/api/keys`
+- **Agent tokens:** `agent_id = NOT NULL` - Must use Protocol 005 exclusively
+
+#### Layer 3: API Enforcement
+
+The `/api/keys` endpoint explicitly rejects agent tokens with HTTP 403 Forbidden:
+
+```rust
+// /module/iron_control_api/src/routes/keys.rs lines 103-136
+pub async fn get_key(
+  auth: ApiTokenAuth,
+  State(state): State<KeysState>,
+) -> Result<Json<KeyResponse>, (StatusCode, Json<serde_json::Value>)>
+{
+  // Check if token is associated with an agent
+  let agent_id: Option<i64> = sqlx::query_scalar(
+    "SELECT agent_id FROM api_tokens WHERE id = ?"
+  )
+  .bind(auth.token_id)
+  .fetch_one(pool)
+  .await?;
+
+  if agent_id.is_some() {
+    return Err((
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": "Agent tokens cannot use this endpoint",
+        "details": "Agent credentials must be obtained through Protocol 005 (Budget Control). Use POST /api/budget/handshake with your IC Token.",
+        "protocol": "005"
+      })),
+    ));
+  }
+  // ... rest of function
+}
+```
+
+**Enforcement Behavior:**
+- Agent tokens attempting to access `/api/keys` receive HTTP 403
+- Error message directs to Protocol 005
+- No credential bypass path exists
+
+### Verification Tests
+
+Protocol 005 exclusivity is verified through enforcement tests:
+
+**Test File:** `/module/iron_control_api/tests/protocol_005_enforcement_simple.rs`
+
+**Test Coverage:**
+1. `test_database_constraints_enforce_agent_budget_relationship()` - Verifies foreign keys exist on `budget_leases` table
+2. `test_api_tokens_table_has_agent_id_column()` - Verifies schema supports token distinguishability
+3. `test_agent_tokens_are_distinguishable_from_user_tokens()` - Verifies tokens can be identified by `agent_id` field
+4. `test_enforcement_summary()` - Documents multi-layer enforcement strategy
+
+**Running Tests:**
+```bash
+cargo test --test protocol_005_enforcement_simple --all-features
+```
+
+### Bypass Path Analysis
+
+**Potential Bypass (BLOCKED):** Agent token → `/api/keys` → Decrypted provider credentials
+
+**Why Blocked:**
+- Database: Agent tokens have non-NULL `agent_id`
+- API: `/api/keys` checks `agent_id` and rejects with 403
+- Result: No way to bypass budget control
+
+**Guaranteed Path:** Agent → IC Token → Protocol 005 handshake → IP Token (encrypted) → Budget-controlled access
+
+### Root Cause Documentation
+
+**Fix(protocol-005-enforcement):** Added database-level and API-level checks to prevent agent tokens from bypassing budget control through `/api/keys`.
+
+**Root Cause:** Original implementation allowed any API token to access `/api/keys`, creating a budget bypass path for agent tokens.
+
+**Pitfall:** Always verify exclusive access patterns with database constraints AND API-level checks. Database constraints alone are insufficient if the API allows unauthorized paths. Both layers must enforce the same invariant.
+
 ## Implementation Variants
 
 ### Pilot Implementation (Per-Request Reporting)
