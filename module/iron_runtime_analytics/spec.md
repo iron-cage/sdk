@@ -2,7 +2,7 @@
 
 **Module:** iron_runtime_analytics
 **Layer:** 2 (Foundation)
-**Status:** Implemented (Phase 1 Complete)
+**Status:** Implemented (Phase 1 + Phase 2 Complete)
 
 ---
 
@@ -30,7 +30,6 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 - Agent name/budget lookups (server enrichment)
 - Min/max/median computation (server computes)
 - HTTP sync to server (Python layer responsibility)
-- PyO3 bindings (Phase 2)
 
 ---
 
@@ -42,9 +41,6 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 - `uuid` - Event identifiers (v4)
 - `serde` - Serialization for sync
 - `iron_cost` - LLM pricing data and cost calculation
-
-**Future (Phase 2):**
-- `pyo3` - Python bindings
 
 ---
 
@@ -253,11 +249,35 @@ module/iron_runtime_analytics/
 ## Integration Points
 
 **Used by:**
-- iron_runtime - LlmRouter proxy integration (Phase 2)
-- Python SDK - Analytics access via PyO3 (Phase 2)
+- iron_runtime/LlmRouter - Proxy integration for automatic event recording and logging
 
 **Depends on:**
 - iron_cost - Pricing data and cost calculation
+
+---
+
+## Python Integration (Phase 2)
+
+Analytics is integrated into LlmRouter proxy and enabled by default via `full` feature.
+
+**Automatic Event Recording:**
+- `LlmRequestCompleted` - Recorded after each successful LLM request
+- `LlmRequestFailed` - Recorded on non-2xx responses
+- `RouterStarted` / `RouterStopped` - Lifecycle events
+
+**Console Logging:**
+All events are logged via `iron_telemetry`:
+```
+INFO LlmRouter proxy listening on http://127.0.0.1:45297
+INFO LLM request completed model=gpt-4o-mini input_tokens=11 output_tokens=1 cost_usd=0.000001
+INFO LlmRouter proxy shutting down
+```
+
+**Budget Tracking:**
+Budget status is available via `router.budget_status` (uses CostController from iron_cost).
+
+**Internal Storage:**
+Events are stored in EventStore for future server sync (Phase 4 - BACKLOG).
 
 ---
 
