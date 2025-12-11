@@ -1,0 +1,35 @@
+name: Deploy CI
+
+on:
+  push:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: amd
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Create .secret.sh file
+      run: |
+        {
+          echo "SECRET_STATE_ARCHIVE_KEY=${{ secrets.SECRET_STATE_ARCHIVE_KEY }}"
+          echo "GOOGLE_SE_CREDS_PATH=${{ secrets.GOOGLE_SE_CREDS_PATH }}"
+          echo "SECRET_RSA_PRIVATE_KEY_PATH=${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
+          echo "SECRET_RSA_PUBLIC_KEY_PATH=${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
+          echo "CSP=${{ secrets.CSP }}"
+          echo "PROJECT_NAME=${{ secrets.PROJECT_NAME }}"
+          echo "SECRET_HETZNER_CLOUD_TOKEN=${{ secrets.SECRET_HETZNER_CLOUD_TOKEN }}"
+          echo "TF_VAR_PROJECT_ID=${{ secrets.TF_VAR_PROJECT_ID }}"
+        } > .secret/-secret.sh
+
+    - name: Create key files
+      run: |
+        echo "${{ secrets.SECRET_GCP_CREDENTIALS }}" | base64 --decode > ${{ secrets.GOOGLE_SE_CREDS_PATH }}
+        echo "${{ secrets.SECRET_RSA_PRIVATE_KEY }}"  > ${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}
+        echo "${{ secrets.SECRET_RSA_PUBLIC_KEY }}"   > ${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}
+
+    - name: 'Build the image, push and deploy'
+      run: 'make deploy'

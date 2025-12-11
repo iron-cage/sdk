@@ -93,3 +93,13 @@ htmlcov/
 # SQLite
 *.sqlite
 *.sqlite3
+
+# Ignore Terraform state files
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.backup
+
+# secret
+/.secret/*
+!/.secret/readme.md

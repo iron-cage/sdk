@@ -1,0 +1,30 @@
+# -------- Stage 1: Build Vue app --------
+FROM node:20-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy source files
+COPY . .
+
+# Install dependencies
+RUN npm install
+
+# Build static assets
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# -------- Stage 2: Serve with nginx --------
+FROM nginx:1.27-alpine
+
+# Copy custom nginx config
+COPY module/iron_dashboard/nginx.conf /etc/nginx/nginx.conf
+
+# Copy built Vue app
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Expose port
+EXPOSE 80
+
+# Healthcheck is handled in docker-compose
