@@ -108,7 +108,9 @@ Response Format:
 
 **Applies to:** All 7 list endpoint categories (agents, providers, analytics, tokens, projects, budget requests, users)
 
-**Reference:** Protocol 002:101-210 (Universal Pagination Standard)
+**Reference:** [API Design Standards - Pagination](../standards/api_design_standards.md#pagination)
+
+**Cross-Cutting Reference:** Protocol 002 lists all paginated endpoints (7 categories: agents, providers, analytics, tokens, projects, budget requests, users)
 
 ---
 

@@ -146,8 +146,8 @@ The Control Panel Pilot Deployment uses a 2-service Docker Compose stack with pe
 
 **Required:**
 - Docker 24.0+ with Compose V2 (`docker compose` not `docker-compose`)
-- 4GB RAM minimum (8GB recommended)
-- 10GB disk space minimum
+- 2GB RAM minimum (4GB recommended)
+- 5GB disk space minimum
 - Linux, macOS, or Windows with WSL2
 
 **Verify Installation:**
@@ -220,12 +220,17 @@ Open http://localhost:8080 in your browser.
 
 #### 2.4.1 Database Configuration
 
-**Connection String (PostgreSQL):**
+**Connection String (SQLite):**
 
 ```bash
-# In .env file
-DATABASE_URL=postgresql://iron_user:${POSTGRES_PASSWORD}@postgres:5432/iron_tokens
+# In .env file (default, already configured in docker-compose.yml)
+DATABASE_URL=sqlite:///app/data/iron.db?mode=rwc
 ```
+
+**Database Location:**
+- **Host Path:** Docker volume `sqlite_data` (managed by Docker)
+- **Container Path:** `/app/data/iron.db`
+- **Persistence:** Data survives container restarts, preserved in Docker volume
 
 **Database Initialization:**
 
@@ -234,14 +239,11 @@ Database schema is initialized automatically on first backend startup. No manual
 **Verify Database:**
 
 ```bash
-# Connect to PostgreSQL
-docker compose exec postgres psql -U iron_user -d iron_tokens
+# Check database file exists
+docker compose exec backend ls -lh /app/data/iron.db
 
-# Check tables
-\dt
-
-# Exit
-\q
+# Connect to SQLite (requires sqlite3 installation in container)
+docker compose exec backend sh -c 'echo ".tables" | sqlite3 /app/data/iron.db'
 ```
 
 #### 2.4.2 Authentication Configuration
@@ -325,12 +327,22 @@ docker compose up -d --force-recreate   # Recreate all containers
 **Create Backup:**
 
 ```bash
-# Backup to timestamped file
-docker compose exec postgres pg_dump -U iron_user -d iron_tokens \
-  > backup_$(date +%Y%m%d_%H%M%S).sql
+# Stop backend to ensure consistent backup
+docker compose stop backend
+
+# Copy SQLite database file from volume
+docker compose run --rm backend cp /app/data/iron.db /tmp/iron.db
+docker cp $(docker compose ps -q backend):/tmp/iron.db ./backup_$(date +%Y%m%d_%H%M%S).db
+
+# Alternative: Use Docker volume backup
+docker run --rm -v sqlite_data:/data -v $(pwd):/backup alpine \
+  cp /data/iron.db /backup/backup_$(date +%Y%m%d_%H%M%S).db
+
+# Restart backend
+docker compose start backend
 
 # Verify backup
-ls -lh backup_*.sql
+ls -lh backup_*.db
 ```
 
 **Automated Backup Script:**
@@ -340,8 +352,21 @@ ls -lh backup_*.sql
 # scripts/backup_db.sh
 BACKUP_DIR=/backups
 mkdir -p "$BACKUP_DIR"
-docker compose exec postgres pg_dump -U iron_user -d iron_tokens \
-  | gzip > "$BACKUP_DIR/iron_tokens_$(date +%Y%m%d_%H%M%S).sql.gz"
+
+# Stop backend for consistent backup
+docker compose stop backend
+
+# Backup SQLite database from Docker volume
+docker run --rm \
+  -v sqlite_data:/data \
+  -v "$BACKUP_DIR:/backup" \
+  alpine cp /data/iron.db "/backup/iron_$(date +%Y%m%d_%H%M%S).db"
+
+# Restart backend
+docker compose start backend
+
+# Compress backup
+gzip "$BACKUP_DIR"/iron_*.db
 ```
 
 #### 2.6.2 Restore Database
@@ -352,19 +377,24 @@ docker compose exec postgres pg_dump -U iron_user -d iron_tokens \
 # Stop backend to prevent writes
 docker compose stop backend
 
-# Restore database
-cat backup_20250311_120000.sql | \
-  docker compose exec -T postgres psql -U iron_user -d iron_tokens
+# Restore SQLite database to Docker volume
+docker run --rm \
+  -v sqlite_data:/data \
+  -v $(pwd):/backup \
+  alpine cp /backup/backup_20250311_120000.db /data/iron.db
 
 # Restart backend
 docker compose start backend
+
+# Verify restoration
+docker compose logs backend | head -20
 ```
 
 **Full Reset (DESTRUCTIVE):**
 
 ```bash
 # WARNING: Deletes all data
-docker compose down -v           # Delete volumes
+docker compose down -v           # Delete volumes (including SQLite database)
 docker compose up -d             # Recreate from scratch
 ```
 
@@ -379,7 +409,7 @@ docker compose up -d             # Recreate from scratch
 ```bash
 # Check logs for errors
 docker compose logs backend
-docker compose logs postgres
+docker compose logs frontend
 
 # Check service dependencies
 docker compose ps
@@ -387,8 +417,8 @@ docker compose ps
 
 **Common Causes:**
 - **Port 8080 already in use:** Change `ports: "8080:80"` in docker-compose.yml
-- **Missing .env secrets:** Verify all required variables are set
-- **Database connection failed:** Check DATABASE_URL format and POSTGRES_PASSWORD
+- **Missing .env secrets:** Verify JWT_SECRET and IRON_SECRETS_MASTER_KEY are set
+- **SQLite volume permission issue:** Recreate volume with `docker compose down -v && docker compose up -d`
 
 #### 2.7.2 Cannot Access Dashboard
 
@@ -429,27 +459,28 @@ docker compose logs backend | tail -50
 
 **Common Causes:**
 - **Backend not healthy:** Check logs for startup errors
-- **Database connection failed:** Verify DATABASE_URL and postgres health
+- **SQLite database locked:** Restart backend with `docker compose restart backend`
 - **JWT_SECRET too short:** Must be 32+ characters
 
 #### 2.7.4 Database Connection Errors
 
-**Symptom:** Backend logs show "Connection refused" or "Authentication failed"
+**Symptom:** Backend logs show "unable to open database file" or "database is locked"
 
 **Diagnosis:**
 
 ```bash
-# Verify postgres is healthy
-docker compose ps postgres
+# Check SQLite database file exists
+docker compose exec backend ls -lh /app/data/iron.db
 
-# Test connection manually
-docker compose exec postgres psql -U iron_user -d iron_tokens -c "SELECT 1;"
+# Check backend logs for SQLite errors
+docker compose logs backend | grep -i sqlite
 ```
 
 **Solutions:**
-- **Wrong password:** Check POSTGRES_PASSWORD matches in .env
-- **Database not initialized:** Restart backend to trigger initialization
-- **Network issue:** Recreate containers: `docker compose up -d --force-recreate`
+- **Database file doesnt exist:** Restart backend to create database: `docker compose restart backend`
+- **Permission denied:** Fix volume permissions: `docker compose down -v && docker compose up -d`
+- **Database locked:** Ensure only one backend instance running
+- **Volume mount issue:** Recreate containers: `docker compose up -d --force-recreate`
 
 #### 2.7.5 High Memory Usage
 
@@ -540,9 +571,9 @@ curl http://localhost:8080/health
 curl http://localhost:8080/api/health
 # Expected: {"status":"ok","database":"connected"}
 
-# Database health
-docker compose exec postgres pg_isready -U iron_user
-# Expected: "accepting connections"
+# Database health (SQLite)
+docker compose exec backend ls -lh /app/data/iron.db
+# Expected: File exists with size > 0
 ```
 
 **Resource Monitoring:**
@@ -619,8 +650,10 @@ git checkout v1.1.0  # Previous working version
 docker compose build --no-cache
 
 # Step 4: Restore database backup
-cat backup_20250311_120000.sql | \
-  docker compose exec -T postgres psql -U iron_user -d iron_tokens
+docker run --rm \
+  -v sqlite_data:/data \
+  -v $(pwd):/backup \
+  alpine cp /backup/backup_20250311_120000.db /data/iron.db
 
 # Step 5: Start services
 docker compose up -d

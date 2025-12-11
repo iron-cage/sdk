@@ -1,0 +1,101 @@
+import os
+import json
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate
+from apollo_tools import tools_list
+
+load_dotenv()
+
+# --- Initialize Language Model ---
+# Sets up the OpenAI model that will drive the agent's logic.
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# --- System Prompt for the Agent ---
+# Defines the agent's role, algorithm, and strict output format.
+system_prompt = """
+You are an API proxy. Your only goal is to return raw data in JSON format.
+
+ALGORITHM:
+1. Use `search_leads` to get IDs.
+2. For EACH found ID, call `get_lead_details`.
+3. Collect all results from `get_lead_details` into a single list.
+
+OUTPUT FORMAT (CRITICAL):
+- Return ONLY a valid JSON Array (list of objects).
+- Do not write any text, do not say hello, do not explain anything.
+- Do not use Markdown (no ```json).
+- Do not truncate data.
+
+Example output:
+[
+  {{ "id": "123", "name": "Ivan" }},
+  {{ "id": "456", "name": "Petro" }}
+]
+"""
+
+# --- Create Prompt Template ---
+# Combines the system instruction, user input, and a placeholder for intermediate steps.
+prompt = ChatPromptTemplate.from_messages([
+    ("system", system_prompt),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+# --- Create Agent and Executor ---
+# Creates the agent's logic by combining the model, tools, and prompt.
+agent = create_tool_calling_agent(llm, tools_list, prompt)
+
+# Creates the executor, which runs the agent and manages its workflow.
+agent_executor = AgentExecutor(
+    agent=agent, 
+    tools=tools_list, 
+    verbose=True,
+    max_iterations=20,
+    max_execution_time=120.0,
+    handle_parsing_errors=True
+)
+
+# --- Main Execution Function ---
+# Starts the user interaction loop.
+def main():
+    print("LeadGen Agent")
+    print("--------------------------------")
+    
+    while True:
+        try:
+            user_query = input("\nEnter query (or 'exit'): ")
+            if user_query.lower() in ['exit', 'quit']: break
+            if not user_query.strip(): continue
+
+            print("Processing request...")
+            
+            # --- Run the Agent to Process the Request ---
+            # Passes the user's query to the agent for execution.
+            result = agent_executor.invoke({"input": user_query})
+            
+            # --- Process and Print the Result ---
+            # Cleans up the agent's response to remove extra characters.
+            raw_output = result["output"].replace("```json", "").replace("```", "").strip()
+            
+            try:
+                # Attempts to parse the text response as JSON and print it.
+                data = json.loads(raw_output)
+                
+                print("\nRESULT (JSON):")
+                print(json.dumps(data, indent=2, ensure_ascii=False))
+                
+            except json.JSONDecodeError:
+                # If the response is not valid JSON, prints the raw text.
+                print("\nAgent did not return valid JSON. Raw text:")
+                print(raw_output)
+                
+        except Exception as e:
+            print(f"Error: {e}")
+
+# --- Program Entry Point ---
+# Runs the main function if the script is executed directly.
+if __name__ == "__main__":
+    main()
+  

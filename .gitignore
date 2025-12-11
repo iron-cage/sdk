@@ -6,6 +6,8 @@ Cargo.lock
 
 # Python
 __pycache__/
+uv.lock
+.python-version
 *.py[cod]
 *$py.class
 *.so
