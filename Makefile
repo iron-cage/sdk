@@ -334,7 +334,6 @@ deploy: check_gcp_keys check_env_variables build_image
 	  -f ./$(TF_DIR)/Dockerfile \
 	  --build-arg google_se_creds="$(GOOGLE_SE_CREDS_PATH)"
 	@docker run --rm \
-	--user $(shell id -u):$(shell id -g) \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-v $(CURDIR):/app \
 	-e HOME=/app \
