@@ -11,7 +11,7 @@ use sqlx::{ Pool, Sqlite, FromRow };
 #[ derive( Debug, Clone, FromRow ) ]
 pub struct User
 {
-  pub id: i64,
+  pub id: String,
   pub username: String,
   pub password_hash: String,
   pub role: String,
@@ -24,7 +24,7 @@ pub struct User
 pub struct BlacklistedToken
 {
   pub jti: String,
-  pub user_id: i64,
+  pub user_id: String,
   pub blacklisted_at: i64,
   pub expires_at: i64,
 }
@@ -173,7 +173,7 @@ pub async fn authenticate_user(
 pub async fn add_token_to_blacklist(
   pool: &Pool< Sqlite >,
   token: &str,
-  user_id: i64,
+  user_id: &str,
   expires_at: chrono::DateTime< chrono::Utc >,
 ) -> Result< (), sqlx::Error >
 {
@@ -279,7 +279,7 @@ mod tests
     let pool = create_test_db().await.expect("Failed to create test database");
 
     let jti = "test_token_jti_123";
-    let user_id = 1;
+    let user_id = "user_123";
     let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
 
     // Add token to blacklist
@@ -287,7 +287,7 @@ mod tests
     assert!(result.is_ok(), "Failed to add token to blacklist");
 
     // Verify token is in blacklist
-    let blacklisted: Option<(String, i64, i64, i64)> = sqlx::query_as(
+    let blacklisted: Option<(String, String, i64, i64)> = sqlx::query_as(
       "SELECT jti, user_id, blacklisted_at, expires_at FROM blacklist WHERE jti = ?"
     )
     .bind(jti)
@@ -309,7 +309,7 @@ mod tests
     let pool = create_test_db().await.expect("Failed to create test database");
 
     let jti = "duplicate_token_jti";
-    let user_id = 1;
+    let user_id = "user_123";
     let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
 
     // Add token to blacklist first time
@@ -325,7 +325,7 @@ mod tests
   async fn test_add_multiple_tokens_to_blacklist() {
     let pool = create_test_db().await.expect("Failed to create test database");
 
-    let user_id = 1;
+    let user_id = "user_123";
     let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
 
     // Add multiple tokens
@@ -350,7 +350,7 @@ mod tests
     let pool = create_test_db().await.expect("Failed to create test database");
 
     let jti = "expiry_test_token";
-    let user_id = 1;
+    let user_id = "user_123";
     let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
     let expected_expiry = expires_at.timestamp();
 

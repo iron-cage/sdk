@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS users
 (
   -- Primary key
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 255),
 
   -- Authentication fields
   username TEXT NOT NULL UNIQUE CHECK (LENGTH(username) > 0 AND LENGTH(username) <= 255),
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS blacklist
   jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
 
   -- User who owned the token
-  user_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL CHECK (LENGTH(user_id) > 0 AND LENGTH(user_id) <= 255),
 
   -- When the token was blacklisted (Unix epoch seconds)
   blacklisted_at INTEGER NOT NULL,

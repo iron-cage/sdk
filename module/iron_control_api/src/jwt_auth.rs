@@ -21,11 +21,11 @@ pub struct AccessTokenClaims
   /// User Role
   pub role: String,
   /// Issued at (Unix timestamp)
+  /// User email
+  pub email: String,
   pub iat: i64,
   /// Expiration time (Unix timestamp)
   pub exp: i64,
-  /// Token type
-  pub token_type: String,
   /// Token ID for blacklist tracking
   pub jti: String,
 }
@@ -36,12 +36,14 @@ pub struct RefreshTokenClaims
 {
   /// User ID
   pub sub: String,
+  /// User email
+  pub email: String,
+  /// User role
+  pub role: String,
   /// Issued at (Unix timestamp)
   pub iat: u64,
   /// Expiration time (Unix timestamp)
   pub exp: u64,
-  /// Token type
-  pub token_type: String,
   /// Token ID for blacklist tracking
   pub jti: String,
 }
@@ -76,7 +78,7 @@ impl JwtSecret
   /// # Errors
   ///
   /// Returns error if JWT encoding fails
-  pub fn generate_access_token( &self, user_id: i64, role: &str, token_id: &str ) -> Result< String, jsonwebtoken::errors::Error >
+  pub fn generate_access_token( &self, user_id: &str, email: &str,role: &str, token_id: &str ) -> Result< String, jsonwebtoken::errors::Error >
   {
     let now = chrono::Utc::now().timestamp();
 
@@ -86,7 +88,7 @@ impl JwtSecret
       role: role.to_string(),
       iat: now,
       exp: now + 60 * 60 * 24 * 30, // 30 days
-      token_type: "access".to_string(),
+      email: email.to_string(),
       jti: token_id.to_string(),
     };
 
@@ -109,7 +111,9 @@ impl JwtSecret
   /// Returns error if JWT encoding fails
   pub fn generate_refresh_token(
     &self,
-    user_id: i64,
+    user_id: &str,
+    email: &str,
+    role: &str,
     token_id: &str,
   ) -> Result< String, jsonwebtoken::errors::Error >
   {
@@ -121,9 +125,10 @@ impl JwtSecret
     let claims = RefreshTokenClaims
     {
       sub: user_id.to_string(),
+      email: email.to_string(),
+      role: role.to_string(),
       iat: now,
       exp: now + ( 7 * 24 * 3600 ), // 7 days
-      token_type: "refresh".to_string(),
       jti: token_id.to_string(),
     };
 
@@ -148,7 +153,6 @@ impl JwtSecret
     token: &str,
   ) -> Result< AccessTokenClaims, jsonwebtoken::errors::Error >
   {
-    println!( "{}", token );
     let token_data = decode::<AccessTokenClaims>(
       token,
       &DecodingKey::from_secret( self.secret.as_bytes() ),
@@ -309,7 +313,7 @@ mod tests
   fn test_generate_access_token()
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( 123, "user", "token_001" ).expect( "Should generate token" );
+    let token = jwt.generate_access_token( "user_123", "user@example.com", "user", "token_001" ).expect( "Should generate token" );
     assert!( !token.is_empty(), "Token should not be empty" );
   }
 
@@ -317,12 +321,12 @@ mod tests
   fn test_verify_access_token()
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( 456, "admin", "token_002" ).expect( "Should generate token" );
+    let token = jwt.generate_access_token( "user_456", "admin@example.com", "admin", "token_002" ).expect( "Should generate token" );
 
     let claims = jwt.verify_access_token( &token ).expect( "Should verify token" );
-    assert_eq!( claims.sub, "456" );
+    assert_eq!( claims.sub, "user_456" );
     assert_eq!( claims.role, "admin" );
-    assert_eq!( claims.token_type, "access" );
+    assert_eq!( claims.email, "admin@example.com" );
     assert_eq!( claims.jti, "token_002" );
   }
 
@@ -331,7 +335,7 @@ mod tests
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
     let token = jwt
-      .generate_refresh_token( 789, "token_id_001" )
+      .generate_refresh_token( "user_789", "user@example.com", "user", "token_id_001" )
       .expect( "Should generate token" );
     assert!( !token.is_empty(), "Token should not be empty" );
   }
@@ -341,13 +345,14 @@ mod tests
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
     let token = jwt
-      .generate_refresh_token( 999, "token_id_002" )
+      .generate_refresh_token( "user_999", "user@example.com", "user", "token_id_002" )
       .expect( "Should generate token" );
 
     let claims = jwt.verify_refresh_token( &token ).expect( "Should verify token" );
-    assert_eq!( claims.sub, "999" );
+    assert_eq!( claims.sub, "user_999" );
+    assert_eq!( claims.email, "user@example.com" );
+    assert_eq!( claims.role, "user" );
     assert_eq!( claims.jti, "token_id_002" );
-    assert_eq!( claims.token_type, "refresh" );
   }
 
   #[ test ]
@@ -364,7 +369,7 @@ mod tests
     let jwt1 = JwtSecret::new( "secret_1".to_string() );
     let jwt2 = JwtSecret::new( "secret_2".to_string() );
 
-    let token = jwt1.generate_access_token( 123, "user", "token_003" ).expect( "Should generate" );
+    let token = jwt1.generate_access_token( "user_123", "user@example.com", "user", "token_003" ).expect( "Should generate" );
     let result = jwt2.verify_access_token( &token );
 
     assert!( result.is_err(), "Token signed with different secret should fail" );

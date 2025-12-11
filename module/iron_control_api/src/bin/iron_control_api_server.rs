@@ -428,13 +428,13 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/health", get( iron_control_api::routes::health::health_check ) )
 
     // Authentication endpoints
-    .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
-    .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
-    .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
-    // .route( "/api/auth/validate", post( iron_control_api::routes::auth::validate ) )
+    .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
+    .route( "/api/v1/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
+    .route( "/api/v1/auth/logout", post( iron_control_api::routes::auth::logout ) )
+    .route( "/api/v1/auth/validate", post( iron_control_api::routes::auth::validate ) )
 
     // User management endpoints
-    .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
+    .route( "/api/v1/users", post( iron_control_api::routes::users::create_user ) )
     .route( "/api/users", get( iron_control_api::routes::users::list_users ) )
     .route( "/api/users/:id", get( iron_control_api::routes::users::get_user ) )
     .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )

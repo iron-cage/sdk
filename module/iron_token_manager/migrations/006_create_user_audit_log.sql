@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS user_audit_log
 (
   -- Primary key
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 255),
 
   -- Operation type
   operation TEXT NOT NULL CHECK (
@@ -24,10 +24,10 @@ CREATE TABLE IF NOT EXISTS user_audit_log
   ),
 
   -- Target user (who was affected)
-  target_user_id INTEGER NOT NULL,
+  target_user_id TEXT NOT NULL CHECK (LENGTH(target_user_id) > 0 AND LENGTH(target_user_id) <= 255),
 
   -- Admin who performed the operation
-  performed_by INTEGER NOT NULL,
+  performed_by TEXT NOT NULL CHECK (LENGTH(performed_by) > 0 AND LENGTH(performed_by) <= 255),
 
   -- When the operation occurred (Unix epoch milliseconds)
   timestamp INTEGER NOT NULL,
