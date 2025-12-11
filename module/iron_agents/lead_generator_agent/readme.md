@@ -39,13 +39,17 @@ APOLLO_API_KEY=your_apollo_api_key_here
 
 ```text
 .
-├── .env                    # Environment variables (API Keys)
-├── .venv/                  # Virtual environment managed by uv
-├── pyproject.toml          # Project dependencies definition
-├── uv.lock                 # Dependency lock file
-├── apollo_tools.py         # Tool definitions for Apollo API interaction
-├── lead_generator_agent.py # Main entry point and agent logic
-└── README.md               # Project documentation
+├── .env                         # Environment variables (API Keys)
+├── .venv/                       # Virtual environment managed by uv
+├── pyproject.toml               # Project dependencies definition
+├── uv.lock                      # Dependency lock file
+├── src
+    ├── apollo_tools.py          # Tool definitions for Apollo API interaction
+    └── lead_generator_agent.py  # Main entry point and agent logic
+├── test
+    ├── test_agent.py            # Tests for agent
+    └── test_apollo_tools.py     # Tests for apollo tools
+└── README.md                    # Project documentation
 ```
 
 The module consists of two main Python files:
