@@ -315,11 +315,11 @@ export function useApi() {
     if (params?.page) query.append('page', String(params.page))
     if (params?.page_size) query.append('page_size', String(params.page_size))
     
-    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(`/api/users?${query.toString()}`)
+    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(`/api/v1/users?${query.toString()}`)
   }
 
   async function createUser(data: CreateUserRequest): Promise<User> {
-    return fetchApi<User>('/api/users', {
+    return fetchApi<User>('/api/v1/users', {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -334,34 +334,34 @@ export function useApi() {
   }
 
   async function suspendUser(id: number, reason?: string): Promise<User> {
-    return fetchApi<User>(`/api/users/${id}/suspend`, {
+    return fetchApi<User>(`/api/v1/users/${id}/suspend`, {
       method: 'PUT',
       body: JSON.stringify({ reason }),
     })
   }
 
   async function activateUser(id: number): Promise<User> {
-    return fetchApi<User>(`/api/users/${id}/activate`, {
+    return fetchApi<User>(`/api/v1/users/${id}/activate`, {
       method: 'PUT',
     })
   }
 
   async function changeUserRole(id: number, role: string): Promise<User> {
-    return fetchApi<User>(`/api/users/${id}/role`, {
+    return fetchApi<User>(`/api/v1/users/${id}/role`, {
       method: 'PUT',
       body: JSON.stringify({ role }),
     })
   }
 
   async function resetUserPassword(id: number, newPassword: string, forceChange: boolean): Promise<User> {
-    return fetchApi<User>(`/api/users/${id}/reset-password`, {
+    return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
       method: 'POST',
       body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
     })
   }
 
   async function deleteUser(id: number): Promise<{ success: boolean }> {
-    return fetchApi<{ success: boolean }>(`/api/users/${id}`, {
+    return fetchApi<{ success: boolean }>(`/api/v1/users/${id}`, {
       method: 'DELETE',
     })
   }

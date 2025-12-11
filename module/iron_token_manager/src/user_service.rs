@@ -30,11 +30,11 @@ pub struct User
   /// Suspension timestamp (milliseconds since epoch)
   pub suspended_at: Option< i64 >,
   /// Admin who suspended this user
-  pub suspended_by: Option< i64 >,
+  pub suspended_by: Option< String >,
   /// Deletion timestamp (milliseconds since epoch, soft delete)
   pub deleted_at: Option< i64 >,
   /// Admin who deleted this user
-  pub deleted_by: Option< i64 >,
+  pub deleted_by: Option< String >,
   /// Force password change on next login
   pub force_password_change: bool,
 }

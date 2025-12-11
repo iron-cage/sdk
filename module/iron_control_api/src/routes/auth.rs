@@ -316,7 +316,6 @@ pub async fn login(
       .into_response();
   }
 
-  println!("Login request: {}", request.email);
   // TODO: Rate limiting check (5 attempts per 5 minutes per IP)
   // SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND timestamp > NOW() - INTERVAL 5 MINUTE
 

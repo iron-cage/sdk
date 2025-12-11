@@ -435,13 +435,13 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
     // User management endpoints
     .route( "/api/v1/users", post( iron_control_api::routes::users::create_user ) )
-    .route( "/api/users", get( iron_control_api::routes::users::list_users ) )
-    .route( "/api/users/:id", get( iron_control_api::routes::users::get_user ) )
-    .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )
-    .route( "/api/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
-    .route( "/api/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
-    .route( "/api/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
-    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
+    .route( "/api/v1/users", get( iron_control_api::routes::users::list_users ) )
+    .route( "/api/v1/users/:id", get( iron_control_api::routes::users::get_user ) )
+    .route( "/api/v1/users/:id", delete( iron_control_api::routes::users::delete_user ) )
+    .route( "/api/v1/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
+    .route( "/api/v1/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
+    .route( "/api/v1/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
+    .route( "/api/v1/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
 
     // Token management endpoints
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )

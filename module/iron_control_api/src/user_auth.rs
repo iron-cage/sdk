@@ -41,7 +41,7 @@ pub struct BlacklistedToken
 /// `true` if password matches hash, `false` otherwise
 pub fn verify_password( password: &str, hash: &str ) -> bool
 {
-  bcrypt::verify( password, hash ).unwrap_or( false )
+ bcrypt::verify( password, hash ).unwrap_or( false )
 }
 
 /// Fetch user by username from database
@@ -144,7 +144,6 @@ pub async fn authenticate_user(
     None => return Ok( None ), // User not found
   };
 
-  // Verify password
   if verify_password( password, &user.password_hash )
   {
     Ok( Some( user ) )
