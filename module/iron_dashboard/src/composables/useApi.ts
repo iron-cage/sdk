@@ -135,6 +135,7 @@ export function useApi() {
     }
 
     const authHeader = authStore.getAuthHeader()
+
     if (authHeader) {
       headers['Authorization'] = authHeader
     }
