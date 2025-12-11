@@ -445,11 +445,29 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
 /// Seed project-provider key assignments
 ///
 /// Creates 2 assignments:
-/// - `project_alpha` -> `OpenAI` key (id 1)
-/// - `project_alpha` -> `Anthropic` key (id 2)
+/// - `project_alpha` -> `OpenAI` key
+/// - `project_alpha` -> `Anthropic` key
+///
+/// Note: Dynamically looks up provider key IDs to avoid AUTOINCREMENT issues
 async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
 {
   let now_ms = crate::storage::current_time_ms();
+
+  // Get OpenAI key ID
+  let openai_key_id: i64 = sqlx::query_scalar(
+    "SELECT id FROM ai_provider_keys WHERE provider = 'openai' LIMIT 1"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  // Get Anthropic key ID
+  let anthropic_key_id: i64 = sqlx::query_scalar(
+    "SELECT id FROM ai_provider_keys WHERE provider = 'anthropic' LIMIT 1"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
 
   // Assignment 1: project_alpha -> OpenAI
   sqlx::query(
@@ -458,7 +476,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3)"
   )
   .bind( "project_alpha" )
-  .bind( 1 )  // OpenAI key ID
+  .bind( openai_key_id )
   .bind( now_ms )
   .execute( pool )
   .await
@@ -471,7 +489,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3)"
   )
   .bind( "project_alpha" )
-  .bind( 2 )  // Anthropic key ID
+  .bind( anthropic_key_id )
   .bind( now_ms )
   .execute( pool )
   .await

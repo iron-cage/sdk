@@ -24,6 +24,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=4.0.0",
+  "black>=24.0.0",
+  "mypy>=1.0.0",
+  "ruff>=0.1.0",
+]
 langchain = ["langchain>=0.1.0"]
 crewai = ["crewai>=0.1.0"]
 autogpt = ["autogpt>=0.1.0"]
@@ -33,13 +40,22 @@ all = ["langchain>=0.1.0", "crewai>=0.1.0", "autogpt>=0.1.0"]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
 
 [tool.mypy]
 python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
