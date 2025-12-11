@@ -5,7 +5,7 @@ User guides and configuration documentation for iron_cage agent.
 ## Organization
 
 - `spec.md` - Specification of this module
-- `README.md` - Description how to use this module
+- `readme.md` - Description of how to use this module
 
 ## Purpose
 
