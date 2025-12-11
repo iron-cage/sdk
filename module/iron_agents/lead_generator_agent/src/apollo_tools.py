@@ -45,7 +45,7 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
         payload["q_organization_keyword_tags"] = [industry]
 
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
         
         if response.status_code != 200:
             return f"Apollo Search Error {response.status_code}: {response.text}"
@@ -69,6 +69,12 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
 
         # Returns the cleaned data in JSON format.
         return json.dumps(clean_results, ensure_ascii=False)
+        
+    # Returns Timeout and General Errors.
+    except requests.exceptions.Timeout:
+        return "Error: The request timed out"
+    except requests.exceptions.RequestException as e:
+        return f"Error: An error occurred: {e}"
         
     except Exception as e:
         return f"System Error: {str(e)}"
