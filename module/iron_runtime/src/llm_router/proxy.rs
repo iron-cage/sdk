@@ -19,6 +19,9 @@ use crate::llm_router::error::LlmRouterError;
 use crate::llm_router::key_fetcher::KeyFetcher;
 use crate::llm_router::translator::{translate_anthropic_to_openai, translate_openai_to_anthropic};
 
+#[cfg(feature = "analytics")]
+use iron_runtime_analytics::{EventStore, Provider};
+
 /// Shared state for proxy handlers
 #[derive(Clone)]
 pub struct ProxyState {
@@ -32,6 +35,15 @@ pub struct ProxyState {
   pub pricing_manager: Arc<PricingManager>,
   /// Cost controller for budget enforcement and spending tracking (None = no budget)
   pub cost_controller: Option<Arc<CostController>>,
+  /// Analytics event store
+  #[cfg(feature = "analytics")]
+  pub event_store: Arc<EventStore>,
+  /// Agent ID for analytics attribution
+  #[cfg(feature = "analytics")]
+  pub agent_id: Option<Arc<str>>,
+  /// Provider ID for analytics attribution
+  #[cfg(feature = "analytics")]
+  pub provider_id: Option<Arc<str>>,
 }
 
 /// Proxy server configuration
@@ -44,6 +56,15 @@ pub struct ProxyConfig {
   pub cost_controller: Option<Arc<CostController>>,
   /// Direct provider API key (bypasses Iron Cage server when set)
   pub provider_key: Option<String>,
+  /// Analytics event store
+  #[cfg(feature = "analytics")]
+  pub event_store: Arc<EventStore>,
+  /// Agent ID for analytics attribution
+  #[cfg(feature = "analytics")]
+  pub agent_id: Option<Arc<str>>,
+  /// Provider ID for analytics attribution
+  #[cfg(feature = "analytics")]
+  pub provider_id: Option<Arc<str>>,
 }
 
 /// Run the proxy server
@@ -77,6 +98,12 @@ pub async fn run_proxy(
     http_client,
     pricing_manager,
     cost_controller: config.cost_controller,
+    #[cfg(feature = "analytics")]
+    event_store: config.event_store,
+    #[cfg(feature = "analytics")]
+    agent_id: config.agent_id,
+    #[cfg(feature = "analytics")]
+    provider_id: config.provider_id,
   };
 
   let app = Router::new()
@@ -331,12 +358,43 @@ async fn handle_proxy(
         controller.add_spend_micros(cost_info.cost_micros);
       }
 
+      // Record analytics event
+      #[cfg(feature = "analytics")]
+      {
+        let provider = Provider::from(target_provider);
+        state.event_store.record_llm_completed_with_provider(
+          &state.pricing_manager,
+          &cost_info.model,
+          provider,
+          cost_info.input_tokens,
+          cost_info.output_tokens,
+          state.agent_id.as_deref(),
+          state.provider_id.as_deref(),
+        );
+      }
+
       tracing::info!(
         model = %cost_info.model,
         input_tokens = cost_info.input_tokens,
         output_tokens = cost_info.output_tokens,
         cost_usd = %format!("{:.6}", cost_info.cost_usd()),
         "LLM request completed"
+      );
+    }
+  } else {
+    // Record failed request for non-2xx responses
+    #[cfg(feature = "analytics")]
+    if let Some(model) = extract_model_from_body(&body_bytes) {
+      let error_msg = serde_json::from_slice::<serde_json::Value>(&resp_body)
+        .ok()
+        .and_then(|v| v.get("error")?.get("message")?.as_str().map(String::from));
+
+      state.event_store.record_llm_failed(
+        &model,
+        state.agent_id.as_deref(),
+        state.provider_id.as_deref(),
+        Some(status.as_str()),
+        error_msg.as_deref(),
       );
     }
   }
@@ -404,4 +462,12 @@ fn calculate_request_cost(
     output_tokens,
     cost_micros,
   })
+}
+
+/// Extract model name from request body (for error recording)
+#[cfg(feature = "analytics")]
+fn extract_model_from_body(body: &[u8]) -> Option<String> {
+  serde_json::from_slice::<serde_json::Value>(body)
+    .ok()
+    .and_then(|json| json.get("model")?.as_str().map(String::from))
 }
