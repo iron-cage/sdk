@@ -248,7 +248,7 @@ pub struct AuthenticatedUser( pub AccessTokenClaims );
 impl< S > axum::extract::FromRequestParts< S > for AuthenticatedUser
 where
   S: Send + Sync,
-  crate::routes::auth_new::AuthState: axum::extract::FromRef< S >,
+  crate::routes::auth::AuthState: axum::extract::FromRef< S >,
 {
   type Rejection = ( axum::http::StatusCode, axum::Json< serde_json::Value > );
 
@@ -258,7 +258,7 @@ where
   ) -> Result< Self, Self::Rejection >
   {
     // Extract auth state
-    let auth_state = crate::routes::auth_new::AuthState::from_ref( state );
+    let auth_state = crate::routes::auth::AuthState::from_ref( state );
 
     // Extract Authorization header
     let auth_header = parts

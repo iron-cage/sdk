@@ -11,7 +11,7 @@
 //! - HTTP Protocol (malformed JSON, empty body)
 
 use axum::http::{ StatusCode, header };
-use axum::{ Router, routing::{ post, get, delete } };
+use axum::{ Router, routing::{ post, delete } };
 use tower::ServiceExt;
 use crate::common::corner_cases;
 use serde_json::json;

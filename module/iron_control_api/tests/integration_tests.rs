@@ -11,7 +11,7 @@
 mod common;
 
 use common::{ create_test_database, create_test_user };
-use iron_control_api::routes::auth_new::AuthState;
+use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::health;
 use iron_control_api::jwt_auth::JwtSecret;
 use axum::{
@@ -41,9 +41,9 @@ async fn create_auth_router() -> Router
   };
 
   Router::new()
-    .route( "/api/auth/login", post( iron_control_api::routes::auth_new::login ) )
-    .route( "/api/auth/refresh", post( iron_control_api::routes::auth_new::refresh ) )
-    .route( "/api/auth/logout", post( iron_control_api::routes::auth_new::logout ) )
+    .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
+    .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
+    .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
     .with_state( auth_state )
 }
 

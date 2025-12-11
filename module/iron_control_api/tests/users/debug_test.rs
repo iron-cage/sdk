@@ -1,23 +1,10 @@
 //! Debug test to see actual error messages
 
-use crate::common::{extract_json_response, extract_response};
-use hyper::StatusCode;
-use iron_control_api::routes::{auth_new::LoginResponse, users::UserManagementState};
-use iron_control_api::rbac::PermissionChecker;
-use axum::
-{
-  Router,
-  routing::{ post, put },
-  http::Request,
-};
-use axum::body::Body;
-use tower::ServiceExt;
-use serde_json::json;
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
-use std::sync::Arc;
+use iron_control_api::routes::users::UserManagementState;
 use axum::extract::FromRef;
-use iron_control_api::routes::auth_new::AuthState;
-use iron_control_api::jwt_auth::JwtSecret;
+use iron_control_api::routes::auth::AuthState;
+use sqlx::sqlite::SqlitePool;
+use sqlx::sqlite::SqlitePoolOptions;
 
 #[derive(Clone)]
 struct TestAppState {
@@ -122,51 +109,6 @@ async fn create_test_database() -> SqlitePool
   }
 
   pool
-}
-
-/// Create test router with user management routes
-async fn create_test_router() -> Router
-{
-  let db_pool = create_test_database().await;
-  let permission_checker = Arc::new( PermissionChecker::new() );
-
-  let auth_state = AuthState {
-    db_pool: db_pool.clone(),
-    jwt_secret: Arc::new(JwtSecret::new("test_secret".to_string())),
-  };
-
-  let user_state = UserManagementState::new( db_pool, permission_checker );
-
-  let state = TestAppState {
-    auth: auth_state,
-    users: user_state,
-  };
-
-  Router::new()
-    .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
-    .route( "/api/users/:id/suspend", put( iron_control_api::routes::users::suspend_user ) )
-    .with_state( state )
-}
-
-/// Get Admin Authentication Bearer Token
-async fn get_admin_bearer_token(router: &Router) -> String
-{
-  let admin_login_body = json!({
-    "username": "test_admin",
-    "password": "admin_password",
-  });
-
-  let admin_login_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &admin_login_body ).unwrap() ) )
-    .unwrap();
-
-  let admin_login_response = router.clone().oneshot( admin_login_request ).await.unwrap();
-
-  let ( _status, admin_login_body ): ( StatusCode, LoginResponse ) = extract_json_response( admin_login_response ).await;
-  admin_login_body.user_token
 }
 
 #[ tokio::test ]

@@ -26,7 +26,7 @@
 //! - Field length limits (DoS prevention)
 //! - Valid complete requests
 
-use iron_control_api::routes::auth_new::{ LoginRequest };
+use iron_control_api::routes::auth::{ LoginRequest };
 
 /// Test empty email is rejected.
 #[ tokio::test ]

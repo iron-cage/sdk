@@ -5,7 +5,7 @@
 //! - User credential validation against database
 //! - User lookup by username
 
-use sqlx::{ Pool, Sqlite, FromRow, Row };
+use sqlx::{ Pool, Sqlite, FromRow };
 
 /// User record from database
 #[ derive( Debug, Clone, FromRow ) ]

@@ -33,7 +33,7 @@ use axum::{
     routing::post,
 };
 use iron_control_api::routes::users::{self, CreateUserRequest, ListUsersResponse, UserManagementState, UserResponse};
-use iron_control_api::routes::auth_new::AuthState;
+use iron_control_api::routes::auth::AuthState;
 use iron_control_api::jwt_auth::JwtSecret;
 use iron_control_api::rbac::PermissionChecker;
 use tower::ServiceExt;

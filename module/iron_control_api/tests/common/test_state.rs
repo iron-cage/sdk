@@ -6,7 +6,7 @@
 //! - Combined application state
 
 use sqlx::SqlitePool;
-use iron_control_api::routes::auth_new::AuthState;
+use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::usage::UsageState;
 
 /// Test JWT secret for all tests (consistent across test runs).

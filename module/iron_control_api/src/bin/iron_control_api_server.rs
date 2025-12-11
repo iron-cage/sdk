@@ -144,7 +144,7 @@ fn detect_deployment_mode() -> DeploymentMode
 #[ derive( Clone ) ]
 struct AppState
 {
-  auth: iron_control_api::routes::auth_new::AuthState,
+  auth: iron_control_api::routes::auth::AuthState,
   tokens: iron_control_api::routes::tokens::TokenState,
   usage: iron_control_api::routes::usage::UsageState,
   limits: iron_control_api::routes::limits::LimitsState,
@@ -160,7 +160,7 @@ struct AppState
 /// This implementation allows:
 /// - Routes with `State<AuthState>` parameter to extract auth sub-state
 /// - `AuthenticatedUser` extractor to access JWT secret for token verification
-impl axum::extract::FromRef< AppState > for iron_control_api::routes::auth_new::AuthState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::auth::AuthState
 {
   fn from_ref( state: &AppState ) -> Self
   {
@@ -322,7 +322,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "Database: {}", database_url );
 
   // Initialize route states
-  let auth_state = iron_control_api::routes::auth_new::AuthState::new( jwt_secret, &database_url )
+  let auth_state = iron_control_api::routes::auth::AuthState::new( jwt_secret, &database_url )
     .await
     .expect( "Failed to initialize auth state" );
 
@@ -396,9 +396,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/health", get( iron_control_api::routes::health::health_check ) )
 
     // Authentication endpoints
-    .route( "/api/auth/login", post( iron_control_api::routes::auth_new::login ) )
-    .route( "/api/auth/refresh", post( iron_control_api::routes::auth_new::refresh ) )
-    .route( "/api/auth/logout", post( iron_control_api::routes::auth_new::logout ) )
+    .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
+    .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
+    .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
     // .route( "/api/auth/validate", post( iron_control_api::routes::auth::validate ) )
 
     // User management endpoints

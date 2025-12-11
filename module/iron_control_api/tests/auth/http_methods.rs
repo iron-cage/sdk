@@ -27,7 +27,7 @@
 //! **Precondition Violations:** Not applicable
 
 use crate::common::test_state::create_test_auth_state;
-use iron_control_api::routes::auth_new;
+use iron_control_api::routes::auth;
 use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
@@ -38,9 +38,9 @@ async fn create_test_router() -> Router
   let auth_state = create_test_auth_state().await;
 
   Router::new()
-    .route( "/api/auth/login", post( auth_new::login ) )
-    .route( "/api/auth/refresh", post( auth_new::refresh ) )
-    .route( "/api/auth/logout", post( auth_new::logout ) )
+    .route( "/api/auth/login", post( auth::login ) )
+    .route( "/api/auth/refresh", post( auth::refresh ) )
+    .route( "/api/auth/logout", post( auth::logout ) )
     .with_state( auth_state )
 }
 
