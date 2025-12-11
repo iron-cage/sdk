@@ -91,11 +91,11 @@ status: ## Show installation status
 #===============================================================================
 
 db-seed: ## Create demo user (demo/testpass)
-	@sqlite3 iron.db "INSERT OR IGNORE INTO users (username, password_hash, role, is_active, created_at) VALUES ('demo', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'user', 1, strftime('%s', 'now'));"
+	@sqlite3 iron.db "INSERT OR IGNORE INTO users (email, username, password_hash, role, is_active, created_at) VALUES ('demo@demo.com', 'demo', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'user', 1, strftime('%s', 'now'));"
 	@echo "✅ Demo user created (demo/testpass)"
 
 db-seed-admin: ## Create admin user
-	@sqlite3 iron.db "INSERT OR IGNORE INTO users (username, password_hash, role, is_active, created_at) VALUES ('admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now'));"
+	@sqlite3 iron.db "INSERT OR IGNORE INTO users (email, username, password_hash, role, is_active, created_at) VALUES ('admin@admin.com', 'admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now'));"
 	@echo "✅ Admin user created (admin/testpass)"
 
 
