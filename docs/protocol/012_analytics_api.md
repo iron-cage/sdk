@@ -836,7 +836,7 @@ iron analytics spending total --agent agent-abc123
 # By agent
 iron analytics spending by-agent
 iron analytics spending by-agent --period last-7-days
-iron analytics spending by-agent --provider ip-openai-001
+iron analytics spending by-agent --provider ip_openai_001
 
 # By provider
 iron analytics spending by-provider
@@ -863,7 +863,7 @@ iron analytics usage tokens by-agent --period last-7-days
 # Models
 iron analytics usage models
 iron analytics usage models --period last-30-days
-iron analytics usage models --provider ip-openai-001
+iron analytics usage models --provider ip_openai_001
 ```
 
 ### iron analytics budget

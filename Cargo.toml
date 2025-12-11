@@ -10,6 +10,9 @@ members = [
   # Infrastructure layer
   "module/iron_runtime_state",
 
+  # Test infrastructure
+  "module/iron_test_db",
+
   # Feature layer
   "module/iron_safety",
   "module/iron_reliability",
@@ -270,6 +273,9 @@ path = "module/iron_telemetry"
 
 [workspace.dependencies.iron_runtime_state]
 path = "module/iron_runtime_state"
+
+[workspace.dependencies.iron_test_db]
+path = "module/iron_test_db"
 
 [workspace.dependencies.iron_safety]
 path = "module/iron_safety"

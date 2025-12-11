@@ -116,6 +116,176 @@ if limiter.check("user-001")? {
 }
 ```
 
+## Development
+
+### Quick Start: Fresh Environment
+
+Get a clean, validated development environment in one command:
+
+```bash
+# Full workflow (reset + seed + validate)
+make dev-fresh
+
+# With full test suite
+make dev-fresh-test
+```
+
+### Database Path Standards
+
+**Canonical Development Path: `./iron.db`**
+
+All development uses this single path:
+- Scripts default to `./iron.db`
+- Config: `sqlite:///./iron.db?mode=rwc`
+- Tests use in-memory databases (`sqlite::memory:`)
+
+**Validation System:**
+
+```bash
+# Run all validators
+make validate
+
+# Individual validators
+make validate-paths    # Check for forbidden paths
+make validate-schema   # Verify schema correctness
+make validate-seed     # Validate seed data
+```
+
+**Enforcement:**
+
+1. **Pre-commit hook** - Blocks commits with path violations
+   ```bash
+   make install-hooks
+   ```
+
+2. **CI/CD validation** - GitHub Actions on every PR
+
+3. **Makefile integration** - Commands include validation
+
+**Quick Reference:**
+
+```bash
+make reset-seed     # Reset and seed database
+make validate       # Run all validators
+make test          # Full test suite
+make dev-fresh     # Complete fresh start
+```
+
+**Test Tokens for Manual Testing:**
+
+```
+Admin:      iron_dev_admin_token_001
+Developer:  iron_dev_pm_token_002
+Viewer:     iron_dev_viewer_token_003
+```
+
+**Detailed Documentation:**
+- [Database Path Standards](./docs/database_path_standards.md) - Complete guide
+- [Database Initialization](./docs/database_initialization.md) - Schema and migrations
+- [Configuration](./docs/configuration.md) - Config file reference
+
+## Testing
+
+### Test Database Infrastructure
+
+This crate uses `iron_test_db` for standardized test database management with automatic cleanup and seed data support.
+
+**Key Features:**
+- RAII cleanup (no manual TempDir management)
+- Shared pool across components (no `/tmp` workarounds)
+- Automatic migrations
+- Seed data population for realistic testing
+- In-memory storage for speed
+
+### Using v2 Test Helpers
+
+The `tests/common/mod.rs` module provides v2 helpers using `iron_test_db`:
+
+```rust
+use crate::common::{ create_test_db_v2, create_test_db_with_seed, create_test_storage_v2 };
+
+#[ tokio::test ]
+async fn test_basic_database()
+{
+  // Create test database with migrations applied
+  let db = create_test_db_v2().await;
+
+  // Use pool directly for SQL queries
+  let result: i64 = sqlx::query_scalar( "SELECT 1" )
+    .fetch_one( db.pool() )
+    .await?;
+
+  // No cleanup needed - TestDatabase handles it via Drop
+}
+
+#[ tokio::test ]
+async fn test_with_seed_data()
+{
+  // Create database with realistic seed data
+  let db = create_test_db_with_seed().await;
+
+  // Database now contains:
+  // - 3 users (admin, developer, viewer)
+  // - 2 AI provider keys (OpenAI, Anthropic)
+  // - 5 API tokens (various states)
+  // - 3 usage limits (different tiers)
+
+  let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( db.pool() )
+    .await?;
+
+  assert_eq!( user_count, 3 );
+}
+
+#[ tokio::test ]
+async fn test_with_components()
+{
+  // Create components sharing the same database
+  let ( storage, db ) = create_test_storage_v2().await;
+
+  // Storage and db share the same pool
+  let token_id = storage.create_token( "hash", "user", None, None, None, None ).await?;
+
+  // Query directly via pool if needed
+  let exists: bool = sqlx::query_scalar(
+    "SELECT EXISTS(SELECT 1 FROM api_tokens WHERE id = ?)"
+  )
+  .bind( token_id )
+  .fetch_one( db.pool() )
+  .await?;
+
+  assert!( exists );
+}
+```
+
+### Seed Data Reference
+
+See `tests/fixtures/seed_data_reference.md` for complete documentation of seeded entities and their properties.
+
+The seed data validation tests in `tests/seed_data_validation.rs` ensure the documentation stays in sync with actual seed data.
+
+### Migration from v1 to v2 Helpers
+
+**Old v1 approach:**
+```rust
+let ( pool, _temp ) = create_test_db().await;
+// Manual pool and TempDir management
+```
+
+**New v2 approach:**
+```rust
+let db = create_test_db_v2().await;
+// Automatic cleanup, cleaner API
+```
+
+**Benefits:**
+- No manual TempDir tracking
+- Shared pool across multiple components
+- Consistent RAII cleanup pattern
+- Better ergonomics
+
+Both approaches are currently supported for backward compatibility.
+
 ## License
 
 Apache-2.0

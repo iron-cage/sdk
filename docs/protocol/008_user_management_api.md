@@ -309,17 +309,17 @@ Content-Type: application/json
       "agent_id": "agent_abc123",
       "name": "Production Agent 1",
       "new_owner_id": "admin_001",
-      "new_project_id": "proj-orphaned",
+      "new_project_id": "proj_orphaned",
       "budget": 100.00,
-      "providers": ["ip-openai-001", "ip-anthropic-001"]
+      "providers": ["ip_openai_001", "ip_anthropic_001"]
     },
     {
       "agent_id": "agent_def456",
       "name": "Test Agent",
       "new_owner_id": "admin_001",
-      "new_project_id": "proj-orphaned",
+      "new_project_id": "proj_orphaned",
       "budget": 10.00,
-      "providers": ["ip-openai-001"]
+      "providers": ["ip_openai_001"]
     }
   ],
   "agents_count": 2,
@@ -379,7 +379,7 @@ HTTP 400 Bad Request (Last admin)
 
 **Owned Agents (if any):**
 - All agents reassigned to admin (`owner_id` changed)
-- All agents moved to "Orphaned Agents" project (`project_id` = `proj-orphaned`)
+- All agents moved to "Orphaned Agents" project (`project_id` = `proj_orphaned`)
 - Tags added to each agent: `orphaned`, `original-owner:{user_id}`
 - IC Tokens remain valid (agents continue working)
 - Budgets remain active (no service disruption)
@@ -412,7 +412,7 @@ HTTP 400 Bad Request (Last admin)
 - Error: 400 Bad Request
 
 **Orphaned Agents Project:**
-- Special project `proj-orphaned` ("Orphaned Agents")
+- Special project `proj_orphaned` ("Orphaned Agents")
 - Contains all deleted users' agents
 - Owned by system admin
 - Admin can view all orphaned agents, reassign to new users, or delete

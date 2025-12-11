@@ -10,7 +10,7 @@
 
 **In Scope:**
 - Agent code (lead_gen_agent.py, Python 3.11 + LangChain)
-- Dependencies (requirements.txt)
+- Dependencies (pyproject.toml with examples group)
 - Test data (100 synthetic leads)
 
 **Out of Scope:**
@@ -25,7 +25,7 @@
 | File/Directory | Responsibility | In Scope | Out of Scope (See) |
 |----------------|----------------|----------|-------------------|
 | **lead_gen_agent.py** | Main agent implementation | LangChain agent, tool definitions, lead processing logic | Rust runtime (→ /runtime/), Control Panel (→ ../control panel/) |
-| **requirements.txt** | Python dependencies | LangChain, OpenAI SDK, requests, pydantic | Rust crates (→ /pilot/crates.md), npm packages (→ ../control panel/package.json) |
+| **pyproject.toml** | Python dependencies | LangChain, OpenAI SDK (examples group in iron-runtime) | Rust crates (→ /pilot/crates.md), npm packages (→ ../control panel/package.json) |
 | **test_data/** | Synthetic lead data | 100 leads CSV, test data documentation | Real customer data (NOT included in demo) |
 | **.venv/** | Python virtual environment | Isolated Python dependencies | System-wide Python packages |
 
@@ -35,7 +35,7 @@
 
 **As of 2025-11-24:**
 - ❌ lead_gen_agent.py: NOT IMPLEMENTED
-- ❌ requirements.txt: NOT CREATED
+- ✅ pyproject.toml: Created (examples dependencies in iron-runtime)
 - ❌ test_data/leads.csv: NOT CREATED
 
 **Priority:** Low (slides-only approach recommended for 23-day timeline)
@@ -70,30 +70,26 @@
 
 ## Python Dependencies
 
-**When implemented, requirements.txt should include:**
+**Dependencies are defined in iron-runtime's pyproject.toml [project.optional-dependencies.examples] group:**
 
-```txt
-# Agent framework
-langchain==0.1.0
-langchain-openai==0.0.2
+```toml
+[project.optional-dependencies]
+examples = [
+  "langchain>=0.3.0",  # AI agent framework for examples
+  "langchain-community>=0.3.0",  # Community extensions
+  "langchain-openai>=0.2.0",  # OpenAI integration
+  "openai>=1.50.0",  # OpenAI SDK
+  "typing-extensions>=4.12.0",  # Type hints backport
+]
+```
 
-# LLM APIs
-openai==1.0.0
-anthropic==0.8.0  # Optional for fallback
+**Installation:**
+```bash
+# Install with examples dependencies
+uv sync --group examples
 
-# HTTP client
-requests==2.31.0
-httpx==0.25.0  # Async HTTP
-
-# Data validation
-pydantic==2.5.0
-pydantic-settings==2.1.0
-
-# Data processing
-pandas==2.1.0  # For CSV test data
-
-# Environment variables
-python-dotenv==1.0.0
+# Or with pip
+pip install -e ".[examples]"
 ```
 
 **See:** `/pilot/tech_stack.md` lines 116-137 for complete dependency list
@@ -181,7 +177,7 @@ cd /home/user1/pro/lib/willbe/module/iron_cage/pilot/demo/agent
 # Setup environment
 uv venv
 source .venv/bin/activate
-uv pip install -r requirements.txt
+uv sync --group examples
 
 # Set API keys
 export OPENAI_API_KEY="sk-..."

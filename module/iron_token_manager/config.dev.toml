@@ -1,0 +1,31 @@
+# Development Configuration
+# This config is used for local development and manual testing
+
+[database]
+# Database URL (SQLite with read-write-create mode)
+# Canonical path: ./iron.db for development database
+url = "sqlite:///./iron.db?mode=rwc"
+
+# Maximum number of concurrent connections
+max_connections = 5
+
+# Automatically apply migrations on startup
+auto_migrate = true
+
+# Enable foreign key constraints (recommended)
+foreign_keys = true
+
+[development]
+# Enable debug logging
+debug = true
+
+# Seed test data on first run (if database is empty)
+auto_seed = false
+
+# Wipe and re-seed database on every startup (DESTRUCTIVE!)
+# Useful for manual testing to ensure clean state
+# Set to true for automatic test data reset
+wipe_and_seed = true
+
+# Test users and tokens
+# Use 'make db-seed' to populate test data manually

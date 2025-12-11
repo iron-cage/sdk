@@ -55,12 +55,11 @@ def my_agent(input: str) -> str:
 ## Installation
 
 ```bash
-uv pip install iron-sdk
+pip install iron-sdk
 ```
 
 **Requirements:**
-- Python 3.8+ (`python --version`)
-- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Python 3.9+ (`python --version`)
 
 **About Dependencies:**
 
@@ -68,27 +67,27 @@ The `iron-cage` package (containing the Rust runtime) is automatically installed
 
 **Package Hierarchy:**
 ```
-What you install:  uv pip install iron-sdk
+What you install:  pip install iron-sdk
 What you import:   from iron_sdk import protect_agent
 Automatic (internal): iron-cage (Rust runtime, auto-installed)
 Internal (never seen): iron_runtime (Rust crate)
 ```
 
-**TL;DR:** Just `uv pip install iron-sdk` - everything else is automatic.
+**TL;DR:** Just `pip install iron-sdk` - everything else is automatic.
 
 **Optional dependencies:**
 ```bash
 # LangChain integration
-uv pip install iron-sdk[langchain]
+pip install iron-sdk[langchain]
 
 # CrewAI integration
-uv pip install iron-sdk[crewai]
+pip install iron-sdk[crewai]
 
 # AutoGPT integration
-uv pip install iron-sdk[autogpt]
+pip install iron-sdk[autogpt]
 
 # All integrations
-uv pip install iron-sdk[all]
+pip install iron-sdk[all]
 ```
 
 ---

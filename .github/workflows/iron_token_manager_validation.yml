@@ -1,0 +1,121 @@
+name: Iron Token Manager - Validation
+
+on:
+  pull_request:
+    paths:
+      - 'module/iron_token_manager/**'
+      - '.github/workflows/iron_token_manager_validation.yml'
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'module/iron_token_manager/**'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  path-validation:
+    name: Database Path Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate database paths
+        run: |
+          cd module/iron_token_manager
+          chmod +x scripts/validate_db_paths.sh
+          ./scripts/validate_db_paths.sh
+
+  test-and-validate:
+    name: Tests & Schema Validation
+    runs-on: ubuntu-latest
+    needs: path-validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: module/iron_token_manager/target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install nextest
+        run: |
+          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
+      - name: Run tests
+        run: |
+          cd module/iron_token_manager
+          RUSTFLAGS="-D warnings" cargo nextest run --all-features
+
+      - name: Run doctests
+        run: |
+          cd module/iron_token_manager
+          RUSTDOCFLAGS="-D warnings" cargo test --doc --all-features
+
+      - name: Run clippy
+        run: |
+          cd module/iron_token_manager
+          cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Reset and seed development database
+        run: |
+          cd module/iron_token_manager
+          chmod +x scripts/reset_and_seed.sh
+          ./scripts/reset_and_seed.sh
+
+      - name: Validate database schema
+        run: |
+          cd module/iron_token_manager
+          chmod +x scripts/validate_db_schema.sh
+          ./scripts/validate_db_schema.sh ./iron.db
+
+      - name: Validate seed data
+        run: |
+          cd module/iron_token_manager
+          chmod +x scripts/validate_seed_data.sh
+          ./scripts/validate_seed_data.sh ./iron.db
+
+  validation-summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [path-validation, test-and-validate]
+    if: always()
+
+    steps:
+      - name: Check validation results
+        run: |
+          if [ "${{ needs.path-validation.result }}" != "success" ] || [ "${{ needs.test-and-validate.result }}" != "success" ]; then
+            echo "❌ Validation failed"
+            echo ""
+            echo "Path validation: ${{ needs.path-validation.result }}"
+            echo "Test & schema validation: ${{ needs.test-and-validate.result }}"
+            echo ""
+            echo "Please fix the validation errors and push again."
+            exit 1
+          fi
+          echo "✅ All validations passed"

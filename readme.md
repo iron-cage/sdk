@@ -69,7 +69,7 @@ Frontend:       iron_dashboard
 
 **Quick Links:**
 - **[Getting Started](docs/getting_started.md)** - Choose your path: Python Developer, Control Panel Admin, or Platform Contributor
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributor workflow guide
+- **[contributing.md](contributing.md)** - Contributor workflow guide
 
 **Key Documentation:**
 - **[Budget Control Protocol](docs/architecture/006_budget_control_protocol.md)** - Two-token system (IC Token, IP Token), budget borrowing, incremental allocation
@@ -89,11 +89,10 @@ Frontend:       iron_dashboard
 **99% of users - you just want to protect your AI agents:**
 
 **Prerequisites:**
-- Python 3.8+ (`python --version`)
-- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Python 3.9+ (`python --version`)
 
 ```bash
-uv pip install iron-sdk
+pip install iron-sdk
 ```
 
 That's it! No Rust compiler, no cargo, no building required.
@@ -117,11 +116,26 @@ def my_agent(prompt: str) -> str:
 **Deploying the Control Panel service for your team:**
 
 ```bash
-# Run Control Panel (manages budgets, users, API keys)
-docker run -p 3000:3000 ironcage/control-panel:latest
+# Clone repository
+git clone https://github.com/iron-cage/iron_runtime.git
+cd iron_runtime/dev
+
+# Configure secrets
+cp .env.example .env
+# Generate and add: POSTGRES_PASSWORD, JWT_SECRET, IRON_SECRETS_MASTER_KEY
+# (See .env.example for generation commands)
+
+# Deploy with Docker Compose
+docker compose up -d
+
+# Access dashboard
+# http://localhost:8080
 ```
 
-See [`pilot/readme.md`](pilot/readme.md) for deployment guide.
+**Next Steps:**
+- [Getting Started Guide](docs/getting_started.md) § Deploy Control Panel - Complete walkthrough
+- [Deployment Guide](docs/deployment_guide.md) - Production deployment and troubleshooting
+- [Docker Compose Architecture](docs/deployment/006_docker_compose_deployment.md) - Design details
 
 ### For Platform Contributors
 
@@ -140,12 +154,12 @@ cd module/iron_dashboard
 npm install
 npm run build
 
-# Install Python SDK in development mode
+# Setup Python modules for development
 cd module/iron_sdk
-uv pip install -e .
+uv sync  # Installs dependencies and creates .venv
 ```
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for contributor workflow.
+See [`contributing.md`](contributing.md) for contributor workflow.
 </details>
 
 ## Status

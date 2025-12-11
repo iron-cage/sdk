@@ -13,11 +13,10 @@ Choose your path based on what you want to do:
 ### Step 1: Install
 
 **Prerequisites:**
-- Python 3.8+ (`python --version`)
-- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Python 3.9+ (`python --version`)
 
 ```bash
-uv pip install iron-sdk
+pip install iron-sdk
 ```
 
 ### Step 2: Get IC Token
@@ -61,33 +60,53 @@ python my_agent.py
 **You need:** Control Panel server
 **Time to start:** 5 minutes
 
-### Step 1: Deploy Control Panel
+### Step 1: Clone Repository
 
 ```bash
-docker pull iron-cage/control-panel:latest
-docker run -d -p 8080:8080 \
-  -e POSTGRES_URL="postgresql://..." \
-  iron-cage/control-panel
+git clone https://github.com/iron-cage/iron_runtime.git
+cd iron_runtime/dev
 ```
 
-### Step 2: Create Admin Account
+### Step 2: Configure Secrets
 
 ```bash
-docker exec -it control-panel \
-  iron-admin create-user \
-    --username admin \
-    --role admin \
-    --email admin@company.com
+# Copy environment template
+cp .env.example .env
+
+# Generate secrets (required for production)
+openssl rand -hex 32    # Copy output for POSTGRES_PASSWORD
+openssl rand -hex 32    # Copy output for JWT_SECRET
+openssl rand -base64 32 # Copy output for IRON_SECRETS_MASTER_KEY
+
+# Edit .env and paste the generated secrets
+nano .env
+# Or use your preferred editor (vim, code, etc.)
 ```
 
-### Step 3: Access Dashboard
+### Step 3: Start Services
 
-Open http://localhost:8080 and login.
+```bash
+# Start all services (PostgreSQL + Backend + Frontend)
+docker compose up -d
+
+# View logs to verify startup
+docker compose logs -f
+
+# Check service status
+docker compose ps
+```
+
+### Step 4: Access Dashboard
+
+Open http://localhost:8080
+
+Default credentials are created on first startup (check logs for details).
 
 **Next:**
-- [Deployment Guide](deployment/readme.md)
-- [User Management](features/006_user_management.md)
-- [Control Panel API](protocol/readme.md)
+- [Full Deployment Guide](deployment_guide.md) - Production deployment, troubleshooting, security
+- [Docker Compose Architecture](deployment/006_docker_compose_deployment.md) - Design details and trade-offs
+- [User Management](features/006_user_management.md) - Creating users and managing roles
+- [Control Panel API](protocol/readme.md) - API documentation
 
 ---
 
@@ -107,7 +126,7 @@ cd iron_runtime
 ### Step 2: Install Prerequisites
 
 - Rust 1.75+ (`rustup update`)
-- Python 3.11+ (`python --version`)
+- Python 3.9+ (`python --version`)
 - uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Node.js 18+ (`node --version`)
 
@@ -123,11 +142,11 @@ cargo build --release --workspace
 cargo nextest run --all-features
 ```
 
-### Step 5: Install SDK in Dev Mode
+### Step 5: Setup Python Modules for Development
 
 ```bash
 cd module/iron_sdk
-uv pip install -e .
+uv sync  # Installs dependencies and creates .venv
 ```
 
 **Next:**
@@ -143,18 +162,16 @@ uv pip install -e .
 
 **Solution:** Install iron-sdk:
 ```bash
-uv pip install iron-sdk
+pip install iron-sdk
 ```
-
-**Note:** Install uv first: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ### "Should I install iron-cage?"
 
-**Answer:** No! iron-cage is automatically installed when you `uv pip install iron-sdk`. You never interact with it directly.
+**Answer:** No! iron-cage is automatically installed when you `pip install iron-sdk`. You never interact with it directly.
 
 ### "Do I need Rust installed?"
 
-**Answer:** No! Only uv and Python. The Rust runtime is pre-compiled in the iron-cage package.
+**Answer:** No! Only Python. The Rust runtime is pre-compiled in the iron-cage package.
 
 ### "I see cargo build commands in the docs"
 

@@ -101,7 +101,7 @@ Response: 200 OK
       "project_id": "proj_456",
       "status": "active",
       "created_at": "2025-12-09T09:00:00Z",
-      "created_by": "user-admin",
+      "created_by": "user_admin",
       "last_used_at": "2025-12-09T12:30:00Z"
     }
   ],
@@ -131,7 +131,7 @@ Response: 200 OK
   "project_id": "proj_456",
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z",
-  "created_by": "user-admin",
+  "created_by": "user_admin",
   "last_used_at": "2025-12-09T12:30:00Z",
   "usage_summary": {
     "total_requests": 1543,
@@ -184,7 +184,7 @@ Response: 201 Created
   "project_id": "proj_456",
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z",
-  "created_by": "user-admin",
+  "created_by": "user_admin",
   "warning": "Save this token securely - it will NOT be shown again"
 }
 
@@ -273,7 +273,7 @@ Response: 200 OK
   "status": "active",
   "created_at": "2025-12-09T09:00:00Z",  // Original creation date preserved
   "rotated_at": "2025-12-09T14:00:00Z",
-  "rotated_by": "user-admin",
+  "rotated_by": "user_admin",
   "warning": "Old token invalidated - save new token securely"
 }
 

@@ -59,6 +59,34 @@ pub struct UsageTracker
 
 impl UsageTracker
 {
+  /// Create new usage tracker from existing pool
+  ///
+  /// Preferred constructor for test environments using `iron_test_db`.
+  /// Does NOT apply migrations - caller is responsible for schema setup.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - Existing database connection pool
+  ///
+  /// # Returns
+  ///
+  /// Initialized tracker using provided pool
+  ///
+  /// # Examples
+  ///
+  /// ```rust,ignore
+  /// use iron_test_db::TestDatabaseBuilder;
+  /// use iron_token_manager::usage_tracker::UsageTracker;
+  ///
+  /// let db = TestDatabaseBuilder::new().in_memory().build().await?;
+  /// let tracker = UsageTracker::from_pool( db.pool().clone() );
+  /// ```
+  #[ must_use ]
+  pub fn from_pool( pool: SqlitePool ) -> Self
+  {
+    Self { pool }
+  }
+
   /// Create new usage tracker
   ///
   /// # Arguments

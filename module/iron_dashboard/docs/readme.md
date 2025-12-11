@@ -110,9 +110,10 @@ When adding new documentation file, update the Responsibility Table below with:
 | `api_integration.md` | Backend integration patterns and type safety | - → Integration guide | REST endpoints, TypeScript types, WebSocket, error handling, auth | Frontend architecture (architecture.md), backend spec (iron_control_api/spec.md), component details (components.md) |
 | `sitemap.md` | Navigation structure and route hierarchy | - → Sitemap | Route hierarchy, navigation schema, page flow, access control matrix | Route implementation (architecture.md), component details (components.md), requirements (spec.md) |
 | `components.md` | UI component inventory and catalog (shadcn-vue + views) | - → Component catalog | shadcn-vue components (Button, Dialog, etc.), Vue views, composables, props/emits, usage examples, dependency graph | Architecture patterns (architecture.md), API contracts (api_integration.md), navigation structure (sitemap.md) |
-| `development_setup.md` | Development environment setup and configuration | - → Setup guide | Node.js install, dependencies, env vars, dev server, IDE config, troubleshooting | Architecture (architecture.md), quick start (readme.md), production deployment (TBD) |
+| `development_setup.md` | Development environment setup and configuration | - → Setup guide | Node.js install, dependencies, env vars, dev server, IDE config, troubleshooting | Architecture (architecture.md), quick start (readme.md), production deployment (deployment.md) |
+| `deployment.md` | Frontend deployment procedures and build configuration | - → Deployment guide | Build process (Vite), Docker deployment (multi-stage), nginx configuration (proxy, caching, security), environment variables, troubleshooting | Development setup (development_setup.md), architecture patterns (architecture.md), full stack deployment (../../docs/deployment_guide.md), Docker Compose architecture (../../docs/deployment/006_docker_compose_deployment.md) |
 
-**Complete Entity Coverage Verified:** 6 entities listed (all files and directories in docs/).
+**Complete Entity Coverage Verified:** 7 entities listed (all files and directories in docs/).
 
 ---
 

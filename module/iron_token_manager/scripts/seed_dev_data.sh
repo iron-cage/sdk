@@ -7,12 +7,12 @@
 # Usage:
 #   ./scripts/seed_dev_data.sh [database_path]
 #
-# Default database: ./dev_tokens.db
+# Default database: ./iron.db (canonical path)
 
 set -euo pipefail
 
 # Configuration
-DB_PATH="${1:-./dev_tokens.db}"
+DB_PATH="${1:-./iron.db}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Colors for output
@@ -87,17 +87,17 @@ VALUES
     $NOW_MS
   ),
   (
-    'project_manager',
+    'developer',
     'user',
-    '\$2b\$12\$hashedpassword_pm_placeholder',
+    '\$2b\$12\$hashedpassword_developer_placeholder',
     1,
     $NOW_MS
   ),
   (
     'viewer',
-    'viewer',
+    'user',
     '\$2b\$12\$hashedpassword_viewer_placeholder',
-    1,
+    0,
     $NOW_MS
   );
 
@@ -126,9 +126,9 @@ VALUES
   ),
   (
     '$HASH_PM',
-    'project_manager',
+    'developer',
     'project_beta',
-    'Project Manager Development Token',
+    'Developer Development Token',
     1,
     $NOW_MS
   ),
@@ -167,7 +167,7 @@ VALUES
     $NOW_MS
   ),
   (
-    'project_manager',
+    'developer',
     'project_beta',
     500000,
     500,
@@ -243,7 +243,7 @@ SELECT
   'token',
   (SELECT id FROM api_tokens WHERE token_hash = '$HASH_PM' LIMIT 1),
   'created',
-  'project_manager',
+  'developer',
   '{"method":"api","reason":"development"}',
   $NOW_MS - 86400000
 UNION ALL
@@ -258,7 +258,7 @@ SELECT
 EOF
 
 # Verify data was inserted
-USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'project_manager', 'viewer');")
+USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'developer', 'viewer');")
 TOKEN_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE token_hash IN ('$HASH_ADMIN', '$HASH_PM', '$HASH_VIEWER');")
 USAGE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM token_usage WHERE token_id IN (SELECT id FROM api_tokens WHERE token_hash IN ('$HASH_ADMIN', '$HASH_PM', '$HASH_VIEWER'));")
 
@@ -270,15 +270,15 @@ echo "  Tokens created:  $TOKEN_COUNT"
 echo "  Usage records:   $USAGE_COUNT"
 echo ""
 log_info "Test tokens (save these for API testing):"
-echo "  Admin:   $TOKEN_ADMIN"
-echo "  PM:      $TOKEN_PM"
-echo "  Viewer:  $TOKEN_VIEWER"
+echo "  Admin:      $TOKEN_ADMIN"
+echo "  Developer:  $TOKEN_PM"
+echo "  Viewer:     $TOKEN_VIEWER"
 echo ""
 log_info "Test credentials:"
-echo "  Admin:   username=admin, role=admin, is_active=1"
-echo "  PM:      username=project_manager, role=user, is_active=1"
-echo "  Viewer:  username=viewer, role=viewer, is_active=1"
+echo "  Admin:      username=admin, role=admin, is_active=1"
+echo "  Developer:  username=developer, role=user, is_active=1"
+echo "  Viewer:     username=viewer, role=user, is_active=0 (INACTIVE)"
 echo ""
 log_info "Projects:"
 echo "  project_alpha (admin)"
-echo "  project_beta (pm + viewer)"
+echo "  project_beta (developer + viewer)"

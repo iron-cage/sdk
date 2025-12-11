@@ -125,7 +125,7 @@ Authorization: Bearer <user-token or api-token>
 **Response** (HTTP 200 OK):
 ```json
 {
-  "user_id": "user-abc123",
+  "user_id": "user_abc123",
   "settings": {
     "display": {
       "theme": "dark",
@@ -198,7 +198,7 @@ Content-Type: application/json
 **Response** (HTTP 200 OK):
 ```json
 {
-  "user_id": "user-abc123",
+  "user_id": "user_abc123",
   "settings": {
     "display": {
       "theme": "light",
@@ -289,7 +289,7 @@ Retrieves project-level settings. Requires Owner or Admin role.
 
 **Request**:
 ```http
-GET /api/v1/settings/project/proj-master-001
+GET /api/v1/settings/project/proj_master_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -301,7 +301,7 @@ Authorization: Bearer <user-token or api-token>
 **Response** (HTTP 200 OK):
 ```json
 {
-  "project_id": "proj-master-001",
+  "project_id": "proj_master_001",
   "settings": {
     "operational": {
       "default_agent_budget": 100.00,
@@ -374,7 +374,7 @@ Updates project-level settings. Requires Owner or Admin role.
 
 **Request**:
 ```http
-PUT /api/v1/settings/project/proj-master-001
+PUT /api/v1/settings/project/proj_master_001
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
@@ -405,7 +405,7 @@ Content-Type: application/json
 **Response** (HTTP 200 OK):
 ```json
 {
-  "project_id": "proj-master-001",
+  "project_id": "proj_master_001",
   "settings": {
     "operational": {
       "default_agent_budget": 150.00,
@@ -428,7 +428,7 @@ Content-Type: application/json
     }
   },
   "updated_at": "2025-12-10T10:30:45Z",
-  "updated_by": "user-abc123"
+  "updated_by": "user_abc123"
 }
 ```
 
@@ -581,7 +581,7 @@ Content-Type: application/json
     }
   },
   "updated_at": "2025-12-10T10:30:45Z",
-  "updated_by": "admin-user-001"
+  "updated_by": "admin-user_001"
 }
 ```
 

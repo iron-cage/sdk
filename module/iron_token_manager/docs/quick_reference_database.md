@@ -45,29 +45,87 @@ make test
 
 ## 🔑 Test Credentials
 
-**Users:**
-- `admin` (role: admin)
-- `project_manager` (role: user)
-- `viewer` (role: viewer)
+**Users (password: `password123`):**
+- `admin` (role: admin, active)
+- `developer` (role: user, active)
+- `viewer` (role: user, inactive)
 
 **API Tokens:**
-- Admin: `iron_dev_admin_token_001`
-- PM: `iron_dev_pm_token_002`
-- Viewer: `iron_dev_viewer_token_003`
+- Admin token (never expires)
+- Developer token (expires in 30 days)
+- Project alpha token
+- Inactive token
+- Expired token
 
 **Projects:**
-- `project_alpha` (admin)
-- `project_beta` (pm + viewer)
+- `project_alpha` (assigned OpenAI + Anthropic keys)
+
+**Provider Keys:**
+- OpenAI (enabled, $50 balance)
+- Anthropic (enabled, $100 balance)
 
 ## 📁 File Locations
 
 | File | Purpose |
 |------|---------|
-| `dev_tokens.db` | Development database (default) |
+| `iron.db` | Development database (default) |
+| `config.dev.toml` | Development configuration |
+| `config.test.toml` | Test configuration |
+| `config.prod.toml.example` | Production config template |
 | `backups/` | Timestamped backups |
 | `migrations/*.sql` | Schema definitions |
 | `scripts/seed_dev_data.sh` | Test data population |
 | `tests/common/mod.rs` | Test helper functions |
+
+## ⚙️ Configuration
+
+### Load from Config File (Recommended)
+
+```rust
+use iron_token_manager::storage::TokenStorage;
+
+// Load from IRON_ENV (default: "development")
+let storage = TokenStorage::from_config().await?;
+
+// Or specify environment
+std::env::set_var("IRON_ENV", "production");
+let storage = TokenStorage::from_config().await?;
+```
+
+### Automatic Wipe and Seed (Development)
+
+Enable automatic database reset on every startup:
+
+```toml
+# config.dev.toml
+[development]
+wipe_and_seed = true
+```
+
+This will:
+1. Wipe ALL data from database (DESTRUCTIVE!)
+2. Re-apply migrations
+3. Seed with sample test data
+4. Run on EVERY startup
+
+⚠️ **Never enable in production!**
+
+### Manual Seed Data
+
+```rust
+use iron_token_manager::seed::{wipe_database, seed_all};
+
+let pool = storage.pool();
+wipe_database(pool).await?;  // Optional: wipe first
+seed_all(pool).await?;
+```
+
+### Environment Overrides
+
+```bash
+export DATABASE_URL="sqlite:///custom.db?mode=rwc"
+export DATABASE_MAX_CONNECTIONS=20
+```
 
 ## 🧪 Test Patterns
 
@@ -106,7 +164,10 @@ async fn test_tokens()
 | Migration guard tables | 6 |
 | Indexes (idx_*) | 32 |
 | Test users (after seed) | 3 |
-| Test tokens (after seed) | 3 |
+| Test tokens (after seed) | 5 |
+| Test provider keys (after seed) | 2 |
+| Test usage limits (after seed) | 3 |
+| Test project assignments (after seed) | 2 |
 
 ## ⚠️ Common Issues
 
@@ -125,7 +186,7 @@ cargo test      # Test DB auto-updates
 ### Seed script fails
 ```bash
 # Check schema matches migrations
-sqlite3 dev_tokens.db .schema users
+sqlite3 iron.db .schema users
 grep "INSERT INTO users" scripts/seed_dev_data.sh
 ```
 
@@ -136,7 +197,7 @@ grep "INSERT INTO users" scripts/seed_dev_data.sh
 make db-inspect
 
 # Or manually:
-sqlite3 dev_tokens.db
+sqlite3 iron.db
 
 sqlite> SELECT COUNT(*) FROM users;
 sqlite> SELECT username, role FROM users;
@@ -156,7 +217,7 @@ sqlite> .quit
 - Share databases between tests
 - Mock database interactions
 - Skip migrations
-- Commit `dev_tokens.db` to git
+- Commit `iron.db` to git
 
 ## 📚 Full Documentation
 

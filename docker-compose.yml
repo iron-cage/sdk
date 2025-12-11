@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: iron_postgres
+    environment:
+      POSTGRES_DB: iron_tokens
+      POSTGRES_USER: iron_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - iron_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iron_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: module/iron_control_api/Dockerfile
+    container_name: iron_backend
+    environment:
+      DATABASE_URL: postgresql://iron_user:${POSTGRES_PASSWORD}@postgres:5432/iron_tokens
+      JWT_SECRET: ${JWT_SECRET}
+      IRON_DEPLOYMENT_MODE: production
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - iron_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: module/iron_dashboard/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: iron_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - iron_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  iron_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

@@ -1,6 +1,6 @@
 """Type stubs for Iron Cage Python bindings"""
 
-from typing import Optional
+from typing import Optional, Any
 
 class Runtime:
     """Iron Cage runtime for AI agent safety and cost control"""
@@ -47,3 +47,38 @@ class Runtime:
             JSON string with metrics or None if agent not found
         """
         ...
+
+
+class LlmRouter:
+    """LLM Router - Local proxy for OpenAI/Anthropic API requests."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        server_url: Optional[str] = None,
+        cache_ttl_seconds: int = 300,
+        budget: Optional[float] = None,
+        provider_key: Optional[str] = None,
+    ) -> None: ...
+
+    @property
+    def base_url(self) -> str: ...
+    @property
+    def api_key(self) -> str: ...
+    @property
+    def port(self) -> int: ...
+    @property
+    def is_running(self) -> bool: ...
+    @property
+    def provider(self) -> str: ...
+    @property
+    def budget(self) -> Optional[float]: ...
+    @property
+    def budget_status(self) -> Optional[tuple[float, float]]: ...
+
+    def total_spent(self) -> float: ...
+    def set_budget(self, amount_usd: float) -> None: ...
+    def stop(self) -> None: ...
+
+    def __enter__(self) -> "LlmRouter": ...
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None: ...

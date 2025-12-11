@@ -49,7 +49,7 @@ make check                  # Fast compilation check
 
 ### Default Database Location
 
-Development database: `./dev_tokens.db`
+Development database: `./iron.db`
 
 Override with environment variable:
 ```bash
@@ -64,7 +64,7 @@ make db-reset-seed
 ```
 
 **What it does:**
-1. Creates backup: `./backups/dev_tokens_backup_YYYYMMDD_HHMMSS.db`
+1. Creates backup: `./backups/iron_backup_YYYYMMDD_HHMMSS.db`
 2. Deletes current database
 3. Applies all migrations (001-008, skipping 007)
 4. Populates test data:
@@ -116,7 +116,7 @@ make db-seed
 
 ```bash
 # Open SQLite shell
-sqlite3 dev_tokens.db
+sqlite3 iron.db
 
 # Count tables
 sqlite> SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND substr(name,1,1) != '_';
@@ -140,11 +140,11 @@ sqlite> .quit
 
 All backups saved to: `./backups/`
 
-**Format:** `dev_tokens_backup_YYYYMMDD_HHMMSS.db`
+**Format:** `iron_backup_YYYYMMDD_HHMMSS.db`
 
 **Restore backup:**
 ```bash
-cp ./backups/dev_tokens_backup_20241211_143000.db ./dev_tokens.db
+cp ./backups/iron_backup_20241211_143000.db ./iron.db
 ```
 
 ---
@@ -291,7 +291,59 @@ Databases are **automatically deleted** when `TempDir` goes out of scope:
 
 ## Production Database Setup
 
-### Database URL Format
+### Configuration File (Recommended)
+
+**Production deployments should use config files for database setup.**
+
+#### Step 1: Create Production Config
+
+```bash
+# Copy template
+cp config.prod.toml.example config.prod.toml
+
+# Edit with your settings
+vim config.prod.toml
+```
+
+#### Step 2: Configure Database
+
+```toml
+# config.prod.toml
+[database]
+url = "sqlite:///./data/tokens.db?mode=rwc"
+max_connections = 10
+auto_migrate = true
+foreign_keys = true
+
+[production]
+debug = false
+auto_seed = false
+```
+
+#### Step 3: Initialize from Config
+
+```rust
+use iron_token_manager::storage::TokenStorage;
+
+// Method 1: Load from IRON_ENV (recommended)
+std::env::set_var("IRON_ENV", "production");
+let storage = TokenStorage::from_config().await?;
+
+// Method 2: Load specific config object
+use iron_token_manager::config::Config;
+let config = Config::from_file("config.prod.toml")?;
+let storage = TokenStorage::from_config_object(&config).await?;
+```
+
+**What happens:**
+1. Loads config from file (`config.{IRON_ENV}.toml`)
+2. Applies environment variable overrides (if any)
+3. Connects with configured max_connections
+4. Enables foreign keys (`PRAGMA foreign_keys = ON`)
+5. Applies migrations if `auto_migrate = true`
+6. Returns ready-to-use `TokenStorage` instance
+
+### Database URL Format (Legacy)
 
 ```
 sqlite:///path/to/database.db?mode=rwc
@@ -299,24 +351,38 @@ sqlite:///path/to/database.db?mode=rwc
 
 **Parameters:**
 - `mode=rwc` - Read/Write/Create (required)
-- Max connections: 5 (hardcoded in `storage.rs`)
+- Max connections: 5 (hardcoded for legacy `new()` method)
 
-### Initial Setup
+### Legacy Direct URL Initialization
 
 ```rust
 use iron_token_manager::storage::TokenStorage;
 
-// Create storage (applies migrations automatically)
+// Create storage with hardcoded URL (not recommended for production)
 let storage = TokenStorage::new( "sqlite:///data/tokens.db?mode=rwc" ).await?;
 
 // Schema is ready!
 ```
 
-**What happens:**
-1. Connects to database (creates if doesn't exist)
-2. Enables foreign keys (`PRAGMA foreign_keys = ON`)
-3. Applies all migrations via `migrations::apply_all_migrations()`
-4. Returns ready-to-use `TokenStorage` instance
+**Note:** This method is maintained for backward compatibility. Use `from_config()` for production deployments.
+
+### Environment Variable Overrides
+
+All config values can be overridden via environment variables:
+
+```bash
+# Override database URL
+export DATABASE_URL="sqlite:///custom/path.db?mode=rwc"
+
+# Override max connections
+export DATABASE_MAX_CONNECTIONS=20
+
+# Disable auto-migration
+export DATABASE_AUTO_MIGRATE=false
+
+# Then load config (will use overrides)
+let storage = TokenStorage::from_config().await?;
+```
 
 ### Migration Guard Pattern
 
@@ -478,7 +544,7 @@ make test
 **Solution:** Verify seed script matches migration files:
 ```bash
 # Check actual schema
-sqlite3 dev_tokens.db .schema users
+sqlite3 iron.db .schema users
 
 # Compare with seed script
 grep "INSERT INTO users" scripts/seed_dev_data.sh
@@ -498,7 +564,7 @@ migrations::apply_all_migrations( &pool ).await?; // Safe to call multiple times
 If still failing:
 ```bash
 # Drop guard table manually
-sqlite3 dev_tokens.db "DROP TABLE IF EXISTS _migration_XXX_completed;"
+sqlite3 iron.db "DROP TABLE IF EXISTS _migration_XXX_completed;"
 
 # Run migration again
 make db-reset
@@ -540,7 +606,7 @@ tracker.record_usage( token_id, "openai", "gpt-4", 100, 50, 150 ).await?;
 
 **Verification:**
 ```bash
-sqlite3 dev_tokens.db \
+sqlite3 iron.db \
   "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%';"
 ```
 
