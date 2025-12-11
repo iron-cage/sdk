@@ -185,7 +185,7 @@ impl LoginRequest {
 ///   "name": "John Doe"
 /// }
 /// ```
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize )]
 pub struct UserInfo {
   pub id: String,
   pub email: String,
@@ -238,7 +238,7 @@ impl UserInfo {
 ///   "user": { ... }
 /// }
 /// ```
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize )]
 pub struct LoginResponse {
   pub user_token: String,
   pub token_type: String,
@@ -592,32 +592,30 @@ pub struct RefreshResponse {
 /// - User prompted to re-login if token expired
 pub async fn refresh(
   State(state): State<AuthState>,
-//   TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-  AuthenticatedUser( claims ): AuthenticatedUser
+  TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
+  // AuthenticatedUser( claims ): AuthenticatedUser
 
 ) -> impl IntoResponse {
-//   let claims = match state.jwt_secret.verify_access_token(&bearer.token()) {
-//     Ok(claims) => claims,
-//     Err(_) => {
-//       return (
-//         StatusCode::UNAUTHORIZED,
-//         Json(ErrorResponse {
-//           error: ErrorDetail {
-//             code: "AUTH_INVALID_TOKEN".to_string(),
-//             message: "Invalid or expired authentication token".to_string(),
-//             details: None,
-//           },
-//         }),
-//       )
-//         .into_response();
-//     }
-//   };
+  let claims = match state.jwt_secret.verify_refresh_token(&bearer.token()) {
+    Ok(claims) => claims,
+    Err(_) => {
+      return (
+        StatusCode::UNAUTHORIZED,
+        Json(ErrorResponse {
+          error: ErrorDetail {
+            code: "AUTH_INVALID_TOKEN".to_string(),
+            message: "Invalid or expired authentication token".to_string(),
+            details: None,
+          },
+        }),
+      )
+        .into_response();
+    }
+  };
 
-  // Check if token is blacklisted
   let blacklisted = match user_auth::get_blacklisted_token(&state.db_pool, &claims.jti).await {
     Ok(blacklisted) => blacklisted,
     Err(err) => {
-      println!("Failed to check token blacklist: {:?}", err);
       tracing::error!("Failed to check token blacklist: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -632,7 +630,6 @@ pub async fn refresh(
         .into_response();
     }
   };
-
   if blacklisted.is_some() {
     return (
         StatusCode::UNAUTHORIZED,

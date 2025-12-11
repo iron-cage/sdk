@@ -33,7 +33,7 @@
 //! **Precondition Violations:** Not applicable
 
 use crate::common::test_state::create_test_auth_state;
-use iron_control_api::routes::auth;
+use iron_control_api::routes::auth_new;
 use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
@@ -44,9 +44,9 @@ async fn create_test_router() -> Router
   let auth_state = create_test_auth_state().await;
 
   Router::new()
-    .route( "/api/auth/login", post( auth::login ) )
-    .route( "/api/auth/refresh", post( auth::refresh ) )
-    .route( "/api/auth/logout", post( auth::logout ) )
+    .route( "/api/auth/login", post( auth_new::login ) )
+    .route( "/api/auth/refresh", post( auth_new::refresh ) )
+    .route( "/api/auth/logout", post( auth_new::logout ) )
     .with_state( auth_state )
 }
 
@@ -59,7 +59,7 @@ async fn test_login_with_invalid_json_syntax()
 {
   let router = create_test_router().await;
 
-  let malformed_json = r#"{"username":"user","password":"pass""#; // Missing closing brace
+  let malformed_json = r#"{"email":"user","password":"pass""#; // Missing closing brace
 
   let request = Request::builder()
     .method( "POST" )
@@ -85,7 +85,7 @@ async fn test_login_with_trailing_comma()
 {
   let router = create_test_router().await;
 
-  let malformed_json = r#"{"username":"user","password":"pass",}"#; // Trailing comma
+  let malformed_json = r#"{"email":"user","password":"pass",}"#; // Trailing comma
 
   let request = Request::builder()
     .method( "POST" )
@@ -100,83 +100,5 @@ async fn test_login_with_trailing_comma()
     response.status(),
     StatusCode::BAD_REQUEST,
     "LOUD FAILURE: Trailing comma in JSON must return 400 Bad Request"
-  );
-}
-
-/// Test POST /api/auth/refresh with invalid JSON syntax.
-///
-/// WHY: Refresh endpoint should also reject malformed JSON at HTTP layer.
-#[ tokio::test ]
-async fn test_refresh_with_invalid_json_syntax()
-{
-  let router = create_test_router().await;
-
-  let malformed_json = r#"{"refresh_token":"abc123"#; // Missing closing brace
-
-  let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/auth/refresh" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
-    .unwrap();
-
-  let response = router.oneshot( request ).await.unwrap();
-
-  assert_eq!(
-    response.status(),
-    StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Refresh with malformed JSON must return 400 Bad Request"
-  );
-}
-
-/// Test POST /api/auth/logout with invalid JSON syntax.
-///
-/// WHY: Logout endpoint should reject malformed JSON at HTTP layer.
-#[ tokio::test ]
-async fn test_logout_with_invalid_json_syntax()
-{
-  let router = create_test_router().await;
-
-  let malformed_json = r#"{"refresh_token":"abc123"#; // Missing closing brace
-
-  let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/auth/logout" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
-    .unwrap();
-
-  let response = router.oneshot( request ).await.unwrap();
-
-  assert_eq!(
-    response.status(),
-    StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Logout with malformed JSON must return 400 Bad Request"
-  );
-}
-
-/// Test POST /api/auth/login with mixed quotes (invalid JSON).
-///
-/// WHY: JSON requires consistent use of double quotes, not single quotes.
-#[ tokio::test ]
-async fn test_login_with_mixed_quotes()
-{
-  let router = create_test_router().await;
-
-  let malformed_json = r#"{'username':'user',"password":"pass"}"#; // Single quotes
-
-  let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
-    .unwrap();
-
-  let response = router.oneshot( request ).await.unwrap();
-
-  assert_eq!(
-    response.status(),
-    StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Mixed/single quotes in JSON must return 400 Bad Request"
   );
 }

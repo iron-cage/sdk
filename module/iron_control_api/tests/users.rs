@@ -33,7 +33,7 @@ use axum::{
     routing::post,
 };
 use iron_control_api::routes::users::{self, CreateUserRequest, ListUsersResponse, UserManagementState, UserResponse};
-use iron_control_api::routes::auth::AuthState;
+use iron_control_api::routes::auth_new::AuthState;
 use iron_control_api::jwt_auth::JwtSecret;
 use iron_control_api::rbac::PermissionChecker;
 use tower::ServiceExt;
@@ -88,15 +88,8 @@ async fn test_create_and_list_users() {
     let (router, state) = create_test_app().await;
 
     // Create admin user for auth
-    let (admin_id, _) = common::create_test_user(&state.auth.db_pool, "admin").await;
-    // Update role to admin
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = ?")
-        .bind(admin_id)
-        .execute(&state.auth.db_pool)
-        .await
-        .unwrap();
-
-    let token = create_test_access_token("admin", "admin", "test_secret");
+    let (admin_id, _) = common::create_test_admin(&state.auth.db_pool).await;
+    let token = create_test_access_token(admin_id, "admin", "test_secret");
 
     // 1. Create a new user
     let create_request = CreateUserRequest {

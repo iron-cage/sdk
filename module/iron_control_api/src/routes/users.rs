@@ -302,9 +302,6 @@ pub async fn create_user(
     }) ) ).into_response();
   }
 
-  // Get admin ID from claims
-  let admin_id = get_admin_id( &state.db_pool, &claims.sub ).await.unwrap_or( 0 );
-
   // Check RBAC permission
   let role = Role::from_str( &claims.role ).unwrap_or( Role::User );
   if !state.permission_checker.has_permission( role, Permission::ManageUsers )
@@ -326,6 +323,8 @@ pub async fn create_user(
     email: request.email,
     role: request.role,
   };
+
+  let admin_id = claims.sub.parse::< i64 >().unwrap_or( 0 );
 
   // Create user
   match user_service.create_user( params, admin_id ).await

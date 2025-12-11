@@ -68,7 +68,7 @@ async fn test_infrastructure_verification()
 
   assert_eq!(
     fetched_user.1,
-    "testuser",
+    "test_user",
     "LOUD FAILURE: Fetched username should match"
   );
 }
@@ -82,7 +82,7 @@ async fn test_jwt_token_infrastructure()
   // Generate access token
   let access_token = auth_state
     .jwt_secret
-    .generate_access_token( "user_testuser", "user" )
+    .generate_access_token( 1, "user", "access" )
     .expect( "LOUD FAILURE: Should generate access token" );
 
   assert!(
@@ -98,7 +98,7 @@ async fn test_jwt_token_infrastructure()
 
   assert_eq!(
     claims.sub,
-    "user_testuser",
+    "1",
     "LOUD FAILURE: Token subject should match user ID"
   );
 
@@ -111,7 +111,7 @@ async fn test_jwt_token_infrastructure()
   // Generate refresh token
   let refresh_token = auth_state
     .jwt_secret
-    .generate_refresh_token( "user_testuser", "token_id_001" )
+    .generate_refresh_token( 1, "token_id_001" )
     .expect( "LOUD FAILURE: Should generate refresh token" );
 
   assert!(
@@ -127,7 +127,7 @@ async fn test_jwt_token_infrastructure()
 
   assert_eq!(
     refresh_claims.sub,
-    "user_testuser",
+    "1",
     "LOUD FAILURE: Refresh token subject should match user ID"
   );
 

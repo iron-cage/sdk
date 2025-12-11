@@ -178,7 +178,6 @@ impl UserService
       } ).to_string() ),
       None,
     ).await?;
-    println!( "Hello" );
 
     // Return created user
     self.get_user_by_id( user_id ).await

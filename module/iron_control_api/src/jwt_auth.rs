@@ -148,6 +148,7 @@ impl JwtSecret
     token: &str,
   ) -> Result< AccessTokenClaims, jsonwebtoken::errors::Error >
   {
+    println!( "{}", token );
     let token_data = decode::<AccessTokenClaims>(
       token,
       &DecodingKey::from_secret( self.secret.as_bytes() ),

@@ -2,7 +2,7 @@
 
 use crate::common::{extract_json_response, extract_response};
 use hyper::StatusCode;
-use iron_control_api::routes::{auth::LoginResponse, users::UserManagementState};
+use iron_control_api::routes::{auth_new::LoginResponse, users::UserManagementState};
 use iron_control_api::rbac::PermissionChecker;
 use axum::
 {
@@ -16,7 +16,7 @@ use serde_json::json;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 use std::sync::Arc;
 use axum::extract::FromRef;
-use iron_control_api::routes::auth::AuthState;
+use iron_control_api::routes::auth_new::AuthState;
 use iron_control_api::jwt_auth::JwtSecret;
 
 #[derive(Clone)]
@@ -166,7 +166,7 @@ async fn get_admin_bearer_token(router: &Router) -> String
   let admin_login_response = router.clone().oneshot( admin_login_request ).await.unwrap();
 
   let ( _status, admin_login_body ): ( StatusCode, LoginResponse ) = extract_json_response( admin_login_response ).await;
-  admin_login_body.access_token
+  admin_login_body.user_token
 }
 
 #[ tokio::test ]

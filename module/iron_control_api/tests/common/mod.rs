@@ -41,14 +41,15 @@ CREATE TABLE IF NOT EXISTS users
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Refresh token blacklist for logout tests
-CREATE TABLE IF NOT EXISTS token_blacklist
+CREATE TABLE IF NOT EXISTS blacklist
 (
-  jti TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  blacklisted_at INTEGER NOT NULL
+  jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
+  user_id INTEGER NOT NULL,
+  blacklisted_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+CREATE INDEX IF NOT EXISTS idx_blacklist_user_id ON blacklist(user_id);
 
 -- User audit log for user management tests
 CREATE TABLE IF NOT EXISTS user_audit_log
@@ -86,10 +87,43 @@ pub async fn create_test_database() -> SqlitePool
   pool
 }
 
+/// Create admin user with credentials
+pub async fn create_test_admin( pool: &SqlitePool ) -> ( i64, String )
+{
+  let password_hash = bcrypt::hash( "testpass", 4 )
+    .expect( "LOUD FAILURE: Failed to hash test password" );
+
+  let now = std::time::SystemTime::now()
+    .duration_since( std::time::UNIX_EPOCH )
+    .expect( "Time went backwards" )
+    .as_secs() as i64;
+
+  let result = sqlx::query(
+    "INSERT INTO users (username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  )
+  .bind( "admin" )
+  .bind( "admin@admin.com" )
+  .bind( &password_hash )
+  .bind( "admin" )
+  .bind( 1 )
+  .bind( now )
+  .execute( pool )
+  .await
+  .unwrap_or_else( |_| panic!(
+    "LOUD FAILURE: Failed to create test admin user '{}'",
+    "admin"
+  ) );
+
+  let user_id = result.last_insert_rowid();
+
+  ( user_id, password_hash )
+}
+
+
 /// Create test user with known credentials.
 ///
 /// Returns (user_id, password_hash) for test assertions.
-pub async fn create_test_user( pool: &SqlitePool, username: &str ) -> ( i64, String )
+pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( i64, String )
 {
   let password_hash = bcrypt::hash( "test_password", 4 )
     .expect( "LOUD FAILURE: Failed to hash test password" );
@@ -100,9 +134,10 @@ pub async fn create_test_user( pool: &SqlitePool, username: &str ) -> ( i64, Str
     .as_secs() as i64;
 
   let result = sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO users (username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
   )
-  .bind( username )
+  .bind( "test_user" )
+  .bind( email )
   .bind( &password_hash )
   .bind( "user" )
   .bind( 1 )
@@ -111,7 +146,7 @@ pub async fn create_test_user( pool: &SqlitePool, username: &str ) -> ( i64, Str
   .await
   .unwrap_or_else( |_| panic!(
     "LOUD FAILURE: Failed to create test user '{}'",
-    username
+    email
   ) );
 
   let user_id = result.last_insert_rowid();
@@ -122,10 +157,10 @@ pub async fn create_test_user( pool: &SqlitePool, username: &str ) -> ( i64, Str
 /// Generate valid JWT access token for test user.
 ///
 /// Uses real JWT generation (not mocked) to catch signing issues.
-pub fn create_test_access_token( user_id: &str, role: &str, jwt_secret: &str ) -> String
+pub fn create_test_access_token( user_id: i64, role: &str, jwt_secret: &str ) -> String
 {
   let jwt = JwtSecret::new( jwt_secret.to_string() );
-  jwt.generate_access_token( user_id, role )
+  jwt.generate_access_token( user_id, role, jwt_secret )
     .unwrap_or_else( |_| panic!(
       "LOUD FAILURE: Failed to generate test JWT for user '{}'",
       user_id
@@ -137,11 +172,11 @@ pub fn create_test_access_token( user_id: &str, role: &str, jwt_secret: &str ) -
   #[ test ]
   fn test_create_test_access_token()
   {
-    let token = create_test_access_token( "user_123", "user", "test_secret" );
+    let token = create_test_access_token( 1, "user", "test_secret" );
     assert!( !token.is_empty(), "Token should not be empty" );
 
     let claims = decode_test_access_token( &token, "test_secret" );
-    assert_eq!( claims.sub, "user_123" );
+    assert_eq!( claims.sub, "1" );
     assert_eq!( claims.role, "user" );
     assert_eq!( claims.token_type, "access" );
   }
@@ -150,7 +185,7 @@ pub fn create_test_access_token( user_id: &str, role: &str, jwt_secret: &str ) -
 ///
 /// Uses real JWT generation (not mocked) to catch signing issues.
 #[ allow( dead_code ) ]
-pub fn create_test_refresh_token( user_id: &str, token_id: &str, jwt_secret: &str ) -> String
+pub fn create_test_refresh_token( user_id: i64, token_id: &str, jwt_secret: &str ) -> String
 {
   let jwt = JwtSecret::new( jwt_secret.to_string() );
   jwt.generate_refresh_token( user_id, token_id )
@@ -291,11 +326,11 @@ mod tests
   #[ test ]
   fn test_create_test_access_token()
   {
-    let token = create_test_access_token( "user_123", "user", "test_secret" );
+    let token = create_test_access_token( 1, "user", "test_secret" );
     assert!( !token.is_empty(), "Token should not be empty" );
 
     let claims = decode_test_access_token( &token, "test_secret" );
-    assert_eq!( claims.sub, "user_123" );
+    assert_eq!( claims.sub, "1" );
     assert_eq!( claims.role, "user" );
     assert_eq!( claims.token_type, "access" );
   }

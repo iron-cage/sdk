@@ -13,7 +13,7 @@ use iron_control_api::jwt_auth::JwtSecret;
 fn test_jwt_secret_creation()
 {
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
-  let token = secret.generate_access_token( "user_123", "user" ).expect( "Should generate token" );
+  let token = secret.generate_access_token( 1, "user", "a" ).expect( "Should generate token" );
   assert!( !token.is_empty() );
 }
 
@@ -23,11 +23,11 @@ fn test_access_token_lifecycle()
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
 
   // Generate access token
-  let token = secret.generate_access_token( "user_456", "user" ).expect( "Should generate" );
+  let token = secret.generate_access_token( 1, "user", "b" ).expect( "Should generate" );
 
   // Verify access token
   let claims = secret.verify_access_token( &token ).expect( "Should verify" );
-  assert_eq!( claims.sub, "user_456" );
+  assert_eq!( claims.sub, 1.to_string() );
   assert_eq!( claims.token_type, "access" );
 }
 
@@ -38,12 +38,12 @@ fn test_refresh_token_lifecycle()
 
   // Generate refresh token
   let token = secret
-    .generate_refresh_token( "user_789", "token_id_001" )
+    .generate_refresh_token( 1, "token_id_001" )
     .expect( "Should generate" );
 
   // Verify refresh token
   let claims = secret.verify_refresh_token( &token ).expect( "Should verify" );
-  assert_eq!( claims.sub, "user_789" );
+  assert_eq!( claims.sub, 1.to_string() );
   assert_eq!( claims.jti, "token_id_001" );
   assert_eq!( claims.token_type, "refresh" );
 }
@@ -55,11 +55,11 @@ fn test_login_flow_concept()
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
 
   // User logs in with credentials (username/password validation would happen here)
-  let user_id = "user_123";
+  let user_id = 1;
   let _user_role = Role::User;
 
   // Server generates access + refresh tokens
-  let access_token = secret.generate_access_token( user_id, "user" ).expect( "Should generate" );
+  let access_token = secret.generate_access_token( user_id, "user", "c" ).expect( "Should generate" );
   let refresh_token = secret
     .generate_refresh_token( user_id, "refresh_001" )
     .expect( "Should generate" );
@@ -79,7 +79,7 @@ fn test_token_refresh_flow_concept()
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
 
   // User has expired access token but valid refresh token
-  let user_id = "user_123";
+  let user_id = 1;
   let old_refresh_token = secret
     .generate_refresh_token( user_id, "refresh_001" )
     .expect( "Should generate" );
@@ -88,10 +88,10 @@ fn test_token_refresh_flow_concept()
   let claims = secret
     .verify_refresh_token( &old_refresh_token )
     .expect( "Should verify" );
-  assert_eq!( claims.sub, user_id );
+  assert_eq!( claims.sub, user_id.to_string() );
 
   // Server generates new access token
-  let new_access_token = secret.generate_access_token( user_id, "user" ).expect( "Should generate" );
+  let new_access_token = secret.generate_access_token( user_id, "user", "c" ).expect( "Should generate" );
   assert!( !new_access_token.is_empty() );
 
   // Optionally generate new refresh token (rotation)
@@ -108,7 +108,7 @@ fn test_logout_flow_concept()
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
 
   let refresh_token = secret
-    .generate_refresh_token( "user_123", "refresh_001" )
+    .generate_refresh_token( 1, "refresh_001" )
     .expect( "Should generate" );
 
   let claims = secret.verify_refresh_token( &refresh_token ).expect( "Should verify" );

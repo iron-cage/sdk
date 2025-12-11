@@ -22,7 +22,7 @@ use crate::common::test_state::create_test_auth_state;
 use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
-use iron_control_api::routes::auth;
+use iron_control_api::routes::auth_new;
 
 /// Create test router with auth routes.
 async fn create_test_router() -> Router
@@ -30,7 +30,7 @@ async fn create_test_router() -> Router
   let auth_state = create_test_auth_state().await;
 
   Router::new()
-    .route( "/api/auth/login", post( auth::login ) )
+    .route( "/api/auth/login", post( auth_new::login ) )
     .with_state( auth_state )
 }
 

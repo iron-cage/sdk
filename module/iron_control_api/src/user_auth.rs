@@ -67,7 +67,7 @@ pub async fn get_user_by_email(
 {
   let user = sqlx::query_as::<_, User>(
     r#"
-    SELECT id, username, password_hash, role, is_active
+    SELECT id, email, username, password_hash, role, is_active
     FROM users
     WHERE email = ? AND is_active = 1
     "#
