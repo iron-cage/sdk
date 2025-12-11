@@ -262,8 +262,7 @@ REQUIRED_SECRET_VARIABLES:= \
 	SECRET_RSA_PRIVATE_KEY_PATH \
 	SECRET_RSA_PUBLIC_KEY_PATH \
 	CSP \
-	PROJECT_NAME \
-	ENVIRONMENT
+	PROJECT_NAME 
 
 $(foreach v,$(REQUIRED_SECRET_VARIABLES),\
   $(if $($v),,$(error Required secret variable '$(v)' is missing or empty after including $(LOCAL_SECRETS_FILE))))
@@ -274,6 +273,8 @@ SECRET_RSA_PRIVATE_KEY_PATH := $(call strip_quotes,$(SECRET_RSA_PRIVATE_KEY_PATH
 SECRET_RSA_PUBLIC_KEY_PATH 	:= $(call strip_quotes,$(SECRET_RSA_PUBLIC_KEY_PATH))
 CSP 						:= $(call strip_quotes,$(CSP))
 PROJECT_NAME 				:= $(call strip_quotes,$(PROJECT_NAME))
+
+export ENVIRONMENT ?= test
 ENVIRONMENT 				:= $(call strip_quotes,$(ENVIRONMENT))
 
 ## --------------------------------------------------------------------------------------
