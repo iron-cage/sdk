@@ -18,6 +18,37 @@ The Agents API provides HTTP endpoints for managing agents in the Iron Control P
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `agent_id`: `agent_<uuid>` (e.g., `agent_550e8400-e29b-41d4-a716-446655440000`)
+- `provider_id`: `provider_<uuid>`
+- `token_id`: `token_<uuid>`
+- `user_id`: `user_<uuid>`
+- `project_id`: `project_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Arrays: Empty array `[]` when no items (not `null`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `DUPLICATE_NAME`, `BUDGET_EXCEEDED`
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `name`, `status`, `tags`, `project_id`
+- Sorting: Optional `?sort=-created_at` (newest first, default)
+- URL structure: `/api/v1/agents`, `/api/v1/agents/{id}`
+
+---
+
 ## Endpoints
 
 ### Create Agent
@@ -36,7 +67,7 @@ Content-Type: application/json
 {
   "name": "Production Agent 1",
   "budget": 100.00,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Main production agent for customer requests",
   "tags": ["production", "customer-facing"]
 }
@@ -62,11 +93,11 @@ Content-Type: application/json
   "id": "agent_abc123",
   "name": "Production Agent 1",
   "budget": 100.00,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Main production agent for customer requests",
   "tags": ["production", "customer-facing"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
     "token": "ic_xyz789abc123def456...",
@@ -180,11 +211,11 @@ Content-Type: application/json
       "budget": 100.00,
       "spent": 45.75,
       "remaining": 54.25,
-      "providers": ["ip-openai-001", "ip-anthropic-001"],
+      "providers": ["ip_openai_001", "ip_anthropic_001"],
       "description": "Main production agent",
       "tags": ["production", "customer-facing"],
-      "owner_id": "user-xyz789",
-      "project_id": "proj-master",
+      "owner_id": "user_xyz789",
+      "project_id": "proj_master",
       "status": "active",
       "created_at": "2025-12-10T10:30:45Z",
       "updated_at": "2025-12-10T10:30:45Z"
@@ -195,9 +226,9 @@ Content-Type: application/json
       "budget": 10.00,
       "spent": 10.00,
       "remaining": 0.00,
-      "providers": ["ip-openai-001"],
-      "owner_id": "user-xyz789",
-      "project_id": "proj-master",
+      "providers": ["ip_openai_001"],
+      "owner_id": "user_xyz789",
+      "project_id": "proj_master",
       "status": "exhausted",
       "created_at": "2025-12-09T14:20:30Z",
       "updated_at": "2025-12-09T18:45:12Z"
@@ -290,20 +321,20 @@ Content-Type: application/json
   "percent_used": 45.75,
   "providers": [
     {
-      "id": "ip-openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1"
     },
     {
-      "id": "ip-anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1"
     }
   ],
   "description": "Main production agent for customer requests",
   "tags": ["production", "customer-facing"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
     "created_at": "2025-12-10T10:30:45Z",
@@ -403,11 +434,11 @@ Content-Type: application/json
   "budget": 100.00,
   "spent": 45.75,
   "remaining": 54.25,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Updated description",
   "tags": ["production", "customer-facing", "high-priority"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "status": "active",
   "created_at": "2025-12-10T10:30:45Z",
   "updated_at": "2025-12-10T15:22:10Z"
@@ -464,6 +495,385 @@ HTTP 404 Not Found
 - **Admin:** Can update all agents
 
 **Audit Log:** Yes (mutation operation)
+
+---
+
+### Assign Providers to Agent
+
+**Endpoint:** `PUT /api/v1/agents/{id}/providers`
+
+**Description:** Replaces agent's provider list with new set. Agent can have zero or more providers (no minimum required). Removes all existing provider assignments and assigns new ones atomically.
+
+**Request:**
+
+**Path Parameters:**
+- `id` (string, required) - Agent ID (e.g., agent-abc123)
+
+**Body:**
+```json
+{
+  "providers": ["ip_openai_001", "ip_anthropic_001"]
+}
+```
+
+**Fields:**
+- `providers` (array of strings, required) - Provider IDs to assign
+  - Can be empty array (removes all providers)
+  - Duplicates ignored
+  - Invalid provider IDs rejected with 400 error
+
+**Response:**
+
+**Success: 200 OK**
+```json
+{
+  "agent_id": "agent-abc123",
+  "providers": [
+    {
+      "id": "ip_openai_001",
+      "name": "openai",
+      "endpoint": "https://api.openai.com/v1",
+      "models": ["gpt-4", "gpt-3.5-turbo"]
+    },
+    {
+      "id": "ip_anthropic_001",
+      "name": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1",
+      "models": ["claude-3-opus", "claude-3-sonnet"]
+    }
+  ],
+  "updated_at": "2025-12-11T10:30:00Z"
+}
+```
+
+**Response Fields:**
+- `agent_id` (string) - Agent ID
+- `providers` (array) - Assigned providers with full details
+  - `id` (string) - Provider ID
+  - `name` (string) - Provider name
+  - `endpoint` (string) - Provider API endpoint
+  - `models` (array of strings) - Available models
+- `updated_at` (string, ISO 8601) - Assignment timestamp
+
+**Error Responses:**
+
+**400 Bad Request - Invalid Provider ID**
+```json
+{
+  "error": {
+    "code": "INVALID_PROVIDER_ID",
+    "message": "Provider not found: ip-unknown-999",
+    "fields": {
+      "providers": "One or more provider IDs are invalid"
+    }
+  }
+}
+```
+
+**400 Bad Request - Validation Error**
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "providers field is required",
+    "fields": {
+      "providers": "Required field, must be array of provider IDs"
+    }
+  }
+}
+```
+
+**401 Unauthorized**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions: You can only modify providers for your own agents"
+  }
+}
+```
+
+**404 Not Found**
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent not found: agent-xyz999"
+  }
+}
+```
+
+**Validation Rules:**
+1. `providers` field is required (can be empty array)
+2. Each provider ID must exist in system
+3. Duplicate provider IDs in request are deduplicated automatically
+4. Zero providers is valid (agent cannot make requests until provider assigned)
+5. No maximum limit on number of providers
+
+**Edge Cases:**
+
+**Empty Array (Remove All Providers):**
+```json
+PUT /api/v1/agents/agent-abc123/providers
+{
+  "providers": []
+}
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "providers": [],
+  "updated_at": "2025-12-11T10:35:00Z"
+}
+```
+
+**Duplicate IDs (Auto-Deduplicate):**
+```json
+PUT /api/v1/agents/agent-abc123/providers
+{
+  "providers": ["ip_openai_001", "ip_openai_001", "ip_anthropic_001"]
+}
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "providers": [
+    {"id": "ip_openai_001", "name": "openai", "endpoint": "https://api.openai.com/v1", "models": ["gpt-4", "gpt-3.5-turbo"]},
+    {"id": "ip_anthropic_001", "name": "anthropic", "endpoint": "https://api.anthropic.com/v1", "models": ["claude-3-opus", "claude-3-sonnet"]}
+  ],
+  "updated_at": "2025-12-11T10:35:00Z"
+}
+```
+
+**Authorization:**
+- **Admin:** Can assign providers to ANY agent
+- **Owner:** Can assign providers to OWN agents only
+- **Other Users:** 403 Forbidden
+
+**Audit:** Yes (mutation operation)
+- Operation: AGENT_PROVIDERS_UPDATED
+- Logged fields: agent_id, old_providers, new_providers, user_id, timestamp
+
+---
+
+### Get Agent Providers
+
+**Endpoint:** `GET /api/v1/agents/{id}/providers`
+
+**Description:** Returns list of providers assigned to agent.
+
+**Request:**
+
+```
+GET /api/v1/agents/agent-abc123/providers
+Authorization: Bearer <user-token or api-token>
+```
+
+**Success Response: 200 OK**
+```json
+{
+  "agent_id": "agent-abc123",
+  "providers": [
+    {
+      "id": "ip_openai_001",
+      "name": "openai",
+      "endpoint": "https://api.openai.com/v1",
+      "models": ["gpt-4", "gpt-3.5-turbo"],
+      "status": "active"
+    },
+    {
+      "id": "ip_anthropic_001",
+      "name": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1",
+      "models": ["claude-3-opus", "claude-3-sonnet"],
+      "status": "active"
+    }
+  ],
+  "count": 2
+}
+```
+
+**Response Fields:**
+- `agent_id` (string) - Agent ID
+- `providers` (array) - Assigned providers
+- `count` (integer) - Number of assigned providers
+
+**Error Responses:**
+
+**401 Unauthorized**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions: You can only view your own agents"
+  }
+}
+```
+
+**404 Not Found**
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent not found: agent-xyz999"
+  }
+}
+```
+
+**Edge Case - Agent with Zero Providers:**
+```json
+GET /api/v1/agents/agent-abc123/providers
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "providers": [],
+  "count": 0
+}
+```
+
+**Authorization:**
+- **Admin:** Can view providers for ANY agent
+- **Owner:** Can view providers for OWN agents only
+- **Other Users:** 403 Forbidden
+
+---
+
+### Remove Provider from Agent
+
+**Endpoint:** `DELETE /api/v1/agents/{agent_id}/providers/{provider_id}`
+
+**Description:** Removes single provider from agent's provider list. Agent can have zero providers after removal.
+
+**Request:**
+
+```
+DELETE /api/v1/agents/agent-abc123/providers/ip_openai_001
+Authorization: Bearer <user-token or api-token>
+```
+
+**Path Parameters:**
+- `agent_id` (string, required) - Agent ID (e.g., agent-abc123)
+- `provider_id` (string, required) - Provider ID to remove (e.g., ip_openai_001)
+
+**Success Response: 200 OK**
+```json
+{
+  "agent_id": "agent-abc123",
+  "provider_id": "ip_openai_001",
+  "removed": true,
+  "remaining_providers": [
+    {
+      "id": "ip_anthropic_001",
+      "name": "anthropic"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Response Fields:**
+- `agent_id` (string) - Agent ID
+- `provider_id` (string) - Removed provider ID
+- `removed` (boolean) - Always true
+- `remaining_providers` (array) - Providers still assigned to agent
+- `count` (integer) - Number of remaining providers
+
+**Error Responses:**
+
+**400 Bad Request - Provider Not Assigned**
+```json
+{
+  "error": {
+    "code": "PROVIDER_NOT_ASSIGNED",
+    "message": "Provider ip_openai_001 is not assigned to agent agent-abc123"
+  }
+}
+```
+
+**401 Unauthorized**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions: You can only modify your own agents"
+  }
+}
+```
+
+**404 Not Found - Agent**
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent not found: agent-xyz999"
+  }
+}
+```
+
+**404 Not Found - Provider**
+```json
+{
+  "error": {
+    "code": "PROVIDER_NOT_FOUND",
+    "message": "Provider not found: ip-xyz999"
+  }
+}
+```
+
+**Edge Case - Removing Last Provider:**
+```json
+DELETE /api/v1/agents/agent-abc123/providers/ip_openai_001
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "provider_id": "ip_openai_001",
+  "removed": true,
+  "remaining_providers": [],
+  "count": 0,
+  "warning": "Agent has zero providers and cannot make inference requests until provider assigned"
+}
+```
+
+**Authorization:**
+- **Admin:** Can remove providers from ANY agent
+- **Owner:** Can remove providers from OWN agents only
+- **Other Users:** 403 Forbidden
+
+**Audit:** Yes (mutation operation)
+- Operation: AGENT_PROVIDER_REMOVED
+- Logged fields: agent_id, provider_id, user_id, timestamp
 
 ---
 
@@ -571,11 +981,11 @@ HTTP 403 Forbidden
   "spent": 45.75,
   "remaining": 54.25,
   "percent_used": 45.75,
-  "providers": ["ip-openai-001", "ip-anthropic-001"],
+  "providers": ["ip_openai_001", "ip_anthropic_001"],
   "description": "Main production agent",
   "tags": ["production", "customer-facing"],
-  "owner_id": "user-xyz789",
-  "project_id": "proj-master",
+  "owner_id": "user_xyz789",
+  "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
     "created_at": "2025-12-10T10:30:45Z",
@@ -649,7 +1059,7 @@ HTTP 403 Forbidden
 ### Agent ↔ Project (Many-to-One)
 
 - Each agent belongs to exactly one project
-- Pilot uses Master Project only (project_id defaults to "proj-master")
+- Pilot uses Master Project only (project_id defaults to "proj_master")
 - Post-Pilot supports multi-project assignment
 
 ---
@@ -786,7 +1196,7 @@ Retry-After: 60
 ```json
 {
   "timestamp": "2025-12-10T10:30:45Z",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "endpoint": "POST /api/v1/agents",
   "method": "POST",
   "resource_type": "agent",
@@ -795,7 +1205,7 @@ Retry-After: 60
   "parameters": {
     "name": "Production Agent 1",
     "budget": 100.00,
-    "providers": ["ip-openai-001", "ip-anthropic-001"]
+    "providers": ["ip_openai_001", "ip_anthropic_001"]
   },
   "status": "success",
   "ip_address": "203.0.113.42",
@@ -817,7 +1227,7 @@ Retry-After: 60
 iron agents create \
   --name "Production Agent 1" \
   --budget 100.00 \
-  --providers ip-openai-001,ip-anthropic-001 \
+  --providers ip_openai_001,ip_anthropic_001 \
   --description "Main production agent" \
   --tags production,customer-facing
 
@@ -849,11 +1259,11 @@ iron agents get agent-abc123
 # Output:
 # ID:          agent-abc123
 # Name:        Production Agent 1
-# Owner:       user-xyz789
+# Owner:       user_xyz789
 # Budget:      $100.00
 # Spent:       $45.75 (45.75%)
 # Remaining:   $54.25
-# Providers:   ip-openai-001 (openai), ip-anthropic-001 (anthropic)
+# Providers:   ip_openai_001 (openai), ip_anthropic_001 (anthropic)
 # IC Token:    ic_def456ghi789 (last used: 2025-12-10 14:22:10)
 # Status:      active
 # Created:     2025-12-10 10:30:45
@@ -917,7 +1327,7 @@ iron agents status agent-abc123
 
 **Changes:**
 - `project_id` becomes user-selectable (not defaulted to Master Project)
-- Add `?project_id=proj-abc` filter to `GET /api/v1/agents`
+- Add `?project_id=proj_abc` filter to `GET /api/v1/agents`
 - Project-level budget limits
 
 ---

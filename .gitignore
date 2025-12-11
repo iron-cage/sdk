@@ -35,6 +35,17 @@ venv/
 ENV/
 env/
 
+# Legacy Python tooling (use uv + pyproject.toml instead)
+.python-version
+requirements.txt
+requirements-dev.txt
+requirements-test.txt
+setup.py
+setup.cfg
+
+# uv lock files (gitignored - regenerate with `uv lock`)
+uv.lock
+
 # Maturin builds
 target/wheels/
 

@@ -3,6 +3,7 @@
 //! Provides admin-only operations for user lifecycle management: create, suspend,
 //! activate, delete, role changes, and password resets. All operations are audited.
 
+use core::fmt::Write as _;
 use sqlx::{ SqlitePool, Row };
 use crate::error::Result;
 
@@ -16,9 +17,9 @@ pub struct User
   pub username: String,
   /// Email address (unique, optional)
   pub email: Option< String >,
-  /// BCrypt password hash
+  /// `BCrypt` password hash
   pub password_hash: String,
-  /// User role (user, super_user, admin)
+  /// User role (user, `super_user`, admin)
   pub role: String,
   /// Account active status
   pub is_active: bool,
@@ -44,11 +45,11 @@ pub struct CreateUserParams
 {
   /// Username (3-50 chars, alphanumeric + underscore)
   pub username: String,
-  /// Password (will be hashed with BCrypt)
+  /// Password (will be hashed with `BCrypt`)
   pub password: String,
   /// Email address (must be unique)
   pub email: String,
-  /// Role (user, super_user, admin)
+  /// Role (user, `super_user`, admin)
   pub role: String,
 }
 
@@ -118,6 +119,7 @@ impl UserService
   /// # Arguments
   ///
   /// * `pool` - Database connection pool
+  #[ must_use ]
   pub fn new( pool: SqlitePool ) -> Self
   {
     Self { pool }
@@ -145,7 +147,7 @@ impl UserService
   {
     // Hash password with BCrypt
     let password_hash = bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )
-      .map_err( |e| { println!( "Error hashing password: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { println!( "Error hashing password: {e}" ); crate::error::TokenError } )?;
 
     let now_ms = current_time_ms();
 
@@ -161,7 +163,7 @@ impl UserService
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |e| { println!( "Error creating user: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { println!( "Error creating user: {e}" ); crate::error::TokenError } )?;
 
     let user_id = result.last_insert_rowid();
 
@@ -211,24 +213,24 @@ impl UserService
 
     if let Some( ref role ) = filters.role
     {
-      query.push_str( &format!( " AND role = '{}'", role ) );
-      count_query.push_str( &format!( " AND role = '{}'", role ) );
+      let _ = write!( &mut query, " AND role = '{role}'" );
+      let _ = write!( &mut count_query, " AND role = '{role}'" );
     }
 
     if let Some( is_active ) = filters.is_active
     {
-      let active_val = if is_active { 1 } else { 0 };
-      query.push_str( &format!( " AND is_active = {}", active_val ) );
-      count_query.push_str( &format!( " AND is_active = {}", active_val ) );
+      let active_val = i32::from( is_active );
+      let _ = write!( &mut query, " AND is_active = {active_val}" );
+      let _ = write!( &mut count_query, " AND is_active = {active_val}" );
     }
 
     if let Some( ref search ) = filters.search
     {
-      query.push_str( &format!( " AND (username LIKE '%{}%' OR email LIKE '%{}%')", search, search ) );
-      count_query.push_str( &format!( " AND (username LIKE '%{}%' OR email LIKE '%{}%')", search, search ) );
+      let _ = write!( &mut query, " AND (username LIKE '%{search}%' OR email LIKE '%{search}%')" );
+      let _ = write!( &mut count_query, " AND (username LIKE '%{search}%' OR email LIKE '%{search}%')" );
     }
 
-    query.push_str( &format!( " ORDER BY created_at DESC LIMIT {} OFFSET {}", limit, offset ) );
+    let _ = write!( &mut query, " ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}" );
 
     // Get total count
     let total : i64 = sqlx::query_scalar( &count_query )
@@ -417,7 +419,7 @@ impl UserService
   ///
   /// # Returns
   ///
-  /// Updated user with deleted_at timestamp
+  /// Updated user with `deleted_at` timestamp
   ///
   /// # Errors
   ///
@@ -465,7 +467,7 @@ impl UserService
   ///
   /// * `user_id` - User to change role
   /// * `admin_id` - Admin performing role change
-  /// * `new_role` - New role (user, super_user, admin)
+  /// * `new_role` - New role (user, `super_user`, admin)
   ///
   /// # Returns
   ///
@@ -541,7 +543,7 @@ impl UserService
     let password_hash = bcrypt::hash( &new_password, bcrypt::DEFAULT_COST )
       .map_err( |_| crate::error::TokenError )?;
 
-    let force_change_val = if force_change { 1 } else { 0 };
+    let force_change_val = i32::from( force_change );
 
     // Update password
     sqlx::query(
@@ -607,7 +609,7 @@ impl UserService
     .bind( reason )
     .execute( &self.pool )
     .await
-    .map_err( |e| { println!( "Error logging audit: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { println!( "Error logging audit: {e}" ); crate::error::TokenError } )?;
 
     Ok( () )
   }

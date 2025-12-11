@@ -32,32 +32,393 @@ HTTP REST API endpoint schemas for all Control Panel operations organized by res
 
 ### Purpose
 
-Provide comprehensive HTTP REST API for all Control Panel operations including entity management, agent budget protocol, authentication, analytics, and system configuration.
+Define cross-cutting REST API standards that apply universally across all resource-specific protocols and serve as the master index for all REST API documentation.
 
-**Problem:**
+**Cross-Cutting Standards Defined in This Document:**
 
-Control Panel requires programmatic access for:
-- **Agent Operations:** Budget protocol (handshake/report/refresh) using IC Token
-- **User Operations:** IC Token management, authentication (login/logout) using User Token
-- **Admin Operations:** Project/IP management, budget limits configuration using User Token (admin role)
-- **Analytics:** Usage metrics, spending analysis, performance monitoring using User Token
-- **Integration:** CLI tool access, external tool integration (CI/CD, admin scripts)
-- **Discovery:** System health, API version (no authentication)
+1. **Audit Logging Standard** - What operations are logged, standard fields, retention policy (mutation operations only)
+2. **CLI-API Parity Standard** - Ensuring 100% coverage of user-facing endpoints in CLI (46 endpoints = 46 commands)
+3. **System Resources** - Health check and API version endpoints (operational/discovery endpoints)
+4. **Rate Limiting Standard** - Cross-endpoint rate limit policies by category
+5. **Example Data Standards** - Consistent example values across all documentation
 
-**Solution:**
+**Cross-Cutting Standards Defined in Separate Files:**
 
-RESTful HTTP API organized by resource type:
-- **Entity Resources:** Standard CRUD for IC Tokens, Projects, IPs (User Token auth)
-- **Operation Resources:** Budget protocol (IC Token auth), authentication (User Token auth)
-- **Analytics Resources:** Usage, spending, metrics (User Token auth)
-- **Configuration Resources:** Limits, settings (User Token auth, admin-only)
-- **System Resources:** Health, version (no auth)
-- Standard HTTP semantics (GET, POST, PUT, DELETE)
-- JSON request/response bodies
-- Consistent error responses
-- CLI-API parity for all user-facing resources
+- **Pagination, Sorting, Filtering:** See [API Design Standards](../standards/api_design_standards.md)
+- **Error Response Format:** See [Error Format Standards](../standards/error_format_standards.md)
+- **ID Format:** See [ID Format Standards](../standards/id_format_standards.md)
+- **Data Format (Timestamps, Currency, etc.):** See [Data Format Standards](../standards/data_format_standards.md)
 
-**Resource Organization:** See [Resource Organization](#resource-organization) section below for complete taxonomy.
+**Resource-Specific API Endpoints:**
+
+See Protocol files 006-017 for individual resource endpoint specifications:
+- Agents (010), Providers (011), Analytics (012)
+- API Tokens (014), Projects (015), Users (008)
+- Budget Requests (017), Settings (016 - POST-PILOT)
+
+**Note:** This document consolidates standards that span multiple resources and don't fit in individual resource protocols. Standards comprehensive enough to warrant separate normative files are maintained independently and referenced here.
+
+---
+
+### How to Use This Document
+
+**For Cross-Cutting Standards (Defined in This Document):**
+- **Audit Logging:** See [Audit Logging Standard](#audit-logging-standard) section below
+- **CLI-API Parity:** See [CLI-API Parity Standard](#cli-api-parity-standard) section below
+- **System Resources:** See [System Resources](#system-resources) section below (health check, API version)
+- **Rate Limiting:** See [Rate Limiting](#rate-limiting) section below
+- **Example Data:** See [Example Data Standards](#example-data-standards) section below
+
+**For Resource-Specific Endpoints:**
+- **Resource Taxonomy:** See [Resource Organization](#resource-organization) for 5-category classification
+- **Master Index:** See [Complete Protocol Reference](#complete-protocol-reference) for full endpoint catalog
+- **Individual Resources:** See protocol files 006-017 for detailed endpoint specifications
+
+**For Standards Defined Elsewhere:**
+- **Pagination:** [API Design Standards - Pagination](../standards/api_design_standards.md#pagination)
+- **Sorting:** [API Design Standards - Sorting](../standards/api_design_standards.md#sorting)
+- **Filtering:** [API Design Standards - Filtering](../standards/api_design_standards.md#filtering)
+- **Errors:** [Error Format Standards](../standards/error_format_standards.md)
+- **IDs:** [ID Format Standards](../standards/id_format_standards.md)
+- **Data Formats:** [Data Format Standards](../standards/data_format_standards.md)
+
+**Quick Start:** If you're looking for a specific endpoint, jump to [Complete Protocol Reference](#complete-protocol-reference) table to find the right protocol file.
+
+---
+
+### Standards Compliance
+
+All REST API endpoints and protocols adhere to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- Examples: `agent_<uuid>`, `provider_<uuid>`, `token_<uuid>`, `user_<uuid>`
+- See standard for complete entity prefix list and validation rules
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Currency: Decimal with exactly 2 decimal places (e.g., `100.50`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Nulls: Omit optional fields when empty (not `null`)
+- Arrays: Empty array `[]` when no items (not `null`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes (e.g., `VALIDATION_ERROR`, `UNAUTHORIZED`)
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409, 429, 500, 503
+- Field-level validation details in `error.fields` object
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Sorting: Optional `?sort=field` (ascending) or `?sort=-field` (descending)
+- Filtering: Resource-specific query parameters
+- Versioning: URL-based `/api/v1/`, `/api/v2/`
+- Deprecation: 6-month notice with `X-API-Deprecation` headers
+
+**Note:** Resource-specific protocols (006-017) inherit these standards and add domain-specific constraints.
+
+---
+
+### Cross-Cutting Standards
+
+The following standards apply universally across ALL REST API endpoints unless explicitly documented otherwise in resource-specific protocols.
+
+#### Universal Pagination Standard
+
+**See:** [API Design Standards - Pagination](../standards/api_design_standards.md#pagination)
+
+All list endpoints adhere to the universal pagination standard defined in API Design Standards.
+
+**Standard Features:**
+- **Method:** Offset-based with `?page=N&per_page=M` query parameters
+- **Defaults:** page=1, per_page=50
+- **Limits:** page >= 1, per_page 1-100 (max 100)
+- **Response Structure:** `{"data": [...], "pagination": {"page": N, "per_page": M, "total": X, "total_pages": Y}}`
+- **Validation:** 400 Bad Request for invalid parameters (page < 1, per_page > 100)
+- **Edge Cases:** Empty results return `data: []` with pagination metadata
+
+**Endpoints with Pagination (7 categories):**
+- `GET /api/v1/agents` - List agents
+- `GET /api/v1/providers` - List providers
+- `GET /api/v1/analytics/*` - All analytics endpoints (8 total)
+- `GET /api/v1/api-tokens` - List API tokens
+- `GET /api/v1/projects` - List projects
+- `GET /api/v1/budget-requests` - List budget requests
+- `GET /api/v1/users` - List users
+
+**Complete Specification:** See [API Design Standards - Pagination](../standards/api_design_standards.md#pagination) for:
+- Detailed query parameter validation rules
+- Complete response format with all fields
+- Edge case handling (empty results, page overflow, invalid params)
+- Error response examples with field-level validation details
+- Implementation notes (SQL OFFSET/LIMIT, performance considerations)
+- Testing guidance and examples
+
+---
+
+#### Audit Logging Standard
+
+**Applies To:** All mutation operations (POST, PUT, DELETE) that modify system state
+
+**Scope:** Mutation operations only (read operations NOT logged to avoid excessive volume)
+
+**Operations Logged:**
+
+| HTTP Method | Operations | Examples |
+|-------------|-----------|----------|
+| POST | Create resources | Create agent, create provider, create API token, create budget request |
+| PUT | Update resources | Update agent budget, approve budget request, suspend user, change role |
+| DELETE | Delete resources | Delete agent, delete provider, revoke API token, delete user |
+
+**NOT Logged:**
+- GET operations (read-only, no state change)
+- Health checks (`GET /api/health`)
+- Version queries (`GET /api/version`)
+- Failed authentication attempts (handled separately in security audit)
+
+**Audit Log Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Audit log entry ID (prefix: `audit_`) |
+| `timestamp` | string | ISO 8601 timestamp with Z suffix |
+| `operation` | string | Operation type (e.g., AGENT_CREATED, BUDGET_UPDATED, USER_DELETED) |
+| `resource_type` | string | Resource affected (agent, provider, user, token, budget_request) |
+| `resource_id` | string | ID of affected resource |
+| `user_id` | string | User who performed operation (null for system operations) |
+| `user_role` | string | Role at time of operation (admin, user, viewer) |
+| `ip_address` | string | Source IP address |
+| `user_agent` | string | HTTP User-Agent header |
+| `request_id` | string | Request correlation ID for tracing |
+| `changes` | object | Before/after state for updates (null for create/delete) |
+| `metadata` | object | Operation-specific details (e.g., justification, review notes) |
+
+**Audit Log Schema Example:**
+
+```json
+{
+  "id": "audit_abc123xyz789",
+  "timestamp": "2025-12-11T10:30:45.123Z",
+  "operation": "AGENT_BUDGET_UPDATED",
+  "resource_type": "agent",
+  "resource_id": "agent_abc123",
+  "user_id": "user_xyz789",
+  "user_role": "admin",
+  "ip_address": "192.168.1.100",
+  "user_agent": "iron-cli/1.0.0",
+  "request_id": "req_def456",
+  "changes": {
+    "before": {"budget": 100.00},
+    "after": {"budget": 150.00}
+  },
+  "metadata": {
+    "justification": "Emergency budget increase for production agent",
+    "force_flag": true
+  }
+}
+```
+
+**Retention Policy:**
+- **Pilot:** 90 days rolling retention
+- **POST-PILOT:** Configurable retention (90 days, 1 year, indefinite) with audit export
+
+**Sensitive Data Handling:**
+- **Never Log:** Passwords, API token values, IC token values, provider credentials
+- **Sanitize:** Replace sensitive fields with `[REDACTED]` in audit log
+- **Hash:** Store user IP as SHA-256 hash for privacy (POST-PILOT option)
+
+**Query Operations (POST-PILOT):**
+- `GET /api/v1/audit-logs` - List audit logs (admin-only, paginated)
+- Filters: `user_id`, `resource_type`, `operation`, `start_date`, `end_date`
+- Export: CSV/JSON download for compliance
+
+**Operation Types:**
+
+| Category | Operations |
+|----------|-----------|
+| Agent | AGENT_CREATED, AGENT_UPDATED, AGENT_DELETED, AGENT_PROVIDERS_UPDATED, AGENT_PROVIDER_REMOVED |
+| Provider | PROVIDER_CREATED, PROVIDER_UPDATED, PROVIDER_DELETED |
+| User | USER_CREATED, USER_SUSPENDED, USER_ACTIVATED, USER_DELETED, USER_ROLE_CHANGED, USER_PASSWORD_RESET |
+| Budget | BUDGET_UPDATED, BUDGET_REQUEST_CREATED, BUDGET_REQUEST_APPROVED, BUDGET_REQUEST_REJECTED, BUDGET_REQUEST_CANCELLED |
+| Token | API_TOKEN_CREATED, API_TOKEN_REVOKED, IC_TOKEN_REGENERATED |
+| Project | PROJECT_CREATED, PROJECT_UPDATED, PROJECT_DELETED (POST-PILOT) |
+
+**Database Schema:**
+
+```sql
+CREATE TABLE audit_logs (
+  id VARCHAR(50) PRIMARY KEY,
+  timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+  operation VARCHAR(100) NOT NULL,
+  resource_type VARCHAR(50) NOT NULL,
+  resource_id VARCHAR(50) NOT NULL,
+  user_id VARCHAR(50),
+  user_role VARCHAR(20),
+  ip_address VARCHAR(45),
+  user_agent VARCHAR(500),
+  request_id VARCHAR(50),
+  changes JSONB,
+  metadata JSONB,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_operation ON audit_logs(operation);
+```
+
+**Implementation Notes:**
+- **Asynchronous:** Write audit logs asynchronously (don't block API responses)
+- **Guaranteed:** Use message queue (Redis/RabbitMQ) to ensure no log loss
+- **Correlation:** Include `request_id` in all responses for tracing
+- **Testing:** Verify all mutation endpoints generate audit logs
+
+---
+
+#### CLI-API Parity Standard
+
+**Principle:** All user-facing REST API endpoints MUST have corresponding CLI commands with identical functionality
+
+**Scope:** User-facing endpoints only (excludes system/internal endpoints like budget handshake protocol)
+
+**Enforcement:** Test suite verifies 1:1 parity between CLI commands and API endpoints
+
+**Parity Requirements:**
+
+| API Endpoint | CLI Command | Parity Level |
+|--------------|-------------|--------------|
+| POST /api/v1/agents | iron agents create | FULL (all parameters) |
+| GET /api/v1/agents | iron agents list | FULL (all filters, pagination) |
+| GET /api/v1/agents/{id} | iron agents get <id> | FULL (identical output) |
+| PUT /api/v1/agents/{id} | iron agents update <id> | FULL (all fields) |
+| PUT /api/v1/agents/{id}/providers | iron agents assign-providers <id> | FULL |
+| GET /api/v1/agents/{id}/providers | iron agents list-providers <id> | FULL |
+| DELETE /api/v1/agents/{id}/providers/{pid} | iron agents remove-provider <id> <pid> | FULL |
+
+**Exclusions (No CLI Required):**
+
+| Endpoint | Reason |
+|----------|--------|
+| POST /api/budget/handshake | Internal protocol (iron_runtime only) |
+| POST /api/budget/report | Internal protocol (iron_runtime only) |
+| POST /api/budget/refresh | Internal protocol (iron_runtime only) |
+| GET /api/health | System endpoint (curl sufficient) |
+| GET /api/version | System endpoint (curl sufficient) |
+
+**CLI Architecture:**
+
+**Native CLI (`iron_cli` - Rust):**
+- Owns responsibility for all user-facing commands
+- Calls REST API endpoints directly (no business logic duplication)
+- Returns API responses in formatted tables or JSON (`--json` flag)
+- Handles authentication (token storage, refresh)
+
+**Python Wrapper (`iron_cli_py` - Python):**
+- Wraps `iron_cli` commands (calls `iron` binary)
+- Provides Python-friendly interface for scripting
+- No direct API calls (delegates to native CLI)
+
+**Command Naming Convention:**
+
+```
+iron <resource> <action> [arguments] [flags]
+```
+
+**Examples:**
+- `iron agents list` → `GET /api/v1/agents`
+- `iron agents create --name "Agent1" --budget 100` → `POST /api/v1/agents`
+- `iron providers delete ip_openai_001` → `DELETE /api/v1/providers/ip_openai_001`
+- `iron budget-requests approve breq-abc123` → `PUT /api/v1/budget-requests/breq-abc123/approve`
+
+**Output Format:**
+
+**Default (Table):**
+```
+$ iron agents list
+
+ID               NAME        BUDGET    SPENT   PROVIDERS   STATUS
+agent-abc123     Agent 1     $100.00   $45.67  2           active
+agent-def456     Agent 2     $50.00    $12.34  1           active
+```
+
+**JSON Mode (`--json`):**
+```
+$ iron agents list --json
+
+{
+  "data": [
+    {"id": "agent-abc123", "name": "Agent 1", "budget": 100.00, "spent": 45.67, "providers_count": 2, "status": "active"},
+    {"id": "agent-def456", "name": "Agent 2", "budget": 50.00, "spent": 12.34, "providers_count": 1, "status": "active"}
+  ],
+  "pagination": {"page": 1, "per_page": 50, "total": 2, "total_pages": 1}
+}
+```
+
+**Error Handling:**
+
+CLI propagates API errors with consistent format:
+
+```
+$ iron agents delete agent-xyz999
+
+Error: Agent not found
+Code: AGENT_NOT_FOUND
+Status: 404
+
+Run 'iron agents list' to see available agents.
+```
+
+**Testing Requirements:**
+
+**Parity Test Suite:**
+- Located: `iron_cli/tests/parity/`
+- Verifies: Every user-facing API endpoint has CLI command
+- Verifies: CLI command parameters match API endpoint parameters
+- Verifies: CLI output includes all API response fields (in table or JSON mode)
+- CI/CD: Runs on every API protocol change
+
+**Example Test:**
+```rust
+#[test]
+fn test_agents_list_parity() {
+  // Verify CLI command exists
+  let cli_result = run_cli(&["agents", "list", "--json"]);
+
+  // Verify API endpoint exists
+  let api_result = http_get("/api/v1/agents");
+
+  // Verify responses match
+  assert_eq!(cli_result.data, api_result.data);
+  assert_eq!(cli_result.pagination, api_result.pagination);
+}
+```
+
+**Documentation:**
+
+- CLI help text (`iron agents --help`) MUST reference API endpoint
+- API protocol docs MUST include CLI command examples
+- CLI architecture doc maintains Responsibility Matrix (see [features/001_cli_architecture.md](../features/001_cli_architecture.md))
+
+**Coverage:**
+
+| Resource | API Endpoints | CLI Commands | Parity |
+|----------|---------------|--------------|--------|
+| Agents | 8 | 8 | ✅ 100% |
+| Providers | 8 | 8 | ✅ 100% |
+| Analytics | 8 | 8 | ✅ 100% |
+| Budget Limits | 2 | 2 | ✅ 100% |
+| API Tokens | 4 | 4 | ✅ 100% |
+| Projects | 2 | 2 | ✅ 100% |
+| Budget Requests | 6 | 6 | ✅ 100% |
+| Users | 8 | 8 | ✅ 100% |
+| **Total User-Facing** | **46** | **46** | **✅ 100%** |
+
+**Implementation Notes:**
+- **Single Source of Truth:** API is canonical, CLI wraps API (no business logic in CLI)
+- **Consistency:** CLI uses exact API error codes/messages
+- **Authentication:** CLI stores tokens in `~/.iron/config.toml`, automatically refreshes
+- **Scripting:** JSON mode (`--json`) enables shell scripting
 
 ---
 
@@ -204,7 +565,7 @@ Response:
 **Filtering:**
 
 ```http
-GET /api/tokens?project_id=proj-123&status=active
+GET /api/tokens?project_id=proj_123&status=active
 ```
 
 **Sorting:**
@@ -232,13 +593,13 @@ GET /api/tokens?fields=id,name,status
 **Use these standard values in all protocol documentation examples for consistency:**
 
 **IDs:**
-- Agent ID: `agent-abc123`
-- IC Token ID: `tok-def456`
-- Project ID: `proj-ghi789`
-- Provider ID: `ip-openai-001`, `ip-anthropic-001`
-- User ID: `user-jkl012`
-- User Token ID: `ut-mno345`
-- API Token ID: `at-pqr678`
+- Agent ID: `agent_abc123`
+- IC Token ID: `ic_def456`
+- Project ID: `proj_ghi789`
+- Provider ID: `ip_openai_001`, `ip_anthropic_001`
+- User ID: `user_jkl012`
+- User Token ID: `ut_mno345`
+- API Token ID: `at_pqr678`
 
 **Tokens:**
 - IC Token: `ic_abc123def456ghi789...`
@@ -349,36 +710,27 @@ Response: 200 OK
 
 ### Error Response Format
 
-**Standard Error Structure:**
+**See:** [Error Format Standards](../standards/error_format_standards.md)
 
-```json
-{
-  "error": {
-    "code": "BUDGET_EXHAUSTED",
-    "message": "Agent budget exhausted (allocated: $100, spent: $100)",
-    "details": {
-      "agent_id": "agent_abc123",
-      "budget_allocated": 100.00,
-      "budget_spent": 100.00,
-      "budget_remaining": 0.00
-    },
-    "timestamp": "2025-12-09T09:00:00Z",
-    "request_id": "req_xyz789"
-  }
-}
-```
+All error responses adhere to the standard error format defined in Error Format Standards.
 
-**Error Code Categories:**
+**Standard Structure:**
+- **Simple JSON format:** `{"error": {"code": "...", "message": "...", "fields": {...}}}`
+- **Machine-readable codes:** UPPER_SNAKE_CASE format (e.g., `VALIDATION_ERROR`, `BUDGET_EXHAUSTED`, `UNAUTHORIZED`)
+- **Field-level validation:** `error.fields` object maps field names to specific error messages
+- **Batch error reporting:** All validation errors returned at once (not fail-fast)
 
-| Code Prefix | Category | Examples |
-|-------------|----------|----------|
-| `AUTH_*` | Authentication errors | `AUTH_INVALID_TOKEN`, `AUTH_TOKEN_EXPIRED` |
-| `BUDGET_*` | Budget errors | `BUDGET_EXHAUSTED`, `BUDGET_INSUFFICIENT` |
-| `RESOURCE_*` | Resource errors | `RESOURCE_NOT_FOUND`, `RESOURCE_CONFLICT` |
-| `VALIDATION_*` | Validation errors | `VALIDATION_REQUIRED_FIELD`, `VALIDATION_INVALID_FORMAT` |
-| `PERMISSION_*` | Authorization errors | `PERMISSION_DENIED`, `PERMISSION_INSUFFICIENT_ROLE` |
-| `RATE_LIMIT_*` | Rate limiting | `RATE_LIMIT_EXCEEDED` |
-| `SERVER_*` | Server errors | `SERVER_INTERNAL_ERROR`, `SERVER_SERVICE_UNAVAILABLE` |
+**HTTP Status Codes:**
+- **2xx Success:** 200 (OK), 201 (Created), 204 (No Content)
+- **4xx Client Errors:** 400 (Validation), 401 (Auth), 403 (Permissions), 404 (Not Found), 409 (Conflict), 429 (Rate Limit)
+- **5xx Server Errors:** 500 (Internal Error), 503 (Service Unavailable)
+
+**Complete Specification:** See [Error Format Standards](../standards/error_format_standards.md) for:
+- Detailed error structure and required/optional fields
+- Complete HTTP status code mapping with usage guidelines
+- Validation error examples with field-level details
+- Design rationale (why simple format instead of RFC 7807)
+- Error code categories and naming conventions
 
 ---
 

@@ -56,12 +56,11 @@ Iron Examples provides 20+ production-ready examples demonstrating Iron Cage pro
 ## Quick Start
 
 **Prerequisites:**
-- Python 3.8+ (`python --version`)
-- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Python 3.9+ (`python --version`)
 
 ```bash
 # Install SDK with examples and framework dependencies
-uv pip install iron-sdk[examples,langchain]
+pip install iron-sdk[examples,langchain]
 
 # Run an example (from module/iron_sdk/ directory)
 python examples/langchain/simple_chat.py
@@ -73,15 +72,15 @@ python examples/langchain/simple_chat.py
 
 ```bash
 # SDK with examples
-uv pip install iron-sdk[examples]
+pip install iron-sdk[examples]
 
 # With specific framework
-uv pip install iron-sdk[examples,langchain]
-uv pip install iron-sdk[examples,crewai]
-uv pip install iron-sdk[examples,autogpt]
+pip install iron-sdk[examples,langchain]
+pip install iron-sdk[examples,crewai]
+pip install iron-sdk[examples,autogpt]
 
 # All frameworks
-uv pip install iron-sdk[examples,all]
+pip install iron-sdk[examples,all]
 ```
 
 **Requirements:**

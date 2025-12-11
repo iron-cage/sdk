@@ -20,6 +20,31 @@ The Budget Limits API provides endpoints for modifying agent budgets after creat
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `agent_id`: `agent_<uuid>`
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `BUDGET_DECREASED_WITHOUT_FORCE`
+- HTTP status codes: 200, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- URL structure: `/api/v1/agents/{id}/budget`
+- Standard HTTP methods: PATCH for budget modifications
+
+---
+
 ## Endpoints
 
 ### Modify Agent Budget
@@ -72,7 +97,7 @@ Content-Type: application/json
   "current_spent": 95.75,
   "new_remaining": 54.25,
   "reason": "Emergency top-up: agent running critical customer task",
-  "modified_by": "user-admin-001",
+  "modified_by": "user_admin_001",
   "modified_at": "2025-12-10T15:30:45Z"
 }
 ```
@@ -140,8 +165,8 @@ HTTP 403 Forbidden
   "error": {
     "code": "FORBIDDEN",
     "message": "Insufficient permissions. Only admin or agent owner can modify budget.",
-    "agent_owner": "user-xyz789",
-    "requesting_user": "user-other-001"
+    "agent_owner": "user_xyz789",
+    "requesting_user": "user_other_001"
   }
 }
 ```
@@ -200,7 +225,7 @@ Content-Type: application/json
       "increase_amount": 50.00,
       "increase_percent": 50.00,
       "reason": "Emergency top-up: agent running critical customer task",
-      "modified_by": "user-admin-001",
+      "modified_by": "user_admin_001",
       "modified_by_name": "Admin User",
       "modified_at": "2025-12-10T15:30:45Z"
     },
@@ -210,7 +235,7 @@ Content-Type: application/json
       "increase_amount": 50.00,
       "increase_percent": 100.00,
       "reason": "Initial budget adjustment after testing",
-      "modified_by": "user-xyz789",
+      "modified_by": "user_xyz789",
       "modified_by_name": "Agent Owner",
       "modified_at": "2025-12-09T10:15:20Z"
     }
@@ -322,7 +347,7 @@ HTTP 404 Not Found
   "current_spent": 95.75,
   "new_remaining": 54.25,
   "reason": "Emergency top-up: agent running critical customer task",
-  "modified_by": "user-admin-001",
+  "modified_by": "user_admin_001",
   "modified_at": "2025-12-10T15:30:45Z"
 }
 ```
@@ -340,7 +365,7 @@ HTTP 404 Not Found
       "increase_amount": 50.00,
       "increase_percent": 50.00,
       "reason": "Emergency top-up",
-      "modified_by": "user-admin-001",
+      "modified_by": "user_admin_001",
       "modified_by_name": "Admin User",
       "modified_at": "2025-12-10T15:30:45Z"
     }
@@ -450,7 +475,7 @@ Content-Type: application/json
 ```json
 {
   "timestamp": "2025-12-10T15:30:45Z",
-  "user_id": "user-admin-001",
+  "user_id": "user_admin_001",
   "endpoint": "PUT /api/v1/limits/agents/agent-abc123/budget",
   "method": "PUT",
   "resource_type": "agent_budget",
@@ -486,7 +511,7 @@ iron limits agent-budget increase agent-abc123 150.00 \
 # Previous: $100.00 → New: $150.00 (+ $50.00, +50%)
 # Current spent: $95.75
 # New remaining: $54.25
-# Modified by: user-admin-001
+# Modified by: user_admin_001
 # Modified at: 2025-12-10 15:30:45
 ```
 

@@ -1,0 +1,59 @@
+# Build artifacts
+target/
+node_modules/
+dist/
+
+# Development files
+.git/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files (hyphenated)
+-*
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+dev_tokens.db
+iron.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test artifacts
+coverage/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+
+# Documentation (not needed in runtime image)
+docs/
+*.md
+!readme.md
+
+# Scripts (not needed in runtime)
+scripts/
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.circleci/
+
+# Docker files themselves
+docker-compose*.yml
+Dockerfile*
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -50,27 +50,9 @@
 //! **Resource Limits:** Not applicable (temporary databases, bounded by test data)
 //! **Precondition Violations:** Not applicable (enforcer creates limits if missing, validates inputs)
 
-use iron_token_manager::limit_enforcer::LimitEnforcer;
-use iron_token_manager::storage::TokenStorage;
-use tempfile::TempDir;
+mod common;
 
-/// Create test limit enforcer with temporary database
-async fn create_test_enforcer() -> ( LimitEnforcer, TokenStorage, TempDir )
-{
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let enforcer = LimitEnforcer::new( &db_url )
-    .await
-    .expect( "Failed to create enforcer" );
-
-  let storage = TokenStorage::new( &db_url )
-    .await
-    .expect( "Failed to create storage" );
-
-  ( enforcer, storage, temp_dir )
-}
+use common::create_test_enforcer;
 
 #[ tokio::test ]
 async fn test_create_limit()

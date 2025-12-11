@@ -77,43 +77,98 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 from iron_cage import LlmRouter
 from openai import OpenAI
 
-# Create router (starts local proxy)
+# ==== Mode 1: Iron Cage Server (managed keys) ====
 router = LlmRouter(
     api_key="ic_xxx",           # Iron Cage token
     server_url="https://...",   # Iron Cage server
     cache_ttl_seconds=300,      # Key cache TTL (optional)
+    budget=10.0,                # Budget limit in USD (optional)
 )
 
+# ==== Mode 2: Direct Provider Key (bypass server) ====
+router = LlmRouter(
+    provider_key="sk-xxx",      # Direct OpenAI/Anthropic key
+    budget=10.0,                # Budget limit in USD (optional)
+)
+# Provider auto-detected: sk-ant-* → anthropic, sk-* → openai
+
 # Properties
-router.base_url   # "http://127.0.0.1:{port}/v1"
-router.api_key    # IC token (for client auth)
-router.provider   # Auto-detected: "openai" or "anthropic"
-router.is_running # bool
+router.base_url      # "http://127.0.0.1:{port}/v1"
+router.api_key       # Token for client auth
+router.provider      # Auto-detected: "openai" or "anthropic"
+router.is_running    # bool
+router.budget        # Budget limit in USD (None if unlimited)
+router.budget_status # (spent, limit) tuple or None
 
 # Use with any OpenAI-compatible client
 client = OpenAI(base_url=router.base_url, api_key=router.api_key)
 response = client.chat.completions.create(...)
 
-# Cost tracking (debug)
+# Cost tracking
 print(f"Total spent: ${router.total_spent():.6f}")
 
+# Budget management (runtime)
+router.set_budget(20.0)  # Update budget limit
+
 # Context manager support
-with LlmRouter(api_key=token, server_url=url) as router:
+with LlmRouter(provider_key="sk-xxx", budget=5.0) as router:
     client = OpenAI(base_url=router.base_url, api_key=router.api_key)
     ...
 
 router.stop()  # Explicit stop
 ```
 
+**Budget Enforcement:**
+- When budget is set, requests are blocked with HTTP 402 when limit exceeded
+- Error response is OpenAI-compatible but distinct from rate limits:
+```json
+{
+  "error": {
+    "message": "Iron Cage budget limit exceeded. Spent: $10.50, Limit: $10.00...",
+    "type": "iron_cage_budget_exceeded",
+    "code": "budget_exceeded"
+  }
+}
+```
+- Use `router.set_budget()` to increase limit at runtime
+
+**Known Limitation - Concurrent Overspend:**
+
+Budget checking uses optimistic concurrency: check happens BEFORE request, cost added AFTER response. With concurrent requests, multiple threads can pass the budget check simultaneously, causing overspend.
+
+Example (5 threads, $0.05 budget, 4000 tokens/request):
+```
+Budget: $0.05
+Final spent: $0.088
+OVERSPEND: $0.038 (76% over budget)
+```
+
+**Why this happens:**
+1. Thread A checks budget → $0.00 < $0.05 → PASS
+2. Thread B checks budget → $0.00 < $0.05 → PASS (same time)
+3. Thread C checks budget → $0.00 < $0.05 → PASS (same time)
+4. All 3 requests complete, each costing ~$0.008
+5. Total: $0.024 spent before any thread saw updated balance
+
+**Mitigation strategies (not yet implemented):**
+- Budget reservation: reserve estimated cost before request, reconcile after
+- Pessimistic locking: serialize budget checks (reduces throughput)
+- Soft limits with hard cutoff: allow some overspend, hard-block at 2x limit
+
+**Current behavior:** Best-effort enforcement. Single-threaded usage is exact. Concurrent usage may overspend proportional to (threads × cost-per-request).
+
 **LlmRouter Rust API:**
 ```rust
 use iron_runtime::LlmRouter;
 
-let mut router = LlmRouter::create(
-    api_key,
-    server_url,
-    cache_ttl_seconds,
-)?;
+// Mode 1: Iron Cage Server
+let mut router = LlmRouter::create(api_key, server_url, cache_ttl_seconds)?;
+
+// Mode 2: With budget
+let mut router = LlmRouter::create_with_budget(api_key, server_url, ttl, 10.0)?;
+
+// Mode 3: Direct provider key
+let mut router = LlmRouter::create_with_provider_key("sk-xxx".into(), Some(10.0))?;
 
 let base_url = router.get_base_url();  // "http://127.0.0.1:{port}/v1"
 let is_running = router.running();
@@ -157,6 +212,15 @@ router.shutdown();  // Stop the proxy
 - Context manager support
 - OpenAI chat completion (provider-aware skip)
 - Invalid token rejection
+
+**Budget E2E Tests:** `python/tests/test_budget_e2e.py`
+- Budget tracking with real API calls
+- Budget exceeded returns HTTP 402
+- `set_budget()` unblocks after exceeded
+- Concurrent budget enforcement (5 threads)
+- Concurrent overspend demonstration test
+- Env vars: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for direct mode
+- Env vars: `IC_TOKEN` + `IC_SERVER` for Iron Cage mode
 
 ---
 

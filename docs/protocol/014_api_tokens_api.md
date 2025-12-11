@@ -33,6 +33,32 @@ The API Tokens API manages persistent authentication tokens for accessing the Ir
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `token_id`: `apitoken_<uuid>` (e.g., `apitoken_550e8400-e29b-41d4-a716-446655440000`)
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Token format: `at_<random_base64_32chars>` (e.g., `at_rY8xKpQm3nZ5vD9wF2sL7h`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `TOKEN_REVOKED`
+- HTTP status codes: 200, 201, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `status`
+- URL structure: `/api/v1/tokens/api`, `/api/v1/tokens/api/{id}`
+
+---
+
 ## Endpoints
 
 ### Create API Token
@@ -72,7 +98,7 @@ Content-Type: application/json
   "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": null,
   "message": "⚠️  Save this token now. You won't be able to see it again."
@@ -139,7 +165,7 @@ GET /api/v1/api-tokens?page=1&per_page=50&sort=-created_at
 Authorization: Bearer <user-token or api-token>
 
 # Admin filtering by specific user:
-GET /api/v1/api-tokens?user_id=user-xyz789&page=1&per_page=50
+GET /api/v1/api-tokens?user_id=user_xyz789&page=1&per_page=50
 Authorization: Bearer <admin-user-token>
 ```
 
@@ -164,7 +190,7 @@ Content-Type: application/json
       "id": "at_abc123",
       "name": "Dashboard Token",
       "description": "Token for production dashboard",
-      "user_id": "user-xyz789",
+      "user_id": "user_xyz789",
       "created_at": "2025-12-10T10:30:45Z",
       "last_used": "2025-12-10T15:22:10Z"
     },
@@ -172,14 +198,14 @@ Content-Type: application/json
       "id": "at_def456",
       "name": "Monitoring Script",
       "description": "Token for budget monitoring automation",
-      "user_id": "user-xyz789",
+      "user_id": "user_xyz789",
       "created_at": "2025-12-09T14:20:30Z",
       "last_used": "2025-12-10T15:00:00Z"
     },
     {
       "id": "at_ghi789",
       "name": "Old Token",
-      "user_id": "user-xyz789",
+      "user_id": "user_xyz789",
       "created_at": "2025-11-01T08:15:00Z",
       "last_used": null
     }
@@ -260,7 +286,7 @@ Content-Type: application/json
   "id": "at_abc123",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": "2025-12-10T15:22:10Z",
   "usage_stats": {
@@ -398,7 +424,7 @@ HTTP 409 Conflict
   "id": "at_abc123",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": "2025-12-10T15:22:10Z",
   "usage_stats": {
@@ -417,7 +443,7 @@ HTTP 409 Conflict
   "token": "apitok_xyz789abc123def456...",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "created_at": "2025-12-10T10:30:45Z",
   "last_used": null,
   "message": "⚠️  Save this token now. You won't be able to see it again."
@@ -558,7 +584,7 @@ HTTP 401 Unauthorized
 ```json
 {
   "timestamp": "2025-12-10T10:30:45Z",
-  "user_id": "user-xyz789",
+  "user_id": "user_xyz789",
   "endpoint": "POST /api/v1/api-tokens",
   "method": "POST",
   "resource_type": "api_token",
@@ -619,7 +645,7 @@ iron api-tokens get at-abc123
 # ID:          at-abc123
 # Name:        Dashboard Token
 # Description: Token for production dashboard
-# User:        user-xyz789
+# User:        user_xyz789
 # Created:     2025-12-10 10:30:45
 # Last Used:   2025-12-10 15:22:10
 #

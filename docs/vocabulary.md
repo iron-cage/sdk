@@ -48,6 +48,7 @@
 | **Agent** | AI agent executing on developer's machine. Has exactly one IC Token (1:1), exactly one Agent Budget (1:1, restrictive), can use multiple Inference Providers. Belongs to one Project |
 | **Project** | Collection of agents, Inference Provider assignments, and entities. Has exactly one Project Budget (1:1, informative). Owned by admin or team |
 | **Master Project** | Special project containing ALL resources (all agents, all Inference Providers, all budgets). Admin-only. Has Master Budget (informative). MUST be in Pilot |
+| **Orphaned Agents Project** | Special project containing agents from deleted user accounts. ID: `proj-orphaned`, Name: "Orphaned Agents", Owner: System admin. Agents automatically moved here when user deleted. Admin can reassign to new users or delete. Agents remain operational (budgets active, IC Tokens valid). See [Protocol 008](protocol/008_user_management_api.md) |
 | **IP** | Inference Provider entity (OpenAI, Anthropic, etc.). Has IP Budget (informative), has IP Token(s). Can be assigned to multiple agents. Deletion cascades - removing provider automatically unassigns from all agents (ON DELETE CASCADE). See [Protocol 011](protocol/011_providers_api.md) |
 | **Agent Budget** | Restrictive budget (ONLY budget that blocks requests). 1:1 with agent. Hard limit enforcement |
 | **Project Budget** | Informative budget (statistics only, no blocking). 1:1 with project. Shows aggregate agent spending |

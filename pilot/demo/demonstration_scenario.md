@@ -108,7 +108,7 @@ NO EXTERNAL DEPENDENCIES:
    npm run build
    cd ../agent
    uv venv && source .venv/bin/activate
-   uv pip install -r requirements.txt
+   uv sync --group examples
    ```
 
 2. **Data Preparation**

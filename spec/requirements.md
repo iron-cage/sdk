@@ -1014,6 +1014,634 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 
 ---
 
+### 1.8 REST API & Control Plane (MUST)
+
+### FR-1.8.1: API Architecture & Standards
+
+**Description:** Production-grade REST API for managing Iron Cage platform resources
+
+**Requirements:**
+- **HTTP Protocol:**
+  - RESTful design following standard HTTP semantics
+  - JSON request/response bodies
+  - Standard HTTP methods (GET, POST, PATCH, DELETE)
+  - Standard HTTP status codes (200, 201, 400, 401, 403, 404, 409, 429, 500, 503)
+
+- **Base URL Structure:**
+  - API versioning via URL path: `/api/v1/`
+  - Resource-oriented endpoints: `/api/v1/agents`, `/api/v1/providers`
+  - Sub-resources: `/api/v1/agents/{id}/status`
+
+- **Standards Compliance:**
+  - ID Format: All entity IDs use `prefix_uuid` format (see [ID Format Standards](../docs/standards/id_format_standards.md))
+  - Error Format: Consistent error responses (see [Error Format Standards](../docs/standards/error_format_standards.md))
+  - Data Types: ISO 8601 timestamps, decimal currency (see [Data Format Standards](../docs/standards/data_format_standards.md))
+  - API Design: Pagination, sorting, filtering (see [API Design Standards](../docs/standards/api_design_standards.md))
+
+**Acceptance Criteria:**
+- ✅ All endpoints follow REST conventions
+- ✅ All entity IDs use `prefix_uuid` format with underscore separator
+- ✅ All errors return consistent JSON structure with machine-readable codes
+- ✅ All timestamps use ISO 8601 with Z suffix (UTC)
+- ✅ All list endpoints support pagination (offset-based, 50 items default)
+
+**References:**
+- `/docs/standards/id_format_standards.md` - Entity ID format specification
+- `/docs/standards/error_format_standards.md` - Error response format
+- `/docs/standards/data_format_standards.md` - Data type conventions
+- `/docs/standards/api_design_standards.md` - Pagination, sorting, versioning
+
+---
+
+### FR-1.8.2: Authentication & Authorization
+
+**Description:** Secure authentication and role-based access control
+
+**Requirements:**
+- **Authentication Methods:**
+  - User authentication: JWT-based tokens (login/logout/refresh)
+  - API tokens: Long-lived tokens for automation and CI/CD
+  - IC tokens: Agent-facing tokens for budget handshake protocol
+
+- **Token Management:**
+  - **IC Tokens:**
+    - Format: `ic_<base64_32chars>` (Stripe-style prefix)
+    - Lifecycle: Create, list, get, delete, rotate
+    - Permissions: Admin creates tokens, developers list/rotate own tokens
+    - Protocol: See `/docs/protocol/006_token_management_api.md`
+  - **API Tokens:**
+    - Format: `at_<base64_32chars>` (Decision: Q31 - Create, List, Get, Revoke operations)
+    - Permissions: SAME-AS-USER (inherit user role and permissions) (Decision: Q15, ADR-009)
+    - Revocation: Soft delete with revoked_at timestamp (audit trail preserved) (Decision: Q31, ADR-009)
+
+- **Role-Based Access Control (RBAC):**
+  - **Roles:**
+    - Admin: Full access (user management, budget administration)
+    - Developer: Resource management (agents, providers, analytics)
+  - **Enforcement:**
+    - Middleware validates role on every request
+    - Admin-only endpoints return 403 Forbidden for non-admin users
+    - Users can only access their own resources (unless admin)
+
+- **Session Management:**
+  - JWT access tokens (short-lived, 1 hour)
+  - Refresh tokens (long-lived, 30 days)
+  - Automatic token refresh before expiration
+  - Secure token storage (HttpOnly cookies for web, keychain for CLI)
+
+**Acceptance Criteria:**
+- ✅ JWT tokens validated on every protected endpoint
+- ✅ Admin-only endpoints correctly reject non-admin requests (403)
+- ✅ API tokens inherit user permissions (cannot escalate privileges)
+- ✅ IC token rotation preserves old token for grace period (24 hours)
+- ✅ Session expires after inactivity (30 minutes default)
+
+**REST API Design Complete:** All API design questions resolved (2025-12-11)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 014: API Tokens API](../docs/protocol/014_api_tokens_api.md) for implementation specifications
+
+**References:**
+- `/docs/protocol/006_token_management_api.md` - IC Token CRUD endpoints
+- `/docs/protocol/007_authentication_api.md` - User authentication endpoints
+
+---
+
+### FR-1.8.3: Agent Management API
+
+**Description:** Full CRUD operations for AI agent lifecycle management
+
+**Requirements:**
+- **Create Agent:** `POST /api/v1/agents`
+  - **Required fields:**
+    - `name` (string, 1-100 chars, unique within project) (Decision: Q20, Q23, ADR-009)
+    - `budget` (decimal, >= 0.01 USD)
+  - **Optional fields:**
+    - `description` (string, max 500 chars)
+    - `providers` (array of provider IDs, can be empty - zero allowed) (Decision: Q20, Q26, ADR-009)
+    - `tags` (array of strings)
+    - `settings` (object, agent-specific configuration)
+  - **Response:** 201 Created with full agent object
+  - **Errors:** 409 Conflict if name duplicate (Decision: Q23, ADR-009)
+
+- **List Agents:** `GET /api/v1/agents`
+  - **Pagination:** Offset-based (`?page=1&per_page=50`)
+  - **Filtering:** By name (partial match), status, tags
+  - **Sorting:** `-created_at` (newest first, default)
+  - **Response:** Array of agent objects with pagination metadata
+
+- **Get Agent:** `GET /api/v1/agents/{id}`
+  - **Response:** Full agent object including budget status
+  - **Errors:** 404 Not Found if agent doesn't exist
+
+- **Update Agent:** `PATCH /api/v1/agents/{id}`
+  - **Mutable fields:** `name`, `budget`, `description`, `tags`, `settings` (Decision: Q21, Q22, ADR-009)
+  - **Immutable fields:** `id`, `created_at`, `updated_at`, `spent`
+  - **Semantics:** Partial updates (only specified fields updated) (Decision: Q22, ADR-009)
+  - **Response:** 200 OK with updated agent object
+
+- **Delete Agent:** `DELETE /api/v1/agents/{id}` **[POST-PILOT]**
+  - **Status:** Deferred to POST-PILOT (Decision: Q24, ADR-009)
+  - **Behavior:** Soft delete (archive pattern) recommended (preserves audit trail)
+  - **Pilot Workaround:** Remove all providers to effectively disable agent
+  - **Response:** TBD POST-PILOT
+
+- **Get Agent Status:** `GET /api/v1/agents/{id}/status`
+  - **Response:** Real-time budget status (spent, remaining, percentage used)
+  - **Use case:** Dashboard budget monitoring, CLI status display
+
+**Acceptance Criteria:**
+- ✅ Agent creation requires explicit budget (no default budget)
+- ✅ Agent names unique within project (409 Conflict on duplicate)
+- ✅ PATCH supports partial updates (omitted fields unchanged)
+- ✅ DELETE cascades to budget requests and leases
+- ✅ Status endpoint shows real-time budget usage
+
+**REST API Design Complete:** All agent API questions resolved (2025-12-11)
+- Agent creation: name + budget required (Decision: Q23, ADR-009)
+- Agent deletion: Deferred to POST-PILOT (Decision: Q24, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 010: Agents API](../docs/protocol/010_agents_api.md) for implementation specifications
+
+**References:**
+- `/docs/protocol/010_agents_api.md` - Complete agent API specification (to be created)
+
+---
+
+### FR-1.8.4: Provider Management API
+
+**Description:** CRUD operations for LLM provider credential management
+
+**Requirements:**
+- **Create Provider:** `POST /api/v1/providers`
+  - **Required fields:**
+    - `name` (string, 1-100 chars)
+    - `type` (enum: `openai`, `anthropic`, `azure_openai`, `google`)
+    - `api_key` (string, encrypted at rest)
+  - **Optional fields:**
+    - `base_url` (for custom endpoints, Azure OpenAI)
+    - `organization_id` (for OpenAI organizations)
+  - **Validation:** Format validation only, no API test call (Decision: Q25, ADR-009)
+  - **Response:** 201 Created (API key never returned in responses)
+
+- **List Providers:** `GET /api/v1/providers`
+  - **Filtering:** By name, type, status
+  - **Response:** Array of provider objects (api_key masked: `sk-***`)
+
+- **Get Provider:** `GET /api/v1/providers/{id}`
+  - **Response:** Provider object with masked API key
+
+- **Update Provider:** `PATCH /api/v1/providers/{id}`
+  - **Mutable fields:** `name`, `api_key`, `base_url`
+  - **API key rotation:** Direct PATCH with new key (Decision: Q26, ADR-009)
+  - **Validation:** Format validation only, no API test (Decision: Q27, ADR-009)
+
+- **Delete Provider:** `DELETE /api/v1/providers/{id}`
+  - **Cascade:** Removes provider from all agents (ON DELETE CASCADE)
+  - **Warning:** Response includes affected agents list (Decision: Q28, ADR-009)
+  - **Response:** 200 OK with affected agents details
+
+**Acceptance Criteria:**
+- ✅ API keys encrypted at rest in database
+- ✅ API keys never returned in GET/PATCH responses (always masked)
+- ✅ Provider creation accepts credentials without validation (fast creation)
+- ✅ DELETE cascades to agent-provider assignments
+- ✅ DELETE response shows affected agents with remaining provider counts
+
+**REST API Design Complete:** All provider API questions resolved (2025-12-11)
+- Provider credentials: No validation on create/update (Decision: Q25-Q27, ADR-009)
+- Provider deletion: Warning with affected agents (Decision: Q28, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 011: Providers API](../docs/protocol/011_providers_api.md) for implementation specifications
+
+**References:**
+- `/docs/protocol/011_providers_api.md` - Complete provider API specification (to be created)
+
+---
+
+### FR-1.8.5: API Token Management
+
+**Description:** Long-lived tokens for automation and external tool integration
+
+**Requirements:**
+- **Create API Token:** `POST /api/v1/api-tokens`
+  - **Required fields:**
+    - `name` (string, 1-100 chars, descriptive label)
+  - **Optional fields:**
+    - `expires_at` (ISO 8601 timestamp, null = no expiration)
+  - **Token generation:**
+    - Format: `at_<base64_32chars>` (Decision: Q31, ADR-009)
+    - Returned only on creation, never retrievable again (Decision: Q32, ADR-009)
+    - Stored as bcrypt hash in database (irreversible)
+  - **Permissions:** SAME-AS-USER - inherit user's role and permissions (Decision: Q15, Q30, ADR-009)
+  - **Response:** 201 Created with token value (shown ONCE, never again)
+
+- **List API Tokens:**
+  - Admin: `GET /api/v1/api-tokens?all=true` (all tokens, all users)
+  - User: `GET /api/v1/api-tokens` (own tokens only)
+  - **Response:** Array of token metadata (not token value, only prefix shown)
+
+- **Get API Token:** `GET /api/v1/api-tokens/{id}`
+  - **Response:** Token metadata (name, created_at, expires_at, last_used_at, status)
+  - **Never includes:** Token value (not retrievable after creation)
+
+- **Revoke API Token:** `DELETE /api/v1/api-tokens/{id}`
+  - **Behavior:** Soft delete with revoked_at timestamp (preserves audit trail) (Decision: Q31, ADR-009)
+  - **Response:** 200 OK with revoked_at timestamp
+  - **Effect:** Token immediately invalid (401 on subsequent use)
+
+**Acceptance Criteria:**
+- ✅ Token value shown only once (on creation)
+- ✅ Token inherits user role (cannot escalate privileges)
+- ✅ Revoked tokens return 401 Unauthorized with TOKEN_REVOKED code
+- ✅ Revoked tokens preserved in database for audit trail
+- ✅ List endpoint filters out revoked tokens by default (opt-in to include revoked)
+
+**REST API Design Complete:** All API token questions resolved (2025-12-11)
+- Token format: `at_<base64_32chars>` (Decision: Q31, ADR-009)
+- Token permissions: SAME-AS-USER (inherit user role) (Decision: Q15, ADR-009)
+- Token visibility: Show once at creation only (Decision: Q32, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 014: API Tokens API](../docs/protocol/014_api_tokens_api.md) for implementation specifications
+
+**References:**
+- `/docs/protocol/014_api_tokens_api.md` - API token management endpoints (to be created)
+
+---
+
+### FR-1.8.6: Analytics & Monitoring API
+
+**Description:** Real-time and historical analytics for agent activity and cost tracking
+
+**Requirements:**
+- **Supported Analytics Queries:**
+  - Spending over time (by agent, by provider, by project, by user)
+  - Token usage over time (input tokens, output tokens, total)
+  - Request volume (requests per hour/day/week)
+  - Error rates (by error type, by agent, by provider)
+  - Top agents by cost/usage
+  - Cost breakdown by provider
+  - Budget utilization (percentage used per agent)
+  - Historical trends (7-day, 30-day, 90-day)
+
+- **Time Ranges:**
+  - Last 24 hours (hourly granularity)
+  - Last 7 days (daily granularity)
+  - Last 30 days (daily granularity)
+  - Last 90 days (weekly granularity)
+  - Custom range (start_date, end_date)
+
+- **Aggregation:**
+  - Group by: agent, provider, project, user, hour, day, week
+  - Metrics: sum, avg, min, max, count
+  - Filters: agent_id, provider_id, date range, status
+
+- **Pagination:**
+  - Offset-based (`?page=1&per_page=50`)
+  - Default: 50 results per page, max 100
+  - Total count included in response metadata
+
+- **Endpoints:**
+  - `GET /api/v1/analytics/spending`
+  - `GET /api/v1/analytics/usage`
+  - `GET /api/v1/analytics/requests`
+  - `GET /api/v1/analytics/errors`
+  - `GET /api/v1/analytics/agents/top`
+  - `GET /api/v1/analytics/providers/breakdown`
+  - `GET /api/v1/analytics/budget-utilization`
+  - `GET /api/v1/analytics/trends`
+
+**Acceptance Criteria:**
+- ✅ Analytics queries complete in <500ms (p95)
+- ✅ Real-time data available within 30 seconds of event
+- ✅ Historical data retained for 90 days minimum
+- ✅ All analytics endpoints support time range filtering
+- ✅ Dashboard can render 8 analytics widgets without pagination
+
+**References:**
+- `/docs/protocol/012_analytics_api.md` - Analytics endpoints specification
+
+---
+
+### FR-1.8.7: Budget Control API
+
+**Description:** Budget limit enforcement and budget request workflow
+
+**Requirements:**
+- **Get Budget Limits:** `GET /api/v1/limits/agents/{agent_id}/budget`
+  - **Response:** Current budget, spent, remaining, status
+
+- **Update Budget Limit:** `PUT /api/v1/limits/agents/{agent_id}/budget`
+  - **Required:** `budget` (decimal, >= 0.01)
+  - **Authorization:** Admin only
+  - **Response:** Updated budget status
+  - **Effect:** Immediately enforced (agents blocked if over budget)
+
+- **Budget Request Workflow:**
+  - **Create Request:** `POST /api/v1/budget-requests`
+    - Developer requests budget increase
+    - Required: `agent_id`, `requested_budget`, `justification`
+    - Status: `pending`
+  - **List Requests:**
+    - Admin: `GET /api/v1/budget-requests` (all requests)
+    - User: `GET /api/v1/budget-requests/me` (own requests)
+  - **Approve Request:** `PUT /api/v1/budget-requests/{id}/approve`
+    - Admin only
+    - Applies budget change to agent
+    - Status: `approved`
+  - **Deny Request:** `PUT /api/v1/budget-requests/{id}/deny`
+    - Admin only
+    - Requires `reason`
+    - Status: `denied`
+
+- **Budget Handshake Protocol:**
+  - Agent-facing endpoint: `POST /api/budget/handshake`
+  - IC Token authentication required
+  - Returns: IP Token (short-lived provider access token)
+  - Protocol: See `/docs/protocol/005_budget_control_protocol.md`
+  - Two-token system: IC Token (agent) → IP Token (provider access)
+
+**Acceptance Criteria:**
+- ✅ Budget enforcement happens immediately after limit update
+- ✅ Budget request workflow supports approval/denial with audit trail
+- ✅ Budget handshake returns IP Token within 100ms (p95)
+- ✅ IP Token expires after agent completes inference request
+- ✅ Budget exceeded agents receive 429 Too Many Requests
+
+**References:**
+- `/docs/protocol/005_budget_control_protocol.md` - Two-token budget handshake
+- `/docs/protocol/013_budget_limits_api.md` - Budget limit management
+- `/docs/protocol/017_budget_requests_api.md` - Budget request workflow (to be created)
+
+---
+
+### FR-1.8.8: Data Format Standards
+
+**Description:** Consistent data type representation across all API responses
+
+**Requirements:**
+- **Timestamps:**
+  - Format: ISO 8601 with Z suffix (UTC timezone)
+  - Precision: Milliseconds included
+  - Example: `"created_at": "2025-12-10T10:30:45.123Z"`
+
+- **Currency:**
+  - Format: Decimal with exactly 2 decimal places
+  - Precision: Hundredths (cents)
+  - Example: `"budget": 100.50`
+  - No currency symbol (always USD for Pilot)
+
+- **Entity IDs:**
+  - Format: `prefix_uuid` (underscore-separated)
+  - Prefixes: `agent_`, `ip_` (provider), `ic_` (IC token), `at_` (API token), `br_` (budget request), `user_`, `proj_`, `lease_`
+  - Example: `"id": "agent_550e8400-e29b-41d4-a716-446655440000"`
+
+- **Booleans:**
+  - Format: JSON boolean (`true` or `false`)
+  - Never use integers (0/1) or strings ("true"/"false")
+
+- **Null Handling:**
+  - **Optional fields:** Omit from response if null/empty (don't include `"field": null`)
+  - **Empty arrays:** Return `[]` not `null`
+  - **Exception:** Explicitly nullable fields must include `null` value
+
+- **Enums:**
+  - Format: lowercase strings with underscores
+  - Example: `"status": "active"`, `"type": "azure_openai"`
+
+**Acceptance Criteria:**
+- ✅ All timestamps parseable by ISO 8601 libraries
+- ✅ All currency values have exactly 2 decimal places (no rounding errors)
+- ✅ All entity IDs use `prefix_uuid` format (validated at API layer)
+- ✅ Null optional fields omitted from JSON responses
+- ✅ All enums documented in API specification
+
+**References:**
+- `/docs/standards/data_format_standards.md` - Complete data format specification
+- `/docs/standards/id_format_standards.md` - Entity ID format details
+
+---
+
+### FR-1.8.9: Error Handling & Rate Limiting
+
+**Description:** Consistent error responses and abuse prevention
+
+**Requirements:**
+- **Error Response Format:**
+  ```json
+  {
+    "error": {
+      "code": "VALIDATION_ERROR",      // Machine-readable error code
+      "message": "Budget must be at least 0.01",  // Human-readable message
+      "fields": {                       // Optional field-level details
+        "budget": "Must be >= 0.01",
+        "name": "Required field"
+      }
+    }
+  }
+  ```
+
+- **HTTP Status Codes:**
+  - 400 Bad Request: Validation errors, malformed requests
+  - 401 Unauthorized: Missing or invalid authentication
+  - 403 Forbidden: Insufficient permissions
+  - 404 Not Found: Resource doesn't exist
+  - 409 Conflict: Resource conflict (duplicate name, concurrent modification)
+  - 429 Too Many Requests: Rate limit exceeded, budget exceeded
+  - 500 Internal Server Error: Unexpected errors
+  - 503 Service Unavailable: Service temporarily down
+
+- **Error Codes:**
+  - `VALIDATION_ERROR`: Field validation failed
+  - `INVALID_TOKEN`: Authentication token invalid
+  - `TOKEN_EXPIRED`: Authentication token expired
+  - `TOKEN_REVOKED`: API token was revoked
+  - `INSUFFICIENT_PERMISSIONS`: User lacks required role
+  - `DUPLICATE_NAME`: Resource name already exists
+  - `BUDGET_EXCEEDED`: Agent over budget
+  - `RATE_LIMIT_EXCEEDED`: Too many requests
+  - `RESOURCE_NOT_FOUND`: Requested resource doesn't exist
+  - `PROVIDER_IN_USE`: Cannot delete provider with active agents
+
+- **Rate Limiting:** **[POST-PILOT]**
+  - **Status:** Deferred to POST-PILOT (Decision: Q32, Q33, ADR-009)
+  - **Proposed Scope:** Per-user (all tokens from same user share limit)
+  - **Proposed Limits:**
+    - Authenticated: 100 requests/minute, 1000/hour
+    - Unauthenticated: 20 requests/minute, 100/hour
+    - Burst: 10 requests instant
+  - **Headers:**
+    - `X-RateLimit-Limit`: Total allowed requests
+    - `X-RateLimit-Remaining`: Requests remaining in window
+    - `X-RateLimit-Reset`: Unix timestamp when limit resets
+  - **Response:** 429 Too Many Requests with `Retry-After` header
+
+**Acceptance Criteria:**
+- ✅ All error responses use consistent JSON structure
+- ✅ Field-level validation errors include specific field names
+- ✅ Rate limit headers present in all responses (even success)
+- ✅ 429 responses include `Retry-After` header (seconds)
+- ✅ Authentication errors distinguish expired vs invalid vs revoked tokens
+
+**REST API Design Complete:** All error handling questions resolved (2025-12-11)
+- Error format: Simple custom format with field-level errors (Decision: Q37, Q39, Q40, ADR-009)
+- HTTP status: 400 for validation errors (Decision: Q38, ADR-009)
+- Rate limits: Deferred to POST-PILOT (Decision: Q32, Q33)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+
+**References:**
+- `/docs/standards/error_format_standards.md` - Error response specification
+
+---
+
+### FR-1.8.10: API Versioning & Deprecation
+
+**Description:** Backward-compatible API evolution and deprecation policy
+
+**Requirements:**
+- **Versioning Strategy:**
+  - URL-based versioning: `/api/v1/`, `/api/v2/`
+  - Major version increments for breaking changes
+  - Minor/patch changes deployed without version change
+
+- **Breaking Changes:**
+  - Removing endpoints
+  - Removing request/response fields
+  - Changing field types (string → integer)
+  - Changing error codes
+  - Changing authentication methods
+
+- **Non-Breaking Changes:**
+  - Adding new endpoints
+  - Adding optional request fields
+  - Adding response fields
+  - Adding new error codes (alongside existing)
+
+- **Deprecation Policy:**
+  - **Notice period:** 6 months minimum before removal
+  - **Communication:**
+    - Deprecation headers: `X-API-Deprecation: true`, `X-API-Sunset: 2026-06-10T00:00:00Z`
+    - Changelog updates (docs.ironcage.dev/changelog)
+    - Email notification to API users
+  - **Support:** Deprecated endpoints remain functional until sunset date
+  - **Documentation:** Deprecated endpoints clearly marked in API docs
+
+- **Migration Support:**
+  - Migration guides for each breaking change
+  - Dual support period (old + new versions run concurrently)
+  - Automated migration tools for common patterns
+
+**Acceptance Criteria:**
+- ✅ Version in URL path for all API endpoints
+- ✅ Deprecated endpoints return `X-API-Deprecation` header
+- ✅ Deprecation notice sent 6+ months before removal
+- ✅ Migration guide available for all breaking changes
+- ✅ Old versions supported for minimum 6 months after new version release
+
+**References:**
+- `/docs/standards/api_design_standards.md` - Versioning policy details
+
+---
+
+### FR-1.8.11: Audit Logging
+
+**Description:** Compliance-ready audit trail of all API operations
+
+**Requirements:**
+- **Logged Operations:**
+  - Mutation-only: POST, PUT, PATCH, DELETE (Decision: Q35, ADR-009)
+  - Not logged: GET (read operations - performance optimization)
+
+- **Audit Log Fields:**
+  - User ID (who performed action)
+  - Endpoint (what endpoint was called)
+  - HTTP method (POST, PUT, PATCH, DELETE)
+  - Request parameters (sanitized - no sensitive data)
+  - Response status code (200, 400, 500, etc.)
+  - Timestamp (ISO 8601, microsecond precision)
+  - IP address (source of request)
+  - User agent (CLI, dashboard, API client)
+  - Resource ID (agent ID, provider ID, etc.)
+
+- **Retention:**
+  - 90 days minimum (compliance standard)
+  - Auto-purge logs older than retention period
+  - Long-term archival to S3/GCS (optional, admin-configurable)
+
+- **Access Control:**
+  - Admin: `GET /api/v1/audit-logs` (view all logs)
+  - User: `GET /api/v1/audit-logs/me` (view own actions only)
+  - Filtering: By user, resource type, date range, action type
+
+- **Sensitive Data:**
+  - API keys: Never logged (masked: `sk-***`)
+  - Passwords: Never logged
+  - Personal data: Redacted per GDPR/HIPAA requirements
+
+**Acceptance Criteria:**
+- ✅ All mutation operations logged (POST, PUT, PATCH, DELETE)
+- ✅ Read operations (GET) not logged (performance optimization)
+- ✅ Audit logs retained for 90 days minimum
+- ✅ Audit log access restricted by role (admin sees all, user sees own)
+- ✅ Sensitive data never appears in audit logs
+
+**REST API Design Complete:** All audit logging questions resolved (2025-12-11)
+- Audit logging scope: Mutation-only (POST, PUT, DELETE) for performance (Decision: Q35, ADR-009)
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 002: Cross-Cutting Standards](../docs/protocol/002_rest_api_protocol.md#audit-logging) for implementation specifications
+
+**References:**
+- `/docs/protocol/027_audit_logging.md` - Centralized audit logging specification (POST-PILOT enhancement)
+
+**Note:** Audit logging is currently implemented as cross-cutting concern in all mutation APIs (see protocols 008, 010, 011, 013, 014, 017). Centralized specification deferred to POST-PILOT.
+
+---
+
+### FR-1.8.12: CLI-API Parity
+
+**Description:** Ensure critical API operations accessible via both REST API and CLI
+
+**Requirements:**
+- **CLI Required (User-Facing Operations):**
+  - ✅ IC Tokens: `iron tokens list/create/delete/rotate`
+  - ✅ Authentication: `iron login/logout`
+  - ✅ Agents: `iron agents list/create/get/update/delete/status`
+  - ✅ Providers: `iron providers list/create/update/delete`
+  - ✅ Analytics: `iron analytics spending/usage/errors`
+  - ✅ API Tokens: `iron api-tokens list/create/revoke`
+  - ✅ Budget Limits: `iron limits agent-budget increase`
+  - ✅ Budget Requests: `iron budget-requests create/approve/deny`
+  - ✅ Projects: `iron projects list/get`
+
+- **CLI Not Required (Agent-Facing / System Operations):**
+  - ❌ Budget Handshake: `POST /api/budget/handshake` (agent-facing only)
+  - ❌ Health Check: `GET /api/health` (monitoring systems)
+  - ❌ Version: `GET /api/version` (system metadata)
+
+- **CLI Implementation:**
+  - Built in Rust (same codebase as runtime)
+  - Uses REST API internally (no direct database access)
+  - Interactive prompts for destructive operations (delete, revoke)
+  - Pretty-printed output (tables, colors, progress bars)
+  - JSON output mode for scripting (`--json` flag)
+
+**Acceptance Criteria:**
+- ✅ All user-facing operations have CLI commands
+- ✅ CLI uses REST API (no direct database access)
+- ✅ Destructive operations prompt for confirmation (unless `--force`)
+- ✅ CLI exit codes follow conventions (0 = success, non-zero = error)
+- ✅ CLI help text explains all options (`--help`)
+
+**REST API Design Complete:** All CLI-API parity questions resolved (2025-12-11)
+- CLI-API parity policy: User-facing only, not agent-facing endpoints (Decision: Q36, ADR-009)
+- 100% parity: 46 user-facing endpoints = 46 CLI commands
+- See [ADR-009: REST API Design Decisions](../docs/decisions/adr_009_rest_api_design.md) for comprehensive design rationale
+- See [Protocol 002: Cross-Cutting Standards](../docs/protocol/002_rest_api_protocol.md#cli-api-parity) for CLI-API mapping
+
+**References:**
+- `/docs/features/004_token_management_cli_api_parity.md` - CLI-API parity implementation
+
+---
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Performance (MUST)
@@ -1161,6 +1789,257 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - Pin major versions, allow minor/patch updates
   - Security audits via `cargo audit` weekly
 - **Validation:** Run `cargo deny check`, verify zero vulnerabilities
+
+### 2.6 Testing (MUST)
+
+### NFR-2.6.1: Database Test Isolation
+- **Requirement:** Every test must use isolated database instance
+- **Implementation:**
+  - Each test creates independent database (in-memory or tempfile)
+  - No shared database connections between tests
+  - Tests can run in parallel without conflicts
+  - Each test applies migrations independently
+- **Acceptance Criteria:**
+  - Tests pass when run in parallel: `cargo nextest run -j8`
+  - Zero race conditions over 100 repeated runs
+  - Test order doesn't affect results
+- **Validation:** Run `cargo nextest run --test-threads 8`, verify all tests pass
+
+### NFR-2.6.2: Automatic Cleanup Mechanisms
+- **Requirement:** All test databases must clean up automatically
+- **Forbidden:** Manual cleanup, cleanup scripts, shared cleanup functions
+- **Required Patterns:**
+  - **TempDir Drop (File-Based):** Use Rust Drop trait for automatic deletion
+    ```rust
+    pub async fn create_test_db() -> (SqlitePool, TempDir) {
+      let temp_dir = TempDir::new()?;
+      let db_path = temp_dir.path().join("test.db");
+      // temp_dir returned, dropped after test completes → automatic cleanup
+      (pool, temp_dir)
+    }
+    ```
+  - **Connection Pool Drop (In-Memory):** Memory database destroyed when pool dropped
+    ```rust
+    pub async fn create_test_database() -> SqlitePool {
+      SqlitePoolOptions::new()
+        .connect("sqlite::memory:?cache=shared")
+        .await?
+      // pool dropped after test → automatic cleanup
+    }
+    ```
+- **Acceptance Criteria:**
+  - No test database files left after test suite completes
+  - Cleanup works even if test panics
+  - Zero manual cleanup commands required
+- **Validation:** Run tests, verify `ls /tmp/test_*` shows zero files
+
+### NFR-2.6.3: Seed Data Standards
+- **Requirement:** All seed data operations must be idempotent and documented
+- **Idempotency Contract:**
+  - Seed functions safe to run multiple times
+  - Use `INSERT OR IGNORE` pattern for SQLite
+  - Check existence before creation for PostgreSQL
+  - Seed functions return Result, not panic
+- **Seed Data Structure (Test Contract):**
+  | Entity | Count | Purpose | Required Fields |
+  |--------|-------|---------|----------------|
+  | users | 3 | Admin, normal, read-only for permission testing | username, password_hash, role |
+  | api_tokens | 5 | Valid, expired, revoked, low-limit, high-limit | token_hash, user_id, status, expires_at |
+  | provider_keys | 2 | OpenAI, Anthropic for multi-provider testing | provider_name, api_key_encrypted, status |
+  | usage_limits | 3 | Default, custom, zero for quota testing | max_usd, max_tokens, time_window |
+  | usage_records | 10 | Recent usage for analytics testing | token_id, tokens_used, cost_usd, timestamp |
+  | project_assignments | 7 | User-token-project relationships | user_id, token_id, project_id, role |
+- **Organization Pattern:**
+  ```rust
+  pub async fn seed_all(pool: &SqlitePool) -> Result<()> {
+    // Call in dependency order (base entities first)
+    seed_users(pool).await?;              // No dependencies
+    seed_provider_keys(pool).await?;      // No dependencies
+    seed_api_tokens(pool).await?;         // Depends on users
+    seed_usage_limits(pool).await?;       // Depends on api_tokens
+    seed_usage_records(pool).await?;      // Depends on api_tokens
+    seed_project_assignments(pool).await?; // Depends on users + api_tokens
+    Ok(())
+  }
+
+  async fn seed_users(pool: &SqlitePool) -> Result<()> {
+    sqlx::query(
+      "INSERT OR IGNORE INTO users (username, password_hash, role)
+       VALUES (?, ?, ?)"
+    )
+    .bind("admin").bind("admin_hash").bind("admin")
+    .execute(pool).await?;
+
+    sqlx::query(
+      "INSERT OR IGNORE INTO users (username, password_hash, role)
+       VALUES (?, ?, ?)"
+    )
+    .bind("normal").bind("normal_hash").bind("user")
+    .execute(pool).await?;
+
+    sqlx::query(
+      "INSERT OR IGNORE INTO users (username, password_hash, role)
+       VALUES (?, ?, ?)"
+    )
+    .bind("readonly").bind("readonly_hash").bind("readonly")
+    .execute(pool).await?;
+
+    Ok(())
+  }
+  ```
+- **Wipe Pattern (Manual Testing Only):**
+  ```rust
+  pub async fn wipe_database(pool: &SqlitePool) -> Result<()> {
+    // Delete in REVERSE dependency order (dependents first)
+    sqlx::query("DELETE FROM project_assignments").execute(pool).await?;
+    sqlx::query("DELETE FROM usage_records").execute(pool).await?;
+    sqlx::query("DELETE FROM usage_limits").execute(pool).await?;
+    sqlx::query("DELETE FROM api_tokens").execute(pool).await?;
+    sqlx::query("DELETE FROM provider_keys").execute(pool).await?;
+    sqlx::query("DELETE FROM users").execute(pool).await?;
+    Ok(())
+  }
+  ```
+- **Acceptance Criteria:**
+  - Running seed_all() twice produces identical database state
+  - Seed functions never panic, return Result
+  - Wipe respects foreign key constraints
+  - All seed data documented in tests/readme.md
+- **Validation:** Run seed_all() twice, verify second run succeeds with zero changes
+
+### NFR-2.6.4: Test Database Selection
+- **Requirement:** Use appropriate database type for each test scenario
+- **Decision Matrix:**
+  | Scenario | Database Type | Pattern | Rationale |
+  |----------|--------------|---------|-----------|
+  | Fast unit tests | In-memory SQLite | `sqlite::memory:?cache=shared` | Fastest, no I/O, automatic cleanup |
+  | Integration tests | Tempfile SQLite | `TempDir + sqlite://{path}` | Inspectable, migration testing |
+  | CI/CD pipelines | In-memory SQLite | `sqlite::memory:` | Fast, no disk space issues |
+  | Debug/manual testing | Config-based SQLite | `config.dev.toml` | Persistent, inspectable between runs |
+  | Production tests | PostgreSQL | Environment variable | Real production database |
+- **Configuration Examples:**
+  ```toml
+  # config.dev.toml (manual testing only)
+  [database]
+  url = "sqlite:///./dev_tokens.db?mode=rwc"
+  auto_migrate = true
+  foreign_keys = true
+
+  [development]
+  debug = true
+  auto_seed = false        # Manual seed only
+  wipe_and_seed = true     # Automatic wipe+seed on startup
+  ```
+- **Acceptance Criteria:**
+  - Automated tests never use config-based databases
+  - Manual testing databases persist for inspection
+  - CI tests complete in <5 minutes (in-memory only)
+- **Validation:** Verify automated tests use `:memory:` or `TempDir`, manual testing uses `dev_*.db`
+
+### NFR-2.6.5: Manual Testing Database Setup
+- **Requirement:** Provide unified commands for manual testing database preparation
+- **Required Makefile Targets:**
+  ```makefile
+  # Fresh database with seed data
+  db-reset-seed:
+    rm -f dev_*.db
+    cargo run --config config.dev.toml
+
+  # Delete development databases
+  db-reset:
+    rm -f dev_*.db
+    @echo "Development databases deleted"
+
+  # Populate seed data (assumes db exists)
+  db-seed:
+    cargo run --bin seed-db --config config.dev.toml
+
+  # Interactive database inspection
+  db-inspect:
+    @echo "Opening dev_tokens.db (press Ctrl+D to exit)"
+    sqlite3 ./dev_tokens.db
+
+  # Complete debug setup (reset + build + seed)
+  debug-setup: db-reset-seed
+    cargo build --workspace
+    @echo "Debug environment ready"
+  ```
+- **Developer Workflow:**
+  ```bash
+  # Day 1: Fresh start
+  make debug-setup        # Clean database + build + seed
+  cargo run --config config.dev.toml
+
+  # Day 2: Continue with existing data
+  cargo run --config config.dev.toml
+
+  # Day 3: Corrupted data, need fresh start
+  make db-reset-seed      # Wipe + seed, keep build
+  cargo run --config config.dev.toml
+
+  # During debugging: inspect state
+  make db-inspect
+  # SQL> SELECT * FROM users;
+  # SQL> SELECT token_prefix, status FROM api_tokens;
+  ```
+- **Database Path Conventions:**
+  - **Development:** `./dev_{module}.db` (e.g., `dev_tokens.db`, `dev_runtime.db`)
+  - **Test (Tempfile):** `{tempdir}/test.db` (automatic cleanup)
+  - **Test (In-Memory):** `:memory:?cache=shared` (no file)
+  - **Production:** `DATABASE_URL` environment variable
+- **Acceptance Criteria:**
+  - `make db-reset-seed` completes in <5 seconds
+  - `make db-inspect` opens SQLite shell successfully
+  - Development databases never committed to git (in .gitignore)
+  - Seed data provides realistic test scenarios
+- **Validation:** Run `make db-reset-seed`, verify database created with seed data
+
+### NFR-2.6.6: Bug Reproducer Tests
+- **Requirement:** Every bug fix must include reproducer test with comprehensive documentation
+- **Test Format:**
+  ```rust
+  /// Reproduces [specific bug description] (issue-NNN).
+  ///
+  /// ### Root Cause
+  /// [Specific technical explanation of WHY bug occurred]
+  ///
+  /// ### Why Not Caught Initially
+  /// [Explanation of what was missing in original test coverage]
+  ///
+  /// ### Fix Applied
+  /// [Specific technical description of fix implementation]
+  ///
+  /// ### Prevention
+  /// [What practices would have prevented this bug]
+  ///
+  /// ### Pitfall to Avoid
+  /// [Specific technical lesson learned for future development]
+  // test_kind: bug_reproducer(issue-NNN)
+  #[test]
+  fn test_specific_bug_description() {
+    // Test must FAIL before fix applied
+    // Test must PASS after fix applied
+  }
+  ```
+- **Source Code Fix Comment:**
+  ```rust
+  // Fix(issue-NNN): [One sentence summary]
+  // Root cause: [Specific technical explanation]
+  // Pitfall: [Specific lesson learned]
+  pub fn fixed_function() { /* ... */ }
+  ```
+- **Documentation Quality Standards:**
+  - **Specific:** Name exact functions, types, conditions (not "fixed bug")
+  - **Technical:** Include code snippets, SQL, algorithms (not "be careful")
+  - **Actionable:** Clear guidance for preventing recurrence (not generic advice)
+  - **Traceable:** Reference issue-NNN for full context
+  - **Concise:** Focus on critical insights only (3-10 sentences per section)
+- **Acceptance Criteria:**
+  - Bug reproducer test exists with 5-section documentation
+  - Source code has 3-field fix comment
+  - Documentation is specific, technical, actionable
+  - Test passes after fix applied
+- **Validation:** Search codebase for `bug_reproducer(issue-`, verify all have 5 sections + 3-field comments
 
 ---
 

@@ -18,6 +18,34 @@ The Providers API manages Inference Providers (IPs) - external AI services (Open
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `provider_id`: `provider_<uuid>` (e.g., `provider_550e8400-e29b-41d4-a716-446655440000`)
+- `agent_id`: `agent_<uuid>`
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Arrays: Empty array `[]` when no items (not `null`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `DUPLICATE_NAME`, `IN_USE`
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `name`, `status`, `type`
+- Sorting: Optional `?sort=-created_at` (newest first, default)
+- URL structure: `/api/v1/providers`, `/api/v1/providers/{id}`
+
+---
+
 ## Endpoints
 
 ### Create Provider
@@ -877,7 +905,7 @@ HTTP 404 Not Found
 ```json
 {
   "timestamp": "2025-12-10T10:30:45Z",
-  "user_id": "user-admin-001",
+  "user_id": "user_admin_001",
   "endpoint": "POST /api/v1/providers",
   "method": "POST",
   "resource_type": "provider",

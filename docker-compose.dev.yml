@@ -1,0 +1,55 @@
+version: '3.8'
+
+# Development Docker Compose - mounts source code for live reload
+# Usage: docker compose -f docker-compose.dev.yml up
+# Database: SQLite (automatically wiped on each startup)
+
+services:
+  backend:
+    image: rust:1-slim-bookworm
+    container_name: iron_backend_dev
+    working_dir: /app
+    volumes:
+      - ./:/app  # Source code (live reload)
+      - ./-dev_data:/app/data  # SQLite DB (bind mount, wiped on startup)
+      - cargo_cache:/usr/local/cargo/registry  # Cargo dependencies cache
+      - target_cache:/app/target  # Build artifacts cache
+    environment:
+      DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
+      JWT_SECRET: dev-secret-change-in-production
+      IRON_SECRETS_MASTER_KEY: 0BneKEc6qxXoTF+EatvWelWhbN4oAzABbEgN3O3vIRw=
+      IRON_DEPLOYMENT_MODE: development
+      RUST_LOG: debug
+    command: >
+      sh -c "apt-get update && apt-get install -y pkg-config libssl-dev curl &&
+             cargo run -p iron_control_api"
+    ports:
+      - "3000:3000"  # Expose for direct API access
+    networks:
+      - iron_network
+
+  frontend:
+    image: node:20-alpine
+    container_name: iron_frontend_dev
+    working_dir: /app
+    volumes:
+      - ./module/iron_dashboard:/app  # Source code (live reload)
+      - node_modules_cache:/app/node_modules  # Node modules cache
+    environment:
+      VITE_API_URL: http://localhost:3000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"  # Vite dev server
+    depends_on:
+      - backend
+    networks:
+      - iron_network
+
+networks:
+  iron_network:
+    driver: bridge
+
+volumes:
+  cargo_cache:  # Persists Cargo dependencies
+  target_cache:  # Persists build artifacts
+  node_modules_cache:  # Persists node_modules

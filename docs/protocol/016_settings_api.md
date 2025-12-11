@@ -84,6 +84,30 @@ Authorization varies by settings scope:
 - **Project Settings**: Owner or Admin
 - **User Settings**: Any authenticated user (own settings only)
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `setting_id`: `setting_<uuid>` (e.g., `setting_550e8400-e29b-41d4-a716-446655440000`)
+- `project_id`: `project_<uuid>`
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Settings values: Type varies by setting (string, number, boolean, object)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_SETTING_VALUE`
+- HTTP status codes: 200, 201, 400, 401, 403, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- URL structure: `/api/v1/settings/user`, `/api/v1/settings/project`, `/api/v1/settings/system`
+- Standard HTTP methods: GET for retrieval, PUT/PATCH for updates
+
 ## Endpoints
 
 ### 1. Get User Settings
@@ -101,7 +125,7 @@ Authorization: Bearer <user-token or api-token>
 **Response** (HTTP 200 OK):
 ```json
 {
-  "user_id": "user-abc123",
+  "user_id": "user_abc123",
   "settings": {
     "display": {
       "theme": "dark",
@@ -174,7 +198,7 @@ Content-Type: application/json
 **Response** (HTTP 200 OK):
 ```json
 {
-  "user_id": "user-abc123",
+  "user_id": "user_abc123",
   "settings": {
     "display": {
       "theme": "light",
@@ -265,7 +289,7 @@ Retrieves project-level settings. Requires Owner or Admin role.
 
 **Request**:
 ```http
-GET /api/v1/settings/project/proj-master-001
+GET /api/v1/settings/project/proj_master_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -277,7 +301,7 @@ Authorization: Bearer <user-token or api-token>
 **Response** (HTTP 200 OK):
 ```json
 {
-  "project_id": "proj-master-001",
+  "project_id": "proj_master_001",
   "settings": {
     "operational": {
       "default_agent_budget": 100.00,
@@ -350,7 +374,7 @@ Updates project-level settings. Requires Owner or Admin role.
 
 **Request**:
 ```http
-PUT /api/v1/settings/project/proj-master-001
+PUT /api/v1/settings/project/proj_master_001
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
@@ -381,7 +405,7 @@ Content-Type: application/json
 **Response** (HTTP 200 OK):
 ```json
 {
-  "project_id": "proj-master-001",
+  "project_id": "proj_master_001",
   "settings": {
     "operational": {
       "default_agent_budget": 150.00,
@@ -404,7 +428,7 @@ Content-Type: application/json
     }
   },
   "updated_at": "2025-12-10T10:30:45Z",
-  "updated_by": "user-abc123"
+  "updated_by": "user_abc123"
 }
 ```
 
@@ -557,7 +581,7 @@ Content-Type: application/json
     }
   },
   "updated_at": "2025-12-10T10:30:45Z",
-  "updated_by": "admin-user-001"
+  "updated_by": "admin-user_001"
 }
 ```
 

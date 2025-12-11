@@ -46,6 +46,37 @@ pub struct TokenStorage
 
 impl TokenStorage
 {
+  /// Create new token storage from existing pool
+  ///
+  /// Preferred constructor for test environments using `iron_test_db`.
+  /// Does NOT apply migrations - caller is responsible for schema setup.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - Existing database connection pool
+  ///
+  /// # Returns
+  ///
+  /// Initialized storage using provided pool
+  ///
+  /// # Examples
+  ///
+  /// ```rust,ignore
+  /// use iron_test_db::TestDatabaseBuilder;
+  /// use iron_token_manager::storage::TokenStorage;
+  ///
+  /// let db = TestDatabaseBuilder::new().in_memory().build().await?;
+  /// let storage = TokenStorage::from_pool( db.pool().clone() );
+  /// ```
+  #[ must_use ]
+  pub fn from_pool( pool: SqlitePool ) -> Self
+  {
+    Self {
+      pool,
+      generator: TokenGenerator::new(),
+    }
+  }
+
   /// Create new token storage
   ///
   /// # Arguments
@@ -67,121 +98,86 @@ impl TokenStorage
       .await
       .map_err( |_| crate::error::TokenError )?;
 
-    // Run migrations in order
-    // Migration 001: Initial schema (tables, indexes, foreign keys)
-    let migration_001 = include_str!( "../migrations/001_initial_schema.sql" );
-    sqlx::raw_sql( migration_001 )
-      .execute( &pool )
+    // Apply all migrations using unified helper
+    crate::migrations::apply_all_migrations( &pool ).await?;
+    Ok( Self {
+      pool,
+      generator: TokenGenerator::new(),
+    } )
+  }
+
+  /// Create new token storage from configuration file
+  ///
+  /// This is the preferred initialization method for production use.
+  /// Supports configuration files and environment variable overrides.
+  ///
+  /// # Returns
+  ///
+  /// Initialized storage with database schema applied according to config
+  ///
+  /// # Errors
+  ///
+  /// Returns error if config loading fails, database connection fails, or migration fails
+  ///
+  /// # Examples
+  ///
+  /// ```rust,ignore
+  /// use iron_token_manager::storage::TokenStorage;
+  ///
+  /// // Load from default environment (IRON_ENV or "development")
+  /// let storage = TokenStorage::from_config().await?;
+  ///
+  /// // Override via environment variable
+  /// std::env::set_var("IRON_ENV", "production");
+  /// let storage = TokenStorage::from_config().await?;
+  /// ```
+  pub async fn from_config() -> Result< Self >
+  {
+    let config = crate::config::Config::load()
+      .map_err( |_| crate::error::TokenError )?;
+    Self::from_config_object( &config ).await
+  }
+
+  /// Create new token storage from configuration object
+  ///
+  /// # Arguments
+  ///
+  /// * `config` - Configuration object
+  ///
+  /// # Returns
+  ///
+  /// Initialized storage with database schema applied according to config
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database connection fails or migration fails
+  pub async fn from_config_object( config: &crate::config::Config ) -> Result< Self >
+  {
+    let pool = SqlitePoolOptions::new()
+      .max_connections( config.database.max_connections )
+      .connect( &config.database.url )
       .await
       .map_err( |_| crate::error::TokenError )?;
 
-    // Migration 002: Length constraints (defense-in-depth for issue-001)
-    // Fix(issue-003): Check if migration already applied to prevent CASCADE DELETE data loss
-    // Root cause: Migration dropped api_tokens table on every run, cascading to token_usage deletion
-    // Pitfall: Always check migration guard tables before running destructive schema changes
-    let migration_002_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_002_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
-
-    // Only run migration if guard table doesn't exist
-    if migration_002_completed == 0
+    // Apply migrations if configured
+    if config.database.auto_migrate
     {
-      let migration_002 = include_str!( "../migrations/002_add_length_constraints.sql" );
-      sqlx::raw_sql( migration_002 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
+      crate::migrations::apply_all_migrations( &pool ).await?;
     }
 
-    // Migration 003: Users table for authentication
-    let migration_003_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_003_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
+    // Wipe and seed if configured (development/test only)
+    let should_wipe_and_seed = config.development
+      .as_ref()
+      .map( |d| d.wipe_and_seed )
+      .or_else( || config.test.as_ref().map( |t| t.wipe_and_seed ) )
+      .unwrap_or( false );
 
-    if migration_003_completed == 0
+    if should_wipe_and_seed
     {
-      let migration_003 = include_str!( "../migrations/003_create_users_table.sql" );
-      sqlx::raw_sql( migration_003 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
+      crate::seed::wipe_database( &pool ).await?;
+      crate::seed::seed_all( &pool ).await?;
     }
 
-    // Migration 004: AI provider keys table
-    let migration_004_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_004_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
-
-    if migration_004_completed == 0
-    {
-      let migration_004 = include_str!( "../migrations/004_create_ai_provider_keys.sql" );
-      sqlx::raw_sql( migration_004 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
-    }
-
-    // Migration 005: Enhance users table for user management
-    let migration_005_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_005_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
-
-    if migration_005_completed == 0
-    {
-      let migration_005 = include_str!( "../migrations/005_enhance_users_table.sql" );
-      sqlx::raw_sql( migration_005 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
-    }
-
-
-
-    // Migration 006: Create user audit log table
-    let migration_006_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
-
-    if migration_006_completed == 0
-    {
-      let migration_006 = include_str!( "../migrations/006_create_user_audit_log.sql" );
-      sqlx::raw_sql( migration_006 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
-    }
-
-    // Migration 008: Create agents table
-    let migration_008_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_008_completed'"
-    )
-    .fetch_one( &pool )
-    .await
-    .map_err( |_| crate::error::TokenError )?;
-
-    if migration_008_completed == 0
-    {
-      let migration_008 = include_str!( "../migrations/008_create_agents_table.sql" );
-      sqlx::raw_sql( migration_008 )
-        .execute( &pool )
-        .await
-        .map_err( |_| crate::error::TokenError )?;
-    }
     Ok( Self {
       pool,
       generator: TokenGenerator::new(),
@@ -556,7 +552,7 @@ impl TokenStorage
 
 /// Get current time in milliseconds since UNIX epoch
 #[ allow( clippy::cast_possible_truncation ) ]
-fn current_time_ms() -> i64
+pub( crate ) fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )

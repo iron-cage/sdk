@@ -42,6 +42,28 @@ All endpoints require authentication via:
 - **User Token**: Short-lived session token from login (`Authorization: Bearer <user-token>`)
 - **API Token**: Persistent authentication token (`Authorization: Bearer <api-token>`)
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `project_id`: `project_<uuid>` (e.g., `project_550e8400-e29b-41d4-a716-446655440000`)
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Counts: Integer (e.g., `42` users, `15` agents)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`
+- HTTP status codes: 200, 400, 401, 404
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- URL structure: `/api/v1/projects`, `/api/v1/projects/{id}`
+
 ## Endpoints
 
 ### 1. List Projects
@@ -130,7 +152,7 @@ Retrieves detailed information about a specific project.
 
 **Request**:
 ```http
-GET /api/v1/projects/proj-master-001
+GET /api/v1/projects/proj_master_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -264,13 +286,13 @@ The following features are planned for POST-PILOT implementation:
 - All users automatically belong to Master Project
 - No project creation or deletion
 - No multi-project switching
-- Project ID is constant: `proj-master-001`
+- Project ID is constant: `proj_master_001`
 
 ### Database Schema (Reference)
 ```sql
 -- Pilot: Single row in projects table
 CREATE TABLE projects (
-  id VARCHAR(50) PRIMARY KEY,        -- 'proj-master-001'
+  id VARCHAR(50) PRIMARY KEY,        -- 'proj_master_001'
   name VARCHAR(255) NOT NULL,        -- 'Master Project'
   description TEXT,
   created_at TIMESTAMP NOT NULL,

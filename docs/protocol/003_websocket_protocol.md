@@ -49,6 +49,25 @@ WebSocket streaming provides:
 
 ---
 
+### Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `agent_id`: `agent_<uuid>` (e.g., `agent_550e8400-e29b-41d4-a716-446655440000`)
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Currency: Decimal with exactly 2 decimal places (e.g., `5.23`, `0.015`)
+- Percentages: Integer 0-100 (e.g., `90`)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- WebSocket error messages follow standard error response format
+- Machine-readable error codes for connection failures
+
+---
+
 ### Protocol Definition
 
 ### Message Types

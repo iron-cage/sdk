@@ -51,6 +51,27 @@ MCP with Iron Cage governance provides:
 
 ---
 
+### Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- Tool IDs and invocation IDs use `prefix_uuid` format when applicable
+- Agent IDs in governance layer: `agent_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Timestamps in governance layer: ISO 8601 with Z suffix
+- Cost tracking: Decimal with 2 decimal places
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Iron Cage errors mapped to MCP error codes
+- Standard error response format in governance layer
+- Machine-readable error codes: `TOOL_NOT_FOUND`, `UNAUTHORIZED`, `BUDGET_EXCEEDED`
+
+**Note:** MCP protocol itself (JSON-RPC 2.0) is externally defined. Standards apply to Iron Cage governance layer.
+
+---
+
 ### Protocol Definition
 
 ### Tool Discovery

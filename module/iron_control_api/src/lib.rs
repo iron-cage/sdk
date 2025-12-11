@@ -26,6 +26,12 @@ pub mod user_auth;
 pub mod token_auth;
 
 #[cfg(feature = "enabled")]
+pub mod ic_token;
+
+#[cfg(feature = "enabled")]
+pub mod ip_token;
+
+#[cfg(feature = "enabled")]
 mod implementation
 {
   use axum::{
@@ -104,7 +110,7 @@ mod implementation
     {
       Some(agent_state) => {
         let response = AgentStatusResponse {
-          agent_id: agent_state.agent_id,
+          agent_id: agent_state.agent_id.to_string(),
           status: format!("{:?}", agent_state.status),
         };
         (StatusCode::OK, Json(response))
@@ -151,7 +157,7 @@ mod implementation
     {
       Some(agent_state) => {
         let metrics = serde_json::json!({
-          "agent_id": agent_state.agent_id,
+          "agent_id": agent_state.agent_id.to_string(),
           "status": format!("{:?}", agent_state.status),
           "budget_spent": agent_state.budget_spent,
           "pii_detections": agent_state.pii_detections,

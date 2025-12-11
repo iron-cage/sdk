@@ -26,6 +26,34 @@ The Budget Change Requests API provides a workflow for developers to request bud
 
 ---
 
+## Standards Compliance
+
+This protocol adheres to the following Iron Cage standards:
+
+**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
+- All entity IDs use `prefix_uuid` format with underscore separator
+- `request_id`: `budgetreq_<uuid>` (e.g., `budgetreq_550e8400-e29b-41d4-a716-446655440000`)
+- `agent_id`: `agent_<uuid>`
+- `user_id`: `user_<uuid>`
+
+**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+- Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
+- Consistent error response structure across all endpoints
+- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `INVALID_STATE_TRANSITION`, `INSUFFICIENT_PERMISSIONS`
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409
+
+**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
+- Filtering: Query parameters for `status`, `agent_id`, `requester_id`
+- Sorting: Optional `?sort=-created_at` (newest first, default)
+- URL structure: `/api/v1/budget-requests`, `/api/v1/budget-requests/{id}`
+
+---
+
 ## Relationship to Direct Budget Modification
 
 **Two paths for budget modification:**
@@ -109,7 +137,7 @@ Content-Type: application/json
   "id": "breq_xyz789",
   "agent_id": "agent_abc123",
   "agent_name": "Production Agent 1",
-  "requester_id": "user-dev123",
+  "requester_id": "user_dev123",
   "requester_name": "John Developer",
   "current_budget": 100.00,
   "requested_budget": 150.00,
@@ -224,7 +252,7 @@ Content-Type: application/json
       "id": "breq_xyz789",
       "agent_id": "agent_abc123",
       "agent_name": "Production Agent 1",
-      "requester_id": "user-dev123",
+      "requester_id": "user_dev123",
       "requester_name": "John Developer",
       "current_budget": 100.00,
       "requested_budget": 150.00,
@@ -241,7 +269,7 @@ Content-Type: application/json
       "id": "breq_abc456",
       "agent_id": "agent_def456",
       "agent_name": "Test Agent",
-      "requester_id": "user-dev123",
+      "requester_id": "user_dev123",
       "requester_name": "John Developer",
       "current_budget": 50.00,
       "requested_budget": 75.00,
@@ -249,7 +277,7 @@ Content-Type: application/json
       "status": "approved",
       "created_at": "2025-12-09T14:00:00Z",
       "reviewed_at": "2025-12-09T16:30:00Z",
-      "reviewed_by": "user-admin001",
+      "reviewed_by": "user_admin001",
       "reviewed_by_name": "Admin User",
       "review_notes": "Approved as requested",
       "approved_budget": 75.00
@@ -337,7 +365,7 @@ Content-Type: application/json
   "agent_spent": 94.50,
   "agent_remaining": 5.50,
   "agent_status": "active",
-  "requester_id": "user-dev123",
+  "requester_id": "user_dev123",
   "requester_name": "John Developer",
   "current_budget": 100.00,
   "requested_budget": 150.00,
@@ -433,7 +461,7 @@ Content-Type: application/json
   "status": "approved",
   "approved_budget": 140.00,
   "reviewed_at": "2025-12-10T16:00:00Z",
-  "reviewed_by": "user-admin001",
+  "reviewed_by": "user_admin001",
   "reviewed_by_name": "Admin User",
   "review_notes": "Approved with 10% reduction...",
   "budget_updated": true,
@@ -490,7 +518,7 @@ HTTP 409 Conflict
     "code": "REQUEST_ALREADY_REVIEWED",
     "message": "Request has already been approved",
     "current_status": "approved",
-    "reviewed_by": "user-admin-xyz",
+    "reviewed_by": "user_admin_xyz",
     "reviewed_by_name": "Other Admin",
     "reviewed_at": "2025-12-10T15:00:00Z"
   }
@@ -557,7 +585,7 @@ Content-Type: application/json
   "id": "breq_xyz789",
   "status": "rejected",
   "reviewed_at": "2025-12-10T16:00:00Z",
-  "reviewed_by": "user-admin001",
+  "reviewed_by": "user_admin001",
   "reviewed_by_name": "Admin User",
   "review_notes": "Cannot approve at this time due to budget constraints...",
   "agent": {
@@ -606,7 +634,7 @@ HTTP 409 Conflict
     "code": "REQUEST_ALREADY_REVIEWED",
     "message": "Request has already been rejected",
     "current_status": "rejected",
-    "reviewed_by": "user-admin-xyz",
+    "reviewed_by": "user_admin_xyz",
     "reviewed_by_name": "Other Admin",
     "reviewed_at": "2025-12-10T15:00:00Z"
   }
@@ -661,7 +689,7 @@ Content-Type: application/json
   "id": "breq_xyz789",
   "status": "cancelled",
   "cancelled_at": "2025-12-10T16:00:00Z",
-  "cancelled_by": "user-dev123",
+  "cancelled_by": "user_dev123",
   "cancelled_by_name": "John Developer"
 }
 ```
@@ -675,7 +703,7 @@ HTTP 400 Bad Request
     "code": "CANNOT_CANCEL_REVIEWED",
     "message": "Cannot cancel request that has been reviewed",
     "current_status": "approved",
-    "reviewed_by": "user-admin001",
+    "reviewed_by": "user_admin001",
     "reviewed_at": "2025-12-10T15:00:00Z"
   }
 }
@@ -725,7 +753,7 @@ HTTP 403 Forbidden
   "id": "breq_xyz789",
   "agent_id": "agent_abc123",
   "agent_name": "Production Agent 1",
-  "requester_id": "user-dev123",
+  "requester_id": "user_dev123",
   "requester_name": "John Developer",
   "current_budget": 100.00,
   "requested_budget": 150.00,
@@ -918,7 +946,7 @@ When request is approved, system creates budget modification history entry with 
   "agent_id": "agent_abc123",
   "previous_budget": 100.00,
   "new_budget": 150.00,
-  "modified_by": "user-admin001",
+  "modified_by": "user_admin001",
   "modified_by_name": "Admin User",
   "modified_at": "2025-12-10T16:00:00Z",
   "change_type": "increase",
@@ -1050,6 +1078,8 @@ WHERE agent_id = ? AND status = 'pending';
 - **[Protocol 010: Agents API](010_agents_api.md)** - Agent management (request references agents)
 - **[Protocol 013: Budget Limits API](013_budget_limits_api.md)** - Direct budget modification (admin path)
 - **[Protocol 008: User Management API](008_user_management_api.md)** - User roles (admin authorization)
-- **[Protocol 002: REST API Protocol](002_rest_api_protocol.md)** - Standard patterns (pagination, errors)
+- **[Protocol 002: REST API Protocol](002_rest_api_protocol.md)** - Cross-cutting standards (audit logging, CLI parity, system resources, rate limiting)
+- **[API Design Standards](../standards/api_design_standards.md)** - Pagination, sorting, filtering patterns
+- **[Error Format Standards](../standards/error_format_standards.md)** - Error response format, HTTP status codes
 - **[Resource Catalog](009_resource_catalog.md)** - Complete resource inventory
 - **[Vocabulary](../vocabulary.md)** - Terminology definitions

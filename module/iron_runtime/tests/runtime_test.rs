@@ -29,7 +29,7 @@ async fn test_start_agent()
 
   assert!(handle.is_ok());
   let handle = handle.unwrap();
-  assert!(handle.agent_id.starts_with("agent_"));
+  assert!(handle.agent_id.as_str().starts_with("agent_"));
 }
 
 #[tokio::test]
@@ -47,7 +47,7 @@ async fn test_get_metrics()
   let handle = runtime.start_agent(path).await.unwrap();
 
   // Get metrics
-  let metrics = runtime.get_metrics(&handle.agent_id);
+  let metrics = runtime.get_metrics(handle.agent_id.as_str());
   assert!(metrics.is_some());
 
   let metrics = metrics.unwrap();
@@ -71,11 +71,11 @@ async fn test_stop_agent()
   let handle = runtime.start_agent(path).await.unwrap();
 
   // Stop agent
-  let result = runtime.stop_agent(&handle.agent_id).await;
+  let result = runtime.stop_agent(handle.agent_id.as_str()).await;
   assert!(result.is_ok());
 
   // Verify state updated
-  let metrics = runtime.get_metrics(&handle.agent_id);
+  let metrics = runtime.get_metrics(handle.agent_id.as_str());
   assert!(metrics.is_some());
 
   // Check status is Stopped

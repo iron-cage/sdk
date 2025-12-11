@@ -102,11 +102,18 @@ User management provides admin-level control over user accounts within Iron Cage
 - **Postconditions:** User can login, is_active=true
 - **Audit Log:** action="activate"
 
-**4. Any → Deleted**
+**4. Any → Deleted (+ Agent Reassignment)**
 - **Operation:** `DELETE /api/v1/users/{id}`
-- **Preconditions:** User exists, not self
-- **Postconditions:** User cannot login, deleted_at set
-- **Audit Log:** action="delete"
+- **Preconditions:** User exists, not self, not last admin
+- **Postconditions:**
+  - User cannot login, deleted_at set
+  - All owned agents reassigned to admin
+  - All agents moved to "Orphaned Agents" project (proj-orphaned)
+  - Pending budget requests auto-cancelled
+  - All API tokens revoked
+  - Agents continue working (IC Tokens valid, budgets active)
+- **Audit Log:** action="delete" with agents_affected, budget_requests_cancelled, api_tokens_revoked
+- **Response:** Includes agents_affected array, agents_count, budget_requests_cancelled, api_tokens_revoked
 
 **5. Role Change**
 - **Operation:** `PUT /api/v1/users/{id}/role`
