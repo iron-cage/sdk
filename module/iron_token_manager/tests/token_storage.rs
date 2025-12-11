@@ -51,23 +51,10 @@
 //! **Resource Limits:** Not applicable (temporary databases, bounded by test data)
 //! **Precondition Violations:** Not applicable (storage validates internally, returns errors for invalid operations)
 
-use iron_token_manager::storage::TokenStorage;
+mod common;
+
 use iron_token_manager::token_generator::TokenGenerator;
-use tempfile::TempDir;
-
-/// Helper: Create test storage with initialized database
-async fn create_test_storage() -> ( TokenStorage, TempDir )
-{
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let storage = TokenStorage::new( &db_url )
-    .await
-    .expect( "Failed to create storage" );
-
-  ( storage, temp_dir )
-}
+use common::create_test_storage;
 
 #[ tokio::test ]
 async fn test_create_token_stores_hash_not_plaintext()

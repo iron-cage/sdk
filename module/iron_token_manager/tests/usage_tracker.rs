@@ -45,28 +45,10 @@
 //! **Resource Limits:** Not applicable (temporary databases, bounded by test data)
 //! **Precondition Violations:** Not applicable (tracker validates `token_id` via foreign key constraints)
 
-use iron_token_manager::usage_tracker::UsageTracker;
-use iron_token_manager::storage::TokenStorage;
+mod common;
+
 use iron_token_manager::token_generator::TokenGenerator;
-use tempfile::TempDir;
-
-/// Helper: Create test storage and tracker
-async fn create_test_tracker() -> ( UsageTracker, TokenStorage, TempDir )
-{
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let storage = TokenStorage::new( &db_url )
-    .await
-    .expect( "Failed to create storage" );
-
-  let tracker = UsageTracker::new( &db_url )
-    .await
-    .expect( "Failed to create tracker" );
-
-  ( tracker, storage, temp_dir )
-}
+use common::create_test_tracker;
 
 #[ tokio::test ]
 async fn test_record_usage()

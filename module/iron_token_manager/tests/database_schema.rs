@@ -48,31 +48,9 @@
 //! - ✅ Invalid foreign key rejected by foreign key constraint
 //! - ✅ Duplicate `usage_limits` rejected by UNIQUE(`user_id`, `project_id`)
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
-use tempfile::TempDir;
+mod common;
 
-/// Helper: Create test database with schema
-async fn create_test_db() -> ( SqlitePool, TempDir )
-{
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( &db_url )
-    .await
-    .expect( "Failed to connect to test database" );
-
-  // Load schema from migration file
-  let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
-  sqlx::raw_sql( migration_sql )
-    .execute( &pool )
-    .await
-    .expect( "Failed to run migration" );
-
-  ( pool, temp_dir )
-}
+use common::create_test_db;
 
 #[ tokio::test ]
 async fn test_schema_creates_all_tables()
@@ -298,6 +276,12 @@ async fn test_all_indexes_created()
   .await
   .expect( "Failed to count indexes" );
 
-  // Expected: 3 (api_tokens) + 3 (token_usage) + 2 (usage_limits) + 3 (api_call_traces) + 4 (audit_log) = 15
-  assert_eq!( index_count, 15, "Expected 15 indexes to be created" );
+  // Expected: All migrations create 32 indexes total
+  // Migration 001: 15 indexes (api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
+  // Migration 003: 2 indexes (users, token_blacklist)
+  // Migration 004: 4 indexes (ai_provider_keys, project_key_assignments)
+  // Migration 005: 4 indexes (users enhancements)
+  // Migration 006: 4 indexes (user_audit_log)
+  // Migration 008: 3 indexes (agents, api_tokens agent_id)
+  assert_eq!( index_count, 32, "Expected 32 indexes to be created across all migrations" );
 }
