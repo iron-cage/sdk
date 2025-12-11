@@ -98,6 +98,9 @@ pub mod limit_enforcer;
 pub mod storage;
 
 #[cfg(feature = "enabled")]
+pub mod migrations;
+
+#[cfg(feature = "enabled")]
 pub mod provider_adapter;
 
 #[cfg(feature = "enabled")]

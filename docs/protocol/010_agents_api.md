@@ -498,6 +498,385 @@ HTTP 404 Not Found
 
 ---
 
+### Assign Providers to Agent
+
+**Endpoint:** `PUT /api/v1/agents/{id}/providers`
+
+**Description:** Replaces agent's provider list with new set. Agent can have zero or more providers (no minimum required). Removes all existing provider assignments and assigns new ones atomically.
+
+**Request:**
+
+**Path Parameters:**
+- `id` (string, required) - Agent ID (e.g., agent-abc123)
+
+**Body:**
+```json
+{
+  "providers": ["ip-openai-001", "ip-anthropic-001"]
+}
+```
+
+**Fields:**
+- `providers` (array of strings, required) - Provider IDs to assign
+  - Can be empty array (removes all providers)
+  - Duplicates ignored
+  - Invalid provider IDs rejected with 400 error
+
+**Response:**
+
+**Success: 200 OK**
+```json
+{
+  "agent_id": "agent-abc123",
+  "providers": [
+    {
+      "id": "ip-openai-001",
+      "name": "openai",
+      "endpoint": "https://api.openai.com/v1",
+      "models": ["gpt-4", "gpt-3.5-turbo"]
+    },
+    {
+      "id": "ip-anthropic-001",
+      "name": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1",
+      "models": ["claude-3-opus", "claude-3-sonnet"]
+    }
+  ],
+  "updated_at": "2025-12-11T10:30:00Z"
+}
+```
+
+**Response Fields:**
+- `agent_id` (string) - Agent ID
+- `providers` (array) - Assigned providers with full details
+  - `id` (string) - Provider ID
+  - `name` (string) - Provider name
+  - `endpoint` (string) - Provider API endpoint
+  - `models` (array of strings) - Available models
+- `updated_at` (string, ISO 8601) - Assignment timestamp
+
+**Error Responses:**
+
+**400 Bad Request - Invalid Provider ID**
+```json
+{
+  "error": {
+    "code": "INVALID_PROVIDER_ID",
+    "message": "Provider not found: ip-unknown-999",
+    "fields": {
+      "providers": "One or more provider IDs are invalid"
+    }
+  }
+}
+```
+
+**400 Bad Request - Validation Error**
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "providers field is required",
+    "fields": {
+      "providers": "Required field, must be array of provider IDs"
+    }
+  }
+}
+```
+
+**401 Unauthorized**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions: You can only modify providers for your own agents"
+  }
+}
+```
+
+**404 Not Found**
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent not found: agent-xyz999"
+  }
+}
+```
+
+**Validation Rules:**
+1. `providers` field is required (can be empty array)
+2. Each provider ID must exist in system
+3. Duplicate provider IDs in request are deduplicated automatically
+4. Zero providers is valid (agent cannot make requests until provider assigned)
+5. No maximum limit on number of providers
+
+**Edge Cases:**
+
+**Empty Array (Remove All Providers):**
+```json
+PUT /api/v1/agents/agent-abc123/providers
+{
+  "providers": []
+}
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "providers": [],
+  "updated_at": "2025-12-11T10:35:00Z"
+}
+```
+
+**Duplicate IDs (Auto-Deduplicate):**
+```json
+PUT /api/v1/agents/agent-abc123/providers
+{
+  "providers": ["ip-openai-001", "ip-openai-001", "ip-anthropic-001"]
+}
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "providers": [
+    {"id": "ip-openai-001", "name": "openai", "endpoint": "https://api.openai.com/v1", "models": ["gpt-4", "gpt-3.5-turbo"]},
+    {"id": "ip-anthropic-001", "name": "anthropic", "endpoint": "https://api.anthropic.com/v1", "models": ["claude-3-opus", "claude-3-sonnet"]}
+  ],
+  "updated_at": "2025-12-11T10:35:00Z"
+}
+```
+
+**Authorization:**
+- **Admin:** Can assign providers to ANY agent
+- **Owner:** Can assign providers to OWN agents only
+- **Other Users:** 403 Forbidden
+
+**Audit:** Yes (mutation operation)
+- Operation: AGENT_PROVIDERS_UPDATED
+- Logged fields: agent_id, old_providers, new_providers, user_id, timestamp
+
+---
+
+### Get Agent Providers
+
+**Endpoint:** `GET /api/v1/agents/{id}/providers`
+
+**Description:** Returns list of providers assigned to agent.
+
+**Request:**
+
+```
+GET /api/v1/agents/agent-abc123/providers
+Authorization: Bearer <user-token or api-token>
+```
+
+**Success Response: 200 OK**
+```json
+{
+  "agent_id": "agent-abc123",
+  "providers": [
+    {
+      "id": "ip-openai-001",
+      "name": "openai",
+      "endpoint": "https://api.openai.com/v1",
+      "models": ["gpt-4", "gpt-3.5-turbo"],
+      "status": "active"
+    },
+    {
+      "id": "ip-anthropic-001",
+      "name": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1",
+      "models": ["claude-3-opus", "claude-3-sonnet"],
+      "status": "active"
+    }
+  ],
+  "count": 2
+}
+```
+
+**Response Fields:**
+- `agent_id` (string) - Agent ID
+- `providers` (array) - Assigned providers
+- `count` (integer) - Number of assigned providers
+
+**Error Responses:**
+
+**401 Unauthorized**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions: You can only view your own agents"
+  }
+}
+```
+
+**404 Not Found**
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent not found: agent-xyz999"
+  }
+}
+```
+
+**Edge Case - Agent with Zero Providers:**
+```json
+GET /api/v1/agents/agent-abc123/providers
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "providers": [],
+  "count": 0
+}
+```
+
+**Authorization:**
+- **Admin:** Can view providers for ANY agent
+- **Owner:** Can view providers for OWN agents only
+- **Other Users:** 403 Forbidden
+
+---
+
+### Remove Provider from Agent
+
+**Endpoint:** `DELETE /api/v1/agents/{agent_id}/providers/{provider_id}`
+
+**Description:** Removes single provider from agent's provider list. Agent can have zero providers after removal.
+
+**Request:**
+
+```
+DELETE /api/v1/agents/agent-abc123/providers/ip-openai-001
+Authorization: Bearer <user-token or api-token>
+```
+
+**Path Parameters:**
+- `agent_id` (string, required) - Agent ID (e.g., agent-abc123)
+- `provider_id` (string, required) - Provider ID to remove (e.g., ip-openai-001)
+
+**Success Response: 200 OK**
+```json
+{
+  "agent_id": "agent-abc123",
+  "provider_id": "ip-openai-001",
+  "removed": true,
+  "remaining_providers": [
+    {
+      "id": "ip-anthropic-001",
+      "name": "anthropic"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Response Fields:**
+- `agent_id` (string) - Agent ID
+- `provider_id` (string) - Removed provider ID
+- `removed` (boolean) - Always true
+- `remaining_providers` (array) - Providers still assigned to agent
+- `count` (integer) - Number of remaining providers
+
+**Error Responses:**
+
+**400 Bad Request - Provider Not Assigned**
+```json
+{
+  "error": {
+    "code": "PROVIDER_NOT_ASSIGNED",
+    "message": "Provider ip-openai-001 is not assigned to agent agent-abc123"
+  }
+}
+```
+
+**401 Unauthorized**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions: You can only modify your own agents"
+  }
+}
+```
+
+**404 Not Found - Agent**
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent not found: agent-xyz999"
+  }
+}
+```
+
+**404 Not Found - Provider**
+```json
+{
+  "error": {
+    "code": "PROVIDER_NOT_FOUND",
+    "message": "Provider not found: ip-xyz999"
+  }
+}
+```
+
+**Edge Case - Removing Last Provider:**
+```json
+DELETE /api/v1/agents/agent-abc123/providers/ip-openai-001
+
+Response: 200 OK
+{
+  "agent_id": "agent-abc123",
+  "provider_id": "ip-openai-001",
+  "removed": true,
+  "remaining_providers": [],
+  "count": 0,
+  "warning": "Agent has zero providers and cannot make inference requests until provider assigned"
+}
+```
+
+**Authorization:**
+- **Admin:** Can remove providers from ANY agent
+- **Owner:** Can remove providers from OWN agents only
+- **Other Users:** 403 Forbidden
+
+**Audit:** Yes (mutation operation)
+- Operation: AGENT_PROVIDER_REMOVED
+- Logged fields: agent_id, provider_id, user_id, timestamp
+
+---
+
 ### Get Agent Status
 
 **Endpoint:** `GET /api/v1/agents/{id}/status`

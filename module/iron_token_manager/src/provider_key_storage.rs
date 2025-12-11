@@ -1,6 +1,6 @@
 //! AI Provider Key storage layer
 //!
-//! Manages encrypted storage of AI provider API keys (OpenAI, Anthropic).
+//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`).
 
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions, Row };
 use crate::error::Result;
@@ -9,15 +9,16 @@ use crate::error::Result;
 #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
 pub enum ProviderType
 {
-  /// OpenAI provider
+  /// `OpenAI` provider
   OpenAI,
-  /// Anthropic provider
+  /// `Anthropic` provider
   Anthropic,
 }
 
 impl ProviderType
 {
   /// Convert to database string representation
+  #[ must_use ]
   pub fn as_str( &self ) -> &'static str
   {
     match self
@@ -28,7 +29,10 @@ impl ProviderType
   }
 
   /// Parse from database string
-  pub fn from_str( s : &str ) -> Option< Self >
+  ///
+  /// Note: Named `parse_str` instead of `from_str` to avoid confusion with `FromStr` trait
+  #[ must_use ]
+  pub fn parse_str( s : &str ) -> Option< Self >
   {
     match s
     {
@@ -39,9 +43,9 @@ impl ProviderType
   }
 }
 
-impl std::fmt::Display for ProviderType
+impl core::fmt::Display for ProviderType
 {
-  fn fmt( &self, f : &mut std::fmt::Formatter< '_ > ) -> std::fmt::Result
+  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
     write!( f, "{}", self.as_str() )
   }
@@ -95,6 +99,7 @@ pub struct ProviderKeyStorage
 impl ProviderKeyStorage
 {
   /// Create new provider key storage from existing pool
+  #[ must_use ]
   pub fn new( pool : SqlitePool ) -> Self
   {
     Self { pool }
@@ -138,6 +143,7 @@ impl ProviderKeyStorage
   }
 
   /// Get the underlying pool for sharing with other storage types
+  #[ must_use ]
   pub fn pool( &self ) -> &SqlitePool
   {
     &self.pool
@@ -157,6 +163,10 @@ impl ProviderKeyStorage
   /// # Returns
   ///
   /// Database ID of created key
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database insert fails
   pub async fn create_key(
     &self,
     provider : ProviderType,
@@ -197,6 +207,10 @@ impl ProviderKeyStorage
   /// # Returns
   ///
   /// Full key record with encrypted data
+  ///
+  /// # Errors
+  ///
+  /// Returns error if key not found or database query fails
   pub async fn get_key( &self, key_id : i64 ) -> Result< ProviderKeyRecord >
   {
     let row = sqlx::query(
@@ -214,6 +228,10 @@ impl ProviderKeyStorage
   }
 
   /// Get a provider key by ID (metadata only, no encrypted data)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if key not found or database query fails
   pub async fn get_key_metadata( &self, key_id : i64 ) -> Result< ProviderKeyMetadata >
   {
     let row = sqlx::query(
@@ -238,6 +256,10 @@ impl ProviderKeyStorage
   /// # Returns
   ///
   /// List of key metadata (no encrypted data)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
   pub async fn list_keys( &self, user_id : &str ) -> Result< Vec< ProviderKeyMetadata > >
   {
     let rows = sqlx::query(
@@ -250,10 +272,14 @@ impl ProviderKeyStorage
     .await
     .map_err( |_| crate::error::TokenError )?;
 
-    Ok( rows.iter().map( |row| row_to_metadata( row ) ).collect() )
+    Ok( rows.iter().map( row_to_metadata ).collect() )
   }
 
   /// Set key enabled/disabled status
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
   pub async fn set_enabled( &self, key_id : i64, enabled : bool ) -> Result< () >
   {
     sqlx::query( "UPDATE ai_provider_keys SET is_enabled = $1 WHERE id = $2" )
@@ -266,6 +292,10 @@ impl ProviderKeyStorage
   }
 
   /// Update description
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
   pub async fn update_description( &self, key_id : i64, description : Option< &str > ) -> Result< () >
   {
     sqlx::query( "UPDATE ai_provider_keys SET description = $1 WHERE id = $2" )
@@ -278,6 +308,10 @@ impl ProviderKeyStorage
   }
 
   /// Update base URL
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
   pub async fn update_base_url( &self, key_id : i64, base_url : Option< &str > ) -> Result< () >
   {
     sqlx::query( "UPDATE ai_provider_keys SET base_url = $1 WHERE id = $2" )
@@ -290,6 +324,10 @@ impl ProviderKeyStorage
   }
 
   /// Update balance
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
   pub async fn update_balance( &self, key_id : i64, balance_cents : i64 ) -> Result< () >
   {
     let now_ms = current_time_ms();
@@ -306,6 +344,10 @@ impl ProviderKeyStorage
   }
 
   /// Update last used timestamp
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
   pub async fn update_last_used( &self, key_id : i64 ) -> Result< () >
   {
     let now_ms = current_time_ms();
@@ -319,6 +361,10 @@ impl ProviderKeyStorage
   }
 
   /// Delete a key
+  ///
+  /// # Errors
+  ///
+  /// Returns error if key not found or database delete fails
   pub async fn delete_key( &self, key_id : i64 ) -> Result< () >
   {
     let result = sqlx::query( "DELETE FROM ai_provider_keys WHERE id = $1" )
@@ -335,6 +381,10 @@ impl ProviderKeyStorage
   }
 
   /// Assign a key to a project
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database insert fails
   pub async fn assign_to_project( &self, key_id : i64, project_id : &str ) -> Result< () >
   {
     let now_ms = current_time_ms();
@@ -352,6 +402,10 @@ impl ProviderKeyStorage
   }
 
   /// Remove key assignment from a project
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database delete fails
   pub async fn unassign_from_project( &self, key_id : i64, project_id : &str ) -> Result< () >
   {
     sqlx::query(
@@ -367,6 +421,10 @@ impl ProviderKeyStorage
   }
 
   /// Get key assigned to a project
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
   pub async fn get_project_key( &self, project_id : &str ) -> Result< Option< i64 > >
   {
     let row : Option< ( i64, ) > = sqlx::query_as(
@@ -381,6 +439,10 @@ impl ProviderKeyStorage
   }
 
   /// Get all project assignments for a key
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
   pub async fn get_key_projects( &self, key_id : i64 ) -> Result< Vec< String > >
   {
     let rows : Vec< ( String, ) > = sqlx::query_as(
@@ -395,6 +457,10 @@ impl ProviderKeyStorage
   }
 
   /// Get all keys of provider
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
   pub async fn get_keys_by_provider( &self, provider : ProviderType ) -> Result< Vec< i64 > >
   {
     let rows : Vec< ( i64, ) > = sqlx::query_as(
@@ -409,6 +475,11 @@ impl ProviderKeyStorage
   }
 
   /// Update key
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  #[ allow( clippy::too_many_arguments ) ]
   pub async fn update_key( &self, key_id : i64, provider : ProviderType, encrypted_api_key : &str, encryption_nonce : &str, base_url : Option< &str >, description : Option< &str >, user_id : &str ) -> Result< i64 >
   {
     sqlx::query(
@@ -430,6 +501,8 @@ impl ProviderKeyStorage
   }
 }
 
+/// Get current time in milliseconds since UNIX epoch
+#[ allow( clippy::cast_possible_truncation ) ]
 fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
@@ -444,7 +517,7 @@ fn row_to_metadata( row : &sqlx::sqlite::SqliteRow ) -> ProviderKeyMetadata
   ProviderKeyMetadata
   {
     id : row.get( "id" ),
-    provider : ProviderType::from_str( &provider_str ).unwrap_or( ProviderType::OpenAI ),
+    provider : ProviderType::parse_str( &provider_str ).unwrap_or( ProviderType::OpenAI ),
     base_url : row.get( "base_url" ),
     description : row.get( "description" ),
     is_enabled : row.get( "is_enabled" ),
@@ -464,7 +537,7 @@ fn row_to_record( row : &sqlx::sqlite::SqliteRow ) -> ProviderKeyRecord
     metadata : ProviderKeyMetadata
     {
       id : row.get( "id" ),
-      provider : ProviderType::from_str( &provider_str ).unwrap_or( ProviderType::OpenAI ),
+      provider : ProviderType::parse_str( &provider_str ).unwrap_or( ProviderType::OpenAI ),
       base_url : row.get( "base_url" ),
       description : row.get( "description" ),
       is_enabled : row.get( "is_enabled" ),
@@ -508,6 +581,7 @@ mod tests
   }
 
   #[ tokio::test ]
+  #[ allow( clippy::similar_names ) ]
   async fn list_keys_by_user()
   {
     let storage = ProviderKeyStorage::connect( "sqlite::memory:" ).await.unwrap();
