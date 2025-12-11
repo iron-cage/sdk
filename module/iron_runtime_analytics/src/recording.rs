@@ -81,6 +81,10 @@ impl EventStore
   /// Record LLM completion with explicit provider (skips inference).
   ///
   /// Use when provider is already known from context (e.g., router configuration).
+  // Allow 8 args: this is an internal recording API where all parameters are
+  // semantically distinct and required for accurate analytics. Introducing a
+  // builder or params struct would add complexity without improving clarity.
+  #[allow(clippy::too_many_arguments)]
   pub fn record_llm_completed_with_provider
   (
     &self,

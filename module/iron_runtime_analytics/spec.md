@@ -281,7 +281,4 @@ Events are stored in EventStore for future server sync (Phase 4 - BACKLOG).
 
 ---
 
-## References
 
-- Implementation plan: `docs/features/007_python_analytics_implementation.md`
-- Protocol 012: `docs/protocol/012_analytics_api.md`
