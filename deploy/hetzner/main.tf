@@ -54,6 +54,10 @@ resource "hcloud_server" "main_resource" {
     project_id                = "${var.PROJECT_ID}"
     repo_name                 = "${var.REPO_NAME}"
     image_name                = "${var.IMAGE_NAME}"
+    jwt_secret                = "${var.JWT_SECRET}"
+    iron_secrets_master_key   = "${var.IRON_SECRETS_MASTER_KEY}"
+    database_url              = "${var.DATABASE_URL}"
+    tag                       = "${var.TAG}"
     service_account_creds_b64 = "${base64encode(data.local_sensitive_file.service_account_creds.content)}"
   })
 }

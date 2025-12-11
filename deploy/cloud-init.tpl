@@ -28,8 +28,11 @@ write_files:
 
       # env for redeploy
       {
-        echo "DOCKER_IMAGE=${location}-docker.pkg.dev/${project_id}/${repo_name}/${image_name}"
+        echo "DOCKER_IMAGE=${tag}"
         echo "DOCKER_IMAGE_NAME=${image_name}"
+        echo "JWT_SECRET=${jwt_secret}"
+        echo "IRON_SECRETS_MASTER_KEY=${iron_secrets_master_key}"
+        echo "DATABASE_URL=${database_url}"
       } >> /etc/environment
 
       apt update

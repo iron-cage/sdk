@@ -244,6 +244,15 @@ else
 	$(error "Secrets file $(LOCAL_SECRETS_FILE) not found")
 endif
 
+# Read .env
+DOT_ENV ?= ./.env
+
+ifneq ("$(wildcard $(DOT_ENV))","")
+	include $(DOT_ENV)
+else
+	$(error "File $(DOT_ENV) not found")
+endif
+
 strip_quotes = $(subst ",,$(1))
 
 ## --------------------------------------------------------------------------------------
@@ -267,6 +276,7 @@ SECRET_RSA_PRIVATE_KEY_PATH := $(call strip_quotes,$(SECRET_RSA_PRIVATE_KEY_PATH
 SECRET_RSA_PUBLIC_KEY_PATH 	:= $(call strip_quotes,$(SECRET_RSA_PUBLIC_KEY_PATH))
 CSP 						:= $(call strip_quotes,$(CSP))
 PROJECT_NAME 				:= $(call strip_quotes,$(PROJECT_NAME))
+ENVIRONMENT 				:= $(call strip_quotes,$(ENVIRONMENT))
 
 ## --------------------------------------------------------------------------------------
 ## Check that secret files exist
@@ -314,16 +324,12 @@ TF_DIR := $(or $(call strip_quotes,$(TF_DIR)),deploy)
 ## IMAGE BUILD
 export GOOGLE_APPLICATION_CREDENTIALS=$(TF_VAR_GOOGLE_SE_CREDS_PATH)
 
-build-image: ## Builds uarust_conf_site image
-	docker build . -f Dockerfile.frontend -t name:$(TF_VAR_IMAGE_NAME)_front -t $(TAG)_front
-	docker build . -f Dockerfile.backend -t name:$(TF_VAR_IMAGE_NAME)_back -t $(TAG)_back
-
-push-image: gcp-docker create-artifact-repo ## Builds and pushes local docker image to the private repository
-	docker push $(TAG)_front
-	docker push $(TAG)_back
+build_image: ## Builds uarust_conf_site image
+	docker build . -f module/iron_dashboard/Dockerfile -t name:$(TF_VAR_IMAGE_NAME)_front -t $(TAG)_front
+	docker build . -f module/iron_control_api/Dockerfile -t name:$(TF_VAR_IMAGE_NAME)_back -t $(TAG)_back
 
 ## Deploys using tools from the container
-deploy: check_gcp_keys build_image
+deploy: check_gcp_keys check_env_variables build_image
 	docker build . \
 	  -t deploy-$(TF_VAR_IMAGE_NAME) \
 	  -f ./$(TF_DIR)/Dockerfile \
@@ -340,7 +346,11 @@ deploy: check_gcp_keys build_image
 	-e TF_VAR_REGION="$(TF_VAR_REGION)" \
 	-e TF_VAR_REPO_NAME="$(TF_VAR_REPO_NAME)" \
 	-e TF_VAR_IMAGE_NAME="$(TF_VAR_IMAGE_NAME)" \
+	-e TF_VAR_JWT_SECRET="$(JWT_SECRET)" \
+	-e TF_VAR_IRON_SECRETS_MASTER_KEY="$(IRON_SECRETS_MASTER_KEY)" \
+	-e TF_VAR_DATABASE_URL="$(DATABASE_URL)" \
 	-e TF_VAR_ENVIRONMENT="$(ENVIRONMENT)" \
+	-e TF_VAR_TAG="$(TAG)" \
 	-e CSP="$(CSP)" \
 	-e TF_VAR_GOOGLE_SE_CREDS_PATH="/app/$(GOOGLE_SE_CREDS_PATH)" \
 	-e GOOGLE_APPLICATION_CREDENTIALS="/app/$(GOOGLE_SE_CREDS_PATH)" \
@@ -380,7 +390,8 @@ state_storage_init:
 	fi
 ## Builds and pushes local docker image to the private repository
 push_image: tf_init create_artifact_repo
-	docker push $(TAG)
+	docker push $(TAG)_front
+	docker push $(TAG)_back
 ## Initializes all terraform projects. Downloads required modules and validates .tf files
 tf_init:
 	@for dir in gar hetzner; do \
@@ -404,6 +415,14 @@ create_hetzner:
 check_keys_hetzner:
 	@[ ! -z "${SECRET_HETZNER_CLOUD_TOKEN}" ] \
 		|| { echo "ERROR: Key SECRET_HETZNER_CLOUD_TOKEN does not exist"; exit 1; }
+
+check_env_variables:
+	@[ ! -z "${JWT_SECRET}" ] \
+		|| { echo "ERROR: Key JWT_SECRET does not exist. Set the variable in .env"; exit 1; }
+	@[ ! -z "${IRON_SECRETS_MASTER_KEY}" ] \
+		|| { echo "ERROR: Key IRON_SECRETS_MASTER_KEY does not exist. Set the variable in .env"; exit 1; }
+	@[ ! -z "${DATABASE_URL}" ] \
+		|| { echo "ERROR: Key DATABASE_URL does not exist. Set the variable in .env"; exit 1; }
 
 ## --------------------------------------------------------------------
 ## TERRAFORM STATE STORAGE
@@ -443,6 +462,9 @@ z_destroy_all:
 			-e SECRET_STATE_ARCHIVE_KEY="$(SECRET_STATE_ARCHIVE_KEY)" \
 			-e TF_VAR_HETZNER_CLOUD_TOKEN="$(SECRET_HETZNER_CLOUD_TOKEN)" \
 			-e TF_VAR_PROJECT_NAME="$(PROJECT_NAME)" \
+			-e TF_VAR_JWT_SECRET="$(JWT_SECRET)" \
+			-e TF_VAR_IRON_SECRETS_MASTER_KEY="$(IRON_SECRETS_MASTER_KEY)" \
+			-e TF_VAR_DATABASE_URL="$(DATABASE_URL)" \
 			-e CSP="$(CSP)" \
 			-e TF_VAR_SECRET_RSA_PRIVATE_KEY_PATH="/app/$(SECRET_RSA_PRIVATE_KEY_PATH)" \
 			-e TF_VAR_SECRET_RSA_PUBLIC_KEY_PATH="/app/$(SECRET_RSA_PUBLIC_KEY_PATH)" \

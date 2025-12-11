@@ -33,6 +33,26 @@ variable "BUCKET_NAME" {
   description = "Bucket name"
 }
 
+# JWT secret key for signing access and refresh tokens
+variable "JWT_SECRET" {
+  description = "JWT secret key for signing access and refresh tokens"
+}
+
+# Master key for AES-256-GCM encryption of AI provider API keys
+variable "IRON_SECRETS_MASTER_KEY" {
+  description = "Master key for AES-256-GCM encryption of AI provider API keys"
+}
+
+# SQLite connection string for pilot mode
+variable "DATABASE_URL" {
+  description = "SQLite connection string for pilot mode"
+}
+
+# Docker image tag
+variable "TAG" {
+  description = "Docker image tag"
+}
+
 # Google Cloud Platform credentials
 data "local_sensitive_file" "service_account_creds" {
   filename = var.GOOGLE_SE_CREDS_PATH
