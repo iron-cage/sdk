@@ -22,13 +22,13 @@ LLM pricing data and cost calculation. Provides pricing data for multiple LLM pr
 - Pre-reservation cost estimation for budget enforcement
 - Per-model pricing with input/output token rates
 - Currency conversion utilities (USD ↔ microdollars)
+- Budget tracking with CostController (in-memory, thread-safe)
 
 **Out of Scope:**
 - Token counting (handled by LLM response)
 - Multi-currency support (USD only)
 - Cost forecasting (see analytics features)
-- Budget persistence (runtime uses in-memory tracking)
-- Budget tracking/enforcement (application-level concern)
+- Budget persistence (uses in-memory tracking only)
 
 ---
 
@@ -53,6 +53,8 @@ LLM pricing data and cost calculation. Provides pricing data for multiple LLM pr
 - **Model:** Pricing info for single LLM model with cost calculation methods
 - **Converter:** USD ↔ microdollars conversion utilities
 - **Embedded Pricing:** LiteLLM pricing JSON embedded at compile time
+- **CostController:** Thread-safe budget tracking with atomic operations
+- **CostError:** Error types for budget enforcement (BudgetExceeded)
 
 **Microdollar Precision:**
 - 1 USD = 1,000,000 microdollars
@@ -72,16 +74,37 @@ LLM pricing data and cost calculation. Provides pricing data for multiple LLM pr
 - `converter::usd_to_micros(f64) -> u64` - Currency conversion
 - `converter::micros_to_usd(u64) -> f64` - Currency conversion
 
+**CostController API:**
+- `CostController::new(budget_usd: f64)` - Create with budget limit
+- `check_budget() -> Result<(), CostError>` - Check if under limit
+- `add_spend(cost_usd: f64)` - Add cost after request
+- `add_spend_micros(cost_micros: u64)` - Add cost in microdollars
+- `set_budget(budget_usd: f64)` - Update budget limit at runtime
+- `total_spent() -> f64` - Get total spent in USD
+- `budget_limit() -> f64` - Get current limit in USD
+- `get_status() -> (f64, f64)` - Get (spent, limit) tuple
+
 ---
 
 ## Integration Points
 
 **Used by:**
-- iron_runtime/LlmRouter - Calculates per-request costs in microdollars, tracks total_spent
+- iron_runtime/LlmRouter - Uses CostController for budget enforcement, PricingManager for cost calculation
 - iron_control_api - Cost reporting endpoints
 
 **Uses:**
 - Embedded LiteLLM pricing data (asset/pricing.json)
+
+---
+
+## Testing
+
+**Unit Tests:** `tests/budget_test.rs`
+- CostController creation and initialization
+- Budget checking (under/at/over limit)
+- Spending accumulation
+- Budget modification at runtime
+- Edge cases (zero budget, large amounts, microdollar precision)
 
 ---
 

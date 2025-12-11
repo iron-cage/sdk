@@ -49,36 +49,48 @@ class LlmRouter:
     """LLM Router - Local proxy for OpenAI/Anthropic API requests.
 
     Creates a local HTTP server that intercepts LLM API requests,
-    fetches real API keys from Iron Cage server, and forwards
-    requests to the actual provider.
+    fetches real API keys from Iron Cage server or uses direct provider key,
+    and forwards requests to the actual provider.
 
-    Example:
+    Example (Iron Cage server mode):
         >>> from iron_cage import LlmRouter
         >>> from openai import OpenAI
         >>>
         >>> router = LlmRouter(
         ...     api_key="ic_xxx",
         ...     server_url="https://api.iron-cage.io",
+        ...     budget=10.0,
         ... )
         >>> client = OpenAI(base_url=router.base_url, api_key=router.api_key)
         >>> response = client.chat.completions.create(...)
         >>> router.stop()
+
+    Example (Direct provider key mode):
+        >>> router = LlmRouter(provider_key="sk-xxx", budget=10.0)
+        >>> client = OpenAI(base_url=router.base_url, api_key=router.api_key)
     """
 
     def __init__(
         self,
-        api_key: str,
-        server_url: str,
+        api_key: Optional[str] = None,
+        server_url: Optional[str] = None,
         cache_ttl_seconds: int = 300,
+        budget: Optional[float] = None,
+        provider_key: Optional[str] = None,
     ) -> None:
         """Create a new LlmRouter instance.
 
+        Either `provider_key` OR both `api_key` and `server_url` must be provided.
+
         Args:
-            api_key: Iron Cage API token (IC_TOKEN)
-            server_url: Iron Cage server URL (required)
+            api_key: Iron Cage API token (required unless provider_key is set)
+            server_url: Iron Cage server URL (required unless provider_key is set)
             cache_ttl_seconds: How long to cache API keys (default: 300)
+            budget: Budget limit in USD (optional, None = unlimited)
+            provider_key: Direct provider API key, bypasses Iron Cage server
 
         Raises:
+            ValueError: If neither provider_key nor (api_key + server_url) provided
             RuntimeError: If server fails to start
         """
         ...
@@ -117,6 +129,40 @@ class LlmRouter:
 
         Returns:
             Provider name ("openai", "anthropic", or "unknown")
+        """
+        ...
+
+    @property
+    def budget(self) -> Optional[float]:
+        """Get the current budget limit in USD.
+
+        Returns:
+            Budget limit or None if unlimited
+        """
+        ...
+
+    @property
+    def budget_status(self) -> Optional[tuple[float, float]]:
+        """Get budget status as (spent, limit) tuple in USD.
+
+        Returns:
+            Tuple of (spent, limit) or None if no budget set
+        """
+        ...
+
+    def total_spent(self) -> float:
+        """Get total spent in USD.
+
+        Returns:
+            Total amount spent (0.0 if no budget set)
+        """
+        ...
+
+    def set_budget(self, amount_usd: float) -> None:
+        """Set or update the budget limit.
+
+        Args:
+            amount_usd: New budget limit in USD
         """
         ...
 
