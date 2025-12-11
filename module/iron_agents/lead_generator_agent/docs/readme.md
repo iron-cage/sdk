@@ -1,6 +1,6 @@
 # docs/
 
-User guides and configuration documentation for iron_cage agent.
+User guides and configuration documentation for lead_generator_agent.
 
 ## Organization
 
