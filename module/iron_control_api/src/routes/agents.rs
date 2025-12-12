@@ -190,7 +190,35 @@ pub async fn list_agents(
     State(pool): State<SqlitePool>,
     Query(query): Query<ListAgentsQuery>,
     user: AuthenticatedUser,
-) -> Result<Json<PaginatedAgentsResponse>, (StatusCode, String)> {
+) -> Result<Json<PaginatedAgentsResponse>, (StatusCode, Json<ErrorResponse>)> {
+    // Validation
+    let mut validation_errors = std::collections::HashMap::new();
+    if query.page < 1 {
+        validation_errors.insert("page".to_string(), "Must be >= 1".to_string());
+    }
+    if query.per_page < 1 || query.per_page > 100 {
+        validation_errors.insert("per_page".to_string(), "Must be between 1 and 100".to_string());
+    }
+    
+    let allowed_sort_fields = ["name", "budget", "created_at"];
+    let sort_field_str = query.sort.strip_prefix('-').unwrap_or(&query.sort);
+    if !allowed_sort_fields.contains(&sort_field_str) {
+         validation_errors.insert("sort".to_string(), "Invalid sort field (allowed: name, budget, created_at)".to_string());
+    }
+
+    if !validation_errors.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "VALIDATION_ERROR".to_string(),
+                    message: None,
+                    fields: Some(validation_errors),
+                },
+            }),
+        ));
+    }
+
     let service = AgentService::new(pool);
 
     // Parse sort parameter
@@ -216,7 +244,13 @@ pub async fn list_agents(
     let result = service.list_agents(filters).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
     })?;
 
@@ -266,21 +300,98 @@ pub async fn get_agent(
     Ok(Json(Agent::from(agent)))
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: ErrorDetail,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorDetail {
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<std::collections::HashMap<String, String>>,
+}
+
 /// Create a new agent (admin only)
 pub async fn create_agent(
     State(pool): State<SqlitePool>,
     user: AuthenticatedUser,
     Json(req): Json<CreateAgentRequest>,
-) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
-    // Only admins can create agents
-    let service = AgentService::new(pool);
+) -> Result<(StatusCode, Json<Agent>), (StatusCode, Json<ErrorResponse>)> {
+    // Validation
+    let mut validation_errors = std::collections::HashMap::new();
+    if req.budget < 0.01 {
+        validation_errors.insert("budget".to_string(), "Must be >= 0.01".to_string());
+    }
+    if req.name.trim().is_empty() {
+        validation_errors.insert("name".to_string(), "Required field".to_string());
+    }
 
+    if !validation_errors.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "VALIDATION_ERROR".to_string(),
+                    message: None,
+                    fields: Some(validation_errors),
+                },
+            }),
+        ));
+    }
+
+    // Permission check
     if user.0.role != "admin" && user.0.sub != req.owner_id {
         return Err((
             StatusCode::FORBIDDEN,
-            "You don't have access to create this agent".to_string(),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions".to_string()),
+                    fields: None,
+                },
+            }),
         ));
     }
+
+    // Provider existence check
+    if let Some(providers) = &req.providers {
+        for provider_id in providers {
+            let exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+                .bind(provider_id)
+                .fetch_optional(&pool)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: ErrorDetail {
+                                code: "INTERNAL_ERROR".to_string(),
+                                message: Some(format!("Database error: {}", e)),
+                                fields: None,
+                            },
+                        }),
+                    )
+                })?;
+
+            if exists.is_none() {
+                return Err((
+                    StatusCode::NOT_FOUND,
+                    Json(ErrorResponse {
+                        error: ErrorDetail {
+                            code: "PROVIDER_NOT_FOUND".to_string(),
+                            message: Some(format!("Provider '{}' does not exist", provider_id)),
+                            fields: None,
+                        },
+                    }),
+                ));
+            }
+        }
+    }
+    
+    let service = AgentService::new(pool);
     
     let params = CreateAgentParams {
         name: req.name,
@@ -294,7 +405,13 @@ pub async fn create_agent(
     let agent = service.create_agent(params, &req.owner_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
     })?;
 
@@ -334,19 +451,47 @@ pub async fn get_agent_details(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
-) -> Result<Json<AgentDetails>, (StatusCode, String)> {
+) -> Result<Json<AgentDetails>, (StatusCode, Json<ErrorResponse>)> {
     let service = AgentService::new(pool);
 
     let agent = service.get_agent_details(&id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
-    })?
-    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+    })?;
+
+    let agent = match agent {
+        Some(a) => a,
+        None => return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "AGENT_NOT_FOUND".to_string(),
+                    message: Some(format!("Agent '{}' does not exist", id)),
+                    fields: None,
+                },
+            }),
+        )),
+    };
 
     if user.0.sub != agent.owner_id && user.0.role != "admin" {
-        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
     }
 
     Ok(Json(AgentDetails {
@@ -377,8 +522,90 @@ pub async fn update_agent(
     Path(id): Path<String>,
     user: AuthenticatedUser,
     Json(req): Json<UpdateAgentRequest>,
-) -> Result<Json<Agent>, (StatusCode, String)> {
+) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
     let service = AgentService::new(pool);
+
+    // Fetch agent first to check existence and permissions
+    let agent = service.get_agent(&id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
+        )
+    })?;
+
+    let agent = match agent {
+        Some(a) => a,
+        None => return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "AGENT_NOT_FOUND".to_string(),
+                    message: Some(format!("Agent '{}' does not exist", id)),
+                    fields: None,
+                },
+            }),
+        )),
+    };
+
+    // Permission check
+    if user.0.role != "admin" && user.0.sub != agent.owner_id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
+    }
+
+    // Validation
+    let mut validation_errors = std::collections::HashMap::new();
+    if let Some(name) = &req.name {
+        if name.len() < 1 || name.len() > 100 {
+             validation_errors.insert("name".to_string(), "Must be between 1 and 100 characters".to_string());
+        }
+    }
+    if let Some(tags) = &req.tags {
+        if tags.len() > 20 {
+             validation_errors.insert("tags".to_string(), "Maximum 20 tags allowed".to_string());
+        }
+    }
+
+    if !validation_errors.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "VALIDATION_ERROR".to_string(),
+                    message: None,
+                    fields: Some(validation_errors),
+                },
+            }),
+        ));
+    }
+
+    // Check if any fields provided
+    if req.name.is_none() && req.description.is_none() && req.tags.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "NO_FIELDS_PROVIDED".to_string(),
+                    message: Some("At least one field must be updated".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
+    }
 
     let params = UpdateAgentParams {
         name: req.name,
@@ -386,22 +613,30 @@ pub async fn update_agent(
         tags: req.tags,
     };
 
-    let agent = service.update_agent(&id, params).await.map_err(|e| {
+    let updated_agent = service.update_agent(&id, params).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
     })?
-    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
-
-    if user.0.role != "admin" && user.0.sub != agent.owner_id {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Only administrators and the owner can update agents".to_string(),
-        ));
-    }
+    .ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: ErrorDetail {
+                code: "AGENT_NOT_FOUND".to_string(),
+                message: Some(format!("Agent '{}' does not exist", id)),
+                fields: None,
+            },
+        }),
+    ))?;
     
-    Ok(Json(Agent::from(agent)))
+    Ok(Json(Agent::from(updated_agent)))
 }
 
 /// Delete an agent (admin only)
@@ -531,19 +766,47 @@ pub async fn get_agent_providers(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
-) -> Result<Json<GetAgentProvidersResponse>, (StatusCode, String)> {
+) -> Result<Json<GetAgentProvidersResponse>, (StatusCode, Json<ErrorResponse>)> {
     let service = AgentService::new(pool);
 
     let agent = service.get_agent_details(&id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
-    })?
-    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+    })?;
+
+    let agent = match agent {
+        Some(a) => a,
+        None => return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "AGENT_NOT_FOUND".to_string(),
+                    message: Some(format!("Agent not found: {}", id)),
+                    fields: None,
+                },
+            }),
+        )),
+    };
 
     if user.0.sub != agent.owner_id && user.0.role != "admin" {
-        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions: You can only view your own agents".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
     }
 
     let providers: Vec<AgentProviderItemExtended> = agent.providers.into_iter().map(|p| AgentProviderItemExtended {
@@ -573,28 +836,122 @@ pub async fn assign_providers_to_agent(
     Path(id): Path<String>,
     user: AuthenticatedUser,
     Json(req): Json<AssignProvidersToAgentRequest>,
-) -> Result<Json<Agent>, (StatusCode, String)> {
-    let service = AgentService::new(pool);
+) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
+    let service = AgentService::new(pool.clone());
+
+    // Validation
+    if req.providers.is_empty() {
+        let mut validation_errors = std::collections::HashMap::new();
+        validation_errors.insert("providers".to_string(), "Required field, must be array of provider IDs".to_string());
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "VALIDATION_ERROR".to_string(),
+                    message: Some("providers field is required".to_string()),
+                    fields: Some(validation_errors),
+                },
+            }),
+        ));
+    }
 
     let agent = service.get_agent_details(&id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
-    })?
-    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+    })?;
+
+    let agent = match agent {
+        Some(a) => a,
+        None => return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "AGENT_NOT_FOUND".to_string(),
+                    message: Some(format!("Agent not found: {}", id)),
+                    fields: None,
+                },
+            }),
+        )),
+    };
 
     if user.0.sub != agent.owner_id && user.0.role != "admin" {
-        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions: You can only modify providers for your own agents".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
+    }
+
+    // Check providers existence
+    for provider_id in &req.providers {
+        let exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+            .bind(provider_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: ErrorDetail {
+                            code: "INTERNAL_ERROR".to_string(),
+                            message: Some(format!("Database error: {}", e)),
+                            fields: None,
+                        },
+                    }),
+                )
+            })?;
+
+        if exists.is_none() {
+            let mut fields = std::collections::HashMap::new();
+            fields.insert("providers".to_string(), "One or more provider IDs are invalid".to_string());
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: ErrorDetail {
+                        code: "INVALID_PROVIDER_ID".to_string(),
+                        message: Some(format!("Provider not found: {}", provider_id)),
+                        fields: Some(fields),
+                    },
+                }),
+            ));
+        }
     }
 
     let agent = service.assign_providers_to_agent(&id, req.providers).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
     })?
-    .ok_or((StatusCode::BAD_REQUEST, "Providers not found".to_string()))?;
+    .ok_or((
+        StatusCode::BAD_REQUEST,
+        Json(ErrorResponse {
+            error: ErrorDetail {
+                code: "INVALID_PROVIDER_ID".to_string(),
+                message: Some("Providers not found".to_string()),
+                fields: None,
+            },
+        }),
+    ))?;
 
     Ok(Json(Agent::from(agent)))
 }
@@ -621,25 +978,105 @@ pub async fn remove_provider_from_agent(
     State(pool): State<SqlitePool>,
     Path((agent_id, provider_id)): Path<(String, String)>,
     user: AuthenticatedUser,
-) -> Result<Json<RemoveProviderFromAgentResponse>, (StatusCode, String)> {
-    let service = AgentService::new(pool);
+) -> Result<Json<RemoveProviderFromAgentResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let service = AgentService::new(pool.clone());
 
     let agent = service.get_agent_details(&agent_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
-    })?
-    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+    })?;
+
+    let agent = match agent {
+        Some(a) => a,
+        None => return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "AGENT_NOT_FOUND".to_string(),
+                    message: Some(format!("Agent not found: {}", agent_id)),
+                    fields: None,
+                },
+            }),
+        )),
+    };
 
     if user.0.sub != agent.owner_id && user.0.role != "admin" {
-        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions: You can only modify your own agents".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
+    }
+
+    // Check if provider exists
+    let provider_exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+        .bind(&provider_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: ErrorDetail {
+                        code: "INTERNAL_ERROR".to_string(),
+                        message: Some(format!("Database error: {}", e)),
+                        fields: None,
+                    },
+                }),
+            )
+        })?;
+
+    if provider_exists.is_none() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "PROVIDER_NOT_FOUND".to_string(),
+                    message: Some(format!("Provider not found: {}", provider_id)),
+                    fields: None,
+                },
+            }),
+        ));
+    }
+
+    // Check if provider is assigned
+    let is_assigned = agent.providers.iter().any(|p| p.id == provider_id);
+    if !is_assigned {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "PROVIDER_NOT_ASSIGNED".to_string(),
+                    message: Some(format!("Provider {} is not assigned to agent {}", provider_id, agent_id)),
+                    fields: None,
+                },
+            }),
+        ));
     }
 
     let providers_list: Vec<RemainedProviderItem> = service.remove_provider_from_agent(&agent_id, &provider_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
         )
     })?.into_iter().map(|p| RemainedProviderItem {
         id: p.id,
@@ -658,34 +1095,55 @@ pub async fn remove_provider_from_agent(
     }))
 }
 
-// TODO: implement after merge
+// TODO: implement get_agent_status
 
-// pub async fn get_agent_provider_status(
+// /// Get agent status
+// pub async fn get_agent_status(
 //     State(pool): State<SqlitePool>,
 //     Path(id): Path<String>,
 //     user: AuthenticatedUser,
-// ) -> Result<Json<Agent>, (StatusCode, String)> {
+// ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
 //     let service = AgentService::new(pool);
 
 //     let agent = service.get_agent_details(&id).await.map_err(|e| {
 //         (
 //             StatusCode::INTERNAL_SERVER_ERROR,
-//             format!("Database error: {}", e),
+//             Json(ErrorResponse {
+//                 error: ErrorDetail {
+//                     code: "INTERNAL_ERROR".to_string(),
+//                     message: Some(format!("Database error: {}", e)),
+//                     fields: None,
+//                 },
+//             }),
 //         )
-//     })?
-//     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+//     })?;
+
+//     let agent = match agent {
+//         Some(a) => a,
+//         None => return Err((
+//             StatusCode::NOT_FOUND,
+//             Json(ErrorResponse {
+//                 error: ErrorDetail {
+//                     code: "AGENT_NOT_FOUND".to_string(),
+//                     message: Some(format!("Agent '{}' does not exist", id)),
+//                     fields: None,
+//                 },
+//             }),
+//         )),
+//     };
 
 //     if user.0.sub != agent.owner_id && user.0.role != "admin" {
-//         return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+//         return Err((
+//             StatusCode::FORBIDDEN,
+//             Json(ErrorResponse {
+//                 error: ErrorDetail {
+//                     code: "FORBIDDEN".to_string(),
+//                     message: Some("Insufficient permissions".to_string()),
+//                     fields: None,
+//                 },
+//             }),
+//         ));
 //     }
-
-//     let agent = service.get_agent_provider_status(&id).await.map_err(|e| {
-//         (
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             format!("Database error: {}", e),
-//         )
-//     })?
-//     .ok_or((StatusCode::BAD_REQUEST, "Providers not found".to_string()))?;
 
 //     Ok(Json(Agent::from(agent)))
 // }

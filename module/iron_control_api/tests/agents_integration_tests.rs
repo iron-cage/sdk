@@ -17,6 +17,7 @@ use axum::{
 };
 use iron_control_api::routes::agents::{AgentDetails, AgentProviderItemExtended, CreateAgentRequest, GetAgentProvidersResponse, PaginatedAgentsResponse, RemoveProviderFromAgentResponse};
 use iron_token_manager::agent_service::{AgentService, CreateAgentParams};
+use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -896,15 +897,31 @@ async fn test_assign_providers_to_agent_empty_list() {
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::OK );
+  assert_eq!( response.status(), StatusCode::BAD_REQUEST );
 
   let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
     .await
     .unwrap();
-  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let error_response: ErrorResponse = serde_json::from_slice( &body_bytes ).unwrap();
 
-  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 0 );
+  assert_eq!( error_response.error.code, "VALIDATION_ERROR" );
+  assert_eq!( error_response.error.message.unwrap(), "providers field is required" );
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: ErrorDetail,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorDetail {
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<std::collections::HashMap<String, String>>,
+}
+
 
 #[ tokio::test ]
 async fn test_assign_providers_to_agent_invalid_provider() {
