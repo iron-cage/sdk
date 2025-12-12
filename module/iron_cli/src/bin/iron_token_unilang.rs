@@ -308,16 +308,6 @@ fn route_to_handler(
       runtime.block_on( iron_cli::adapters::health_adapters::version_adapter( params ) )
     }
 
-    // Legacy health commands (if still referenced)
-    ".health.check" =>
-    {
-      runtime.block_on( iron_cli::adapters::health_adapters::health_check_adapter( params ) )
-    }
-    ".health.version" =>
-    {
-      runtime.block_on( iron_cli::adapters::health_adapters::version_adapter( params ) )
-    }
-
     // Default: Command not implemented
     _ =>
     {
@@ -341,8 +331,7 @@ fn print_banner()
   println!();
   println!( "Help:" );
   println!( "  iron-token .help                    # List all commands" );
-  println!( "  iron-token .tokens.list ?           # Quick help" );
-  println!( "  iron-token .tokens.list ??          # Detailed help" );
+  println!( "  iron-token .tokens.list ?           # Command help" );
   println!();
   println!( "Status: Phase 5 - Full adapter integration complete ✓" );
   println!( "All 22 commands integrated with HTTP adapters" );

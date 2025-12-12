@@ -34,7 +34,7 @@ Integration tests for each adapter function across 22 commands:
 
 1. **test_all_adapters_have_valid_endpoints**
    - Verifies adapter count per module
-   - Ensures total of 19 adapters exist
+   - Ensures total of 22 adapters exist
    - NC-A.2: Zero API contract violations
 
 2. **test_no_orphaned_adapters_exist**
@@ -44,7 +44,7 @@ Integration tests for each adapter function across 22 commands:
 
 3. **test_adapter_count_metrics**
    - Verifies migration metrics (6→0 orphaned)
-   - Calculates orphaned percentage (27%→0%)
+   - Calculates orphaned percentage (21%→0%)
    - NC-A.3: Orphaned percentage = 0%
 
 ## Negative Criteria
@@ -53,26 +53,11 @@ Integration tests for each adapter function across 22 commands:
 - **NC-A.2**: Zero adapters calling non-existent endpoints
 - **NC-A.3**: Orphaned percentage must be 0%
 
-## Migration Metrics
+## Migration Summary
 
-### Before Migration
-- Total adapters: 25
-- Orphaned: 6 (27%)
-- Correct: 19 (73%)
+Migration eliminated 6 orphaned adapters (28→22 total, 21%→0% orphaned).
 
-### After Migration
-- Total adapters: 19
-- Orphaned: 0 (0%)
-- Correct: 19 (100%)
-
-### Deleted Orphaned Adapters (6)
-
-1. show_agent_usage_adapter (usage_adapters.rs)
-2. export_agent_usage_adapter (usage_adapters.rs)
-3. reset_limit_adapter (limits_adapters.rs)
-4. show_agent_limits_adapter (limits_adapters.rs)
-5. update_agent_limit_adapter (limits_adapters.rs)
-6. show_trace_stats_adapter (traces_adapters.rs)
+For complete migration details, metrics, and deleted adapter list, see ../migration/readme.md.
 
 ## Running Tests
 
@@ -95,6 +80,6 @@ cargo test test_no_orphaned_adapters_exist --package iron_cli
 | token_adapters | 5 | 5 | 0 |
 | usage_adapters | 4 | 6 | 2 |
 | limits_adapters | 5 | 8 | 3 |
-| traces_adapters | 2 | 3 | 1 |
+| traces_adapters | 3 | 4 | 1 |
 | health_adapters | 2 | 2 | 0 |
-| **Total** | **19** | **25** | **6** |
+| **Total** | **22** | **28** | **6** |

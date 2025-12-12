@@ -104,20 +104,13 @@ fn generate_static_commands( commands_dir : &Path )
           // Supports both:
           // - Format A: Root-level array (unilang spec compliant)
           // - Format B: Legacy format with `commands:` wrapper
-          let commands_seq = if let Some( seq ) = yaml.as_sequence()
-          {
+          let commands_seq = yaml.as_sequence()
             // Format A: Root-level array (CORRECT)
-            Some( seq )
-          }
-          else if let Some( commands ) = yaml.get( "commands" ).and_then( | v | v.as_sequence() )
-          {
-            // Format B: Legacy with wrapper (DEPRECATED)
-            Some( commands )
-          }
-          else
-          {
-            None
-          };
+            .or_else( ||
+            {
+              // Format B: Legacy with wrapper (DEPRECATED)
+              yaml.get( "commands" ).and_then( | v | v.as_sequence() )
+            });
 
           if let Some( commands ) = commands_seq
           {

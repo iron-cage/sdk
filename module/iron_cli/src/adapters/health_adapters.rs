@@ -59,7 +59,7 @@ pub async fn health_check_adapter(
 
 /// Version adapter
 ///
-/// Retrieves Token Manager API version information.
+/// Returns CLI version information. Optionally includes API version if available.
 ///
 /// ## Parameters
 ///
@@ -68,7 +68,7 @@ pub async fn health_check_adapter(
 /// ## Example
 ///
 /// ```bash
-/// iron-token .health.version
+/// iron-token .version
 /// ```
 pub async fn version_adapter(
   params: &HashMap<String, String>,
@@ -78,18 +78,37 @@ pub async fn version_adapter(
   health_handlers::version_handler( params )
     .map_err( |e| e.to_string() )?;
 
-  // 2. Create HTTP client (no auth needed for version)
-  let config = TokenApiConfig::load();
-  let client = TokenApiClient::new( config );
+  // 2. Get CLI version (always available)
+  let cli_version = env!( "CARGO_PKG_VERSION" );
 
-  // 3. Make HTTP call (no access_token needed)
-  let response = client
-    .get( "/api/v1/version", None, None )
-    .await
-    .map_err( |e| format!( "Version check failed: {}", e ) )?;
+  // 3. Try to get API version (optional, fails gracefully)
+  let api_version = {
+    let config = TokenApiConfig::load();
+    let client = TokenApiClient::new( config );
 
-  // 4. Format output
+    client
+      .get( "/api/v1/version", None, None )
+      .await
+      .ok()
+      .and_then( |v| v.get( "version" ).and_then( |v| v.as_str() ).map( String::from ) )
+  };
+
+  // 4. Build response
+  let mut version_info = serde_json::json!({
+    "cli_version": cli_version,
+  });
+
+  if let Some( api_ver ) = api_version
+  {
+    version_info[ "api_version" ] = serde_json::json!( api_ver );
+  }
+  else
+  {
+    version_info[ "api_version" ] = serde_json::json!( "<unavailable>" );
+  }
+
+  // 5. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
 
-  format_response( &response, format )
+  format_response( &version_info, format )
 }

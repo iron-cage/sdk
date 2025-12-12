@@ -74,7 +74,9 @@ pub fn get_access_token() -> Result<String, KeyringError>
     .map_err( |e|
     {
       let error_msg = e.to_string();
-      if error_msg.contains( "NoEntry" ) || error_msg.contains( "not found" )
+      if error_msg.contains( "NoEntry" )
+        || error_msg.contains( "not found" )
+        || error_msg.contains( "No matching entry" )
       {
         KeyringError::NotFound( "Access token not found. Please login first.".to_string() )
       }
@@ -119,7 +121,9 @@ pub fn get_refresh_token() -> Result<String, KeyringError>
     .map_err( |e|
     {
       let error_msg = e.to_string();
-      if error_msg.contains( "NoEntry" ) || error_msg.contains( "not found" )
+      if error_msg.contains( "NoEntry" )
+        || error_msg.contains( "not found" )
+        || error_msg.contains( "No matching entry" )
       {
         KeyringError::NotFound( "Refresh token not found. Please login first.".to_string() )
       }
@@ -245,13 +249,17 @@ mod tests
     let result = get_access_token();
     assert!( result.is_err() );
 
-    if let Err( KeyringError::NotFound( msg ) ) = result
+    match result
     {
-      assert!( msg.contains( "not found" ) );
-    }
-    else
-    {
-      panic!( "Expected NotFound error" );
+      Err( KeyringError::NotFound( msg ) ) =>
+      {
+        assert!( msg.contains( "not found" ) );
+      }
+      Err( KeyringError::StorageError( msg ) ) =>
+      {
+        panic!( "Expected NotFound error, got StorageError: {}", msg );
+      }
+      Ok( _ ) => panic!( "Expected error, got Ok" ),
     }
   }
 }

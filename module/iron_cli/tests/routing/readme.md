@@ -39,14 +39,9 @@ Verify all CLI commands route to correct adapter functions and that no routes ca
 
 ## Orphaned Adapters (Deleted)
 
-The following 6 adapters were deleted in migration because they had no matching API endpoints:
+Six adapters were deleted during migration because they had no matching API endpoints.
 
-1. `show_agent_usage_adapter` (usage_adapters.rs)
-2. `export_agent_usage_adapter` (usage_adapters.rs)
-3. `reset_limit_adapter` (limits_adapters.rs)
-4. `show_agent_limits_adapter` (limits_adapters.rs)
-5. `update_agent_limit_adapter` (limits_adapters.rs)
-6. `show_trace_stats_adapter` (traces_adapters.rs)
+For the complete list of deleted orphaned adapters, see ../migration/readme.md § Deleted Orphaned Adapters.
 
 ## Running Tests
 

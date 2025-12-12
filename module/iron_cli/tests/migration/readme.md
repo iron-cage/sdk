@@ -10,7 +10,8 @@ Verify migration metrics are at target values and migration trajectory is correc
 
 | File | Responsibility |
 |------|----------------|
-| metrics.rs | Migration metrics verification tests |
+| metrics.rs | Verify migration metrics and trajectory through tests |
+| framework.md | Document migration metrics framework and methodology |
 
 ## Test Coverage
 
@@ -37,41 +38,25 @@ Verify migration metrics are at target values and migration trajectory is correc
 - **NC-M.2**: Broken route count must be 0
 - **NC-M.3**: All ratios must match targets (0% orphaned, 100% correct)
 
-## Migration Metrics
+## Migration Results
 
-### M1: Adapter Function Counts
-- Before: Total 28, Orphaned 6 (21%), Correct 22 (79%)
-- After: Total 22, Orphaned 0 (0%), Correct 22 (100%)
-- Delta: Orphaned -6 (-100%), Correct +0 (maintained)
+**Final Metrics:**
+- Total adapters: 28 → 22 (6 deleted)
+- Orphaned adapters: 6 → 0 (100% elimination)
+- Broken routes: 6 → 0 (100% fixed)
+- Dead code: ~384 lines → 0 (100% removed)
 
-### M2: Routing Pattern Counts
-- Before: Broken 6 (routing to orphaned), Correct 16
-- After: Broken 0, Correct 22
-- Delta: Broken -6 (-100%), Correct +6 (+37%)
-
-### M3: Code Quality Counts
-- Before: Dead code indicators 6, API violations 6
-- After: Dead code 0, API violations 0
-- Delta: Dead code -6 (-100%), Violations -6 (-100%)
-
-## Migration Trajectory
-
-| Metric | Initial | Final | Delta | Status |
-|--------|---------|-------|-------|--------|
-| Orphaned adapters | 6 | 0 | -6 | ✓ TARGET |
-| Broken routes | 6 | 0 | -6 | ✓ TARGET |
-| Dead code lines | ~384 | 0 | -384 | ✓ TARGET |
-| Orphaned % | 21% | 0% | -21% | ✓ TARGET |
-| Correct % | 79% | 100% | +21% | ✓ TARGET |
-
-## Deleted Orphaned Adapters (6)
-
+**Deleted Orphaned Adapters (6):**
 1. show_agent_usage_adapter (usage_adapters.rs)
 2. export_agent_usage_adapter (usage_adapters.rs)
 3. reset_limit_adapter (limits_adapters.rs)
 4. show_agent_limits_adapter (limits_adapters.rs)
 5. update_agent_limit_adapter (limits_adapters.rs)
 6. show_trace_stats_adapter (traces_adapters.rs)
+
+## Migration Framework
+
+For complete migration metrics framework, checkpoint methodology, measurement commands, and verification criteria, see framework.md.
 
 ## Running Tests
 
@@ -85,24 +70,3 @@ cargo test metrics --package iron_cli
 # Run specific test
 cargo test test_migration_metrics_at_target --package iron_cli
 ```
-
-## Migration Framework
-
-For complete migration methodology and checkpoint verification, see the migration framework documentation (migrated from `-phase2_migration_metrics.md`).
-
-### Checkpoints
-
-**Checkpoint 1: Initial State (Before Migration)**
-- Orphaned adapters: 6 (21%)
-- Broken routes: 6 (27%)
-- Dead code: ~384 lines
-
-**Checkpoint 2: After Routing Fixes**
-- Orphaned adapters: 6 (still exist)
-- Broken routes: 0 (fixed)
-- Migration: 50% complete
-
-**Checkpoint 3: After Adapter Deletion (Final)**
-- Orphaned adapters: 0 (deleted)
-- Broken routes: 0 (maintained)
-- Migration: 100% complete ✓
