@@ -170,6 +170,10 @@ impl SyncClient {
         }
 
         // Filter to only LLM events (server only accepts these)
+        // NOTE: RouterStarted, RouterStopped, and BudgetThresholdReached events are
+        // intentionally NOT synced. They remain in the EventStore with unsynced status.
+        // This is a pilot limitation - these events are logged locally but not sent to server.
+        // Future: Add server endpoints for lifecycle/budget events if dashboard needs them.
         let llm_events: Vec<_> = events.into_iter().filter(|e| {
             matches!(e.payload, EventPayload::LlmRequestCompleted(_) | EventPayload::LlmRequestFailed(_))
         }).collect();

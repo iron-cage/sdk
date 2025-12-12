@@ -250,6 +250,11 @@ pub struct SyncHandle {
 - **Event filtering:** Only `llm_request_completed` and `llm_request_failed` synced
 - **Error handling:** 4xx errors mark event as synced (no retry), 5xx/network errors retry
 
+**Pilot Limitation - Unsynced Events:**
+- `RouterStarted`, `RouterStopped`, `BudgetThresholdReached` events are NOT synced
+- These events remain in EventStore with unsynced status (logged locally only)
+- Future: Add server endpoints for lifecycle/budget events if dashboard needs them
+
 ---
 
 ## Protocol 012 Compatibility
