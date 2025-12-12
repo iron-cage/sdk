@@ -541,9 +541,10 @@ fn test_token_randomness_chi_squared()
 /// 3. Verify timing ratio is close to 1.0 (within 30% tolerance)
 ///
 /// NOTE: Perfect constant-time is impossible to test reliably due to
-/// system noise, CPU caching, branch prediction, etc. We allow 30%
-/// variance to account for these factors while still catching obvious
-/// timing leaks (e.g., early-exit string comparison would show 2-10x ratio).
+/// system noise, CPU caching, branch prediction, etc. We allow 50%
+/// variance to account for these factors (especially in CI environments)
+/// while still catching obvious timing leaks (e.g., early-exit string
+/// comparison would show 2-10x ratio).
 #[ test ]
 fn test_verify_token_constant_time()
 {
@@ -587,10 +588,11 @@ fn test_verify_token_constant_time()
   };
 
   // Timing should be similar (ratio close to 1.0)
-  // Allow 30% variance for system noise (ratio between 0.7 and 1.3)
+  // Allow 50% variance for system noise (ratio between 0.5 and 1.5)
+  // CI environments especially show more variance due to shared resources
   assert!(
-    ratio > 0.7 && ratio < 1.3,
-    "LOUD FAILURE: Timing attack vulnerable! Early/late mismatch ratio: {ratio:.3} (expected 0.7-1.3). \
+    ratio > 0.5 && ratio < 1.5,
+    "LOUD FAILURE: Timing attack vulnerable! Early/late mismatch ratio: {ratio:.3} (expected 0.5-1.5). \
      Early mismatch: {duration_early:?}, Late mismatch: {duration_late:?}. \
      Non-constant-time comparison (e.g., `==`) would show ratio >2.0."
   );

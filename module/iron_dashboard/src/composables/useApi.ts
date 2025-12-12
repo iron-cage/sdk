@@ -423,6 +423,53 @@ export function useApi() {
     })
   }
 
+  // ============================================================================
+  // Analytics API (Protocol 012)
+  // ============================================================================
+
+  async function getAnalyticsSpendingTotal(
+    filters?: AnalyticsFilters
+  ): Promise<SpendingTotalResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsSpendingByProvider(
+    filters?: AnalyticsFilters
+  ): Promise<SpendingByProviderResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsUsageRequests(
+    filters?: AnalyticsFilters
+  ): Promise<RequestUsageResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsUsageModels(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams
+  ): Promise<ModelUsageResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
+  }
+
   return {
     getTokens,
     getToken,
@@ -463,6 +510,11 @@ export function useApi() {
     getAgentTokens,
     createAgentToken,
     updateTokenProvider,
+    // Analytics (Protocol 012)
+    getAnalyticsSpendingTotal,
+    getAnalyticsSpendingByProvider,
+    getAnalyticsUsageRequests,
+    getAnalyticsUsageModels,
   }
 }
 
@@ -507,4 +559,78 @@ export type {
   CreateProviderKeyRequest,
   UpdateProviderKeyRequest,
   AssignProviderRequest,
+}
+
+// ============================================================================
+// Analytics Types (Protocol 012)
+// ============================================================================
+
+export type AnalyticsPeriod =
+  | 'today'
+  | 'yesterday'
+  | 'last7-days'
+  | 'last30-days'
+  | 'this-month'
+  | 'last-month'
+  | 'all-time'
+
+export interface AnalyticsFilters {
+  period?: AnalyticsPeriod
+  agent_id?: number
+  provider_id?: string
+}
+
+export interface PaginationParams {
+  page?: number
+  per_page?: number
+}
+
+export interface SpendingTotalResponse {
+  total_spend: number
+  currency: string
+  period: string
+  filters: { agent_id?: number; provider_id?: string }
+  calculated_at: string
+}
+
+export interface ProviderSpending {
+  provider: string
+  spending: number
+  request_count: number
+  avg_cost_per_request: number
+  agent_count: number
+}
+
+export interface SpendingByProviderResponse {
+  data: ProviderSpending[]
+  summary: { total_spend: number; total_requests: number; providers_count: number }
+  period: string
+  calculated_at: string
+}
+
+export interface RequestUsageResponse {
+  total_requests: number
+  successful_requests: number
+  failed_requests: number
+  success_rate: number
+  period: string
+  filters: { agent_id?: number; provider_id?: string }
+  calculated_at: string
+}
+
+export interface ModelUsage {
+  model: string
+  provider: string
+  request_count: number
+  spending: number
+  input_tokens: number
+  output_tokens: number
+}
+
+export interface ModelUsageResponse {
+  data: ModelUsage[]
+  summary: { unique_models: number; total_requests: number; total_spend: number }
+  pagination: { page: number; per_page: number; total: number; total_pages: number }
+  period: string
+  calculated_at: string
 }

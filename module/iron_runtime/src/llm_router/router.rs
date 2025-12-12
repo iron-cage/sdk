@@ -22,6 +22,9 @@ use crate::llm_router::proxy::{run_proxy, ProxyConfig};
 #[cfg(feature = "analytics")]
 use iron_runtime_analytics::EventStore;
 
+#[cfg(feature = "analytics")]
+use iron_runtime_analytics::{SyncClient, SyncConfig, SyncHandle};
+
 /// LLM Router - Local proxy server for OpenAI/Anthropic API requests
 ///
 /// Creates a local HTTP server that intercepts LLM API requests,
@@ -71,6 +74,10 @@ pub struct LlmRouter {
   #[cfg(feature = "analytics")]
   #[allow(dead_code)]
   provider_id: Option<Arc<str>>,
+  /// Analytics sync handle - auto-flushes on drop
+  #[cfg(feature = "analytics")]
+  #[allow(dead_code)] // Used for Drop behavior
+  sync_handle: Option<SyncHandle>,
 }
 
 #[pymethods]
@@ -114,9 +121,11 @@ impl LlmRouter {
     provider_key: Option<String>,
   ) -> PyResult<Self> {
     // Validate: either provider_key OR (api_key + server_url) must be provided
+    // Can also use provider_key + api_key + server_url for direct mode with analytics sync
     if provider_key.is_none() && (api_key.is_none() || server_url.is_none()) {
       return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-        "Either 'provider_key' or both 'api_key' and 'server_url' must be provided"
+        "Either 'provider_key' or both 'api_key' and 'server_url' must be provided. \
+         Use provider_key + api_key + server_url for direct mode with analytics sync."
       ));
     }
 
@@ -354,6 +363,16 @@ impl LlmRouter {
       }
     });
 
+    // Start analytics sync (if server_url is provided)
+    #[cfg(feature = "analytics")]
+    let sync_handle = if !server_url.is_empty() {
+      let sync_config = SyncConfig::new(&server_url, &api_key);
+      let sync_client = SyncClient::new(event_store.clone(), sync_config);
+      Some(sync_client.start(runtime.handle()))
+    } else {
+      None
+    };
+
     // Wait for server to start
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -371,6 +390,8 @@ impl LlmRouter {
       agent_id: agent_id_arc,
       #[cfg(feature = "analytics")]
       provider_id: provider_id_arc,
+      #[cfg(feature = "analytics")]
+      sync_handle,
     })
   }
 
@@ -378,6 +399,14 @@ impl LlmRouter {
     if let Some(tx) = self.shutdown_tx.take() {
       #[cfg(feature = "analytics")]
       self.event_store.record_router_stopped();
+
+      // Stop analytics sync (triggers flush) before stopping proxy
+      #[cfg(feature = "analytics")]
+      if let Some(handle) = self.sync_handle.take() {
+        handle.stop(); // This triggers flush
+        // Give sync task time to complete flush
+        std::thread::sleep(std::time::Duration::from_millis(500));
+      }
 
       let _ = tx.send(());
     }
