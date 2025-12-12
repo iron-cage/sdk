@@ -1058,11 +1058,11 @@ pub struct RemoveProviderFromAgentResponse {
 
 /// Remove provider from an agent
 pub async fn remove_provider_from_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path((agent_id, provider_id)): Path<(String, String)>,
     user: AuthenticatedUser,
 ) -> Result<Json<RemoveProviderFromAgentResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let service = AgentService::new(pool.clone());
+    let service = state.agent_service;
 
     let agent = service.get_agent_details(&agent_id).await.map_err(|e| {
         (
@@ -1098,37 +1098,6 @@ pub async fn remove_provider_from_agent(
                 error: ErrorDetail {
                     code: "FORBIDDEN".to_string(),
                     message: Some("Insufficient permissions: You can only modify your own agents".to_string()),
-                    fields: None,
-                },
-            }),
-        ));
-    }
-
-    // Check if provider exists
-    let provider_exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
-        .bind(&provider_id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: ErrorDetail {
-                        code: "INTERNAL_ERROR".to_string(),
-                        message: Some(format!("Database error: {}", e)),
-                        fields: None,
-                    },
-                }),
-            )
-        })?;
-
-    if provider_exists.is_none() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: ErrorDetail {
-                    code: "PROVIDER_NOT_FOUND".to_string(),
-                    message: Some(format!("Provider not found: {}", provider_id)),
                     fields: None,
                 },
             }),
