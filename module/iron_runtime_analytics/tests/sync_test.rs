@@ -135,7 +135,7 @@ async fn test_sync_events_to_mock_server() {
 
     assert_eq!(store.unsynced_count(), 2);
 
-    let config = SyncConfig::new(&mock_server.uri(), "test_token")
+    let config = SyncConfig::new(mock_server.uri(), "test_token")
         .with_interval(Duration::from_secs(60)); // Long interval, we'll use manual sync
 
     let client = SyncClient::new(store.clone(), config);
@@ -172,7 +172,7 @@ async fn test_sync_filters_non_llm_events() {
     // All 3 events are unsynced initially
     assert_eq!(store.unsynced_count(), 3);
 
-    let config = SyncConfig::new(&mock_server.uri(), "test_token");
+    let config = SyncConfig::new(mock_server.uri(), "test_token");
     let client = SyncClient::new(store.clone(), config);
 
     // Use manual sync for predictable behavior
@@ -210,7 +210,7 @@ async fn test_sync_retries_on_server_error() {
     let store = Arc::new(EventStore::new());
     store.record(create_completed_event("gpt-4", 100, 50, 1000));
 
-    let config = SyncConfig::new(&mock_server.uri(), "test_token")
+    let config = SyncConfig::new(mock_server.uri(), "test_token")
         .with_interval(Duration::from_millis(20));
 
     let client = SyncClient::new(store.clone(), config);
@@ -241,7 +241,7 @@ async fn test_sync_marks_synced_on_client_error() {
     let store = Arc::new(EventStore::new());
     store.record(create_completed_event("gpt-4", 100, 50, 1000));
 
-    let config = SyncConfig::new(&mock_server.uri(), "test_token")
+    let config = SyncConfig::new(mock_server.uri(), "test_token")
         .with_interval(Duration::from_millis(10));
 
     let client = SyncClient::new(store.clone(), config);
@@ -280,7 +280,7 @@ async fn test_sync_flushes_on_shutdown() {
     store.record(create_failed_event("claude-3", "timeout", "Request timeout"));
 
     // Use long interval so sync won't happen during test
-    let config = SyncConfig::new(&mock_server.uri(), "test_token")
+    let config = SyncConfig::new(mock_server.uri(), "test_token")
         .with_interval(Duration::from_secs(60));
 
     let client = SyncClient::new(store.clone(), config);
@@ -314,7 +314,7 @@ async fn test_concurrent_recording_during_sync() {
 
     let store = Arc::new(EventStore::new());
 
-    let config = SyncConfig::new(&mock_server.uri(), "test_token")
+    let config = SyncConfig::new(mock_server.uri(), "test_token")
         .with_interval(Duration::from_millis(10))
         .with_batch_threshold(5);
 
@@ -407,7 +407,7 @@ async fn test_manual_sync_events() {
     store.record(create_completed_event("gpt-4", 100, 50, 1000));
     store.record(create_completed_event("claude-3", 200, 100, 2000));
 
-    let config = SyncConfig::new(&mock_server.uri(), "test_token");
+    let config = SyncConfig::new(mock_server.uri(), "test_token");
     let client = SyncClient::new(store.clone(), config);
 
     // Manual sync (not using background task)

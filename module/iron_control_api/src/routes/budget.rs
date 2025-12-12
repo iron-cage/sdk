@@ -437,39 +437,96 @@ pub async fn handshake(
     }
   };
 
-  // Get agent budget status
-  let agent_budget = match state.agent_budget_manager.get_budget_status( agent_id ).await
+  // Get agent's owner_id to look up usage_limits
+  let owner_id: Option< String > = match sqlx::query_scalar(
+    "SELECT owner_id FROM agents WHERE id = ?"
+  )
+  .bind( agent_id )
+  .fetch_optional( &state.db_pool )
+  .await
   {
-    Ok( Some( budget ) ) => budget,
-    Ok( None ) =>
-    {
-      return (
-        StatusCode::FORBIDDEN,
-        Json( serde_json::json!({ "error": "No budget allocated for agent" }) ),
-      )
-        .into_response();
-    }
+    Ok( owner ) => owner,
     Err( err ) =>
     {
-      tracing::error!( "Database error fetching agent budget: {}", err );
+      tracing::error!( "Database error fetching agent owner: {}", err );
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Budget service unavailable" }) ),
+        Json( serde_json::json!({ "error": "Database error" }) ),
       )
         .into_response();
     }
   };
 
-  // Check if agent has sufficient budget
-  let budget_to_grant = 10.0; // Default $10 per lease
-  if agent_budget.budget_remaining < budget_to_grant
+  let owner_id = match owner_id
+  {
+    Some( id ) => id,
+    None =>
+    {
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Agent not found" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Get usage limit for this user (budget from usage_limits table)
+  let usage_limit: Option< ( Option< i64 >, i64 ) > = match sqlx::query_as(
+    "SELECT max_cost_cents_per_month, current_cost_cents_this_month FROM usage_limits WHERE user_id = ?"
+  )
+  .bind( &owner_id )
+  .fetch_optional( &state.db_pool )
+  .await
+  {
+    Ok( limit ) => limit,
+    Err( err ) =>
+    {
+      tracing::error!( "Database error fetching usage limit: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Database error" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Calculate budget from usage_limits (convert cents to USD)
+  let ( limit_usd, spent_usd, remaining_usd ) = match usage_limit
+  {
+    Some( ( Some( limit_cents ), spent_cents ) ) =>
+    {
+      let limit = limit_cents as f64 / 100.0;
+      let spent = spent_cents as f64 / 100.0;
+      let remaining = ( limit - spent ).max( 0.0 );
+      ( limit, spent, remaining )
+    }
+    Some( ( None, _ ) ) =>
+    {
+      // No cost limit set - allow unlimited
+      ( f64::MAX, 0.0, f64::MAX )
+    }
+    None =>
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "No budget limit configured for user" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Grant the full remaining budget as the lease
+  let budget_to_grant = remaining_usd;
+  if budget_to_grant <= 0.0
   {
     return (
       StatusCode::FORBIDDEN,
       Json( serde_json::json!(
       {
-        "error": "Insufficient budget",
-        "budget_remaining": agent_budget.budget_remaining
+        "error": "Budget limit exceeded",
+        "limit_usd": limit_usd,
+        "spent_usd": spent_usd,
+        "remaining_usd": remaining_usd
       } ) ),
     )
       .into_response();
@@ -584,13 +641,39 @@ pub async fn handshake(
       .into_response();
   }
 
+  // Deduct lease amount from usage_limits (the "bank")
+  let granted_cents = ( budget_to_grant * 100.0 ).round() as i64;
+  if let Err( err ) = sqlx::query(
+    "UPDATE usage_limits SET current_cost_cents_this_month = current_cost_cents_this_month + ? WHERE user_id = ?"
+  )
+  .bind( granted_cents )
+  .bind( &owner_id )
+  .execute( &state.db_pool )
+  .await
+  {
+    tracing::error!( "Database error updating usage_limits: {}", err );
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to update usage limits" }) ),
+    )
+      .into_response();
+  }
+
+  tracing::info!(
+    agent_id = agent_id,
+    owner_id = %owner_id,
+    budget_granted = budget_to_grant,
+    "Budget lease granted, deducted from usage_limits"
+  );
+
   // Return successful handshake response
+  // budget_remaining is 0 because we grant the full remaining budget as the lease
   ( StatusCode::OK, Json( HandshakeResponse
   {
     ip_token,
     lease_id,
     budget_granted: budget_to_grant,
-    budget_remaining: agent_budget.budget_remaining - budget_to_grant,
+    budget_remaining: 0.0, // Full budget granted to lease
     expires_at: None, // No expiration by default
   } ) )
     .into_response()
@@ -1730,4 +1813,199 @@ pub async fn reject_budget_request(
         .into_response()
     }
   }
+}
+
+// ============================================================================
+// Protocol 005: Budget Return Endpoint
+// ============================================================================
+
+/// Budget return request (Step 4: Return Unused Budget)
+#[ derive( Debug, Deserialize ) ]
+pub struct BudgetReturnRequest
+{
+  pub lease_id: String,
+  /// Amount spent by client (USD) - from iron_cost CostController
+  #[ serde( default ) ]
+  pub spent_usd: f64,
+}
+
+impl BudgetReturnRequest
+{
+  /// Maximum lease_id length
+  const MAX_LEASE_ID_LENGTH: usize = 100;
+
+  /// Validate budget return request parameters
+  pub fn validate( &self ) -> Result< (), String >
+  {
+    if self.lease_id.trim().is_empty()
+    {
+      return Err( "lease_id cannot be empty".to_string() );
+    }
+
+    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
+    {
+      return Err( format!( "lease_id too long (max {} characters)", Self::MAX_LEASE_ID_LENGTH ) );
+    }
+
+    if self.spent_usd < 0.0
+    {
+      return Err( "spent_usd cannot be negative".to_string() );
+    }
+
+    Ok( () )
+  }
+}
+
+/// Budget return response
+#[ derive( Debug, Serialize ) ]
+pub struct BudgetReturnResponse
+{
+  pub success: bool,
+  pub returned: f64,
+}
+
+/// POST /api/budget/return
+///
+/// Return unused budget when runtime shuts down
+///
+/// This endpoint closes the lease and credits the unused budget back to
+/// the agent's available budget.
+///
+/// # Arguments
+///
+/// * `state` - Budget protocol state
+/// * `request` - Budget return request with lease_id
+///
+/// # Returns
+///
+/// - 200 OK with returned amount if successful
+/// - 400 Bad Request if validation fails
+/// - 404 Not Found if lease doesn't exist
+/// - 500 Internal Server Error if database fails
+pub async fn return_budget(
+  State( state ): State< BudgetState >,
+  Json( request ): Json< BudgetReturnRequest >,
+) -> impl IntoResponse
+{
+  // Validate request
+  if let Err( validation_error ) = request.validate()
+  {
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+    {
+      "error": validation_error
+    } ) ) ).into_response();
+  }
+
+  // Get lease to find agent_id
+  let lease = match state.lease_manager.get_lease( &request.lease_id ).await
+  {
+    Ok( Some( lease ) ) => lease,
+    Ok( None ) =>
+    {
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Lease not found" }) ),
+      )
+        .into_response();
+    }
+    Err( err ) =>
+    {
+      tracing::error!( "Database error fetching lease: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Lease service unavailable" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Check if lease is already closed
+  if lease.lease_status != "active"
+  {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json( serde_json::json!({ "error": "Lease is not active" }) ),
+    )
+      .into_response();
+  }
+
+  // Close the lease
+  if let Err( err ) = state.lease_manager.close_lease( &request.lease_id ).await
+  {
+    tracing::error!( "Database error closing lease: {}", err );
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to close lease" }) ),
+    )
+      .into_response();
+  }
+
+  // Calculate returned: granted - spent (capped at 0)
+  let returned = ( lease.budget_granted - request.spent_usd ).max( 0.0 );
+
+  // Credit the returned amount back to usage_limits
+  if returned > 0.0
+  {
+    // Get agent's owner_id to find the usage_limits record
+    let owner_id: Option< String > = match sqlx::query_scalar(
+      "SELECT owner_id FROM agents WHERE id = ?"
+    )
+    .bind( lease.agent_id )
+    .fetch_optional( &state.db_pool )
+    .await
+    {
+      Ok( owner ) => owner,
+      Err( err ) =>
+      {
+        tracing::error!( "Database error fetching agent owner: {}", err );
+        // Still return success since lease was closed
+        None
+      }
+    };
+
+    if let Some( owner_id ) = owner_id
+    {
+      // Credit the returned amount back to usage_limits
+      let returned_cents = ( returned * 100.0 ).round() as i64;
+      if let Err( err ) = sqlx::query(
+        "UPDATE usage_limits SET current_cost_cents_this_month = current_cost_cents_this_month - ? WHERE user_id = ?"
+      )
+      .bind( returned_cents )
+      .bind( &owner_id )
+      .execute( &state.db_pool )
+      .await
+      {
+        tracing::error!( "Database error crediting usage_limits: {}", err );
+        // Still return success since lease was closed
+      }
+      else
+      {
+        tracing::info!(
+          lease_id = %request.lease_id,
+          agent_id = lease.agent_id,
+          owner_id = %owner_id,
+          returned_usd = %returned,
+          returned_cents = %returned_cents,
+          "Budget returned and credited to usage_limits"
+        );
+      }
+    }
+    else
+    {
+      tracing::warn!(
+        lease_id = %request.lease_id,
+        agent_id = lease.agent_id,
+        returned_usd = %returned,
+        "Budget returned but agent has no owner - cannot credit usage_limits"
+      );
+    }
+  }
+
+  // Return success response
+  ( StatusCode::OK, Json( BudgetReturnResponse
+  {
+    success: true,
+    returned,
+  } ) )
+    .into_response()
 }

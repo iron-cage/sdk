@@ -6,13 +6,15 @@
 
 ---
 
-## Responsibility
+**Specification Philosophy:** Focus on architecture-level behavior and interfaces; avoid low-level implementation details to preserve flexibility and testability.
+
+### Responsibility
 
 Lock-free event-based analytics storage for Python LlmRouter. Provides async-safe event recording with bounded memory, atomic counters for O(1) stats, and Protocol 012 Analytics API compatibility.
 
 ---
 
-## Scope
+### Scope
 
 **In Scope:**
 - Lock-free event buffer (crossbeam ArrayQueue)
@@ -33,7 +35,7 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 
 ---
 
-## Dependencies
+### Dependencies
 
 **Required:**
 - `crossbeam` - Lock-free data structures (ArrayQueue, channels)
@@ -51,7 +53,7 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 
 ---
 
-## Core Types
+### Core Types
 
 ### EventStore
 
@@ -156,7 +158,7 @@ pub struct SyncHandle {
 
 ---
 
-## API Surface
+### API Surface
 
 ### Constructors
 
@@ -216,7 +218,7 @@ pub struct SyncHandle {
 
 ---
 
-## Design Decisions
+### Design Decisions
 
 ### Pilot Strategy
 
@@ -257,7 +259,7 @@ pub struct SyncHandle {
 
 ---
 
-## Protocol 012 Compatibility
+### Protocol 012 Compatibility
 
 **Event Fields (Protocol 012 compatible):**
 - `timestamp_ms` - Unix timestamp in milliseconds
@@ -275,7 +277,7 @@ pub struct SyncHandle {
 
 ---
 
-## File Structure
+### File Structure
 
 ```
 module/iron_runtime_analytics/
@@ -302,7 +304,7 @@ module/iron_runtime_analytics/
 
 ---
 
-## Test Coverage
+### Test Coverage
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
@@ -317,7 +319,7 @@ module/iron_runtime_analytics/
 
 ---
 
-## Integration Points
+### Integration Points
 
 **Used by:**
 - iron_runtime/LlmRouter - Proxy integration for automatic event recording and logging
@@ -327,7 +329,7 @@ module/iron_runtime_analytics/
 
 ---
 
-## Python Integration (Phase 2)
+### Python Integration (Phase 2)
 
 Analytics is integrated into LlmRouter proxy and enabled by default via `full` feature.
 
@@ -354,5 +356,4 @@ When using direct mode with `server_url` and `api_key`, events are automatically
 - Only LLM request events synced (completed/failed)
 
 ---
-
 

@@ -502,3 +502,168 @@ fn converter_micros_to_usd() {
     assert_eq!(micros_to_usd(500_000), 0.5);
     assert_eq!(micros_to_usd(1), 0.000001);
 }
+
+// =============================================================================
+// PricingManager::estimate_max_cost tests
+// =============================================================================
+
+#[test]
+fn estimate_max_cost_returns_none_for_invalid_json() {
+    let manager = PricingManager::new().expect("should create manager");
+    assert!(manager.estimate_max_cost(b"not json").is_none());
+}
+
+#[test]
+fn estimate_max_cost_returns_none_for_missing_model() {
+    let manager = PricingManager::new().expect("should create manager");
+    let body = br#"{"messages": []}"#;
+    assert!(manager.estimate_max_cost(body).is_none());
+}
+
+#[test]
+fn estimate_max_cost_returns_none_for_unknown_model() {
+    let manager = PricingManager::new().expect("should create manager");
+    let body = br#"{"model": "unknown-model-xyz", "max_tokens": 100}"#;
+    assert!(manager.estimate_max_cost(body).is_none());
+}
+
+#[test]
+fn estimate_max_cost_estimates_input_from_messages() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.002
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // 400 chars = ~100 tokens, +10% + 100 overhead = 110 + 100 = 210 input tokens
+    let body = br#"{"model": "test-model", "max_tokens": 1000, "messages": [{"role": "user", "content": "This is a test message that is exactly four hundred characters long. We need to make sure we have enough text here to properly test the token estimation logic. The estimation uses approximately four characters per token which is a reasonable approximation for English text. Adding more text here to reach the target length of four hundred characters exactly."}]}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    // ~210 input * 0.001 + 1000 output * 0.002 = 0.21 + 2.0 = 2.21 USD = 2_210_000 micros
+    // Allow some tolerance for exact char count
+    assert!((2_000_000..=2_500_000).contains(&cost), "cost was {}", cost);
+}
+
+#[test]
+fn estimate_max_cost_uses_max_completion_tokens() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.002
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // Short message: ~25 chars = ~6 tokens, but minimum with buffer will be higher
+    let body = br#"{"model": "test-model", "max_completion_tokens": 500, "messages": [{"role": "user", "content": "Hello, how are you today?"}]}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    // Small input + 500 output * 0.002 = ~1.0+ USD
+    assert!(cost >= 1_000_000, "cost was {}", cost);
+}
+
+#[test]
+fn estimate_max_cost_uses_model_max_output_tokens_when_no_max_tokens() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.0001,
+            "output_cost_per_token": 0.0001,
+            "max_output_tokens": 8192
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // No messages = 1000 minimum input tokens
+    let body = br#"{"model": "test-model"}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    // 1000 input * 0.0001 + 8192 output * 0.0001 = 0.1 + 0.8192 = 0.9192 USD = 919_200 micros
+    assert_eq!(cost, 919_200);
+}
+
+#[test]
+fn estimate_max_cost_uses_128000_fallback_when_no_model_max() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.000001,
+            "output_cost_per_token": 0.000001
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // No max_output_tokens in model = uses 128000 fallback
+    let body = br#"{"model": "test-model"}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    // 1000 input + 128000 output * 0.000001 = 0.001 + 0.128 = 0.129 USD = 129_000 micros
+    assert_eq!(cost, 129_000);
+}
+
+#[test]
+fn estimate_max_cost_handles_anthropic_system_prompt() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.001
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // 100 char system + 50 char message = 150 chars = ~37 tokens + buffer
+    let body = br#"{"model": "test-model", "max_tokens": 100, "system": "You are a helpful assistant that answers questions concisely and accurately for the user.", "messages": [{"role": "user", "content": "What is the capital of France? Please tell me."}]}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    // Input estimate + 100 output tokens at $0.001/token
+    assert!(cost > 100_000, "cost was {}", cost); // At least $0.10
+}
+
+#[test]
+fn estimate_max_cost_handles_content_blocks() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.001
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // Content blocks format (vision-style)
+    let body = br#"{"model": "test-model", "max_tokens": 100, "messages": [{"role": "user", "content": [{"type": "text", "text": "What is in this image? Please describe it in detail."}]}]}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    assert!(cost > 100_000, "cost was {}", cost);
+}
+
+#[test]
+fn estimate_max_cost_minimum_1000_tokens_when_no_content() {
+    let manager = PricingManager::new().expect("should create manager");
+
+    let json = r#"{
+        "test-model": {
+            "input_cost_per_token": 0.001,
+            "output_cost_per_token": 0.001
+        }
+    }"#;
+    manager.load_from_file(json).expect("should parse");
+
+    // Empty messages array
+    let body = br#"{"model": "test-model", "max_tokens": 100, "messages": []}"#;
+    let cost = manager.estimate_max_cost(body).expect("should estimate");
+
+    // 1000 minimum input + 100 output = 1100 tokens * $0.001 = $1.10 = 1_100_000 micros
+    assert_eq!(cost, 1_100_000);
+}

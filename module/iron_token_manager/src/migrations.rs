@@ -107,6 +107,12 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 015: Add revoked_at timestamp to api_tokens
   apply_migration_015( pool ).await?;
 
+  // Migration 016: Add lease return columns (Protocol 005)
+  apply_migration_016( pool ).await?;
+
+  // Migration 017: Create system_config table and seed dev data
+  apply_migration_017( pool ).await?;
+
   Ok( () )
 }
 
@@ -464,6 +470,35 @@ async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
+/// Migration 016: Add lease return columns (Protocol 005)
+///
+/// Adds columns to budget_leases for tracking lease returns:
+/// - returned_amount: USD returned when lease closed
+/// - closed_at: Timestamp when lease was closed
+/// - updated_at: Last activity timestamp for stale detection
+#[ allow( dead_code ) ]
+async fn apply_migration_016( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_016_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError::Generic )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/016_add_lease_return_columns.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+  }
+
+  Ok( () )
+}
+
 #[ cfg( test ) ]
 mod tests
 {
@@ -530,4 +565,32 @@ mod tests
 
     assert_eq!( fk_enabled, 1, "Foreign keys must be enabled" );
   }
+}
+
+/// Migration 017: Create system_config table and seed development data
+#[ allow( dead_code ) ]
+async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
+{
+  // Check if migration has already run using the guard table pattern
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_017_completed'"
+  )
+      .fetch_one( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+  // Only execute if not previously completed
+  if completed == 0
+  {
+    // The SQL file handles table creation, data seeding, and guard table creation
+    let migration = include_str!( "../migrations/017_create_system_config.sql" );
+
+    sqlx::raw_sql( migration )
+        .execute( pool )
+        .await
+        .map_err( |_| crate::error::TokenError::Generic )?;
+  }
+
+  Ok( () )
 }

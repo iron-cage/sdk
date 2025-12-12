@@ -69,7 +69,7 @@ uuid = { workspace = true, features = ["v4"], optional = true }
 axum = { workspace = true, optional = true }
 
 # HTTP client (LlmRouter)
-reqwest = { workspace = true, features = ["json"], optional = true }
+reqwest = { workspace = true, features = ["json", "blocking"], optional = true }
 
 # Logging
 tracing = { workspace = true, optional = true }
