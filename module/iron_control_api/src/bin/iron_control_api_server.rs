@@ -564,6 +564,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
     .route( "/api/v1/budget/report", post( iron_control_api::routes::budget::report_usage ) )
     .route( "/api/v1/budget/refresh", post( iron_control_api::routes::budget::refresh_budget ) )
+    .route( "/api/v1/budget/return", post( iron_control_api::routes::budget::return_budget ) )
 
     // Budget Request Workflow endpoints (Protocol 012)
     .route( "/api/v1/budget/requests", post( iron_control_api::routes::budget::create_budget_request ) )

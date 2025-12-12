@@ -252,4 +252,99 @@ impl LeaseManager
       expires_at: r.get( "expires_at" ),
     } ).collect() )
   }
+
+  /// Close a lease and record returned amount
+  ///
+  /// Sets the lease status to 'closed', records the returned amount,
+  /// and sets the closed_at timestamp.
+  ///
+  /// # Arguments
+  ///
+  /// * `lease_id` - Lease ID to close
+  ///
+  /// # Returns
+  ///
+  /// The amount that was returned (granted - spent)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails or lease not found
+  pub async fn close_lease( &self, lease_id: &str ) -> Result< f64, sqlx::Error >
+  {
+    #[ allow( clippy::cast_possible_truncation ) ]
+    let now = SystemTime::now()
+      .duration_since( UNIX_EPOCH )
+      .expect( "Time went backwards" )
+      .as_millis() as i64;
+
+    // Use transaction for atomic read-modify-write
+    let mut tx = self.pool.begin().await?;
+
+    // Get current lease state
+    let row = sqlx::query(
+      "SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ? AND lease_status = 'active'"
+    )
+    .bind( lease_id )
+    .fetch_optional( &mut *tx )
+    .await?;
+
+    let ( granted, spent ): ( f64, f64 ) = match row {
+      Some( r ) => ( r.get( "budget_granted" ), r.get( "budget_spent" ) ),
+      None => {
+        // Lease not found or not active
+        return Ok( 0.0 );
+      }
+    };
+
+    // Calculate returned amount
+    let returned = ( granted - spent ).max( 0.0 );
+
+    // Update lease to closed state
+    sqlx::query(
+      "UPDATE budget_leases
+       SET lease_status = 'closed',
+           returned_amount = ?,
+           closed_at = ?,
+           updated_at = ?
+       WHERE id = ?"
+    )
+    .bind( returned )
+    .bind( now )
+    .bind( now )
+    .bind( lease_id )
+    .execute( &mut *tx )
+    .await?;
+
+    tx.commit().await?;
+
+    Ok( returned )
+  }
+
+  /// Update the updated_at timestamp for a lease (keeps lease alive)
+  ///
+  /// Called after each report to prevent stale lease expiration.
+  ///
+  /// # Arguments
+  ///
+  /// * `lease_id` - Lease ID to update
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  pub async fn touch_lease( &self, lease_id: &str ) -> Result< (), sqlx::Error >
+  {
+    #[ allow( clippy::cast_possible_truncation ) ]
+    let now = SystemTime::now()
+      .duration_since( UNIX_EPOCH )
+      .expect( "Time went backwards" )
+      .as_millis() as i64;
+
+    sqlx::query( "UPDATE budget_leases SET updated_at = ? WHERE id = ?" )
+      .bind( now )
+      .bind( lease_id )
+      .execute( &self.pool )
+      .await?;
+
+    Ok( () )
+  }
 }
