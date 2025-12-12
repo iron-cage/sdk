@@ -78,6 +78,8 @@ pub struct LlmRouter {
   #[cfg(feature = "analytics")]
   #[allow(dead_code)] // Used for Drop behavior
   sync_handle: Option<SyncHandle>,
+  /// Lease ID from server handshake (for budget return on shutdown)
+  lease_id: Option<String>,
 }
 
 #[pymethods]
@@ -326,15 +328,19 @@ impl LlmRouter {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     // Determine budget: use explicit budget, or fetch from server handshake, or default to 0
-    let effective_budget = if let Some(b) = budget {
-      b
+    // Also capture lease_id from handshake for budget return on shutdown
+    let (effective_budget, lease_id) = if let Some(b) = budget {
+      (b, None)
     } else if !server_url.is_empty() {
       // Fetch budget from server handshake (Protocol 005)
-      runtime.block_on(async {
+      match runtime.block_on(async {
         fetch_budget_from_handshake(&server_url, &api_key).await
-      }).unwrap_or(0.0)
+      }) {
+        Some(result) => (result.budget, Some(result.lease_id)),
+        None => (0.0, None),
+      }
     } else {
-      0.0
+      (0.0, None)
     };
 
     // Create cost controller with effective budget (always created, defaults to 0)
@@ -404,11 +410,56 @@ impl LlmRouter {
       provider_id: provider_id_arc,
       #[cfg(feature = "analytics")]
       sync_handle,
+      lease_id,
     })
   }
 
   fn stop_inner(&mut self) {
     if let Some(tx) = self.shutdown_tx.take() {
+      // Return unused budget to server before shutting down (Protocol 005)
+      if let Some(lease_id) = self.lease_id.take() {
+        if !self.server_url.is_empty() {
+          // Get spent amount from cost_controller
+          let spent_usd = self.cost_controller
+            .as_ref()
+            .map(|cc| cc.total_spent())
+            .unwrap_or(0.0);
+
+          let url = format!("{}/api/v1/budget/return", self.server_url);
+          let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build();
+
+          match client {
+            Ok(client) => {
+              match client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .json(&serde_json::json!({"lease_id": lease_id, "spent_usd": spent_usd}))
+                .send()
+              {
+                Ok(resp) if resp.status().is_success() => {
+                  if let Ok(body) = resp.json::<serde_json::Value>() {
+                    if let Some(returned) = body.get("returned").and_then(|v| v.as_f64()) {
+                      tracing::info!("Budget returned to server: ${:.6} (spent: ${:.6})", returned, spent_usd);
+                    }
+                  }
+                }
+                Ok(resp) => {
+                  tracing::warn!("Budget return failed with status: {}", resp.status());
+                }
+                Err(e) => {
+                  tracing::warn!("Budget return request failed: {}", e);
+                }
+              }
+            }
+            Err(e) => {
+              tracing::warn!("Failed to create HTTP client for budget return: {}", e);
+            }
+          }
+        }
+      }
+
       #[cfg(feature = "analytics")]
       self.event_store.record_router_stopped();
 
@@ -431,8 +482,14 @@ fn find_free_port() -> std::io::Result<u16> {
   Ok(listener.local_addr()?.port())
 }
 
+/// Result from server handshake containing budget and lease info
+struct HandshakeResult {
+  budget: f64,
+  lease_id: String,
+}
+
 /// Fetch budget from server handshake (Protocol 005)
-async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option<f64> {
+async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option<HandshakeResult> {
   let client = reqwest::Client::new();
   let url = format!("{}/api/v1/budget/handshake", server_url);
 
@@ -461,14 +518,16 @@ async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option
   #[derive(serde::Deserialize)]
   struct HandshakeResponse {
     budget_granted: f64,
-    #[allow(dead_code)]
-    lease_id: Option<String>,
+    lease_id: String,
   }
 
   match response.json::<HandshakeResponse>().await {
     Ok(data) => {
-      tracing::info!("Budget from server handshake: ${:.4}", data.budget_granted);
-      Some(data.budget_granted)
+      tracing::info!("Budget from server handshake: ${:.4}, lease_id: {}", data.budget_granted, data.lease_id);
+      Some(HandshakeResult {
+        budget: data.budget_granted,
+        lease_id: data.lease_id,
+      })
     }
     Err(e) => {
       tracing::warn!("Failed to parse handshake response: {}", e);
