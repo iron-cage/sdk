@@ -1,6 +1,13 @@
 //! Health endpoint tests
 //!
 //! Verifies the health check endpoint location and response format per FR-2 specification.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_health_endpoint_at_correct_path` | Health endpoint at correct path per FR-2 spec | GET /api/health | 200 OK with JSON {"status": "healthy"} | ✅ |
+//! | `test_old_health_path_returns_404` | Old incorrect path should not exist | GET /health | 404 Not Found (only /api/health should exist) | ✅ |
 
 use axum::{ http::StatusCode, body::Body, Router };
 use tower::ServiceExt;

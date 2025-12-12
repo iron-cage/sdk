@@ -11,6 +11,14 @@
 //! 12. SQL injection in provider name (CRITICAL - security)
 //! 13. IC Token from different agent / authorization (CRITICAL - authorization)
 //! 14. IP Token replay attack (MEDIUM - cryptographic property)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_sql_injection_in_provider_name` | SQL injection attack via provider field | POST /api/budget/handshake with provider="openai'; DROP TABLE agents; --" | 400/404 Bad Request, agents table intact | ✅ |
+//! | `test_ic_token_authorization_enforcement` | Authorization bypass attempt with different agent's IC Token | Create lease for agent_1, attempt refresh with agent_2's IC Token | 403 Forbidden | ✅ |
+//! | `test_ip_token_replay_prevention` | Replay attack prevention | Two handshakes with same IC Token | Each handshake produces unique IP Token (different nonces) | ✅ |
 
 use axum::
 {

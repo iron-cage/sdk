@@ -32,6 +32,17 @@
 //! - `new_pattern_count >= 1` (Protocol 005 path exists)
 //! - `enforcement_count >= 3` (multi-layer enforcement active)
 //! - `ratio_shift == "complete"` (from "bypass available" to "bypass blocked")
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `metric_1_agent_accessible_credential_endpoints` | Count unprotected credential endpoints | Check /api/keys for agent token enforcement | 0 unprotected endpoints | ✅ |
+//! | `metric_2_budget_control_paths` | Count Protocol 005 budget control paths | Count budget tables and endpoints in code | 2 tables + 3 endpoints = 5 paths | ✅ |
+//! | `metric_3_enforcement_layers` | Count enforcement mechanisms | Verify database FK constraints, token schema, API enforcement | 3 enforcement layers active | ✅ |
+//! | `metric_4_migration_ratio_shift` | Verify migration ratio shift | Calculate bypass:protocol ratio | bypass:0% protocol:100% | ✅ |
+//! | `metric_5_checkpoint_verification` | Verify migration checkpoints | Check historical documentation, code change evidence, test coverage | All 3 checkpoints verified | ✅ |
+//! | `metric_summary_migration_score` | Calculate overall migration completeness | Combine all metrics into score | 5/5 checks pass (100%) | ✅ |
 
 use sqlx::SqlitePool;
 use iron_token_manager::migrations::apply_all_migrations;

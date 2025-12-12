@@ -16,6 +16,18 @@
 //! 5. Report usage on expired lease (time boundary)
 //! 6. Report usage exceeding lease budget (CRITICAL enforcement)
 //! 7. Refresh with insufficient agent budget (enforcement)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_handshake_with_nonexistent_agent` | Handshake for nonexistent agent | POST /api/budget/handshake with IC token for agent_id=999 (not in DB) | 404 Not Found or 403 Forbidden | ✅ |
+//! | `test_handshake_with_zero_agent_budget` | Handshake with zero budget | Agent with budget_remaining=0.0, POST /api/budget/handshake | 403 Forbidden (insufficient budget) | ✅ |
+//! | `test_handshake_with_insufficient_budget_for_lease` | Handshake with budget < lease requirement | Agent with budget=5.0 USD, request lease requiring 10.0 USD | 403 Forbidden (insufficient budget) | ✅ |
+//! | `test_report_usage_with_nonexistent_lease` | Report usage for nonexistent lease | POST /api/budget/report with lease_id="nonexistent_lease" | 404 Not Found | ✅ |
+//! | `test_report_usage_on_expired_lease` | Report usage on expired lease | Create lease, expire it, POST /api/budget/report | 403 Forbidden or 400 Bad Request (lease expired) | ✅ |
+//! | `test_report_usage_exceeding_lease_budget` | Usage exceeds lease budget limit | Lease with 10.0 USD, POST /api/budget/report with cost_usd=15.0 | 403 Forbidden (budget exceeded) | ✅ |
+//! | `test_refresh_with_insufficient_agent_budget` | Refresh with insufficient agent budget | Agent budget=5.0 USD, POST /api/budget/refresh requesting 10.0 USD | 403 Forbidden (insufficient budget) | ✅ |
 
 use axum::
 {

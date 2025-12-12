@@ -11,6 +11,22 @@
 //!
 //! # Authority
 //! test_organization.rulebook.md § Comprehensive Corner Case Coverage
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_handshake_whitespace_only_ic_token` | Whitespace-only IC token validation | POST /api/budget/handshake with ic_token="   \t\n  " | 400 Bad Request, error mentions "empty" | ✅ |
+//! | `test_handshake_whitespace_only_provider` | Whitespace-only provider validation | POST /api/budget/handshake with provider="   " | 400 Bad Request | ✅ |
+//! | `test_handshake_ic_token_over_max_length` | IC token DoS protection | POST /api/budget/handshake with ic_token >10KB | 400 Bad Request (length limit) | ✅ |
+//! | `test_handshake_provider_over_max_length` | Provider DoS protection | POST /api/budget/handshake with provider >1KB | 400 Bad Request (length limit) | ✅ |
+//! | `test_handshake_malformed_jwt_missing_segments` | Malformed JWT handling | POST /api/budget/handshake with ic_token="invalid.jwt" | 400 Bad Request (JWT validation) | ✅ |
+//! | `test_report_usage_negative_tokens` | Negative token value validation | POST /api/budget/report with tokens=-100 | 400 Bad Request | ✅ |
+//! | `test_report_usage_negative_cost` | Negative cost value validation | POST /api/budget/report with cost_usd=-5.0 | 400 Bad Request | ✅ |
+//! | `test_error_messages_no_sensitive_data_leak` | Error message security | Invalid handshake request | Error message contains no sensitive data (tokens, keys) | ✅ |
+//! | `test_report_usage_zero_cost_cached_response` | Zero cost cached response | POST /api/budget/report with cost_usd=0.0 | 200 OK (cached responses valid) | ✅ |
+//! | `test_database_foreign_key_constraint_agent` | FK constraint enforcement | Create lease for nonexistent agent_id | Database error (FK violation) | ✅ |
+//! | `test_database_not_null_constraint` | NOT NULL constraint enforcement | Insert lease with NULL required field | Database error (NOT NULL violation) | ✅ |
 
 use axum::
 {

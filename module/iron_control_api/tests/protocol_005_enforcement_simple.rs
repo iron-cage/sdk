@@ -17,6 +17,15 @@
 //! **Pitfall**: Always verify exclusive access patterns with database constraints
 //! AND API-level checks. Database constraints alone are insufficient if the API
 //! allows unauthorized paths. Both layers must enforce the same invariant.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_database_constraints_enforce_agent_budget_relationship` | Verify database FK constraints | Query pragma_foreign_key_list('budget_leases') | 2 foreign keys: agent_id→agents(id), budget_id→agent_budgets(agent_id) | ✅ |
+//! | `test_api_tokens_table_has_agent_id_column` | Verify api_tokens schema supports agent_id | Query pragma_table_info('api_tokens') for agent_id column | agent_id column exists | ✅ |
+//! | `test_agent_tokens_are_distinguishable_from_user_tokens` | Verify agent vs user token distinguishability | Create user token (agent_id=NULL) and agent token (agent_id=<id>) | User token has NULL agent_id, agent token has non-NULL agent_id | ✅ |
+//! | `test_enforcement_summary` | Summary of enforcement mechanisms | Verify all enforcement layers active | All enforcement checks pass | ✅ |
 
 use sqlx::SqlitePool;
 
