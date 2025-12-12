@@ -290,9 +290,9 @@ pub struct TokenListItem
 /// - **Authentication Required:** User must be authenticated via JWT Bearer token
 /// - **user_id Source:** Extracted from JWT claims (not request body)
 /// - **Request Fields:** `name` (required, 1-100 chars), `description` (optional, max 500 chars)
-/// - **Rate Limiting:** TODO - 10 creates/min per user (not yet implemented)
-/// - **Token Limit:** TODO - Max 10 active tokens per user (not yet implemented)
-/// - **Audit Logging:** TODO - Log creation with token value excluded (not yet implemented)
+/// - **Rate Limiting:** 10 creates/min per user (429 Too Many Requests if exceeded)
+/// - **Token Limit:** Max 10 active tokens per user (429 Too Many Requests if exceeded)
+/// - **Audit Logging:** Logs creation to audit_log (plaintext token excluded for security)
 ///
 /// # Backward Compatibility
 ///
@@ -328,6 +328,56 @@ pub async fn create_token(
   // Protocol 014: user_id comes from JWT authentication, not request body
   // Legacy: If user_id in request body, use it (for backward compatibility with existing tests)
   let user_id = request.user_id.as_ref().unwrap_or( &claims.sub );
+
+  // Rate limiting: Check both limits (Protocol 014)
+  // 1. Max active tokens per user: 10
+  // 2. Max token creates per minute: 10
+  let active_token_count = match state.storage.count_active_tokens_for_user( user_id ).await
+  {
+    Ok( count ) => count,
+    Err( _ ) =>
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to check token limit" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  let recent_creations = match state.storage.count_recent_token_creations( user_id ).await
+  {
+    Ok( count ) => count,
+    Err( _ ) =>
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to check rate limit" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Check rate limit first (time-based constraint is more restrictive in practice)
+  // This ensures users get the correct error message when both limits are reached
+  if recent_creations >= 10
+  {
+    return (
+      StatusCode::TOO_MANY_REQUESTS,
+      Json( serde_json::json!({ "error": "Rate limit exceeded" }) ),
+    )
+      .into_response();
+  }
+
+  // Then check active token limit
+  if active_token_count >= 10
+  {
+    return (
+      StatusCode::TOO_MANY_REQUESTS,
+      Json( serde_json::json!({ "error": "Token limit exceeded" }) ),
+    )
+      .into_response();
+  }
 
   // Generate token
   let token = state.generator.generate();
@@ -375,6 +425,28 @@ pub async fn create_token(
         .into_response();
     }
   };
+
+  // Log token creation to audit_log (Protocol 014 requirement)
+  // SECURITY: Never log plaintext token value
+  let changes_json = serde_json::json!({
+    "name": metadata.name,
+    "user_id": metadata.user_id,
+    "project_id": metadata.project_id,
+    "agent_id": metadata.agent_id,
+    "provider": metadata.provider,
+  }).to_string();
+
+  if state.storage.log_audit_event(
+    "token",
+    token_id,
+    "created",
+    user_id,
+    Some( &changes_json ),
+  ).await.is_err()
+  {
+    // Log error but don't fail request (audit logging is not critical path)
+    tracing::error!( "Failed to log token creation to audit_log (token_id={})", token_id );
+  }
 
   ( StatusCode::CREATED, Json( CreateTokenResponse
   {
@@ -732,7 +804,7 @@ pub async fn rotate_token(
 ///
 /// - **Authentication Required:** User must be authenticated via JWT Bearer token
 /// - **Ownership Verification:** User can only revoke their own tokens (403 Forbidden for others)
-/// - **Audit Logging:** TODO - Log revocation (not yet implemented)
+/// - **Audit Logging:** Revocation is logged to audit_log table (Protocol 014 requirement)
 /// - **Response:** 200 OK with details (not 204 No Content)
 /// - **Already Revoked:** Returns 409 Conflict (not 404 Not Found)
 ///
@@ -782,21 +854,54 @@ pub async fn revoke_token(
       .into_response();
   }
 
-  // Check if token is already revoked (Protocol 014: return 409 Conflict, not 404)
+  // Check if token is inactive (was revoked or rotated)
   if !metadata.is_active
   {
-    return (
-      StatusCode::CONFLICT,
-      Json( serde_json::json!({ "error": "Token already revoked" }) ),
-    )
-      .into_response();
+    // Distinguish explicit revocation (409) from rotation (404)
+    if metadata.revoked_at.is_some()
+    {
+      // Token was explicitly revoked - return 409 (Protocol 014)
+      return (
+        StatusCode::CONFLICT,
+        Json( serde_json::json!({ "error": "Token already revoked" }) ),
+      )
+        .into_response();
+    }
+    else
+    {
+      // Token was rotated or otherwise deactivated - return 404
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Token not found" }) ),
+      )
+        .into_response();
+    }
   }
 
-  // Deactivate token (atomic operation)
-  match state.storage.deactivate_token( token_id ).await
+  // Revoke token (sets is_active = 0 and revoked_at = timestamp)
+  match state.storage.revoke_token( token_id ).await
   {
     Ok( () ) =>
     {
+      // Log token revocation to audit_log (Protocol 014 requirement)
+      let changes_json = serde_json::json!({
+        "token_id": token_id,
+        "user_id": metadata.user_id,
+        "project_id": metadata.project_id,
+      }).to_string();
+
+      if state.storage.log_audit_event(
+        "token",
+        token_id,
+        "revoked",
+        user_id,
+        Some( &changes_json ),
+      ).await.is_err()
+      {
+        // Log error but don't fail request (audit logging is not critical path)
+        tracing::error!( "Failed to log token revocation to audit_log (token_id={})", token_id );
+      }
+
       // Protocol 014: Return 200 OK with details (not 204 No Content)
       ( StatusCode::OK, Json( serde_json::json!({
         "id": token_id,
@@ -807,12 +912,41 @@ pub async fn revoke_token(
     }
     Err( _ ) =>
     {
-      // Deactivation failed (race condition - token was revoked by another request)
-      (
-        StatusCode::CONFLICT,
-        Json( serde_json::json!({ "error": "Token already revoked" }) ),
-      )
-        .into_response()
+      // Revocation failed (race condition - token was deactivated by another request)
+      // Fetch metadata again to determine if it was revoked or rotated
+      match state.storage.get_token_metadata( token_id ).await
+      {
+        Ok( updated_metadata ) =>
+        {
+          if updated_metadata.revoked_at.is_some()
+          {
+            // Token was revoked - return 409
+            (
+              StatusCode::CONFLICT,
+              Json( serde_json::json!({ "error": "Token already revoked" }) ),
+            )
+              .into_response()
+          }
+          else
+          {
+            // Token was rotated or otherwise deactivated - return 404
+            (
+              StatusCode::NOT_FOUND,
+              Json( serde_json::json!({ "error": "Token not found" }) ),
+            )
+              .into_response()
+          }
+        }
+        Err( _ ) =>
+        {
+          // Token doesn't exist - return 404
+          (
+            StatusCode::NOT_FOUND,
+            Json( serde_json::json!({ "error": "Token not found" }) ),
+          )
+            .into_response()
+        }
+      }
     }
   }
 }

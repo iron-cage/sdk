@@ -156,6 +156,7 @@ struct AppState
   users: iron_control_api::routes::users::UserManagementState,
   agents: sqlx::SqlitePool,
   budget: iron_control_api::routes::budget::BudgetState,
+  analytics: iron_control_api::routes::analytics::AnalyticsState,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -264,6 +265,15 @@ impl axum::extract::FromRef< AppState > for iron_control_api::token_auth::ApiTok
     {
       token_storage: state.keys.token_storage.clone(),
     }
+  }
+}
+
+/// Enable analytics routes to access AnalyticsState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::analytics::AnalyticsState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.analytics.clone()
   }
 }
 
@@ -431,8 +441,32 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     permission_checker,
   );
 
+  // Initialize analytics state (Protocol 012)
+  // Uses same IC_TOKEN_SECRET as budget module for consistent agent authentication
+  let analytics_state = iron_control_api::routes::analytics::AnalyticsState::new(
+    &database_url,
+    ic_token_secret.clone(),
+  )
+    .await
+    .expect( "Failed to initialize analytics state" );
+
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
+
+  // Seed database with test data if empty (development convenience)
+  let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( &agents_pool )
+    .await
+    .unwrap_or( 0 );
+
+  if user_count == 0
+  {
+    tracing::info!( "Seeding database with test data..." );
+    iron_token_manager::seed::seed_all( &agents_pool )
+      .await
+      .expect( "Failed to seed database" );
+    tracing::info!( "✓ Database seeded (admin@admin.com / testpass)" );
+  }
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
@@ -457,6 +491,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     users: user_management_state,
     agents: agents_pool,
     budget: budget_state,
+    analytics: analytics_state,
   };
 
   // Build router with all endpoints
@@ -536,6 +571,17 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/budget/requests/:id/approve", axum::routing::patch( iron_control_api::routes::budget::approve_budget_request ) )
     .route( "/api/v1/budget/requests/:id/reject", axum::routing::patch( iron_control_api::routes::budget::reject_budget_request ) )
 
+    // Analytics endpoints (Protocol 012)
+    .route( "/api/v1/analytics/events", post( iron_control_api::routes::analytics::post_event ) )
+    .route( "/api/v1/analytics/spending/total", get( iron_control_api::routes::analytics::get_spending_total ) )
+    .route( "/api/v1/analytics/spending/by-agent", get( iron_control_api::routes::analytics::get_spending_by_agent ) )
+    .route( "/api/v1/analytics/spending/by-provider", get( iron_control_api::routes::analytics::get_spending_by_provider ) )
+    .route( "/api/v1/analytics/spending/avg-per-request", get( iron_control_api::routes::analytics::get_spending_avg ) )
+    .route( "/api/v1/analytics/budget/status", get( iron_control_api::routes::analytics::get_budget_status ) )
+    .route( "/api/v1/analytics/usage/requests", get( iron_control_api::routes::analytics::get_usage_requests ) )
+    .route( "/api/v1/analytics/usage/tokens/by-agent", get( iron_control_api::routes::analytics::get_usage_tokens ) )
+    .route( "/api/v1/analytics/usage/models", get( iron_control_api::routes::analytics::get_usage_models ) )
+
     // Apply combined state to all routes
     .with_state( app_state )
 
@@ -601,6 +647,15 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  GET  /api/v1/budget/requests/:id" );
   tracing::info!( "  PATCH /api/v1/budget/requests/:id/approve" );
   tracing::info!( "  PATCH /api/v1/budget/requests/:id/reject" );
+  tracing::info!( "  POST /api/v1/analytics/events" );
+  tracing::info!( "  GET  /api/v1/analytics/spending/total" );
+  tracing::info!( "  GET  /api/v1/analytics/spending/by-agent" );
+  tracing::info!( "  GET  /api/v1/analytics/spending/by-provider" );
+  tracing::info!( "  GET  /api/v1/analytics/spending/avg-per-request" );
+  tracing::info!( "  GET  /api/v1/analytics/budget/status" );
+  tracing::info!( "  GET  /api/v1/analytics/usage/requests" );
+  tracing::info!( "  GET  /api/v1/analytics/usage/tokens/by-agent" );
+  tracing::info!( "  GET  /api/v1/analytics/usage/models" );
 
   // Start server
   let listener = tokio::net::TcpListener::bind( addr ).await?;

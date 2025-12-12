@@ -42,6 +42,10 @@ async fn seed_test_users_for_tokens( pool: &SqlitePool )
     "test", "test_rotate",
     // Concurrency test users
     "user_rotate_concurrent", "user_revoke_concurrent", "user_rotate_revoke_race",
+    // Audit logging test users
+    "user_audit_test", "user_revoke_audit",
+    // Rate limiting test users
+    "user_rate_limit_test", "user_rate_limit_creation",
   ];
 
   // Security test users (command injection, SQL injection, XSS, unicode, etc.)

@@ -19,9 +19,10 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 **In Scope:**
 - REST API endpoints (tokens, usage, limits, traces, auth handshake, user management)
 - Budget control endpoints (Protocol 005: handshake, usage reporting, budget refresh)
+- Analytics endpoints (Protocol 012: event ingestion, spending/usage queries)
 - Agent token enforcement (blocking unauthorized credential access)
 - WebSocket server for dashboard real-time updates
-- Authentication and authorization (IC Token validation)
+- Authentication and authorization (IC Token validation, JWT)
 - Request routing and validation
 - RBAC enforcement (role-based access control)
 - Integration with iron_token_manager, iron_runtime_state
@@ -58,9 +59,10 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 **Key Components:**
 - **REST Router:** Handles HTTP endpoints for tokens, usage, limits
 - **Budget Control Router (Protocol 005):** Manages budget handshake, usage reporting, budget refresh
+- **Analytics Router (Protocol 012):** Event ingestion and spending/usage queries
 - **Agent Token Enforcement:** Blocks agent tokens from unauthorized credential endpoints
 - **WebSocket Server:** Broadcasts real-time agent events to dashboard
-- **Auth Middleware:** Validates IC Tokens, enforces authorization
+- **Auth Middleware:** Validates IC Tokens and JWT, enforces authorization
 - **Request Handler:** Routes requests to appropriate modules
 
 ---
@@ -394,6 +396,84 @@ Reject a budget change request.
 
 ---
 
+### Analytics API (Protocol 012)
+
+Protocol 012 provides analytics for LLM usage tracking and dashboard display.
+
+#### POST /api/v1/analytics/events
+
+Report LLM request events from LlmRouter.
+
+**Request:**
+```json
+{
+  "ic_token": "<ic_token>",
+  "event_id": "evt_7c9e6679-7425-40de-944b",
+  "timestamp_ms": 1733830245123,
+  "event_type": "llm_request_completed",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "input_tokens": 150,
+  "output_tokens": 50,
+  "cost_micros": 1250,
+  "provider_id": "ip_openai-001"
+}
+```
+
+**Request Fields:**
+- `ic_token` (string, required): IC Token for authentication - agent_id derived from token claims
+- `event_id` (string, required): UUID for deduplication, unique per agent
+- `timestamp_ms` (integer, required): Unix timestamp in milliseconds
+- `event_type` (string, required): `llm_request_completed` or `llm_request_failed`
+- `model` (string, required): Model name (e.g., `gpt-4o-mini`)
+- `provider` (string, required): Provider: `openai`, `anthropic`, `unknown`
+- `input_tokens` (integer, required*): Input token count (*required for completed)
+- `output_tokens` (integer, required*): Output token count (*required for completed)
+- `cost_micros` (integer, required*): Cost in microdollars (1 USD = 1,000,000)
+- `provider_id` (string, optional): Provider key identifier
+- `error_code` (string, optional): Error code (for failed events)
+- `error_message` (string, optional): Error message (for failed events)
+
+**Note:** `agent_id` is automatically extracted from IC Token claims (format: `agent_<id>`).
+
+**Response (202 Accepted):**
+```json
+{
+  "event_id": "evt_7c9e6679-7425-40de-944b",
+  "status": "accepted"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid event data or validation error
+- `401 Unauthorized`: Invalid or expired IC Token
+
+---
+
+#### GET Endpoints (JWT Protected)
+
+All GET endpoints require JWT authentication via `Authorization: Bearer <jwt_token>` header.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/analytics/spending/total` | Total spending across all agents |
+| `GET /api/v1/analytics/spending/by-agent` | Spending breakdown by agent |
+| `GET /api/v1/analytics/spending/by-provider` | Spending breakdown by provider |
+| `GET /api/v1/analytics/spending/avg-per-request` | Average cost per request |
+| `GET /api/v1/analytics/budget/status` | Budget status for agents |
+| `GET /api/v1/analytics/usage/requests` | Request count statistics |
+| `GET /api/v1/analytics/usage/tokens/by-agent` | Token usage by agent |
+| `GET /api/v1/analytics/usage/models` | Model usage statistics |
+
+**Common Query Parameters:**
+- `period` (string): Time range: `today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time`
+- `agent_id` (integer): Filter by specific agent
+- `provider_id` (string): Filter by specific provider
+- `page` (integer): Page number (default: 1)
+- `per_page` (integer): Results per page (default: 50, max: 100)
+
+---
+
 ### Agent Token Enforcement
 
 **Enforcement Rule:** Agent tokens (api_tokens table rows where agent_id IS NOT NULL) CANNOT access credential endpoints that bypass Protocol 005.
@@ -435,3 +515,4 @@ Reject a budget change request.
 *For WebSocket protocol, see docs/protocol/003_websocket_protocol.md*
 *For Budget Control Protocol (Protocol 005), see docs/protocol/005_budget_control_protocol.md*
 *For user management API, see docs/protocol/008_user_management_api.md*
+*For Analytics API (Protocol 012), see docs/protocol/012_analytics_api.md*

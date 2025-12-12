@@ -104,6 +104,9 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 014: Add owner_id to agents table
   apply_migration_014( pool ).await?;
 
+  // Migration 015: Add revoked_at timestamp to api_tokens
+  apply_migration_015( pool ).await?;
+
   Ok( () )
 }
 
@@ -421,6 +424,37 @@ async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
   if completed == 0
   {
     let migration = include_str!( "../migrations/014_add_agents_owner_id.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 015: Add `revoked_at` timestamp to `api_tokens`
+///
+/// Adds timestamp to distinguish explicit revocations from rotations.
+/// Fixes concurrency race condition where revoke returns wrong status code.
+///
+/// Fix(issue-TBD): Enable distinguishing revoked (409) vs rotated (404) tokens
+/// Root cause: `is_active` flag alone cannot distinguish revocation reason
+/// Pitfall: Without this field, concurrent rotate+revoke returns wrong status
+#[ allow( dead_code ) ]
+async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_015_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/015_add_revoked_at.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await

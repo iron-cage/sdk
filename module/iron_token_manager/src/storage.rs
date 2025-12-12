@@ -31,6 +31,8 @@ pub struct TokenMetadata
   pub last_used_at: Option< i64 >,
   /// Expiration timestamp (milliseconds since epoch)
   pub expires_at: Option< i64 >,
+  /// Revocation timestamp (milliseconds since epoch, NULL if rotated/deactivated)
+  pub revoked_at: Option< i64 >,
 }
 
 /// Token storage layer
@@ -352,7 +354,7 @@ impl TokenStorage
   pub async fn get_token_metadata( &self, token_id: i64 ) -> Result< TokenMetadata >
   {
     let row = sqlx::query(
-      "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at \
+      "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at, revoked_at \
        FROM api_tokens WHERE id = $1"
     )
     .bind( token_id )
@@ -371,6 +373,7 @@ impl TokenStorage
       created_at: row.get( "created_at" ),
       last_used_at: row.get( "last_used_at" ),
       expires_at: row.get( "expires_at" ),
+      revoked_at: row.get( "revoked_at" ),
     } )
   }
 
@@ -390,6 +393,39 @@ impl TokenStorage
       .execute( &self.pool )
       .await
       .map_err( |_| crate::error::TokenError )?;
+
+    if result.rows_affected() == 0
+    {
+      return Err( crate::error::TokenError );
+    }
+
+    Ok( () )
+  }
+
+  /// Revoke token (deactivate and mark as explicitly revoked)
+  ///
+  /// Sets both `is_active = 0` and `revoked_at = current_timestamp`.
+  /// Enables distinguishing explicit revocations (409) from rotations (404).
+  ///
+  /// # Arguments
+  ///
+  /// * `token_id` - Database ID of token to revoke
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails or token not found (0 rows affected)
+  pub async fn revoke_token( &self, token_id: i64 ) -> Result< () >
+  {
+    let now_ms = current_time_ms();
+
+    let result = sqlx::query(
+      "UPDATE api_tokens SET is_active = 0, revoked_at = $1 WHERE id = $2 AND is_active = 1"
+    )
+    .bind( now_ms )
+    .bind( token_id )
+    .execute( &self.pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
 
     if result.rows_affected() == 0
     {
@@ -438,7 +474,7 @@ impl TokenStorage
   pub async fn list_user_tokens( &self, user_id: &str ) -> Result< Vec< TokenMetadata > >
   {
     let rows = sqlx::query(
-      "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at \
+      "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at, revoked_at \
        FROM api_tokens WHERE user_id = $1 ORDER BY created_at DESC"
     )
     .bind( user_id )
@@ -458,6 +494,7 @@ impl TokenStorage
         created_at: row.get( "created_at" ),
         last_used_at: row.get( "last_used_at" ),
         expires_at: row.get( "expires_at" ),
+        revoked_at: row.get( "revoked_at" ),
       } ).collect()
     )
   }
@@ -547,6 +584,115 @@ impl TokenStorage
   pub fn pool( &self ) -> &SqlitePool
   {
     &self.pool
+  }
+
+  /// Log audit event to `audit_log` table
+  ///
+  /// # Arguments
+  ///
+  /// * `entity_type` - Type of entity ("token", "limit", "usage")
+  /// * `entity_id` - ID of the entity
+  /// * `action` - Action performed ("created", "revoked", "updated", etc.)
+  /// * `actor_user_id` - User who performed the action
+  /// * `changes` - JSON object with before/after values (optional)
+  ///
+  /// # Returns
+  ///
+  /// Ok if audit log entry was created successfully
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database write fails
+  ///
+  /// # Security
+  ///
+  /// - Never log plaintext token values in changes field
+  /// - Always log who performed the action for accountability
+  pub async fn log_audit_event(
+    &self,
+    entity_type: &str,
+    entity_id: i64,
+    action: &str,
+    actor_user_id: &str,
+    changes: Option< &str >,
+  ) -> Result< () >
+  {
+    let logged_at = current_time_ms();
+
+    sqlx::query(
+      "INSERT INTO audit_log (entity_type, entity_id, action, actor_user_id, changes, logged_at)
+       VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    .bind( entity_type )
+    .bind( entity_id )
+    .bind( action )
+    .bind( actor_user_id )
+    .bind( changes )
+    .bind( logged_at )
+    .execute( &self.pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    Ok( () )
+  }
+
+  /// Count active tokens for a user
+  ///
+  /// Used for enforcing max active tokens limit (Protocol 014: max 10 per user).
+  ///
+  /// # Arguments
+  ///
+  /// * `user_id` - User ID to check
+  ///
+  /// # Returns
+  ///
+  /// Number of active tokens for this user
+  ///
+  /// # Errors
+  ///
+  /// Returns `TokenError` if database query fails
+  pub async fn count_active_tokens_for_user( &self, user_id: &str ) -> Result< i64 >
+  {
+    let count: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM api_tokens WHERE user_id = ? AND is_active = 1"
+    )
+    .bind( user_id )
+    .fetch_one( &self.pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    Ok( count )
+  }
+
+  /// Count token creations in the last minute for a user
+  ///
+  /// Used for rate limiting (Protocol 014: max 10 creates/min per user).
+  ///
+  /// # Arguments
+  ///
+  /// * `user_id` - User ID to check
+  ///
+  /// # Returns
+  ///
+  /// Number of tokens created in the last 60 seconds
+  ///
+  /// # Errors
+  ///
+  /// Returns `TokenError` if database query fails
+  pub async fn count_recent_token_creations( &self, user_id: &str ) -> Result< i64 >
+  {
+    let one_minute_ago = current_time_ms() - 60_000;  // 60 seconds in milliseconds
+
+    let count: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM api_tokens WHERE user_id = ? AND created_at > ?"
+    )
+    .bind( user_id )
+    .bind( one_minute_ago )
+    .fetch_one( &self.pool )
+    .await
+    .map_err( |_| crate::error::TokenError )?;
+
+    Ok( count )
   }
 }
 

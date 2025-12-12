@@ -10,7 +10,7 @@
 //! | `test_concurrent_token_creation_uniqueness` | 2x POST /api/v1/api-tokens | Both succeed with unique tokens | ✅ |
 //! | `test_concurrent_rotate_same_token` | 2x POST /api/v1/api-tokens/:id/rotate | One succeeds, one gets 404 | ✅ |
 //! | `test_concurrent_revoke_same_token` | 2x DELETE /api/v1/api-tokens/:id | One 200, one 409 | ✅ |
-//! | `test_concurrent_rotate_and_revoke` | Rotate + Revoke same token | One succeeds, one 404 | ✅ |
+//! | `test_concurrent_rotate_and_revoke` | Rotate + Revoke same token | One succeeds, one 404/409 | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -400,11 +400,15 @@ async fn test_concurrent_rotate_and_revoke()
   let ( op1, status1 ) = rotate_handle.await.unwrap();
   let ( op2, status2 ) = revoke_handle.await.unwrap();
 
-  // One operation should succeed, the other should get 404
+  // One operation should succeed, the other should get 404 or 409
+  // WHY: If rotate wins, revoke gets 404 (token no longer exists)
+  //      If revoke wins, rotate gets 409 (token already revoked)
   let results = vec![ ( op1, status1 ), ( op2, status2 ) ];
 
   let success_count = results.iter().filter( |( _, s )| s.is_success() ).count();
-  let not_found_count = results.iter().filter( |( _, s )| *s == StatusCode::NOT_FOUND ).count();
+  let failure_count = results.iter().filter( |( _, s )|
+    *s == StatusCode::NOT_FOUND || *s == StatusCode::CONFLICT
+  ).count();
 
   assert_eq!(
     success_count,
@@ -414,9 +418,9 @@ async fn test_concurrent_rotate_and_revoke()
   );
 
   assert_eq!(
-    not_found_count,
+    failure_count,
     1,
-    "LOUD FAILURE: Exactly one operation must fail with 404. Results: {:?}",
+    "LOUD FAILURE: Exactly one operation must fail with 404 or 409. Results: {:?}",
     results
   );
 }

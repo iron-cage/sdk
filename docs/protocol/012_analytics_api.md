@@ -1,9 +1,8 @@
 # Protocol 012: Analytics API
 
 **Status:** Specification
-**Version:** 1.1.0
+**Version:** 1.7.0
 **Last Updated:** 2025-12-12
-**Priority:** NICE-TO-HAVE
 
 ---
 
@@ -18,6 +17,7 @@ The Analytics API provides insights into agent spending, provider usage, budget 
 - **Pagination:** Consistent offset pagination across all endpoints
 - **Filtering:** By agent_id and provider_id
 - **Authorization:** Users see own data, admins see all data
+- **Multi-agent:** Single database stores events from all agents, filtered by `agent_id`
 
 ---
 
@@ -78,13 +78,13 @@ LlmRouter reports analytics events after each LLM request. Events are sent async
 ```http
 POST /api/v1/analytics/events
 Content-Type: application/json
-Authorization: Bearer <ic_token>
 ```
 
 **Request Body:**
 
 ```json
 {
+  "ic_token": "<ic_token>",
   "event_id": "evt_7c9e6679-7425-40de-944b",
   "timestamp_ms": 1733830245123,
   "event_type": "llm_request_completed",
@@ -93,7 +93,6 @@ Authorization: Bearer <ic_token>
   "input_tokens": 150,
   "output_tokens": 50,
   "cost_micros": 1250,
-  "agent_id": "agent_abc123",
   "provider_id": "ip_openai-001"
 }
 ```
@@ -102,7 +101,8 @@ Authorization: Bearer <ic_token>
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `event_id` | string | YES | UUID for deduplication (`evt_<uuid>`) |
+| `ic_token` | string | YES | IC Token for authentication - agent_id derived from token claims |
+| `event_id` | string | YES | UUID for deduplication, unique per agent (`evt_<uuid>`) |
 | `timestamp_ms` | integer | YES | Unix timestamp in milliseconds |
 | `event_type` | string | YES | `llm_request_completed` or `llm_request_failed` |
 | `model` | string | YES | Model name (e.g., `gpt-4o-mini`, `claude-3-opus`) |
@@ -110,10 +110,11 @@ Authorization: Bearer <ic_token>
 | `input_tokens` | integer | YES* | Input token count (*required for completed) |
 | `output_tokens` | integer | YES* | Output token count (*required for completed) |
 | `cost_micros` | integer | YES* | Cost in microdollars (1 USD = 1,000,000) |
-| `agent_id` | string | NO | Agent identifier (optional) |
 | `provider_id` | string | NO | Provider key identifier (optional) |
 | `error_code` | string | NO | Error code (for failed events) |
 | `error_message` | string | NO | Error message (for failed events) |
+
+**Note:** `agent_id` is automatically extracted from the IC Token claims (format: `agent_<id>`).
 
 **Event Types:**
 
@@ -167,9 +168,39 @@ Content-Type: application/json
 **Behavior:**
 
 - **Async processing:** Server accepts immediately (202), processes asynchronously
-- **Idempotent:** Duplicate `event_id` returns 200 (not error)
+- **Idempotent:** Duplicate `(agent_id, event_id)` returns 200 (not error)
+- **Per-agent deduplication:** Same `event_id` from different agents are distinct events
 - **Non-blocking:** LlmRouter sends fire-and-forget, doesn't wait for response
 - **Retry:** On network failure, LlmRouter retries with exponential backoff
+
+**Storage:**
+
+All events stored in single shared `analytics_events` table:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     analytics_events                         │
+├─────────────────────────────────────────────────────────────┤
+│ id │ event_id │ agent_id │ model     │ cost_micros │ ...   │
+├────┼──────────┼──────────┼───────────┼─────────────┼───────┤
+│ 1  │ evt_001  │ 42       │ gpt-4o    │ 1250        │       │
+│ 2  │ evt_002  │ 42       │ gpt-4o    │ 800         │       │
+│ 3  │ evt_001  │ 99       │ claude    │ 2100        │ ✓     │ ← same event_id, different agent
+│ 4  │ evt_003  │ 42       │ gpt-4o    │ 500         │       │
+└─────────────────────────────────────────────────────────────┘
+        ↑
+   UNIQUE(agent_id, event_id)  ← per-agent deduplication
+```
+
+**Deduplication examples:**
+
+```
+Agent 42 sends: { ic_token: "<token_for_agent_42>", event_id: "evt_001" } → 202 Accepted
+Agent 99 sends: { ic_token: "<token_for_agent_99>", event_id: "evt_001" } → 202 Accepted (different agent)
+Agent 42 sends: { ic_token: "<token_for_agent_42>", event_id: "evt_001" } → 200 Duplicate (same agent+event)
+```
+
+Note: `agent_id` is extracted from IC token claims, not from request body.
 
 **Cost Units:**
 
@@ -184,12 +215,12 @@ $1.00 USD = 1,000,000 microdollars
 
 ```json
 {
+  "ic_token": "<ic_token>",
   "event_id": "evt_8d0f7780-8536-51ef-955c",
   "timestamp_ms": 1733830246456,
   "event_type": "llm_request_failed",
   "model": "gpt-4o-mini",
   "provider": "openai",
-  "agent_id": "agent_abc123",
   "provider_id": "ip_openai-001",
   "error_code": "rate_limit_exceeded",
   "error_message": "Rate limit exceeded. Please retry after 60 seconds."
@@ -198,8 +229,9 @@ $1.00 USD = 1,000,000 microdollars
 
 **Authorization:**
 
-- Requires valid IC Token
-- Events are associated with token's user
+- Requires valid IC Token in request body
+- `agent_id` extracted from token claims (format: `agent_<id>`)
+- Events are associated with token's agent
 
 **Rate Limiting:**
 
@@ -222,7 +254,7 @@ $1.00 USD = 1,000,000 microdollars
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/total?period=today&agent_id=agent_abc123
+GET /api/v1/analytics/spending/total?period=today&agent_id=agent-abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -231,7 +263,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range: `today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time` |
-| `agent_id` | string | - | Filter by specific agent (optional) |
+| `agent_id` | integer | - | Filter by specific agent (optional) |
 | `provider_id` | string | - | Filter by specific provider (optional) |
 
 **Success Response:**
@@ -288,7 +320,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | string | - | Filter by specific agent (returns single result) |
+| `agent_id` | integer | - | Filter by specific agent (returns single result) |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -339,7 +371,7 @@ Content-Type: application/json
 | Field | Type | Description |
 |-------|------|-------------|
 | `data[]` | array | Agent spending records (sorted by spending desc) |
-| `data[].agent_id` | string | Agent identifier |
+| `data[].agent_id` | integer | Agent identifier |
 | `data[].agent_name` | string | Agent name |
 | `data[].spending` | number | Amount spent (USD) |
 | `data[].budget` | number | Total budget (USD) |
@@ -377,7 +409,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | integer | - | Filter agents above threshold (e.g., 80 = show agents with >80% budget used) |
-| `agent_id` | string | - | Filter by specific agent |
+| `agent_id` | integer | - | Filter by specific agent |
 | `status` | string | - | Filter by status: `active`, `exhausted`, `inactive` |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -480,7 +512,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | string | - | Filter by specific agent |
+| `agent_id` | integer | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider (returns single result) |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -556,7 +588,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/usage/requests?period=today&agent_id=agent_abc123
+GET /api/v1/analytics/usage/requests?period=today&agent_id=agent-abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -565,7 +597,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `today` | Time range |
-| `agent_id` | string | - | Filter by specific agent |
+| `agent_id` | integer | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -625,7 +657,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | string | - | Filter by specific agent |
+| `agent_id` | integer | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -712,7 +744,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | string | - | Filter by specific agent |
+| `agent_id` | integer | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -798,7 +830,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent_abc123
+GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent-abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -807,7 +839,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | string | - | Filter by specific agent |
+| `agent_id` | integer | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -890,7 +922,7 @@ All list endpoints support pagination:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `agent_id` | string | Filter by specific agent |
+| `agent_id` | integer | Filter by specific agent |
 | `provider_id` | string | Filter by specific provider |
 
 **Note:** Filters are optional. Omitting filters returns data for all accessible agents/providers (based on user authorization).
@@ -979,7 +1011,7 @@ HTTP 200 OK
 # Total spend
 iron analytics spending total
 iron analytics spending total --period today
-iron analytics spending total --agent agent_abc123
+iron analytics spending total --agent agent-abc123
 
 # By agent
 iron analytics spending by-agent
@@ -989,7 +1021,7 @@ iron analytics spending by-agent --provider ip_openai_001
 # By provider
 iron analytics spending by-provider
 iron analytics spending by-provider --period last-30-days
-iron analytics spending by-provider --agent agent_abc123
+iron analytics spending by-provider --agent agent-abc123
 
 # Average cost
 iron analytics spending avg-per-request
@@ -1002,7 +1034,7 @@ iron analytics spending avg-per-request --period today
 # Requests
 iron analytics usage requests
 iron analytics usage requests --period today
-iron analytics usage requests --agent agent_abc123
+iron analytics usage requests --agent agent-abc123
 
 # Tokens
 iron analytics usage tokens by-agent
@@ -1024,9 +1056,9 @@ iron analytics budget status --status active
 
 # Output:
 # AGENT                 BUDGET    SPENT     REMAINING  USED    RISK
-# agent_abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
-# agent_def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
-# agent_ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
+# agent-abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
+# agent-def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
+# agent-ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
 #
 # Summary: 3 agents (2 active, 1 exhausted, 1 critical, 1 high)
 ```
@@ -1043,6 +1075,6 @@ iron analytics budget status --status active
 
 ---
 
-**Protocol 012 Version:** 1.1.0
+**Protocol 012 Version:** 1.5.0
 **Status:** Specification
-**Last Updated:** 2025-12-12
+**Last Updated:** 2025-12-11
