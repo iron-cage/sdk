@@ -16,11 +16,11 @@ secrets_path = os.path.join(script_dir, "..", "secret", "-secrets.sh")
 # Load variables
 load_dotenv(secrets_path, override=True)
 
-# Check for OpenAI Key
+# Check for OpenAI Token
 if not os.getenv("OPENAI_API_KEY"):
     clean_path = os.path.normpath(secrets_path)
     raise ValueError(f"CRITICAL ERROR: OPENAI_API_KEY is missing. Checked file: {clean_path}")
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-5-nano", temperature=1, max_retries=2)
 
 # --- System Prompt for the Agent ---
 # Defines the agent's role, algorithm, and strict output format.
@@ -30,13 +30,14 @@ You are an API proxy. Your only goal is to return raw data in JSON format.
 ALGORITHM:
 1. Use `search_leads` to get IDs.
 2. For EACH found ID, call `get_lead_details`.
-3. Collect all results from `get_lead_details` into a single list.
+3. Collect all results from `get_lead_details` as a JSON.
 
 OUTPUT FORMAT (CRITICAL):
-- Return ONLY a valid JSON Array (list of objects).
+- Return all and ONLY a valid JSON Array (list of objects).
 - Do not write any text, do not say hello, do not explain anything.
 - Do not use Markdown (no ```json).
 - Do not truncate data.
+- Do not revrite or modify the data.
 
 Example output:
 [
@@ -58,7 +59,6 @@ prompt = ChatPromptTemplate.from_messages([
 agent = create_tool_calling_agent(llm, tools_list, prompt)
 
 # Creates the executor, which runs the agent and manages its workflow.
-agent_executor = AgentExecutor(
 agent_executor = AgentExecutor(
     agent=agent, 
     tools=tools_list, 
