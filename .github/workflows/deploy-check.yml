@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy-tests:
-    runs-on: iron_sdk
+    runs-on: iron_cage_sdk
 
     steps:
     - name: Checkout code
@@ -22,7 +22,7 @@ jobs:
         bats deploy/tests/redeploy.bats
 
   terraform-validate-gar:
-    runs-on: iron_sdk
+    runs-on: iron_cage_sdk
 
     defaults:
       run:
@@ -50,7 +50,7 @@ jobs:
 
   terraform-validate-hetzner:
     name: Validate deploy/hetzner
-    runs-on: iron_sdk
+    runs-on: iron_cage_sdk
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

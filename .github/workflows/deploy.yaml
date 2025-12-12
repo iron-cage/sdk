@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: iron_sdk
+    runs-on: iron_cage_sdk
     steps:
     - uses: actions/checkout@v4
     
