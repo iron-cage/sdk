@@ -1,69 +1,103 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi } from '../composables/useApi'
+import { useApi, type AnalyticsPeriod } from '../composables/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const api = useApi()
 
-// Fetch usage data
-const { data: usageRecords, isLoading: recordsLoading, error: recordsError } = useQuery({
-  queryKey: ['usage'],
-  queryFn: () => api.getUsage(),
+// Period selector
+const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
+
+const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'last7-days', label: 'Last 7 Days' },
+  { value: 'last30-days', label: 'Last 30 Days' },
+  { value: 'this-month', label: 'This Month' },
+  { value: 'all-time', label: 'All Time' },
+]
+
+// Fetch from Protocol 012 endpoints
+const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
+  queryKey: ['analytics-requests', selectedPeriod],
+  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value }),
 })
 
-const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
-  queryKey: ['usage-stats'],
-  queryFn: () => api.getUsageStats(),
+const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
+  queryKey: ['analytics-spending-provider', selectedPeriod],
+  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value }),
 })
 
-const isLoading = computed(() => recordsLoading.value || statsLoading.value)
-const error = computed(() => recordsError.value || statsError.value)
-
-// Recent usage (last 10)
-const recentUsage = computed(() => {
-  if( !usageRecords.value ) return []
-  return [ ...usageRecords.value ]
-    .sort( ( a, b ) => b.timestamp - a.timestamp )
-    .slice( 0, 10 )
+const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
+  queryKey: ['analytics-models', selectedPeriod],
+  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value }),
 })
+
+const isLoading = computed(() =>
+  requestsLoading.value || providerLoading.value || modelLoading.value
+)
+const error = computed(() =>
+  requestsError.value || providerError.value || modelError.value
+)
+
+// Computed values from Protocol 012 responses
+const totalRequests = computed(() => requestStats.value?.total_requests || 0)
+const successRate = computed(() => requestStats.value?.success_rate || 0)
+const totalSpend = computed(() => spendingByProvider.value?.summary.total_spend || 0)
+const totalInputTokens = computed(() =>
+  modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0
+)
+const totalOutputTokens = computed(() =>
+  modelUsage.value?.data.reduce((sum, m) => sum + m.output_tokens, 0) || 0
+)
 
 // Provider breakdown with visual bars
 const providerBreakdown = computed(() => {
-  if( !stats.value?.by_provider ) return []
-  const maxCost = Math.max( ...stats.value.by_provider.map( p => p.cost ) )
-  return stats.value.by_provider.map( p => ({
+  if (!spendingByProvider.value?.data) return []
+  const data = spendingByProvider.value.data
+  const maxCost = Math.max(...data.map(p => p.spending), 0.001)
+  return data.map(p => ({
     ...p,
-    percentage: maxCost > 0 ? ( p.cost / maxCost ) * 100 : 0,
+    percentage: maxCost > 0 ? (p.spending / maxCost) * 100 : 0,
   }))
 })
 
 // Model breakdown with visual bars
 const modelBreakdown = computed(() => {
-  if( !stats.value?.by_model ) return []
-  const maxRequests = Math.max( ...stats.value.by_model.map( m => m.requests ) )
-  return stats.value.by_model.map( m => ({
+  if (!modelUsage.value?.data) return []
+  const data = modelUsage.value.data
+  const maxRequests = Math.max(...data.map(m => m.request_count), 1)
+  return data.map(m => ({
     ...m,
-    percentage: maxRequests > 0 ? ( m.requests / maxRequests ) * 100 : 0,
+    percentage: maxRequests > 0 ? (m.request_count / maxRequests) * 100 : 0,
   }))
 })
 
-function formatDate( timestamp: number ): string {
-  return new Date( timestamp ).toLocaleString()
+function formatCost(cost: number): string {
+  return `$${cost.toFixed(4)}`
 }
 
-function formatCost( cost: number ): string {
-  return `$${cost.toFixed( 4 )}`
-}
-
-function formatNumber( num: number ): string {
+function formatNumber(num: number): string {
   return num.toLocaleString()
 }
 </script>
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Usage Analytics</h1>
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Usage Analytics</h1>
+
+      <!-- Period selector -->
+      <select
+        v-model="selectedPeriod"
+        class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option v-for="option in periodOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+    </div>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
@@ -72,13 +106,13 @@ function formatNumber( num: number ): string {
 
     <!-- Error state -->
     <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading usage analytics: {{ error.message }}</p>
+      <p class="text-red-600">Error loading usage analytics: {{ (error as Error).message }}</p>
     </div>
 
     <!-- Analytics content -->
     <div v-else>
       <!-- Summary statistics -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
         <!-- Total requests -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -86,7 +120,19 @@ function formatNumber( num: number ): string {
           </CardHeader>
           <CardContent>
             <div class="text-3xl font-bold text-gray-900">
-              {{ formatNumber( stats?.total_requests || 0 ) }}
+              {{ formatNumber(totalRequests) }}
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Success rate -->
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium text-gray-600">Success Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-3xl font-bold" :class="successRate >= 95 ? 'text-green-600' : 'text-yellow-600'">
+              {{ successRate.toFixed(1) }}%
             </div>
           </CardContent>
         </Card>
@@ -98,7 +144,7 @@ function formatNumber( num: number ): string {
           </CardHeader>
           <CardContent>
             <div class="text-3xl font-bold text-blue-600">
-              {{ formatNumber( stats?.total_input_tokens || 0 ) }}
+              {{ formatNumber(totalInputTokens) }}
             </div>
           </CardContent>
         </Card>
@@ -110,7 +156,7 @@ function formatNumber( num: number ): string {
           </CardHeader>
           <CardContent>
             <div class="text-3xl font-bold text-green-600">
-              {{ formatNumber( stats?.total_output_tokens || 0 ) }}
+              {{ formatNumber(totalOutputTokens) }}
             </div>
           </CardContent>
         </Card>
@@ -122,7 +168,7 @@ function formatNumber( num: number ): string {
           </CardHeader>
           <CardContent>
             <div class="text-3xl font-bold text-purple-600">
-              {{ formatCost( stats?.total_cost || 0 ) }}
+              {{ formatCost(totalSpend) }}
             </div>
           </CardContent>
         </Card>
@@ -145,10 +191,10 @@ function formatNumber( num: number ): string {
                   <span class="text-sm font-medium text-gray-900">{{ provider.provider }}</span>
                   <div class="text-right">
                     <span class="text-sm font-semibold text-gray-900">
-                      {{ formatCost( provider.cost ) }}
+                      {{ formatCost(provider.spending) }}
                     </span>
                     <span class="text-xs text-gray-500 ml-2">
-                      {{ formatNumber( provider.requests ) }} requests
+                      {{ formatNumber(provider.request_count) }} requests
                     </span>
                   </div>
                 </div>
@@ -178,10 +224,10 @@ function formatNumber( num: number ): string {
                   <span class="text-sm font-medium text-gray-900">{{ model.model }}</span>
                   <div class="text-right">
                     <span class="text-sm font-semibold text-gray-900">
-                      {{ formatNumber( model.requests ) }} requests
+                      {{ formatNumber(model.request_count) }} requests
                     </span>
                     <span class="text-xs text-gray-500 ml-2">
-                      {{ formatCost( model.cost ) }}
+                      {{ formatCost(model.spending) }}
                     </span>
                   </div>
                 </div>
@@ -196,70 +242,6 @@ function formatNumber( num: number ): string {
           </CardContent>
         </Card>
       </div>
-
-      <!-- Recent usage records -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Usage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="recentUsage.length === 0" class="text-center text-gray-600">
-            No usage records found
-          </div>
-          <table v-else class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Timestamp
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Token ID
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Provider
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Model
-                </th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Input Tokens
-                </th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Output Tokens
-                </th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cost
-                </th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="record in recentUsage" :key="record.id">
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ formatDate( record.timestamp ) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ record.token_id }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ record.provider }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ record.model }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                  {{ formatNumber( record.input_tokens ) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                  {{ formatNumber( record.output_tokens ) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                  {{ formatCost( record.cost ) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
     </div>
   </div>
 </template>
