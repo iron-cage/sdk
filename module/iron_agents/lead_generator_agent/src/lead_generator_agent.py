@@ -6,10 +6,20 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
 from apollo_tools import tools_list
 
-load_dotenv()
+# --- Load Configuration ---
+# Get path to this script
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
-# --- Initialize Language Model ---
-# Sets up the OpenAI model that will drive the agent's logic.
+# Build path to secrets file
+secrets_path = os.path.join(script_dir, "..", "secret", "-secrets.sh")
+
+# Load variables
+load_dotenv(secrets_path, override=True)
+
+# Check for OpenAI Key
+if not os.getenv("OPENAI_API_KEY"):
+    clean_path = os.path.normpath(secrets_path)
+    raise ValueError(f"CRITICAL ERROR: OPENAI_API_KEY is missing. Checked file: {clean_path}")
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 # --- System Prompt for the Agent ---
@@ -30,8 +40,8 @@ OUTPUT FORMAT (CRITICAL):
 
 Example output:
 [
-  {{ "id": "123", "name": "Ivan" }},
-  {{ "id": "456", "name": "Petro" }}
+  {{ "id": "123", "name": "John" }},
+  {{ "id": "456", "name": "Criss" }}
 ]
 """
 
@@ -48,6 +58,7 @@ prompt = ChatPromptTemplate.from_messages([
 agent = create_tool_calling_agent(llm, tools_list, prompt)
 
 # Creates the executor, which runs the agent and manages its workflow.
+agent_executor = AgentExecutor(
 agent_executor = AgentExecutor(
     agent=agent, 
     tools=tools_list, 
@@ -98,4 +109,3 @@ def main():
 # Runs the main function if the script is executed directly.
 if __name__ == "__main__":
     main()
-  
