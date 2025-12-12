@@ -27,7 +27,7 @@ help: ## Show this help
 # Development (Daily Use)
 #===============================================================================
 
-dev: ## Run full stack (API:3000 + Dashboard:5173)
+dev: ## Run full stack (API:3001 + Dashboard:5173)
 	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \
 		echo "Installing dashboard dependencies..."; \
 		cd $(DASHBOARD_DIR) && npm install; \
@@ -36,7 +36,7 @@ dev: ## Run full stack (API:3000 + Dashboard:5173)
 		RUST_LOG="trace" cargo run --release --bin iron_control_api_server & \
 		sleep 2 && cd $(DASHBOARD_DIR) && npm run dev
 
-api: ## Run API server only (port 3000)
+api: ## Run API server only (port 3001)
 	RUST_LOG="trace" cargo run --release --bin iron_control_api_server
 
 dashboard: ## Run dashboard only (port 5173)
@@ -142,10 +142,10 @@ debug-setup: db-reset-seed ## Complete debug environment setup
 	@echo "  2. Inspect database: make db-inspect"
 	@echo "  3. Check test tokens: See output from db-reset-seed above"
 
-ports: ## Kill processes on ports 3000/5173
-	@lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
+ports: ## Kill processes on ports 3001/5173
+	@lsof -ti:3001 | xargs -r kill -9 2>/dev/null || true
 	@lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
-	@echo "Ports 3000 and 5173 cleared"
+	@echo "Ports 3001 and 5173 cleared"
 
 #===============================================================================
 # Python Bindings (iron_runtime / LlmRouter)
@@ -164,7 +164,7 @@ py-test-e2e: ## Run E2E tests (requires IC_TOKEN, IC_SERVER)
 	@if [ -z "$$IC_TOKEN" ] || [ -z "$$IC_SERVER" ]; then \
 		echo "ERROR: Set IC_TOKEN and IC_SERVER environment variables"; \
 		echo "  export IC_TOKEN=iron_xxx"; \
-		echo "  export IC_SERVER=http://localhost:3000"; \
+		echo "  export IC_SERVER=http://localhost:3001"; \
 		exit 1; \
 	fi
 	cd $(RUNTIME_DIR) && uv run pytest python/tests/test_llm_router_e2e.py -v
@@ -173,7 +173,7 @@ py-test-manual: ## Run manual LlmRouter test (requires IC_TOKEN, IC_SERVER)
 	@if [ -z "$$IC_TOKEN" ] || [ -z "$$IC_SERVER" ]; then \
 		echo "ERROR: Set IC_TOKEN and IC_SERVER environment variables"; \
 		echo "  export IC_TOKEN=iron_xxx"; \
-		echo "  export IC_SERVER=http://localhost:3000"; \
+		echo "  export IC_SERVER=http://localhost:3001"; \
 		exit 1; \
 	fi
 	cd $(RUNTIME_DIR) && uv run python python/examples/test_manual.py
