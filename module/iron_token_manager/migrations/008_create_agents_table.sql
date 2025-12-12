@@ -7,7 +7,7 @@
 
 -- Create agents table
 CREATE TABLE IF NOT EXISTS agents (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY CHECK(id NOT NULL),
   name TEXT NOT NULL,
   providers TEXT NOT NULL,  -- JSON array of supported providers
   created_at INTEGER NOT NULL
@@ -16,11 +16,10 @@ CREATE TABLE IF NOT EXISTS agents (
 CREATE INDEX IF NOT EXISTS idx_agents_created_at ON agents(created_at);
 
 -- Add new columns to api_tokens
-ALTER TABLE api_tokens ADD COLUMN agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE;
 ALTER TABLE api_tokens ADD COLUMN provider TEXT;  -- Current provider for this token
 
 -- Create index on agent_id for fast lookups
-CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
+-- CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
 
 -- Note: SQLite doesn't support DROP COLUMN, so project_id will remain but should not be used
 -- The application layer will ignore project_id and use agent_id + provider instead

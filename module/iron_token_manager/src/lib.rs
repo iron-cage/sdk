@@ -132,3 +132,6 @@ pub mod agent_budget;
 
 #[cfg(feature = "enabled")]
 pub mod budget_request;
+
+#[cfg(feature = "enabled")]
+pub mod agent_service;

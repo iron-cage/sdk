@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS ai_provider_keys
   balance_cents INTEGER,
   balance_updated_at INTEGER,
 
+  preview TEXT CHECK ( preview IS NULL OR LENGTH( preview ) <= 10 ),
+
   -- Owner
   user_id TEXT NOT NULL CHECK ( LENGTH( user_id ) > 0 AND LENGTH( user_id ) <= 500 )
 );

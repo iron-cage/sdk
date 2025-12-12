@@ -15,33 +15,11 @@ use axum::{
   http::{ StatusCode, Request, Method },
   body::Body,
 };
+use iron_control_api::routes::agents::CreateAgentRequest;
+use iron_token_manager::agent_service::{AgentService, CreateAgentParams};
 use tower::ServiceExt;
 use serde_json::json;
 use sqlx::SqlitePool;
-
-/// Test schema for agents integration tests
-const AGENTS_SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS agents (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  providers TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  owner_id TEXT REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS api_tokens (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  token_hash TEXT NOT NULL UNIQUE,
-  user_id TEXT NOT NULL,
-  agent_id INTEGER,
-  provider TEXT,
-  name TEXT,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL,
-  last_used_at INTEGER,
-  FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
-);
-"#;
 
 /// Helper to create test router with agents endpoints
 async fn create_agents_router() -> ( Router, SqlitePool, String, String, String, String )
@@ -49,11 +27,6 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
   // Create TestAppState with auth support
   let app_state = TestAppState::new().await;
 
-  // Add agents schema to database
-  sqlx::raw_sql( AGENTS_SCHEMA )
-    .execute( &app_state.database )
-    .await
-    .expect( "LOUD FAILURE: Failed to apply agents schema" );
 
   // Create admin and regular user
   let ( admin_id, _ ) = create_test_admin( &app_state.database ).await;
@@ -84,10 +57,14 @@ async fn test_create_agent_as_admin_success()
 {
   let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
 
-  let request_body = json!({
-    "name": "Test Agent",
-    "providers": ["openai", "anthropic"]
-  });
+  let request_body = CreateAgentRequest {
+    name: "Test Agent".to_string(),
+    budget: 100.0,
+    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
 
   let response = app
     .oneshot(
@@ -118,10 +95,14 @@ async fn test_create_agent_as_user_forbidden()
 {
   let ( app, _pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
 
-  let request_body = json!({
-    "name": "Test Agent",
-    "providers": ["openai"]
-  });
+  let request_body = CreateAgentRequest {
+    name: "Test Agent".to_string(),
+    budget: 100.0,
+    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
 
   let response = app
     .oneshot(
@@ -144,10 +125,14 @@ async fn test_create_agent_without_auth_unauthorized()
 {
   let ( app, _pool, _admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
 
-  let request_body = json!({
-    "name": "Test Agent",
-    "providers": ["openai"]
-  });
+  let request_body = CreateAgentRequest {
+    name: "Test Agent".to_string(),
+    budget: 100.0,
+    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
 
   let response = app
     .oneshot(
@@ -168,30 +153,49 @@ async fn test_create_agent_without_auth_unauthorized()
 // Agent Listing Tests
 // ============================================================================
 
+async fn seed_test_agents( pool: &SqlitePool, admin_id: &str ) 
+{
+  let agent1 = CreateAgentParams {
+    name: "Agent 4".to_string(),
+    budget: 400.0,
+    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
+
+  let agent2 = CreateAgentParams {
+    name: "Agent 4".to_string(),
+    budget: 400.0,
+    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
+
+  let agent3 = CreateAgentParams {
+    name: "Agent 4".to_string(),
+    budget: 400.0,
+    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
+
+  let service: AgentService = AgentService::new(pool.clone());
+
+  service.create_agent(agent1, &admin_id).await.unwrap();
+  service.create_agent(agent2, &admin_id).await.unwrap();
+  service.create_agent(agent3, &admin_id).await.unwrap();
+}
+
 #[ tokio::test ]
 async fn test_list_agents_as_admin_sees_all()
 {
   let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
 
   // Create test agents
-  let now = chrono::Utc::now().timestamp_millis();
-  sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Agent 1" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Agent 2" )
-    .bind( "[\"anthropic\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  seed_test_agents( &pool, &admin_id ).await;
 
   let response = app
     .oneshot(
@@ -212,7 +216,7 @@ async fn test_list_agents_as_admin_sees_all()
     .unwrap();
   let agents: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
 
-  assert_eq!( agents.len(), 2, "Admin should see all agents" );
+  assert_eq!( agents.len(), 3, "Admin should see all agents" );
 }
 
 #[ tokio::test ]

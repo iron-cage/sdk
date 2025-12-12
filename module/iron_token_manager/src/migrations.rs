@@ -61,8 +61,7 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   sqlx::query( "PRAGMA foreign_keys = ON" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
-
+.unwrap();
   // Migration 001: Initial schema (5 core tables)
   apply_migration_001( pool ).await?;
 
@@ -104,6 +103,9 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 014: Add owner_id to agents table
   apply_migration_014( pool ).await?;
 
+  // Enhance agents table
+  apply_migration_015( pool ).await?;
+
   Ok( () )
 }
 
@@ -121,8 +123,7 @@ async fn apply_migration_001( pool: &SqlitePool ) -> Result< () >
   sqlx::raw_sql( migration )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
-  Ok( () )
+.unwrap();  Ok( () )
 }
 
 /// Migration 002: Length constraints (GUARDED)
@@ -150,8 +151,7 @@ async fn apply_migration_002( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -176,8 +176,7 @@ async fn apply_migration_003( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -199,8 +198,7 @@ async fn apply_migration_004( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -222,8 +220,7 @@ async fn apply_migration_005( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -245,8 +242,7 @@ async fn apply_migration_006( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -273,8 +269,7 @@ async fn apply_migration_008( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -298,8 +293,7 @@ async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -322,8 +316,7 @@ async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -346,8 +339,7 @@ async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -370,8 +362,7 @@ async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -397,8 +388,7 @@ async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
 
   Ok( () )
 }
@@ -424,8 +414,31 @@ async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
-  }
+  .unwrap();  }
+
+  Ok( () )
+}
+
+/// Migration 015: Enhance agents table
+///
+/// This migration adds additional fields to agents table.
+async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_015_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/015_enhance_agents_table.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+  .unwrap();  }
 
   Ok( () )
 }

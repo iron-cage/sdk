@@ -74,15 +74,13 @@ pub async fn create_test_database() -> SqlitePool
 {
   let pool = SqlitePoolOptions::new()
     .max_connections( 5 )
-    .connect( "sqlite::memory:?cache=shared" )
+    .connect( "sqlite::memory:" )
     .await
     .expect( "LOUD FAILURE: Failed to create in-memory database" );
 
-  // Apply test schema
-  sqlx::raw_sql( TEST_SCHEMA )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to apply test schema" );
+  // Apply all migrations
+
+  iron_token_manager::migrations::apply_all_migrations( &pool ).await.unwrap();
 
   pool
 }

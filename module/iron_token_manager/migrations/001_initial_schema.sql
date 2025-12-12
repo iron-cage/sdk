@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS api_tokens
   scopes TEXT,  -- JSON array of allowed scopes
   is_active BOOLEAN NOT NULL DEFAULT 1,
 
-
+  agent_id TEXT NOT NULL,
   -- Timestamps
   created_at INTEGER NOT NULL,  -- milliseconds since epoch
   last_used_at INTEGER,  -- nullable

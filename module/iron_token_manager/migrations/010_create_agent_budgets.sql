@@ -10,7 +10,7 @@
 -- Create agent_budgets table
 CREATE TABLE IF NOT EXISTS agent_budgets
 (
-  agent_id INTEGER PRIMARY KEY,  -- 1:1 relationship with agents(id)
+  agent_id TEXT PRIMARY KEY,  -- 1:1 relationship with agents(id)
   total_allocated REAL NOT NULL,  -- USD total budget allocated
   total_spent REAL NOT NULL DEFAULT 0.0,  -- USD total spent across all leases
   budget_remaining REAL NOT NULL,  -- USD remaining (total_allocated - total_spent)

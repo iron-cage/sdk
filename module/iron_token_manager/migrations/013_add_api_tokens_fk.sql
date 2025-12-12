@@ -27,7 +27,7 @@ WHERE NOT EXISTS (SELECT 1 FROM _migration_013_completed);
 CREATE TABLE IF NOT EXISTS api_tokens_new
 (
   -- Primary key
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY,
 
   -- Token hash (SHA-256, never store plaintext)
   token_hash TEXT NOT NULL UNIQUE,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS api_tokens_new
   project_id TEXT CHECK (project_id IS NULL OR (LENGTH(project_id) > 0 AND LENGTH(project_id) <= 500)),
 
   -- Agent association (added in migration 008)
-  agent_id INTEGER,
+  agent_id TEXT NOT NULL,
   provider TEXT,
 
   -- Token metadata
@@ -59,11 +59,11 @@ CREATE TABLE IF NOT EXISTS api_tokens_new
 );
 
 -- Step 2: Copy data from old table to new table
-INSERT INTO api_tokens_new
-  (id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at)
-SELECT
-  id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at
-FROM api_tokens;
+-- INSERT INTO api_tokens_new
+--   (id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at)
+-- SELECT
+--   id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at
+-- FROM api_tokens;
 
 -- Step 3: Drop old table
 DROP TABLE api_tokens;
@@ -75,4 +75,4 @@ ALTER TABLE api_tokens_new RENAME TO api_tokens;
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_project_id ON api_tokens(project_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_is_active ON api_tokens(is_active);
-CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
+-- CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);

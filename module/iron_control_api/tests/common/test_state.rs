@@ -6,6 +6,7 @@
 //! - UsageState (usage tracking)
 //! - Combined application state
 
+use iron_token_manager::migrations::apply_all_migrations;
 use sqlx::SqlitePool;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::tokens::TokenState;
