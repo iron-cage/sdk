@@ -8,6 +8,11 @@ users:
     ssh_authorized_keys:
       - ${MASTER_SSH_KEY}
 
+packages:
+  - htop
+  - sqlite3
+  - libsqlite3-dev
+
 write_files:
   - path: /root/service_account.json.b64
     permissions: '0600'

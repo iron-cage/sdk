@@ -32,4 +32,3 @@ CREATE INDEX IF NOT EXISTS idx_users_username_search ON users(username);
 -- Create guard table to mark migration as completed
 CREATE TABLE IF NOT EXISTS _migration_005_completed (applied_at INTEGER NOT NULL);
 INSERT INTO _migration_005_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
-INSERT OR IGNORE INTO users (id, email, username, password_hash, role, is_active, created_at) VALUES ('admin', 'admin@admin.com', 'admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now'));"

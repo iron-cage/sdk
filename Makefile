@@ -327,8 +327,15 @@ TF_DIR := $(or $(call strip_quotes,$(TF_DIR)),deploy)
 export GOOGLE_APPLICATION_CREDENTIALS=$(TF_VAR_GOOGLE_SE_CREDS_PATH)
 
 build_image: ## Builds uarust_conf_site image
-	docker build . -f module/iron_dashboard/Dockerfile -t name:$(TF_VAR_IMAGE_NAME)_front -t $(TAG)_front
-	docker build . -f module/iron_control_api/Dockerfile -t name:$(TF_VAR_IMAGE_NAME)_back -t $(TAG)_back
+	docker build . \
+		-f module/iron_dashboard/Dockerfile \
+		-t name:$(TF_VAR_IMAGE_NAME)_front \
+		--build-arg VITE_API_URL="/api" \
+		-t $(TAG)_front
+	docker build . \
+		-f module/iron_control_api/Dockerfile \
+		-t name:$(TF_VAR_IMAGE_NAME)_back \
+		-t $(TAG)_back
 
 ## Deploys using tools from the container
 deploy: check_gcp_keys check_env_variables build_image
