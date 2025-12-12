@@ -432,8 +432,7 @@ fn print_banner()
   println!();
   println!( "Help:" );
   println!( "  iron .help                    # List all commands" );
-  println!( "  iron .agent.list ?            # Quick help" );
-  println!( "  iron .agent.list ??           # Detailed help" );
+  println!( "  iron .agent.list ?            # Command help" );
   println!();
   println!( "Status: Phase 3 - Command execution framework complete" );
   println!( "Pipeline integration successful ✓" );

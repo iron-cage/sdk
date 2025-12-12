@@ -59,7 +59,7 @@ fn test_migration_metrics_at_target()
   let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
 
   // M1: Adapter counts
-  let adapter_files = vec![
+  let adapter_files = [
     "src/adapters/auth_adapters.rs",
     "src/adapters/token_adapters.rs",
     "src/adapters/usage_adapters.rs",
@@ -74,7 +74,7 @@ fn test_migration_metrics_at_target()
   {
     let file_path = manifest_dir.join( file_path_str );
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_path_str ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
 
     let count = content
       .lines()
@@ -116,7 +116,7 @@ fn test_migration_metrics_at_target()
     .expect( "Failed to read routing file" );
 
   // List of orphaned adapters that should NOT appear in routing
-  let orphaned_adapter_names = vec![
+  let orphaned_adapter_names = [
     "show_agent_usage_adapter",
     "export_agent_usage_adapter",
     "reset_limit_adapter",
@@ -163,7 +163,7 @@ fn test_migration_metrics_at_target()
   {
     let file_path = manifest_dir.join( file_path_str );
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_path_str ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
 
     for orphaned_name in &orphaned_adapter_names
     {
@@ -218,7 +218,7 @@ fn test_migration_trajectory_correctness()
   let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
 
   // Count current adapters
-  let adapter_files = vec![
+  let adapter_files = [
     "src/adapters/auth_adapters.rs",
     "src/adapters/token_adapters.rs",
     "src/adapters/usage_adapters.rs",
@@ -233,7 +233,7 @@ fn test_migration_trajectory_correctness()
   {
     let file_path = manifest_dir.join( file_path_str );
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_path_str ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
 
     let count = content
       .lines()
@@ -311,7 +311,7 @@ fn test_ratios_at_target()
   let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
 
   // Count adapters
-  let adapter_files = vec![
+  let adapter_files = [
     "src/adapters/auth_adapters.rs",
     "src/adapters/token_adapters.rs",
     "src/adapters/usage_adapters.rs",
@@ -326,7 +326,7 @@ fn test_ratios_at_target()
   {
     let file_path = manifest_dir.join( file_path_str );
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_path_str ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
 
     let count = content
       .lines()
@@ -348,7 +348,7 @@ fn test_ratios_at_target()
   let routing_content = std::fs::read_to_string( &routing_file )
     .expect( "Failed to read routing file" );
 
-  let orphaned_adapter_names = vec![
+  let orphaned_adapter_names = [
     "show_agent_usage_adapter",
     "export_agent_usage_adapter",
     "reset_limit_adapter",

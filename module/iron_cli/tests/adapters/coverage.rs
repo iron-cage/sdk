@@ -46,6 +46,7 @@ use std::path::PathBuf;
 /// - limits_adapters: 5 (was 8, deleted 3)
 /// - traces_adapters: 3 (was 4, deleted 1)
 /// - health_adapters: 2
+///
 /// Total: 22 adapters
 #[ test ]
 fn test_all_adapters_have_valid_endpoints()
@@ -75,7 +76,7 @@ fn test_all_adapters_have_valid_endpoints()
     );
 
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_name ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_name ) );
 
     // Count public adapter functions
     let adapter_count = content
@@ -157,7 +158,7 @@ fn test_no_orphaned_adapters_exist()
     }
 
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_path_str ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
 
     // Check for orphaned adapter references
     for adapter in &orphaned_adapters
@@ -229,7 +230,7 @@ fn test_adapter_count_metrics()
     let file_path = manifest_dir.join( format!( "src/adapters/{}", file_name ) );
 
     let content = std::fs::read_to_string( &file_path )
-      .expect( &format!( "Failed to read {}", file_name ) );
+      .unwrap_or_else( |_| panic!( "Failed to read {}", file_name ) );
 
     let count = content
       .lines()

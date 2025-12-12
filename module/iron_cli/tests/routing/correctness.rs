@@ -232,10 +232,99 @@ fn test_routing_compilation_prevents_old_adapters()
     );
   }
 
-  // Document: Compilation success = no orphaned adapter references
-  // If orphaned adapters were referenced, this crate would fail to compile
-  assert!(
-    true,
-    "Compilation success proves no orphaned adapter usage (syntactic protection layer)"
-  );
+  // Compilation success proves no orphaned adapter usage (syntactic protection layer)
+  // If orphaned adapters were referenced, this crate would fail to compile.
+  // The fact that this test compiles and runs verifies syntactic protection.
+}
+
+/// Bug reproducer for Issue 4: Help syntax documentation inconsistency
+///
+/// ## Root Cause
+///
+/// The help text in both `iron_token_unilang.rs` and `iron_control_unilang.rs`
+/// showed examples using `??` for "Detailed help", but the unilang parser only
+/// supports single `?` as the help operator. Using `??` results in error:
+/// "Help operator '?' must be the last token" because the second `?` is parsed
+/// as a separate token.
+///
+/// ## Why Not Caught
+///
+/// 1. **Documentation-Only Issue**: No automated tests verify help text accuracy
+/// 2. **Manual Testing Gap**: Help examples weren't tested during development
+/// 3. **Parser Behavior**: Error comes from unilang library, not iron_cli code
+///
+/// ## Fix Applied
+///
+/// Modified both binary files:
+/// 1. `iron_token_unilang.rs` (line 334-335): Removed `??` example, kept single `?`
+/// 2. `iron_control_unilang.rs` (line 435-436): Removed `??` example, kept single `?`
+/// 3. Changed comment from "Quick help" / "Detailed help" to just "Command help"
+///
+/// ## Prevention
+///
+/// 1. **Documentation Tests**: Verify help text doesn't contain invalid syntax
+/// 2. **Manual Testing**: Test all examples shown in help text
+/// 3. **Parser Documentation**: Document unilang help operator behavior clearly
+///
+/// ## Pitfall
+///
+/// **Never document syntax that doesn't work**
+///
+/// All examples shown in help text must be actually executable. Users will
+/// copy-paste examples from help, and if those examples fail, it creates
+/// confusion and frustration. Always test help examples during development.
+/// This applies to all CLI tools: documentation accuracy is critical for UX.
+///
+/// **Specific lesson**: Before documenting any CLI syntax, test it actually
+/// works. Don't assume similar tools' conventions apply without verification.
+#[ test ]
+fn bug_reproducer_issue_004_help_syntax_consistency()
+{
+  // Read both binary source files
+  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+
+  let binaries = vec![
+    "src/bin/iron_token_unilang.rs",
+    "src/bin/iron_control_unilang.rs",
+  ];
+
+  for binary_file in &binaries
+  {
+    let path = manifest_dir.join( binary_file );
+
+    assert!(
+      path.exists(),
+      "Binary source must exist: {}",
+      binary_file
+    );
+
+    let content = std::fs::read_to_string( &path )
+      .expect( "Failed to read binary source" );
+
+    // Verify help text doesn't contain invalid ?? syntax
+    // Search for pattern: ".command ??" in help examples
+    let invalid_patterns = vec![
+      ".tokens.list ??",
+      ".agent.list ??",
+      ".help ??",
+      "command ??",
+    ];
+
+    for pattern in &invalid_patterns
+    {
+      assert!(
+        !content.contains( pattern ),
+        "File {} contains invalid help syntax '{}'. Only single '?' is valid.",
+        binary_file,
+        pattern
+      );
+    }
+
+    // Verify at least one valid single ? help example exists
+    assert!(
+      content.contains( " ?" ) && !content.contains( " ??" ),
+      "File {} should contain valid single '?' help examples",
+      binary_file
+    );
+  }
 }
