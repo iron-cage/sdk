@@ -206,7 +206,7 @@ export function useApi() {
         requests: number
         cost_cents: number
       }>
-    }>('/api/usage/aggregate')
+    }>('/api/v1/usage/aggregate')
 
     return {
       total_requests: aggregate.total_requests,
@@ -223,85 +223,85 @@ export function useApi() {
   }
 
   async function getUsageByToken(tokenId: number): Promise<UsageRecord[]> {
-    return fetchApi<UsageRecord[]>(`/api/usage/token/${tokenId}`)
+    return fetchApi<UsageRecord[]>(`/api/v1/usage/token/${tokenId}`)
   }
 
   // Limits API methods
   async function getLimits(): Promise<LimitRecord[]> {
-    return fetchApi<LimitRecord[]>('/api/limits')
+    return fetchApi<LimitRecord[]>('/api/v1/limits')
   }
 
   async function getLimit(id: number): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>(`/api/limits/${id}`)
+    return fetchApi<LimitRecord>(`/api/v1/limits/${id}`)
   }
 
   async function createLimit(data: CreateLimitRequest): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>('/api/limits', {
+    return fetchApi<LimitRecord>('/api/v1/limits', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
   async function updateLimit(id: number, data: UpdateLimitRequest): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>(`/api/limits/${id}`, {
+    return fetchApi<LimitRecord>(`/api/v1/limits/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async function deleteLimit(id: number): Promise<void> {
-    await fetchApi<void>(`/api/limits/${id}`, {
+    await fetchApi<void>(`/api/v1/limits/${id}`, {
       method: 'DELETE',
     })
   }
 
   // Traces API methods
   async function getTraces(): Promise<TraceRecord[]> {
-    return fetchApi<TraceRecord[]>('/api/traces')
+    return fetchApi<TraceRecord[]>('/api/v1/traces')
   }
 
   async function getTrace(id: number): Promise<TraceRecord> {
-    return fetchApi<TraceRecord>(`/api/traces/${id}`)
+    return fetchApi<TraceRecord>(`/api/v1/traces/${id}`)
   }
 
   // Provider Key API methods
   async function getProviderKeys(): Promise<ProviderKey[]> {
-    return fetchApi<ProviderKey[]>('/api/providers')
+    return fetchApi<ProviderKey[]>('/api/v1/providers')
   }
 
   async function getProviderKey(id: number): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>(`/api/providers/${id}`)
+    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`)
   }
 
   async function createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>('/api/providers', {
+    return fetchApi<ProviderKey>('/api/v1/providers', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
   async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>(`/api/providers/${id}`, {
+    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async function deleteProviderKey(id: number): Promise<void> {
-    await fetchApi<void>(`/api/providers/${id}`, {
+    await fetchApi<void>(`/api/v1/providers/${id}`, {
       method: 'DELETE',
     })
   }
 
   async function assignProjectProvider(projectId: string, keyId: number): Promise<void> {
-    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+    await fetchApi<void>(`/api/v1/projects/${projectId}/provider`, {
       method: 'POST',
       body: JSON.stringify({ provider_key_id: keyId }),
     })
   }
 
   async function unassignProjectProvider(projectId: string): Promise<void> {
-    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+    await fetchApi<void>(`/api/v1/projects/${projectId}/provider`, {
       method: 'DELETE',
     })
   }
@@ -368,15 +368,15 @@ export function useApi() {
 
   // Agent API methods
   async function getAgents(): Promise<Agent[]> {
-    return fetchApi<Agent[]>('/api/agents')
+    return fetchApi<Agent[]>('/api/v1/agents')
   }
 
   async function getAgent(id: number): Promise<Agent> {
-    return fetchApi<Agent>(`/api/agents/${id}`)
+    return fetchApi<Agent>(`/api/v1/agents/${id}`)
   }
 
   async function createAgent(data: { name: string; providers: string[] }): Promise<Agent> {
-    return fetchApi<Agent>('/api/agents', {
+    return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -384,20 +384,20 @@ export function useApi() {
 
   async function updateAgent(data: { id: number; name?: string; providers?: string[] }): Promise<Agent> {
     const { id, ...updateData } = data
-    return fetchApi<Agent>(`/api/agents/${id}`, {
+    return fetchApi<Agent>(`/api/v1/agents/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updateData),
     })
   }
 
   async function deleteAgent(id: number): Promise<void> {
-    await fetchApi<void>(`/api/agents/${id}`, {
+    await fetchApi<void>(`/api/v1/agents/${id}`, {
       method: 'DELETE',
     })
   }
 
   async function getAgentTokens(agentId: number): Promise<TokenMetadata[]> {
-    return fetchApi<TokenMetadata[]>(`/api/agents/${agentId}/tokens`)
+    return fetchApi<TokenMetadata[]>(`/api/v1/agents/${agentId}/tokens`)
   }
 
   async function createAgentToken(data: { agent_id: number; user_id: string; provider: string; description?: string }): Promise<CreateTokenResponse> {

@@ -4,12 +4,18 @@
 .PHONY: help dev api dashboard test clean setup status ports validate build lint-docs lint-python
 .PHONY: db-reset db-reset-seed db-seed db-inspect debug-setup
 .PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-sync py-clean
+.PHONY: secrets-check
 .DEFAULT_GOAL := help
 
 # Configuration
 DASHBOARD_DIR := module/iron_dashboard
 RUNTIME_DIR := module/iron_runtime
 CONFIG_DEV := config.dev.toml
+
+# Secrets: source from secret/ directory (see secret/readme.md)
+# Files with - prefix are gitignored, sourceable shell format
+SECRETS_IRON := secret/-iron.sh
+SECRETS_API_KEYS := secret/-api_keys.sh
 
 #===============================================================================
 # Help
@@ -27,17 +33,17 @@ help: ## Show this help
 # Development (Daily Use)
 #===============================================================================
 
-dev: ## Run full stack (API:3001 + Dashboard:5173)
+dev: secrets-check ## Run full stack (API:3001 + Dashboard:5173)
 	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \
 		echo "Installing dashboard dependencies..."; \
 		cd $(DASHBOARD_DIR) && npm install; \
 	fi
 	@trap 'kill 0' EXIT; \
-		RUST_LOG="trace" cargo run --release --bin iron_control_api_server & \
+		set -a && . $(SECRETS_IRON) && set +a && RUST_LOG="trace" cargo run --release --bin iron_control_api_server & \
 		sleep 2 && cd $(DASHBOARD_DIR) && npm run dev
 
-api: ## Run API server only (port 3001)
-	RUST_LOG="trace" cargo run --release --bin iron_control_api_server
+api: secrets-check ## Run API server only (port 3001)
+	@set -a && . $(SECRETS_IRON) && set +a && RUST_LOG="trace" cargo run --release --bin iron_control_api_server
 
 dashboard: ## Run dashboard only (port 5173)
 	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \
@@ -81,7 +87,24 @@ lint-python: ## Check Python tooling compliance
 
 setup: ## Initial setup (install dependencies)
 	cd $(DASHBOARD_DIR) && npm install
-	@echo "✅ Setup complete. Run: make dev"
+	@echo "✅ Setup complete"
+	@echo ""
+	@echo "Next: Configure secrets in secret/-iron.sh (see secret/readme.md)"
+	@echo "Then run: make dev"
+
+secrets-check: ## Verify secrets are configured
+	@if [ ! -f "$(SECRETS_IRON)" ]; then \
+		echo "❌ Missing $(SECRETS_IRON)"; \
+		echo "   See secret/readme.md for setup instructions"; \
+		exit 1; \
+	fi
+	@. $(SECRETS_IRON) && \
+	if [ -z "$$JWT_SECRET" ]; then \
+		echo "❌ JWT_SECRET not set in $(SECRETS_IRON)"; \
+		echo "   Generate with: openssl rand -hex 32"; \
+		exit 1; \
+	fi
+	@echo "✅ Secrets configured"
 
 clean: ## Clean all build artifacts
 	cargo clean
@@ -92,6 +115,7 @@ status: ## Show installation status
 	@cargo --version
 	@[ -d "$(DASHBOARD_DIR)/node_modules" ] && echo "Dashboard: ✅ installed" || echo "Dashboard: ❌ run make setup"
 	@[ -f iron.db ] && echo "Database: ✅ exists (iron.db)" || echo "Database: ⚠️  run make db-reset-seed"
+	@[ -f "$(SECRETS_IRON)" ] && echo "Secrets: ✅ configured" || echo "Secrets: ❌ see secret/readme.md"
 
 #===============================================================================
 # Database Management
@@ -197,9 +221,9 @@ docker-build: ## Build Docker images for Control Panel
 	@echo "Building Docker images..."
 	docker compose build
 
-docker-up: ## Start Control Panel services
+docker-up: secrets-check ## Start Control Panel services
 	@echo "Starting Control Panel services..."
-	docker compose up -d
+	@set -a && . $(SECRETS_IRON) && set +a && docker compose up -d
 	@echo "✅ Control Panel available at http://localhost:8080"
 
 docker-down: ## Stop Control Panel services (keeps volumes)
