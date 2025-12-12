@@ -12,5 +12,5 @@ This folder contains sensitive information related to the Lead Generator Agent A
 - **Do Not Share**: Never share the contents of this folder publicly or with unauthorized personnel.
 - **Use Environment Variables**: Store sensitive information in `secrets.sh`
 - **Git**: Don't push any real tokens into a git repository!
-- **Use Template**: Use template with all required varibels and paste API tokens. For example: OPENAI_API_KEY=yourkey;
-APOLLO_API_KEY=your_key.
+- **Use Template**: Use template with all required varibels and paste API tokens. For example: OPENAI_API_KEY=your_token;
+APOLLO_API_KEY=your_token.
