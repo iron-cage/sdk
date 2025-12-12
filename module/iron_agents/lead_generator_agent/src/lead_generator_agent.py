@@ -1,46 +1,22 @@
-import os
+import sys
 import json
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
 from apollo_tools import tools_list
-from iron_cage import LlmRouter
+from config import IC_TOKEN, OPENAI_API_KEY
 
-# --- Load Configuration ---
-# Get path to this script
-script_dir = os.path.dirname(os.path.abspath(__file__))
+# Check if Iron Cage library is available
+try:
+    from iron_cage import LlmRouter
+    IRON_CAGE_AVAILABLE = True
+except ImportError:
+    IRON_CAGE_AVAILABLE = False
 
-# Build path to secrets file
-secrets_path = os.path.join(script_dir, "..", "secret", "-secrets.sh")
-
-# Load variables
-load_dotenv(secrets_path, override=True)
-
-# Check for OpenAI Token
-if not os.getenv("OPENAI_API_KEY"):
-    raise ValueError("CRITICAL ERROR: OPENAI_API_KEY is missing.")
-
-IC_TOKEN = os.getenv("IC_TOKEN")
-if not IC_TOKEN:
-    raise ValueError(f"CRITICAL ERROR: IC_TOKEN is missing in {secrets_path}")
-
-# --- Initialize Iron Cage Router ---
-print("Initializing Iron Cage Router...")
-router = LlmRouter(
-    api_key=IC_TOKEN,         
-    budget_usd=10.0,          # Hard limit
-    pii_detection=True,       # Auto-redact emails/phones
-    circuit_breaker=True      # Handle API failures
-)
-
-# --- Initialize Language Model ---
-llm = ChatOpenAI(
-    model="gpt-5-nano",
-    temperature=0,
-    api_key=router.api_key,
-    base_url=router.base_url
-)
+# Validation
+if not OPENAI_API_KEY:
+    print("CRITICAL ERROR: OPENAI_API_KEY is missing via config.")
+    sys.exit(1)
 
 # --- System Prompt for the Agent ---
 # Defines the agent's role, algorithm, and strict output format.
@@ -68,33 +44,76 @@ Example output:
 
 # --- Create Prompt Template ---
 # Combines the system instruction, user input, and a placeholder for intermediate steps.
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])
+def setup_llm():
+    """
+    Interactively asks the user which mode to use.
+    """
+    print("\n--- SELECT MODE ---")
+    print("1. OpenAI API mode")
+    print("2. Iron Cage  mode")
+    
+    choice = input("Select option (1 or 2): ").strip()
+    
+    # --- OPTION 2: IRON CAGE ---
+    if choice == "2":
+        if not IRON_CAGE_AVAILABLE:
+            print("Error: 'iron_cage' library is not installed (pip install iron-cage).")
+            sys.exit(1)
+            
+        if not IC_TOKEN:
+            print("Error: IC_TOKEN is missing in secrets file")
+            sys.exit(1)
 
-# --- Create Agent and Executor ---
-# Creates the agent's logic by combining the model, tools, and prompt.
-agent = create_tool_calling_agent(llm, tools_list, prompt)
+        print("\n> Initializing Iron Cage Router...")
+        router = LlmRouter(
+            api_key=IC_TOKEN,
+            budget_usd=10.0,
+            pii_detection=True,
+            circuit_breaker=True
+        )
+        
+        print("> Connected via Iron Cage Proxy")
+        return ChatOpenAI(
+            model="gpt-5-nano",
+            temperature=0,
+            base_url=router.base_url,
+            api_key=router.api_key
+        )
 
-# Creates the executor, which runs the agent and manages its workflow.
-agent_executor = AgentExecutor(
-    agent=agent, 
-    tools=tools_list, 
-    verbose=True,
-    max_iterations=20,
-    max_execution_time=120.0,
-    handle_parsing_errors=True
-)
+    # --- OPTION 1: DIRECT (Default) ---
+    else:
+        print("\n> Initializing Direct OpenAI Connection...")
+        return ChatOpenAI(
+            model="gpt-4o-mini", 
+            temperature=0
+        )
 
 # --- Main Execution Function ---
-# Starts the user interaction loop.
 def main():
     print("--------------------------------")
     print("|         LeadGen Agent         |")
     print("--------------------------------")
     
+    llm = setup_llm()
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+    
+    agent = create_tool_calling_agent(llm, tools_list, prompt)
+    
+    agent_executor = AgentExecutor(
+        agent=agent, 
+        tools=tools_list, 
+        verbose=True,
+        max_iterations=20,
+        handle_parsing_errors=True
+    )
+    
+    print("\nAgent is ready. Waiting for commands.")
+    print("--------------------------------")
     while True:
         try:
             user_query = input("\nEnter query (or 'exit'): ")
@@ -103,7 +122,7 @@ def main():
 
             print("Processing request...")
             
-            # --- Run the Agent to Process the Request ---
+      # --- Run the Agent to Process the Request ---
             # Passes the user's query to the agent for execution.
             result = agent_executor.invoke({"input": user_query})
             

@@ -1,29 +1,11 @@
-import os
 import requests
 import json
 from langchain.agents import tool
-from dotenv import load_dotenv
+from config import APOLLO_API_KEY
 
-# --- Load Configuration ---
-
-# Get the absolute path of this script
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Build the path to the secrets file
-dotenv_path = os.path.join(script_dir, "..", "secret", "-secrets.sh")
-
-# Load environment variables from the secrets file
-load_dotenv(dotenv_path, override=True)
-
-APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
-
+# Immediate validation
 if not APOLLO_API_KEY:
-    clean_path = os.path.normpath(dotenv_path)
-    raise ValueError(
-        f"CRITICAL ERROR: APOLLO_API_KEY is missing.\n"
-        f"Script looked for file at: {clean_path}\n"
-        f"Please ensure the folder is named 'secret' and the file is named '-secrets.sh'."
-    )
+    raise ValueError("CRITICAL: APOLLO_API_KEY is missing. Check your 'secret/-secrets.sh' file.")
 
 # --- Tool for Searching Leads ---
 @tool
