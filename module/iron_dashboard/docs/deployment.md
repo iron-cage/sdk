@@ -61,7 +61,7 @@ npm run lint
 - Hot Module Replacement (HMR) - instant updates without page reload
 - TypeScript checking - errors shown in terminal and browser
 - Source maps - debug original TypeScript in DevTools
-- API proxy - `/api` proxied to `http://localhost:3000` (configured in vite.config.ts)
+- API proxy - `/api` proxied to `http://localhost:3001` (configured in vite.config.ts)
 
 ### 2.2 Production Build
 
@@ -123,7 +123,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3000'  // Proxy API requests in dev
+      '/api': 'http://localhost:3001'  // Proxy API requests in dev
     }
   }
 })
@@ -222,7 +222,7 @@ location / {
 
 ```nginx
 location /api/ {
-  proxy_pass http://backend:3000/api/;
+  proxy_pass http://backend:3001/api/;
   proxy_http_version 1.1;
   proxy_set_header Host $host;
   proxy_set_header X-Real-IP $remote_addr;
@@ -239,7 +239,7 @@ location /api/ {
 
 **Flow:**
 1. Browser sends `GET /api/users` → nginx (port 80)
-2. nginx proxies to `http://backend:3000/api/users` (internal Docker network)
+2. nginx proxies to `http://backend:3001/api/users` (internal Docker network)
 3. Backend processes request and returns JSON
 4. nginx forwards response to browser
 
@@ -247,7 +247,7 @@ location /api/ {
 
 ```nginx
 location /ws {
-  proxy_pass http://backend:3000/ws;
+  proxy_pass http://backend:3001/ws;
   proxy_http_version 1.1;
   proxy_set_header Upgrade $http_upgrade;
   proxy_set_header Connection "upgrade";
@@ -402,7 +402,7 @@ docker exec iron-dashboard ls -la /usr/share/nginx/html
 docker logs iron-dashboard 2>&1 | grep error
 
 # Check if backend is reachable from frontend container
-docker exec iron-dashboard wget -O- http://backend:3000/api/health
+docker exec iron-dashboard wget -O- http://backend:3001/api/health
 ```
 
 **Solutions:**

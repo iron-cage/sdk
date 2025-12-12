@@ -24,7 +24,7 @@ This document describes how iron_dashboard integrates with iron_control_api back
 ### Base Configuration
 
 **Backend:** iron_control_api (Axum Rust server)
-**Base URL:** `http://localhost:3000` (dev), configurable via `VITE_API_URL`
+**Base URL:** `http://localhost:3001` (dev), configurable via `VITE_API_URL`
 **Content-Type:** `application/json`
 **Authentication:** `Authorization: Bearer <jwt_token>` header
 
@@ -40,7 +40,7 @@ This document describes how iron_dashboard integrates with iron_control_api back
 // src/composables/useApi.ts
 import { useAuthStore } from '../stores/auth'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export function useApi() {
   const authStore = useAuthStore()

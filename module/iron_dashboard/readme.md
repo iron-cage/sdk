@@ -36,7 +36,7 @@ Provides Vue 3-based web interface for monitoring agent execution, managing API 
 
 - **Node.js:** 20.0.0 or higher
 - **npm:** 10.0.0 or higher
-- **Backend:** iron_control_api running on http://localhost:3000
+- **Backend:** iron_control_api running on http://localhost:3001
 
 ### Setup
 
@@ -51,7 +51,7 @@ npm install
 cp .env.example .env.local
 
 # Edit environment variables (if needed)
-# VITE_API_URL defaults to http://localhost:3000
+# VITE_API_URL defaults to http://localhost:3001
 ```
 
 ---
@@ -118,7 +118,7 @@ npm run dev
 
 Starts Vite dev server on **http://localhost:5173** with hot module replacement (HMR).
 
-**Backend Required:** Ensure iron_control_api is running on http://localhost:3000 before starting frontend.
+**Backend Required:** Ensure iron_control_api is running on http://localhost:3001 before starting frontend.
 
 ```bash
 # Terminal 1: Start backend
