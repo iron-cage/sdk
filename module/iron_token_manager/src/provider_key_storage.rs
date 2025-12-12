@@ -120,7 +120,7 @@ impl ProviderKeyStorage
       .max_connections( 5 )
       .connect( database_url )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Run migration 004 if not already applied
     let migration_004_completed : i64 = sqlx::query_scalar(
@@ -128,7 +128,7 @@ impl ProviderKeyStorage
     )
     .fetch_one( &pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     if migration_004_completed == 0
     {
@@ -136,7 +136,7 @@ impl ProviderKeyStorage
       sqlx::raw_sql( migration_004 )
         .execute( &pool )
         .await
-        .map_err( |_| crate::error::TokenError )?;
+        .map_err( |_| crate::error::TokenError::Generic )?;
     }
 
     Ok( Self { pool } )
@@ -193,7 +193,7 @@ impl ProviderKeyStorage
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( result.last_insert_rowid() )
   }
@@ -222,7 +222,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( row_to_record( &row ) )
   }
@@ -242,7 +242,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( row_to_metadata( &row ) )
   }
@@ -270,7 +270,7 @@ impl ProviderKeyStorage
     .bind( user_id )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( rows.iter().map( row_to_metadata ).collect() )
   }
@@ -287,7 +287,7 @@ impl ProviderKeyStorage
       .bind( key_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -303,7 +303,7 @@ impl ProviderKeyStorage
       .bind( key_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -319,7 +319,7 @@ impl ProviderKeyStorage
       .bind( key_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -339,7 +339,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -356,7 +356,7 @@ impl ProviderKeyStorage
       .bind( key_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -371,11 +371,11 @@ impl ProviderKeyStorage
       .bind( key_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     if result.rows_affected() == 0
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
     Ok( () )
   }
@@ -397,7 +397,7 @@ impl ProviderKeyStorage
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -416,7 +416,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( () )
   }
 
@@ -433,7 +433,7 @@ impl ProviderKeyStorage
     .bind( project_id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( row.map( |r| r.0 ) )
   }
@@ -451,7 +451,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( rows.into_iter().map( |r| r.0 ).collect() )
   }
@@ -469,7 +469,7 @@ impl ProviderKeyStorage
     .bind( provider.as_str() )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( rows.into_iter().map( |r| r.0 ).collect() )
   }
@@ -496,7 +496,7 @@ impl ProviderKeyStorage
     .bind( key_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
     Ok( key_id )
   }
 }

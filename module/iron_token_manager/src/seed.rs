@@ -50,58 +50,58 @@ pub async fn wipe_database( pool: &SqlitePool ) -> Result< () >
   sqlx::query( "DELETE FROM token_usage" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM api_call_traces" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM audit_log" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM project_provider_key_assignments" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM token_blacklist" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM user_audit_log" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Parent tables (referenced by foreign keys)
   sqlx::query( "DELETE FROM api_tokens" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM ai_provider_keys" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM usage_limits" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM users" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM agents" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -162,8 +162,8 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   let now_ms = crate::storage::current_time_ms();
   let day_ms = 24 * 60 * 60 * 1000;
 
-  // Bcrypt hash of "password123" (cost = 4, for fast dev testing)
-  let password_hash = "$2b$04$xQa5kFZZhNGwPDXqJvw9XuXUdQEPAqXwNMOqQcU6MqWxPLxOVyJqO";
+  // Bcrypt hash of "testpass" (cost = 12)
+  let password_hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
 
   // Admin user
   sqlx::query(
@@ -173,13 +173,13 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( "user_admin" )
   .bind( "admin" )
   .bind( password_hash )
-  .bind( "admin@example.com" )
+  .bind( "admin@admin.com" )
   .bind( "admin" )
   .bind( 1 )
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Developer user
   sqlx::query(
@@ -195,7 +195,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Inactive viewer user
   sqlx::query(
@@ -211,7 +211,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Tester user (no usage limits - unlimited testing)
   sqlx::query(
@@ -227,7 +227,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms - ( 7 * day_ms ) )  // Created a week ago
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Guest user (no tokens - just registered)
   sqlx::query(
@@ -243,7 +243,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms - ( 60 * 60 * 1000 ) )  // Created 1 hour ago
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -280,7 +280,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( "user_admin" )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Anthropic key
   let anthropic_encrypted = "ZmFrZV9lbmNyeXB0ZWRfa2V5X2FudGhyb3BpYw==";
@@ -303,7 +303,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( "user_admin" )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -338,7 +338,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )  // Never expires
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 2: Developer token (expires in 30 days)
   let token_hash_2 = "dev_token_hash_placeholder_bbb222";
@@ -356,7 +356,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms + ( 30 * day_ms ) )  // Expires in 30 days
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 3: Project token
   let token_hash_3 = "project_token_hash_placeholder_ccc333";
@@ -374,7 +374,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 4: Inactive token
   let token_hash_4 = "inactive_token_hash_placeholder_ddd444";
@@ -392,7 +392,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 5: Expired token
   let token_hash_5 = "expired_token_hash_placeholder_eee555";
@@ -410,7 +410,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms - ( 30 * day_ms ) )  // Expired 30 days ago
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 6: Expiring soon (within 7 days)
   let token_hash_6 = "expiring_soon_token_hash_placeholder_fff666";
@@ -428,7 +428,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms + ( 7 * day_ms ) )  // Expires in 7 days
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 7: Tester token (unlimited user, short expiry)
   let token_hash_7 = "tester_token_hash_placeholder_ggg777";
@@ -446,7 +446,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms + ( 14 * day_ms ) )  // Expires in 14 days
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 8: Second tester token (for rotation testing)
   let token_hash_8 = "tester_token_2_hash_placeholder_hhh888";
@@ -464,7 +464,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )  // Never expires
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Note: guest user deliberately has NO tokens (edge case testing)
 
@@ -501,7 +501,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Limit 2: Developer standard tier
   sqlx::query(
@@ -523,7 +523,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Limit 3: Free tier
   sqlx::query(
@@ -545,7 +545,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -567,7 +567,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Get Anthropic key ID
   let anthropic_key_id: i64 = sqlx::query_scalar(
@@ -575,7 +575,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Assignment 1: project_alpha -> OpenAI
   sqlx::query(
@@ -588,7 +588,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Assignment 2: project_alpha -> Anthropic
   sqlx::query(
@@ -601,7 +601,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -628,28 +628,28 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   let dev_token_id: Option< i64 > = sqlx::query_scalar(
     "SELECT id FROM api_tokens WHERE token_hash = 'dev_token_hash_placeholder_bbb222' LIMIT 1"
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   let project_token_id: Option< i64 > = sqlx::query_scalar(
     "SELECT id FROM api_tokens WHERE token_hash = 'project_token_hash_placeholder_ccc333' LIMIT 1"
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   let tester_token_id: Option< i64 > = sqlx::query_scalar(
     "SELECT id FROM api_tokens WHERE token_hash = 'tester_token_hash_placeholder_ggg777' LIMIT 1"
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Pattern 1: Admin token - moderate usage over 7 days
   if let Some( token_id ) = admin_token_id
@@ -673,7 +673,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
       .bind( now_ms - ( day_offset * day_ms ) )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     }
   }
 
@@ -699,7 +699,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
       .bind( now_ms - ( day_offset * day_ms ) )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     }
   }
 
@@ -724,7 +724,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Day 3 - low usage
     sqlx::query(
@@ -744,7 +744,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms - ( 3 * day_ms ) )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   // Pattern 4: Tester token - mixed provider usage
@@ -768,7 +768,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms - ( 2 * day_ms ) )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Anthropic usage
     sqlx::query(
@@ -788,7 +788,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms - day_ms )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   // Note: Some tokens deliberately have ZERO usage (newly created tokens, inactive tokens, etc.)

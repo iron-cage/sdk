@@ -1,8 +1,8 @@
 # Protocol 014: API Tokens API
 
 **Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
+**Version:** 1.1.0
+**Last Updated:** 2025-12-12
 **Priority:** NICE-TO-HAVE
 
 ---
@@ -16,7 +16,7 @@ The API Tokens API manages persistent authentication tokens for accessing the Ir
 - **Primary use case:** Dashboard authentication (persistent sessions)
 - **Secondary use case:** Admin automation (scripts, monitoring)
 - **Security:** Token value shown ONLY on creation (GitHub pattern)
-- **Lifecycle:** Create, List, Get, Revoke operations
+- **Lifecycle:** Create, List, Get, Validate, Revoke operations
 
 ---
 
@@ -413,6 +413,95 @@ HTTP 409 Conflict
 - **Other Users:** 403 Forbidden (including admins - token privacy)
 
 **Audit Log:** Yes (mutation operation)
+
+---
+
+### Validate API Token
+
+**Endpoint:** `POST /api/v1/api-tokens/validate`
+
+**Description:** Validates an API token without authentication. Returns token validity status and metadata if valid. This public endpoint allows external services to verify tokens without requiring their own authentication.
+
+**Request:**
+
+```json
+POST /api/v1/api-tokens/validate
+Content-Type: application/json
+
+{
+  "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+}
+```
+
+**Request Parameters:**
+
+| Field | Type | Required | Constraints | Description |
+|-------|------|----------|-------------|-------------|
+| `token` | string | Yes | 1-500 chars | API token value to validate |
+
+**Success Response (Valid Token):**
+
+```json
+HTTP 200 OK
+Content-Type: application/json
+
+{
+  "valid": true,
+  "user_id": "user_xyz789",
+  "project_id": "project_abc456",
+  "token_id": 123
+}
+```
+
+**Success Response (Invalid Token):**
+
+```json
+HTTP 200 OK
+Content-Type: application/json
+
+{
+  "valid": false
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `valid` | boolean | Token validity status |
+| `user_id` | string | User who created token (only if valid) |
+| `project_id` | string | Associated project ID (only if valid, nullable) |
+| `token_id` | integer | Token database ID (only if valid) |
+
+**Important:**
+- **Public endpoint:** No authentication required (allows external services to validate tokens)
+- **Always 200 OK:** Returns success status even for invalid tokens (prevents information leakage)
+- **Minimal metadata:** Only returns essential information for valid tokens
+- **Security:** Uses constant-time comparison to prevent timing attacks
+
+**Error Responses:**
+
+```json
+HTTP 400 Bad Request
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Missing required field: token"
+  }
+}
+```
+
+**Authorization:**
+- **No authentication required:** Public endpoint for external validation
+
+**Audit Log:** No (read-only operation, public endpoint)
+
+**Rate Limiting:** Recommend external rate limiting at reverse proxy (e.g., 100 requests/min per IP)
+
+**Use Cases:**
+1. **External services:** Validate tokens before processing requests
+2. **Load balancers:** Health check token validity before routing
+3. **Monitoring systems:** Verify token status without authentication
 
 ---
 

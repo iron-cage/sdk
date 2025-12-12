@@ -29,6 +29,15 @@
 //! - Old path: Direct credential access, no budget tracking
 //! - New path: Budget-controlled access, full tracking
 //! - Any rollback breaks the budget control guarantee
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_token_distinguishability_enables_enforcement` | Verify agent vs user token distinguishability | Create user token (agent_id=NULL) and agent token (agent_id=<id>) | User token has NULL agent_id, agent token has non-NULL agent_id | ✅ |
+//! | `test_protocol_005_budget_flow_works` | Verify Protocol 005 budget flow functionality | Create agent budget, allocate budget lease, track usage | Agent budget operations succeed | ✅ |
+//! | `test_rollback_impossibility_is_documented` | Verify rollback impossibility is documented | Check test file contains "Why Rollback Is Impossible" section | Documentation exists explaining why rollback breaks security | ✅ |
+//! | `test_enforcement_code_exists_in_keys_endpoint` | Verify enforcement code in /api/keys | Check keys.rs source code for agent token blocking | keys.rs contains "Agent tokens cannot use this endpoint" | ✅ |
 
 use iron_token_manager::{ agent_budget::AgentBudgetManager, lease_manager::LeaseManager, migrations::apply_all_migrations };
 use sqlx::SqlitePool;
@@ -200,7 +209,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_budget_status( agent_id )
     .await
     .unwrap()
-    .expect( "Budget should exist" );
+    .expect("LOUD FAILURE: Budget should exist");
 
   assert_eq!( budget.total_allocated, 100.0, "Total allocated should be $100" );
   assert_eq!( budget.budget_remaining, 100.0, "Budget remaining should be $100" );
@@ -220,7 +229,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_lease( &lease_id )
     .await
     .unwrap()
-    .expect( "Lease should exist" );
+    .expect("LOUD FAILURE: Lease should exist");
 
   assert_eq!( lease.budget_granted, 10.0, "Lease should have $10 granted" );
   assert_eq!( lease.budget_spent, 0.0, "Lease should have $0 spent initially" );
@@ -241,7 +250,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_lease( &lease_id )
     .await
     .unwrap()
-    .expect( "Lease should exist" );
+    .expect("LOUD FAILURE: Lease should exist");
 
   assert_eq!( updated_lease.budget_spent, 2.5, "Lease should show $2.50 spent" );
 
@@ -249,7 +258,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_budget_status( agent_id )
     .await
     .unwrap()
-    .expect( "Budget should exist" );
+    .expect("LOUD FAILURE: Budget should exist");
 
   assert_eq!( updated_budget.total_spent, 2.5, "Budget should show $2.50 total spent" );
   assert_eq!(

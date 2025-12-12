@@ -9,35 +9,43 @@ This directory contains ALL tests for iron_token_manager crate following domain-
 ```
 tests/
 ├── readme.md (this file)
-├── token_generator.rs      # Token generation and hashing tests (12 tests)
-├── token_storage.rs         # Token database operations tests (9 tests)
-├── cost_calculator.rs       # Cost calculation tests (9 tests)
-├── usage_tracker.rs         # Usage tracking tests (8 tests)
-├── limit_enforcer.rs        # Limit enforcement tests (11 tests)
-├── rate_limiter.rs          # Rate limiting tests (7 tests)
-├── database_schema.rs       # Database schema validation tests (7 tests)
-└── budget_integration.rs    # Budget tracking integration tests (7 tests)
+├── token_generator.rs          # Token generation and hashing tests (16 tests)
+├── token_storage.rs            # Token database operations tests (9 tests)
+├── cost_calculator.rs          # Cost calculation tests (9 tests)
+├── usage_tracker.rs            # Usage tracking tests (8 tests)
+├── limit_enforcer.rs           # Limit enforcement tests (15 tests)
+├── rate_limiter.rs             # Rate limiting tests (7 tests)
+├── database_schema.rs          # Database schema validation tests (5 tests)
+├── database_initialization.rs  # Database initialization tests (1 test)
+├── seed_data_validation.rs     # Seed data validation tests (20 tests)
+├── common/                     # Shared test utilities
+├── fixtures/                   # Test data and reference docs
+└── manual/                     # Manual testing procedures
 ```
 
 ## Responsibility Table
 
-| Entity | Responsibility | Input→Output | Scope | Out of Scope |
-|--------|----------------|--------------|-------|--------------|
-| `token_generator.rs` | Test cryptographic token generation and hashing | Generation requests → Tokens + Hashes | Token generation, Base64 encoding, SHA-256 hashing, hash verification, uniqueness, entropy | NOT database storage (token_storage.rs), NOT token usage tracking (usage_tracker.rs), NOT cost calculation (cost_calculator.rs), NOT rate limiting (rate_limiter.rs) |
+| File | Responsibility | Input→Output | Scope | Out of Scope |
+|------|----------------|--------------|-------|--------------|
+| `token_generator.rs` | Test cryptographic token generation and hashing | Generation requests → Tokens + Hashes | Token generation, Base64 encoding, SHA-256 hashing, hash verification, uniqueness, entropy, constant-time comparison, randomness distribution | NOT database storage (token_storage.rs), NOT token usage tracking (usage_tracker.rs), NOT cost calculation (cost_calculator.rs), NOT rate limiting (rate_limiter.rs) |
 | `token_storage.rs` | Test token database CRUD operations | Token operations → Database state | Token creation, retrieval, verification, expiration, deactivation, deletion, hash storage, metadata management | NOT token generation (token_generator.rs), NOT usage tracking (usage_tracker.rs), NOT cost calculation (cost_calculator.rs), NOT schema creation (database_schema.rs) |
-| `cost_calculator.rs` | Test token-to-cost conversion | Provider + Model + Tokens → Cost (cents) | OpenAI pricing, Anthropic pricing, Gemini pricing, unknown providers, zero tokens, cost accuracy | NOT usage recording (usage_tracker.rs), NOT budget tracking (budget_integration.rs), NOT token generation (token_generator.rs), NOT database operations (token_storage.rs) |
-| `usage_tracker.rs` | Test usage event recording and retrieval | Usage events → Database records + Aggregations | Usage recording, time-based filtering, provider filtering, aggregation, cascade deletion, timestamp tracking | NOT cost calculation (cost_calculator.rs), NOT token storage (token_storage.rs), NOT rate limiting (rate_limiter.rs), NOT budget enforcement (budget_integration.rs) |
+| `cost_calculator.rs` | Test token-to-cost conversion | Provider + Model + Tokens → Cost (cents) | OpenAI pricing, Anthropic pricing, Gemini pricing, unknown providers, zero tokens, cost accuracy | NOT usage recording (usage_tracker.rs), NOT token generation (token_generator.rs), NOT database operations (token_storage.rs) |
+| `usage_tracker.rs` | Test usage event recording and retrieval | Usage events → Database records + Aggregations | Usage recording, time-based filtering, provider filtering, aggregation, cascade deletion, timestamp tracking | NOT cost calculation (cost_calculator.rs), NOT token storage (token_storage.rs), NOT rate limiting (rate_limiter.rs) |
 | `limit_enforcer.rs` | Test usage limit enforcement | Limit scenarios → Allow/Deny decisions | Token quotas, request limits, cost caps, daily resets, project-level limits, create/update limits, unlimited checks | NOT rate limiting (rate_limiter.rs), NOT usage recording (usage_tracker.rs), NOT cost calculation (cost_calculator.rs), NOT database schema (database_schema.rs) |
 | `rate_limiter.rs` | Test token bucket rate limiting | Request patterns → Rate decisions | Requests per second, burst handling, per-user isolation, project-level rates, quota tracking, recovery over time, zero quota rejection | NOT quota limits (limit_enforcer.rs), NOT usage tracking (usage_tracker.rs), NOT token operations (token_storage.rs), NOT cost calculation (cost_calculator.rs) |
 | `database_schema.rs` | Test database schema correctness | Schema creation → Table validation | Table creation, column structure, indexes, foreign keys, CASCADE DELETE, uniqueness constraints, CHECK constraints | NOT business logic (limit_enforcer.rs, usage_tracker.rs), NOT token operations (token_storage.rs), NOT cost calculations (cost_calculator.rs), NOT rate limiting (rate_limiter.rs) |
-| `budget_integration.rs` | Test iron_cost integration | Budget scenarios → Budget tracking | Cost calculation + tracking, budget enforcement, per-agent isolation, zero cost handling, unknown providers, overspending prevention | NOT standalone cost calculation (cost_calculator.rs), NOT usage recording (usage_tracker.rs), NOT token operations (token_storage.rs), NOT rate limiting (rate_limiter.rs) |
+| `database_initialization.rs` | Test database initialization and isolation | Database setup → Isolated test databases | Test database creation, schema application, fixture loading, test isolation, parallel test safety | NOT schema definition (database_schema.rs), NOT seed data validation (seed_data_validation.rs), NOT business logic tests |
+| `seed_data_validation.rs` | Test seed data correctness and consistency | Seed script execution → Data validation | Seed data counts, user properties, provider keys, foreign key integrity, password hashes, consistent reproducibility | NOT seed implementation (src/seed.rs), NOT schema validation (database_schema.rs), NOT database initialization (database_initialization.rs) |
+| `common/` | Provide shared test utilities and fixtures | Test utilities → Reusable test helpers | Test database creation, common assertions, test data builders, shared setup/teardown | NOT actual tests (test files), NOT production code (src/), NOT seed data implementation |
+| `fixtures/` | Store test data and reference documentation | Test scenarios → Static test data | Seed data reference documentation, expected test outputs, sample payloads | NOT test implementations, NOT production fixtures, NOT dynamic test data generation |
+| `manual/` | Document manual testing procedures | Manual test scenarios → Testing instructions | Manual verification scripts, layer verification procedures (task 1.3), operational testing | NOT automated tests (test files), NOT production procedures (docs/operations/)
 
 ## Test Coverage Summary
 
-**Total Tests:** 73 (100% passing)
+**Total Tests:** 129 (100% passing)
 
-**Last Verified:** 2025-12-07
-- ✅ 73/73 tests passing
+**Last Verified:** 2025-12-12
+- ✅ 129/129 tests passing
 - ✅ 0 clippy warnings
 - ✅ All doc tests passing
 - ✅ SHA-256 hashing for API tokens (high-entropy random values)
@@ -45,14 +53,17 @@ tests/
 - ✅ Real implementations (no mocking)
 - ✅ Loud failure patterns
 - ✅ Bug reproducer test for BCrypt→SHA-256 migration (issue-bcrypt-revert)
+- ✅ Token generator security tests (10K uniqueness, chi-squared randomness, constant-time comparison)
+- ✅ Seed data validation tests (20 tests validating seed.rs correctness)
 
 ### By Functional Domain
 
-- **Token Generation (`token_generator.rs`):** 12 tests
+- **Token Generation (`token_generator.rs`):** 16 tests
   - Token generation, Base64 encoding, minimum length, uniqueness, entropy
   - SHA-256 hashing (64 hex chars, deterministic)
   - Hash verification (correct/wrong hash validation)
   - Bug reproducer: BCrypt non-determinism issue (issue-bcrypt-revert)
+  - Security tests: 10K uniqueness, chi-squared randomness distribution, constant-time comparison
   - Edge cases: Unique token generation (100 iterations), prefix support
 
 - **Token Storage (`token_storage.rs`):** 9 tests
@@ -76,7 +87,7 @@ tests/
   - Cascade deletion on token deletion
   - Edge cases: Multiple records, cost tracking, timestamp verification
 
-- **Limit Enforcer (`limit_enforcer.rs`):** 11 tests
+- **Limit Enforcer (`limit_enforcer.rs`):** 15 tests
   - Limit creation, updates
   - Token quota checks, request limit checks, cost cap checks
   - Daily token resets
@@ -92,20 +103,23 @@ tests/
   - Quota tracking, recovery over time
   - Edge cases: Zero quota rejection, rate limit recovery
 
-- **Database Schema (`database_schema.rs`):** 7 tests
+- **Database Schema (`database_schema.rs`):** 5 tests
   - Table creation (api_tokens, token_usage, usage_limits)
-  - Column structure validation
-  - Index creation
-  - Foreign key constraints
-  - CASCADE DELETE behavior
+  - Foreign key constraints and CASCADE DELETE behavior
   - Uniqueness constraints (token_hash, usage_limits per user/project)
 
-- **Budget Integration (`budget_integration.rs`):** 7 tests
-  - CostCalculator + BudgetTracker integration
-  - Budget enforcement, overspending prevention
-  - Per-agent isolation
-  - Multi-provider cost tracking
-  - Edge cases: Zero cost, unknown providers
+- **Database Initialization (`database_initialization.rs`):** 1 test
+  - Test database creation with schema and fixtures
+  - Isolated test databases for parallel test safety
+  - Proper cleanup and resource management
+
+- **Seed Data Validation (`seed_data_validation.rs`):** 20 tests
+  - User count and properties (admin, developer, viewer, tester, guest)
+  - Provider key count and validation (OpenAI, Anthropic)
+  - Foreign key integrity verification
+  - Password hash consistency (bcrypt cost=12)
+  - API token relationships and deactivation states
+  - Edge cases: Inactive users, token limits, reproducibility
 
 ## Test Methodology
 
@@ -199,15 +213,16 @@ If manual testing becomes necessary:
 
 ## Known Test Gaps
 
-None currently identified. All 72 tests passing with comprehensive coverage:
-- ✅ Token generation and hashing
+None currently identified. All 129 tests passing with comprehensive coverage:
+- ✅ Token generation and hashing (including security tests)
 - ✅ Token storage CRUD operations
 - ✅ Cost calculation for all major providers
 - ✅ Usage tracking and aggregation
 - ✅ Limit enforcement
 - ✅ Rate limiting
 - ✅ Database schema validation
-- ✅ Budget integration
+- ✅ Database initialization and isolation
+- ✅ Seed data validation (20 tests)
 
 ## Test Maintenance
 
@@ -239,8 +254,8 @@ Follow bug-fixing workflow (code_design.rulebook.md):
 
 ## Verification
 
-Last verified: 2025-12-07
-- ✅ 72/72 tests passing
+Last verified: 2025-12-12
+- ✅ 129/129 tests passing
 - ✅ 0 clippy warnings
 - ✅ All doc tests passing
 - ✅ All domains have comprehensive test coverage
@@ -248,4 +263,6 @@ Last verified: 2025-12-07
 - ✅ Loud failure pattern consistently applied
 - ✅ SHA-256 hashing correctly implemented for API tokens
 - ✅ Database schema with proper constraints
-- ✅ Responsibility Table documents all 8 test domains
+- ✅ Token generator security tests (10K uniqueness, randomness, constant-time)
+- ✅ Seed data validation (20 tests)
+- ✅ Responsibility Table documents all 12 test files/directories

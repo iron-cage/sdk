@@ -20,6 +20,28 @@
 //! - Database persistence
 //! - Audit logging
 //! - Edge cases (duplicate usernames, self-operations, invalid filters)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_create_user_valid_request` | Create user with valid data | POST /api/users with valid username/email/password/role | 201 Created, user in DB | ✅ |
+//! | `test_create_user_empty_username_rejected` | Create user with empty username | POST with username="" | 400 Bad Request | ✅ |
+//! | `test_create_user_short_password_rejected` | Create user with password <8 chars | POST with password="123" | 400 Bad Request | ✅ |
+//! | `test_create_user_empty_email_rejected` | Create user with empty email | POST with email="" | 400 Bad Request | ✅ |
+//! | `test_create_user_invalid_email_rejected` | Create user with invalid email format | POST with email="notanemail" | 400 Bad Request | ✅ |
+//! | `test_create_user_invalid_role_rejected` | Create user with invalid role | POST with role="superadmin" | 400 Bad Request | ✅ |
+//! | `test_list_users_no_filters` | List all users without filters | GET /api/users | 200 OK, all users returned | ✅ |
+//! | `test_list_users_with_role_filter` | List users filtered by role | GET /api/users?role=admin | 200 OK, only admin users | ✅ |
+//! | `test_get_user_valid_id` | Get user by valid ID | GET /api/users/:id with existing user | 200 OK, user details | ✅ |
+//! | `test_get_user_nonexistent_id` | Get user by nonexistent ID | GET /api/users/nonexistent | 404 Not Found | ✅ |
+//! | `test_suspend_user_valid` | Suspend user with reason | PUT /api/users/:id/suspend with reason | 200 OK, user suspended, audit log created | ✅ |
+//! | `test_activate_user_valid` | Activate suspended user | PUT /api/users/:id/activate | 200 OK, user activated, audit log created | ✅ |
+//! | `test_delete_user_valid` | Delete user | DELETE /api/users/:id | 200 OK, user soft-deleted, audit log created | ✅ |
+//! | `test_change_user_role_valid` | Change user role | PUT /api/users/:id/role with new role | 200 OK, role updated, audit log created | ✅ |
+//! | `test_change_user_role_invalid_rejected` | Change user to invalid role | PUT /api/users/:id/role with role="invalid" | 400 Bad Request | ✅ |
+//! | `test_reset_password_valid` | Reset user password | POST /api/users/:id/reset-password with new password | 200 OK, password reset, audit log created | ✅ |
+//! | `test_reset_password_short_rejected` | Reset password too short | POST with password <8 chars | 400 Bad Request | ✅ |
 
 use crate::common::extract_json_response;
 use iron_control_api::routes::users::
@@ -105,7 +127,7 @@ async fn create_test_database() -> SqlitePool
 
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64;
 
   sqlx::query(

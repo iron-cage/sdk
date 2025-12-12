@@ -5,6 +5,43 @@
 //! - Role-based access control (admin vs regular user)
 //! - Get agent tokens endpoint
 //! - Error cases (401, 403, 404)
+//!
+//! ## Security Tests Added (2025-12-12)
+//!
+//! Manual testing (Task 1.3) identified missing security-critical tests for unauthenticated
+//! access and authorization bypass scenarios. Added 5 tests:
+//!
+//! - `test_list_agents_without_auth_unauthorized`: Prevents unauthenticated agent enumeration
+//! - `test_get_agent_without_auth_unauthorized`: Prevents unauthenticated agent access
+//! - `test_delete_agent_without_auth_unauthorized`: Prevents unauthenticated agent deletion
+//! - `test_delete_nonexistent_agent_as_admin`: Verifies proper 404 error handling
+//! - `test_create_agent_ignores_owner_id_in_request`: Prevents authorization bypass via owner_id override
+//!
+//! These tests ensure authentication middleware cannot be accidentally removed and that
+//! owner_id is always derived from JWT claims, never from request body.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_create_agent_as_admin_success` | Admin creates agent | POST /api/agents with admin token, valid agent data | 201 Created, agent in DB with correct owner_id | ✅ |
+//! | `test_create_agent_as_user_forbidden` | Regular user creates agent | POST /api/agents with user token, valid agent data | 403 Forbidden | ✅ |
+//! | `test_create_agent_without_auth_unauthorized` | Unauthenticated creation | POST /api/agents without auth header, valid agent data | 401 Unauthorized | ✅ |
+//! | `test_create_agent_ignores_owner_id_in_request` | Authorization bypass attempt | POST /api/agents with admin token, request includes owner_id field | 201 Created, owner_id derived from JWT (not request) | ✅ |
+//! | `test_list_agents_as_admin_sees_all` | Admin lists all agents | GET /api/agents with admin token, DB has agents from multiple users | 200 OK, all agents returned | ✅ |
+//! | `test_list_agents_as_user_sees_only_accessible` | User lists accessible agents | GET /api/agents with user token, DB has user's agents + others | 200 OK, only user's agents returned | ✅ |
+//! | `test_list_agents_without_auth_unauthorized` | Unauthenticated listing | GET /api/agents without auth header | 401 Unauthorized | ✅ |
+//! | `test_get_agent_as_admin_success` | Admin retrieves specific agent | GET /api/agents/:id with admin token, agent exists | 200 OK, agent details returned | ✅ |
+//! | `test_get_agent_as_user_without_access_forbidden` | User retrieves other user's agent | GET /api/agents/:id with user token, agent belongs to different user | 403 Forbidden | ✅ |
+//! | `test_get_agent_not_found` | Retrieve nonexistent agent | GET /api/agents/999999 with admin token | 404 Not Found | ✅ |
+//! | `test_get_agent_without_auth_unauthorized` | Unauthenticated retrieval | GET /api/agents/:id without auth header | 401 Unauthorized | ✅ |
+//! | `test_update_agent_as_admin_success` | Admin updates agent | PUT /api/agents/:id with admin token, valid update data | 200 OK, agent updated in DB | ✅ |
+//! | `test_update_agent_as_user_forbidden` | User updates other user's agent | PUT /api/agents/:id with user token, agent belongs to different user | 403 Forbidden | ✅ |
+//! | `test_delete_agent_as_admin_success` | Admin deletes agent | DELETE /api/agents/:id with admin token | 204 No Content, agent removed from DB | ✅ |
+//! | `test_delete_agent_as_user_forbidden` | User deletes other user's agent | DELETE /api/agents/:id with user token, agent belongs to different user | 403 Forbidden | ✅ |
+//! | `test_delete_nonexistent_agent_as_admin` | Delete nonexistent agent | DELETE /api/agents/999999 with admin token | 404 Not Found | ✅ |
+//! | `test_delete_agent_without_auth_unauthorized` | Unauthenticated deletion | DELETE /api/agents/:id without auth header | 401 Unauthorized | ✅ |
+//! | `test_get_agent_tokens_success` | Retrieve agent's API tokens | GET /api/agents/:id/tokens with admin token, agent has tokens | 200 OK, list of agent's tokens returned | ✅ |
 
 mod common;
 
@@ -1052,4 +1089,181 @@ async fn test_remove_provider_from_agent() {
 
   assert_eq!( agent.remaining_providers.len(), 0 );
 }
-  
+
+// ============================================================================
+// Security Tests - Unauthenticated Access
+// ============================================================================
+
+#[ tokio::test ]
+async fn test_list_agents_without_auth_unauthorized()
+{
+  let ( app, _pool, _admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( "/api/agents" )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "Unauthenticated list agents should return 401 UNAUTHORIZED"
+  );
+}
+
+#[ tokio::test ]
+async fn test_get_agent_without_auth_unauthorized()
+{
+  let ( app, pool, _admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+
+  // Create agent first
+  let now = chrono::Utc::now().timestamp_millis();
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
+    .bind( "Test Agent" )
+    .bind( "[\"openai\"]" )
+    .bind( now )
+    .bind( &admin_id )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let agent_id = result.last_insert_rowid();
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( format!( "/api/agents/{}", agent_id ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "Unauthenticated get agent should return 401 UNAUTHORIZED"
+  );
+}
+
+#[ tokio::test ]
+async fn test_delete_agent_without_auth_unauthorized()
+{
+  let ( app, pool, _admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+
+  // Create agent first
+  let now = chrono::Utc::now().timestamp_millis();
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
+    .bind( "Test Agent" )
+    .bind( "[\"openai\"]" )
+    .bind( now )
+    .bind( &admin_id )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let agent_id = result.last_insert_rowid();
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::DELETE )
+        .uri( format!( "/api/agents/{}", agent_id ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "Unauthenticated delete agent should return 401 UNAUTHORIZED"
+  );
+}
+
+#[ tokio::test ]
+async fn test_delete_nonexistent_agent_as_admin()
+{
+  let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::DELETE )
+        .uri( "/api/agents/99999" )
+        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::NOT_FOUND,
+    "Deleting nonexistent agent should return 404 NOT FOUND"
+  );
+}
+
+// ============================================================================
+// Security Tests - Owner ID Override Attempts
+// ============================================================================
+
+#[ tokio::test ]
+async fn test_create_agent_ignores_owner_id_in_request()
+{
+  let ( app, pool, admin_token, _user_token, admin_id, user_id ) = create_agents_router().await;
+
+  // Attempt to create agent with different owner_id in request body
+  let request_body = json!({
+    "name": "Test Agent",
+    "providers": ["openai"],
+    "owner_id": user_id  // Trying to set different owner
+  });
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::POST )
+        .uri( "/api/agents" )
+        .header( "content-type", "application/json" )
+        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::CREATED,
+    "Agent creation should succeed"
+  );
+
+  // Verify owner_id is set to admin (from JWT), not user_id (from request body)
+  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+    .await
+    .unwrap();
+  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let agent_id = agent[ "id" ].as_i64().unwrap();
+
+  // Query database to verify actual owner_id
+  let row: ( String, ) = sqlx::query_as( "SELECT owner_id FROM agents WHERE id = ?" )
+    .bind( agent_id )
+    .fetch_one( &pool )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    row.0, admin_id,
+    "Owner ID should be set to authenticated user (admin), not request body value"
+  );
+}

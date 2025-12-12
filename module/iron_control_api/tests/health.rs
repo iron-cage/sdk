@@ -1,6 +1,13 @@
 //! Health endpoint tests
 //!
 //! Verifies the health check endpoint location and response format per FR-2 specification.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_health_endpoint_at_correct_path` | Health endpoint at correct path per FR-2 spec | GET /api/health | 200 OK with JSON {"status": "healthy"} | ✅ |
+//! | `test_old_health_path_returns_404` | Old incorrect path should not exist | GET /health | 404 Not Found (only /api/health should exist) | ✅ |
 
 use axum::{ http::StatusCode, body::Body, Router };
 use tower::ServiceExt;
@@ -41,7 +48,7 @@ async fn test_health_endpoint_at_correct_path()
   // Verify response is JSON
   let body = response.into_body().collect().await.unwrap().to_bytes();
   let json: serde_json::Value = serde_json::from_slice( &body )
-    .expect( "Health response should be valid JSON" );
+    .expect("LOUD FAILURE: Health response should be valid JSON");
 
   // Verify response has required fields
   assert!( json.get( "status" ).is_some(), "Health response should have 'status' field" );

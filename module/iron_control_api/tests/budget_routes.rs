@@ -4,6 +4,23 @@
 //!
 //! Tests for budget handshake, usage reporting, and budget refresh endpoints.
 //! These tests validate request validation, IC Token verification, and response formatting.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_handshake_request_validation` | HandshakeRequest validation | Valid/empty/oversized ic_token and provider fields | Valid passes, empty/oversized fail | ✅ |
+//! | `test_usage_report_request_validation` | UsageReportRequest validation | Valid/empty/negative/oversized fields | Valid passes, invalid fail | ✅ |
+//! | `test_budget_refresh_request_validation` | BudgetRefreshRequest validation | Valid/empty/negative/oversized fields | Valid passes, invalid fail | ✅ |
+//! | `test_ic_token_lifecycle` | IC Token generation and validation | Generate IC Token, validate claims | Token valid, claims match input | ✅ |
+//! | `test_ip_token_encryption` | IP Token encryption/decryption | Encrypt lease data, decrypt IP Token | Data round-trips correctly | ✅ |
+//! | `test_ip_token_format_validation` | IP Token format validation | Valid/invalid IP Token formats | Valid passes, malformed fails | ✅ |
+//! | `test_ic_token_expiration` | IC Token expiration handling | Create expired IC Token, validate | Validation fails for expired token | ✅ |
+//! | `test_ic_token_agent_id_format` | IC Token agent_id format validation | Valid/invalid agent_id in claims | Valid passes, invalid fails | ✅ |
+//! | `test_budget_state_creation` | BudgetState initialization | Create BudgetState with all components | State created successfully | ✅ |
+//! | `test_handshake_response_serialization` | HandshakeResponse JSON serialization | Serialize HandshakeResponse to JSON | Valid JSON with required fields | ✅ |
+//! | `test_usage_report_response_serialization` | UsageReportResponse JSON serialization | Serialize UsageReportResponse to JSON | Valid JSON with required fields | ✅ |
+//! | `test_budget_refresh_response_serialization` | BudgetRefreshResponse JSON serialization | Serialize BudgetRefreshResponse to JSON | Valid JSON with required fields | ✅ |
 
 use iron_control_api::
 {
@@ -215,11 +232,11 @@ fn test_ic_token_lifecycle()
   assert!( claims.validate().is_ok() );
 
   // Generate IC Token JWT
-  let token = manager.generate_token( &claims ).expect( "Should generate IC Token" );
+  let token = manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token");
   assert!( !token.is_empty() );
 
   // Verify IC Token
-  let verified_claims = manager.verify_token( &token ).expect( "Should verify IC Token" );
+  let verified_claims = manager.verify_token( &token ).expect("LOUD FAILURE: Should verify IC Token");
   assert_eq!( verified_claims.agent_id, "agent_123" );
   assert_eq!( verified_claims.budget_id, "budget_456" );
   assert_eq!( verified_claims.permissions, vec![ "llm:call", "data:read" ] );
@@ -232,17 +249,17 @@ fn test_ip_token_encryption()
   // Create 32-byte encryption key
   let key : [ u8; 32 ] = [ 0u8; 32 ]; // In production, use random key
 
-  let crypto = IpTokenCrypto::new( &key ).expect( "Should create IP Token crypto" );
+  let crypto = IpTokenCrypto::new( &key ).expect("LOUD FAILURE: Should create IP Token crypto");
 
   // Test provider API key
   let provider_key = "sk-proj_test_key_abc123";
 
   // Encrypt
-  let ip_token = crypto.encrypt( provider_key ).expect( "Should encrypt" );
+  let ip_token = crypto.encrypt( provider_key ).expect("LOUD FAILURE: Should encrypt");
   assert!( ip_token.starts_with( "AES256:" ) );
 
   // Decrypt
-  let decrypted = crypto.decrypt( &ip_token ).expect( "Should decrypt" );
+  let decrypted = crypto.decrypt( &ip_token ).expect("LOUD FAILURE: Should decrypt");
   assert_eq!( &*decrypted, provider_key );
 }
 
@@ -251,7 +268,7 @@ fn test_ip_token_encryption()
 fn test_ip_token_format_validation()
 {
   let key : [ u8; 32 ] = [ 0u8; 32 ];
-  let crypto = IpTokenCrypto::new( &key ).expect( "Should create crypto" );
+  let crypto = IpTokenCrypto::new( &key ).expect("LOUD FAILURE: Should create crypto");
 
   // Invalid format - missing parts
   let invalid_token1 = "AES256:abc:def";
@@ -347,7 +364,7 @@ fn test_handshake_response_serialization()
     expires_at: None,
   };
 
-  let json = serde_json::to_string( &response ).expect( "Should serialize" );
+  let json = serde_json::to_string( &response ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "ip_token" ) );
   assert!( json.contains( "lease_id" ) );
   assert!( json.contains( "budget_granted" ) );
@@ -363,7 +380,7 @@ fn test_usage_report_response_serialization()
     budget_remaining: 9.5,
   };
 
-  let json = serde_json::to_string( &response ).expect( "Should serialize" );
+  let json = serde_json::to_string( &response ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "success" ) );
   assert!( json.contains( "budget_remaining" ) );
 }
@@ -382,7 +399,7 @@ fn test_budget_refresh_response_serialization()
     reason: None,
   };
 
-  let json = serde_json::to_string( &approved ).expect( "Should serialize" );
+  let json = serde_json::to_string( &approved ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "approved" ) );
   assert!( json.contains( "budget_granted" ) );
 
@@ -396,7 +413,7 @@ fn test_budget_refresh_response_serialization()
     reason: Some( "insufficient_budget".to_string() ),
   };
 
-  let json = serde_json::to_string( &denied ).expect( "Should serialize" );
+  let json = serde_json::to_string( &denied ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "denied" ) );
   assert!( json.contains( "insufficient_budget" ) );
 }

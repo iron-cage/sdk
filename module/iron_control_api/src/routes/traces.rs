@@ -60,13 +60,18 @@ pub struct ApiTrace
 ///
 /// # Arguments
 ///
+/// * `_user` - Authenticated user (enforces JWT authentication)
 /// * `state` - Traces state
 ///
 /// # Returns
 ///
 /// - 200 OK with list of traces
+/// - 401 Unauthorized if authentication fails
 /// - 500 Internal Server Error if database query fails
-pub async fn list_traces( State( state ): State< TracesState > ) -> impl IntoResponse
+pub async fn list_traces(
+  _user: crate::jwt_auth::AuthenticatedUser,
+  State( state ): State< TracesState >,
+) -> impl IntoResponse
 {
   // Query all traces
   let traces = match state.storage.get_all_traces().await
@@ -106,15 +111,18 @@ pub async fn list_traces( State( state ): State< TracesState > ) -> impl IntoRes
 ///
 /// # Arguments
 ///
+/// * `_user` - Authenticated user (enforces JWT authentication)
 /// * `state` - Traces state
 /// * `trace_id` - Trace identifier
 ///
 /// # Returns
 ///
 /// - 200 OK with trace details
+/// - 401 Unauthorized if authentication fails
 /// - 404 Not Found if trace doesn't exist
 /// - 500 Internal Server Error if database query fails
 pub async fn get_trace(
+  _user: crate::jwt_auth::AuthenticatedUser,
   State( state ): State< TracesState >,
   JsonPath( trace_id ): JsonPath< i64 >,
 ) -> impl IntoResponse

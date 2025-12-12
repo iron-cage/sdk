@@ -24,22 +24,29 @@
 //! 3. Check ApiTrace serialization includes all required fields
 //! 4. Verify handler maps "not found" error to HTTP 404
 
-use crate::common::extract_response;
-use iron_control_api::routes::traces::TracesState;
+use crate::common::{ extract_response, test_state::TestTracesAppState };
 use axum::{ Router, routing::get, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 
-/// Create test router with trace get-by-id route.
-async fn create_test_router() -> Router
+/// Generate JWT token for test user
+fn generate_jwt_for_user( app_state: &TestTracesAppState, user_id: &str ) -> String
 {
-  let traces_state = TracesState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create traces state with in-memory database" );
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+}
 
-  Router::new()
+/// Create test router with trace get-by-id route.
+async fn create_test_router() -> ( Router, TestTracesAppState )
+{
+  let app_state = TestTracesAppState::new().await;
+
+  let router = Router::new()
     .route( "/api/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
-    .with_state( traces_state )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
 }
 
 /// Test non-existent ID returns 404 Not Found.
@@ -48,11 +55,13 @@ async fn create_test_router() -> Router
 #[ tokio::test ]
 async fn test_get_by_id_nonexistent_returns_404()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/traces/999999" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -79,11 +88,13 @@ async fn test_get_by_id_nonexistent_returns_404()
 #[ tokio::test ]
 async fn test_get_by_id_path_parameter_extraction()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/traces/12345" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -103,11 +114,13 @@ async fn test_get_by_id_path_parameter_extraction()
 #[ tokio::test ]
 async fn test_get_by_id_invalid_format()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/traces/not_a_number" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -129,11 +142,13 @@ async fn test_get_by_id_invalid_format()
 #[ tokio::test ]
 async fn test_get_by_id_negative_id()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/traces/-1" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -153,11 +168,13 @@ async fn test_get_by_id_negative_id()
 #[ tokio::test ]
 async fn test_get_by_id_zero_id()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/traces/0" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -174,7 +191,7 @@ async fn test_get_by_id_zero_id()
 #[ tokio::test ]
 async fn test_get_by_id_rejects_post_method()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let request = Request::builder()
     .method( "POST" )
@@ -197,7 +214,7 @@ async fn test_get_by_id_rejects_post_method()
 #[ tokio::test ]
 async fn test_get_by_id_rejects_delete_method()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let request = Request::builder()
     .method( "DELETE" )
@@ -218,11 +235,13 @@ async fn test_get_by_id_rejects_delete_method()
 #[ tokio::test ]
 async fn test_get_by_id_404_content_type_is_json()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/traces/999999" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 

@@ -94,8 +94,7 @@ mod implementation
     }
   }
 
-  // PyO3 bridge module
-  #[cfg(feature = "pyo3")]
+  // PyO3 bridge module (enabled feature includes pyo3 dependency)
   pub mod pyo3_bridge
   {
     use pyo3::prelude::*;
@@ -159,19 +158,24 @@ mod implementation
       }
     }
 
-    /// Python module definition
-    #[pymodule]
-    fn iron_cage(m: &Bound<'_, PyModule>) -> PyResult<()>
-    {
-      m.add_class::<Runtime>()?;
-      m.add_class::<crate::llm_router::LlmRouter>()?;
-      Ok(())
-    }
   }
 }
 
 #[cfg(feature = "enabled")]
 pub use implementation::*;
+
+/// Python module definition - must be at crate root for PyO3
+#[cfg(feature = "enabled")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "enabled")]
+#[pymodule]
+fn iron_cage(m: &Bound<'_, PyModule>) -> PyResult<()>
+{
+  m.add_class::<implementation::pyo3_bridge::Runtime>()?;
+  m.add_class::<llm_router::LlmRouter>()?;
+  Ok(())
+}
 
 #[cfg(not(feature = "enabled"))]
 mod stub

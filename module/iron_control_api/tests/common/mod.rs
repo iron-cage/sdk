@@ -94,7 +94,7 @@ pub async fn create_test_admin( pool: &SqlitePool ) -> ( String, String )
 
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_secs() as i64;
 
   let user_id = "user_admin_test".to_string();
@@ -130,7 +130,7 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
 
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_secs() as i64;
 
   sqlx::query(
@@ -250,7 +250,7 @@ pub async fn blacklist_refresh_token( pool: &SqlitePool, token_id: &str, user_id
 {
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_secs() as i64;
 
   sqlx::query(
@@ -318,7 +318,7 @@ mod tests
       .bind( user_id )
       .fetch_one( &pool )
       .await
-      .expect( "Should query users" );
+      .expect("LOUD FAILURE: Should query users");
 
     assert_eq!( count, 1, "User should be inserted" );
   }
@@ -339,7 +339,7 @@ mod tests
   #[ test ]
   fn test_verify_password()
   {
-    let hash = bcrypt::hash( "mypassword", 4 ).expect( "Should hash" );
+    let hash = bcrypt::hash( "mypassword", 4 ).expect("LOUD FAILURE: Should hash");
     assert!( verify_password( "mypassword", &hash ) );
     assert!( !verify_password( "wrongpassword", &hash ) );
   }

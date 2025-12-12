@@ -135,6 +135,12 @@ router.stop()  # Explicit stop
 ```
 - Use `router.set_budget()` to increase limit at runtime
 
+**Server-Managed Budget (Protocol 005 Handshake):**
+- When `api_key` is an IC token and `server_url` is provided, LlmRouter performs `/api/v1/budget/handshake` to fetch a lease based on server usage limits (usage_limits table).
+- The handshake grants the full remaining monthly budget in one lease; response may include `budget_remaining: 0.0` because the remaining budget was fully granted.
+- If monthly budget is exhausted, handshake returns HTTP 403 (`Budget limit exceeded`) and router budget is 0; subsequent requests are blocked.
+- Concurrency protection is validated by `python/tests/test_budget_concurrent_server.py`: first run consumes the 1¢ budget, second run receives 403 on handshake and blocks all threads.
+
 **Known Limitation - Concurrent Overspend:**
 
 Budget checking uses optimistic concurrency: check happens BEFORE request, cost added AFTER response. With concurrent requests, multiple threads can pass the budget check simultaneously, causing overspend.
@@ -174,6 +180,15 @@ INFO LlmRouter proxy listening on http://127.0.0.1:45297
 INFO LLM request completed model=gpt-4o-mini input_tokens=11 output_tokens=1 cost_usd=0.000001
 INFO LlmRouter proxy shutting down
 ```
+
+**Server Sync (Direct Mode):**
+
+When using direct mode with `server_url` and `api_key`, analytics events are automatically synced to Control API:
+- Background sync task runs every 5 seconds
+- Posts events to `POST /api/v1/analytics/events`
+- Auto-flush on `router.stop()` ensures no events lost
+- Only `llm_request_completed` and `llm_request_failed` events are synced
+- Synced events visible in Dashboard usage view
 
 **LlmRouter Rust API:**
 ```rust
@@ -241,6 +256,14 @@ router.shutdown();  // Stop the proxy
 - Concurrent overspend demonstration test
 - Env vars: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for direct mode
 - Env vars: `IC_TOKEN` + `IC_SERVER` for Iron Cage mode
+
+**Analytics Sync Tests:** `python/tests/test_analytics_*.py`
+- `test_analytics_sync.py` - Basic sync to Control API
+- `test_analytics_multithread.py` - 5 threads, 3 requests each
+- `test_analytics_models.py` - Multiple OpenAI models
+- `test_analytics_errors.py` - Error scenarios (invalid model, rate limit)
+- `test_analytics_long_prompt.py` - 50k token prompts stress test
+- Env vars: `IC_TOKEN` + `IC_SERVER` + `OPENAI_API_KEY`
 
 ---
 

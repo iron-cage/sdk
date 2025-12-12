@@ -1,6 +1,6 @@
 //! Tests for helper functions and Provider enum
 
-use iron_runtime_analytics::helpers::{infer_provider, Provider};
+use iron_runtime_analytics::provider_utils::{infer_provider, Provider};
 use std::sync::Arc;
 
 // ============================================================================

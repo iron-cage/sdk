@@ -202,4 +202,33 @@ impl PricingManager {
     pub fn get(&self, model_id: &str) -> Option<Model> {
         self.pricing.load().get(model_id).cloned()
     }
+
+    /// Estimate maximum cost for a request based on max_tokens in request body.
+    ///
+    /// Parses the request JSON to extract model and max_tokens, then calculates
+    /// the worst-case cost assuming all output tokens are used.
+    ///
+    /// If max_tokens not specified, uses model's max_output_tokens from pricing.
+    /// Input tokens are estimated from message content length (~4 chars per token).
+    ///
+    /// Returns cost in microdollars, or None if model/pricing not found.
+    pub fn estimate_max_cost(&self, request_body: &[u8]) -> Option<u64> {
+        let json: Value = serde_json::from_slice(request_body).ok()?;
+        let model = json.get("model")?.as_str()?;
+
+        // Get pricing for model first (needed for default max_tokens)
+        let pricing = self.get(model)?;
+
+        // Get max_tokens from request, or use model's max_output_tokens
+        let max_tokens = json.get("max_tokens")
+            .or_else(|| json.get("max_completion_tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or_else(|| pricing.max_output_tokens().unwrap_or(MAX_OUTPUT_TOKENS));
+
+        // Estimate input tokens from message content
+        let estimated_input = crate::token_estimation::estimate_input_tokens(&json);
+        let max_cost = pricing.calculate_cost_micros(estimated_input, max_tokens);
+
+        Some(max_cost)
+    }
 }

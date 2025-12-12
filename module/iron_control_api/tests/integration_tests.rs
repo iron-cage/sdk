@@ -7,6 +7,17 @@
 //! - Token management endpoints (CRUD operations)
 //! - Error cases (401, 403, 404)
 //! - Health check endpoint
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_health_endpoint` | Health check endpoint | GET /health | 200 OK | ✅ |
+//! | `test_login_success` | Successful login with valid credentials | POST /api/auth/login with valid user/pass | 200 OK, access + refresh tokens returned | ✅ |
+//! | `test_login_empty_credentials` | Login with empty credentials | POST /api/auth/login with empty email/password | 400 Bad Request | ✅ |
+//! | `test_refresh_token_flow` | Refresh access token using refresh token | Valid refresh token → POST /api/auth/refresh | 200 OK, new access token returned | ✅ |
+//! | `test_logout_flow` | Logout with valid token | POST /api/auth/logout with valid access token | 200 OK, token blacklisted | ✅ |
+//! | `test_invalid_refresh_token` | Refresh with invalid token | POST /api/auth/refresh with invalid/malformed token | 401 Unauthorized | ✅ |
 
 mod common;
 

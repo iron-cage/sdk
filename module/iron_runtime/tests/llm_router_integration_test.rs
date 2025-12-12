@@ -6,6 +6,8 @@
 //! - Provider key configured in Iron Cage dashboard
 //!
 //! Run with: cargo test --features integration
+//!
+//! Tests skip gracefully when env vars are not set (for CI compatibility).
 
 #![ cfg( feature = "integration" ) ]
 
@@ -18,13 +20,26 @@ use std::env;
 // Helper functions
 // =============================================================================
 
-fn get_test_credentials() -> ( String, String )
+/// Get test credentials, returning None if env vars not set.
+/// This allows tests to skip gracefully in CI without env vars.
+fn get_test_credentials() -> Option< ( String, String ) >
 {
-  let token = env::var( "IC_TOKEN" )
-    .expect( "IC_TOKEN environment variable required for integration tests" );
-  let server = env::var( "IC_SERVER" )
-    .expect( "IC_SERVER environment variable required for integration tests" );
-  ( token, server )
+  let token = env::var( "IC_TOKEN" ).ok()?;
+  let server = env::var( "IC_SERVER" ).ok()?;
+  Some( ( token, server ) )
+}
+
+/// Macro to skip test if credentials not available
+macro_rules! require_credentials {
+  () => {
+    match get_test_credentials() {
+      Some( creds ) => creds,
+      None => {
+        eprintln!( "SKIPPED: IC_TOKEN/IC_SERVER not set" );
+        return;
+      }
+    }
+  };
 }
 
 // =============================================================================
@@ -34,9 +49,9 @@ fn get_test_credentials() -> ( String, String )
 #[test]
 fn test_router_starts_and_stops()
 {
-  let ( token, server ) = get_test_credentials();
+  let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
   assert!( router.port > 0 );
@@ -58,9 +73,9 @@ fn test_router_starts_and_stops()
 #[test]
 fn test_router_provider_detection()
 {
-  let ( token, server ) = get_test_credentials();
+  let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   let provider = &router.provider;
   debug!( "Detected provider: {}", provider );
@@ -78,9 +93,9 @@ fn test_router_provider_detection()
 #[test]
 fn test_router_base_url_format()
 {
-  let ( token, server ) = get_test_credentials();
+  let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   let base_url = router.get_base_url();
 
@@ -99,9 +114,9 @@ fn test_router_base_url_format()
 #[test]
 fn test_router_api_key_passthrough()
 {
-  let ( token, server ) = get_test_credentials();
+  let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token.clone(), server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token.clone(), server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   // API key should be the same as the input token
   assert_eq!( router.api_key, token );
@@ -112,10 +127,10 @@ fn test_router_api_key_passthrough()
 #[test]
 fn test_router_custom_cache_ttl()
 {
-  let ( token, server ) = get_test_credentials();
+  let ( token, server ) = require_credentials!();
 
   // Create with custom cache TTL
-  let mut router = LlmRouter::create( token, server, 60 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 60 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
 
@@ -133,7 +148,7 @@ fn test_router_invalid_server_url()
   let server = "http://invalid-server-that-does-not-exist:9999".to_string();
 
   // Router should still start (connection errors happen on first request)
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
   // Provider will be "unknown" since it couldn't fetch the key

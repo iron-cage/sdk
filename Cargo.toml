@@ -341,3 +341,6 @@ version = "1.7.1"
 
 [workspace.dependencies.crossbeam]
 version = "0.8.4"
+
+[workspace.dependencies.wiremock]
+version = "0.6.5"

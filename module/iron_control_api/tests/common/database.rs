@@ -138,7 +138,7 @@ mod tests
         .bind( 1234567890 )
         .execute( db.pool() )
         .await
-        .expect( "Should insert test data" );
+        .expect("LOUD FAILURE: Should insert test data");
 
       // Query to verify data exists in first database
       let row: ( String, ) = sqlx::query_as(
@@ -147,7 +147,7 @@ mod tests
         .bind( "user_test_1" )
         .fetch_one( db.pool() )
         .await
-        .expect( "Should fetch inserted data" );
+        .expect("LOUD FAILURE: Should fetch inserted data");
 
       row.0
       // db is dropped here, pool closed, in-memory database destroyed
@@ -169,7 +169,7 @@ mod tests
         .bind( "user_test_1" )
         .fetch_one( db.pool() )
         .await
-        .expect( "Should query database" );
+        .expect("LOUD FAILURE: Should query database");
 
       assert_eq!(
         count.0,
@@ -230,7 +230,7 @@ mod tests
     let count: ( i64, ) = sqlx::query_as( "SELECT COUNT(*) FROM api_tokens" )
       .fetch_one( db.pool() )
       .await
-      .expect( "Database should still be accessible after panic" );
+      .expect("LOUD FAILURE: Database should still be accessible after panic");
 
     assert_eq!(
       count.0,
@@ -290,7 +290,7 @@ mod tests
           .bind( 1234567890 + i as i64 )
           .execute( db.pool() )
           .await
-          .expect( "Should insert without conflicts" );
+          .expect("LOUD FAILURE: Should insert without conflicts");
 
         // Verify only THIS task's data exists (isolation check)
         let count: ( i64, ) = sqlx::query_as(
@@ -299,7 +299,7 @@ mod tests
           .bind( format!( "user_concurrent_{}", i ) )
           .fetch_one( db.pool() )
           .await
-          .expect( "Should query without conflicts" );
+          .expect("LOUD FAILURE: Should query without conflicts");
 
         assert_eq!(
           count.0,
@@ -316,7 +316,7 @@ mod tests
     let mut completed = Vec::new();
     while let Some( result ) = join_set.join_next().await
     {
-      completed.push( result.expect( "Task should not panic" ) );
+      completed.push( result.expect("LOUD FAILURE: Task should not panic") );
     }
 
     assert_eq!(

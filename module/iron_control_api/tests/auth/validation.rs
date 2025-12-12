@@ -25,6 +25,22 @@
 //! - Valid minimal inputs (1 char)
 //! - Field length limits (DoS prevention)
 //! - Valid complete requests
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_empty_email_rejected` | Empty email validation | LoginRequest with email="" | Validation error "Email cannot be empty" | ✅ |
+//! | `test_empty_password_rejected` | Empty password validation | LoginRequest with password="" | Validation error "Password cannot be empty" | ✅ |
+//! | `test_whitespace_email_rejected` | Whitespace-only email | LoginRequest with email="   " | Validation error "Email cannot be empty" | ✅ |
+//! | `test_whitespace_password_rejected` | Whitespace-only password | LoginRequest with password="   " | Validation error "Password cannot be empty" | ✅ |
+//! | `test_single_char_email_accepted` | Minimal valid email | LoginRequest with email="a" | Validation passes | ✅ |
+//! | `test_single_char_password_accepted` | Minimal valid password | LoginRequest with password="a" | Validation passes | ✅ |
+//! | `test_email_too_long_rejected` | Oversized email (DoS) | LoginRequest with email=256 chars | Validation error "Email too long" | ✅ |
+//! | `test_password_too_long_rejected` | Oversized password (DoS) | LoginRequest with password=1001 chars | Validation error "Password too long" | ✅ |
+//! | `test_email_max_length_accepted` | Email at max length | LoginRequest with email=255 chars | Validation passes | ✅ |
+//! | `test_password_max_length_accepted` | Password at max length | LoginRequest with password=1000 chars | Validation passes | ✅ |
+//! | `test_valid_complete_request` | Valid complete request | LoginRequest with valid email+password | Validation passes | ✅ |
 
 use iron_control_api::routes::auth::{ LoginRequest };
 

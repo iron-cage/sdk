@@ -13,4 +13,5 @@ mod adapters {
     pub mod limits_adapters_test;
     pub mod traces_adapters_test;
     pub mod health_adapters_test;
+    pub mod coverage;
 }

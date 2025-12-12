@@ -213,7 +213,7 @@ async fn validate_expired_token_is_expired()
   assert_eq!( expired_token.0, "Expired Token", "Name should match" );
   assert_eq!( expired_token.1, 1, "Token should be marked active (but expired)" );
 
-  let expires_at = expired_token.2.expect( "Expired token should have expires_at timestamp" );
+  let expires_at = expired_token.2.expect("LOUD FAILURE: Expired token should have expires_at timestamp");
   assert!(
     expires_at < now_ms,
     "LOUD FAILURE: Expired token should have expires_at in the past (doc says 30 days ago)"
@@ -393,10 +393,11 @@ async fn validate_all_users_have_same_password_hash()
     "LOUD FAILURE: All users should have the SAME password hash (password123)"
   );
 
-  let expected_hash = "$2b$04$xQa5kFZZhNGwPDXqJvw9XuXUdQEPAqXwNMOqQcU6MqWxPLxOVyJqO";
+  // Bcrypt hash of "testpass" with cost=12 (matches src/seed.rs:166)
+  let expected_hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
   assert_eq!(
     password_hashes[ 0 ].0, expected_hash,
-    "Password hash should match documented bcrypt hash"
+    "Password hash should match documented bcrypt hash (cost=12)"
   );
 }
 

@@ -1,4 +1,10 @@
 //! Debug test to see actual error messages
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `debug_direct_suspend` | Debug user suspension with verbose logging | Create user via UserService, suspend user, log all operations and errors | User created and suspended successfully, debug logs show operation details | ✅ |
 
 use iron_control_api::routes::users::UserManagementState;
 use axum::extract::FromRef;
@@ -68,7 +74,7 @@ async fn create_test_database() -> SqlitePool
 
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64;
 
   let admin_result = sqlx::query(
