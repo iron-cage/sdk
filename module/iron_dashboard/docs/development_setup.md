@@ -71,19 +71,19 @@ nvm alias default 20
 cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
 cargo run --release
 
-# Wait for: "Server listening on http://0.0.0.0:3000"
+# Wait for: "Server listening on http://0.0.0.0:3001"
 ```
 
-**Why Running Locally:** Frontend makes REST API calls to `http://localhost:3000` for all data operations
+**Why Running Locally:** Frontend makes REST API calls to `http://localhost:3001` for all data operations
 
 **Health Check:**
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 # Expected: {"status":"ok"}
 ```
 
 **Troubleshooting:**
-- Port 3000 already in use → Kill process: `sudo lsof -t -i:3000 | xargs kill -9`
+- Port 3001 already in use → Kill process: `sudo lsof -t -i:3001 | xargs kill -9`
 - Database connection error → Ensure PostgreSQL running
 - Compilation errors → Run `cargo clean && cargo build`
 
@@ -134,13 +134,13 @@ found 0 vulnerabilities
 **File:** `.env` (create in project root)
 
 ```bash
-# API Backend URL (default: http://localhost:3000)
-VITE_API_URL=http://localhost:3000
+# API Backend URL (default: http://localhost:3001)
+VITE_API_URL=http://localhost:3001
 ```
 
 **Usage in Code:**
 ```typescript
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 ```
 
 **Why `VITE_` Prefix:** Vite only exposes environment variables starting with `VITE_` to client code (security: prevents leaking server-side secrets)
@@ -446,7 +446,7 @@ cargo run
 
 **Verify Backend Running:**
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 # Expected: {"status":"ok"}
 ```
 
@@ -514,7 +514,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3001',
         changeOrigin: true
       }
     }
@@ -672,7 +672,7 @@ npx shadcn-vue@latest --version
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `VITE_API_URL` | `http://localhost:3000` | Backend API base URL |
+| `VITE_API_URL` | `http://localhost:3001` | Backend API base URL |
 | `NODE_ENV` | `development` | Build environment (auto-set by Vite) |
 
 **Future Variables:**

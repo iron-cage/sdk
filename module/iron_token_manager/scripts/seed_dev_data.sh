@@ -123,7 +123,7 @@ INSERT OR IGNORE INTO api_tokens (
 VALUES
   (
     '$HASH_ADMIN',
-    'admin',
+    'user_admin',
     'project_alpha',
     'Admin Development Token',
     1,
@@ -131,7 +131,7 @@ VALUES
   ),
   (
     '$HASH_PM',
-    'developer',
+    'user_developer',
     'project_beta',
     'Developer Development Token',
     1,
@@ -139,7 +139,7 @@ VALUES
   ),
   (
     '$HASH_VIEWER',
-    'viewer',
+    'user_viewer',
     'project_beta',
     'Viewer Development Token',
     1,
@@ -163,7 +163,7 @@ INSERT OR IGNORE INTO usage_limits (
 )
 VALUES
   (
-    'admin',
+    'user_admin',
     NULL,
     1000000,
     1000,
@@ -172,7 +172,7 @@ VALUES
     $NOW_MS
   ),
   (
-    'developer',
+    'user_developer',
     'project_beta',
     500000,
     500,
@@ -181,7 +181,7 @@ VALUES
     $NOW_MS
   ),
   (
-    'viewer',
+    'user_viewer',
     'project_beta',
     100000,
     100,
@@ -240,7 +240,7 @@ SELECT
   'token',
   (SELECT id FROM api_tokens WHERE token_hash = '$HASH_ADMIN' LIMIT 1),
   'created',
-  'admin',
+  'user_admin',
   '{"method":"api","reason":"development"}',
   $NOW_MS - 86400000
 UNION ALL
@@ -248,7 +248,7 @@ SELECT
   'token',
   (SELECT id FROM api_tokens WHERE token_hash = '$HASH_PM' LIMIT 1),
   'created',
-  'developer',
+  'user_developer',
   '{"method":"api","reason":"development"}',
   $NOW_MS - 86400000
 UNION ALL
@@ -256,7 +256,7 @@ SELECT
   'token',
   (SELECT id FROM api_tokens WHERE token_hash = '$HASH_VIEWER' LIMIT 1),
   'created',
-  'viewer',
+  'user_viewer',
   '{"method":"api","reason":"development"}',
   $NOW_MS - 86400000;
 
