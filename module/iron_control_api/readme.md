@@ -329,7 +329,7 @@ The Dockerfile uses multi-stage builds for security and efficiency:
 | rbac.rs | RBAC (Role-Based Access Control) module |
 | token_auth.rs | API Token authentication middleware |
 | user_auth.rs | User authentication and password verification |
-| bin/ | TBD - bin module |
+| bin/ | REST API server binary for Iron Control API |
 | middleware/ | Middleware modules for Iron Control API |
 | routes/ | REST API route handlers |
 

@@ -296,7 +296,7 @@ Apache-2.0
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | `iron_token_manager` |
+| lib.rs | Token management for LLM API access control |
 | agent_budget.rs | Agent Budget Manager |
 | budget_request.rs | Budget Request Storage Layer |
 | config.rs | Configuration management for token manager |

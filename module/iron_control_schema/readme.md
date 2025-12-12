@@ -55,7 +55,7 @@ Apache-2.0 - See `license` file for details
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | `PostgreSQL` schema for Iron Cage Control Panel (producti... |
+| lib.rs | PostgreSQL schema for Iron Cage Control Panel |
 
 **Notes:**
 - Entries marked 'TBD' require manual documentation

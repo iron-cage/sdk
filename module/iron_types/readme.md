@@ -69,8 +69,8 @@ MIT
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | Foundational types and type-safe identifiers for Iron Run... |
-| ids.rs | Type-safe entity identifiers with validation and backward... |
+| lib.rs | Foundational types and type-safe identifiers for Iron Runtime |
+| ids.rs | Type-safe entity identifiers with validation |
 
 **Notes:**
 - Entries marked 'TBD' require manual documentation

@@ -338,10 +338,10 @@ MIT
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | Command-line interface for Iron Runtime token management ... |
+| lib.rs | Command-line interface for token management |
 | config.rs | Configuration system with hierarchical precedence |
 | adapters/ | Adapter layer for unilang CLI |
-| bin/ | TBD - bin module |
+| bin/ | CLI binary entry points for iron-token and iron commands |
 | formatting/ | Universal formatter supporting 4 output formats |
 | handlers/ | Pure business logic handlers for CLI commands |
 

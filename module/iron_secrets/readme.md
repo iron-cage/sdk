@@ -62,7 +62,7 @@ Apache-2.0
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | `iron_secrets` |
+| lib.rs | Secure secrets management for AI agents |
 | access_control.rs | Access control for secrets |
 | audit.rs | Audit logging for secrets access |
 | crypto.rs | Cryptographic operations for secret encryption/decryption |

@@ -66,7 +66,7 @@ MIT
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | PII detection and output sanitization for multi-agent sys... |
+| lib.rs | PII detection and output sanitization |
 
 **Notes:**
 - Entries marked 'TBD' require manual documentation

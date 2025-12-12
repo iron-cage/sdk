@@ -296,7 +296,7 @@ Apache-2.0
 
 | File | Responsibility |
 |------|----------------|
-| lib.rs | Core runtime for AI agent execution with integrated safet... |
+| lib.rs | Core runtime for AI agent execution |
 | llm_router/ | LLM Router - Local proxy for LLM API requests |
 
 **Notes:**
