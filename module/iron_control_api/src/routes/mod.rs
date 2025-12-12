@@ -3,6 +3,7 @@
 //! Phase 4 Days 28-29: REST API Endpoints
 
 pub mod agents;
+pub mod analytics;
 // pub mod auth;
 pub mod health;
 pub mod tokens;
