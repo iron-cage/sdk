@@ -545,7 +545,7 @@ fn estimate_max_cost_estimates_input_from_messages() {
 
     // ~210 input * 0.001 + 1000 output * 0.002 = 0.21 + 2.0 = 2.21 USD = 2_210_000 micros
     // Allow some tolerance for exact char count
-    assert!(cost >= 2_000_000 && cost <= 2_500_000, "cost was {}", cost);
+    assert!((2_000_000..=2_500_000).contains(&cost), "cost was {}", cost);
 }
 
 #[test]
