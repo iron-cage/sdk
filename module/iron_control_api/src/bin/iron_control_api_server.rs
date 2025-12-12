@@ -434,6 +434,21 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
 
+  // Seed database with test data if empty (development convenience)
+  let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( &agents_pool )
+    .await
+    .unwrap_or( 0 );
+
+  if user_count == 0
+  {
+    tracing::info!( "Seeding database with test data..." );
+    iron_token_manager::seed::seed_all( &agents_pool )
+      .await
+      .expect( "Failed to seed database" );
+    tracing::info!( "✓ Database seeded (admin@admin.com / testpass)" );
+  }
+
   // Initialize budget state (Protocol 005: Budget Control Protocol)
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
