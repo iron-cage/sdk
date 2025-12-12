@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Token blacklist for logout functionality (JWT revocation)
-CREATE TABLE IF NOT EXISTS blacklist
+CREATE TABLE IF NOT EXISTS token_blacklist
 (
   -- JWT ID (jti claim)
   jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS blacklist
 );
 
 -- Index for looking up blacklisted tokens by user
-CREATE INDEX IF NOT EXISTS idx_blacklist_user_id ON blacklist(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
 
 -- Create guard table to mark migration as completed
 CREATE TABLE IF NOT EXISTS _migration_003_completed (applied_at INTEGER NOT NULL);

@@ -157,7 +157,7 @@ impl UserService
     user_prefix.push_str( &user_id );
 
     // Insert user
-    let result = sqlx::query(
+    let _result = sqlx::query(
       "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
        VALUES ($1, $2, $3, $4, $5, 1, $6)"
     )
@@ -600,12 +600,14 @@ impl UserService
   ) -> Result< () >
   {
     let now_ms = current_time_ms();
+    let audit_id = format!( "audit_{}", uuid::Uuid::new_v4() );
 
     sqlx::query(
       "INSERT INTO user_audit_log \
-       (operation, target_user_id, performed_by, timestamp, previous_state, new_state, reason) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7)"
+       (id, operation, target_user_id, performed_by, timestamp, previous_state, new_state, reason) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
     )
+    .bind( &audit_id )
     .bind( operation )
     .bind( target_user_id )
     .bind( performed_by )

@@ -50,6 +50,7 @@ impl UserManagementState
 }
 
 /// Helper to get admin ID from username
+#[ allow( dead_code ) ]
 async fn get_admin_id( pool: &Pool< Sqlite >, username: &str ) -> Result< i64, sqlx::Error >
 {
   let row: ( i64, ) = sqlx::query_as( "SELECT id FROM users WHERE username = ?" )

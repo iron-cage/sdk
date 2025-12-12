@@ -201,7 +201,7 @@ impl UserInfo {
   /// * `user` - Database user record
   pub fn from_claims_and_user(claims: &crate::jwt_auth::AccessTokenClaims, user: &crate::user_auth::User) -> Self {
     Self {
-      id: format!("{}", user.id),
+      id: user.id.to_string(),
       email: user.username.clone(),
       role: claims.role.clone(),
       name: user.username.clone(), // TODO: Add name field to users table
@@ -215,7 +215,7 @@ impl UserInfo {
   /// * `user` - Database user record
   pub fn from_user(user: &crate::user_auth::User) -> Self {
     Self {
-      id: format!("{}", user.id),
+      id: user.id.to_string(),
       email: user.email.clone(),
       role: user.role.clone(),
       name: user.username.clone(), // TODO: Add name field to users table
@@ -380,7 +380,7 @@ pub async fn login(
   // Generate User Token (30 days expiration)
   // Generate unique token ID for blacklist tracking
   let access_token_id = format!("access_{}_{}", user_id, chrono::Utc::now().timestamp());
-  let user_token = match state.jwt_secret.generate_access_token(&user_id, &user.email, user_role, &access_token_id) {
+  let user_token = match state.jwt_secret.generate_access_token(user_id, &user.email, user_role, &access_token_id) {
     Ok(token) => token,
     Err(err) => {
       tracing::error!("Failed to generate user token: {}", err);
@@ -403,7 +403,7 @@ pub async fn login(
   let refresh_token_id = format!("refresh_{}_{}", user_id, chrono::Utc::now().timestamp());
   let refresh_token = match state
     .jwt_secret
-    .generate_refresh_token(&user_id, &user.email, user_role, &refresh_token_id)
+    .generate_refresh_token(user_id, &user.email, user_role, &refresh_token_id)
   {
     Ok(token) => Some(token),
     Err(err) => {
@@ -443,7 +443,6 @@ pub async fn login(
 /// ```
 ///
 /// No request body required.
-
 /// POST /api/v1/auth/logout
 ///
 /// Logout user by blacklisting User Token
@@ -498,7 +497,8 @@ pub async fn logout(
   // - jti: Token ID from JWT claims
   // - blacklisted_at: Current timestamp
   // - expires_at: Original token expiration (for cleanup)
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(claims.exp as i64);
+  let expires_at = chrono::DateTime::from_timestamp( claims.exp, 0 )
+    .expect( "Invalid expiration timestamp in JWT claims" );
   match user_auth::add_token_to_blacklist(&state.db_pool, &jti, &user_id, expires_at).await {
     Ok(()) => {},
     Err(err) => {
@@ -580,7 +580,7 @@ pub async fn refresh(
   // AuthenticatedUser( claims ): AuthenticatedUser
 
 ) -> impl IntoResponse {
-  let claims = match state.jwt_secret.verify_refresh_token(&bearer.token()) {
+  let claims = match state.jwt_secret.verify_refresh_token(bearer.token()) {
     Ok(claims) => claims,
     Err(_) => {
       return (
@@ -698,7 +698,7 @@ pub async fn refresh(
     Json(RefreshResponse {
       user_token: new_user_token,
       token_type: "Bearer".to_string(),
-      expires_in: expires_in,
+      expires_in,
       expires_at: expires_at.to_rfc3339(),
       user: UserInfo::from_user(&user),
     }),
@@ -776,7 +776,7 @@ pub async fn validate(
   TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
 ) -> impl IntoResponse {
   // Verify User Token
-  let claims = match state.jwt_secret.verify_access_token(&bearer.token()) {
+  let claims = match state.jwt_secret.verify_access_token(bearer.token()) {
     Ok(claims) => claims,
     Err(_err) => {
       // Token expired or invalid
@@ -806,31 +806,28 @@ pub async fn validate(
     }
   };
 
-  match blacklisted {
-    Some(blacklisted) => {
-      let blacklisted_at = chrono::DateTime::from_timestamp(blacklisted.blacklisted_at, 0);
+  if let Some(blacklisted) = blacklisted {
+    let blacklisted_at = chrono::DateTime::from_timestamp(blacklisted.blacklisted_at, 0);
 
-      match blacklisted_at {
-        Some(timestamp) => {
-          return (StatusCode::OK, Json(ValidateResponse::Invalid {
-            valid: false,
-            reason: "TOKEN_REVOKED".to_string(),
-            expired_at: None,
-            revoked_at: Some(timestamp.to_rfc3339()),
-          })).into_response();
-        },
-        None => {
-          return (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
-            error: ErrorDetail {
-              code: "TOKEN_BLACKLIST_ERROR".to_string(),
-              message: "Failed to check if token is blacklisted".to_string(),
-              details: None,
-            },
-          })).into_response();
-        },
-      }
-    },
-    None => {},
+    match blacklisted_at {
+      Some(timestamp) => {
+        return (StatusCode::OK, Json(ValidateResponse::Invalid {
+          valid: false,
+          reason: "TOKEN_REVOKED".to_string(),
+          expired_at: None,
+          revoked_at: Some(timestamp.to_rfc3339()),
+        })).into_response();
+      },
+      None => {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
+          error: ErrorDetail {
+            code: "TOKEN_BLACKLIST_ERROR".to_string(),
+            message: "Failed to check if token is blacklisted".to_string(),
+            details: None,
+          },
+        })).into_response();
+      },
+    }
   }
   
   // Fetch user to get current info
@@ -863,7 +860,7 @@ pub async fn validate(
     }
   };
 
-  let expires_at = chrono::DateTime::from_timestamp(claims.exp as i64, 0).unwrap();
+  let expires_at = chrono::DateTime::from_timestamp(claims.exp, 0).unwrap();
   let expires_in = (expires_at - chrono::Utc::now()).num_seconds() as u64;
 
   // Placeholder response
@@ -873,7 +870,7 @@ pub async fn validate(
       valid: true,
       user: UserInfo::from_user(&user),
       expires_at: expires_at.to_rfc3339(),
-      expires_in: expires_in,
+      expires_in,
     }),
   )
     .into_response()
@@ -960,7 +957,7 @@ mod tests {
     let created_at = chrono::Utc::now().timestamp();
     
     let mut user_id = username.to_string();
-    user_id.push_str("_");
+    user_id.push('_');
     user_id.push_str(&created_at.to_string());
 
 
@@ -1025,7 +1022,7 @@ mod tests {
 
     // Verify token was added to blacklist
     let blacklisted: Option<(String,)> = sqlx::query_as(
-      "SELECT jti FROM blacklist WHERE jti = ?"
+      "SELECT jti FROM token_blacklist WHERE jti = ?"
     )
     .bind(token_id)
     .fetch_optional(&pool)
@@ -1565,7 +1562,7 @@ mod tests {
       .expect("Failed to blacklist token");
 
     // Create validate request with blacklisted token
-    use axum::http::{Request, StatusCode};
+    use axum::http::Request;
     use axum::body::Body;
     use tower::ServiceExt;
 

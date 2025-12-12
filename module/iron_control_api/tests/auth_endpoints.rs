@@ -94,12 +94,12 @@ fn test_token_refresh_flow_concept()
   assert_eq!( claims.sub, user_id.to_string() );
 
   // Server generates new access token
-  let new_access_token = secret.generate_access_token( &user_id, "user@mail.com", "c", "token_id_002" ).expect( "Should generate" );
+  let new_access_token = secret.generate_access_token( user_id, "user@mail.com", "c", "token_id_002" ).expect( "Should generate" );
   assert!( !new_access_token.is_empty() );
 
   // Optionally generate new refresh token (rotation)
   let new_refresh_token = secret
-    .generate_refresh_token( &user_id, "user@mail.com", "c", "refresh_002" )
+    .generate_refresh_token( user_id, "user@mail.com", "c", "refresh_002" )
     .expect( "Should generate" );
   assert!( !new_refresh_token.is_empty() );
 }

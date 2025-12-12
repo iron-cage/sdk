@@ -181,7 +181,7 @@ pub async fn add_token_to_blacklist(
 
   sqlx::query(
     r#"
-    INSERT INTO blacklist (jti, user_id, blacklisted_at, expires_at) VALUES (?, ?, ?, ?)
+    INSERT INTO token_blacklist (jti, user_id, blacklisted_at, expires_at) VALUES (?, ?, ?, ?)
     "#
   )
   .bind( token )
@@ -217,7 +217,7 @@ pub async fn get_blacklisted_token(
 {
   let blacklisted = sqlx::query_as(
     r#"
-    SELECT jti, user_id, blacklisted_at, expires_at FROM blacklist WHERE jti = ?
+    SELECT jti, user_id, blacklisted_at, expires_at FROM token_blacklist WHERE jti = ?
     "#
   )
   .bind( token )
@@ -287,7 +287,7 @@ mod tests
 
     // Verify token is in blacklist
     let blacklisted: Option<(String, String, i64, i64)> = sqlx::query_as(
-      "SELECT jti, user_id, blacklisted_at, expires_at FROM blacklist WHERE jti = ?"
+      "SELECT jti, user_id, blacklisted_at, expires_at FROM token_blacklist WHERE jti = ?"
     )
     .bind(jti)
     .fetch_optional(&pool)
@@ -335,7 +335,7 @@ mod tests
     }
 
     // Verify all tokens are in blacklist
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM blacklist WHERE user_id = ?")
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM token_blacklist WHERE user_id = ?")
       .bind(user_id)
       .fetch_one(&pool)
       .await
@@ -360,7 +360,7 @@ mod tests
 
     // Verify expiration timestamp is correct
     let (db_expires_at,): (i64,) = sqlx::query_as(
-      "SELECT expires_at FROM blacklist WHERE jti = ?"
+      "SELECT expires_at FROM token_blacklist WHERE jti = ?"
     )
     .bind(jti)
     .fetch_one(&pool)

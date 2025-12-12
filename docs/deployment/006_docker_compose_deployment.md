@@ -201,22 +201,52 @@ Deploy Control Panel (API + Dashboard) for pilot/development use with minimal op
 
 ## Deployment Modes Comparison
 
-### Native SQLite (Local Development)
+### Development Mode (Docker Compose - Clean State)
+
+- **Database**: SQLite in bind mount (`./-dev_data/iron.db`)
+- **Behavior**: Database wiped automatically on every startup
+- **Deployment**: `docker compose -f docker-compose.dev.yml up`
+- **Use Case**: Testing, debugging, clean state verification
+- **Environment**: `IRON_DEPLOYMENT_MODE=development`
+- **Secrets**: Hardcoded development secrets (insecure, for testing only)
+- **Ports**: Frontend :5173 (Vite HMR), Backend :3000
+- **Build**: Development build with source mounting (hot reload)
+- **Persistence**: None (data deleted on startup)
+- **⚠️ WARNING**: Never use in production - all data is lost on restart
+
+### Production Mode (Docker Compose - Data Persistence)
+
+- **Database**: SQLite in Docker volume (`sqlite_data:/app/data/iron.db`)
+- **Behavior**: Database persists across restarts
+- **Deployment**: `docker compose up -d`
+- **Use Case**: Production deployment with data retention
+- **Environment**: `IRON_DEPLOYMENT_MODE=production`
+- **Secrets**: Required via `.env` file (secure)
+- **Ports**: Frontend :8080 (nginx production build)
+- **Build**: Production build with optimizations
+- **Persistence**: Full (survives container restarts)
+- **Data Safety**: Backed by Docker named volume
+
+### Native SQLite (Local Development - Deprecated)
 
 - **Database**: SQLite file (`./iron.db`)
 - **Concurrency**: Single process only
 - **Deployment**: `cargo run --bin iron_control_api_server`
-- **Use Case**: Local development, testing
+- **Use Case**: Local development (superseded by development mode)
 - **Limitation**: File locking prevents concurrent backend instances
+- **Note**: Use development mode instead for better experience
 
-### Docker Compose SQLite (Pilot Deployment)
+### Quick Comparison: Development vs Production
 
-- **Database**: SQLite file in Docker volume (`/app/data/iron.db`)
-- **Concurrency**: Single backend instance (sufficient for <100 users)
-- **Deployment**: `docker compose up -d`
-- **Use Case**: Pilot deployment, small teams (<50 users)
-- **Limitation**: Single backend instance (no horizontal scaling)
-- **Persistence**: Data survives container restarts via named volume
+| Aspect | Development Mode | Production Mode |
+|--------|------------------|-----------------|
+| **Command** | `docker compose -f docker-compose.dev.yml up` | `docker compose up -d` |
+| **Data Persistence** | ❌ Wiped on startup | ✅ Persists forever |
+| **Configuration** | Zero config (hardcoded) | Requires .env file |
+| **Secrets** | Insecure (hardcoded) | Secure (from .env) |
+| **Use Case** | Testing, debugging | Production |
+| **Frontend** | Vite dev server (:5173) | nginx production (:8080) |
+| **Backend** | Hot reload enabled | Pre-built optimized |
 
 ### Kubernetes + PostgreSQL (Future Production)
 

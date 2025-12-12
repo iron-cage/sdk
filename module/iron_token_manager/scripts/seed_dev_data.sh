@@ -76,32 +76,31 @@ PRAGMA foreign_keys = ON;
 -- ============================================================================
 
 -- Insert test users (INSERT OR IGNORE for idempotency)
--- Note: id is INTEGER AUTOINCREMENT, so we dont specify it
 INSERT OR IGNORE INTO users (id, username, email, role, password_hash, is_active, created_at)
 VALUES
   (
+    'user_admin',
     'admin',
     'admin@admin.com',
     'admin',
-    'admin',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     1,
     $NOW_MS
   ),
   (
-    'developer',
+    'user_developer',
     'developer',
     'developer@developer.com',
-    'developer',
+    'user',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     1,
     $NOW_MS
   ),
   (
-    'viewer',
+    'user_viewer',
     'viewer',
     'viewer@viewer.com',
-    'viewer',
+    'user',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     0,
     $NOW_MS

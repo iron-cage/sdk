@@ -158,7 +158,91 @@ docker compose version    # Should show v2.x.x
 docker info | grep -i memory  # Check available RAM
 ```
 
-### 2.3 Quick Start
+### 2.3 Development vs Production Modes
+
+The Control Panel supports two deployment modes with different database persistence behaviors:
+
+| Aspect | Development Mode | Production Mode |
+|--------|------------------|-----------------|
+| **Command** | `docker compose -f docker-compose.dev.yml up` | `docker compose up -d` |
+| **Database Behavior** | Wiped on every restart (fresh state) | Persistent across restarts |
+| **Database Storage** | Bind mount (`./-dev_data/`) | Named volume (`sqlite_data`) |
+| **Environment** | IRON_DEPLOYMENT_MODE=development | IRON_DEPLOYMENT_MODE=production |
+| **Secrets** | Hardcoded (dev-secret) | Required in .env file |
+| **Port** | localhost:5173 (Vite dev server) | localhost:8080 (nginx) |
+| **Build Type** | Development (hot reload) | Production (optimized) |
+| **Use Case** | Testing, debugging, clean state testing | Production deployment, data retention |
+| **Data Persistence** | None (wiped on startup) | Full (survives restarts) |
+
+**Choose Development Mode when:**
+- Testing database migrations
+- Debugging with clean state each run
+- Rapid iteration without data pollution
+- Frontend hot module replacement (HMR) needed
+
+**Choose Production Mode when:**
+- Deploying to production environment
+- Data must persist across restarts
+- Running with real user data
+- Optimized builds for performance
+
+**⚠️ WARNING:** Development mode **ALWAYS** deletes the database on startup. Never use `IRON_DEPLOYMENT_MODE=development` in production.
+
+### 2.4 Development Mode Deployment (Clean State)
+
+**Purpose:** Quick development/testing deployment with automatic database wiping on every restart.
+
+**Single-Line Command:**
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+**What Happens:**
+
+1. Backend container starts with live source code mounting
+2. Backend detects `IRON_DEPLOYMENT_MODE=development`
+3. Backend automatically deletes database file (`./-dev_data/iron.db`)
+4. Backend creates fresh database with all migrations
+5. Frontend starts with Vite dev server (HMR enabled)
+
+**Database Wiping Confirmation:**
+
+Check logs for database wiping message:
+
+```bash
+docker logs iron_backend_dev | grep "Cleared"
+# Expected: "✓ Cleared /app/data/iron.db"
+```
+
+**Access Points:**
+- Frontend (HMR): http://localhost:5173
+- Backend API: http://localhost:3000/api/health
+
+**Database Location:**
+- Host: `./-dev_data/iron.db` (git-ignored, hyphen-prefixed)
+- Container: `/app/data/iron.db`
+- Inspect locally: `sqlite3 ./-dev_data/iron.db`
+
+**Stopping Development Mode:**
+
+```bash
+# Stop containers
+docker compose -f docker-compose.dev.yml down
+
+# Optional: Remove database directory
+rm -rf ./-dev_data
+```
+
+**Key Features:**
+- ✅ No .env configuration required (uses development secrets)
+- ✅ Source code hot reload (edit code, see changes immediately)
+- ✅ Fresh database state on every restart
+- ✅ Faster startup (no production build step)
+
+### 2.5 Production Deployment (Data Persistence)
+
+**Purpose:** Production deployment with persistent database storage.
 
 **Step 1: Clone Repository**
 

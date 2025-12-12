@@ -155,6 +155,7 @@ struct AppState
   keys: iron_control_api::routes::keys::KeysState,
   users: iron_control_api::routes::users::UserManagementState,
   agents: sqlx::SqlitePool,
+  budget: iron_control_api::routes::budget::BudgetState,
   analytics: iron_control_api::routes::analytics::AnalyticsState,
 }
 
@@ -246,6 +247,15 @@ impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
   }
 }
 
+/// Enable budget routes to access BudgetState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::budget::BudgetState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.budget.clone()
+  }
+}
+
 /// Enable API token authentication extractor to access ApiTokenState from combined AppState
 impl axum::extract::FromRef< AppState > for iron_control_api::token_auth::ApiTokenState
 {
@@ -291,10 +301,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Extract database file path from SQLite URL for development mode wiping
   let extract_sqlite_path = | url: &str | -> Option< String >
   {
-    if url.starts_with( "sqlite://" )
+    if let Some( path_with_query ) = url.strip_prefix( "sqlite://" )
     {
-      // Remove "sqlite://" prefix and query parameters
-      let path_with_query = &url[ 9.. ]; // Skip "sqlite://"
+      // Remove query parameters
       let path = path_with_query.split( '?' ).next()?;
       Some( path.to_string() )
     }
@@ -360,6 +369,23 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let jwt_secret = std::env::var( "JWT_SECRET" )
     .unwrap_or_else( |_| "dev-secret-change-in-production".to_string() );
 
+  // Protocol 005: Budget Control Protocol secrets
+  let ic_token_secret = std::env::var( "IC_TOKEN_SECRET" )
+    .unwrap_or_else( |_| "dev-ic-token-secret-change-in-production".to_string() );
+
+  // IP Token encryption key (32 bytes for AES-256-GCM)
+  let ip_token_key_hex = std::env::var( "IP_TOKEN_KEY" )
+    .unwrap_or_else( |_| "0000000000000000000000000000000000000000000000000000000000000000".to_string() );
+
+  // Decode hex string to bytes
+  let ip_token_key = hex::decode( &ip_token_key_hex )
+    .expect( "IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
+
+  if ip_token_key.len() != 32
+  {
+    panic!( "IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters), got {} bytes", ip_token_key.len() );
+  }
+
   tracing::info!( "Initializing API server..." );
   tracing::info!( "Database: {}", database_url );
 
@@ -423,6 +449,15 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
 
+  // Initialize budget state (Protocol 005: Budget Control Protocol)
+  let budget_state = iron_control_api::routes::budget::BudgetState::new(
+    ic_token_secret,
+    &ip_token_key,
+    &database_url,
+  )
+  .await
+  .expect( "Failed to initialize budget state" );
+
   // Create combined app state
   let app_state = AppState
   {
@@ -435,6 +470,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     keys: keys_state,
     users: user_management_state,
     agents: agents_pool,
+    budget: budget_state,
     analytics: analytics_state,
   };
 
@@ -503,6 +539,18 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
 
+    // Budget Control Protocol endpoints (Protocol 005)
+    .route( "/api/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
+    .route( "/api/budget/report", post( iron_control_api::routes::budget::report_usage ) )
+    .route( "/api/budget/refresh", post( iron_control_api::routes::budget::refresh_budget ) )
+
+    // Budget Request Workflow endpoints (Protocol 012)
+    .route( "/api/v1/budget/requests", post( iron_control_api::routes::budget::create_budget_request ) )
+    .route( "/api/v1/budget/requests/:id", get( iron_control_api::routes::budget::get_budget_request ) )
+    .route( "/api/v1/budget/requests", get( iron_control_api::routes::budget::list_budget_requests ) )
+    .route( "/api/v1/budget/requests/:id/approve", axum::routing::patch( iron_control_api::routes::budget::approve_budget_request ) )
+    .route( "/api/v1/budget/requests/:id/reject", axum::routing::patch( iron_control_api::routes::budget::reject_budget_request ) )
+
     // Analytics endpoints (Protocol 012)
     .route( "/api/v1/analytics/events", post( iron_control_api::routes::analytics::post_event ) )
     .route( "/api/v1/analytics/spending/total", get( iron_control_api::routes::analytics::get_spending_total ) )
@@ -566,6 +614,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  POST /api/projects/:project_id/provider" );
   tracing::info!( "  DELETE /api/projects/:project_id/provider" );
   tracing::info!( "  GET  /api/keys" );
+  tracing::info!( "  POST /api/budget/handshake" );
+  tracing::info!( "  POST /api/budget/report" );
+  tracing::info!( "  POST /api/budget/refresh" );
+  tracing::info!( "  POST /api/v1/budget/requests" );
+  tracing::info!( "  GET  /api/v1/budget/requests" );
+  tracing::info!( "  GET  /api/v1/budget/requests/:id" );
+  tracing::info!( "  PATCH /api/v1/budget/requests/:id/approve" );
+  tracing::info!( "  PATCH /api/v1/budget/requests/:id/reject" );
   tracing::info!( "  POST /api/v1/analytics/events" );
   tracing::info!( "  GET  /api/v1/analytics/spending/total" );
   tracing::info!( "  GET  /api/v1/analytics/spending/by-agent" );

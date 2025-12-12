@@ -38,10 +38,11 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 
 **Required Modules:**
 - iron_runtime_state - Agent state persistence
-- iron_cost - Budget tracking
+- iron_cost - Budget tracking and cost calculation
 - iron_safety - PII detection
 - iron_reliability - Circuit breakers
-- iron_telemetry - Logging
+- iron_telemetry - Logging infrastructure
+- iron_runtime_analytics - Lock-free event recording (via `analytics` feature)
 
 **Required External:**
 - pyo3 - Python FFI
@@ -49,8 +50,10 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 - axum - HTTP server for LlmRouter proxy
 - reqwest - HTTP client for forwarding requests
 
-**Optional:**
-- None
+**Features:**
+- `enabled` - Core functionality (default)
+- `analytics` - Event recording via iron_runtime_analytics
+- `full` - All features (`enabled` + `analytics`, **default**)
 
 ---
 
@@ -157,6 +160,21 @@ OVERSPEND: $0.038 (76% over budget)
 
 **Current behavior:** Best-effort enforcement. Single-threaded usage is exact. Concurrent usage may overspend proportional to (threads × cost-per-request).
 
+**Analytics Integration:**
+
+LlmRouter automatically records analytics events when built with `analytics` feature (default via `full`):
+
+- **LlmRequestCompleted** - Model, tokens, cost, provider for each successful request
+- **LlmRequestFailed** - Model, status code, error message for failed requests
+- **RouterStarted** / **RouterStopped** - Lifecycle events with port/stats
+
+Events are stored in lock-free `EventStore` (from `iron_runtime_analytics`) and logged to console:
+```
+INFO LlmRouter proxy listening on http://127.0.0.1:45297
+INFO LLM request completed model=gpt-4o-mini input_tokens=11 output_tokens=1 cost_usd=0.000001
+INFO LlmRouter proxy shutting down
+```
+
 **LlmRouter Rust API:**
 ```rust
 use iron_runtime::LlmRouter;
@@ -187,9 +205,11 @@ router.shutdown();  // Stop the proxy
 
 **Uses:**
 - iron_runtime_state - Persists agent state
-- iron_cost - Tracks budget consumption
+- iron_cost - Tracks budget consumption and calculates request costs
 - iron_safety - Validates LLM inputs/outputs
 - iron_reliability - Circuit breaker logic
+- iron_telemetry - Logging infrastructure
+- iron_runtime_analytics - Event recording and stats aggregation
 - Iron Cage Server - Fetches provider API keys via `/api/keys`
 
 ---

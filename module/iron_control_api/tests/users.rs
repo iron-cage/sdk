@@ -123,9 +123,9 @@ async fn test_create_and_list_users() {
     ).await.unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let (_status, list_response): (StatusCode, ListUsersResponse) = extract_json_response(response).await;
-    assert!(list_response.users.len() >= 1);
+    assert!( !list_response.users.is_empty() );
     let found = list_response.users.iter().any(|u| u.username == "newuser");
     assert!(found, "Created user should be in the list");
 }

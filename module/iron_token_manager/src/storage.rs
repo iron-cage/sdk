@@ -226,8 +226,7 @@ impl TokenStorage
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .unwrap();
-    // .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError )?;
 
     Ok( result.last_insert_rowid() )
   }

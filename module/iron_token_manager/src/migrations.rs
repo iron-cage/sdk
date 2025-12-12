@@ -40,7 +40,7 @@ use crate::error::Result;
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-010, skipping 007).
+/// Migrations are applied in order (001-012, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -86,11 +86,17 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 008: Agents table
   apply_migration_008( pool ).await?;
 
-  // // Migration 009: Budget leases (Protocol 005)
-  // apply_migration_009( pool ).await?;
+  // Migration 009: Budget leases (Protocol 005)
+  apply_migration_009( pool ).await?;
 
-  // // Migration 010: Agent budgets (Protocol 005)
-  // apply_migration_010( pool ).await?;
+  // Migration 010: Agent budgets (Protocol 005)
+  apply_migration_010( pool ).await?;
+
+  // Migration 011: Budget requests (Protocol 012)
+  apply_migration_011( pool ).await?;
+
+  // Migration 012: Budget history (Protocol 012)
+  apply_migration_012( pool ).await?;
 
   Ok( () )
 }
@@ -258,6 +264,103 @@ async fn apply_migration_008( pool: &SqlitePool ) -> Result< () >
   if completed == 0
   {
     let migration = include_str!( "../migrations/008_create_agents_table.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+
+/// Migration 009: Budget leases (Protocol 005)
+#[ allow( dead_code ) ]
+async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_009_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/009_create_budget_leases.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 010: Agent budgets (Protocol 005)
+#[ allow( dead_code ) ]
+async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_010_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/010_create_agent_budgets.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 011: Budget requests (Protocol 012)
+#[ allow( dead_code ) ]
+async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_011_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/011_create_budget_requests.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 012: Budget history (Protocol 012)
+#[ allow( dead_code ) ]
+async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_012_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/012_create_budget_history.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await

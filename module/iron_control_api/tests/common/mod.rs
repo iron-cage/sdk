@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS users
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Refresh token blacklist for logout tests
-CREATE TABLE IF NOT EXISTS blacklist
+CREATE TABLE IF NOT EXISTS token_blacklist
 (
   jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
   user_id TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS blacklist
   expires_at INTEGER NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_blacklist_user_id ON blacklist(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
 
 -- User audit log for user management tests
 CREATE TABLE IF NOT EXISTS user_audit_log
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS user_audit_log
   operation TEXT NOT NULL,
   target_user_id TEXT NOT NULL,
   performed_by TEXT NOT NULL,
-  timestamp TEXT NOT NULL,
+  timestamp INTEGER NOT NULL,
   previous_state TEXT,
   new_state TEXT,
   reason TEXT,
@@ -88,7 +88,8 @@ pub async fn create_test_database() -> SqlitePool
 }
 
 /// Create admin user with credentials
-pub async fn create_test_admin( pool: &SqlitePool ) -> ( i64, String )
+#[allow(dead_code)]
+pub async fn create_test_admin( pool: &SqlitePool ) -> ( String, String )
 {
   let password_hash = bcrypt::hash( "testpass", 4 )
     .expect( "LOUD FAILURE: Failed to hash test password" );
@@ -98,9 +99,12 @@ pub async fn create_test_admin( pool: &SqlitePool ) -> ( i64, String )
     .expect( "Time went backwards" )
     .as_secs() as i64;
 
-  let result = sqlx::query(
-    "INSERT INTO users (username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  let user_id = "user_admin_test".to_string();
+
+  sqlx::query(
+    "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
+  .bind( &user_id )
   .bind( "admin" )
   .bind( "admin@admin.com" )
   .bind( &password_hash )
@@ -113,8 +117,6 @@ pub async fn create_test_admin( pool: &SqlitePool ) -> ( i64, String )
     "LOUD FAILURE: Failed to create test admin user '{}'",
     "admin"
   ) );
-
-  let user_id = result.last_insert_rowid();
 
   ( user_id, password_hash )
 }
