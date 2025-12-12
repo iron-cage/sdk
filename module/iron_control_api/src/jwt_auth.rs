@@ -12,7 +12,7 @@ use jsonwebtoken::{ encode, decode, Header, Validation, EncodingKey, DecodingKey
 use serde::{ Serialize, Deserialize };
 use std::time::{ SystemTime, UNIX_EPOCH };
 
-/// JWT claims for access tokens (1 hour expiry)
+/// JWT claims for access tokens (30 days expiry)
 #[ derive( Debug, Serialize, Deserialize, Clone ) ]
 pub struct AccessTokenClaims
 {
@@ -21,11 +21,13 @@ pub struct AccessTokenClaims
   /// User Role
   pub role: String,
   /// Issued at (Unix timestamp)
-  pub iat: u64,
+  /// User email
+  pub email: String,
+  pub iat: i64,
   /// Expiration time (Unix timestamp)
-  pub exp: u64,
-  /// Token type
-  pub token_type: String,
+  pub exp: i64,
+  /// Token ID for blacklist tracking
+  pub jti: String,
 }
 
 /// JWT claims for refresh tokens (7 days expiry)
@@ -34,12 +36,14 @@ pub struct RefreshTokenClaims
 {
   /// User ID
   pub sub: String,
+  /// User email
+  pub email: String,
+  /// User role
+  pub role: String,
   /// Issued at (Unix timestamp)
   pub iat: u64,
   /// Expiration time (Unix timestamp)
   pub exp: u64,
-  /// Token type
-  pub token_type: String,
   /// Token ID for blacklist tracking
   pub jti: String,
 }
@@ -63,30 +67,29 @@ impl JwtSecret
     Self { secret }
   }
 
-  /// Generate access token (1 hour expiry)
+  /// Generate access token (30 days expiry)
   ///
   /// # Arguments
   ///
   /// * `user_id` - User ID to encode in token
   /// * `role` - User role to encode in token
+  /// * `token_id` - Unique token ID for blacklist tracking
   ///
   /// # Errors
   ///
   /// Returns error if JWT encoding fails
-  pub fn generate_access_token( &self, user_id: &str, role: &str ) -> Result< String, jsonwebtoken::errors::Error >
+  pub fn generate_access_token( &self, user_id: &str, email: &str,role: &str, token_id: &str ) -> Result< String, jsonwebtoken::errors::Error >
   {
-    let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "Time went backwards" )
-      .as_secs();
+    let now = chrono::Utc::now().timestamp();
 
     let claims = AccessTokenClaims
     {
       sub: user_id.to_string(),
       role: role.to_string(),
       iat: now,
-      exp: now + 3600, // 1 hour
-      token_type: "access".to_string(),
+      exp: now + 60 * 60 * 24 * 30, // 30 days
+      email: email.to_string(),
+      jti: token_id.to_string(),
     };
 
     encode(
@@ -109,6 +112,8 @@ impl JwtSecret
   pub fn generate_refresh_token(
     &self,
     user_id: &str,
+    email: &str,
+    role: &str,
     token_id: &str,
   ) -> Result< String, jsonwebtoken::errors::Error >
   {
@@ -120,9 +125,10 @@ impl JwtSecret
     let claims = RefreshTokenClaims
     {
       sub: user_id.to_string(),
+      email: email.to_string(),
+      role: role.to_string(),
       iat: now,
       exp: now + ( 7 * 24 * 3600 ), // 7 days
-      token_type: "refresh".to_string(),
       jti: token_id.to_string(),
     };
 
@@ -265,15 +271,21 @@ where
       .and_then( |h| h.to_str().ok() )
       .ok_or_else( || (
         axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json( serde_json::json!({ "error": "Missing Authorization header" }) ),
+        axum::Json( serde_json::json!({ "error": {
+          "code": "AUTH_MISSING_TOKEN",
+          "message": "Missing authentication token"
+        } }) ),
       ) )?;
 
     // Parse "Bearer <token>" format
     let token = auth_header
-      .strip_prefix( "Bearer " )
+      .strip_prefix( "Bearer ")
       .ok_or_else( || (
         axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json( serde_json::json!({ "error": "Invalid Authorization header format" }) ),
+        axum::Json( serde_json::json!({ "error": {
+          "code": "AUTH_MISSING_TOKEN",
+          "message": "Missing authentication token"
+        } }) ),
       ) )?;
 
     // Verify token and extract claims
@@ -282,7 +294,10 @@ where
       .verify_access_token( token )
       .map_err( |_| (
         axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json( serde_json::json!({ "error": "Invalid or expired token" }) ),
+        axum::Json( serde_json::json!({ "error": {
+          "code": "AUTH_INVALID_TOKEN",
+          "message": "Invalid or expired authentication token"
+        } }) ),
       ) )?;
 
     Ok( AuthenticatedUser( claims ) )
@@ -298,7 +313,7 @@ mod tests
   fn test_generate_access_token()
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( "user_123", "user" ).expect( "Should generate token" );
+    let token = jwt.generate_access_token( "user_123", "user@example.com", "user", "token_001" ).expect( "Should generate token" );
     assert!( !token.is_empty(), "Token should not be empty" );
   }
 
@@ -306,12 +321,13 @@ mod tests
   fn test_verify_access_token()
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( "user_456", "admin" ).expect( "Should generate token" );
+    let token = jwt.generate_access_token( "user_456", "admin@example.com", "admin", "token_002" ).expect( "Should generate token" );
 
     let claims = jwt.verify_access_token( &token ).expect( "Should verify token" );
     assert_eq!( claims.sub, "user_456" );
     assert_eq!( claims.role, "admin" );
-    assert_eq!( claims.token_type, "access" );
+    assert_eq!( claims.email, "admin@example.com" );
+    assert_eq!( claims.jti, "token_002" );
   }
 
   #[ test ]
@@ -319,7 +335,7 @@ mod tests
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
     let token = jwt
-      .generate_refresh_token( "user_789", "token_id_001" )
+      .generate_refresh_token( "user_789", "user@example.com", "user", "token_id_001" )
       .expect( "Should generate token" );
     assert!( !token.is_empty(), "Token should not be empty" );
   }
@@ -329,13 +345,14 @@ mod tests
   {
     let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
     let token = jwt
-      .generate_refresh_token( "user_999", "token_id_002" )
+      .generate_refresh_token( "user_999", "user@example.com", "user", "token_id_002" )
       .expect( "Should generate token" );
 
     let claims = jwt.verify_refresh_token( &token ).expect( "Should verify token" );
     assert_eq!( claims.sub, "user_999" );
+    assert_eq!( claims.email, "user@example.com" );
+    assert_eq!( claims.role, "user" );
     assert_eq!( claims.jti, "token_id_002" );
-    assert_eq!( claims.token_type, "refresh" );
   }
 
   #[ test ]
@@ -352,7 +369,7 @@ mod tests
     let jwt1 = JwtSecret::new( "secret_1".to_string() );
     let jwt2 = JwtSecret::new( "secret_2".to_string() );
 
-    let token = jwt1.generate_access_token( "user_123", "user" ).expect( "Should generate" );
+    let token = jwt1.generate_access_token( "user_123", "user@example.com", "user", "token_003" ).expect( "Should generate" );
     let result = jwt2.verify_access_token( &token );
 
     assert!( result.is_err(), "Token signed with different secret should fail" );

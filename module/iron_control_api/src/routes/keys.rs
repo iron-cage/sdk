@@ -100,7 +100,42 @@ pub async fn get_key(
     ) );
   }
 
-  // 1. Require project_id
+  // 1. Enforce Protocol 005: Agent tokens CANNOT use this endpoint
+  //
+  // This endpoint provides direct access to decrypted provider keys without
+  // budget control. Protocol 005 (Budget Control Protocol) is the ONLY
+  // authorized path for agent credential access. Any token associated with
+  // an agent MUST use the budget handshake flow instead.
+  //
+  // This enforcement ensures:
+  // - All agent LLM access is budget-controlled
+  // - Usage tracking is mandatory
+  // - No bypass path exists for budget limits
+  let pool = state.token_storage.pool();
+  let agent_id: Option< i64 > = sqlx::query_scalar(
+    "SELECT agent_id FROM api_tokens WHERE id = ?"
+  )
+  .bind( auth.token_id )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| (
+    StatusCode::INTERNAL_SERVER_ERROR,
+    Json( serde_json::json!({ "error": "Failed to verify token type" }) ),
+  ) )?;
+
+  if agent_id.is_some()
+  {
+    return Err( (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({
+        "error": "Agent tokens cannot use this endpoint",
+        "details": "Agent credentials must be obtained through Protocol 005 (Budget Control). Use POST /api/budget/handshake with your IC Token.",
+        "protocol": "005"
+      }) ),
+    ) );
+  }
+
+  // 2. Require project_id
   let project_id = auth.project_id.ok_or_else( || (
     StatusCode::BAD_REQUEST,
     Json( serde_json::json!({ "error": "Token not assigned to a project" }) ),
@@ -173,7 +208,7 @@ pub async fn get_key(
   });
 
   // Insert audit log entry (fire and forget - don't fail request if logging fails)
-  let pool = state.provider_storage.pool();
+  let pool = state.token_storage.pool();
   if let Err( e ) = sqlx::query(
     "INSERT INTO audit_log ( entity_type, entity_id, action, actor_user_id, changes, logged_at ) \
      VALUES ( $1, $2, $3, $4, $5, $6 )"

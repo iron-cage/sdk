@@ -31,7 +31,7 @@ async fn create_auth_router() -> Router
   let db_pool = create_test_database().await;
 
   // Create test user with known credentials
-  create_test_user( &db_pool, "test_user" ).await;
+  create_test_user( &db_pool, "test_user@mail.com" ).await;
 
   // Construct AuthState directly with prepared database
   let auth_state = AuthState
@@ -72,7 +72,7 @@ async fn test_login_success()
   let app = create_auth_router().await;
 
   let request_body = json!({
-    "username": "test_user",
+    "email": "test_user@mail.com",
     "password": "test_password"
   });
 
@@ -107,7 +107,7 @@ async fn test_login_empty_credentials()
   let app = create_auth_router().await;
 
   let request_body = json!({
-    "username": "",
+    "email": "",
     "password": ""
   });
 
@@ -122,7 +122,7 @@ async fn test_login_empty_credentials()
     )
     .await
     .unwrap();
-
+  
   assert_eq!( response.status(), StatusCode::BAD_REQUEST );
 }
 
@@ -133,7 +133,7 @@ async fn test_refresh_token_flow()
 
   // First login to get tokens
   let login_body = json!({
-    "username": "test_user",
+    "email": "test_user@mail.com",
     "password": "test_password"
   });
 
@@ -169,6 +169,7 @@ async fn test_refresh_token_flow()
         .method( "POST" )
         .uri( "/api/auth/refresh" )
         .header( "content-type", "application/json" )
+        .header( "Authorization", format!( "Bearer {}", refresh_token ) )
         .body( Body::from( serde_json::to_string( &refresh_body ).unwrap() ) )
         .unwrap(),
     )
@@ -185,7 +186,7 @@ async fn test_logout_flow()
 
   // First login
   let login_body = json!({
-    "username": "test_user",
+    "email": "test_user@mail.com",
     "password": "test_password"
   });
 
@@ -206,11 +207,11 @@ async fn test_logout_flow()
     .await
     .unwrap();
   let login_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let refresh_token = login_data[ "refresh_token" ].as_str().unwrap();
+  let user_token = login_data[ "user_token" ].as_str().unwrap();
 
   // Logout
   let logout_body = json!({
-    "refresh_token": refresh_token
+    "user_token": user_token
   });
 
   let logout_response = app
@@ -219,13 +220,14 @@ async fn test_logout_flow()
         .method( "POST" )
         .uri( "/api/auth/logout" )
         .header( "content-type", "application/json" )
+        .header( "Authorization", format!( "Bearer {}", user_token ) )
         .body( Body::from( serde_json::to_string( &logout_body ).unwrap() ) )
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( logout_response.status(), StatusCode::OK );
+  assert_eq!( logout_response.status(), StatusCode::NO_CONTENT );
 }
 
 #[ tokio::test ]
@@ -243,6 +245,7 @@ async fn test_invalid_refresh_token()
         .method( "POST" )
         .uri( "/api/auth/refresh" )
         .header( "content-type", "application/json" )
+        .header( "Authorization", format!( "Bearer {}", "invalid_token_123" ) )
         .body( Body::from( serde_json::to_string( &refresh_body ).unwrap() ) )
         .unwrap(),
     )

@@ -253,3 +253,43 @@ pub async fn create_test_tracker_v2() -> ( UsageTracker, TokenStorage, TestDatab
 
   ( tracker, storage, db )
 }
+
+/// Seed test agent with budget (for budget management tests)
+///
+/// Creates test agent and associated budget in the database.
+/// Uses INSERT OR IGNORE for idempotent seeding.
+///
+/// # Arguments
+///
+/// * `pool` - Database connection pool
+/// * `agent_id` - Agent ID to create
+///
+/// # Example
+///
+/// ```ignore
+/// let db = create_test_db_v2().await;
+/// seed_test_agent(db.pool(), 1).await;
+/// // Agent 1 now exists with $100 budget
+/// ```
+pub async fn seed_test_agent( pool: &sqlx::SqlitePool, agent_id: i32 )
+{
+  sqlx::query( "INSERT OR IGNORE INTO agents (id, name, providers, created_at) VALUES (?, ?, ?, ?)" )
+    .bind( agent_id )
+    .bind( "test-agent" )
+    .bind( "[]" )
+    .bind( chrono::Utc::now().timestamp_millis() )
+    .execute( pool )
+    .await
+    .expect( "Should insert test agent" );
+
+  sqlx::query( "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( agent_id )
+    .bind( 100.0 )
+    .bind( 0.0 )
+    .bind( 100.0 )
+    .bind( chrono::Utc::now().timestamp_millis() )
+    .bind( chrono::Utc::now().timestamp_millis() )
+    .execute( pool )
+    .await
+    .expect( "Should insert agent budget" );
+}

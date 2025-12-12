@@ -18,6 +18,8 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 
 **In Scope:**
 - REST API endpoints (tokens, usage, limits, traces, auth handshake, user management)
+- Budget control endpoints (Protocol 005: handshake, usage reporting, budget refresh)
+- Agent token enforcement (blocking unauthorized credential access)
 - WebSocket server for dashboard real-time updates
 - Authentication and authorization (IC Token validation)
 - Request routing and validation
@@ -55,9 +57,363 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 
 **Key Components:**
 - **REST Router:** Handles HTTP endpoints for tokens, usage, limits
+- **Budget Control Router (Protocol 005):** Manages budget handshake, usage reporting, budget refresh
+- **Agent Token Enforcement:** Blocks agent tokens from unauthorized credential endpoints
 - **WebSocket Server:** Broadcasts real-time agent events to dashboard
 - **Auth Middleware:** Validates IC Tokens, enforces authorization
 - **Request Handler:** Routes requests to appropriate modules
+
+---
+
+## API Contract
+
+### Budget Control Endpoints (Protocol 005)
+
+Protocol 005 provides budget-controlled LLM access for agents through a three-step workflow: handshake, usage reporting, and budget refresh.
+
+#### POST /api/budget/handshake
+
+Exchange IC Token for IP Token (encrypted provider API key).
+
+**Request:**
+```json
+{
+  "ic_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "provider": "openai",
+  "provider_key_id": 123
+}
+```
+
+**Request Fields:**
+- `ic_token` (string, required): JWT containing agent_id, budget_id, permissions. HMAC-SHA256 signed.
+- `provider` (string, required): Provider type: "openai" | "anthropic" | "google"
+- `provider_key_id` (integer, optional): Specific provider key ID. If omitted, uses first available key for provider.
+
+**Response (200 OK):**
+```json
+{
+  "ip_token": "ip_v1:AQIDBAUGBwgJ...",
+  "lease_id": "lease_abc123-def4-5678-90ab-cdef12345678",
+  "budget_granted": 10.0,
+  "expires_at": 1735689600000
+}
+```
+
+**Response Fields:**
+- `ip_token` (string): AES-256-GCM encrypted provider API key. Format: `ip_v1:<base64_ciphertext>`
+- `lease_id` (string): Budget lease identifier. Format: `lease_<uuid>`
+- `budget_granted` (float): USD allocated for this session
+- `expires_at` (integer, nullable): Expiration timestamp in milliseconds since epoch. NULL = no expiration.
+
+**Error Responses:**
+- `400 Bad Request`: Invalid IC Token, missing required fields, or malformed request
+- `403 Forbidden`: Insufficient budget, expired IC Token, or unauthorized agent
+- `404 Not Found`: Provider key not found
+- `500 Internal Server Error`: Database error, encryption failure, or server malfunction
+
+**Side Effects:**
+- Creates budget lease in database (budget_leases table)
+- Allocates budget from agent's total budget (agent_budgets table)
+- Encrypts provider API key into IP Token (memory-only, not persisted)
+
+---
+
+#### POST /api/budget/report
+
+Report LLM usage for a budget lease.
+
+**Request:**
+```json
+{
+  "lease_id": "lease_abc123-def4-5678-90ab-cdef12345678",
+  "cost_usd": 2.5,
+  "tokens_used": 10000,
+  "model": "gpt-4"
+}
+```
+
+**Request Fields:**
+- `lease_id` (string, required): Budget lease identifier from handshake response
+- `cost_usd` (float, required): USD cost of this usage event. Must be > 0.
+- `tokens_used` (integer, optional): Total tokens consumed (prompt + completion)
+- `model` (string, optional): Model identifier used for this request
+
+**Response (200 OK):**
+```json
+{
+  "budget_spent": 2.5,
+  "budget_remaining": 7.5,
+  "lease_status": "active"
+}
+```
+
+**Response Fields:**
+- `budget_spent` (float): Total USD spent in this lease so far
+- `budget_remaining` (float): Remaining budget for this lease (granted - spent)
+- `lease_status` (string): Lease status: "active" | "expired" | "revoked"
+
+**Error Responses:**
+- `400 Bad Request`: Invalid lease_id format or negative cost_usd
+- `404 Not Found`: Lease not found in database
+- `409 Conflict`: Budget exceeded (cost_usd > budget_remaining)
+- `500 Internal Server Error`: Database error during usage recording
+
+**Side Effects:**
+- Updates budget_spent in budget_leases table
+- Updates total_spent and budget_remaining in agent_budgets table
+- Maintains budget invariant: total_allocated = total_spent + budget_remaining
+
+---
+
+#### POST /api/budget/refresh
+
+Request additional budget allocation for an agent.
+
+**Request:**
+```json
+{
+  "agent_id": 42,
+  "additional_budget": 20.0,
+  "reason": "Extended task execution"
+}
+```
+
+**Request Fields:**
+- `agent_id` (integer, required): Agent database ID
+- `additional_budget` (float, required): Additional USD to allocate. Must be > 0.
+- `reason` (string, optional): Human-readable justification for budget increase
+
+**Response (200 OK):**
+```json
+{
+  "total_allocated": 30.0,
+  "budget_remaining": 27.5,
+  "updated_at": 1735689700000
+}
+```
+
+**Response Fields:**
+- `total_allocated` (float): New total allocated budget (old + additional)
+- `budget_remaining` (float): Updated remaining budget
+- `updated_at` (integer): Timestamp of budget update in milliseconds since epoch
+
+**Error Responses:**
+- `400 Bad Request`: Invalid agent_id or negative additional_budget
+- `404 Not Found`: Agent budget not found (agent_id doesn't exist)
+- `500 Internal Server Error`: Database error during budget update
+
+**Side Effects:**
+- Updates total_allocated and budget_remaining in agent_budgets table
+- Updates updated_at timestamp to current time
+
+---
+
+### Budget Request Workflow Endpoints (Protocol 012)
+
+Protocol 012 provides a request-approval workflow for budget modifications, enabling agents to request budget increases through an approval process.
+
+#### POST /api/v1/budget/requests
+
+Create a new budget change request.
+
+**Request:**
+```json
+{
+  "agent_id": 1,
+  "requester_id": "user-123",
+  "requested_budget_usd": 250.0,
+  "justification": "Need increased budget for expanded testing and model experimentation"
+}
+```
+
+**Request Fields:**
+- `agent_id` (integer, required): Agent database ID
+- `requester_id` (string, required): ID of user creating the request
+- `requested_budget_usd` (float, required): Requested budget amount in USD. Must be > 0.
+- `justification` (string, required): Reason for budget request. Length: 20-500 characters.
+
+**Response (201 Created):**
+```json
+{
+  "request_id": "breq_550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending",
+  "created_at": 1735689600000
+}
+```
+
+**Response Fields:**
+- `request_id` (string): Unique identifier for this request
+- `status` (string): Request status, always "pending" on creation
+- `created_at` (integer): Timestamp in milliseconds since epoch
+
+**Error Responses:**
+- `400 Bad Request`: Invalid parameters, justification too short/long, or negative budget
+- `404 Not Found`: Agent doesn't exist in database
+- `500 Internal Server Error`: Database error during request creation
+
+---
+
+#### GET /api/v1/budget/requests/:id
+
+Get a budget change request by ID.
+
+**Path Parameters:**
+- `id` (string): Budget request ID (e.g., "breq_550e8400-e29b-41d4-a716-446655440000")
+
+**Response (200 OK):**
+```json
+{
+  "id": "breq_550e8400-e29b-41d4-a716-446655440000",
+  "agent_id": 1,
+  "requester_id": "user-123",
+  "current_budget_usd": 100.0,
+  "requested_budget_usd": 250.0,
+  "justification": "Need increased budget for expanded testing",
+  "status": "pending",
+  "created_at": 1735689600000,
+  "updated_at": 1735689600000
+}
+```
+
+**Response Fields:**
+- `id` (string): Request identifier
+- `agent_id` (integer): Agent database ID
+- `requester_id` (string): User who created the request
+- `current_budget_usd` (float): Budget at time of request creation
+- `requested_budget_usd` (float): Requested budget amount
+- `justification` (string): Request justification
+- `status` (string): Current status: "pending" | "approved" | "rejected" | "cancelled"
+- `created_at` (integer): Creation timestamp
+- `updated_at` (integer): Last update timestamp
+
+**Error Responses:**
+- `404 Not Found`: Request ID doesn't exist
+- `500 Internal Server Error`: Database error
+
+---
+
+#### GET /api/v1/budget/requests
+
+List budget change requests with optional filtering.
+
+**Query Parameters:**
+- `agent_id` (integer, optional): Filter by agent ID
+- `status` (string, optional): Filter by status ("pending" | "approved" | "rejected" | "cancelled")
+
+**Response (200 OK):**
+```json
+{
+  "requests": [
+    {
+      "id": "breq_550e8400-e29b-41d4-a716-446655440000",
+      "agent_id": 1,
+      "requester_id": "user-123",
+      "current_budget_usd": 100.0,
+      "requested_budget_usd": 250.0,
+      "justification": "Need increased budget for expanded testing",
+      "status": "pending",
+      "created_at": 1735689600000,
+      "updated_at": 1735689600000
+    }
+  ]
+}
+```
+
+**Response Fields:**
+- `requests` (array): Array of budget request objects (empty array if no matches)
+
+**Error Responses:**
+- `400 Bad Request`: Invalid status parameter
+- `500 Internal Server Error`: Database error
+
+---
+
+#### PATCH /api/v1/budget/requests/:id/approve
+
+Approve a budget change request and apply the budget change.
+
+**Path Parameters:**
+- `id` (string): Budget request ID
+
+**Side Effects:**
+- Updates request status to "approved"
+- Updates agent budget to requested amount
+- Records change in budget_modification_history
+- All operations are atomic (uses database transaction)
+
+**Response (200 OK):**
+```json
+{
+  "request_id": "breq_550e8400-e29b-41d4-a716-446655440000",
+  "status": "approved",
+  "updated_at": 1735689700000
+}
+```
+
+**Response Fields:**
+- `request_id` (string): Request identifier
+- `status` (string): New status, always "approved"
+- `updated_at` (integer): Approval timestamp
+
+**Error Responses:**
+- `404 Not Found`: Request ID doesn't exist
+- `409 Conflict`: Request is not in pending status (already approved/rejected/cancelled)
+- `500 Internal Server Error`: Database error or transaction failure
+
+---
+
+#### PATCH /api/v1/budget/requests/:id/reject
+
+Reject a budget change request.
+
+**Path Parameters:**
+- `id` (string): Budget request ID
+
+**Side Effects:**
+- Updates request status to "rejected"
+- Does NOT modify agent budget
+
+**Response (200 OK):**
+```json
+{
+  "request_id": "breq_550e8400-e29b-41d4-a716-446655440000",
+  "status": "rejected",
+  "updated_at": 1735689700000
+}
+```
+
+**Response Fields:**
+- `request_id` (string): Request identifier
+- `status` (string): New status, always "rejected"
+- `updated_at` (integer): Rejection timestamp
+
+**Error Responses:**
+- `404 Not Found`: Request ID doesn't exist
+- `409 Conflict`: Request is not in pending status
+- `500 Internal Server Error`: Database error
+
+---
+
+### Agent Token Enforcement
+
+**Enforcement Rule:** Agent tokens (api_tokens table rows where agent_id IS NOT NULL) CANNOT access credential endpoints that bypass Protocol 005.
+
+**Affected Endpoints:**
+- `GET /api/keys` - Blocked for agent tokens (returns 403 Forbidden)
+
+**Enforcement Response (403 Forbidden):**
+```json
+{
+  "error": "Agent tokens cannot use this endpoint",
+  "details": "Agent credentials must be obtained through Protocol 005 (Budget Control). Use POST /api/budget/handshake with your IC Token.",
+  "protocol": "005"
+}
+```
+
+**Implementation:**
+- Middleware checks api_tokens.agent_id for all credential requests
+- If agent_id IS NOT NULL, request is rejected before reaching handler
+- Ensures Protocol 005 is the EXCLUSIVE path for agent credential access
 
 ---
 
@@ -77,4 +433,5 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 *For detailed API specification, see spec/-archived_detailed_spec.md*
 *For REST protocol, see docs/protocol/002_rest_api_protocol.md*
 *For WebSocket protocol, see docs/protocol/003_websocket_protocol.md*
+*For Budget Control Protocol (Protocol 005), see docs/protocol/005_budget_control_protocol.md*
 *For user management API, see docs/protocol/008_user_management_api.md*

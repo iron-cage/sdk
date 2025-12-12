@@ -30,8 +30,8 @@ async fn test_infrastructure_verification()
 
   // Verify user ID is positive
   assert!(
-    user_id > 0,
-    "LOUD FAILURE: User ID should be positive integer"
+    !user_id.is_empty(),
+    "LOUD FAILURE: User ID should not be empty"
   );
 
   // Verify password hash is not empty
@@ -52,10 +52,10 @@ async fn test_infrastructure_verification()
   );
 
   // Query user from database
-  let fetched_user: ( i64, String, String ) = sqlx::query_as(
+  let fetched_user: ( String, String, String ) = sqlx::query_as(
     "SELECT id, username, password_hash FROM users WHERE id = ?"
   )
-  .bind( user_id )
+  .bind( &user_id )
   .fetch_one( &pool )
   .await
   .expect( "LOUD FAILURE: Should fetch created user from database" );
@@ -68,7 +68,7 @@ async fn test_infrastructure_verification()
 
   assert_eq!(
     fetched_user.1,
-    "testuser",
+    "test_user",
     "LOUD FAILURE: Fetched username should match"
   );
 }
@@ -82,7 +82,7 @@ async fn test_jwt_token_infrastructure()
   // Generate access token
   let access_token = auth_state
     .jwt_secret
-    .generate_access_token( "user_testuser", "user" )
+    .generate_access_token( "user_123", "user@mail.com", "user", "token_id_001" )
     .expect( "LOUD FAILURE: Should generate access token" );
 
   assert!(
@@ -98,20 +98,32 @@ async fn test_jwt_token_infrastructure()
 
   assert_eq!(
     claims.sub,
-    "user_testuser",
+    "user_123",
     "LOUD FAILURE: Token subject should match user ID"
   );
 
   assert_eq!(
-    claims.token_type,
-    "access",
-    "LOUD FAILURE: Token type should be 'access'"
+    claims.email,
+    "user@mail.com",
+    "LOUD FAILURE: Token email should match user email"
+  );
+
+  assert_eq!(
+    claims.role,
+    "user",
+    "LOUD FAILURE: Token role should match user role"
+  );
+
+  assert_eq!(
+    claims.jti,
+    "token_id_001",
+    "LOUD FAILURE: Token JTI should match"
   );
 
   // Generate refresh token
   let refresh_token = auth_state
     .jwt_secret
-    .generate_refresh_token( "user_testuser", "token_id_001" )
+    .generate_refresh_token( "user_123", "user@mail.com", "user", "token_id_001" )
     .expect( "LOUD FAILURE: Should generate refresh token" );
 
   assert!(
@@ -127,7 +139,7 @@ async fn test_jwt_token_infrastructure()
 
   assert_eq!(
     refresh_claims.sub,
-    "user_testuser",
+    "user_123",
     "LOUD FAILURE: Refresh token subject should match user ID"
   );
 
@@ -138,9 +150,15 @@ async fn test_jwt_token_infrastructure()
   );
 
   assert_eq!(
-    refresh_claims.token_type,
-    "refresh",
-    "LOUD FAILURE: Token type should be 'refresh'"
+    refresh_claims.email,
+    "user@mail.com",
+    "LOUD FAILURE: Refresh token email should match user email"
+  );
+
+  assert_eq!(
+    refresh_claims.role,
+    "user",
+    "LOUD FAILURE: Refresh token role should match user role"
   );
 }
 

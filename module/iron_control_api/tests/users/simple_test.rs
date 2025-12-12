@@ -4,6 +4,7 @@ use iron_control_api::routes::users::{ UserManagementState, CreateUserRequest, S
 use iron_control_api::rbac::PermissionChecker;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 use std::sync::Arc;
+use tracing::{debug, info};
 
 /// Create test database
 async fn create_test_database() -> SqlitePool
@@ -66,16 +67,16 @@ async fn test_direct_handler_call()
   };
 
   let user = user_service.create_user( params, 999 ).await.expect( "Create user failed" );
-  println!( "Created user: {}", user.id );
+  debug!( "Created user: {}", user.id );
 
   // Now try to suspend through the same UserService instance
   let result = user_service.suspend_user( user.id, 999, Some( "Test".to_string() ) ).await;
 
   match result {
     Ok( suspended ) => {
-      println!( "Suspend succeeded!" );
-      println!( "  is_active: {}", suspended.is_active );
-      println!( "  suspended_at: {:?}", suspended.suspended_at );
+      info!( "Suspend succeeded!" );
+      info!( "  is_active: {}", suspended.is_active );
+      info!( "  suspended_at: {:?}", suspended.suspended_at );
       assert!( !suspended.is_active, "User should be suspended" );
     }
     Err( e ) => {
@@ -91,6 +92,6 @@ async fn test_direct_handler_call()
   .await
   .expect( "Audit query failed" );
 
-  println!( "Audit log entries for suspend: {}", audit_count );
+  debug!( "Audit log entries for suspend: {}", audit_count );
   assert_eq!( audit_count, 1, "Should have exactly 1 suspend audit entry" );
 }

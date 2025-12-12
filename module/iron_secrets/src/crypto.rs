@@ -34,6 +34,7 @@ pub struct EncryptedSecret
 impl EncryptedSecret
 {
   /// Encode ciphertext as base64 string
+  #[must_use]
   pub fn ciphertext_base64( &self ) -> String
   {
     use base64::{ Engine as _, engine::general_purpose::STANDARD };
@@ -41,13 +42,18 @@ impl EncryptedSecret
   }
 
   /// Encode nonce as base64 string
+  #[must_use]
   pub fn nonce_base64( &self ) -> String
   {
     use base64::{ Engine as _, engine::general_purpose::STANDARD };
-    STANDARD.encode( &self.nonce )
+    STANDARD.encode( self.nonce )
   }
 
   /// Decode from base64 strings
+  ///
+  /// # Errors
+  ///
+  /// Returns error if base64 decoding fails or nonce length invalid
   pub fn from_base64( ciphertext_b64 : &str, nonce_b64 : &str ) -> Result< Self, CryptoError >
   {
     use base64::{ Engine as _, engine::general_purpose::STANDARD };
@@ -76,9 +82,9 @@ pub struct CryptoService
   cipher : Aes256Gcm,
 }
 
-impl std::fmt::Debug for CryptoService
+impl core::fmt::Debug for CryptoService
 {
-  fn fmt( &self, f : &mut std::fmt::Formatter< '_ > ) -> std::fmt::Result
+  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
     f.debug_struct( "CryptoService" )
       .field( "cipher", &"<redacted>" )
@@ -110,7 +116,7 @@ impl CryptoService
     Ok( Self { cipher } )
   }
 
-  /// Create from environment variable IRON_SECRETS_MASTER_KEY
+  /// Create from environment variable `IRON_SECRETS_MASTER_KEY`
   ///
   /// # Errors
   ///
@@ -137,6 +143,10 @@ impl CryptoService
   /// # Returns
   ///
   /// Encrypted secret with random nonce
+  ///
+  /// # Errors
+  ///
+  /// Returns error if AES-GCM encryption operation fails
   pub fn encrypt( &self, plaintext : &str ) -> Result< EncryptedSecret, CryptoError >
   {
     // Generate random nonce
@@ -165,6 +175,10 @@ impl CryptoService
   /// # Returns
   ///
   /// Decrypted plaintext (zeroized on drop)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if decryption fails or plaintext not valid UTF-8
   pub fn decrypt( &self, encrypted : &EncryptedSecret ) -> Result< Zeroizing< String >, CryptoError >
   {
     let nonce = Nonce::from_slice( &encrypted.nonce );
@@ -202,17 +216,17 @@ pub enum CryptoError
   InvalidUtf8,
 }
 
-impl std::fmt::Display for CryptoError
+impl core::fmt::Display for CryptoError
 {
-  fn fmt( &self, f : &mut std::fmt::Formatter< '_ > ) -> std::fmt::Result
+  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
     match self
     {
-      Self::MasterKeyNotSet => write!( f, "Master key not set: environment variable {} not found", MASTER_KEY_ENV_VAR ),
-      Self::InvalidKeyLength => write!( f, "Invalid key length: master key must be {} bytes", KEY_SIZE ),
+      Self::MasterKeyNotSet => write!( f, "Master key not set: environment variable {MASTER_KEY_ENV_VAR} not found" ),
+      Self::InvalidKeyLength => write!( f, "Invalid key length: master key must be {KEY_SIZE} bytes" ),
       Self::InvalidKey => write!( f, "Invalid master key" ),
       Self::InvalidBase64 => write!( f, "Invalid base64 encoding" ),
-      Self::InvalidNonceLength => write!( f, "Invalid nonce length: must be {} bytes", NONCE_SIZE ),
+      Self::InvalidNonceLength => write!( f, "Invalid nonce length: must be {NONCE_SIZE} bytes" ),
       Self::EncryptionFailed => write!( f, "Encryption failed" ),
       Self::DecryptionFailed => write!( f, "Decryption failed: wrong key or tampered ciphertext" ),
       Self::InvalidUtf8 => write!( f, "Decrypted data is not valid UTF-8" ),
@@ -227,6 +241,7 @@ impl std::error::Error for CryptoError {}
 /// # Rules
 /// - len <= 8: "***"
 /// - len > 8: "first4...last3"
+#[must_use]
 pub fn mask_api_key( key : &str ) -> String
 {
   let len = key.len();
@@ -238,7 +253,7 @@ pub fn mask_api_key( key : &str ) -> String
 
   let prefix = &key[ ..4 ];
   let suffix = &key[ len - 3.. ];
-  format!( "{}...{}", prefix, suffix )
+  format!( "{prefix}...{suffix}" )
 }
 
 #[ cfg( test ) ]

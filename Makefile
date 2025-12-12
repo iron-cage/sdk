@@ -115,6 +115,10 @@ db-seed: ## Populate seed data (assumes database exists)
 	@module/iron_token_manager/scripts/seed_dev_data.sh dev_tokens.db
 	@echo "✅ Seed data populated: dev_tokens.db"
 
+db-seed-admin: ## Create admin user
+	@sqlite3 dev_tokens.db "INSERT OR IGNORE INTO users (id, email, username, password_hash, role, is_active, created_at) VALUES ('admin', 'admin@admin.com', 'admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now'));"
+	@echo "✅ Admin user created (admin/testpass)"
+
 db-inspect: ## Open interactive SQLite shell (dev_tokens.db)
 	@if [ ! -f dev_tokens.db ]; then \
 		echo "❌ dev_tokens.db not found"; \

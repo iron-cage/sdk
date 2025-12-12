@@ -155,6 +155,7 @@ struct AppState
   keys: iron_control_api::routes::keys::KeysState,
   users: iron_control_api::routes::users::UserManagementState,
   agents: sqlx::SqlitePool,
+  budget: iron_control_api::routes::budget::BudgetState,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -245,6 +246,15 @@ impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
   }
 }
 
+/// Enable budget routes to access BudgetState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::budget::BudgetState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.budget.clone()
+  }
+}
+
 /// Enable API token authentication extractor to access ApiTokenState from combined AppState
 impl axum::extract::FromRef< AppState > for iron_control_api::token_auth::ApiTokenState
 {
@@ -281,10 +291,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Extract database file path from SQLite URL for development mode wiping
   let extract_sqlite_path = | url: &str | -> Option< String >
   {
-    if url.starts_with( "sqlite://" )
+    if let Some( path_with_query ) = url.strip_prefix( "sqlite://" )
     {
-      // Remove "sqlite://" prefix and query parameters
-      let path_with_query = &url[ 9.. ]; // Skip "sqlite://"
+      // Remove query parameters
       let path = path_with_query.split( '?' ).next()?;
       Some( path.to_string() )
     }
@@ -300,20 +309,20 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   {
     DeploymentMode::ProductionUnconfirmed =>
     {
-      eprintln!( "⚠️  WARNING: Production environment detected but IRON_DEPLOYMENT_MODE not set" );
-      eprintln!( "⚠️  Set IRON_DEPLOYMENT_MODE=production to confirm production deployment" );
-      eprintln!( "⚠️  See docs/production_deployment.md for security checklist" );
-      eprintln!();
-      eprintln!( "Sleeping 10 seconds to ensure this warning is visible..." );
+      tracing::warn!( "⚠️  WARNING: Production environment detected but IRON_DEPLOYMENT_MODE not set" );
+      tracing::warn!( "⚠️  Set IRON_DEPLOYMENT_MODE=production to confirm production deployment" );
+      tracing::warn!( "⚠️  See docs/production_deployment.md for security checklist" );
+      tracing::warn!( "" );
+      tracing::warn!( "Sleeping 10 seconds to ensure this warning is visible..." );
       std::thread::sleep( std::time::Duration::from_secs( 10 ) );
     }
     DeploymentMode::Production =>
     {
-      eprintln!( "✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)" );
+      tracing::info!( "✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)" );
     }
     DeploymentMode::Development =>
     {
-      eprintln!( "✓ Development mode (clearing database)" );
+      tracing::info!( "✓ Development mode (clearing database)" );
 
       // Extract database path from DATABASE_URL and delete it for clean state
       if let Some( db_path ) = extract_sqlite_path( &database_url )
@@ -322,33 +331,50 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
         {
           if let Err( e ) = std::fs::remove_file( &db_path )
           {
-            eprintln!( "⚠️  Failed to delete {}: {}", db_path, e );
+            tracing::warn!( "⚠️  Failed to delete {}: {}", db_path, e );
           }
           else
           {
-            eprintln!( "✓ Cleared {}", db_path );
+            tracing::info!( "✓ Cleared {}", db_path );
           }
         }
         else
         {
-          eprintln!( "✓ Database file doesn't exist (will be created fresh)" );
+          tracing::info!( "✓ Database file doesn't exist (will be created fresh)" );
         }
       }
       else
       {
-        eprintln!( "⚠️  Non-SQLite database detected - database wiping only works with SQLite URLs" );
+        tracing::warn!( "⚠️  Non-SQLite database detected - database wiping only works with SQLite URLs" );
       }
     }
 
     DeploymentMode::Pilot =>
     {
-      eprintln!( "✓ Pilot mode (localhost only)" );
+      tracing::info!( "✓ Pilot mode (localhost only)" );
     }
   }
 
   // JWT secret for authentication
   let jwt_secret = std::env::var( "JWT_SECRET" )
     .unwrap_or_else( |_| "dev-secret-change-in-production".to_string() );
+
+  // Protocol 005: Budget Control Protocol secrets
+  let ic_token_secret = std::env::var( "IC_TOKEN_SECRET" )
+    .unwrap_or_else( |_| "dev-ic-token-secret-change-in-production".to_string() );
+
+  // IP Token encryption key (32 bytes for AES-256-GCM)
+  let ip_token_key_hex = std::env::var( "IP_TOKEN_KEY" )
+    .unwrap_or_else( |_| "0000000000000000000000000000000000000000000000000000000000000000".to_string() );
+
+  // Decode hex string to bytes
+  let ip_token_key = hex::decode( &ip_token_key_hex )
+    .expect( "IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
+
+  if ip_token_key.len() != 32
+  {
+    panic!( "IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters), got {} bytes", ip_token_key.len() );
+  }
 
   tracing::info!( "Initializing API server..." );
   tracing::info!( "Database: {}", database_url );
@@ -408,6 +434,15 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
 
+  // Initialize budget state (Protocol 005: Budget Control Protocol)
+  let budget_state = iron_control_api::routes::budget::BudgetState::new(
+    ic_token_secret,
+    &ip_token_key,
+    &database_url,
+  )
+  .await
+  .expect( "Failed to initialize budget state" );
+
   // Create combined app state
   let app_state = AppState
   {
@@ -420,6 +455,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     keys: keys_state,
     users: user_management_state,
     agents: agents_pool,
+    budget: budget_state,
   };
 
   // Build router with all endpoints
@@ -428,19 +464,20 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/health", get( iron_control_api::routes::health::health_check ) )
 
     // Authentication endpoints
-    .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
-    .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
-    .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
+    .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
+    .route( "/api/v1/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
+    .route( "/api/v1/auth/logout", post( iron_control_api::routes::auth::logout ) )
+    .route( "/api/v1/auth/validate", post( iron_control_api::routes::auth::validate ) )
 
     // User management endpoints
-    .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
-    .route( "/api/users", get( iron_control_api::routes::users::list_users ) )
-    .route( "/api/users/:id", get( iron_control_api::routes::users::get_user ) )
-    .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )
-    .route( "/api/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
-    .route( "/api/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
-    .route( "/api/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
-    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
+    .route( "/api/v1/users", post( iron_control_api::routes::users::create_user ) )
+    .route( "/api/v1/users", get( iron_control_api::routes::users::list_users ) )
+    .route( "/api/v1/users/:id", get( iron_control_api::routes::users::get_user ) )
+    .route( "/api/v1/users/:id", delete( iron_control_api::routes::users::delete_user ) )
+    .route( "/api/v1/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
+    .route( "/api/v1/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
+    .route( "/api/v1/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
+    .route( "/api/v1/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
 
     // Token management endpoints
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
@@ -479,13 +516,24 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/keys", get( iron_control_api::routes::keys::get_key ) )
 
     // Agent management endpoints
-    // Agent management endpoints
     .route( "/api/agents", get( iron_control_api::routes::agents::list_agents ) )
     .route( "/api/agents", post( iron_control_api::routes::agents::create_agent ) )
     .route( "/api/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
+
+    // Budget Control Protocol endpoints (Protocol 005)
+    .route( "/api/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
+    .route( "/api/budget/report", post( iron_control_api::routes::budget::report_usage ) )
+    .route( "/api/budget/refresh", post( iron_control_api::routes::budget::refresh_budget ) )
+
+    // Budget Request Workflow endpoints (Protocol 012)
+    .route( "/api/v1/budget/requests", post( iron_control_api::routes::budget::create_budget_request ) )
+    .route( "/api/v1/budget/requests/:id", get( iron_control_api::routes::budget::get_budget_request ) )
+    .route( "/api/v1/budget/requests", get( iron_control_api::routes::budget::list_budget_requests ) )
+    .route( "/api/v1/budget/requests/:id/approve", axum::routing::patch( iron_control_api::routes::budget::approve_budget_request ) )
+    .route( "/api/v1/budget/requests/:id/reject", axum::routing::patch( iron_control_api::routes::budget::reject_budget_request ) )
 
     // Apply combined state to all routes
     .with_state( app_state )
@@ -539,6 +587,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  POST /api/projects/:project_id/provider" );
   tracing::info!( "  DELETE /api/projects/:project_id/provider" );
   tracing::info!( "  GET  /api/keys" );
+  tracing::info!( "  POST /api/budget/handshake" );
+  tracing::info!( "  POST /api/budget/report" );
+  tracing::info!( "  POST /api/budget/refresh" );
+  tracing::info!( "  POST /api/v1/budget/requests" );
+  tracing::info!( "  GET  /api/v1/budget/requests" );
+  tracing::info!( "  GET  /api/v1/budget/requests/:id" );
+  tracing::info!( "  PATCH /api/v1/budget/requests/:id/approve" );
+  tracing::info!( "  PATCH /api/v1/budget/requests/:id/reject" );
 
   // Start server
   let listener = tokio::net::TcpListener::bind( addr ).await?;

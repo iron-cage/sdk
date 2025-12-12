@@ -59,10 +59,17 @@ tests/
 | `integration_tests.rs` | Test full API integration across endpoints | Integration scenarios → End-to-end validation | NOT domain-specific details (tokens/, usage/, limits/, traces/), NOT auth internals (auth/), NOT manual procedures (manual/) |
 | `rbac.rs` | Test role-based access control middleware | RBAC scenarios → Authorization validation | NOT auth flows (auth/), NOT endpoint logic (tokens/, usage/, limits/, traces/), NOT integration (integration_tests.rs) |
 | `api_test.rs` | Test API-level contracts and behaviors | API scenarios → Contract validation | NOT domain specifics (tokens/, usage/, limits/, traces/), NOT auth (auth/), NOT RBAC (rbac.rs) |
+| `budget_routes.rs` | Test Protocol 005 budget control types and crypto | Budget control unit tests → Type validation | NOT HTTP integration (integration_tests.rs), NOT enforcement (protocol_005_enforcement_simple.rs), NOT migration metrics (protocol_005_migration_metrics.rs) |
+| `protocol_005_enforcement_simple.rs` | Test Protocol 005 multi-layer enforcement | Enforcement checks → Security validation | NOT budget flow (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT metrics (protocol_005_migration_metrics.rs) |
+| `protocol_005_migration_metrics.rs` | Test Protocol 005 migration completeness metrics | Migration metrics → Quantitative validation | NOT enforcement (protocol_005_enforcement_simple.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT types (budget_routes.rs) |
+| `protocol_005_rollback_verification.rs` | Test Protocol 005 rollback impossibility | Rollback attempts → Prevention validation | NOT enforcement checks (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types (budget_routes.rs) |
+| `budget_database_state.rs` | Test Protocol 005 database state corner cases | Database state scenarios → Enforcement validation | NOT enforcement layers (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types/crypto (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs) |
+| `auth_endpoints.rs` | Test authentication endpoint JWT token lifecycle | JWT scenarios → Token validation | NOT auth flows (auth/), NOT user management (users.rs), NOT RBAC (rbac.rs), NOT integration (integration_tests.rs) |
+| `users.rs` | Test user management CRUD endpoints | User management scenarios → CRUD validation | NOT auth (auth/, auth_endpoints.rs), NOT tokens (tokens/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
 
 ## Test Coverage Summary
 
-**Total Tests:** 353 (all passing, 8 implementation bugs fixed)
+**Total Tests:** 379 (all passing, 8 implementation bugs fixed, +26 Protocol 005 tests)
 
 **Phase 1 Security Additions** (2025-12-06):
 - **issue-001:** 3 DoS protection bug reproducer tests (unbounded string inputs)
@@ -99,6 +106,32 @@ tests/
 - **Additional test coverage:** Integration tests, auth flows, RBAC scenarios, traces endpoints
 - **Phase 3-4 Complete:** 330 tests → **Phase 5 Complete:** 353 tests (+23 tests, +7%)
 - **Status:** All tests passing, comprehensive corner case coverage achieved
+
+**Protocol 005 Budget Control** (2025-12-11):
+- **budget_routes.rs:** 12 unit tests for Protocol 005 types, crypto, and validation
+  - IC Token lifecycle (JWT generation, validation, expiration)
+  - IP Token encryption (AES-256-GCM format validation)
+  - Request/response serialization for handshake, usage reporting, budget refresh
+  - Budget state creation and initialization
+- **protocol_005_enforcement_simple.rs:** 4 enforcement verification tests
+  - Database foreign key constraints enforcement (agent_id → agents, budget_id → agent_budgets)
+  - Agent token distinguishability (agent_id column presence in api_tokens)
+  - Token schema enables enforcement (agent tokens vs user tokens)
+  - Enforcement summary (multi-layer validation)
+- **protocol_005_migration_metrics.rs:** 6 quantitative migration tests
+  - Metric 1: Unprotected credential endpoints = 0
+  - Metric 2: Budget control paths = 5 (handshake, report, refresh, leases, budgets)
+  - Metric 3: Enforcement layers = 3 (database, schema, API)
+  - Metric 4: Migration ratio = bypass:0%, protocol:100%
+  - Metric 5: Checkpoint verification (rollback tests exist)
+  - Summary: Migration score = 100%
+- **protocol_005_rollback_verification.rs:** 4 rollback prevention tests
+  - Budget flow works (agent budgets, budget leases functional)
+  - Token distinguishability enables enforcement (agent_id field in schema)
+  - Enforcement code exists in keys.rs (source code verification)
+  - Rollback impossibility documented (lines 357-412 in test file)
+- **Phase 5 Complete:** 353 tests → **Protocol 005 Complete:** 379 tests (+26 tests, +7%)
+- **Status:** All Protocol 005 tests passing, 100% migration score, rollback impossible
 
 ### By Functional Requirement
 

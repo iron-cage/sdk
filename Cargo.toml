@@ -5,6 +5,7 @@ members = [
   "module/iron_types",
   "module/iron_cost",
   "module/iron_telemetry",
+  "module/iron_runtime_analytics",
 
   # Infrastructure layer
   "module/iron_runtime_state",
@@ -117,6 +118,10 @@ features = ["derive"]
 
 [workspace.dependencies.axum]
 version = "0.7"
+
+[workspace.dependencies.axum-extra]
+version = "0.9"
+features = ["typed-header"]
 
 [workspace.dependencies.tower]
 version = "0.5"
@@ -300,6 +305,9 @@ path = "module/iron_cli"
 [workspace.dependencies.iron_control_schema]
 path = "module/iron_control_schema"
 
+[workspace.dependencies.iron_runtime_analytics]
+path = "module/iron_runtime_analytics"
+
 ## HTTP Client
 
 [workspace.dependencies.reqwest]
@@ -330,3 +338,6 @@ version = "0.1"
 
 [workspace.dependencies.arc-swap]
 version = "1.7.1"
+
+[workspace.dependencies.crossbeam]
+version = "0.8.4"

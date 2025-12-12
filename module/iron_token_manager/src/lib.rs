@@ -123,3 +123,12 @@ pub mod provider_key_storage;
 
 #[cfg(feature = "enabled")]
 pub mod user_service;
+
+#[cfg(feature = "enabled")]
+pub mod lease_manager;
+
+#[cfg(feature = "enabled")]
+pub mod agent_budget;
+
+#[cfg(feature = "enabled")]
+pub mod budget_request;

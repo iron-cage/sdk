@@ -9,6 +9,8 @@
 
 #![ cfg( feature = "integration" ) ]
 
+use tracing::debug;
+
 use iron_runtime::llm_router::LlmRouter;
 use std::env;
 
@@ -61,7 +63,7 @@ fn test_router_provider_detection()
   let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
 
   let provider = &router.provider;
-  println!( "Detected provider: {}", provider );
+  debug!( "Detected provider: {}", provider );
 
   // Provider should be one of the known values
   assert!(

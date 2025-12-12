@@ -74,7 +74,7 @@ async fn test_migrations_are_idempotent()
   .await
   .expect( "Failed to count tables" );
 
-  assert_eq!( table_count, 11, "Should have exactly 11 application tables after multiple runs" );
+  assert_eq!( table_count, 15, "Should have exactly 15 application tables after multiple runs" );
 }
 
 #[ tokio::test ]
@@ -129,11 +129,15 @@ async fn test_production_schema_matches_test_schema()
 
   // Expected application tables from all migrations (excluding guard tables)
   let expected_tables = vec![
+    "agent_budgets",
     "agents",
     "ai_provider_keys",
     "api_call_traces",
     "api_tokens",
     "audit_log",
+    "budget_change_requests",
+    "budget_leases",
+    "budget_modification_history",
     "project_provider_key_assignments",
     "token_blacklist",
     "token_usage",
@@ -152,7 +156,7 @@ async fn test_production_schema_matches_test_schema()
   .await
   .expect( "Failed to count indexes" );
 
-  assert_eq!( index_count, 32, "Should have 32 indexes across all migrations" );
+  assert_eq!( index_count, 39, "Should have 39 indexes across all migrations" );
 }
 
 #[ tokio::test ]
@@ -187,6 +191,8 @@ async fn test_all_migrations_have_guards()
     "_migration_005_completed",
     "_migration_006_completed",
     "_migration_008_completed",
+    "_migration_009_completed",
+    "_migration_010_completed",
   ];
 
   for guard_table in guard_tables
@@ -360,8 +366,8 @@ async fn test_wipe_and_seed_integration_with_config()
 
   // Add extra data manually to simulate existing data from previous runs
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ('manual_user', 'hash', 'user', 1, 0)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ('user_manual', 'manual_user', 'hash', 'manual@example.com', 'user', 1, 0)"
   )
   .execute( pool )
   .await
@@ -456,8 +462,8 @@ async fn test_wipe_and_seed_disabled_preserves_data()
 
   // Manually insert a user
   sqlx::query(
-    "INSERT INTO users (username, password_hash, role, is_active, created_at) \
-     VALUES ('persistent_user', 'hash', 'user', 1, 0)"
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ('user_persistent', 'persistent_user', 'hash', 'persistent@example.com', 'user', 1, 0)"
   )
   .execute( pool )
   .await

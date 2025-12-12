@@ -1,0 +1,866 @@
+//! Protocol 005 database state corner case tests
+//!
+//! Tests database-dependent corner cases for Protocol 005 (Budget Control Protocol):
+//! - Non-existent agents
+//! - Zero/insufficient budgets
+//! - Non-existent/expired leases
+//! - Budget enforcement at boundaries
+//!
+//! # Corner Case Coverage
+//!
+//! Tests address the following critical gaps from gap analysis:
+//! 1. Handshake with non-existent agent (security)
+//! 2. Handshake with zero agent budget (enforcement boundary)
+//! 3. Handshake with insufficient budget for lease (enforcement)
+//! 4. Report usage with non-existent lease (prevents phantom usage)
+//! 5. Report usage on expired lease (time boundary)
+//! 6. Report usage exceeding lease budget (CRITICAL enforcement)
+//! 7. Refresh with insufficient agent budget (enforcement)
+
+use axum::
+{
+  body::Body,
+  http::{ Request, StatusCode },
+  Router,
+};
+use iron_control_api::
+{
+  ic_token::{ IcTokenClaims, IcTokenManager },
+  routes::budget::{ BudgetState, handshake, report_usage, refresh_budget },
+};
+use iron_token_manager::lease_manager::LeaseManager;
+use serde_json::json;
+use sqlx::SqlitePool;
+use std::sync::Arc;
+use tower::ServiceExt;
+
+/// Helper: Create test database with all migrations
+async fn setup_test_db() -> SqlitePool
+{
+  let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
+  iron_token_manager::migrations::apply_all_migrations( &pool )
+    .await
+    .expect( "Failed to apply migrations" );
+  pool
+}
+
+/// Helper: Create test BudgetState
+async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
+{
+  let ic_token_secret = "test_secret_key_12345".to_string();
+  let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+
+  let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
+  let ip_token_crypto = Arc::new(
+    iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
+  );
+  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
+  let agent_budget_manager = Arc::new(
+    iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
+  );
+  let provider_key_storage = Arc::new(
+    iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
+  );
+
+  BudgetState
+  {
+    ic_token_manager,
+    ip_token_crypto,
+    lease_manager,
+    agent_budget_manager,
+    provider_key_storage,
+    db_pool: pool,
+  }
+}
+
+/// Helper: Generate IC Token for test agent
+fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
+{
+  let claims = IcTokenClaims::new(
+    format!( "agent_{}", agent_id ),
+    format!( "budget_{}", agent_id ),
+    vec![ "llm:call".to_string() ],
+    None, // No expiration
+  );
+
+  manager.generate_token( &claims ).expect( "Should generate IC Token" )
+}
+
+/// Helper: Seed agent with specific budget
+async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f64 )
+{
+  let now_ms = chrono::Utc::now().timestamp_millis();
+
+  // Insert agent
+  sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at) VALUES (?, ?, ?, ?)"
+  )
+  .bind( agent_id )
+  .bind( format!( "test_agent_{}", agent_id ) )
+  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
+  .bind( now_ms )
+  .execute( pool )
+  .await
+  .unwrap();
+
+  // Insert budget (using real column names from migration 010)
+  sqlx::query(
+    "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)"
+  )
+  .bind( agent_id )
+  .bind( budget_usd )
+  .bind( 0.0 )
+  .bind( budget_usd )
+  .bind( now_ms )
+  .bind( now_ms )
+  .execute( pool )
+  .await
+  .unwrap();
+}
+
+/// Helper: Seed provider key for testing
+async fn seed_provider_key( pool: &SqlitePool )
+{
+  let now_ms = chrono::Utc::now().timestamp_millis();
+
+  // Insert into ai_provider_keys (actual table name from migration 004)
+  sqlx::query(
+    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( 1i64 )
+  .bind( "openai" )
+  .bind( "encrypted_test_key_base64" )
+  .bind( "test_nonce_base64" )
+  .bind( 1 )
+  .bind( now_ms )
+  .bind( "test_user" )
+  .execute( pool )
+  .await
+  .unwrap();
+}
+
+// ============================================================================
+// TEST 1: Handshake with Non-Existent Agent
+// ============================================================================
+
+/// TEST 1: Handshake with non-existent agent
+///
+/// # Corner Case
+///
+/// IC Token contains agent_id that doesnt exist in database
+///
+/// # Expected Behavior
+///
+/// - HTTP 403 "No budget allocated for agent"
+/// - Prevents token forgery attacks (attacker cannot create IC Token for fake agent)
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: Without this check, an attacker could forge IC Tokens
+/// for non-existent agents and potentially access provider keys without budget tracking.
+///
+/// **Prevention**: Database lookup MUST occur before any budget operations.
+#[ tokio::test ]
+async fn test_handshake_with_nonexistent_agent()
+{
+  let pool = setup_test_db().await;
+  seed_provider_key( &pool ).await;
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create IC Token for agent that doesnt exist (agent_id = 999)
+  let ic_token = create_ic_token( 999, &state.ic_token_manager );
+
+  // Build handshake request
+  let request_body = json!(
+  {
+    "ic_token": ic_token,
+    "provider": "openai",
+    "provider_key_id": 1
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/handshake" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 403 Forbidden (no budget allocated)
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "Handshake with non-existent agent should return 403 Forbidden"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  assert!(
+    body_str.contains( "No budget allocated" ),
+    "Error message should indicate no budget allocated: {}",
+    body_str
+  );
+}
+
+// ============================================================================
+// TEST 2: Handshake with Zero Agent Budget
+// ============================================================================
+
+/// TEST 2: Handshake with zero agent budget
+///
+/// # Corner Case
+///
+/// Agent exists in database but budget.remaining_micros = 0
+///
+/// # Expected Behavior
+///
+/// - HTTP 403 "Insufficient budget"
+/// - Enforces budget boundary at exactly $0.00
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: Zero budget is a boundary condition that could bypass
+/// enforcement if not explicitly checked.
+///
+/// **Prevention**: Budget check MUST use `<` not `<=` to reject zero budgets.
+#[ tokio::test ]
+async fn test_handshake_with_zero_agent_budget()
+{
+  let pool = setup_test_db().await;
+  seed_provider_key( &pool ).await;
+
+  // Seed agent with exactly $0.00 budget
+  seed_agent_with_budget( &pool, 1, 0.0 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+
+  let request_body = json!(
+  {
+    "ic_token": ic_token,
+    "provider": "openai",
+    "provider_key_id": 1
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/handshake" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 403 Forbidden
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "Handshake with zero budget should return 403 Forbidden"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  assert!(
+    body_str.contains( "Insufficient budget" ),
+    "Error message should indicate insufficient budget: {}",
+    body_str
+  );
+}
+
+// ============================================================================
+// TEST 3: Handshake with Insufficient Budget for Lease
+// ============================================================================
+
+/// TEST 3: Handshake with insufficient budget for lease
+///
+/// # Corner Case
+///
+/// Agent budget = $5.00, lease requests $10.00 (default lease amount)
+///
+/// # Expected Behavior
+///
+/// - HTTP 403 "Insufficient budget"
+/// - Prevents partial lease allocation
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: Budget must be checked BEFORE lease creation to prevent
+/// over-allocation.
+///
+/// **Prevention**: Pre-check ensures atomic budget allocation.
+#[ tokio::test ]
+async fn test_handshake_with_insufficient_budget_for_lease()
+{
+  let pool = setup_test_db().await;
+  seed_provider_key( &pool ).await;
+
+  // Seed agent with $5.00 (insufficient for $10.00 default lease)
+  seed_agent_with_budget( &pool, 1, 5.0 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+
+  let request_body = json!(
+  {
+    "ic_token": ic_token,
+    "provider": "openai",
+    "provider_key_id": 1
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/handshake" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 403 Forbidden
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "Handshake with insufficient budget should return 403 Forbidden"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  assert!(
+    body_str.contains( "Insufficient budget" ),
+    "Error message should indicate insufficient budget: {}",
+    body_str
+  );
+}
+
+// ============================================================================
+// TEST 4: Report Usage with Non-Existent Lease
+// ============================================================================
+
+/// TEST 4: Report usage with non-existent lease
+///
+/// # Corner Case
+///
+/// Lease ID in usage report doesnt exist in database
+///
+/// # Expected Behavior
+///
+/// - HTTP 404 "Lease not found"
+/// - Prevents phantom usage reports from affecting budgets
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: Without this check, malicious clients could report usage
+/// on fake leases to manipulate budget accounting.
+///
+/// **Prevention**: Lease lookup MUST occur before any usage accounting.
+#[ tokio::test ]
+async fn test_report_usage_with_nonexistent_lease()
+{
+  let pool = setup_test_db().await;
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create usage report for non-existent lease
+  let request_body = json!(
+  {
+    "lease_id": "lease_00000000-0000-0000-0000-000000000000",
+    "request_id": "req_12345",
+    "tokens": 1000,
+    "cost_usd": 0.05,
+    "model": "gpt-4",
+    "provider": "openai"
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/report", axum::routing::post( report_usage ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/report" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 404 Not Found
+  assert_eq!(
+    response.status(),
+    StatusCode::NOT_FOUND,
+    "Report usage with non-existent lease should return 404 Not Found"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  assert!(
+    body_str.contains( "Lease not found" ) || body_str.contains( "not found" ),
+    "Error message should indicate lease not found: {}",
+    body_str
+  );
+}
+
+// ============================================================================
+// TEST 5: Report Usage on Expired Lease
+// ============================================================================
+
+/// TEST 5: Report usage on expired lease
+///
+/// # Corner Case
+///
+/// Lease exists but expires_at < current_time
+///
+/// # Expected Behavior
+///
+/// - HTTP 403 "Lease expired"
+/// - Enforces time boundary for lease validity
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: Expired leases should not accept new usage reports
+/// to prevent stale usage from affecting budgets.
+///
+/// **Prevention**: Expiry check MUST occur before usage accounting.
+///
+/// # Bug Reproducer
+///
+/// This test exposes a bug in the current implementation: `report_usage` endpoint
+/// (budget.rs:575-656) does NOT check lease expiry before accepting usage reports.
+/// The implementation only checks if lease exists (line 590-610), not if its expired.
+#[ tokio::test ]
+async fn test_report_usage_on_expired_lease()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 1, 100.0 ).await;
+  seed_provider_key( &pool ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create lease that expired 1 hour ago
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  let one_hour_ago = now_ms - ( 60 * 60 * 1000 );
+  let lease_id = "lease_expired_test";
+
+  state
+    .lease_manager
+    .create_lease( lease_id, 1, 1, 10.0, Some( one_hour_ago ) )
+    .await
+    .unwrap();
+
+  // Try to report usage on expired lease
+  let request_body = json!(
+  {
+    "lease_id": lease_id,
+    "request_id": "req_12345",
+    "tokens": 1000,
+    "cost_usd": 0.05,
+    "model": "gpt-4",
+    "provider": "openai"
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/report", axum::routing::post( report_usage ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/report" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 403 Forbidden (lease expired)
+  // NOTE: This assertion will FAIL, exposing the bug
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "BUG EXPOSED: Report usage on expired lease should return 403 Forbidden, \
+     but implementation at budget.rs:590-610 doesnt check expiry"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  assert!(
+    body_str.contains( "expired" ) || body_str.contains( "Lease expired" ),
+    "Error message should indicate lease expired: {}",
+    body_str
+  );
+}
+
+//
+// # Bug Fix Documentation: Missing Lease Expiry Check (issue-budget-001)
+//
+// ## 1. Root Cause
+//
+// The `report_usage` endpoint (budget.rs:575-656) was implemented without lease expiry validation.
+// After successfully fetching the lease from the database (lines 590-610), the implementation
+// immediately proceeded to record usage without checking if `lease.expires_at` timestamp had passed.
+// This occurred because the initial implementation focused on database schema validation (does lease
+// exist?) rather than business logic validation (is lease still valid for use?).
+//
+// ## 2. Why Not Caught
+//
+// No existing Protocol 005 tests covered expired lease scenarios. The test suite (budget_routes.rs,
+// protocol_005_*.rs) focused on:
+// - Request validation (empty fields, malformed data)
+// - Token verification (IC Token, IP Token)
+// - Happy path flows (handshake → report → refresh)
+//
+// But NO tests verified time-based enforcement boundaries. This gap existed because the original
+// test implementation (26 tests) covered API contract validation but not database state corner cases.
+//
+// ## 3. Fix Applied
+//
+// Added lease expiry check at budget.rs:605-617 (immediately after lease fetch, before usage recording):
+//
+// ```rust
+// // Check if lease has expired
+// if let Some( expires_at ) = lease.expires_at
+// {
+//   let now_ms = chrono::Utc::now().timestamp_millis();
+//   if expires_at < now_ms
+//   {
+//     return (
+//       StatusCode::FORBIDDEN,
+//       Json( serde_json::json!({ "error": "Lease expired" }) ),
+//     )
+//       .into_response();
+//   }
+// }
+// ```
+//
+// This check runs BEFORE usage recording, ensuring expired leases cannot affect budgets.
+//
+// ## 4. Prevention
+//
+// **Test Coverage**: Create database state corner case tests for ALL time-bounded resources (leases,
+// tokens, sessions). Test both "just expired" (t = expiry + 1ms) and "long expired" (t = expiry + 1 hour).
+//
+// **Code Review Checklist**: For all endpoint handlers, verify that ALL validation checks occur
+// BEFORE side effects (database writes, state mutations). Separation of concerns: validate first,
+// mutate second.
+//
+// **Specification Requirement**: Protocol specifications must explicitly enumerate ALL enforcement
+// checks including temporal boundaries. Protocol 005 spec should list: request validation, IC Token
+// verification, lease existence, lease expiry, lease budget sufficiency.
+//
+// ## 5. Pitfall
+//
+// **Time-Based Validation Gaps**: Implementing database fetch without subsequent state validation
+// creates a gap between "resource exists" and "resource is valid for operation". This pitfall applies
+// to ANY time-bounded resource (API tokens, sessions, leases, credentials).
+//
+// **Example Pattern**: If implementation checks `if lease.is_some()` but not `if lease.is_valid()`,
+// temporal constraints are silently violated.
+//
+// **Detection**: Any endpoint accepting a resource ID (lease_id, token_id, session_id) must verify
+// BOTH existence AND validity (expiry, revocation status, enabled flag) before usage.
+//
+
+// ============================================================================
+// TEST 6: Report Usage Exceeding Lease Budget (CRITICAL)
+// ============================================================================
+
+/// TEST 6: Report usage exceeding lease budget
+///
+/// # Corner Case
+///
+/// Lease budget_granted = $1.00, budget_spent = $0.90, usage report cost = $0.50
+/// Remaining = $0.10, but trying to spend $0.50
+///
+/// # Expected Behavior
+///
+/// - HTTP 403 "Insufficient lease budget"
+/// - CRITICAL: Budget enforcement at lease level
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: This is the PRIMARY budget enforcement mechanism.
+/// Without this check, agents could exceed lease budgets indefinitely.
+///
+/// **Prevention**: Lease budget check MUST occur BEFORE updating budget_spent.
+///
+/// # Bug Reproducer
+///
+/// This test exposes a CRITICAL bug: `report_usage` endpoint (budget.rs:612-624)
+/// does NOT check if lease has sufficient remaining budget before recording usage.
+/// It blindly calls `record_usage()` which just adds to budget_spent unconditionally.
+#[ tokio::test ]
+async fn test_report_usage_exceeding_lease_budget()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 1, 100.0 ).await;
+  seed_provider_key( &pool ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create lease with $1.00 budget
+  let lease_id = "lease_budget_test";
+  state
+    .lease_manager
+    .create_lease( lease_id, 1, 1, 1.0, None )
+    .await
+    .unwrap();
+
+  // Record $0.90 usage (leaving $0.10 remaining)
+  state.lease_manager.record_usage( lease_id, 0.90 ).await.unwrap();
+
+  // Try to report $0.50 usage (exceeds remaining $0.10)
+  let request_body = json!(
+  {
+    "lease_id": lease_id,
+    "request_id": "req_12345",
+    "tokens": 5000,
+    "cost_usd": 0.50,
+    "model": "gpt-4",
+    "provider": "openai"
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/report", axum::routing::post( report_usage ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/report" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 403 Forbidden (insufficient lease budget)
+  // NOTE: This assertion will FAIL, exposing CRITICAL bug
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "CRITICAL BUG EXPOSED: Report usage exceeding lease budget should return 403 Forbidden, \
+     but implementation at budget.rs:612-624 doesnt check lease remaining budget"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  assert!(
+    body_str.contains( "Insufficient" ) || body_str.contains( "budget" ),
+    "Error message should indicate insufficient budget: {}",
+    body_str
+  );
+}
+
+//
+// # Bug Fix Documentation: Missing Lease Budget Check (issue-budget-002) - CRITICAL
+//
+// ## 1. Root Cause
+//
+// The `report_usage` endpoint (budget.rs:575-656) immediately recorded usage in the lease without
+// verifying that the lease had sufficient remaining budget. After fetching the lease (lines 590-610)
+// and checking expiry (lines 605-617), the code directly called `lease_manager.record_usage()` at
+// line 631 without calculating `lease.budget_granted - lease.budget_spent` and comparing it to
+// `request.cost_usd`.
+//
+// This is a CRITICAL security bug because it allows agents to exceed their allocated budgets. An agent
+// with a $1.00 lease could report usage of $100.00 and the system would accept it, violating the core
+// budget control guarantee of Protocol 005.
+//
+// ## 2. Why Not Caught
+//
+// No existing Protocol 005 tests verified budget enforcement at the lease level. The test suite
+// (budget_routes.rs, protocol_005_*.rs) tested:
+// - Request validation (negative costs, zero tokens)
+// - Token verification (IC Token, IP Token)
+// - Happy path success cases
+//
+// But NO tests covered boundary conditions where reported cost exceeds remaining lease budget. This
+// gap existed because the original tests focused on API contract compliance (is the request valid?)
+// rather than business logic enforcement (does the system honor budget constraints?).
+//
+// The oversight occurred because lease budget enforcement seems "obvious" but wasn't explicitly
+// verified. This is a classic pitfall: critical enforcement logic that's assumed to work but never tested.
+//
+// ## 3. Fix Applied
+//
+// Added lease budget sufficiency check at budget.rs:619-628 (after expiry check, before usage recording):
+//
+// ```rust
+// // Check if lease has sufficient remaining budget
+// let lease_remaining = lease.budget_granted - lease.budget_spent;
+// if lease_remaining < request.cost_usd
+// {
+//   return (
+//     StatusCode::FORBIDDEN,
+//     Json( serde_json::json!({ "error": "Insufficient lease budget" }) ),
+//   )
+//     .into_response();
+// }
+// ```
+//
+// This check enforces the fundamental budget control invariant: agents cannot spend more than allocated.
+//
+// ## 4. Prevention
+//
+// **Test Coverage**: For ALL resource-constrained operations (budget leases, token limits, rate limits),
+// create tests that verify enforcement at boundaries:
+// - Request exactly at limit (remaining = cost) → should succeed
+// - Request 1 cent over limit (remaining < cost) → should fail with 403
+// - Request far over limit (remaining << cost) → should fail with 403
+//
+// **Specification Requirement**: Protocol specifications must explicitly state ALL enforcement
+// invariants as testable properties. Protocol 005 should state: "The system MUST reject usage reports
+// where `cost_usd > (lease.budget_granted - lease.budget_spent)`".
+//
+// **Code Review Pattern**: Any operation that consumes a limited resource (budget, tokens, quota)
+// MUST verify sufficiency BEFORE consumption. Look for this pattern in code reviews:
+// ```rust
+// // ❌ BAD: Consume first, check later
+// resource.consume(amount)?;
+// if resource.remaining < 0 { /* too late */ }
+//
+// // ✅ GOOD: Check first, consume only if sufficient
+// if resource.remaining < amount { return Err(...); }
+// resource.consume(amount)?;
+// ```
+//
+// ## 5. Pitfall
+//
+// **Assumed Enforcement**: Never assume that "obvious" business rules are automatically enforced.
+// Budget limits, rate limits, quota constraints, and permission checks MUST be explicitly coded
+// AND explicitly tested. If there's no test proving enforcement works, assume it doesn't work.
+//
+// **Resource Consumption Pattern**: Any code path that modifies a limited resource (budgets, quotas,
+// tokens) without a sufficiency check is a potential vulnerability. This pattern appears in:
+// - Budget systems (this bug)
+// - Rate limiters (allow request before checking remaining quota)
+// - Token allocators (mint tokens before checking pool capacity)
+// - Permission systems (perform action before checking authorization)
+//
+// **Detection Strategy**: Search codebase for resource modification operations (`.record_usage()`,
+// `.consume()`, `.allocate()`, `.spend()`) and verify that each has a corresponding sufficiency
+// check immediately before it. If the check is missing or occurs after modification, it's a bug.
+//
+// **Historical Context**: This bug class (check-after-modify vs check-before-modify) is analogous to
+// TOCTOU (time-of-check-time-of-use) vulnerabilities in security. The fix pattern is identical:
+// perform ALL checks BEFORE ANY modifications.
+//
+
+// ============================================================================
+// TEST 7: Refresh with Insufficient Agent Budget
+// ============================================================================
+
+/// TEST 7: Refresh with insufficient agent budget
+///
+/// # Corner Case
+///
+/// Agent budget remaining = $5.00, refresh request amount = $10.00
+///
+/// # Expected Behavior
+///
+/// - HTTP 200 OK with status="denied" and reason="insufficient_budget"
+/// - Prevents lease refresh when agent cannot afford it
+///
+/// # Root Cause Prevention
+///
+/// **Why This Test Exists**: Refresh operations must check agent budget
+/// availability before granting additional lease budget.
+///
+/// **Prevention**: Agent budget check MUST occur before lease refresh.
+///
+/// # Implementation Note
+///
+/// Based on budget.rs:737-748, the refresh endpoint DOES check agent budget
+/// and returns status="denied" (HTTP 200 with denial) when insufficient.
+/// This test verifies the check works correctly.
+#[ tokio::test ]
+async fn test_refresh_with_insufficient_agent_budget()
+{
+  let pool = setup_test_db().await;
+  seed_provider_key( &pool ).await;
+
+  // Seed agent with $5.00 (insufficient for $10.00 default refresh)
+  seed_agent_with_budget( &pool, 1, 5.0 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create active lease
+  let lease_id = "lease_refresh_test";
+  state
+    .lease_manager
+    .create_lease( lease_id, 1, 1, 10.0, None )
+    .await
+    .unwrap();
+
+  // Try to refresh with $10.00 (exceeds remaining $5.00)
+  let request_body = json!(
+  {
+    "lease_id": lease_id,
+    "requested_budget": 10.0
+  } );
+
+  let app = Router::new()
+    .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
+    .with_state( state );
+
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/budget/refresh" )
+    .header( "content-type", "application/json" )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = app.oneshot( request ).await.unwrap();
+
+  // Assert: HTTP 200 OK (refresh endpoint returns 200 even for denials)
+  assert_eq!(
+    response.status(),
+    StatusCode::OK,
+    "Refresh request should return 200 OK"
+  );
+
+  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
+  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+
+  // Parse JSON response
+  let response_json: serde_json::Value = serde_json::from_str( &body_str )
+    .expect( "Response should be valid JSON" );
+
+  // Assert: Status is "denied"
+  assert_eq!(
+    response_json[ "status" ].as_str().unwrap(),
+    "denied",
+    "Refresh with insufficient budget should return status='denied'"
+  );
+
+  // Assert: Reason is "insufficient_budget"
+  assert_eq!(
+    response_json[ "reason" ].as_str().unwrap(),
+    "insufficient_budget",
+    "Denial reason should be 'insufficient_budget'"
+  );
+
+  // Assert: budget_granted is None
+  assert!(
+    response_json[ "budget_granted" ].is_null(),
+    "No budget should be granted when denied"
+  );
+}

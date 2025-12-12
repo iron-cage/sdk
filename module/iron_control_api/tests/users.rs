@@ -85,15 +85,8 @@ async fn test_create_and_list_users() {
     let (router, state) = create_test_app().await;
 
     // Create admin user for auth
-    let (admin_id, _) = common::create_test_user(&state.auth.db_pool, "admin").await;
-    // Update role to admin
-    sqlx::query("UPDATE users SET role = 'admin' WHERE id = ?")
-        .bind(admin_id)
-        .execute(&state.auth.db_pool)
-        .await
-        .unwrap();
-
-    let token = create_test_access_token("admin", "admin", "test_secret");
+    let (admin_id, _) = common::create_test_admin(&state.auth.db_pool).await;
+    let token = create_test_access_token(&admin_id.to_string(), "admin@mail.com", "admin", "test_secret");
 
     // 1. Create a new user
     let create_request = CreateUserRequest {
@@ -130,9 +123,9 @@ async fn test_create_and_list_users() {
     ).await.unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let (_status, list_response): (StatusCode, ListUsersResponse) = extract_json_response(response).await;
-    assert!(list_response.users.len() >= 1);
+    assert!( !list_response.users.is_empty() );
     let found = list_response.users.iter().any(|u| u.username == "newuser");
     assert!(found, "Created user should be in the list");
 }
