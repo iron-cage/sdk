@@ -1,54 +1,64 @@
 //! Empty request body handling tests for token endpoints.
 //!
-//! Tests that verify endpoints properly reject requests with missing
-//! or empty bodies, enforcing required field validation.
+//! Tests that verify endpoints properly handle requests with empty bodies.
 //!
-//! ## Test Matrix
+//! ## Test Matrix (Protocol 014)
 //!
 //! | Test Case | Endpoint | Body | Expected Result | Status |
 //! |-----------|----------|------|----------------|--------|
-//! | `test_create_token_with_empty_json_object` | POST /api/v1/api-tokens | {} | 400 Bad Request | ✅ |
+//! | `test_create_token_with_empty_json_object` | POST /api/v1/api-tokens | {} | 201 Created | ✅ |
 //! | `test_create_token_with_no_body` | POST /api/v1/api-tokens | (empty) | 400 Bad Request | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
-//! **Error Conditions:**
-//! - ✅ Empty JSON object `{}` → 400 (missing required fields)
+//! **Protocol 014 Changes:**
+//! - ✅ Empty JSON object `{}` → 201 Created (user_id from JWT, all fields optional)
 //! - ✅ Completely empty body → 400 (cannot parse as JSON)
-//! - ✅ Clear error messages about missing fields
 //!
 //! **Why These Tests Matter:**
-//! 1. **Validation**: Required fields must be enforced
-//! 2. **API Contract**: Explicit about required vs optional fields
-//! 3. **Client UX**: Clear error messages for malformed requests
+//! 1. **Protocol 014**: user_id extracted from JWT, not required in request
+//! 2. **API Contract**: All request fields are optional (name, project_id, description)
+//! 3. **Client UX**: Minimal request `{}` with JWT auth is valid
 
-use iron_control_api::routes::tokens::TokenState;
+use crate::common::test_state::TestAppState;
 use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 
-/// Create test router with token routes.
-async fn create_test_router() -> Router
+/// Helper: Generate JWT token for a given user_id
+fn generate_jwt_for_user( app_state: &TestAppState, user_id: &str ) -> String
 {
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token state" );
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+}
 
-  Router::new()
+/// Create test router with token routes.
+///
+/// Uses TestAppState (auth + tokens) to support JWT authentication in routes.
+async fn create_test_router() -> ( Router, TestAppState )
+{
+  let app_state = TestAppState::new().await;
+
+  let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .with_state( token_state )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
 }
 
 #[ tokio::test ]
 async fn test_create_token_with_empty_json_object()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
-  // WHY: Empty JSON object lacks required user_id field
+  // WHY: Protocol 014 - Empty JSON object is valid (user_id from JWT, all fields optional)
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( "{}" ) )
     .unwrap();
 
@@ -56,28 +66,30 @@ async fn test_create_token_with_empty_json_object()
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Empty JSON object must return 400 (missing required user_id)"
+    StatusCode::CREATED,
+    "LOUD FAILURE: Empty JSON object with JWT auth must return 201 Created (Protocol 014)"
   );
 
-  // WHY: Verify error response is JSON
+  // WHY: Verify response is JSON with token
   let content_type = response.headers().get( "content-type" );
   assert!(
     content_type.is_some() && content_type.unwrap().to_str().unwrap().contains( "application/json" ),
-    "LOUD FAILURE: Error response must be JSON"
+    "LOUD FAILURE: Success response must be JSON"
   );
 }
 
 #[ tokio::test ]
 async fn test_create_token_with_no_body()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // WHY: Completely empty body should fail to parse as JSON
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 

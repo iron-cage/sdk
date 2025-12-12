@@ -330,9 +330,9 @@ async fn test_protocol_014_token_format_integration()
   assert_eq!( body.len(), 64, "Token body should be 64 characters" );
   assert!( body.chars().all( |c| c.is_ascii_alphanumeric() ), "Token body should be Base62" );
 
-  // Create token in database
+  // Create token in database (uses user_001 from seed_test_users)
   let token_id = storage
-    .create_token( &token, "protocol_014_user", Some( "project_014" ), Some( "Protocol 014 Token" ), None, None )
+    .create_token( &token, "user_001", Some( "project_014" ), Some( "Protocol 014 Token" ), None, None )
     .await
     .expect( "Failed to create Protocol 014 token" );
 
@@ -352,7 +352,7 @@ async fn test_protocol_014_token_format_integration()
     .await
     .expect( "Failed to get Protocol 014 token metadata" );
 
-  assert_eq!( metadata.user_id, "protocol_014_user" );
+  assert_eq!( metadata.user_id, "user_001" );
   assert_eq!( metadata.project_id, Some( "project_014".to_string() ) );
   assert_eq!( metadata.name, Some( "Protocol 014 Token".to_string() ) );
   assert!( metadata.is_active );
@@ -389,9 +389,9 @@ async fn test_backward_compatibility_old_token_format()
   // This represents tokens created before Protocol 014 implementation
   let old_token = "xyz789ABC123def456GHI789jkl012MNO345pqr678STU901vwx234YZa567bcd";
 
-  // Create old token in database
+  // Create old token in database (uses user_002 from seed_test_users)
   let token_id = storage
-    .create_token( old_token, "legacy_user", Some( "legacy_project" ), Some( "Old Format Token" ), None, None )
+    .create_token( old_token, "user_002", Some( "legacy_project" ), Some( "Old Format Token" ), None, None )
     .await
     .expect( "Failed to create old format token" );
 
@@ -411,7 +411,7 @@ async fn test_backward_compatibility_old_token_format()
     .await
     .expect( "Failed to get old format token metadata" );
 
-  assert_eq!( metadata.user_id, "legacy_user" );
+  assert_eq!( metadata.user_id, "user_002" );
   assert_eq!( metadata.project_id, Some( "legacy_project".to_string() ) );
   assert_eq!( metadata.name, Some( "Old Format Token".to_string() ) );
   assert!( metadata.is_active );
@@ -447,9 +447,9 @@ async fn test_prefix_stripped_before_hashing_integration()
   let token = generator.generate();
   let body = &token[ 7.. ]; // Extract body (64 chars)
 
-  // Create token in database
+  // Create token in database (uses user_003 from seed_test_users)
   let token_id = storage
-    .create_token( &token, "prefix_test_user", None, Some( "Prefix Strip Test" ), None, None )
+    .create_token( &token, "user_003", None, Some( "Prefix Strip Test" ), None, None )
     .await
     .expect( "Failed to create token" );
 

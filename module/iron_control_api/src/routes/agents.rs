@@ -17,6 +17,7 @@ pub struct Agent {
     #[serde(skip)]
     providers_json: Option<String>,
     pub created_at: i64,
+    pub owner_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,11 +41,12 @@ pub async fn list_agents(
         // Admin sees all agents
         sqlx::query_as::<_, Agent>(
             r#"
-            SELECT 
+            SELECT
                 id,
                 name,
                 providers as providers_json,
-                created_at
+                created_at,
+                owner_id
             FROM agents
             ORDER BY created_at DESC
             "#
@@ -58,18 +60,18 @@ pub async fn list_agents(
             )
         })?
     } else {
-        // Regular users only see agents where they have tokens
+        // Regular users only see agents they own
         sqlx::query_as::<_, Agent>(
             r#"
-            SELECT DISTINCT
-                a.id,
-                a.name,
-                a.providers as providers_json,
-                a.created_at
-            FROM agents a
-            INNER JOIN api_tokens t ON t.agent_id = a.id
-            WHERE t.user_id = ?
-            ORDER BY a.created_at DESC
+            SELECT
+                id,
+                name,
+                providers as providers_json,
+                created_at,
+                owner_id
+            FROM agents
+            WHERE owner_id = ?
+            ORDER BY created_at DESC
             "#
         )
         .bind(&user.0.sub)
@@ -101,11 +103,12 @@ pub async fn get_agent(
 ) -> Result<Json<Agent>, (StatusCode, String)> {
     let mut agent = sqlx::query_as::<_, Agent>(
         r#"
-        SELECT 
+        SELECT
             id,
             name,
             providers as providers_json,
-            created_at
+            created_at,
+            owner_id
         FROM agents
         WHERE id = ?
         "#
@@ -121,32 +124,12 @@ pub async fn get_agent(
     })?
     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
 
-    // Check if user has access (admin or has tokens for this agent)
-    if user.0.role != "admin" {
-        let has_access: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*) as count
-            FROM api_tokens
-            WHERE agent_id = ? AND user_id = ?
-            "#
-        )
-        .bind(id)
-        .bind(&user.0.sub)
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
-            )
-        })?;
-
-        if has_access == 0 {
-            return Err((
-                StatusCode::FORBIDDEN,
-                "You don't have access to this agent".to_string(),
-            ));
-        }
+    // Check if user has access (admin or owns the agent)
+    if user.0.role != "admin" && agent.owner_id != user.0.sub {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "You don't have access to this agent".to_string(),
+        ));
     }
 
     // Parse providers JSON
@@ -178,16 +161,18 @@ pub async fn create_agent(
         )
     })?;
     let created_at = chrono::Utc::now().timestamp_millis();
+    let owner_id = user.0.sub.clone();
 
     let result = sqlx::query(
         r#"
-        INSERT INTO agents (name, providers, created_at)
-        VALUES (?, ?, ?)
+        INSERT INTO agents (name, providers, created_at, owner_id)
+        VALUES (?, ?, ?, ?)
         "#
     )
     .bind(&req.name)
     .bind(&providers_json)
     .bind(created_at)
+    .bind(&owner_id)
     .execute(&pool)
     .await
     .map_err(|e| {
@@ -203,6 +188,7 @@ pub async fn create_agent(
         providers: req.providers,
         providers_json: Some(providers_json),
         created_at,
+        owner_id,
     };
 
     Ok((StatusCode::CREATED, Json(agent)))
@@ -277,11 +263,12 @@ pub async fn update_agent(
     // Fetch updated agent
     let mut agent = sqlx::query_as::<_, Agent>(
         r#"
-        SELECT 
+        SELECT
             id,
             name,
             providers as providers_json,
-            created_at
+            created_at,
+            owner_id
         FROM agents
         WHERE id = ?
         "#
@@ -354,8 +341,8 @@ pub async fn get_agent_tokens(
     Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<AgentTokenItem>>, (StatusCode, String)> {
-    // Check if agent exists
-    let agent_exists: Option<i64> = sqlx::query_scalar("SELECT id FROM agents WHERE id = ?")
+    // Check if agent exists and get owner_id for authorization
+    let agent_owner: Option<String> = sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
         .bind(id)
         .fetch_optional(&pool)
         .await
@@ -366,8 +353,19 @@ pub async fn get_agent_tokens(
             )
         })?;
 
-    if agent_exists.is_none() {
-        return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
+    let owner_id = match agent_owner {
+        Some(owner) => owner,
+        None => {
+            return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
+        }
+    };
+
+    // Check if user has access (admin or owns the agent)
+    if user.0.role != "admin" && owner_id != user.0.sub {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "You don't have access to this agent".to_string(),
+        ));
     }
 
     // Get tokens based on user role

@@ -60,7 +60,7 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 #[ tokio::test ]
 async fn test_create_token_same_data_produces_different_tokens()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   let request_body = json!({
     "user_id": "test_user",
@@ -68,10 +68,12 @@ async fn test_create_token_same_data_produces_different_tokens()
   });
 
   // WHY: Create first token
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request1 = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -90,6 +92,7 @@ async fn test_create_token_same_data_produces_different_tokens()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 

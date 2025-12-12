@@ -51,13 +51,17 @@ fn generate_jwt_for_user( app_state: &TestAppState, user_id: &str ) -> String
 #[ tokio::test ]
 async fn test_token_plaintext_only_on_creation()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
+
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &state, "test-user" );
 
   // Create token
   let create_request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &json!({
       "user_id": "test-user",
       "project_id": "test-project",
@@ -83,9 +87,6 @@ async fn test_token_plaintext_only_on_creation()
     plaintext_token.len() >= 32,
     "Token must be at least 32 characters for security (base64-url encoded)"
   );
-
-  // Generate JWT for the same user
-  let jwt_token = generate_jwt_for_user( &_state, "test-user" );
 
   // GET token by ID should NOT return plaintext
   let get_request = Request::builder()
@@ -116,13 +117,17 @@ async fn test_token_plaintext_only_on_creation()
 #[ tokio::test ]
 async fn test_get_token_never_returns_plaintext()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
+
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &state, "test-user" );
 
   // Create token
   let create_request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &json!({
       "user_id": "test-user",
       "project_id": "test-project",
@@ -133,9 +138,6 @@ async fn test_get_token_never_returns_plaintext()
   let create_response = router.clone().oneshot( create_request ).await.unwrap();
   let ( _status, create_body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
   let token_id = create_body.id;
-
-  // Generate JWT for the same user
-  let jwt_token = generate_jwt_for_user( &_state, "test-user" );
 
   // GET token by ID with authentication
   let get_request = Request::builder()
@@ -170,10 +172,10 @@ async fn test_get_token_never_returns_plaintext()
 #[ tokio::test ]
 async fn test_get_token_negative_id_returns_404()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
 
   // Generate JWT for any user
-  let jwt_token = generate_jwt_for_user( &_state, "test_user" );
+  let jwt_token = generate_jwt_for_user( &state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
@@ -192,10 +194,10 @@ async fn test_get_token_negative_id_returns_404()
 #[ tokio::test ]
 async fn test_get_token_zero_id_returns_404()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
 
   // Generate JWT for any user
-  let jwt_token = generate_jwt_for_user( &_state, "test_user" );
+  let jwt_token = generate_jwt_for_user( &state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
@@ -212,10 +214,10 @@ async fn test_get_token_zero_id_returns_404()
 #[ tokio::test ]
 async fn test_get_token_very_large_id_handles_gracefully()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
 
   // Generate JWT for any user
-  let jwt_token = generate_jwt_for_user( &_state, "test_user" );
+  let jwt_token = generate_jwt_for_user( &state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
@@ -240,7 +242,10 @@ async fn test_get_token_very_large_id_handles_gracefully()
 #[ tokio::test ]
 async fn test_unicode_in_user_id()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
+
+  // Generate JWT for the user (Unicode user_id)
+  let jwt_token = generate_jwt_for_user( &state, "用户-user-123" );
 
   let request_body = json!({
     "user_id": "用户-user-123",
@@ -252,6 +257,7 @@ async fn test_unicode_in_user_id()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -260,9 +266,6 @@ async fn test_unicode_in_user_id()
 
   let ( _status, create_body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
   assert_eq!( create_body.user_id, "用户-user-123" );
-
-  // Generate JWT for the same user (Unicode user_id)
-  let jwt_token = generate_jwt_for_user( &_state, "用户-user-123" );
 
   // Verify retrieval preserves Unicode
   let get_request = Request::builder()
@@ -288,10 +291,13 @@ async fn test_unicode_in_user_id()
 #[ tokio::test ]
 async fn test_sql_injection_in_user_id()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
 
   // SQL injection attempt
   let malicious_user_id = "admin' OR '1'='1";
+
+  // Generate JWT for the malicious user_id (treated as literal string)
+  let jwt_token = generate_jwt_for_user( &state, malicious_user_id );
 
   let request_body = json!({
     "user_id": malicious_user_id,
@@ -303,6 +309,7 @@ async fn test_sql_injection_in_user_id()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -318,9 +325,6 @@ async fn test_sql_injection_in_user_id()
 
   // Verify SQL injection string stored as literal (not executed)
   assert_eq!( create_body.user_id, malicious_user_id );
-
-  // Generate JWT for the malicious user_id (treated as literal string)
-  let jwt_token = generate_jwt_for_user( &_state, malicious_user_id );
 
   // Verify retrieval returns exact string
   let get_request = Request::builder()
@@ -352,9 +356,12 @@ async fn test_sql_injection_in_user_id()
 #[ tokio::test ]
 async fn test_sql_injection_in_project_id()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
 
   let malicious_project_id = "proj'; DROP TABLE tokens; --";
+
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &state, "user_1" );
 
   let request_body = json!({
     "user_id": "user_1",
@@ -366,6 +373,7 @@ async fn test_sql_injection_in_project_id()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -379,9 +387,6 @@ async fn test_sql_injection_in_project_id()
 
   let ( _status, create_body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
   assert_eq!( create_body.project_id, Some( malicious_project_id.to_string() ) );
-
-  // Generate JWT for the user
-  let jwt_token = generate_jwt_for_user( &_state, "user_1" );
 
   // Verify token can be retrieved (proves table wasn't dropped)
   let get_request = Request::builder()
@@ -404,6 +409,7 @@ async fn test_sql_injection_in_project_id()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &json!({
       "user_id": "user_2",
       "project_id": "safe-project"
@@ -431,7 +437,10 @@ async fn test_sql_injection_in_project_id()
 #[ tokio::test ]
 async fn test_xss_in_description_stored_as_literal()
 {
-  let ( router, _state ) = create_test_router().await;
+  let ( router, state ) = create_test_router().await;
+
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &state, "test-user" );
 
   let xss_description = "<script>alert('XSS')</script>";
 
@@ -445,6 +454,7 @@ async fn test_xss_in_description_stored_as_literal()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -453,9 +463,6 @@ async fn test_xss_in_description_stored_as_literal()
 
   let ( _status, create_body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
   assert_eq!( create_body.description, Some( xss_description.to_string() ) );
-
-  // Generate JWT for the user
-  let jwt_token = generate_jwt_for_user( &_state, "test-user" );
 
   // Verify retrieval returns exact string (unmodified)
   let get_request = Request::builder()

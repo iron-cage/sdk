@@ -50,12 +50,15 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
     .unwrap()
     .as_millis() as i64;
 
-  // Create test user
+  // Create test user with explicit ID
   let password_hash = bcrypt::hash( "test_password", bcrypt::DEFAULT_COST ).unwrap();
+  let user_id = "test_user";
+
   sqlx::query(
-    "INSERT INTO users ( username, password_hash, role, email, is_active, created_at )
-     VALUES ( $1, $2, $3, $4, $5, $6 )"
+    "INSERT INTO users ( id, username, password_hash, role, email, is_active, created_at )
+     VALUES ( $1, $2, $3, $4, $5, $6, $7 )"
   )
+  .bind( user_id )
   .bind( "test_user" )
   .bind( &password_hash )
   .bind( "developer" )
@@ -66,15 +69,16 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
   .await
   .unwrap();
 
-  // Create test agent
+  // Create test agent (requires owner_id from migration 014)
   let agent_id: i64 = sqlx::query_scalar(
-    "INSERT INTO agents ( name, providers, created_at )
-     VALUES ( $1, $2, $3 )
+    "INSERT INTO agents ( name, providers, created_at, owner_id )
+     VALUES ( $1, $2, $3, $4 )
      RETURNING id"
   )
   .bind( "test_agent" )
   .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
   .bind( now_ms )
+  .bind( user_id )
   .fetch_one( pool )
   .await
   .unwrap();
@@ -86,7 +90,7 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
      RETURNING id"
   )
   .bind( "hash_user_token" )
-  .bind( "test_user" )
+  .bind( user_id )
   .bind( true )
   .bind( now_ms )
   .bind( Option::< i64 >::None )
@@ -101,7 +105,7 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
      RETURNING id"
   )
   .bind( "hash_agent_token" )
-  .bind( "test_user" )
+  .bind( user_id )
   .bind( true )
   .bind( now_ms )
   .bind( Some( agent_id ) )

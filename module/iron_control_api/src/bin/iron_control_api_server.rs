@@ -438,6 +438,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
     &ip_token_key,
+    auth_state.jwt_secret.clone(),
     &database_url,
   )
   .await

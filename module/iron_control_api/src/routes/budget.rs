@@ -7,10 +7,10 @@
 //! - POST /api/budget/report - Report LLM usage cost to Control Panel
 //! - POST /api/budget/refresh - Request additional budget when running low
 
-use crate::{ ic_token::IcTokenManager, ip_token::IpTokenCrypto };
+use crate::{ ic_token::IcTokenManager, ip_token::IpTokenCrypto, jwt_auth::JwtSecret, routes::auth::AuthState };
 use axum::
 {
-  extract::State,
+  extract::{ FromRef, State },
   http::StatusCode,
   response::{ IntoResponse, Json },
 };
@@ -35,6 +35,20 @@ pub struct BudgetState
   pub agent_budget_manager: Arc< AgentBudgetManager >,
   pub provider_key_storage: Arc< ProviderKeyStorage >,
   pub db_pool: SqlitePool,
+  pub jwt_secret: Arc< JwtSecret >,
+}
+
+/// Enable AuthState extraction from BudgetState
+impl FromRef< BudgetState > for AuthState
+{
+  fn from_ref( state: &BudgetState ) -> Self
+  {
+    AuthState
+    {
+      jwt_secret: state.jwt_secret.clone(),
+      db_pool: state.db_pool.clone(),
+    }
+  }
 }
 
 impl BudgetState
@@ -45,6 +59,7 @@ impl BudgetState
   ///
   /// * `ic_token_secret` - Secret key for IC Token JWT signing
   /// * `ip_token_key` - 32-byte encryption key for IP Token AES-256-GCM
+  /// * `jwt_secret` - Secret key for JWT access token signing/verification
   /// * `database_url` - Database connection string
   ///
   /// # Errors
@@ -53,6 +68,7 @@ impl BudgetState
   pub async fn new(
     ic_token_secret: String,
     ip_token_key: &[ u8 ],
+    jwt_secret: Arc< JwtSecret >,
     database_url: &str,
   ) -> Result< Self, Box< dyn std::error::Error > >
   {
@@ -71,6 +87,7 @@ impl BudgetState
       agent_budget_manager,
       provider_key_storage,
       db_pool,
+      jwt_secret,
     } )
   }
 }
@@ -1045,16 +1062,19 @@ pub struct CreateBudgetRequestResponse
 /// # Arguments
 ///
 /// * `state` - Budget protocol state (database, managers)
+/// * `user` - Authenticated user from JWT
 /// * `request` - Budget request parameters
 ///
 /// # Returns
 ///
 /// - 201 Created with request_id if successful
 /// - 400 Bad Request if validation fails
+/// - 403 Forbidden if user doesn't own agent
 /// - 404 Not Found if agent doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn create_budget_request(
   State( state ): State< BudgetState >,
+  user: crate::jwt_auth::AuthenticatedUser,
   Json( request ): Json< CreateBudgetRequestRequest >,
 ) -> impl IntoResponse
 {
@@ -1067,21 +1087,17 @@ pub async fn create_budget_request(
     } ) ) ).into_response();
   }
 
-  // Check if agent exists
-  let agent_check = sqlx::query( "SELECT id FROM agents WHERE id = ?" )
-    .bind( request.agent_id )
-    .fetch_optional( &state.db_pool )
-    .await;
+  // Check if agent exists and verify ownership
+  let agent_owner_result = sqlx::query_scalar::<sqlx::Sqlite, String>(
+    "SELECT owner_id FROM agents WHERE id = ?"
+  )
+  .bind( request.agent_id )
+  .fetch_optional( &state.db_pool )
+  .await;
 
-  match agent_check
+  let agent_owner = match agent_owner_result
   {
-    Ok( None ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
-      {
-        "error": "Agent not found"
-      } ) ) ).into_response();
-    }
+    Ok( owner ) => owner,
     Err( err ) =>
     {
       tracing::error!( "Database error checking agent: {}", err );
@@ -1091,9 +1107,28 @@ pub async fn create_budget_request(
       )
         .into_response();
     }
-    Ok( Some( _ ) ) =>
+  };
+
+  match agent_owner
+  {
+    None =>
     {
-      // Agent exists, continue
+      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
+      {
+        "error": "Agent not found"
+      } ) ) ).into_response();
+    }
+    Some( owner_id ) if user.0.role != "admin" && owner_id != user.0.sub =>
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "You don't own this agent" }) ),
+      )
+        .into_response();
+    }
+    Some( _ ) =>
+    {
+      // Authorized - user owns the agent or is admin
     }
   }
 

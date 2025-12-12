@@ -71,14 +71,17 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 #[ tokio::test ]
 async fn test_create_token_with_invalid_json_syntax()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   let malformed_json = r#"{"user_id":"test","project_id":"proj""#; // Missing closing brace
 
+  // WHY: Auth extraction happens before JSON parsing in Axum middleware chain
+  let jwt_token = generate_jwt_for_user( &app_state, "test" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -98,14 +101,16 @@ async fn test_create_token_with_invalid_json_syntax()
 #[ tokio::test ]
 async fn test_create_token_with_trailing_comma()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   let malformed_json = r#"{"user_id":"test","project_id":"proj",}"#; // Trailing comma
 
+  let jwt_token = generate_jwt_for_user( &app_state, "test" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -125,14 +130,16 @@ async fn test_create_token_with_trailing_comma()
 #[ tokio::test ]
 async fn test_create_token_with_unquoted_keys()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   let malformed_json = r#"{user_id:"test",project_id:"proj"}"#; // Unquoted keys
 
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -156,7 +163,7 @@ async fn test_create_token_with_unquoted_keys()
 #[ tokio::test ]
 async fn test_create_token_with_deeply_nested_json()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // Create JSON with 150 levels of nesting (well beyond reasonable limits)
   let mut deeply_nested = String::from( r#"{"user_id":"test","project_id":"proj","nested":"# );
@@ -171,10 +178,13 @@ async fn test_create_token_with_deeply_nested_json()
   }
   deeply_nested.push_str( r#""}"# );
 
+  // WHY: Auth extraction happens before JSON parsing in Axum middleware chain
+  let jwt_token = generate_jwt_for_user( &app_state, "test" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( deeply_nested ) )
     .unwrap();
 
@@ -194,15 +204,17 @@ async fn test_create_token_with_deeply_nested_json()
 #[ tokio::test ]
 async fn test_create_token_with_invalid_utf8()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // Create byte sequence with invalid UTF-8 (0xFF is not valid UTF-8 start byte)
   let invalid_utf8 = b"{\"user_id\":\"\xFF\xFF\xFF\",\"project_id\":\"proj\"}";
 
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( &invalid_utf8[..] ) )
     .unwrap();
 
@@ -227,10 +239,13 @@ async fn test_rotate_token_with_malformed_body()
 
   // First create a token to rotate
   let user_id = "test_rotate";
+  let jwt_token = generate_jwt_for_user( &app_state, user_id );
+
   let create_request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( r#"{"user_id":"test_rotate","project_id":"proj","description":"Test"}"# ) )
     .unwrap();
 
@@ -240,9 +255,6 @@ async fn test_rotate_token_with_malformed_body()
   let body_bytes = axum::body::to_bytes( create_response.into_body(), usize::MAX ).await.unwrap();
   let body: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
   let token_id = body[ "id" ].as_i64().unwrap();
-
-  // Generate JWT for the user
-  let jwt_token = generate_jwt_for_user( &app_state, user_id );
 
   // Now try to rotate with malformed JSON body
   let malformed_json = r#"{"invalid":"json"#; // Missing closing brace

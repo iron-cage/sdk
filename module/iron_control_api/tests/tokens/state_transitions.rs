@@ -3,19 +3,19 @@
 //! Tests token lifecycle state transitions and validates that operations
 //! on tokens in different states behave correctly.
 //!
-//! ## Test Matrix
+//! ## Test Matrix (Protocol 014)
 //!
 //! | Test Case | Initial State | Operation | Expected Result | Status |
 //! |-----------|--------------|-----------|----------------|--------|
 //! | `test_rotate_revoked_token` | Token revoked | POST /api/v1/api-tokens/:id/rotate | 404 Not Found | ✅ |
 //! | `test_get_revoked_token_shows_metadata` | Token revoked | GET /api/v1/api-tokens/:id | 200 OK with metadata | ✅ |
-//! | `test_revoke_already_revoked_token` | Token revoked | DELETE /api/v1/api-tokens/:id | 404 Not Found | ✅ |
+//! | `test_revoke_already_revoked_token` | Token revoked | DELETE /api/v1/api-tokens/:id | 409 Conflict | ✅ |
 //! | `test_token_state_after_failed_rotation` | Valid token, rotation fails | POST /api/v1/api-tokens/:id/rotate | Original token still valid | ✅ |
-//! | `test_cascade_delete_token_removes_usage` | Token with usage records | DELETE /api/v1/api-tokens/:id | Usage records deleted | ✅ |
+//! | `test_cascade_delete_token_removes_usage` | Token with usage records | DELETE /api/v1/api-tokens/:id | 200 OK, usage deleted | ✅ |
 //! | `test_rotate_nonexistent_token` | No token | POST /api/v1/api-tokens/:id/rotate | 404 Not Found | ✅ |
 //! | `test_revoke_nonexistent_token` | No token | DELETE /api/v1/api-tokens/:id | 404 Not Found | ✅ |
 //!
-//! ## Corner Cases Covered
+//! ## Corner Cases Covered (Protocol 014)
 //!
 //! **Happy Path:**
 //! - ✅ Normal token lifecycle (create → use → rotate → revoke)
@@ -23,10 +23,11 @@
 //! **State Transitions:**
 //! - ✅ Active → Revoked (cannot rotate revoked token)
 //! - ✅ Active → Rotated → New Active (old token invalid)
-//! - ✅ Revoked → Revoked (idempotency: second revoke returns 404)
+//! - ✅ Revoked → Revoked (idempotency: second revoke returns 409 Conflict)
 //!
 //! **Error Conditions:**
-//! - ✅ Operate on revoked token → 404 Not Found
+//! - ✅ Rotate revoked token → 404 Not Found
+//! - ✅ Revoke already-revoked token → 409 Conflict (Protocol 014)
 //! - ✅ Operate on non-existent token → 404 Not Found
 //! - ✅ Failed rotation preserves original token state
 //!
@@ -71,8 +72,10 @@ fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, u
 }
 
 /// Helper: Create a token and return its ID.
-async fn create_token( router: &Router, user_id: &str ) -> i64
+async fn create_token( router: &Router, app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> i64
 {
+  let jwt_token = generate_jwt_for_user( app_state, user_id );
+
   let request_body = json!({
     "user_id": user_id,
     "project_id": "test_project",
@@ -83,6 +86,7 @@ async fn create_token( router: &Router, user_id: &str ) -> i64
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -118,11 +122,11 @@ async fn test_rotate_revoked_token()
   let ( router, app_state ) = create_test_router().await;
 
   // Create and revoke token
-  let token_id = create_token( &router, "user_revoke_test" ).await;
+  let token_id = create_token( &router, &app_state, "user_revoke_test" ).await;
   let revoke_status = revoke_token( &router, &app_state, "user_revoke_test", token_id ).await;
   assert_eq!(
     revoke_status,
-    StatusCode::NO_CONTENT,
+    StatusCode::OK,
     "LOUD FAILURE: Token revocation must succeed"
   );
 
@@ -156,9 +160,9 @@ async fn test_get_revoked_token_shows_metadata()
   let ( router, app_state ) = create_test_router().await;
 
   // Create and revoke token
-  let token_id = create_token( &router, "user_metadata_test" ).await;
+  let token_id = create_token( &router, &app_state, "user_metadata_test" ).await;
   let revoke_status = revoke_token( &router, &app_state, "user_metadata_test", token_id ).await;
-  assert_eq!( revoke_status, StatusCode::NO_CONTENT );
+  assert_eq!( revoke_status, StatusCode::OK );
 
   // Generate JWT for the user
   let jwt_token = generate_jwt_for_user( &app_state, "user_metadata_test" );
@@ -185,27 +189,27 @@ async fn test_get_revoked_token_shows_metadata()
   assert!( !body.is_active, "LOUD FAILURE: Revoked token must show is_active=false" );
 }
 
-/// Test revoking an already-revoked token returns 404 Not Found (idempotency).
+/// Test revoking an already-revoked token returns 409 Conflict (Protocol 014).
 ///
-/// WHY: DELETE operations should be idempotent. Second revoke returns 404
-/// because the token no longer exists in the active set.
+/// WHY: Protocol 014 specifies that revoking an already-revoked token returns
+/// 409 Conflict to clearly indicate the token is already in revoked state.
 #[ tokio::test ]
 async fn test_revoke_already_revoked_token()
 {
   let ( router, app_state ) = create_test_router().await;
 
   // Create and revoke token
-  let token_id = create_token( &router, "user_double_revoke" ).await;
+  let token_id = create_token( &router, &app_state, "user_double_revoke" ).await;
   let first_revoke = revoke_token( &router, &app_state, "user_double_revoke", token_id ).await;
-  assert_eq!( first_revoke, StatusCode::NO_CONTENT );
+  assert_eq!( first_revoke, StatusCode::OK );
 
   // Revoke again
   let second_revoke = revoke_token( &router, &app_state, "user_double_revoke", token_id ).await;
 
   assert_eq!(
     second_revoke,
-    StatusCode::NOT_FOUND,
-    "LOUD FAILURE: Second revoke must return 404 Not Found (not 204)"
+    StatusCode::CONFLICT,
+    "LOUD FAILURE: Second revoke must return 409 Conflict (Protocol 014)"
   );
 }
 
@@ -267,7 +271,7 @@ async fn test_token_state_after_failed_rotation()
   let ( router, app_state ) = create_test_router().await;
 
   // Create token
-  let token_id = create_token( &router, "user_rotation_failure" ).await;
+  let token_id = create_token( &router, &app_state, "user_rotation_failure" ).await;
 
   // Generate JWT for the user
   let jwt_token = generate_jwt_for_user( &app_state, "user_rotation_failure" );
@@ -338,13 +342,13 @@ async fn test_cascade_delete_token_removes_usage()
   // For now, this test serves as documentation of the integration requirement.
 
   let ( router, app_state ) = create_test_router().await;
-  let token_id = create_token( &router, "user_cascade_test" ).await;
+  let token_id = create_token( &router, &app_state, "user_cascade_test" ).await;
 
   // Delete token
   let status = revoke_token( &router, &app_state, "user_cascade_test", token_id ).await;
   assert_eq!(
     status,
-    StatusCode::NO_CONTENT,
+    StatusCode::OK,
     "LOUD FAILURE: Token deletion must succeed"
   );
 

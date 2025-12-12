@@ -14,6 +14,117 @@ use iron_control_api::routes::usage::UsageState;
 /// Test JWT secret for all tests (consistent across test runs).
 pub const TEST_JWT_SECRET: &str = "test_jwt_secret_key_for_testing_12345";
 
+/// Seed common test users for token tests.
+///
+/// Creates users that token tests expect:
+/// - Normal test users (user_test, user_minimal, etc.)
+/// - Security test users (command injection, unicode, etc.)
+///
+/// This is required because migration 013 added FK constraint from `api_tokens` to users.
+async fn seed_test_users_for_tokens( pool: &SqlitePool )
+{
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  let password_hash = "test_hash";
+
+  // Common test users used across token tests
+  let mut test_users = vec![
+    "user_test", "user_minimal", "user_abc", "user_xyz", "user_001", "user_002",
+    "user_003", "user_admin", "user_developer", "user_viewer", "testuser1",
+    "testuser2", "testuser3", "testuser4", "testuser5", "test-user", "test_user",
+    "user_1", "user1", "user_123", "user_2", "user2", "user_rotate",
+    "user_timestamp_test", "user\nid_with_newline",
+    // State transition test users
+    "user_revoke_test", "user_metadata_test", "user_double_revoke",
+    "user_rotation_failure", "user_cascade_test",
+    // Corner case test users
+    "user_plaintext_test", "user_sha256_test", "user_null_project", "user_valid",
+    // Content-type test user
+    "test", "test_rotate",
+    // Concurrency test users
+    "user_rotate_concurrent", "user_revoke_concurrent", "user_rotate_revoke_race",
+  ];
+
+  // Security test users (command injection, SQL injection, XSS, unicode, etc.)
+  // These are used in corner case and security tests
+  test_users.extend_from_slice( &[
+    // Command injection
+    "; ls -la",
+    "| cat /etc/passwd",
+    "`whoami`",
+    "$(rm -rf /)",
+    // SQL injection
+    "' OR '1'='1",
+    "admin' OR '1'='1",
+    "'; DROP TABLE users; --",
+    "' UNION SELECT * FROM tokens --",
+    "admin'--",
+    "1' OR '1' = '1' --",
+    "'; DELETE FROM limits WHERE '1'='1",
+    // XSS vectors
+    "<script>alert('XSS')</script>",
+    "<img src=x onerror=alert(1)>",
+    "<svg/onload=alert('XSS')>",
+    "javascript:alert(1)",
+    "<iframe src=\"javascript:alert('XSS')\"></iframe>",
+    // Path traversal
+    "../../../etc/passwd",
+    "..\\..\\..\\windows\\system32\\config\\sam",
+    // Unicode
+    "用户-user-123",
+    "пользователь",
+    "مستخدم",
+    "ユーザー",
+    "👤user🔑token",
+    "café_résumé",
+    "user\u{200B}hidden",
+    "user\nwith\nnewlines",
+  ] );
+
+  // Add numbered users for concurrency and uniqueness tests
+  for i in 0..=100
+  {
+    test_users.push( Box::leak( format!( "user_{i}" ).into_boxed_str() ) );
+    if i <= 20
+    {
+      test_users.push( Box::leak( format!( "concurrent_user_{i}" ).into_boxed_str() ) );
+      test_users.push( Box::leak( format!( "user_concurrent_{i}" ).into_boxed_str() ) );
+    }
+  }
+
+  // Add boundary test users for length constraint tests
+  test_users.push( Box::leak( "C".repeat( 255 ).into_boxed_str() ) );  // Max valid length (255 chars, matches users.id)
+
+  for user_id in test_users
+  {
+    // Create email that fits within 255 char limit
+    // For long user_ids, truncate to fit
+    let max_user_id_for_email = 255 - "@example.com".len();  // 243 chars
+    let email = if user_id.len() > max_user_id_for_email
+    {
+      // Truncate user_id to fit within email constraint
+      format!( "{}@example.com", &user_id[ ..max_user_id_for_email ] )
+    }
+    else
+    {
+      format!( "{user_id}@example.com" )
+    };
+
+    let _ = sqlx::query(
+      "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7)"
+    )
+    .bind( user_id )
+    .bind( user_id )
+    .bind( password_hash )
+    .bind( email )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now_ms )
+    .execute( pool )
+    .await;
+  }
+}
+
 /// Create test AuthState with known JWT secret and in-memory database.
 pub async fn create_test_auth_state() -> AuthState
 {
@@ -22,12 +133,17 @@ pub async fn create_test_auth_state() -> AuthState
     .expect( "LOUD FAILURE: Failed to create test AuthState" )
 }
 
-/// Create test TokenState with in-memory database.
+/// Create test TokenState with in-memory database and seed test users.
 pub async fn create_test_token_state() -> TokenState
 {
-  TokenState::new( "sqlite::memory:" )
+  let token_state = TokenState::new( "sqlite::memory:" )
     .await
-    .expect( "LOUD FAILURE: Failed to create test TokenState" )
+    .expect( "LOUD FAILURE: Failed to create test TokenState" );
+
+  // Seed test users for FK constraint compliance
+  seed_test_users_for_tokens( token_state.storage.pool() ).await;
+
+  token_state
 }
 
 /// Create test UsageState with in-memory database.
@@ -75,6 +191,9 @@ impl TestAppState
     let tokens = TokenState::new( db_path )
       .await
       .expect( "LOUD FAILURE: Failed to create test TokenState with custom db_path" );
+
+    // Seed test users for FK constraint compliance
+    seed_test_users_for_tokens( tokens.storage.pool() ).await;
 
     let database = SqlitePool::connect( db_path )
       .await

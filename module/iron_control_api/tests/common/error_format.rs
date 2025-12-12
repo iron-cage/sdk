@@ -35,15 +35,25 @@ use axum::body::Body;
 use tower::ServiceExt;
 
 /// Create test router with token routes.
-async fn create_token_router() -> Router
+async fn create_token_router() -> ( Router, crate::common::test_state::TestAppState )
 {
   let app_state = crate::common::test_state::TestAppState::new().await;
 
-  Router::new()
+  let router = Router::new()
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
     .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( app_state )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
+}
+
+/// Helper: Generate JWT token for a given user_id
+fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
+{
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
 /// Create test router with limit routes.
@@ -63,7 +73,7 @@ async fn create_limit_router() -> Router
 #[ tokio::test ]
 async fn test_4xx_errors_return_json()
 {
-  let token_router = create_token_router().await;
+  let ( token_router, _app_state ) = create_token_router().await;
 
   // Test 401 Unauthorized (missing authentication for protected endpoint)
   // Note: get_token requires authentication, so calling without JWT returns 401
@@ -123,13 +133,17 @@ async fn test_4xx_errors_return_json()
 #[ tokio::test ]
 async fn test_validation_errors_return_json()
 {
-  let token_router = create_token_router().await;
+  let ( token_router, app_state ) = create_token_router().await;
+
+  // Generate JWT token for authenticated request
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   // WHY: Test 400 Bad Request (validation failure)
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( r#"{"user_id":""}"# ) ) // Empty user_id should fail validation
     .unwrap();
 

@@ -277,7 +277,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .bind( 5000 )  // $50.00 balance
   .bind( now_ms )
-  .bind( "admin" )
+  .bind( "user_admin" )
   .execute( pool )
   .await
   .map_err( |_| crate::error::TokenError )?;
@@ -300,7 +300,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .bind( 10000 )  // $100.00 balance
   .bind( now_ms )
-  .bind( "admin" )
+  .bind( "user_admin" )
   .execute( pool )
   .await
   .map_err( |_| crate::error::TokenError )?;
@@ -330,7 +330,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_1 )
-  .bind( "admin" )
+  .bind( "user_admin" )
   .bind::< Option< &str > >( None )
   .bind( "Admin Master Token" )
   .bind( 1 )
@@ -348,7 +348,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_2 )
-  .bind( "developer" )
+  .bind( "user_developer" )
   .bind::< Option< &str > >( None )
   .bind( "Developer Token" )
   .bind( 1 )
@@ -366,7 +366,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_3 )
-  .bind( "developer" )
+  .bind( "user_developer" )
   .bind( "project_alpha" )
   .bind( "Project Alpha Token" )
   .bind( 1 )
@@ -384,7 +384,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_4 )
-  .bind( "viewer" )
+  .bind( "user_viewer" )
   .bind::< Option< &str > >( None )
   .bind( "Inactive Token" )
   .bind( 0 )  // Inactive
@@ -402,7 +402,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_5 )
-  .bind( "developer" )
+  .bind( "user_developer" )
   .bind::< Option< &str > >( None )
   .bind( "Expired Token" )
   .bind( 1 )
@@ -420,7 +420,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_6 )
-  .bind( "developer" )
+  .bind( "user_developer" )
   .bind( "project_beta" )
   .bind( "Expiring Soon Token" )
   .bind( 1 )
@@ -438,7 +438,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_7 )
-  .bind( "tester" )
+  .bind( "user_tester" )
   .bind::< Option< &str > >( None )
   .bind( "Tester Token" )
   .bind( 1 )
@@ -456,7 +456,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_8 )
-  .bind( "tester" )
+  .bind( "user_tester" )
   .bind( "project_alpha" )
   .bind( "Tester Token 2" )
   .bind( 1 )

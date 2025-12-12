@@ -61,6 +61,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
   let provider_key_storage = Arc::new(
     iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
   );
+  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
 
   BudgetState
   {
@@ -70,6 +71,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     agent_budget_manager,
     provider_key_storage,
     db_pool: pool,
+    jwt_secret,
   }
 }
 

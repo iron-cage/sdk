@@ -1,17 +1,18 @@
 # Protocol 012: Analytics API
 
 **Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
+**Version:** 1.1.0
+**Last Updated:** 2025-12-12
 **Priority:** NICE-TO-HAVE
 
 ---
 
 ## Overview
 
-The Analytics API provides insights into agent spending, provider usage, budget status, and request patterns. All endpoints return real-time data with optional daily aggregations. Analytics are read-only and optimized for dashboard display and budget monitoring.
+The Analytics API provides insights into agent spending, provider usage, budget status, and request patterns. Supports both event ingestion from LlmRouter and query endpoints for dashboard display.
 
 **Key characteristics:**
+- **Event ingestion:** LlmRouter reports events via POST (async, non-blocking)
 - **8 critical use cases:** Answers essential questions about spending, usage, and budget status
 - **Real-time + daily aggregations:** Supports today, yesterday, last-7-days, last-30-days, all-time
 - **Pagination:** Consistent offset pagination across all endpoints
@@ -62,7 +63,153 @@ The Analytics API answers 8 critical questions:
 
 ---
 
-## Endpoints
+## Event Ingestion
+
+LlmRouter reports analytics events after each LLM request. Events are sent asynchronously (non-blocking) to avoid impacting request latency.
+
+### POST /api/v1/analytics/events
+
+**Description:** Report LLM request events from LlmRouter to server.
+
+**Use Case:** Record successful/failed LLM requests for analytics and dashboard.
+
+**Request:**
+
+```http
+POST /api/v1/analytics/events
+Content-Type: application/json
+Authorization: Bearer <ic_token>
+```
+
+**Request Body:**
+
+```json
+{
+  "event_id": "evt_7c9e6679-7425-40de-944b",
+  "timestamp_ms": 1733830245123,
+  "event_type": "llm_request_completed",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "input_tokens": 150,
+  "output_tokens": 50,
+  "cost_micros": 1250,
+  "agent_id": "agent_abc123",
+  "provider_id": "ip_openai-001"
+}
+```
+
+**Request Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `event_id` | string | YES | UUID for deduplication (`evt_<uuid>`) |
+| `timestamp_ms` | integer | YES | Unix timestamp in milliseconds |
+| `event_type` | string | YES | `llm_request_completed` or `llm_request_failed` |
+| `model` | string | YES | Model name (e.g., `gpt-4o-mini`, `claude-3-opus`) |
+| `provider` | string | YES | Provider: `openai`, `anthropic`, `unknown` |
+| `input_tokens` | integer | YES* | Input token count (*required for completed) |
+| `output_tokens` | integer | YES* | Output token count (*required for completed) |
+| `cost_micros` | integer | YES* | Cost in microdollars (1 USD = 1,000,000) |
+| `agent_id` | string | NO | Agent identifier (optional) |
+| `provider_id` | string | NO | Provider key identifier (optional) |
+| `error_code` | string | NO | Error code (for failed events) |
+| `error_message` | string | NO | Error message (for failed events) |
+
+**Event Types:**
+
+| Type | Description | Required Fields |
+|------|-------------|-----------------|
+| `llm_request_completed` | Successful LLM request | `input_tokens`, `output_tokens`, `cost_micros` |
+| `llm_request_failed` | Failed LLM request | `error_code`, `error_message` |
+
+**Success Response:**
+
+```json
+HTTP 202 Accepted
+Content-Type: application/json
+
+{
+  "event_id": "evt_7c9e6679-7425-40de-944b",
+  "status": "accepted"
+}
+```
+
+**Duplicate Response (idempotent):**
+
+```json
+HTTP 200 OK
+Content-Type: application/json
+
+{
+  "event_id": "evt_7c9e6679-7425-40de-944b",
+  "status": "duplicate"
+}
+```
+
+**Error Response:**
+
+```json
+HTTP 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid event_type",
+    "details": {
+      "field": "event_type",
+      "allowed": ["llm_request_completed", "llm_request_failed"]
+    }
+  }
+}
+```
+
+**Behavior:**
+
+- **Async processing:** Server accepts immediately (202), processes asynchronously
+- **Idempotent:** Duplicate `event_id` returns 200 (not error)
+- **Non-blocking:** LlmRouter sends fire-and-forget, doesn't wait for response
+- **Retry:** On network failure, LlmRouter retries with exponential backoff
+
+**Cost Units:**
+
+Cost is reported in **microdollars** (1 USD = 1,000,000 microdollars) for precision:
+
+```
+$0.001250 USD = 1250 microdollars
+$1.00 USD = 1,000,000 microdollars
+```
+
+**Example: Failed Request**
+
+```json
+{
+  "event_id": "evt_8d0f7780-8536-51ef-955c",
+  "timestamp_ms": 1733830246456,
+  "event_type": "llm_request_failed",
+  "model": "gpt-4o-mini",
+  "provider": "openai",
+  "agent_id": "agent_abc123",
+  "provider_id": "ip_openai-001",
+  "error_code": "rate_limit_exceeded",
+  "error_message": "Rate limit exceeded. Please retry after 60 seconds."
+}
+```
+
+**Authorization:**
+
+- Requires valid IC Token
+- Events are associated with token's user
+
+**Rate Limiting:**
+
+| Limit | Value | Window |
+|-------|-------|--------|
+| Events per token | 1000 | 1 minute |
+
+---
+
+## Query Endpoints
 
 ### 1. Total Spending
 
@@ -895,3 +1042,7 @@ iron analytics budget status --status active
 - [002: REST API Protocol](002_rest_api_protocol.md) - General standards
 
 ---
+
+**Protocol 012 Version:** 1.1.0
+**Status:** Specification
+**Last Updated:** 2025-12-12

@@ -9,7 +9,7 @@
 //! |-----------|----------------------|----------------|--------|
 //! | `test_concurrent_token_creation_uniqueness` | 2x POST /api/v1/api-tokens | Both succeed with unique tokens | ✅ |
 //! | `test_concurrent_rotate_same_token` | 2x POST /api/v1/api-tokens/:id/rotate | One succeeds, one gets 404 | ✅ |
-//! | `test_concurrent_revoke_same_token` | 2x DELETE /api/v1/api-tokens/:id | One 204, one 404 | ✅ |
+//! | `test_concurrent_revoke_same_token` | 2x DELETE /api/v1/api-tokens/:id | One 200, one 409 | ✅ |
 //! | `test_concurrent_rotate_and_revoke` | Rotate + Revoke same token | One succeeds, one 404 | ✅ |
 //!
 //! ## Corner Cases Covered
@@ -106,8 +106,11 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 }
 
 /// Helper: Create a token and return its ID.
-async fn create_token( router: Arc< Router >, user_id: &str ) -> ( StatusCode, i64, String )
+async fn create_token( router: Arc< Router >, app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> ( StatusCode, i64, String )
 {
+  // Generate JWT token for authenticated request
+  let jwt_token = generate_jwt_for_user( app_state, user_id );
+
   let request_body = json!({
     "user_id": user_id,
     "project_id": "test_project",
@@ -118,6 +121,7 @@ async fn create_token( router: Arc< Router >, user_id: &str ) -> ( StatusCode, i
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -144,7 +148,7 @@ async fn create_token( router: Arc< Router >, user_id: &str ) -> ( StatusCode, i
 #[ tokio::test ]
 async fn test_concurrent_token_creation_uniqueness()
 {
-  let ( router, _app_state ) = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
   let router = Arc::new( router );
 
   // Launch 10 concurrent token creations
@@ -153,11 +157,12 @@ async fn test_concurrent_token_creation_uniqueness()
   for i in 0..10
   {
     let router_clone = Arc::clone( &router );
+    let app_state_clone = app_state.clone();
     let user_id = format!( "user_concurrent_{}", i );
 
     let handle = tokio::spawn( async move
     {
-      create_token( router_clone, &user_id ).await
+      create_token( router_clone, &app_state_clone, &user_id ).await
     } );
 
     handles.push( handle );
@@ -209,7 +214,7 @@ async fn test_concurrent_rotate_same_token()
 
   // Create a token first
   let user_id = "user_rotate_concurrent";
-  let ( _, token_id, _ ) = create_token( Arc::clone( &router ), user_id ).await;
+  let ( _, token_id, _ ) = create_token( Arc::clone( &router ), &app_state, user_id ).await;
 
   // Generate JWT for the user
   let jwt_token = generate_jwt_for_user( &app_state, user_id );
@@ -271,8 +276,8 @@ async fn test_concurrent_rotate_same_token()
 
 /// Test concurrent revocation of the same token.
 ///
-/// WHY: DELETE operations should be atomic. First revoke succeeds (204),
-/// second revoke fails (404) because token no longer exists.
+/// WHY: DELETE operations should be atomic. First revoke succeeds (200 OK),
+/// second revoke fails (409 CONFLICT) because token is already revoked.
 #[ tokio::test ]
 async fn test_concurrent_revoke_same_token()
 {
@@ -281,7 +286,7 @@ async fn test_concurrent_revoke_same_token()
 
   // Create a token first
   let user_id = "user_revoke_concurrent";
-  let ( _, token_id, _ ) = create_token( Arc::clone( &router ), user_id ).await;
+  let ( _, token_id, _ ) = create_token( Arc::clone( &router ), &app_state, user_id ).await;
 
   // Generate JWT for the user
   let jwt_token = generate_jwt_for_user( &app_state, user_id );
@@ -321,23 +326,25 @@ async fn test_concurrent_revoke_same_token()
   let status1 = handle1.await.unwrap();
   let status2 = handle2.await.unwrap();
 
-  // One should succeed (204 NO CONTENT), one should fail (404 NOT FOUND)
+  // One should succeed (200 OK), one should fail (409 CONFLICT for already-revoked)
   let statuses = [ status1, status2 ];
-  let success_count = statuses.iter().filter( |&&s| s == StatusCode::NO_CONTENT ).count();
-  let not_found_count = statuses.iter().filter( |&&s| s == StatusCode::NOT_FOUND ).count();
+  let success_count = statuses.iter().filter( |&&s| s == StatusCode::OK ).count();
+  let conflict_count = statuses.iter().filter( |&&s| s == StatusCode::CONFLICT ).count();
 
   assert_eq!(
     success_count,
     1,
-    "LOUD FAILURE: Exactly one revocation must succeed. Got {} successes",
-    success_count
+    "LOUD FAILURE: Exactly one revocation must succeed with 200 OK. Got {} successes. Statuses: {:?}",
+    success_count,
+    statuses
   );
 
   assert_eq!(
-    not_found_count,
+    conflict_count,
     1,
-    "LOUD FAILURE: Exactly one revocation must fail with 404. Got {} 404s",
-    not_found_count
+    "LOUD FAILURE: Exactly one revocation must fail with 409 CONFLICT. Got {} conflicts. Statuses: {:?}",
+    conflict_count,
+    statuses
   );
 }
 
@@ -353,7 +360,7 @@ async fn test_concurrent_rotate_and_revoke()
 
   // Create a token first
   let user_id = "user_rotate_revoke_race";
-  let ( _, token_id, _ ) = create_token( Arc::clone( &router ), user_id ).await;
+  let ( _, token_id, _ ) = create_token( Arc::clone( &router ), &app_state, user_id ).await;
 
   // Generate JWT for the user
   let jwt_token = generate_jwt_for_user( &app_state, user_id );
