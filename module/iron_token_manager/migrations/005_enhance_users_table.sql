@@ -14,11 +14,11 @@ ALTER TABLE users ADD COLUMN last_login INTEGER;
 
 -- Add account suspension tracking
 ALTER TABLE users ADD COLUMN suspended_at INTEGER;
-ALTER TABLE users ADD COLUMN suspended_by INTEGER REFERENCES users(id);
+ALTER TABLE users ADD COLUMN suspended_by TEXT REFERENCES users(id);
 
 -- Add account deletion tracking (soft delete)
 ALTER TABLE users ADD COLUMN deleted_at INTEGER;
-ALTER TABLE users ADD COLUMN deleted_by INTEGER REFERENCES users(id);
+ALTER TABLE users ADD COLUMN deleted_by TEXT REFERENCES users(id);
 
 -- Add password reset fields
 ALTER TABLE users ADD COLUMN force_password_change INTEGER NOT NULL DEFAULT 0;

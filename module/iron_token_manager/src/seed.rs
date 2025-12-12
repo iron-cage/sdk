@@ -162,8 +162,8 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   let now_ms = crate::storage::current_time_ms();
   let day_ms = 24 * 60 * 60 * 1000;
 
-  // Bcrypt hash of "password123" (cost = 4, for fast dev testing)
-  let password_hash = "$2b$04$xQa5kFZZhNGwPDXqJvw9XuXUdQEPAqXwNMOqQcU6MqWxPLxOVyJqO";
+  // Bcrypt hash of "testpass" (cost = 12)
+  let password_hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
 
   // Admin user
   sqlx::query(
@@ -173,7 +173,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( "user_admin" )
   .bind( "admin" )
   .bind( password_hash )
-  .bind( "admin@example.com" )
+  .bind( "admin@admin.com" )
   .bind( "admin" )
   .bind( 1 )
   .bind( now_ms )

@@ -91,7 +91,7 @@ status: ## Show installation status
 	@echo "=== Iron Runtime Status ==="
 	@cargo --version
 	@[ -d "$(DASHBOARD_DIR)/node_modules" ] && echo "Dashboard: ✅ installed" || echo "Dashboard: ❌ run make setup"
-	@[ -f dev_tokens.db ] && echo "Database: ✅ exists (dev_tokens.db)" || echo "Database: ⚠️  run make db-reset-seed"
+	@[ -f iron.db ] && echo "Database: ✅ exists (iron.db)" || echo "Database: ⚠️  run make db-reset-seed"
 
 #===============================================================================
 # Database Management
@@ -101,36 +101,35 @@ status: ## Show installation status
 
 db-reset-seed: ## Fresh database with seed data (recommended)
 	@echo "Resetting databases and populating seed data..."
-	@module/iron_token_manager/scripts/reset_and_seed.sh dev_tokens.db
-	@echo "✅ Database reset and seeded: dev_tokens.db"
+	@module/iron_token_manager/scripts/reset_and_seed.sh iron.db
+	@echo "✅ Database reset and seeded: iron.db"
 
 db-reset: ## Delete all development databases
-	@rm -f dev_*.db
-	@echo "✅ Development databases deleted (dev_*.db)"
+	@rm -f iron.db dev_*.db
+	@echo "✅ Databases deleted (iron.db, dev_*.db)"
 	@echo "   Run 'make db-reset-seed' to recreate with seed data"
-	@echo "   Or start runtime to create fresh databases"
 
 db-seed: ## Populate seed data (assumes database exists)
 	@echo "Populating seed data..."
-	@module/iron_token_manager/scripts/seed_dev_data.sh dev_tokens.db
-	@echo "✅ Seed data populated: dev_tokens.db"
+	@module/iron_token_manager/scripts/seed_dev_data.sh iron.db
+	@echo "✅ Seed data populated: iron.db"
 
-db-seed-admin: ## Create admin user
-	@sqlite3 dev_tokens.db "INSERT OR IGNORE INTO users (id, email, username, password_hash, role, is_active, created_at) VALUES ('admin', 'admin@admin.com', 'admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now'));"
-	@echo "✅ Admin user created (admin/testpass)"
+db-admin: ## Create admin user
+	@sqlite3 iron.db "INSERT OR REPLACE INTO users (id, email, username, password_hash, role, is_active, created_at) VALUES ('user_admin', 'admin@admin.com', 'admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now') * 1000);"
+	@echo "✅ Admin user created (admin@admin.com / testpass)"
 
-db-inspect: ## Open interactive SQLite shell (dev_tokens.db)
-	@if [ ! -f dev_tokens.db ]; then \
-		echo "❌ dev_tokens.db not found"; \
+db-inspect: ## Open interactive SQLite shell (iron.db)
+	@if [ ! -f iron.db ]; then \
+		echo "❌ iron.db not found"; \
 		echo "   Run 'make db-reset-seed' first"; \
 		exit 1; \
 	fi
-	@echo "Opening dev_tokens.db (press Ctrl+D or .exit to quit)"
+	@echo "Opening iron.db (press Ctrl+D or .exit to quit)"
 	@echo "Useful commands:"
 	@echo "  .tables                    -- List all tables"
 	@echo "  .schema users             -- Show table structure"
 	@echo "  SELECT * FROM users;      -- View data"
-	@sqlite3 dev_tokens.db
+	@sqlite3 iron.db
 
 debug-setup: db-reset-seed ## Complete debug environment setup
 	@echo "Building workspace..."
