@@ -802,6 +802,9 @@ async fn test_refresh_with_insufficient_agent_budget()
 
   let state = create_test_budget_state( pool.clone() ).await;
 
+  // Generate IC Token for agent 1
+  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+
   // Create active lease
   let lease_id = "lease_refresh_test";
   state
@@ -813,7 +816,8 @@ async fn test_refresh_with_insufficient_agent_budget()
   // Try to refresh with $10.00 (exceeds remaining $5.00)
   let request_body = json!(
   {
-    "lease_id": lease_id,
+    "ic_token": ic_token,
+    "current_lease_id": lease_id,
     "requested_budget": 10.0
   } );
 

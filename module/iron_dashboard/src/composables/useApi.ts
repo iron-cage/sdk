@@ -160,29 +160,29 @@ export function useApi() {
 
   // Token API methods
   async function getTokens(): Promise<TokenMetadata[]> {
-    return fetchApi<TokenMetadata[]>('/api/tokens')
+    return fetchApi<TokenMetadata[]>('/api/v1/api-tokens')
   }
 
   async function getToken(id: number): Promise<TokenMetadata> {
-    return fetchApi<TokenMetadata>(`/api/tokens/${id}`)
+    return fetchApi<TokenMetadata>(`/api/v1/api-tokens/${id}`)
   }
 
   async function createToken(data: CreateTokenRequest): Promise<CreateTokenResponse> {
-    return fetchApi<CreateTokenResponse>('/api/tokens', {
+    return fetchApi<CreateTokenResponse>('/api/v1/api-tokens', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
   async function rotateToken(id: number): Promise<CreateTokenResponse> {
-    return fetchApi<CreateTokenResponse>(`/api/tokens/${id}/rotate`, {
+    return fetchApi<CreateTokenResponse>(`/api/v1/api-tokens/${id}/rotate`, {
       method: 'POST',
       body: JSON.stringify({}),
     })
   }
 
   async function revokeToken(id: number): Promise<void> {
-    await fetchApi<void>(`/api/tokens/${id}`, {
+    await fetchApi<void>(`/api/v1/api-tokens/${id}`, {
       method: 'DELETE',
     })
   }
@@ -402,7 +402,7 @@ export function useApi() {
 
   async function createAgentToken(data: { agent_id: number; user_id: string; provider: string; description?: string }): Promise<CreateTokenResponse> {
     // TODO: Update backend to accept agent_id and provider
-    return fetchApi<CreateTokenResponse>('/api/tokens', {
+    return fetchApi<CreateTokenResponse>('/api/v1/api-tokens', {
       method: 'POST',
       body: JSON.stringify({
         user_id: data.user_id,
@@ -417,7 +417,7 @@ export function useApi() {
   async function updateTokenProvider(tokenId: number, provider: string): Promise<void> {
     // TODO: Add backend endpoint for updating token provider
     // For now, this is a placeholder
-    await fetchApi<void>(`/api/tokens/${tokenId}`, {
+    await fetchApi<void>(`/api/v1/api-tokens/${tokenId}`, {
       method: 'PUT',
       body: JSON.stringify({ provider }),
     })

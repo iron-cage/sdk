@@ -7,13 +7,13 @@
 //!
 //! | Test Case | Initial State | Operation | Expected Result | Status |
 //! |-----------|--------------|-----------|----------------|--------|
-//! | `test_rotate_revoked_token` | Token revoked | POST /api/tokens/:id/rotate | 404 Not Found | ✅ |
-//! | `test_get_revoked_token_shows_metadata` | Token revoked | GET /api/tokens/:id | 200 OK with metadata | ✅ |
-//! | `test_revoke_already_revoked_token` | Token revoked | DELETE /api/tokens/:id | 404 Not Found | ✅ |
-//! | `test_token_state_after_failed_rotation` | Valid token, rotation fails | POST /api/tokens/:id/rotate | Original token still valid | ✅ |
-//! | `test_cascade_delete_token_removes_usage` | Token with usage records | DELETE /api/tokens/:id | Usage records deleted | ✅ |
-//! | `test_rotate_nonexistent_token` | No token | POST /api/tokens/:id/rotate | 404 Not Found | ✅ |
-//! | `test_revoke_nonexistent_token` | No token | DELETE /api/tokens/:id | 404 Not Found | ✅ |
+//! | `test_rotate_revoked_token` | Token revoked | POST /api/v1/api-tokens/:id/rotate | 404 Not Found | ✅ |
+//! | `test_get_revoked_token_shows_metadata` | Token revoked | GET /api/v1/api-tokens/:id | 200 OK with metadata | ✅ |
+//! | `test_revoke_already_revoked_token` | Token revoked | DELETE /api/v1/api-tokens/:id | 404 Not Found | ✅ |
+//! | `test_token_state_after_failed_rotation` | Valid token, rotation fails | POST /api/v1/api-tokens/:id/rotate | Original token still valid | ✅ |
+//! | `test_cascade_delete_token_removes_usage` | Token with usage records | DELETE /api/v1/api-tokens/:id | Usage records deleted | ✅ |
+//! | `test_rotate_nonexistent_token` | No token | POST /api/v1/api-tokens/:id/rotate | 404 Not Found | ✅ |
+//! | `test_revoke_nonexistent_token` | No token | DELETE /api/v1/api-tokens/:id | 404 Not Found | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -40,25 +40,34 @@
 //! **Precondition Violations:** Tested via non-existent token operations
 
 use crate::common::extract_json_response;
-use iron_control_api::routes::tokens::{ TokenState, CreateTokenResponse, TokenListItem };
+use iron_control_api::routes::tokens::{ CreateTokenResponse, TokenListItem };
 use axum::{ Router, routing::{ post, get, delete }, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 use serde_json::json;
 
 /// Create test router with token routes.
-async fn create_test_router() -> Router
+async fn create_test_router() -> ( Router, crate::common::test_state::TestAppState )
 {
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token state" );
+  // Create test application state with auth + token support
+  let app_state = crate::common::test_state::TestAppState::new().await;
 
-  Router::new()
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( token_state )
+  let router = Router::new()
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
+    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
+}
+
+/// Helper: Generate JWT token for a given user_id
+fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
+{
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
 /// Helper: Create a token and return its ID.
@@ -72,7 +81,7 @@ async fn create_token( router: &Router, user_id: &str ) -> i64
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -83,11 +92,15 @@ async fn create_token( router: &Router, user_id: &str ) -> i64
 }
 
 /// Helper: Revoke a token by ID.
-async fn revoke_token( router: &Router, token_id: i64 ) -> StatusCode
+async fn revoke_token( router: &Router, app_state: &crate::common::test_state::TestAppState, user_id: &str, token_id: i64 ) -> StatusCode
 {
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( app_state, user_id );
+
   let request = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -102,21 +115,25 @@ async fn revoke_token( router: &Router, token_id: i64 ) -> StatusCode
 #[ tokio::test ]
 async fn test_rotate_revoked_token()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // Create and revoke token
   let token_id = create_token( &router, "user_revoke_test" ).await;
-  let revoke_status = revoke_token( &router, token_id ).await;
+  let revoke_status = revoke_token( &router, &app_state, "user_revoke_test", token_id ).await;
   assert_eq!(
     revoke_status,
     StatusCode::NO_CONTENT,
     "LOUD FAILURE: Token revocation must succeed"
   );
 
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_revoke_test" );
+
   // Attempt to rotate revoked token
   let request = Request::builder()
     .method( "POST" )
-    .uri( format!( "/api/tokens/{}/rotate", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -136,17 +153,21 @@ async fn test_rotate_revoked_token()
 #[ tokio::test ]
 async fn test_get_revoked_token_shows_metadata()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // Create and revoke token
   let token_id = create_token( &router, "user_metadata_test" ).await;
-  let revoke_status = revoke_token( &router, token_id ).await;
+  let revoke_status = revoke_token( &router, &app_state, "user_metadata_test", token_id ).await;
   assert_eq!( revoke_status, StatusCode::NO_CONTENT );
+
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_metadata_test" );
 
   // Get revoked token metadata
   let request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -171,15 +192,15 @@ async fn test_get_revoked_token_shows_metadata()
 #[ tokio::test ]
 async fn test_revoke_already_revoked_token()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // Create and revoke token
   let token_id = create_token( &router, "user_double_revoke" ).await;
-  let first_revoke = revoke_token( &router, token_id ).await;
+  let first_revoke = revoke_token( &router, &app_state, "user_double_revoke", token_id ).await;
   assert_eq!( first_revoke, StatusCode::NO_CONTENT );
 
   // Revoke again
-  let second_revoke = revoke_token( &router, token_id ).await;
+  let second_revoke = revoke_token( &router, &app_state, "user_double_revoke", token_id ).await;
 
   assert_eq!(
     second_revoke,
@@ -194,11 +215,15 @@ async fn test_revoke_already_revoked_token()
 #[ tokio::test ]
 async fn test_rotate_nonexistent_token()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for any user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens/99999/rotate" )
+    .uri( "/api/v1/api-tokens/99999/rotate" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -218,9 +243,9 @@ async fn test_rotate_nonexistent_token()
 #[ tokio::test ]
 async fn test_revoke_nonexistent_token()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
-  let status = revoke_token( &router, 99999 ).await;
+  let status = revoke_token( &router, &app_state, "test_user", 99999 ).await;
 
   assert_eq!(
     status,
@@ -239,15 +264,19 @@ async fn test_revoke_nonexistent_token()
 #[ tokio::test ]
 async fn test_token_state_after_failed_rotation()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // Create token
   let token_id = create_token( &router, "user_rotation_failure" ).await;
 
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_rotation_failure" );
+
   // Get original token state
   let get_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token.clone() ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -268,7 +297,8 @@ async fn test_token_state_after_failed_rotation()
 
   let final_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -293,9 +323,9 @@ async fn test_token_state_after_failed_rotation()
 async fn test_cascade_delete_token_removes_usage()
 {
   // This is an integration test that would require:
-  // 1. Creating a token via POST /api/tokens
+  // 1. Creating a token via POST /api/v1/api-tokens
   // 2. Recording usage via iron_token_manager (or usage API if it existed)
-  // 3. Deleting the token via DELETE /api/tokens/:id
+  // 3. Deleting the token via DELETE /api/v1/api-tokens/:id
   // 4. Verifying usage records are gone
   //
   // Current iron_api doesn't expose usage recording endpoint (it's internal).
@@ -307,21 +337,25 @@ async fn test_cascade_delete_token_removes_usage()
   //
   // For now, this test serves as documentation of the integration requirement.
 
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
   let token_id = create_token( &router, "user_cascade_test" ).await;
 
   // Delete token
-  let status = revoke_token( &router, token_id ).await;
+  let status = revoke_token( &router, &app_state, "user_cascade_test", token_id ).await;
   assert_eq!(
     status,
     StatusCode::NO_CONTENT,
     "LOUD FAILURE: Token deletion must succeed"
   );
 
+  // Generate JWT for the user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_cascade_test" );
+
   // Verify token is revoked (still retrievable for audit but marked inactive)
   let get_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 

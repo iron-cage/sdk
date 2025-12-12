@@ -8,9 +8,9 @@
 //!
 //! | Test Case | Endpoint | Content-Type | Expected Result | Status |
 //! |-----------|----------|-------------|----------------|--------|
-//! | `test_create_token_missing_content_type` | POST /api/tokens | (none) | 415 or 400 | ✅ |
-//! | `test_create_token_text_plain_rejected` | POST /api/tokens | text/plain | 415 | ✅ |
-//! | `test_create_token_form_urlencoded_rejected` | POST /api/tokens | application/x-www-form-urlencoded | 415 | ✅ |
+//! | `test_create_token_missing_content_type` | POST /api/v1/api-tokens | (none) | 415 or 400 | ✅ |
+//! | `test_create_token_text_plain_rejected` | POST /api/v1/api-tokens | text/plain | 415 | ✅ |
+//! | `test_create_token_form_urlencoded_rejected` | POST /api/v1/api-tokens | application/x-www-form-urlencoded | 415 | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -44,7 +44,7 @@ async fn create_test_router() -> Router
     .expect( "LOUD FAILURE: Failed to create token state" );
 
   Router::new()
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
     .with_state( token_state )
 }
 
@@ -57,7 +57,7 @@ async fn test_create_token_missing_content_type()
   // Expected: 415 Unsupported Media Type or 400 Bad Request
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     // No Content-Type header set
     .body( Body::from( r#"{"user_id":"test","project_id":"proj"}"# ) )
     .unwrap();
@@ -81,7 +81,7 @@ async fn test_create_token_text_plain_rejected()
   // WHY: Even if body contains valid JSON, wrong Content-Type should be rejected
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "text/plain" )
     .body( Body::from( r#"{"user_id":"test","project_id":"proj"}"# ) )
     .unwrap();
@@ -105,7 +105,7 @@ async fn test_create_token_form_urlencoded_rejected()
   // WHY: Form data format is incompatible with JSON endpoints
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/x-www-form-urlencoded" )
     .body( Body::from( "user_id=test&project_id=proj" ) )
     .unwrap();

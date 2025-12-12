@@ -10,6 +10,50 @@ use std::fs::File;
 use std::io::{ Write, BufWriter };
 use std::path::{ Path, PathBuf };
 
+/// Recursively register YAML files for rebuild detection
+fn register_yaml_files_recursive( dir: &Path )
+{
+  if let Ok( entries ) = std::fs::read_dir( dir )
+  {
+    for entry in entries.flatten()
+    {
+      let path = entry.path();
+
+      if path.is_dir()
+      {
+        // Recurse into subdirectories
+        register_yaml_files_recursive( &path );
+      }
+      else if path.extension().is_some_and( | e | e == "yaml" || e == "yml" )
+      {
+        println!( "cargo:rerun-if-changed={}", path.display() );
+      }
+    }
+  }
+}
+
+/// Recursively discover all YAML files in directory
+fn discover_yaml_files_recursive( dir: &Path, files: &mut Vec<PathBuf> )
+{
+  if let Ok( entries ) = std::fs::read_dir( dir )
+  {
+    for entry in entries.flatten()
+    {
+      let path = entry.path();
+
+      if path.is_dir()
+      {
+        // Recurse into subdirectories
+        discover_yaml_files_recursive( &path, files );
+      }
+      else if path.extension().is_some_and( | e | e == "yaml" || e == "yml" )
+      {
+        files.push( path );
+      }
+    }
+  }
+}
+
 fn main()
 {
   println!( "cargo:rerun-if-changed=build.rs" );
@@ -21,15 +65,8 @@ fn main()
 
   if commands_dir.exists()
   {
-    // Register each YAML file for rebuild detection
-    for entry in std::fs::read_dir( &commands_dir ).unwrap().flatten()
-    {
-      let path = entry.path();
-      if path.extension().is_some_and( | e | e == "yaml" || e == "yml" )
-      {
-        println!( "cargo:rerun-if-changed={}", path.display() );
-      }
-    }
+    // Register each YAML file for rebuild detection (recursively)
+    register_yaml_files_recursive( &commands_dir );
 
     // Generate static commands registry
     generate_static_commands( &commands_dir );
@@ -46,34 +83,35 @@ fn generate_static_commands( commands_dir : &Path )
   let out_dir = env::var( "OUT_DIR" ).unwrap();
   let dest_path = PathBuf::from( &out_dir ).join( "static_commands.rs" );
 
-  // Collect all command definitions from YAML files
+  // Collect all command definitions from YAML files (recursively)
   let mut all_commands = Vec::new();
+  let mut yaml_files = Vec::new();
 
-  for entry in std::fs::read_dir( commands_dir ).unwrap().flatten()
+  // Discover all YAML files recursively
+  discover_yaml_files_recursive( commands_dir, &mut yaml_files );
+
+  // Parse each YAML file and collect commands
+  for path in yaml_files
   {
-    let path = entry.path();
-    if path.extension().is_some_and( | e | e == "yaml" || e == "yml" )
+    // Parse YAML file
+    if let Ok( contents ) = std::fs::read_to_string( &path )
     {
-      // Parse YAML file
-      if let Ok( contents ) = std::fs::read_to_string( &path )
+      match serde_yaml::from_str::< serde_yaml::Value >( &contents )
       {
-        match serde_yaml::from_str::< serde_yaml::Value >( &contents )
+        Ok( yaml ) =>
         {
-          Ok( yaml ) =>
+          // Extract commands array from YAML
+          if let Some( commands ) = yaml.get( "commands" ).and_then( | v | v.as_sequence() )
           {
-            // Extract commands array from YAML
-            if let Some( commands ) = yaml.get( "commands" ).and_then( | v | v.as_sequence() )
+            for cmd in commands
             {
-              for cmd in commands
-              {
-                all_commands.push( cmd.clone() );
-              }
+              all_commands.push( cmd.clone() );
             }
           }
-          Err( e ) =>
-          {
-            eprintln!( "Warning: Failed to parse {}: {}", path.display(), e );
-          }
+        }
+        Err( e ) =>
+        {
+          eprintln!( "Warning: Failed to parse {}: {}", path.display(), e );
         }
       }
     }

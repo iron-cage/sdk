@@ -261,17 +261,24 @@ pub struct UsageReportResponse
 #[ derive( Debug, Deserialize ) ]
 pub struct BudgetRefreshRequest
 {
-  pub lease_id: String,
-  pub requested_budget: f64,
+  pub ic_token: String,
+  pub current_lease_id: String,
+  pub requested_budget: Option< f64 >,
 }
 
 impl BudgetRefreshRequest
 {
+  /// Maximum IC Token length
+  const MAX_IC_TOKEN_LENGTH: usize = 2000;
+
   /// Maximum lease_id length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Maximum budget request (USD)
   const MAX_BUDGET_REQUEST: f64 = 1000.0;
+
+  /// Default budget refresh amount (USD)
+  const DEFAULT_REFRESH_BUDGET: f64 = 10.0;
 
   /// Validate budget refresh request parameters
   ///
@@ -280,36 +287,58 @@ impl BudgetRefreshRequest
   /// Returns error if validation fails
   pub fn validate( &self ) -> Result< (), String >
   {
-    // Validate lease_id
-    if self.lease_id.trim().is_empty()
+    // Validate ic_token
+    if self.ic_token.trim().is_empty()
     {
-      return Err( "lease_id cannot be empty".to_string() );
+      return Err( "ic_token cannot be empty".to_string() );
     }
 
-    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
+    if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
     {
       return Err( format!(
-        "lease_id too long (max {} characters)",
+        "ic_token too long (max {} characters)",
+        Self::MAX_IC_TOKEN_LENGTH
+      ) );
+    }
+
+    // Validate current_lease_id
+    if self.current_lease_id.trim().is_empty()
+    {
+      return Err( "current_lease_id cannot be empty".to_string() );
+    }
+
+    if self.current_lease_id.len() > Self::MAX_LEASE_ID_LENGTH
+    {
+      return Err( format!(
+        "current_lease_id too long (max {} characters)",
         Self::MAX_LEASE_ID_LENGTH
       ) );
     }
 
-    // Validate requested_budget is positive
-    if self.requested_budget <= 0.0
+    // Validate requested_budget if provided
+    if let Some( budget ) = self.requested_budget
     {
-      return Err( "requested_budget must be positive".to_string() );
-    }
+      if budget <= 0.0
+      {
+        return Err( "requested_budget must be positive".to_string() );
+      }
 
-    // Validate requested_budget doesnt exceed maximum
-    if self.requested_budget > Self::MAX_BUDGET_REQUEST
-    {
-      return Err( format!(
-        "requested_budget too large (max ${} USD)",
-        Self::MAX_BUDGET_REQUEST
-      ) );
+      if budget > Self::MAX_BUDGET_REQUEST
+      {
+        return Err( format!(
+          "requested_budget too large (max ${} USD)",
+          Self::MAX_BUDGET_REQUEST
+        ) );
+      }
     }
 
     Ok( () )
+  }
+
+  /// Get requested budget or default
+  pub fn get_requested_budget( &self ) -> f64
+  {
+    self.requested_budget.unwrap_or( Self::DEFAULT_REFRESH_BUDGET )
   }
 }
 
@@ -730,8 +759,45 @@ pub async fn refresh_budget(
     } ) ) ).into_response();
   }
 
+  // Verify IC Token
+  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  {
+    Ok( claims ) => claims,
+    Err( _ ) =>
+    {
+      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+      {
+        "error": "Invalid IC Token"
+      } ) ) ).into_response();
+    }
+  };
+
+  // Extract agent_id from IC Token claims
+  // Claims.agent_id format: "agent_<id>"
+  let agent_id = match claims.agent_id.strip_prefix( "agent_" )
+  {
+    Some( id_str ) => match id_str.parse::< i64 >()
+    {
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+        {
+          "error": "Invalid agent ID in IC Token"
+        } ) ) ).into_response();
+      }
+    },
+    None =>
+    {
+      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+      {
+        "error": "Invalid IC Token agent_id format"
+      } ) ) ).into_response();
+    }
+  };
+
   // Get current lease
-  let lease = match state.lease_manager.get_lease( &request.lease_id ).await
+  let lease = match state.lease_manager.get_lease( &request.current_lease_id ).await
   {
     Ok( Some( lease ) ) => lease,
     Ok( None ) =>
@@ -752,6 +818,19 @@ pub async fn refresh_budget(
         .into_response();
     }
   };
+
+  // Verify IC Token agent matches lease owner (authorization check)
+  if lease.agent_id != agent_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!(
+      {
+        "error": "Unauthorized - lease belongs to different agent"
+      } ) ),
+    )
+      .into_response();
+  }
 
   // Get agent budget
   let agent_budget = match state
@@ -779,8 +858,11 @@ pub async fn refresh_budget(
     }
   };
 
+  // Get requested budget amount (with default)
+  let requested_budget = request.get_requested_budget();
+
   // Check if agent has sufficient remaining budget
-  if agent_budget.budget_remaining < request.requested_budget
+  if agent_budget.budget_remaining < requested_budget
   {
     // Deny request
     return ( StatusCode::OK, Json( BudgetRefreshResponse
@@ -803,7 +885,7 @@ pub async fn refresh_budget(
       &new_lease_id,
       lease.agent_id,
       lease.budget_id,
-      request.requested_budget,
+      requested_budget,
       None,
     )
     .await
@@ -817,7 +899,7 @@ pub async fn refresh_budget(
   }
 
   // Expire old lease
-  if let Err( err ) = state.lease_manager.expire_lease( &request.lease_id ).await
+  if let Err( err ) = state.lease_manager.expire_lease( &request.current_lease_id ).await
   {
     tracing::error!( "Database error expiring old lease: {}", err );
     // Continue anyway - new lease was created
@@ -830,8 +912,8 @@ pub async fn refresh_budget(
   ( StatusCode::OK, Json( BudgetRefreshResponse
   {
     status: "approved".to_string(),
-    budget_granted: Some( request.requested_budget ),
-    budget_remaining: agent_budget.budget_remaining - request.requested_budget,
+    budget_granted: Some( requested_budget ),
+    budget_remaining: agent_budget.budget_remaining - requested_budget,
     lease_id: Some( new_lease_id ),
     reason: None,
   } ) )

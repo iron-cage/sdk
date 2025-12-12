@@ -1,9 +1,9 @@
 # Protocol 017: Budget Change Requests API
 
-**Status:** ✅ MUST-HAVE
+**Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
-**Priority:** MUST-HAVE for Pilot
+**Priority:** MUST-HAVE
 
 ---
 
@@ -1081,5 +1081,5 @@ WHERE agent_id = ? AND status = 'pending';
 - **[Protocol 002: REST API Protocol](002_rest_api_protocol.md)** - Cross-cutting standards (audit logging, CLI parity, system resources, rate limiting)
 - **[API Design Standards](../standards/api_design_standards.md)** - Pagination, sorting, filtering patterns
 - **[Error Format Standards](../standards/error_format_standards.md)** - Error response format, HTTP status codes
-- **[Resource Catalog](009_resource_catalog.md)** - Complete resource inventory
+- **[Resource Catalog](../architecture/009_resource_catalog.md)** - Complete resource inventory
 - **[Vocabulary](../vocabulary.md)** - Terminology definitions

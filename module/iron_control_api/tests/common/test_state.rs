@@ -2,11 +2,13 @@
 //!
 //! Provides builders for:
 //! - AuthState (JWT authentication)
+//! - TokenState (token management)
 //! - UsageState (usage tracking)
 //! - Combined application state
 
 use sqlx::SqlitePool;
 use iron_control_api::routes::auth::AuthState;
+use iron_control_api::routes::tokens::TokenState;
 use iron_control_api::routes::usage::UsageState;
 
 /// Test JWT secret for all tests (consistent across test runs).
@@ -18,6 +20,14 @@ pub async fn create_test_auth_state() -> AuthState
   AuthState::new( TEST_JWT_SECRET.to_string(), "sqlite::memory:" )
     .await
     .expect( "LOUD FAILURE: Failed to create test AuthState" )
+}
+
+/// Create test TokenState with in-memory database.
+pub async fn create_test_token_state() -> TokenState
+{
+  TokenState::new( "sqlite::memory:" )
+    .await
+    .expect( "LOUD FAILURE: Failed to create test TokenState" )
 }
 
 /// Create test UsageState with in-memory database.
@@ -37,6 +47,7 @@ pub async fn create_test_usage_state() -> UsageState
 pub struct TestAppState
 {
   pub auth: AuthState,
+  pub tokens: TokenState,
   pub database: SqlitePool,
 }
 
@@ -46,9 +57,30 @@ impl TestAppState
   pub async fn new() -> Self
   {
     let auth = create_test_auth_state().await;
+    let tokens = create_test_token_state().await;
     let database = super::create_test_database().await;
 
-    Self { auth, database }
+    Self { auth, tokens, database }
+  }
+
+  /// Create new test application state with custom database path.
+  ///
+  /// Used for concurrency tests where shared database path is needed.
+  pub async fn with_db_path( db_path: &str ) -> Self
+  {
+    let auth = AuthState::new( TEST_JWT_SECRET.to_string(), db_path )
+      .await
+      .expect( "LOUD FAILURE: Failed to create test AuthState with custom db_path" );
+
+    let tokens = TokenState::new( db_path )
+      .await
+      .expect( "LOUD FAILURE: Failed to create test TokenState with custom db_path" );
+
+    let database = SqlitePool::connect( db_path )
+      .await
+      .expect( "LOUD FAILURE: Failed to connect to custom database path" );
+
+    Self { auth, tokens, database }
   }
 
   /// Get JWT secret for token generation in tests.
@@ -64,6 +96,24 @@ impl axum::extract::FromRef< TestAppState > for AuthState
   fn from_ref( state: &TestAppState ) -> Self
   {
     state.auth.clone()
+  }
+}
+
+/// Enable TokenState extraction from TestAppState.
+impl axum::extract::FromRef< TestAppState > for TokenState
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    state.tokens.clone()
+  }
+}
+
+/// Enable SqlitePool extraction from TestAppState.
+impl axum::extract::FromRef< TestAppState > for SqlitePool
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    state.database.clone()
   }
 }
 

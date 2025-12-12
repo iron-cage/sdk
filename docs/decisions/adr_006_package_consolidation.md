@@ -77,4 +77,4 @@ Consolidate to 5 deployment packages:
 
 ---
 
-*Related: [adr_005_001_cli_architecture.md](adr_005_001_cli_architecture.md) | [architecture/two_repo_model.md](../architecture/two_repo_model.md)*
+<!-- TODO: Add related documentation links when available -->

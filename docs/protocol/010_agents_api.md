@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -29,6 +30,8 @@ This protocol adheres to the following Iron Cage standards:
 - `token_id`: `token_<uuid>`
 - `user_id`: `user_<uuid>`
 - `project_id`: `project_<uuid>`
+
+> **Note:** Examples in this document use simplified IDs (e.g., `agent_abc123`, `ip_openai_001`) for readability. Production systems use full UUIDs as specified in ID Format Standards.
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
@@ -113,7 +116,7 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique agent identifier (agent- prefix) |
+| `id` | string | Unique agent identifier (agent_ prefix) |
 | `name` | string | Agent name |
 | `budget` | number | Current agent budget in USD |
 | `providers` | array<string> | Provider IDs assigned to agent |
@@ -161,7 +164,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider 'ip-invalid-001' does not exist"
+    "message": "Provider 'ip_invalid_001' does not exist"
   }
 }
 ```
@@ -302,7 +305,7 @@ HTTP 400 Bad Request
 **Request:**
 
 ```
-GET /api/v1/agents/agent-abc123
+GET /api/v1/agents/agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -369,7 +372,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -401,7 +404,7 @@ HTTP 403 Forbidden
 **Request:**
 
 ```json
-PUT /api/v1/agents/agent-abc123
+PUT /api/v1/agents/agent_abc123
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
@@ -485,7 +488,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -507,7 +510,7 @@ HTTP 404 Not Found
 **Request:**
 
 **Path Parameters:**
-- `id` (string, required) - Agent ID (e.g., agent-abc123)
+- `id` (string, required) - Agent ID (e.g., agent_abc123)
 
 **Body:**
 ```json
@@ -527,7 +530,7 @@ HTTP 404 Not Found
 **Success: 200 OK**
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [
     {
       "id": "ip_openai_001",
@@ -562,7 +565,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "INVALID_PROVIDER_ID",
-    "message": "Provider not found: ip-unknown-999",
+    "message": "Provider not found: ip_unknown_999",
     "fields": {
       "providers": "One or more provider IDs are invalid"
     }
@@ -608,7 +611,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent not found: agent-xyz999"
+    "message": "Agent not found: agent_xyz999"
   }
 }
 ```
@@ -624,14 +627,14 @@ HTTP 404 Not Found
 
 **Empty Array (Remove All Providers):**
 ```json
-PUT /api/v1/agents/agent-abc123/providers
+PUT /api/v1/agents/agent_abc123/providers
 {
   "providers": []
 }
 
 Response: 200 OK
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [],
   "updated_at": "2025-12-11T10:35:00Z"
 }
@@ -639,14 +642,14 @@ Response: 200 OK
 
 **Duplicate IDs (Auto-Deduplicate):**
 ```json
-PUT /api/v1/agents/agent-abc123/providers
+PUT /api/v1/agents/agent_abc123/providers
 {
   "providers": ["ip_openai_001", "ip_openai_001", "ip_anthropic_001"]
 }
 
 Response: 200 OK
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [
     {"id": "ip_openai_001", "name": "openai", "endpoint": "https://api.openai.com/v1", "models": ["gpt-4", "gpt-3.5-turbo"]},
     {"id": "ip_anthropic_001", "name": "anthropic", "endpoint": "https://api.anthropic.com/v1", "models": ["claude-3-opus", "claude-3-sonnet"]}
@@ -675,14 +678,14 @@ Response: 200 OK
 **Request:**
 
 ```
-GET /api/v1/agents/agent-abc123/providers
+GET /api/v1/agents/agent_abc123/providers
 Authorization: Bearer <user-token or api-token>
 ```
 
 **Success Response: 200 OK**
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [
     {
       "id": "ip_openai_001",
@@ -735,18 +738,18 @@ Authorization: Bearer <user-token or api-token>
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent not found: agent-xyz999"
+    "message": "Agent not found: agent_xyz999"
   }
 }
 ```
 
 **Edge Case - Agent with Zero Providers:**
 ```json
-GET /api/v1/agents/agent-abc123/providers
+GET /api/v1/agents/agent_abc123/providers
 
 Response: 200 OK
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "providers": [],
   "count": 0
 }
@@ -768,18 +771,18 @@ Response: 200 OK
 **Request:**
 
 ```
-DELETE /api/v1/agents/agent-abc123/providers/ip_openai_001
+DELETE /api/v1/agents/agent_abc123/providers/ip_openai_001
 Authorization: Bearer <user-token or api-token>
 ```
 
 **Path Parameters:**
-- `agent_id` (string, required) - Agent ID (e.g., agent-abc123)
+- `agent_id` (string, required) - Agent ID (e.g., agent_abc123)
 - `provider_id` (string, required) - Provider ID to remove (e.g., ip_openai_001)
 
 **Success Response: 200 OK**
 ```json
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "provider_id": "ip_openai_001",
   "removed": true,
   "remaining_providers": [
@@ -806,7 +809,7 @@ Authorization: Bearer <user-token or api-token>
 {
   "error": {
     "code": "PROVIDER_NOT_ASSIGNED",
-    "message": "Provider ip_openai_001 is not assigned to agent agent-abc123"
+    "message": "Provider ip_openai_001 is not assigned to agent agent_abc123"
   }
 }
 ```
@@ -836,7 +839,7 @@ Authorization: Bearer <user-token or api-token>
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent not found: agent-xyz999"
+    "message": "Agent not found: agent_xyz999"
   }
 }
 ```
@@ -846,18 +849,18 @@ Authorization: Bearer <user-token or api-token>
 {
   "error": {
     "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider not found: ip-xyz999"
+    "message": "Provider not found: ip_xyz999"
   }
 }
 ```
 
 **Edge Case - Removing Last Provider:**
 ```json
-DELETE /api/v1/agents/agent-abc123/providers/ip_openai_001
+DELETE /api/v1/agents/agent_abc123/providers/ip_openai_001
 
 Response: 200 OK
 {
-  "agent_id": "agent-abc123",
+  "agent_id": "agent_abc123",
   "provider_id": "ip_openai_001",
   "removed": true,
   "remaining_providers": [],
@@ -886,7 +889,7 @@ Response: 200 OK
 **Request:**
 
 ```
-GET /api/v1/agents/agent-abc123/status
+GET /api/v1/agents/agent_abc123/status
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -944,7 +947,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -1232,7 +1235,7 @@ iron agents create \
   --tags production,customer-facing
 
 # Output:
-# Agent created: agent-abc123
+# Agent created: agent_abc123
 # IC Token: ic_xyz789abc123def456...
 # ⚠️  Save this token now. You won't be able to see it again.
 ```
@@ -1247,17 +1250,17 @@ iron agents list --sort -budget
 
 # Output:
 # ID            NAME                 BUDGET   SPENT   REMAINING  STATUS
-# agent-abc123  Production Agent 1   $100.00  $45.75  $54.25     active
-# agent-def456  Test Agent           $10.00   $10.00  $0.00      exhausted
+# agent_abc123  Production Agent 1   $100.00  $45.75  $54.25     active
+# agent_def456  Test Agent           $10.00   $10.00  $0.00      exhausted
 ```
 
 ### iron agents get
 
 ```bash
-iron agents get agent-abc123
+iron agents get agent_abc123
 
 # Output:
-# ID:          agent-abc123
+# ID:          agent_abc123
 # Name:        Production Agent 1
 # Owner:       user_xyz789
 # Budget:      $100.00
@@ -1272,22 +1275,22 @@ iron agents get agent-abc123
 ### iron agents update
 
 ```bash
-iron agents update agent-abc123 \
+iron agents update agent_abc123 \
   --name "Production Agent 1 (Updated)" \
   --description "Updated description" \
   --tags production,customer-facing,high-priority
 
 # Output:
-# Agent updated: agent-abc123
+# Agent updated: agent_abc123
 ```
 
 ### iron agents status
 
 ```bash
-iron agents status agent-abc123
+iron agents status agent_abc123
 
 # Output:
-# Agent:       agent-abc123 (Production Agent 1)
+# Agent:       agent_abc123 (Production Agent 1)
 # Status:      active
 # Budget:      $54.25 / $100.00 (45.75% used)
 # Requests:    1247 total, 89 today, 12 last hour
@@ -1346,7 +1349,3 @@ iron agents status agent-abc123
 - [002: REST API Protocol](002_rest_api_protocol.md) - General REST API standards
 
 ---
-
-**Protocol 010 Version:** 1.0.0
-**Status:** Specification
-**Last Updated:** 2025-12-10

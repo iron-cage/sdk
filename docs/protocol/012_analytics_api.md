@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** NICE-TO-HAVE
 
 ---
 
@@ -74,7 +75,7 @@ The Analytics API answers 8 critical questions:
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/total?period=today&agent_id=agent-abc123
+GET /api/v1/analytics/spending/total?period=today&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -408,7 +409,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/usage/requests?period=today&agent_id=agent-abc123
+GET /api/v1/analytics/usage/requests?period=today&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -650,7 +651,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent-abc123
+GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -831,7 +832,7 @@ HTTP 200 OK
 # Total spend
 iron analytics spending total
 iron analytics spending total --period today
-iron analytics spending total --agent agent-abc123
+iron analytics spending total --agent agent_abc123
 
 # By agent
 iron analytics spending by-agent
@@ -841,7 +842,7 @@ iron analytics spending by-agent --provider ip_openai_001
 # By provider
 iron analytics spending by-provider
 iron analytics spending by-provider --period last-30-days
-iron analytics spending by-provider --agent agent-abc123
+iron analytics spending by-provider --agent agent_abc123
 
 # Average cost
 iron analytics spending avg-per-request
@@ -854,7 +855,7 @@ iron analytics spending avg-per-request --period today
 # Requests
 iron analytics usage requests
 iron analytics usage requests --period today
-iron analytics usage requests --agent agent-abc123
+iron analytics usage requests --agent agent_abc123
 
 # Tokens
 iron analytics usage tokens by-agent
@@ -876,9 +877,9 @@ iron analytics budget status --status active
 
 # Output:
 # AGENT                 BUDGET    SPENT     REMAINING  USED    RISK
-# agent-abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
-# agent-def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
-# agent-ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
+# agent_abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
+# agent_def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
+# agent_ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
 #
 # Summary: 3 agents (2 active, 1 exhausted, 1 critical, 1 high)
 ```
@@ -894,7 +895,3 @@ iron analytics budget status --status active
 - [002: REST API Protocol](002_rest_api_protocol.md) - General standards
 
 ---
-
-**Protocol 012 Version:** 1.0.0
-**Status:** Specification
-**Last Updated:** 2025-12-10

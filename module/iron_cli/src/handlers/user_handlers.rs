@@ -138,7 +138,7 @@ pub fn list_users_handler(
   if let Some(page_size_str) = params.get("page_size")
   {
     let page_size = validate_non_negative_integer(page_size_str, "page_size")?;
-    if page_size < 1 || page_size > 100
+    if !(1..=100).contains(&page_size)
     {
       return Err(CliError::InvalidParameter {
         param: "page_size",

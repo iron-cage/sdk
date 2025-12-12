@@ -26,5 +26,5 @@
 
 ---
 
-*For design principles, see [principles/](../principles/)*
-*For architectural decisions, see [decisions/](../decisions/)*
+*For design principles, see [principles/](../principles/readme.md)*
+*For architectural decisions, see [decisions/](../decisions/readme.md)*

@@ -1,9 +1,15 @@
 # Protocol 005: Budget Control Protocol
 
-**Purpose:** How runtime and Control Panel communicate to enforce budget limits without exposing provider tokens.
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
+
+---
+
+### Purpose
+
+Define how runtime and Control Panel communicate to enforce budget limits without exposing provider tokens.
 
 ---
 
@@ -111,7 +117,7 @@ This protocol adheres to the following Iron Cage standards:
 ```json
 {
   "agent_id": "agent_abc123",
-  "budget_id": "budget-xyz789",
+  "budget_id": "budget_xyz789",
   "issued_at": 1702123456,
   "expires_at": null,
   "issuer": "iron-control-panel",
@@ -126,7 +132,7 @@ This protocol adheres to the following Iron Cage standards:
 | Claim | Type | Format | Example | Purpose |
 |-------|------|--------|---------|---------|
 | `agent_id` | string | `^agent_[a-z0-9]{6,32}$` | "agent_abc123" | Unique agent identifier |
-| `budget_id` | string | `^budget-[a-z0-9]{6,32}$` | "budget-xyz789" | Links to budget allocation |
+| `budget_id` | string | `^budget-[a-z0-9]{6,32}$` | "budget_xyz789" | Links to budget allocation |
 | `issued_at` | number | Unix timestamp (seconds) | 1702123456 | Token creation time |
 | `expires_at` | number or null | Unix timestamp or null | null | Optional expiration (null = long-lived, no auto-expiration) |
 | `issuer` | string | Literal "iron-control-panel" | "iron-control-panel" | Token source validation |
@@ -314,7 +320,7 @@ Content-Type: application/json
 ```json
 {
   "lease_id": "lease_001",
-  "budget_id": "budget-xyz789",
+  "budget_id": "budget_xyz789",
   "requested_budget": 10.00,
   "current_remaining": 0.85,
   "total_spent": 9.15
@@ -411,7 +417,7 @@ The system enforces Protocol 005 exclusivity through three complementary layers:
 
 #### Layer 1: Database Constraints
 
-Foreign key constraints in the database schema prevent orphaned budget data and enforce the agent-budget-lease relationship:
+Foreign key constraints in the database schema prevent orphaned budget data and enforce the agent_budget-lease relationship:
 
 ```sql
 -- budget_leases table (migration 009)
@@ -587,4 +593,4 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 ---
 
-*Related: [003_service_boundaries.md](003_service_boundaries.md) | [002_layer_model.md](002_layer_model.md)*
+*Related: [003_service_boundaries.md](../architecture/003_service_boundaries.md) | [002_layer_model.md](../architecture/002_layer_model.md)*

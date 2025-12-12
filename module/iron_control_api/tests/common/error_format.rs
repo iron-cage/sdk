@@ -8,7 +8,7 @@
 //!
 //! | Test Case | Error Type | Expected Format | Status |
 //! |-----------|-----------|----------------|--------|
-//! | `test_4xx_errors_return_json` | 400, 404, 405, 415 | {"error": "..."} | ✅ |
+//! | `test_4xx_errors_return_json` | 401, 405 | {"error": "..."} | ✅ |
 //! | `test_validation_errors_return_json` | 400 (validation) | {"error": "..."} | ✅ |
 //!
 //! ## Corner Cases Covered
@@ -29,7 +29,6 @@
 //! 5xx errors are harder to trigger in integration tests (require
 //! infrastructure failures).
 
-use iron_control_api::routes::tokens::TokenState;
 use iron_control_api::routes::limits::LimitsState;
 use axum::{ Router, routing::{ post, get, delete, put }, http::{ Request, StatusCode } };
 use axum::body::Body;
@@ -38,15 +37,13 @@ use tower::ServiceExt;
 /// Create test router with token routes.
 async fn create_token_router() -> Router
 {
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token state" );
+  let app_state = crate::common::test_state::TestAppState::new().await;
 
   Router::new()
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
     .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( token_state )
+    .with_state( app_state )
 }
 
 /// Create test router with limit routes.
@@ -68,31 +65,32 @@ async fn test_4xx_errors_return_json()
 {
   let token_router = create_token_router().await;
 
-  // Test 404 Not Found (non-existent resource)
-  let request_404 = Request::builder()
+  // Test 401 Unauthorized (missing authentication for protected endpoint)
+  // Note: get_token requires authentication, so calling without JWT returns 401
+  let request_401 = Request::builder()
     .method( "GET" )
     .uri( "/api/tokens/999999" )
     .body( Body::empty() )
     .unwrap();
 
-  let response_404 = token_router.clone().oneshot( request_404 ).await.unwrap();
-  assert_eq!( response_404.status(), StatusCode::NOT_FOUND );
+  let response_401 = token_router.clone().oneshot( request_401 ).await.unwrap();
+  assert_eq!( response_401.status(), StatusCode::UNAUTHORIZED );
 
   // WHY: Check Content-Type is JSON
-  let content_type_404 = response_404.headers().get( "content-type" );
+  let content_type_401 = response_401.headers().get( "content-type" );
   assert!(
-    content_type_404.is_some() && content_type_404.unwrap().to_str().unwrap().contains( "application/json" ),
-    "LOUD FAILURE: 404 errors must have Content-Type: application/json"
+    content_type_401.is_some() && content_type_401.unwrap().to_str().unwrap().contains( "application/json" ),
+    "LOUD FAILURE: 401 errors must have Content-Type: application/json"
   );
 
   // WHY: Check body is valid JSON with "error" field
-  let body_404 = axum::body::to_bytes( response_404.into_body(), usize::MAX ).await.unwrap();
-  let json_404: serde_json::Value = serde_json::from_slice( &body_404 )
-    .expect( "LOUD FAILURE: 404 response must be valid JSON" );
+  let body_401 = axum::body::to_bytes( response_401.into_body(), usize::MAX ).await.unwrap();
+  let json_401: serde_json::Value = serde_json::from_slice( &body_401 )
+    .expect( "LOUD FAILURE: 401 response must be valid JSON" );
   assert!(
-    json_404.get( "error" ).is_some(),
-    "LOUD FAILURE: 404 JSON must have 'error' field. Got: {:?}",
-    json_404
+    json_401.get( "error" ).is_some(),
+    "LOUD FAILURE: 401 JSON must have 'error' field. Got: {:?}",
+    json_401
   );
 
   // Test 405 Method Not Allowed

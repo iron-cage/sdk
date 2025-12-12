@@ -1,4 +1,4 @@
-//! P0 Critical Corner Case Tests for POST /api/tokens
+//! P0 Critical Corner Case Tests for POST /api/v1/api-tokens
 //!
 //! Tests the most critical security and DoS protection corner cases identified
 //! in the comprehensive corner case analysis.
@@ -14,25 +14,24 @@ use axum::http::{ StatusCode, header };
 use axum::{ Router, routing::{ post, delete } };
 use tower::ServiceExt;
 use crate::common::corner_cases;
+use crate::common::test_state::TestAppState;
 use serde_json::json;
-use iron_control_api::routes::tokens::TokenState;
 
 /// Create test router with token routes and return both router and state.
-async fn create_test_router_with_state() -> ( Router, TokenState )
+async fn create_test_router_with_state() -> ( Router, TestAppState )
 {
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token state" );
+  // Create test application state with auth + token support
+  let app_state = TestAppState::new().await;
 
   let router = Router::new()
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
     // Note: get_token now requires authentication
-    // .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( token_state.clone() );
+    // .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
+    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .with_state( app_state.clone() );
 
-  ( router, token_state )
+  ( router, app_state )
 }
 
 /// Reproduces DoS attack via unlimited user_id string causing memory exhaustion (issue-001).
@@ -53,7 +52,7 @@ async fn create_test_router_with_state() -> ( Router, TokenState )
 /// Returns 400 Bad Request with descriptive error when limit exceeded.
 ///
 /// ## Prevention
-/// All POST /api/tokens requests now validated before database operations.
+/// All POST /api/v1/api-tokens requests now validated before database operations.
 /// Length limit enforced at API boundary (Axum handler level) preventing downstream
 /// resource exhaustion. Constant can be adjusted based on operational requirements.
 ///
@@ -71,7 +70,7 @@ async fn test_create_token_very_long_user_id_rejected()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": very_long_user_id,
@@ -124,7 +123,7 @@ async fn test_create_token_very_long_project_id_rejected()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": "user_123",
@@ -178,7 +177,7 @@ async fn test_create_token_very_long_description_rejected()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": "user_123",
@@ -235,7 +234,7 @@ async fn test_create_token_command_injection_user_id_safe()
   {
     let request = axum::http::Request::builder()
       .method( "POST" )
-      .uri( "/api/tokens" )
+      .uri( "/api/v1/api-tokens" )
       .header( header::CONTENT_TYPE, "application/json" )
       .body( axum::body::Body::from( json!({
         "user_id": command_injection,
@@ -293,7 +292,7 @@ async fn test_create_token_command_injection_project_id_safe()
   {
     let request = axum::http::Request::builder()
       .method( "POST" )
-      .uri( "/api/tokens" )
+      .uri( "/api/v1/api-tokens" )
       .header( header::CONTENT_TYPE, "application/json" )
       .body( axum::body::Body::from( json!({
         "user_id": "user_123",
@@ -351,7 +350,7 @@ async fn test_create_token_path_traversal_project_id_safe()
   {
     let request = axum::http::Request::builder()
       .method( "POST" )
-      .uri( "/api/tokens" )
+      .uri( "/api/v1/api-tokens" )
       .header( header::CONTENT_TYPE, "application/json" )
       .body( axum::body::Body::from( json!({
         "user_id": "user_123",
@@ -406,7 +405,7 @@ async fn test_create_token_null_byte_user_id_safe()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": null_byte_user,
@@ -462,7 +461,7 @@ async fn test_create_token_null_byte_project_id_safe()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": "user_123",
@@ -489,7 +488,7 @@ async fn test_create_token_null_byte_at_start()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": null_byte_start,
@@ -516,7 +515,7 @@ async fn test_create_token_null_byte_at_end()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": null_byte_end,
@@ -543,7 +542,7 @@ async fn test_create_token_multiple_null_bytes()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": multiple_nulls,
@@ -575,7 +574,7 @@ async fn test_create_token_newline_char_accepted()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( json!({
       "user_id": with_newline,
@@ -630,8 +629,9 @@ async fn test_create_token_plaintext_never_stored_in_database()
   let ( _router, state ) = create_test_router_with_state().await;
 
   // Create token via API
-  let plaintext_token = state.generator.generate();
+  let plaintext_token = state.tokens.generator.generate();
   let token_id = state
+    .tokens
     .storage
     .create_token( &plaintext_token, "user_plaintext_test", None, None, None, None )
     .await
@@ -640,7 +640,7 @@ async fn test_create_token_plaintext_never_stored_in_database()
   // Query database directly to verify token_hash column
   let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
     .bind( token_id )
-    .fetch_one( state.storage.pool() )
+    .fetch_one( state.tokens.storage.pool() )
     .await
     .expect( "Database query should succeed" );
 
@@ -711,8 +711,9 @@ async fn test_create_token_uses_sha256_hash()
   let ( _router, state ) = create_test_router_with_state().await;
 
   // Create token via API (256-bit cryptographically random value)
-  let plaintext_token = state.generator.generate();
+  let plaintext_token = state.tokens.generator.generate();
   let token_id = state
+    .tokens
     .storage
     .create_token( &plaintext_token, "user_sha256_test", None, None, None, None )
     .await
@@ -721,7 +722,7 @@ async fn test_create_token_uses_sha256_hash()
   // Query database directly to verify hash algorithm
   let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
     .bind( token_id )
-    .fetch_one( state.storage.pool() )
+    .fetch_one( state.tokens.storage.pool() )
     .await
     .expect( "Database query should succeed" );
 
@@ -744,7 +745,7 @@ async fn test_create_token_uses_sha256_hash()
   );
 
   // Verify deterministic hashing (same input produces same hash)
-  let expected_hash = state.generator.hash_token( &plaintext_token );
+  let expected_hash = state.tokens.generator.hash_token( &plaintext_token );
   assert_eq!(
     stored_hash,
     expected_hash,
@@ -767,7 +768,7 @@ async fn test_create_token_unique_generation()
 
     let request = axum::http::Request::builder()
       .method( "POST" )
-      .uri( "/api/tokens" )
+      .uri( "/api/v1/api-tokens" )
       .header( header::CONTENT_TYPE, "application/json" )
       .body( axum::body::Body::from( json!({
         "user_id": format!( "user_{}", i ),
@@ -818,7 +819,7 @@ async fn test_create_token_concurrent_requests()
 
       let request = axum::http::Request::builder()
         .method( "POST" )
-        .uri( "/api/tokens" )
+        .uri( "/api/v1/api-tokens" )
         .header( header::CONTENT_TYPE, "application/json" )
         .body( axum::body::Body::from( json!({
           "user_id": format!( "concurrent_user_{}", i ),
@@ -859,7 +860,7 @@ async fn test_create_token_malformed_json_rejected()
   {
     let request = axum::http::Request::builder()
       .method( "POST" )
-      .uri( "/api/tokens" )
+      .uri( "/api/v1/api-tokens" )
       .header( header::CONTENT_TYPE, "application/json" )
       .body( axum::body::Body::from( malformed_json.to_string() ) )
       .unwrap();
@@ -883,7 +884,7 @@ async fn test_create_token_empty_body_rejected()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( header::CONTENT_TYPE, "application/json" )
     .body( axum::body::Body::from( "" ) )
     .unwrap();
@@ -905,7 +906,7 @@ async fn test_create_token_missing_content_type()
 
   let request = axum::http::Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     // No Content-Type header
     .body( axum::body::Body::from( json!({
       "user_id": "user_123",
@@ -976,7 +977,7 @@ async fn test_database_constraints_enforce_length_limits()
     .bind( "project_123" )
     .bind( valid_hash )
     .bind( 1234567890 )
-    .execute( state.storage.pool() )
+    .execute( state.tokens.storage.pool() )
     .await;
 
   assert!(
@@ -1001,7 +1002,7 @@ async fn test_database_constraints_enforce_length_limits()
     .bind( "project_123" )
     .bind( "different_hash_67890" )
     .bind( 1234567890 )
-    .execute( state.storage.pool() )
+    .execute( state.tokens.storage.pool() )
     .await;
 
   assert!(
@@ -1020,7 +1021,7 @@ async fn test_database_constraints_enforce_length_limits()
     .bind( &too_long_project_id )
     .bind( "yet_another_hash_11111" )
     .bind( 1234567890 )
-    .execute( state.storage.pool() )
+    .execute( state.tokens.storage.pool() )
     .await;
 
   assert!(
@@ -1036,7 +1037,7 @@ async fn test_database_constraints_enforce_length_limits()
     .bind( "user_null_project" )
     .bind( "hash_for_null_project" )
     .bind( 1234567890 )
-    .execute( state.storage.pool() )
+    .execute( state.tokens.storage.pool() )
     .await;
 
   assert!(
@@ -1057,7 +1058,7 @@ async fn test_database_constraints_enforce_length_limits()
     .bind( &max_length_project_id )
     .bind( "hash_max_length_test" )
     .bind( 1234567890 )
-    .execute( state.storage.pool() )
+    .execute( state.tokens.storage.pool() )
     .await;
 
   assert!(

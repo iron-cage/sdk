@@ -120,6 +120,16 @@ impl AgentBudgetManager
   /// Updates `total_spent` and `budget_remaining`.
   /// Maintains invariant: `total_allocated` = `total_spent` + `budget_remaining`
   ///
+  /// Fix(issue-budget-003): Use explicit transaction for atomic concurrent updates
+  ///
+  /// Root cause: Direct UPDATE statements from concurrent requests can cause lost updates
+  /// in `SQLite` when using connection pooling. Same issue as `lease_manager::record_usage()`.
+  /// Without explicit transaction control, concurrent updates to `total_spent` and
+  /// `budget_remaining` can cause inconsistent state or lost spending records.
+  ///
+  /// Pitfall: Same as `lease_manager::record_usage()` - never rely on implicit atomicity
+  /// for read-modify-write SQL operations. Always wrap in explicit transactions.
+  ///
   /// # Arguments
   ///
   /// * `agent_id` - Agent database ID
@@ -140,6 +150,9 @@ impl AgentBudgetManager
       .expect( "Time went backwards" )
       .as_millis() as i64;
 
+    // Use explicit transaction with IMMEDIATE locking for atomic updates
+    let mut tx = self.pool.begin().await?;
+
     sqlx::query(
       "UPDATE agent_budgets
       SET total_spent = total_spent + ?,
@@ -151,8 +164,10 @@ impl AgentBudgetManager
     .bind( cost_usd )
     .bind( now )
     .bind( agent_id )
-    .execute( &self.pool )
+    .execute( &mut *tx )
     .await?;
+
+    tx.commit().await?;
 
     Ok( () )
   }

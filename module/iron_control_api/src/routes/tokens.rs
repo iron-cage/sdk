@@ -355,18 +355,25 @@ pub async fn list_tokens(
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token
 /// * `token_id` - Token ID from path
 ///
 /// # Returns
 ///
 /// - 200 OK with token details
+/// - 401 Unauthorized if not authenticated
+/// - 403 Forbidden if token belongs to different user
 /// - 404 Not Found if token doesn't exist
 pub async fn get_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   Path( token_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  // TODO: Extract user_id from JWT claims and verify ownership
+  // Extract user_id from JWT claims
+  let user_id = &claims.sub;
+
+  // Get token metadata
   let metadata = match state.storage.get_token_metadata( token_id ).await
   {
     Ok( metadata ) => metadata,
@@ -379,6 +386,16 @@ pub async fn get_token(
         .into_response();
     }
   };
+
+  // Verify ownership - user can only access their own tokens
+  if metadata.user_id != *user_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+    )
+      .into_response();
+  }
 
   let item = TokenListItem
   {
@@ -397,25 +414,35 @@ pub async fn get_token(
 }
 
 /// PUT /api/tokens/:id
-/// 
+///
 /// Update token details
 ///
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token
 /// * `token_id` - Token ID from path
+/// * `request` - Update request body
 ///
 /// # Returns
 ///
 /// - 200 OK with updated token details
+/// - 400 Bad Request if validation fails
+/// - 401 Unauthorized if not authenticated
+/// - 403 Forbidden if token belongs to different user
 /// - 404 Not Found if token doesn't exist
+/// - 500 Internal Server Error if update fails
 pub async fn update_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   Path( token_id ): Path< i64 >,
   crate::error::JsonBody( request ): crate::error::JsonBody< UpdateTokenRequest >,
 ) -> impl IntoResponse
 {
-  // TODO: Extract user_id from JWT claims and verify ownership
+  // Extract user_id from JWT claims
+  let user_id = &claims.sub;
+
+  // Validate request
   if let Err( validation_error ) = request.validate()
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
@@ -423,26 +450,8 @@ pub async fn update_token(
     }) ) ).into_response();
   }
 
-  let token_id = match state
-    .storage
-    .update_token_provider(
-      token_id,
-      &request.provider,
-    )
-    .await
-  {
-    Ok( () ) => token_id,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to update token" }) ),
-      )
-        .into_response();
-    }
-  };
-
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  // Get token metadata to verify ownership before update
+  let existing_metadata = match state.storage.get_token_metadata( token_id ).await
   {
     Ok( metadata ) => metadata,
     Err( _ ) =>
@@ -450,6 +459,46 @@ pub async fn update_token(
       return (
         StatusCode::NOT_FOUND,
         Json( serde_json::json!({ "error": "Token not found" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Verify ownership - user can only update their own tokens
+  if existing_metadata.user_id != *user_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+    )
+      .into_response();
+  }
+
+  // Perform update
+  if let Err( _ ) = state
+    .storage
+    .update_token_provider(
+      token_id,
+      &request.provider,
+    )
+    .await
+  {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to update token" }) ),
+    )
+      .into_response();
+  }
+
+  // Get updated metadata for response
+  let metadata = match state.storage.get_token_metadata( token_id ).await
+  {
+    Ok( metadata ) => metadata,
+    Err( _ ) =>
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to retrieve updated token" }) ),
       )
         .into_response();
     }

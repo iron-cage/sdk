@@ -1,0 +1,72 @@
+#
+# Budget Limits Commands
+#
+# Commands for managing global budget limits
+# REST API Base: /api/v1/budget-limits
+#
+
+# Get budget limit
+- name: ".budget_limit.get"
+  namespace: ""
+  description: "Get current global budget limit"
+  hint: "Shows maximum token budget across all agents"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Set budget limit
+- name: ".budget_limit.set"
+  namespace: ""
+  description: "Set global budget limit"
+  hint: "Updates maximum token budget"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "limit"
+      kind: "Integer"
+      description: "New budget limit in tokens"
+      hint: "Maximum tokens allowed"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []

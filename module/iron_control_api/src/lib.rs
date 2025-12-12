@@ -17,6 +17,9 @@ pub mod rbac;
 pub mod routes;
 
 #[cfg(feature = "enabled")]
+pub mod middleware;
+
+#[cfg(feature = "enabled")]
 pub mod error;
 
 #[cfg(feature = "enabled")]

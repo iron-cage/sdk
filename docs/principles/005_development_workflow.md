@@ -150,4 +150,4 @@ Idea → ADR (if significant) → Spec Update → Tests (RED) → Implementation
 
 ---
 
-*Related: [001_design_philosophy.md](001_design_philosophy.md) | [../decisions/](../decisions/)*
+*Related: [001_design_philosophy.md](001_design_philosophy.md) | [../decisions/](../decisions/readme.md)*

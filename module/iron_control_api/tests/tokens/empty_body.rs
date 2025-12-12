@@ -7,8 +7,8 @@
 //!
 //! | Test Case | Endpoint | Body | Expected Result | Status |
 //! |-----------|----------|------|----------------|--------|
-//! | `test_create_token_with_empty_json_object` | POST /api/tokens | {} | 400 Bad Request | ✅ |
-//! | `test_create_token_with_no_body` | POST /api/tokens | (empty) | 400 Bad Request | ✅ |
+//! | `test_create_token_with_empty_json_object` | POST /api/v1/api-tokens | {} | 400 Bad Request | ✅ |
+//! | `test_create_token_with_no_body` | POST /api/v1/api-tokens | (empty) | 400 Bad Request | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -35,7 +35,7 @@ async fn create_test_router() -> Router
     .expect( "LOUD FAILURE: Failed to create token state" );
 
   Router::new()
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
     .with_state( token_state )
 }
 
@@ -47,7 +47,7 @@ async fn test_create_token_with_empty_json_object()
   // WHY: Empty JSON object lacks required user_id field
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( "{}" ) )
     .unwrap();
@@ -76,7 +76,7 @@ async fn test_create_token_with_no_body()
   // WHY: Completely empty body should fail to parse as JSON
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::empty() )
     .unwrap();

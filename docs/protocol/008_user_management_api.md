@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -762,8 +763,3 @@ CREATE TABLE user_audit_log
 - Migrations: `module/iron_token_manager/migrations/005_enhance_users_table.sql`, `006_create_user_audit_log.sql`
 
 ---
-
-**Last Updated:** 2025-12-10
-**Document Version:** 1.0
-**API Version:** v1 (`/api/v1/`)
-**Status:** ✅ Implemented (Phase 2 complete, Phase 4 CLI pending)

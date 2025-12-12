@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -62,7 +63,7 @@ This protocol adheres to the following Iron Cage standards:
 **Request:**
 
 ```json
-PUT /api/v1/limits/agents/agent-abc123/budget
+PUT /api/v1/limits/agents/agent_abc123/budget
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
@@ -176,7 +177,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -198,7 +199,7 @@ HTTP 404 Not Found
 **Request:**
 
 ```
-GET /api/v1/limits/agents/agent-abc123/budget/history?page=1&per_page=50
+GET /api/v1/limits/agents/agent_abc123/budget/history?page=1&per_page=50
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -319,7 +320,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "AGENT_NOT_FOUND",
-    "message": "Agent 'agent-invalid' does not exist"
+    "message": "Agent 'agent_invalid' does not exist"
   }
 }
 ```
@@ -419,7 +420,7 @@ HTTP 404 Not Found
 
 **Example decrease request:**
 ```json
-PUT /api/v1/limits/agents/agent-abc123/budget
+PUT /api/v1/limits/agents/agent_abc123/budget
 Authorization: Bearer <user-token>
 Content-Type: application/json
 
@@ -476,7 +477,7 @@ Content-Type: application/json
 {
   "timestamp": "2025-12-10T15:30:45Z",
   "user_id": "user_admin_001",
-  "endpoint": "PUT /api/v1/limits/agents/agent-abc123/budget",
+  "endpoint": "PUT /api/v1/limits/agents/agent_abc123/budget",
   "method": "PUT",
   "resource_type": "agent_budget",
   "resource_id": "agent_abc123",
@@ -499,15 +500,15 @@ Content-Type: application/json
 
 ## CLI Integration
 
-### iron limits agent-budget increase
+### iron limits agent_budget increase
 
 ```bash
-iron limits agent-budget increase agent-abc123 150.00
-iron limits agent-budget increase agent-abc123 150.00 \
+iron limits agent_budget increase agent_abc123 150.00
+iron limits agent_budget increase agent_abc123 150.00 \
   --reason "Emergency top-up: agent running critical customer task"
 
 # Output:
-# Budget increased for agent-abc123
+# Budget increased for agent_abc123
 # Previous: $100.00 → New: $150.00 (+ $50.00, +50%)
 # Current spent: $95.75
 # New remaining: $54.25
@@ -515,13 +516,13 @@ iron limits agent-budget increase agent-abc123 150.00 \
 # Modified at: 2025-12-10 15:30:45
 ```
 
-### iron limits agent-budget history
+### iron limits agent_budget history
 
 ```bash
-iron limits agent-budget history agent-abc123
+iron limits agent_budget history agent_abc123
 
 # Output:
-# Budget Modification History for agent-abc123
+# Budget Modification History for agent_abc123
 # Current budget: $150.00
 #
 # DATE                 FROM      TO        INCREASE  REASON                         BY
@@ -535,13 +536,13 @@ iron limits agent-budget history agent-abc123
 #   Modifications: 2
 ```
 
-### iron limits agent-budget get
+### iron limits agent_budget get
 
 ```bash
-iron limits agent-budget get agent-abc123
+iron limits agent_budget get agent_abc123
 
 # Output:
-# Agent: agent-abc123 (Production Agent 1)
+# Agent: agent_abc123 (Production Agent 1)
 # Budget: $150.00
 # Spent: $95.75 (63.83%)
 # Remaining: $54.25
@@ -570,21 +571,21 @@ iron limits agent-budget get agent-abc123
 **CLI:**
 ```bash
 # Check current status
-iron agents status agent-abc123
-# Agent: agent-abc123 (Production Agent 1)
+iron agents status agent_abc123
+# Agent: agent_abc123 (Production Agent 1)
 # Status: active
 # Budget: $95.00 / $100.00 (95% used)
 # ⚠️  WARNING: Agent near budget limit
 
 # Increase budget
-iron limits agent-budget increase agent-abc123 150.00 \
+iron limits agent_budget increase agent_abc123 150.00 \
   --reason "Emergency top-up: running critical customer task"
 # Budget increased: $100.00 → $150.00 (+$50.00)
 # New remaining: $55.00
 
 # Verify
-iron agents status agent-abc123
-# Agent: agent-abc123 (Production Agent 1)
+iron agents status agent_abc123
+# Agent: agent_abc123 (Production Agent 1)
 # Status: active
 # Budget: $95.00 / $150.00 (63% used)
 # ✅ Budget healthy
@@ -604,7 +605,7 @@ iron agents status agent-abc123
 **CLI:**
 ```bash
 # Attempt decrease
-iron limits agent-budget increase agent-abc123 50.00
+iron limits agent_budget increase agent_abc123 50.00
 
 # Error:
 # ❌ Budget decrease not allowed
@@ -613,7 +614,7 @@ iron limits agent-budget increase agent-abc123 50.00
 # Budget can only be increased to prevent accidental agent shutdowns.
 
 # Correct usage
-iron limits agent-budget increase agent-abc123 150.00
+iron limits agent_budget increase agent_abc123 150.00
 # ✅ Budget increased: $100.00 → $150.00
 ```
 
@@ -631,7 +632,7 @@ iron limits agent-budget increase agent-abc123 150.00
 **CLI:**
 ```bash
 # View history
-iron limits agent-budget history agent-abc123
+iron limits agent_budget history agent_abc123
 
 # Output shows:
 # - All modifications with reasons
@@ -689,10 +690,6 @@ iron limits agent-budget history agent-abc123
 
 **Related Documents:**
 - [007: Entity Model](../architecture/007_entity_model.md) - Agent Budget entity
-- [004: Budget Architecture](../architecture/004_budget_architecture.md) - Budget types
+<!-- TODO: Add Budget Architecture doc for budget types -->
 
 ---
-
-**Protocol 013 Version:** 1.0.0
-**Status:** Specification
-**Last Updated:** 2025-12-10

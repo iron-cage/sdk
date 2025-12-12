@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** NICE-TO-HAVE
 
 ---
 
@@ -20,7 +21,7 @@ Iron Cage integration with Model Context Protocol (MCP) for standardized tool di
 
 **Out of Scope:**
 - MCP specification itself (see https://modelcontextprotocol.io)
-- IronLang data protocol (see [001_ironlang_data_protocol.md](001_ironlang_data_protocol.md))
+- IronLang data protocol (see [-archived_001_ironlang_data_protocol.md](-archived_001_ironlang_data_protocol.md))
 - REST API protocol (see [002_rest_api_protocol.md](002_rest_api_protocol.md))
 - Implementation details (see module specifications)
 
@@ -169,7 +170,7 @@ This protocol adheres to the following Iron Cage standards:
 - [architecture/004: Data Flow](../architecture/004_data_flow.md) - Tool invocation in request flow (Step 5)
 
 **Related:**
-- [001: IronLang Data Protocol](001_ironlang_data_protocol.md) - Alternative data access protocol
+- [001: IronLang Data Protocol](-archived_001_ironlang_data_protocol.md) - Alternative data access protocol
 - [capabilities/003: Safe Execution](../capabilities/003_safe_execution.md) - Tool execution sandboxing
 - [capabilities/004: AI Safety Guardrails](../capabilities/004_ai_safety_guardrails.md) - Parameter validation for tools
 
@@ -178,7 +179,3 @@ This protocol adheres to the following Iron Cage standards:
 - Specification: (TBD - MCP integration spec pending)
 
 ---
-
-**Last Updated:** 2025-12-09
-**Protocol Version:** MCP 1.0 + Iron Cage Governance Layer
-**Status:** Design phase (not yet implemented)

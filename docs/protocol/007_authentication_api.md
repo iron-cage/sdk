@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -146,7 +147,7 @@ Error: 429 Too Many Requests (Rate limit)
   "role": "developer",
   "iat": 1733740800,         // Issued at (Unix timestamp)
   "exp": 1736332800,         // Expires at (Unix timestamp)
-  "jti": "token-xyz789"      // Token ID (for revocation)
+  "jti": "token_xyz789"      // Token ID (for revocation)
 }
 ```
 
@@ -395,8 +396,3 @@ Response: 200 OK (Blacklisted token)
 - Tests: `module/iron_control_api/tests/auth_test.rs` - Integration tests
 
 ---
-
-**Last Updated:** 2025-12-09
-**Document Version:** 1.0
-**API Version:** v1 (`/api/v1/`)
-**Status:** ✅ Certain (required for Pilot)

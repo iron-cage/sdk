@@ -1,0 +1,270 @@
+#
+# Analytics Commands
+#
+# Commands for querying usage and spending analytics
+# REST API Base: /api/v1/analytics
+#
+
+# Get usage statistics
+- name: ".analytics.usage"
+  namespace: ""
+  description: "Get token usage statistics"
+  hint: "Shows usage metrics for agents and providers"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "v"
+      kind: "Integer"
+      description: "Verbosity level (0-5)"
+      hint: "Controls detail level"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get spending statistics
+- name: ".analytics.spending"
+  namespace: ""
+  description: "Get spending statistics"
+  hint: "Shows cost metrics for usage"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "v"
+      kind: "Integer"
+      description: "Verbosity level (0-5)"
+      hint: "Controls detail level"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get metrics
+- name: ".analytics.metrics"
+  namespace: ""
+  description: "Get aggregated metrics"
+  hint: "Shows combined usage and cost data"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "v"
+      kind: "Integer"
+      description: "Verbosity level (0-5)"
+      hint: "Controls detail level"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get usage by agent
+- name: ".analytics.usage_by_agent"
+  namespace: ""
+  description: "Get usage statistics per agent"
+  hint: "Shows token usage grouped by agent"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "agent_id"
+      kind: "String"
+      description: "Agent ID to filter by"
+      hint: "Optional specific agent UUID"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get usage by provider
+- name: ".analytics.usage_by_provider"
+  namespace: ""
+  description: "Get usage statistics per provider"
+  hint: "Shows token usage grouped by provider"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "provider_id"
+      kind: "String"
+      description: "Provider ID to filter by"
+      hint: "Optional specific provider UUID"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get spending by period
+- name: ".analytics.spending_by_period"
+  namespace: ""
+  description: "Get spending statistics by time period"
+  hint: "Shows costs grouped by day/week/month"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "period"
+      kind: "String"
+      description: "Time period for grouping"
+      hint: "day, week, or month"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Export usage data
+- name: ".analytics.export_usage"
+  namespace: ""
+  description: "Export usage data to file"
+  hint: "Saves usage statistics to specified format"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "output_file"
+      kind: "String"
+      description: "Output file path"
+      hint: "Where to save export"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Export format"
+      hint: "csv, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Export spending data
+- name: ".analytics.export_spending"
+  namespace: ""
+  description: "Export spending data to file"
+  hint: "Saves spending statistics to specified format"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "output_file"
+      kind: "String"
+      description: "Output file path"
+      hint: "Where to save export"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Export format"
+      hint: "csv, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []

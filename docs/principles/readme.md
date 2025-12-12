@@ -28,5 +28,5 @@
 
 ---
 
-*For architectural concepts, see [architecture/](../architecture/)*
-*For constraints and trade-offs, see [constraints/](../constraints/)*
+*For architectural concepts, see [architecture/](../architecture/readme.md)*
+*For constraints and trade-offs, see [constraints/](../constraints/readme.md)*

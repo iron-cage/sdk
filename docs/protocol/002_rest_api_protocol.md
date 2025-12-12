@@ -2,7 +2,8 @@
 
 **Status:** Specification
 **Version:** 1.0.0
-**Last Updated:** 2025-12-10
+**Last Updated:** 2025-12-11
+**Priority:** MUST-HAVE
 
 ---
 
@@ -288,13 +289,13 @@ CREATE INDEX idx_audit_logs_operation ON audit_logs(operation);
 
 | API Endpoint | CLI Command | Parity Level |
 |--------------|-------------|--------------|
-| POST /api/v1/agents | iron agents create | FULL (all parameters) |
-| GET /api/v1/agents | iron agents list | FULL (all filters, pagination) |
-| GET /api/v1/agents/{id} | iron agents get <id> | FULL (identical output) |
-| PUT /api/v1/agents/{id} | iron agents update <id> | FULL (all fields) |
-| PUT /api/v1/agents/{id}/providers | iron agents assign-providers <id> | FULL |
-| GET /api/v1/agents/{id}/providers | iron agents list-providers <id> | FULL |
-| DELETE /api/v1/agents/{id}/providers/{pid} | iron agents remove-provider <id> <pid> | FULL |
+| POST /api/v1/agents | iron .agent.create | FULL (all parameters) |
+| GET /api/v1/agents | iron .agent.list | FULL (all filters, pagination) |
+| GET /api/v1/agents/{id} | iron .agent.get id::<id> | FULL (identical output) |
+| PUT /api/v1/agents/{id} | iron .agent.update id::<id> | FULL (all fields) |
+| PUT /api/v1/agents/{id}/providers | iron .agent.assign_providers id::<id> | FULL |
+| GET /api/v1/agents/{id}/providers | iron .agent.list_providers id::<id> | FULL |
+| DELETE /api/v1/agents/{id}/providers/{pid} | iron .agent.remove_provider id::<id> provider_id::<pid> | FULL |
 
 **Exclusions (No CLI Required):**
 
@@ -311,7 +312,7 @@ CREATE INDEX idx_audit_logs_operation ON audit_logs(operation);
 **Native CLI (`iron_cli` - Rust):**
 - Owns responsibility for all user-facing commands
 - Calls REST API endpoints directly (no business logic duplication)
-- Returns API responses in formatted tables or JSON (`--json` flag)
+- Returns API responses in formatted tables or JSON (format::json parameter)
 - Handles authentication (token storage, refresh)
 
 **Python Wrapper (`iron_cli_py` - Python):**
@@ -319,54 +320,281 @@ CREATE INDEX idx_audit_logs_operation ON audit_logs(operation);
 - Provides Python-friendly interface for scripting
 - No direct API calls (delegates to native CLI)
 
+---
+
+**Framework Requirements:**
+
+**Mandatory Framework:** All CLI implementations MUST use the `unilang` crate exclusively. The `clap` crate is strictly forbidden.
+
+**Unilang Architecture:**
+```
+YAML Command Definitions → build.rs (compile-time) → Static Registry → Pipeline API
+```
+
+**Components:**
+
+1. **Command Definitions** (`commands/*.yaml`):
+   - One YAML file per command
+   - Defines parameters, help text, validation rules
+   - Example: `commands/agent/list.yaml`
+
+2. **Build-Time Generation** (`build.rs`):
+   - Parses YAML files at compile time
+   - Generates static command registry (binary search array)
+   - Type-safe handler signatures
+   - Zero runtime overhead
+
+3. **Handler Layer** (pure functions):
+   - No I/O operations
+   - No async code
+   - Deterministic transformations only
+   - Signature: `fn handler(params: Params) -> HandlerResult`
+
+4. **Adapter Layer** (async I/O):
+   - Bridges handlers to API clients
+   - Handles HTTP requests
+   - Formats output (table, JSON, YAML)
+   - Signature: `async fn adapter(result: HandlerResult) -> CliOutput`
+
+**Performance Characteristics:**
+- Command resolution: <100ns (50x faster than HashMap)
+- Startup time: <50ms
+- Memory usage: <10MB typical
+- Binary size: ~2-3MB (with compression)
+
+**Benefits:**
+- Compile-time safety: Invalid commands can't compile
+- Zero overhead: Static dispatch, no dynamic lookups
+- Maintainability: YAML changes don't require code changes
+- Consistency: All CLIs use same framework
+
+**Example YAML Definition:**
+```yaml
+command:
+  name: "agent.list"
+  description: "List all agents"
+  parameters:
+    - name: "v"
+      type: "integer"
+      default: 2
+      range: [0, 5]
+      description: "Verbosity level"
+    - name: "format"
+      type: "string"
+      default: "table"
+      enum: ["table", "json", "yaml"]
+      description: "Output format"
+  api_endpoint:
+    method: "GET"
+    path: "/api/v1/agents"
+```
+
 **Command Naming Convention:**
 
 ```
-iron <resource> <action> [arguments] [flags]
+iron .<resource>.<action> [param::value...]
 ```
 
+**Format Rules:**
+- Dot-prefix mandatory: Commands MUST start with `.`
+- Noun-verb order: Resource before action (`.agent.create` not `.create.agent`)
+- Parameter format: Use `param::value` (NOT `--param value`)
+- Underscore for multi-word: `.agent.assign_providers` not `.agent.assign-providers`
+
 **Examples:**
-- `iron agents list` → `GET /api/v1/agents`
-- `iron agents create --name "Agent1" --budget 100` → `POST /api/v1/agents`
-- `iron providers delete ip_openai_001` → `DELETE /api/v1/providers/ip_openai_001`
-- `iron budget-requests approve breq-abc123` → `PUT /api/v1/budget-requests/breq-abc123/approve`
+- `iron .agent.list` → `GET /api/v1/agents`
+- `iron .agent.create name::"Agent1" budget::100` → `POST /api/v1/agents`
+- `iron .provider.delete id::ip_openai_001` → `DELETE /api/v1/providers/ip_openai_001`
+- `iron .budget_request.approve id::breq-abc123` → `PUT /api/v1/budget-requests/breq-abc123/approve`
 
 **Output Format:**
 
-**Default (Table):**
+**Default (Table with verbosity v::2):**
 ```
-$ iron agents list
+$ iron .agent.list v::2
 
 ID               NAME        BUDGET    SPENT   PROVIDERS   STATUS
-agent-abc123     Agent 1     $100.00   $45.67  2           active
-agent-def456     Agent 2     $50.00    $12.34  1           active
+agent_abc123     Agent 1     $100.00   $45.67  2           active
+agent_def456     Agent 2     $50.00    $12.34  1           active
 ```
 
-**JSON Mode (`--json`):**
+**JSON Mode (format::json):**
 ```
-$ iron agents list --json
+$ iron .agent.list format::json
 
 {
   "data": [
-    {"id": "agent-abc123", "name": "Agent 1", "budget": 100.00, "spent": 45.67, "providers_count": 2, "status": "active"},
-    {"id": "agent-def456", "name": "Agent 2", "budget": 50.00, "spent": 12.34, "providers_count": 1, "status": "active"}
+    {"id": "agent_abc123", "name": "Agent 1", "budget": 100.00, "spent": 45.67, "providers_count": 2, "status": "active"},
+    {"id": "agent_def456", "name": "Agent 2", "budget": 50.00, "spent": 12.34, "providers_count": 1, "status": "active"}
   ],
   "pagination": {"page": 1, "per_page": 50, "total": 2, "total_pages": 1}
 }
 ```
+
+**Help System:**
+
+The CLI provides three ways to access help:
+
+1. **Quick Help (`?`)** - One-line summary:
+   ```
+   $ iron .agent.list ?
+   List all agents (GET /api/v1/agents) - Params: v, format, page, limit
+   ```
+
+2. **Detailed Help (`??`)** - Full command documentation:
+   ```
+   $ iron .agent.list ??
+
+   Command: iron .agent.list
+   API: GET /api/v1/agents
+   Description: List all agents with optional filtering and pagination
+
+   Parameters:
+     v::N           Verbosity level (0-5, default: 2)
+     format::STR    Output format (table|json|yaml, default: table)
+     page::N        Page number (default: 1)
+     limit::N       Results per page (default: 50)
+
+   Examples:
+     iron .agent.list                         # List all agents (table)
+     iron .agent.list v::0                   # Silent mode
+     iron .agent.list format::json           # JSON output
+     iron .agent.list page::2 limit::100     # Pagination
+   ```
+
+3. **Global Help (`.help`)** - All commands:
+   ```
+   $ iron .help
+
+   Available Commands:
+
+   Agents:
+     .agent.list                List all agents
+     .agent.create              Create new agent
+     .agent.get                 Get agent details
+     .agent.update              Update agent
+     .agent.delete              Delete agent
+
+   Providers:
+     .provider.list             List all providers
+     .provider.create           Create provider
+     ...
+
+   Use 'iron <command> ??' for detailed help on any command
+   ```
+
+**Help Implementation:**
+- Help text stored in YAML command definitions
+- Generated at compile time (no runtime overhead)
+- Supports filtering by resource: `iron .help resource::agent`
+- Supports search: `iron .help search::budget`
+
+---
+
+**Verbosity Control:**
+
+**Levels (0-5):**
+```
+$ iron .agent.list v::0          # Silent - exit code only (for scripting)
+$ iron .agent.list v::1          # Minimal - count only ("2 agents")
+$ iron .agent.list v::2          # Normal - table (default, human-readable)
+$ iron .agent.list v::3          # Detailed - includes metadata, timestamps
+$ iron .agent.list v::4          # Verbose - includes request/response details
+$ iron .agent.list v::5          # Debug - full API response with timing, headers
+```
+
+**Key Principle:** Verbosity controls DISPLAY only, not computation or API calls.
+
+**Example - Query Execution:**
+```rust
+// ALWAYS execute the API call (even at v::0)
+let agents = api_client.get("/api/v1/agents").await?;
+let count = agents.len();
+
+// Verbosity only affects display
+match verbosity {
+  0 => {}, // Silent - no output
+  1 => println!("{} agents", count),
+  2 => print_table(&agents),
+  3 => print_table_with_metadata(&agents),
+  4 => print_verbose(&agents, &request_details),
+  5 => print_debug(&agents, &full_response),
+  _ => {}, // Invalid level
+}
+
+// Metrics ALWAYS recorded (even at v::0)
+metrics.record("agent_count", count);
+```
+
+**Benefits:**
+- Consistent behavior across verbosity levels
+- Reliable for automation (`v::0` for scripts, check exit code)
+- Debugging support (`v::5` shows full API interaction)
+- No hidden side effects from verbosity changes
+
+---
+
+**Dry Run Mode:**
+
+**Syntax:** `dry::1` parameter (default: `dry::0` for real execution)
+
+**Behavior:**
+```
+$ iron .agent.create name::"Test Agent" budget::100 dry::1
+
+DRY RUN MODE - No changes will be made
+
+Would execute:
+  API: POST /api/v1/agents
+  Body: {"name": "Test Agent", "budget": 100}
+
+Expected response:
+  Status: 201 Created
+  Agent ID: (generated on real execution)
+
+To execute for real, remove 'dry::1' parameter
+```
+
+**Implementation:**
+- Client-side validation before API call
+- Shows what WOULD happen (endpoint, method, payload)
+- Validates all parameters (same validation as real execution)
+- Safe testing for destructive operations (delete, update)
+
+**Example - Delete with Dry Run:**
+```
+$ iron .agent.delete id::agent_abc123 dry::1
+
+DRY RUN MODE - No changes will be made
+
+Would execute:
+  API: DELETE /api/v1/agents/agent_abc123
+
+Expected response:
+  Status: 204 No Content
+
+Verification: Run 'iron .agent.get id::agent_abc123' to confirm existence
+To execute for real, remove 'dry::1' parameter
+```
+
+**Mutation Commands:** All mutation commands (create, update, delete, approve, etc.) MUST support `dry::1`
+
+**Read-Only Commands:** Dry run has no effect on read-only commands (list, get) - always executes normally
+
+---
 
 **Error Handling:**
 
 CLI propagates API errors with consistent format:
 
 ```
-$ iron agents delete agent-xyz999
+$ iron .agent.delete id::agent_xyz999
 
 Error: Agent not found
 Code: AGENT_NOT_FOUND
 Status: 404
 
-Run 'iron agents list' to see available agents.
+Run 'iron .agent.list' to see available agents.
 ```
 
 **Testing Requirements:**
@@ -383,7 +611,7 @@ Run 'iron agents list' to see available agents.
 #[test]
 fn test_agents_list_parity() {
   // Verify CLI command exists
-  let cli_result = run_cli(&["agents", "list", "--json"]);
+  let cli_result = run_cli(&[".agent.list", "format::json"]);
 
   // Verify API endpoint exists
   let api_result = http_get("/api/v1/agents");
@@ -396,9 +624,10 @@ fn test_agents_list_parity() {
 
 **Documentation:**
 
-- CLI help text (`iron agents --help`) MUST reference API endpoint
+- CLI help text (`iron .agent ?` or `iron .agent ??`) MUST reference API endpoint
 - API protocol docs MUST include CLI command examples
 - CLI architecture doc maintains Responsibility Matrix (see [features/001_cli_architecture.md](../features/001_cli_architecture.md))
+- Note: Token management CLI (`iron-token`) is documented separately in [004_token_management_cli_api_parity.md](../features/004_token_management_cli_api_parity.md)
 
 **Coverage:**
 
@@ -414,11 +643,73 @@ fn test_agents_list_parity() {
 | Users | 8 | 8 | ✅ 100% |
 | **Total User-Facing** | **46** | **46** | **✅ 100%** |
 
+---
+
+**CLI Command Responsibility Table:**
+
+| # | CLI Command | API Endpoint | Responsibility | Category |
+|---|-------------|--------------|----------------|----------|
+| 1 | `.agent.list` | `GET /api/v1/agents` | List all agents with optional filtering/pagination | Agents |
+| 2 | `.agent.create` | `POST /api/v1/agents` | Create new agent with name and budget | Agents |
+| 3 | `.agent.get` | `GET /api/v1/agents/{id}` | Get agent details by ID | Agents |
+| 4 | `.agent.update` | `PUT /api/v1/agents/{id}` | Update agent name or budget | Agents |
+| 5 | `.agent.delete` | `DELETE /api/v1/agents/{id}` | Delete agent (cascade deletes associated leases) | Agents |
+| 6 | `.agent.assign_providers` | `PUT /api/v1/agents/{id}/providers` | Assign LLM providers to agent | Agents |
+| 7 | `.agent.list_providers` | `GET /api/v1/agents/{id}/providers` | List providers assigned to agent | Agents |
+| 8 | `.agent.remove_provider` | `DELETE /api/v1/agents/{id}/providers/{pid}` | Remove provider assignment from agent | Agents |
+| 9 | `.provider.list` | `GET /api/v1/providers` | List all LLM providers | Providers |
+| 10 | `.provider.create` | `POST /api/v1/providers` | Create new LLM provider | Providers |
+| 11 | `.provider.get` | `GET /api/v1/providers/{id}` | Get provider details by ID | Providers |
+| 12 | `.provider.update` | `PUT /api/v1/providers/{id}` | Update provider configuration | Providers |
+| 13 | `.provider.delete` | `DELETE /api/v1/providers/{id}` | Delete provider (fails if agents assigned) | Providers |
+| 14 | `.provider.assign_agents` | `PUT /api/v1/providers/{id}/agents` | Assign agents to provider | Providers |
+| 15 | `.provider.list_agents` | `GET /api/v1/providers/{id}/agents` | List agents using this provider | Providers |
+| 16 | `.provider.remove_agent` | `DELETE /api/v1/providers/{id}/agents/{aid}` | Remove agent from provider | Providers |
+| 17 | `.analytics.usage` | `GET /api/v1/analytics/usage` | Get usage statistics (tokens, requests) | Analytics |
+| 18 | `.analytics.spending` | `GET /api/v1/analytics/spending` | Get spending statistics by agent/provider | Analytics |
+| 19 | `.analytics.metrics` | `GET /api/v1/analytics/metrics` | Get performance metrics (latency, errors) | Analytics |
+| 20 | `.analytics.usage_by_agent` | `GET /api/v1/analytics/usage/by-agent` | Usage breakdown by agent | Analytics |
+| 21 | `.analytics.usage_by_provider` | `GET /api/v1/analytics/usage/by-provider` | Usage breakdown by provider | Analytics |
+| 22 | `.analytics.spending_by_period` | `GET /api/v1/analytics/spending/by-period` | Spending breakdown by time period | Analytics |
+| 23 | `.analytics.export_usage` | `GET /api/v1/analytics/export/usage` | Export usage data (CSV/JSON) | Analytics |
+| 24 | `.analytics.export_spending` | `GET /api/v1/analytics/export/spending` | Export spending data (CSV/JSON) | Analytics |
+| 25 | `.budget_limit.get` | `GET /api/v1/budget/limit` | Get current budget limit (admin only) | Budget Limits |
+| 26 | `.budget_limit.set` | `PUT /api/v1/budget/limit` | Set budget limit (admin only) | Budget Limits |
+| 27 | `.api_token.list` | `GET /api/v1/api-tokens` | List all API tokens | API Tokens |
+| 28 | `.api_token.create` | `POST /api/v1/api-tokens` | Create new API token | API Tokens |
+| 29 | `.api_token.get` | `GET /api/v1/api-tokens/{id}` | Get API token details | API Tokens |
+| 30 | `.api_token.revoke` | `DELETE /api/v1/api-tokens/{id}` | Revoke API token | API Tokens |
+| 31 | `.project.list` | `GET /api/v1/projects` | List all projects | Projects |
+| 32 | `.project.get` | `GET /api/v1/projects/{id}` | Get project details | Projects |
+| 33 | `.budget_request.list` | `GET /api/v1/budget-requests` | List budget change requests | Budget Requests |
+| 34 | `.budget_request.create` | `POST /api/v1/budget-requests` | Create budget increase request | Budget Requests |
+| 35 | `.budget_request.get` | `GET /api/v1/budget-requests/{id}` | Get budget request details | Budget Requests |
+| 36 | `.budget_request.approve` | `PUT /api/v1/budget-requests/{id}/approve` | Approve budget request (admin only) | Budget Requests |
+| 37 | `.budget_request.reject` | `PUT /api/v1/budget-requests/{id}/reject` | Reject budget request (admin only) | Budget Requests |
+| 38 | `.budget_request.cancel` | `DELETE /api/v1/budget-requests/{id}` | Cancel pending budget request | Budget Requests |
+| 39 | `.user.list` | `GET /api/v1/users` | List all users | Users |
+| 40 | `.user.create` | `POST /api/v1/users` | Create new user | Users |
+| 41 | `.user.get` | `GET /api/v1/users/{id}` | Get user details | Users |
+| 42 | `.user.update` | `PUT /api/v1/users/{id}` | Update user profile | Users |
+| 43 | `.user.delete` | `DELETE /api/v1/users/{id}` | Delete user | Users |
+| 44 | `.user.set_role` | `PUT /api/v1/users/{id}/role` | Set user role (admin/user) | Users |
+| 45 | `.user.reset_password` | `POST /api/v1/users/{id}/reset-password` | Trigger password reset | Users |
+| 46 | `.user.get_permissions` | `GET /api/v1/users/{id}/permissions` | Get user permissions | Users |
+
+**Table Notes:**
+- All commands use unilang framework
+- All commands support `v::N` (verbosity 0-5)
+- All mutation commands support `dry::1` (dry run mode)
+- All commands support `format::json` for machine-readable output
+- All commands support `?` (quick help) and `??` (detailed help)
+
+---
+
 **Implementation Notes:**
 - **Single Source of Truth:** API is canonical, CLI wraps API (no business logic in CLI)
 - **Consistency:** CLI uses exact API error codes/messages
 - **Authentication:** CLI stores tokens in `~/.iron/config.toml`, automatically refreshes
-- **Scripting:** JSON mode (`--json`) enables shell scripting
+- **Scripting:** JSON mode (format::json) enables shell scripting
 
 ---
 
@@ -577,7 +868,7 @@ GET /api/tokens?sort_by=created_at&order=desc
 **Search:**
 
 ```http
-GET /api/tokens?search=agent-name
+GET /api/tokens?search=agent_name
 ```
 
 **Field Selection (Future):**
@@ -786,7 +1077,7 @@ X-RateLimit-Reset: 1733754300
 
 ### Budget Protocol Summary
 
-Budget protocol endpoints enable agent runtime to negotiate and report LLM usage. These are agent-facing endpoints (not exposed via CLI).
+Budget protocol endpoints enable agent runtime to negotiate and report LLM usage. These are agent_facing endpoints (not exposed via CLI).
 
 **Endpoints:**
 
@@ -975,34 +1266,34 @@ Response:
 
 | API Pattern | HTTP Method | CLI Pattern | Example |
 |-------------|-------------|-------------|---------|
-| `GET /api/{resource}` | GET (list) | `iron {resource} list` | `GET /api/tokens` → `iron tokens list` |
-| `GET /api/{resource}/{id}` | GET (get) | `iron {resource} get <id>` | `GET /api/tokens/tok-123` → `iron tokens get tok-123` |
-| `POST /api/{resource}` | POST | `iron {resource} create` | `POST /api/tokens` → `iron tokens create` |
-| `PUT /api/{resource}/{id}` | PUT | `iron {resource} update <id>` | `PUT /api/tokens/tok-123` → `iron tokens update tok-123` |
-| `DELETE /api/{resource}/{id}` | DELETE | `iron {resource} delete <id>` | `DELETE /api/tokens/tok-123` → `iron tokens delete tok-123` |
-| `POST /api/{resource}/{id}/{action}` | POST | `iron {resource} {action} <id>` | `POST /api/tokens/tok-123/rotate` → `iron tokens rotate tok-123` |
-| `POST /api/{operation}` | POST | `iron {operation}` | `POST /api/auth/login` → `iron login` |
+| `GET /api/{resource}` | GET (list) | `iron .{resource}.list` | `GET /api/tokens` → `iron .token.list` |
+| `GET /api/{resource}/{id}` | GET (get) | `iron .{resource}.get id::<id>` | `GET /api/tokens/tok-123` → `iron .token.get id::tok-123` |
+| `POST /api/{resource}` | POST | `iron .{resource}.create` | `POST /api/tokens` → `iron .token.create` |
+| `PUT /api/{resource}/{id}` | PUT | `iron .{resource}.update id::<id>` | `PUT /api/tokens/tok-123` → `iron .token.update id::tok-123` |
+| `DELETE /api/{resource}/{id}` | DELETE | `iron .{resource}.delete id::<id>` | `DELETE /api/tokens/tok-123` → `iron .token.delete id::tok-123` |
+| `POST /api/{resource}/{id}/{action}` | POST | `iron .{resource}.{action} id::<id>` | `POST /api/tokens/tok-123/rotate` → `iron .token.rotate id::tok-123` |
+| `POST /api/{operation}` | POST | `iron .{operation}` | `POST /api/auth/login` → `iron .auth.login` |
 
 **Entity Resources:**
 
 | API Endpoint | CLI Command | Auth | Status |
 |--------------|-------------|------|--------|
-| `GET /api/tokens` | `iron tokens list` | User Token | ✅ Certain |
-| `POST /api/tokens` | `iron tokens create` | User Token | ✅ Certain |
-| `DELETE /api/tokens/{id}` | `iron tokens delete <id>` | User Token | ✅ Certain |
-| `PUT /api/tokens/{id}/rotate` | `iron tokens rotate <id>` | User Token | ✅ Certain |
-| `GET /api/api-tokens` | `iron api-tokens list` | User Token | ⚠️ Uncertain |
-| `POST /api/api-tokens` | `iron api-tokens create` | User Token | ⚠️ Uncertain |
-| `DELETE /api/api-tokens/{id}` | `iron api-tokens revoke <id>` | User Token | ⚠️ Uncertain |
-| `GET /api/projects` | `iron projects list` | User Token | ⚠️ Uncertain |
-| `GET /api/providers` | `iron providers list` | User Token | ⚠️ Uncertain |
+| `GET /api/tokens` | `iron .token.list` | User Token | ✅ Certain |
+| `POST /api/tokens` | `iron .token.create` | User Token | ✅ Certain |
+| `DELETE /api/tokens/{id}` | `iron .token.delete id::<id>` | User Token | ✅ Certain |
+| `PUT /api/tokens/{id}/rotate` | `iron .token.rotate id::<id>` | User Token | ✅ Certain |
+| `GET /api/api-tokens` | `iron .api_token.list` | User Token | ⚠️ Uncertain |
+| `POST /api/api-tokens` | `iron .api_token.create` | User Token | ⚠️ Uncertain |
+| `DELETE /api/api-tokens/{id}` | `iron .api_token.revoke id::<id>` | User Token | ⚠️ Uncertain |
+| `GET /api/projects` | `iron .project.list` | User Token | ⚠️ Uncertain |
+| `GET /api/providers` | `iron .provider.list` | User Token | ⚠️ Uncertain |
 
 **Operation Resources:**
 
 | API Endpoint | CLI Command | Auth | Status |
 |--------------|-------------|------|--------|
-| `POST /api/auth/login` | `iron login` | None → User Token | ✅ Certain |
-| `POST /api/auth/logout` | `iron logout` | User Token | ✅ Certain |
+| `POST /api/auth/login` | `iron .auth.login` | None → User Token | ✅ Certain |
+| `POST /api/auth/logout` | `iron .auth.logout` | User Token | ✅ Certain |
 | `POST /api/budget/handshake` | (no CLI) | IC Token | ✅ Certain |
 | `POST /api/budget/report` | (no CLI) | IC Token | ✅ Certain |
 | `POST /api/budget/refresh` | (no CLI) | IC Token | ✅ Certain |
@@ -1011,9 +1302,9 @@ Response:
 
 | API Endpoint | CLI Command | Auth | Status |
 |--------------|-------------|------|--------|
-| `GET /api/analytics/usage` | `iron usage report` or `iron analytics usage` | User Token | ⚠️ Uncertain |
-| `GET /api/analytics/spending` | `iron spending show` or `iron analytics spending` | User Token | ⚠️ Uncertain |
-| `GET /api/analytics/metrics` | `iron metrics view` or `iron analytics metrics` | User Token | ⚠️ Uncertain |
+| `GET /api/analytics/usage` | `iron .analytics.usage` | User Token | ⚠️ Uncertain |
+| `GET /api/analytics/spending` | `iron .analytics.spending` | User Token | ⚠️ Uncertain |
+| `GET /api/analytics/metrics` | `iron .analytics.metrics` | User Token | ⚠️ Uncertain |
 
 **Parity Details:** See [features/004_token_management_cli_api_parity.md](../features/004_token_management_cli_api_parity.md) for complete 24-operation mapping.
 
@@ -1078,8 +1369,3 @@ Response:
 - Specification: `module/iron_control_api/spec.md` - Implementation spec
 
 ---
-
-**Last Updated:** 2025-12-09
-**Document Version:** 1.0
-**API Version:** v1 (`/api/v1/`)
-**Status:** Overview complete, resource-specific protocols in progress

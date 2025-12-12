@@ -4,13 +4,13 @@
 //!
 //! | Endpoint | Method | Test Cases | Expected Status Codes |
 //! |----------|--------|------------|----------------------|
-//! | /api/tokens | POST | Valid request, Empty user_id, Invalid fields | 201, 400 |
-//! | /api/tokens | GET | NOT TESTED - Requires authentication | - |
-//! | /api/tokens/:id | GET | Valid ID, Non-existent ID | 200, 404 |
-//! | /api/tokens/:id/rotate | POST | Valid rotation, Non-existent ID | 200, 404 |
-//! | /api/tokens/:id | DELETE | Valid revocation, Non-existent ID | 204, 404 |
+//! | /api/v1/api-tokens | POST | Valid request, Empty user_id, Invalid fields | 201, 400 |
+//! | /api/v1/api-tokens | GET | NOT TESTED - Requires authentication | - |
+//! | /api/v1/api-tokens/:id | GET | Valid ID, Non-existent ID | 200, 404 |
+//! | /api/v1/api-tokens/:id/rotate | POST | Valid rotation, Non-existent ID | 200, 404 |
+//! | /api/v1/api-tokens/:id | DELETE | Valid revocation, Non-existent ID | 204, 404 |
 //!
-//! Note: GET /api/tokens (list_tokens) requires JWT authentication via AuthenticatedUser.
+//! Note: GET /api/v1/api-tokens (list_tokens) requires JWT authentication via AuthenticatedUser.
 //! This endpoint is not tested in integration tests as they don't include auth infrastructure.
 //! The endpoint is functional and can be tested via manual/integration tests with auth setup.
 //!
@@ -22,33 +22,41 @@
 //! - Error handling
 
 use crate::common::{ extract_response, extract_json_response };
-use iron_control_api::routes::tokens::{ TokenState, CreateTokenResponse, TokenListItem };
+use iron_control_api::routes::tokens::{ CreateTokenResponse, TokenListItem };
 use axum::{ Router, routing::{ post, get, delete }, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 use serde_json::json;
 
 /// Create test router with token routes.
-async fn create_test_router() -> Router
+async fn create_test_router() -> ( Router, crate::common::test_state::TestAppState )
 {
-  // Create token state with in-memory database
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token state" );
+  // Create test application state with auth + token support
+  let app_state = crate::common::test_state::TestAppState::new().await;
 
-  Router::new()
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( token_state )
+  let router = Router::new()
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
+    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
 }
 
-/// Test POST /api/tokens with valid request returns 201 Created.
+/// Helper: Generate JWT token for a given user_id
+fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
+{
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+}
+
+/// Test POST /api/v1/api-tokens with valid request returns 201 Created.
 #[ tokio::test ]
 async fn test_create_token_valid_request()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let request_body = json!({
     "user_id": "user_test",
@@ -58,7 +66,7 @@ async fn test_create_token_valid_request()
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -89,11 +97,11 @@ async fn test_create_token_valid_request()
   );
 }
 
-/// Test POST /api/tokens with minimal valid request (only user_id).
+/// Test POST /api/v1/api-tokens with minimal valid request (only user_id).
 #[ tokio::test ]
 async fn test_create_token_minimal_request()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
   
   let request_body = json!({
     "user_id": "user_minimal",
@@ -103,7 +111,7 @@ async fn test_create_token_minimal_request()
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -122,11 +130,11 @@ async fn test_create_token_minimal_request()
   assert_eq!( body.description, None );
 }
 
-/// Test POST /api/tokens with empty user_id returns 400.
+/// Test POST /api/v1/api-tokens with empty user_id returns 400.
 #[ tokio::test ]
 async fn test_create_token_empty_user_id_rejected()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let request_body = json!({
     "user_id": "",
@@ -136,7 +144,7 @@ async fn test_create_token_empty_user_id_rejected()
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -158,11 +166,11 @@ async fn test_create_token_empty_user_id_rejected()
   );
 }
 
-/// Test POST /api/tokens with empty project_id returns 400.
+/// Test POST /api/v1/api-tokens with empty project_id returns 400.
 #[ tokio::test ]
 async fn test_create_token_empty_project_id_rejected()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let request_body = json!({
     "user_id": "user_test",
@@ -172,7 +180,7 @@ async fn test_create_token_empty_project_id_rejected()
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -194,11 +202,11 @@ async fn test_create_token_empty_project_id_rejected()
   );
 }
 
-/// Test POST /api/tokens with description too long returns 400.
+/// Test POST /api/v1/api-tokens with description too long returns 400.
 #[ tokio::test ]
 async fn test_create_token_description_too_long_rejected()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let long_description = "a".repeat( 501 ); // Max is 500
 
@@ -210,7 +218,7 @@ async fn test_create_token_description_too_long_rejected()
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -232,11 +240,11 @@ async fn test_create_token_description_too_long_rejected()
   );
 }
 
-/// Test GET /api/tokens/:id with valid ID returns 200 OK.
+/// Test GET /api/v1/api-tokens/:id with valid ID returns 200 OK.
 #[ tokio::test ]
 async fn test_get_token_valid_id_returns_200()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // First create a token
   let create_body = json!({
@@ -247,7 +255,7 @@ async fn test_get_token_valid_id_returns_200()
 
   let create_request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &create_body ).unwrap() ) )
     .unwrap();
@@ -256,10 +264,14 @@ async fn test_get_token_valid_id_returns_200()
   let ( _status, created ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
   let token_id = created.id;
 
-  // Now get the token by ID
+  // Generate JWT for the same user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_test" );
+
+  // Now get the token by ID with authentication
   let get_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -279,15 +291,19 @@ async fn test_get_token_valid_id_returns_200()
   assert!( body.is_active, "LOUD FAILURE: Newly created token must be active" );
 }
 
-/// Test GET /api/tokens/:id with non-existent ID returns 404.
+/// Test GET /api/v1/api-tokens/:id with non-existent ID returns 404.
 #[ tokio::test ]
 async fn test_get_token_nonexistent_id_returns_404()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for any user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "GET" )
-    .uri( "/api/tokens/999999" )
+    .uri( "/api/v1/api-tokens/999999" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -308,11 +324,11 @@ async fn test_get_token_nonexistent_id_returns_404()
   );
 }
 
-/// Test DELETE /api/tokens/:id with valid ID returns 204.
+/// Test DELETE /api/v1/api-tokens/:id with valid ID returns 204.
 #[ tokio::test ]
 async fn test_revoke_token_valid_id_returns_204()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // First create a token
   let create_body = json!({
@@ -323,7 +339,7 @@ async fn test_revoke_token_valid_id_returns_204()
 
   let create_request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &create_body ).unwrap() ) )
     .unwrap();
@@ -332,10 +348,14 @@ async fn test_revoke_token_valid_id_returns_204()
   let ( _status, created ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
   let token_id = created.id;
 
-  // Now revoke the token
+  // Generate JWT for the same user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_test" );
+
+  // Now revoke the token with authentication
   let delete_request = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -348,15 +368,19 @@ async fn test_revoke_token_valid_id_returns_204()
   );
 }
 
-/// Test DELETE /api/tokens/:id with non-existent ID returns 404.
+/// Test DELETE /api/v1/api-tokens/:id with non-existent ID returns 404.
 #[ tokio::test ]
 async fn test_revoke_token_nonexistent_id_returns_404()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for any user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "DELETE" )
-    .uri( "/api/tokens/999999" )
+    .uri( "/api/v1/api-tokens/999999" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -373,7 +397,7 @@ async fn test_revoke_token_nonexistent_id_returns_404()
 #[ tokio::test ]
 async fn test_token_created_at_timestamp()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   let request_body = json!({
     "user_id": "user_timestamp_test",
@@ -383,7 +407,7 @@ async fn test_token_created_at_timestamp()
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
@@ -416,7 +440,7 @@ async fn test_token_created_at_timestamp()
 #[ tokio::test ]
 async fn test_token_id_auto_increment()
 {
-  let router = create_test_router().await;
+  let ( router, _app_state ) = create_test_router().await;
 
   // Create first token
   let request1_body = json!({
@@ -427,7 +451,7 @@ async fn test_token_id_auto_increment()
 
   let request1 = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request1_body ).unwrap() ) )
     .unwrap();
@@ -445,7 +469,7 @@ async fn test_token_id_auto_increment()
 
   let request2 = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &request2_body ).unwrap() ) )
     .unwrap();
@@ -462,11 +486,11 @@ async fn test_token_id_auto_increment()
   );
 }
 
-/// Test POST /api/tokens/:id/rotate with valid ID returns 200 and new token.
+/// Test POST /api/v1/api-tokens/:id/rotate with valid ID returns 200 and new token.
 #[ tokio::test ]
 async fn test_rotate_token_valid_id_returns_200()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   // First create a token
   let create_body = json!({
@@ -477,7 +501,7 @@ async fn test_rotate_token_valid_id_returns_200()
 
   let create_request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
     .body( Body::from( serde_json::to_string( &create_body ).unwrap() ) )
     .unwrap();
@@ -487,10 +511,14 @@ async fn test_rotate_token_valid_id_returns_200()
   let token_id = created.id;
   let original_token = created.token.clone();
 
-  // Now rotate the token
+  // Generate JWT for the same user
+  let jwt_token = generate_jwt_for_user( &app_state, "user_rotate" );
+
+  // Now rotate the token with authentication
   let rotate_request = Request::builder()
     .method( "POST" )
-    .uri( format!( "/api/tokens/{}/rotate", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -499,7 +527,7 @@ async fn test_rotate_token_valid_id_returns_200()
   assert_eq!(
     rotate_response.status(),
     StatusCode::OK,
-    "LOUD FAILURE: POST /api/tokens/:id/rotate with valid ID must return 200 OK"
+    "LOUD FAILURE: POST /api/v1/api-tokens/:id/rotate with valid ID must return 200 OK"
   );
 
   let ( _status, rotated ): ( StatusCode, CreateTokenResponse ) = extract_json_response( rotate_response ).await;
@@ -528,15 +556,19 @@ async fn test_rotate_token_valid_id_returns_200()
   );
 }
 
-/// Test POST /api/tokens/:id/rotate with non-existent ID returns 404.
+/// Test POST /api/v1/api-tokens/:id/rotate with non-existent ID returns 404.
 #[ tokio::test ]
 async fn test_rotate_token_nonexistent_id_returns_404()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for any user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   let request = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens/999999/rotate" )
+    .uri( "/api/v1/api-tokens/999999/rotate" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -545,6 +577,6 @@ async fn test_rotate_token_nonexistent_id_returns_404()
   assert_eq!(
     response.status(),
     StatusCode::NOT_FOUND,
-    "LOUD FAILURE: POST /api/tokens/:id/rotate with non-existent ID must return 404 Not Found"
+    "LOUD FAILURE: POST /api/v1/api-tokens/:id/rotate with non-existent ID must return 404 Not Found"
   );
 }
