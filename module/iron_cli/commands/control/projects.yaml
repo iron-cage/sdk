@@ -1,60 +1,60 @@
-#
-# Projects Commands
-#
-# Commands for viewing project information
-# REST API Base: /api/v1/projects
-#
-
-# List projects
-- name: ".project.list"
-  namespace: ""
-  description: "List all projects"
-  hint: "Shows available projects"
-  status: "stable"
-  version: "1.0.0"
+- name: .project.list
+  namespace: ''
+  description: List all projects
+  hint: Shows available projects
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Get project details
-- name: ".project.get"
-  namespace: ""
-  description: "Get details for specific project"
-  hint: "Shows project configuration"
-  status: "stable"
-  version: "1.0.0"
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .project.list
+  aliases: []
+  tags: []
+- name: .project.get
+  namespace: ''
+  description: Get details for specific project
+  hint: Shows project configuration
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Project ID"
-      hint: "UUID of project to retrieve"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
+  - name: id
+    kind: String
+    description: Project ID
+    hint: UUID of project to retrieve
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .project.get id::abc123
+  aliases: []
+  tags: []

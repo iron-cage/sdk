@@ -221,14 +221,14 @@ impl Config
 
     if !config_path.exists()
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
 
     let contents = std::fs::read_to_string( config_path )
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     let mut config: Config = toml::from_str( &contents )
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Apply environment variable overrides
     config.apply_env_overrides();

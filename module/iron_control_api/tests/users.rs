@@ -19,6 +19,12 @@
 //! - RBAC enforcement (Admin-only operations)
 //! - Database persistence and audit logging
 //! - Edge cases (self-deletion, duplicate usernames, invalid filters)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_create_and_list_users` | User creation and listing integration | POST /api/v1/users with valid user data (username="newuser", email="newuser@example.com"), then GET /api/v1/users | User created with 201 Created, appears in user list | ✅ |
 
 #[ path = "common/mod.rs" ]
 mod common;

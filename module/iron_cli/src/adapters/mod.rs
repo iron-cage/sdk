@@ -40,5 +40,15 @@ pub mod health;
 // Control API adapters (for iron binary)
 pub mod control;
 
+// Token API adapters (for iron-token binary)
+pub mod token;
+pub mod keyring;
+pub mod auth_adapters;
+pub mod token_adapters;
+pub mod usage_adapters;
+pub mod limits_adapters;
+pub mod traces_adapters;
+pub mod health_adapters;
+
 pub use error::{ AdapterError, ServiceError };
 pub use services::{ AuthService, TokenService, UsageService, LimitsService, TracesService, HealthService, StorageService, Services, Tokens, Token, UsageRecord, Limit, Trace, HealthStatus };

@@ -65,10 +65,10 @@ Before running manual tests:
 **Purpose:** Verify token creation returns plaintext token once, subsequent GETs return metadata only.
 
 **Steps:**
-1. Create token: `curl -X POST http://localhost:3000/api/tokens -H "Content-Type: application/json" -d '{"user_id":"test-user","project_id":"proj-1","description":"Test token"}'`
+1. Create token: `curl -X POST http://localhost:3000/api/v1/api-tokens -H "Content-Type: application/json" -d '{"user_id":"test-user","project_id":"proj-1","description":"Test token"}'`
 2. Save response with plaintext `token` field
 3. Extract `id` from response
-4. Get token by ID: `curl http://localhost:3000/api/tokens/{id}`
+4. Get token by ID: `curl http://localhost:3000/api/v1/api-tokens/{id}`
 5. Verify response has NO `token` field (only metadata: id, user_id, project_id, description, created_at, is_active)
 6. Verify `is_active` is true
 
@@ -86,7 +86,7 @@ Before running manual tests:
 **Steps:**
 1. Create token via test 2.1
 2. Save old token value
-3. Rotate: `curl -X POST http://localhost:3000/api/tokens/{id}/rotate`
+3. Rotate: `curl -X POST http://localhost:3000/api/v1/api-tokens/{id}/rotate`
 4. Verify response contains NEW plaintext token (different from old)
 5. Verify new token ID is different
 6. Try using old token (should fail authentication)
@@ -106,9 +106,9 @@ Before running manual tests:
 **Steps:**
 1. Create token via test 2.1
 2. Verify token works
-3. Revoke: `curl -X DELETE http://localhost:3000/api/tokens/{id}`
+3. Revoke: `curl -X DELETE http://localhost:3000/api/v1/api-tokens/{id}`
 4. Verify 204 No Content response
-5. Get token by ID: `curl http://localhost:3000/api/tokens/{id}`
+5. Get token by ID: `curl http://localhost:3000/api/v1/api-tokens/{id}`
 6. Verify 404 Not Found
 7. Try using revoked token
 8. Verify authentication fails
@@ -127,7 +127,7 @@ Before running manual tests:
 **Steps:**
 1. Create 3 tokens for same user_id
 2. Obtain JWT token for user
-3. List tokens: `curl http://localhost:3000/api/tokens -H "Authorization: Bearer {jwt}"`
+3. List tokens: `curl http://localhost:3000/api/v1/api-tokens -H "Authorization: Bearer {jwt}"`
 4. Verify all 3 tokens present in array
 5. Verify NO plaintext token values (only metadata)
 6. Verify each has correct user_id, project_id, description
@@ -160,14 +160,46 @@ Before running manual tests:
 
 **Pass/Fail:** ___
 
-#### 2.6 Input Validation (Phase 1 Security)
+#### 2.6 Token Validation Endpoint (Deliverable 1.6)
+
+**Purpose:** Verify /api/v1/api-tokens/validate endpoint validates tokens without authentication.
+
+**Steps:**
+1. Create token via test 2.1: `curl -X POST http://localhost:3000/api/v1/api-tokens -H "Content-Type: application/json" -d '{"user_id":"test-user","project_id":"proj-1"}'`
+2. Save plaintext token from response: `token_value=$(jq -r '.token' response.json)`
+3. Validate valid token: `curl -X POST http://localhost:3000/api/v1/api-tokens/validate -H "Content-Type: application/json" -d "{\"token\":\"$token_value\"}"`
+4. Verify response: `{"valid":true,"user_id":"test-user","project_id":"proj-1","token_id":...}`
+5. Validate invalid token: `curl -X POST http://localhost:3000/api/v1/api-tokens/validate -H "Content-Type: application/json" -d '{"token":"invalid_token_xyz"}'`
+6. Verify response: `{"valid":false}`
+7. Revoke token: `curl -X DELETE http://localhost:3000/api/v1/api-tokens/{id}`
+8. Validate revoked token: `curl -X POST http://localhost:3000/api/v1/api-tokens/validate -H "Content-Type: application/json" -d "{\"token\":\"$token_value\"}"`
+9. Verify response: `{"valid":false}`
+10. Verify no auth required: Make validation request WITHOUT Authorization header
+11. Verify 200 OK (not 401)
+
+**Expected Result:**
+- Valid active tokens return `{"valid":true}` with metadata (user_id, project_id, token_id)
+- Invalid tokens return `{"valid":false}` with no metadata
+- Revoked tokens return `{"valid":false}` with no metadata
+- Endpoint is public (no Authorization header required)
+- Response is always 200 OK with validation result
+
+**Security Notes:**
+- Constant-time comparison prevents timing attacks
+- Public endpoint design allows external services to validate tokens
+- No sensitive information leaked for invalid tokens
+- Recommend rate limiting at reverse proxy (100 validates/min per IP)
+
+**Pass/Fail:** ___
+
+#### 2.7 Input Validation (Phase 1 Security)
 
 **Purpose:** Verify DoS protection (issue-001) and NULL byte injection prevention (issue-002).
 
 **Steps:**
 1. **Test DoS protection - user_id length limit:**
    - Create 501-char user_id: `python3 -c "print('a' * 501)"`
-   - Attempt create: `curl -X POST http://localhost:3000/api/tokens -H "Content-Type: application/json" -d "{\"user_id\":\"$(python3 -c 'print("a" * 501)')\"}" -v`
+   - Attempt create: `curl -X POST http://localhost:3000/api/v1/api-tokens -H "Content-Type: application/json" -d "{\"user_id\":\"$(python3 -c 'print("a" * 501)')\"}" -v`
    - Verify 400 Bad Request
    - Verify error message: `"Field 'user_id' exceeds maximum length (501 chars, max 500)"`
 
@@ -234,7 +266,7 @@ Before running manual tests:
    - Token 1 (OpenAI): 1000 tokens, 5 requests, 100 cost_cents
    - Token 2 (Anthropic): 2000 tokens, 3 requests, 200 cost_cents
    - Token 3 (OpenAI): 500 tokens, 2 requests, 50 cost_cents
-3. Query: `curl http://localhost:3000/api/usage/aggregate`
+3. Query: `curl http://localhost:3000/api/v1/usage/aggregate`
 4. Verify totals:
    - `total_tokens`: 3500
    - `total_requests`: 10
@@ -255,9 +287,9 @@ Before running manual tests:
 
 **Steps:**
 1. Use tokens from test 2.1
-2. Query: `curl http://localhost:3000/api/usage/by-project/project_1`
+2. Query: `curl http://localhost:3000/api/v1/usage/by-project/project_1`
 3. Verify only Token 1 usage counted
-4. Query: `curl http://localhost:3000/api/usage/by-project/nonexistent`
+4. Query: `curl http://localhost:3000/api/v1/usage/by-project/nonexistent`
 5. Verify 200 OK with all zeros (not 404)
 
 **Expected Result:**
@@ -272,14 +304,14 @@ Before running manual tests:
 
 **Steps:**
 1. Use tokens from test 2.1
-2. Query: `curl http://localhost:3000/api/usage/by-provider/openai`
+2. Query: `curl http://localhost:3000/api/v1/usage/by-provider/openai`
 3. Verify totals:
    - `tokens`: 1500
    - `requests`: 7
    - `cost_cents`: 150
-4. Query: `curl http://localhost:3000/api/usage/by-provider/anthropic`
+4. Query: `curl http://localhost:3000/api/v1/usage/by-provider/anthropic`
 5. Verify Anthropic totals
-6. Query: `curl http://localhost:3000/api/usage/by-provider/unknown`
+6. Query: `curl http://localhost:3000/api/v1/usage/by-provider/unknown`
 7. Verify 200 OK with zeros
 
 **Expected Result:**
@@ -295,13 +327,13 @@ Before running manual tests:
 **Purpose:** Verify complete CRUD cycle persists correctly.
 
 **Steps:**
-1. Create limit: `curl -X POST http://localhost:3000/api/limits -H "Content-Type: application/json" -d '{"tokens_per_day":1000,"requests_per_minute":10,"cost_per_month_cents":500}'`
+1. Create limit: `curl -X POST http://localhost:3000/api/v1/limits -H "Content-Type: application/json" -d '{"tokens_per_day":1000,"requests_per_minute":10,"cost_per_month_cents":500}'`
 2. Extract `id` from response
-3. Verify appears in list: `curl http://localhost:3000/api/limits`
-4. Get by ID: `curl http://localhost:3000/api/limits/{id}`
-5. Update: `curl -X PUT http://localhost:3000/api/limits/{id} -H "Content-Type: application/json" -d '{"tokens_per_day":2000}'`
+3. Verify appears in list: `curl http://localhost:3000/api/v1/limits`
+4. Get by ID: `curl http://localhost:3000/api/v1/limits/{id}`
+5. Update: `curl -X PUT http://localhost:3000/api/v1/limits/{id} -H "Content-Type: application/json" -d '{"tokens_per_day":2000}'`
 6. Verify update persisted via GET
-7. Delete: `curl -X DELETE http://localhost:3000/api/limits/{id}`
+7. Delete: `curl -X DELETE http://localhost:3000/api/v1/limits/{id}`
 8. Verify 404 on subsequent GET
 
 **Expected Result:**
@@ -339,7 +371,7 @@ Before running manual tests:
 
 **Steps:**
 1. Record 5 API call traces via TraceStorage
-2. Query: `curl http://localhost:3000/api/traces`
+2. Query: `curl http://localhost:3000/api/v1/traces`
 3. Verify all 5 traces present
 4. Verify ordered by `traced_at` DESC (most recent first)
 5. Verify all fields present (id, token_id, provider, model, endpoint, status_code, latency_ms, input_tokens, output_tokens, cost_cents, timestamp)
@@ -358,9 +390,9 @@ Before running manual tests:
 **Steps:**
 1. Use traces from test 4.1
 2. Extract ID of first trace
-3. Query: `curl http://localhost:3000/api/traces/{id}`
+3. Query: `curl http://localhost:3000/api/v1/traces/{id}`
 4. Verify all fields match list response
-5. Query non-existent ID: `curl http://localhost:3000/api/traces/999999`
+5. Query non-existent ID: `curl http://localhost:3000/api/v1/traces/999999`
 6. Verify 404 Not Found
 
 **Expected Result:**

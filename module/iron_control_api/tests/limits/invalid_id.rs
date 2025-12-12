@@ -1,6 +1,14 @@
 //! Tests for invalid ID parameter handling in limits endpoints
 //!
 //! Verifies that non-numeric IDs return JSON error responses per FR-5 specification.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_get_limit_with_non_numeric_id_returns_json_error` | Get limit with non-numeric ID | GET /api/limits/abc | 400 Bad Request, JSON error with deserialize message | ✅ |
+//! | `test_update_limit_with_non_numeric_id_returns_json_error` | Update limit with non-numeric ID | PUT /api/limits/xyz | 400 Bad Request, JSON error with deserialize message | ✅ |
+//! | `test_delete_limit_with_non_numeric_id_returns_json_error` | Delete limit with non-numeric ID | DELETE /api/limits/foo | 400 Bad Request, JSON error with deserialize message | ✅ |
 
 use axum::{ http::StatusCode, body::Body, Router };
 use tower::ServiceExt;

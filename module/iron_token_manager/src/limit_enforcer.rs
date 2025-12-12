@@ -98,14 +98,14 @@ impl LimitEnforcer
       .max_connections( 5 )
       .connect( database_url )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Run migrations
     let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
     sqlx::raw_sql( migration_sql )
       .execute( &pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( Self { pool } )
   }
@@ -148,7 +148,7 @@ impl LimitEnforcer
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( result.last_insert_rowid() )
   }
@@ -179,8 +179,8 @@ impl LimitEnforcer
     .bind( project_id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?
-    .ok_or( crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?
+    .ok_or( crate::error::TokenError::Generic )?;
 
     Ok( UsageLimit {
       id: row.get( "id" ),
@@ -299,7 +299,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -327,7 +327,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -357,7 +357,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -385,7 +385,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -413,7 +413,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -441,7 +441,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -483,7 +483,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -512,8 +512,8 @@ impl LimitEnforcer
     .bind( id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?
-    .ok_or( crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?
+    .ok_or( crate::error::TokenError::Generic )?;
 
     Ok( UsageLimit {
       id: row.get( "id" ),
@@ -552,7 +552,7 @@ impl LimitEnforcer
     )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| UsageLimit {
@@ -607,7 +607,7 @@ impl LimitEnforcer
     .bind( id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -627,7 +627,7 @@ impl LimitEnforcer
       .bind( id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }

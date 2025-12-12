@@ -1,3 +1,12 @@
+//! API server creation and state access tests
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_api_server_creation` | Create API server instance | StateManager + port 3000 | Server created successfully | ✅ |
+//! | `test_api_state_access` | Access agent state through StateManager | Create StateManager, add agent state, query it | Agent state retrievable | ✅ |
+
 use iron_control_api::*;
 use iron_runtime_state::StateManager;
 use iron_types::AgentId;

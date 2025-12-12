@@ -38,7 +38,7 @@ Define cross-cutting REST API standards that apply universally across all resour
 **Cross-Cutting Standards Defined in This Document:**
 
 1. **Audit Logging Standard** - What operations are logged, standard fields, retention policy (mutation operations only)
-2. **CLI-API Parity Standard** - Ensuring 100% coverage of user-facing endpoints in CLI (46 endpoints = 46 commands)
+2. **CLI-API Parity Standard** - Ensuring 100% coverage of user-facing endpoints in CLI (69 commands total: 47 control + 22 token management)
 3. **System Resources** - Health check and API version endpoints (operational/discovery endpoints)
 4. **Rate Limiting Standard** - Cross-endpoint rate limit policies by category
 5. **Example Data Standards** - Consistent example values across all documentation
@@ -370,23 +370,43 @@ YAML Command Definitions → build.rs (compile-time) → Static Registry → Pip
 
 **Example YAML Definition:**
 ```yaml
-command:
-  name: "agent.list"
+- name: ".agent.list"
+  namespace: ""
   description: "List all agents"
-  parameters:
+  hint: "Shows all configured AI agents"
+  status: "stable"
+  version: "1.0.0"
+  idempotent: true
+  arguments:
     - name: "v"
-      type: "integer"
-      default: 2
-      range: [0, 5]
-      description: "Verbosity level"
+      kind: "Integer"
+      description: "Verbosity level (0-5)"
+      hint: "Higher values show more details"
+      attributes:
+        optional: true
+        default: "2"
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
     - name: "format"
-      type: "string"
-      default: "table"
-      enum: ["table", "json", "yaml"]
+      kind: "String"
       description: "Output format"
-  api_endpoint:
-    method: "GET"
-    path: "/api/v1/agents"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        default: "table"
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+  examples: []
+  aliases: []
+  tags: []
 ```
 
 **Command Naming Convention:**
