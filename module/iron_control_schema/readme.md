@@ -48,3 +48,16 @@ See `spec.md` for complete schema definitions.
 ## License
 
 Apache-2.0 - See `license` file for details
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | `PostgreSQL` schema for Iron Cage Control Panel (producti... |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

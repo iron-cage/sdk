@@ -289,3 +289,33 @@ Both approaches are currently supported for backward compatibility.
 ## License
 
 Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | `iron_token_manager` |
+| agent_budget.rs | Agent Budget Manager |
+| budget_request.rs | Budget Request Storage Layer |
+| config.rs | Configuration management for token manager |
+| cost_calculator.rs | Cost calculation service |
+| error.rs | Error types |
+| lease_manager.rs | Budget Lease Manager |
+| limit_enforcer.rs | Limit enforcement service |
+| migrations.rs | Database migration utilities |
+| provider_adapter.rs | LLM provider adapter layer |
+| provider_key_storage.rs | AI Provider Key storage layer |
+| rate_limiter.rs | Rate limiting service |
+| seed.rs | Database seeding utilities for development and testing |
+| storage.rs | Database storage layer |
+| token_generator.rs | Token generation service |
+| trace_storage.rs | Trace storage service |
+| usage_tracker.rs | Usage tracking service |
+| user_service.rs | User management service |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

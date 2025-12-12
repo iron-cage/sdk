@@ -55,3 +55,16 @@ state.log_event("agent_001", "PII detected and redacted")?;
 ## License
 
 Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Type-safe state management for Iron Cage runtime |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

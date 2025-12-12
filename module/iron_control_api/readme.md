@@ -314,3 +314,26 @@ The Dockerfile uses multi-stage builds for security and efficiency:
 - [Docker Compose Architecture](../../docs/deployment/006_docker_compose_deployment.md) - Design details
 - [Getting Started Guide](../../docs/getting_started.md) § Deploy Control Panel - Quickstart
 - [Deployment Guide](../../docs/deployment_guide.md) - Production procedures
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | REST API and WebSocket server for Iron Runtime dashboard. |
+| error.rs | Custom error types and JSON error responses for API |
+| ic_token.rs | ic token claims implementation |
+| ip_token.rs | IP Token (Iron Provider Token) encryption |
+| jwt_auth.rs | JWT authentication middleware |
+| rbac.rs | RBAC (Role-Based Access Control) module |
+| token_auth.rs | API Token authentication middleware |
+| user_auth.rs | User authentication and password verification |
+| bin/ | TBD - bin module |
+| middleware/ | Middleware modules for Iron Control API |
+| routes/ | REST API route handlers |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

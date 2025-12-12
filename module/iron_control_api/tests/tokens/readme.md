@@ -10,6 +10,7 @@ Tests are organized by concern (validation, concurrency, security, etc.) rather 
 
 | File | Responsibility |
 |------|----------------|
+| `audit_logging.rs` | Test token lifecycle event audit logging |
 | `concurrency.rs` | Test concurrent token operations |
 | `content_type.rs` | Test Content-Type header validation |
 | `corner_cases.rs` | Test token creation corner cases |
@@ -18,6 +19,7 @@ Tests are organized by concern (validation, concurrency, security, etc.) rather 
 | `http_methods.rs` | Test HTTP method validation |
 | `idempotency.rs` | Test token operation idempotency |
 | `malformed_json.rs` | Test malformed JSON handling |
+| `rate_limiting.rs` | Test token creation rate limits (10 active tokens, 10 creates/min) |
 | `security.rs` | Test token security boundaries |
 | `state_transitions.rs` | Test token state transitions |
 | `validation.rs` | Test token request validation |

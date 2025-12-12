@@ -289,3 +289,17 @@ router.shutdown();
 ## License
 
 Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Core runtime for AI agent execution with integrated safet... |
+| llm_router/ | LLM Router - Local proxy for LLM API requests |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+
