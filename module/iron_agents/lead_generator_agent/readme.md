@@ -22,17 +22,19 @@ The agent follows a two-step process:
 
 This project is configured to use `uv` for dependency management.
 
-  **Initialize the project (if starting fresh):**
+  **Sync the project:**
     ```bash
-    uv init
+    uv sync
     ```
 
 ### Configuration
 
-Create a file named `.env` in the root directory of the project. Add your API tokens to this file.
 
-**File: .env**
-```env
+
+Create a file named `-secrets.sh` in the secret folder with tokens. You can use secrets.template to copypaste variables.
+
+**File: -secrets.sh**
+```
 OPENAI_API_KEY=sk-your_openai_token_here
 APOLLO_API_KEY=your_apollo_api_token_here
 ```
@@ -41,7 +43,6 @@ APOLLO_API_KEY=your_apollo_api_token_here
 
 ```text
 .
-├── .env                                 # Environment variables (API Keys)
 ├── .venv/                               # Virtual environment managed by uv
 ├── pyproject.toml                       # Project dependencies definition
 ├── uv.lock                              # Dependency lock file
@@ -55,6 +56,8 @@ APOLLO_API_KEY=your_apollo_api_token_here
 ├── test
 │   ├── test_agent.py                    # Tests for agent
 │   └── test_apollo_tools.py             # Tests for apollo tools
+├── license                              # License
+├── spec.md                              # Specification of project
 └── readme.md                            # Project documentation
 ```
 
@@ -78,17 +81,41 @@ This file contains the core logic for interacting with the Apollo.io API. It def
 #### 2. `lead_generator_agent.py`
 This is the entry point of the application. It initializes the OpenAI model and the LangChain AgentExecutor.
 
-*   **Model:** Uses `gpt-4o` with `temperature=0` for deterministic and precise output.
+*   **Model:** Uses `gpt-5-nano` with `temperature=0` and `max-retries=2` for deterministic and precise output.
 *   **System Prompt:** Strictly enforces a JSON-only output format. It instructs the agent to perform the search first and then iterate through every found ID to fetch details.
 *   **Output Handling:** The script captures the agent's output, strips any Markdown formatting, validates the JSON, and prints the result to the console.
 
+### Agent prompt
+
+```You are an API proxy. Your only goal is to return raw data in JSON format.
+
+ALGORITHM:
+1. Use `search_leads` to get IDs.
+2. For EACH found ID, call `get_lead_details`.
+3. Collect all results from `get_lead_details` as a JSON.
+
+OUTPUT FORMAT (CRITICAL):
+- Return all and ONLY a valid JSON Array (list of objects).
+- Do not write any text, do not say hello, do not explain anything.
+- Do not use Markdown (no ```json).
+- Do not truncate data.
+- Do not revrite or modify the data.
+
+Example output:
+[
+  {{ "id": "123", "name": "John" }},
+  {{ "id": "456", "name": "Criss" }}
+]
+```
+
 ### Usage
 
-To run the agent, execute the following command in your terminal when you are in src folder:
-
-```bash
-uv run lead_generator_agent.py
-```
+### How to run an agent:
+1. Sync all by `uv sync`
+2. Create a file -secrets.sh and paste related tokets
+3. Move to folder `src` and type `uv run lead_generator_agent.py` in a console
+4. Type a prompt in a console, for example: `Find 3 Jewelry Founders in Germany`
+5. Wait for answer
 
 #### Interactive Mode
 Once running, the script will prompt you for a query.
