@@ -5,6 +5,20 @@
 //! - Role-based access control (admin vs regular user)
 //! - Get agent tokens endpoint
 //! - Error cases (401, 403, 404)
+//!
+//! ## Security Tests Added (2025-12-12)
+//!
+//! Manual testing (Task 1.3) identified missing security-critical tests for unauthenticated
+//! access and authorization bypass scenarios. Added 5 tests:
+//!
+//! - `test_list_agents_without_auth_unauthorized`: Prevents unauthenticated agent enumeration
+//! - `test_get_agent_without_auth_unauthorized`: Prevents unauthenticated agent access
+//! - `test_delete_agent_without_auth_unauthorized`: Prevents unauthenticated agent deletion
+//! - `test_delete_nonexistent_agent_as_admin`: Verifies proper 404 error handling
+//! - `test_create_agent_ignores_owner_id_in_request`: Prevents authorization bypass via owner_id override
+//!
+//! These tests ensure authentication middleware cannot be accidentally removed and that
+//! owner_id is always derived from JWT claims, never from request body.
 
 mod common;
 

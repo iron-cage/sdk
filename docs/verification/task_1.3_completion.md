@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Task 1.3 (Add Authorization Checks) has been successfully implemented and verified using the eight-layer verification framework. All endpoints requiring authorization (7 total) are now protected with owner-based access control, achieving 100% migration completion.
+Task 1.3 (Add Authorization Checks) has been successfully implemented and verified using the eight-layer verification framework. All endpoints requiring authorization (7 total) are now protected with role-based and ownership-based access control, achieving 100% migration completion.
 
 **Key Achievements:**
 - ✅ 100% endpoint protection ratio (7/7 endpoints)
@@ -235,33 +235,34 @@ RUSTFLAGS="-D warnings" cargo nextest run --all-features
 ### Agent Endpoints (6)
 
 1. **GET /api/agents**
-   - Location: `src/routes/agents.rs:159`
-   - Authorization: Filter by `owner_id = user.sub` (admin sees all)
+   - Location: `src/routes/agents.rs:36`
+   - Authorization: Admin sees all agents, regular users see only owned agents (filter by `owner_id = user.sub`)
    - Status: ✅ Protected
 
 2. **POST /api/agents**
-   - Location: `src/routes/agents.rs:222`
-   - Authorization: Sets `owner_id = user.sub` on creation
+   - Location: `src/routes/agents.rs:144`
+   - Authorization: **Admin-only** (`role == "admin"`)
+   - Sets `owner_id = user.sub` (admin's ID) on creation
    - Status: ✅ Protected
 
 3. **GET /api/agents/:id**
-   - Location: `src/routes/agents.rs:265`
-   - Authorization: Verify `owner_id == user.sub OR role == admin`
+   - Location: `src/routes/agents.rs:99`
+   - Authorization: Admin OR owner (`role == "admin" OR owner_id == user.sub`)
    - Status: ✅ Protected
 
-4. **DELETE /api/agents/:id**
-   - Location: `src/routes/agents.rs:299`
-   - Authorization: Verify `owner_id == user.sub OR role == admin`
+4. **PUT /api/agents/:id**
+   - Location: `src/routes/agents.rs:198`
+   - Authorization: **Admin-only** (`role == "admin"`)
    - Status: ✅ Protected
 
-5. **POST /api/agents/:id/tokens**
-   - Location: `src/routes/agents.rs:329`
-   - Authorization: Verify `owner_id == user.sub OR role == admin`
+5. **DELETE /api/agents/:id**
+   - Location: `src/routes/agents.rs:295`
+   - Authorization: **Admin-only** (`role == "admin"`)
    - Status: ✅ Protected
 
 6. **GET /api/agents/:id/tokens**
-   - Location: `src/routes/agents.rs:345`
-   - Authorization: Verify `owner_id == user.sub OR role == admin`
+   - Location: `src/routes/agents.rs:339`
+   - Authorization: Admin OR owner (`role == "admin" OR owner_id == user.sub`)
    - Status: ✅ Protected
 
 ### Budget Endpoints (1)
