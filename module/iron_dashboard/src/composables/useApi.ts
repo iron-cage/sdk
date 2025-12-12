@@ -206,7 +206,7 @@ export function useApi() {
         requests: number
         cost_cents: number
       }>
-    }>('/api/usage/aggregate')
+    }>('/api/v1/usage/aggregate')
 
     return {
       total_requests: aggregate.total_requests,
@@ -228,7 +228,7 @@ export function useApi() {
 
   // Limits API methods
   async function getLimits(): Promise<LimitRecord[]> {
-    return fetchApi<LimitRecord[]>('/api/limits')
+    return fetchApi<LimitRecord[]>('/api/v1/limits')
   }
 
   async function getLimit(id: number): Promise<LimitRecord> {
@@ -236,7 +236,7 @@ export function useApi() {
   }
 
   async function createLimit(data: CreateLimitRequest): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>('/api/limits', {
+    return fetchApi<LimitRecord>('/api/v1/limits', {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -257,7 +257,7 @@ export function useApi() {
 
   // Traces API methods
   async function getTraces(): Promise<TraceRecord[]> {
-    return fetchApi<TraceRecord[]>('/api/traces')
+    return fetchApi<TraceRecord[]>('/api/v1/traces')
   }
 
   async function getTrace(id: number): Promise<TraceRecord> {
@@ -266,29 +266,29 @@ export function useApi() {
 
   // Provider Key API methods
   async function getProviderKeys(): Promise<ProviderKey[]> {
-    return fetchApi<ProviderKey[]>('/api/providers')
+    return fetchApi<ProviderKey[]>('/api/v1/providers')
   }
 
   async function getProviderKey(id: number): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>(`/api/providers/${id}`)
+    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`)
   }
 
   async function createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>('/api/providers', {
+    return fetchApi<ProviderKey>('/api/v1/providers', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
   async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>(`/api/providers/${id}`, {
+    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async function deleteProviderKey(id: number): Promise<void> {
-    await fetchApi<void>(`/api/providers/${id}`, {
+    await fetchApi<void>(`/api/v1/providers/${id}`, {
       method: 'DELETE',
     })
   }
@@ -368,7 +368,7 @@ export function useApi() {
 
   // Agent API methods
   async function getAgents(): Promise<Agent[]> {
-    return fetchApi<Agent[]>('/api/agents')
+    return fetchApi<Agent[]>('/api/v1/agents')
   }
 
   async function getAgent(id: number): Promise<Agent> {
@@ -376,7 +376,7 @@ export function useApi() {
   }
 
   async function createAgent(data: { name: string; providers: string[] }): Promise<Agent> {
-    return fetchApi<Agent>('/api/agents', {
+    return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     })
