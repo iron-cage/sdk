@@ -3,7 +3,6 @@
 **Version:** 1.0.0
 **Date:** 2025-12-02
 **Status:** Design document
-**Related Task:** [task/backlog/001_implement_llm_token_management_dashboard_and_backend.md](../../../task/backlog/001_implement_llm_token_management_dashboard_and_backend.md)
 
 ---
 

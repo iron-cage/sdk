@@ -5,7 +5,6 @@
 **Status:** Planning document (TDD enforced, no mocks, CLI/API parity)
 **Architecture:** [002_token_management.md](002_token_management.md)
 **CLI/API Parity:** [004_token_management_cli_api_parity.md](004_token_management_cli_api_parity.md)
-**Related Task:** [task/backlog/001_implement_llm_token_management_dashboard_and_backend.md](../../../task/backlog/001_implement_llm_token_management_dashboard_and_backend.md)
 
 ---
 

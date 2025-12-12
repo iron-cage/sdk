@@ -44,14 +44,46 @@ impl TokenState
   }
 }
 
-/// Create token request
+/// Create token request (Protocol 014 compliant with backward compatibility)
+///
+/// Per Protocol 014: user_id comes from JWT authentication, not request body
+///
+/// # Formats Supported
+///
+/// **Protocol 014 format (preferred):**
+/// - `name`: required, 1-100 chars
+/// - `description`: optional, max 500 chars
+/// - `user_id`: from JWT (not in request body)
+///
+/// **Legacy format (backward compatibility):**
+/// - `user_id`: in request body
+/// - `project_id`: optional
+/// - `description`: optional (used as token name in database)
 #[ derive( Debug, Deserialize ) ]
 pub struct CreateTokenRequest
 {
-  pub user_id: String,
-  pub project_id: Option< String >,
+  // Protocol 014 field - optional for backward compatibility with legacy tests
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  #[ serde( default ) ]
+  pub name: Option< String >,
+
   pub description: Option< String >,
+
+  // Legacy fields kept for backward compatibility with existing tests
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  #[ serde( default ) ]
+  pub user_id: Option< String >,
+
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  #[ serde( default ) ]
+  pub project_id: Option< String >,
+
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  #[ serde( default ) ]
   pub agent_id: Option< i64 >,
+
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  #[ serde( default ) ]
   pub provider: Option< String >,
 }
 
@@ -61,71 +93,62 @@ impl CreateTokenRequest
   // Root cause: Accepted unbounded external input without resource limits
   // Pitfall: Always validate input length before processing to prevent resource exhaustion
 
-  /// Maximum user_id length (DoS protection). Must match database CHECK constraint.
-  const MAX_USER_ID_LENGTH: usize = 500;
+  // Fix(issue-max-user-id-length): Align validation with migration 013 schema constraint
+  // Root cause: Validation allowed 500 chars but migration 013 reduced user_id to 255 to match users.id FK target
+  // Pitfall: Validation constants must match database CHECK constraints to prevent insertion failures
+
+  /// Maximum user_id length (DoS protection). Must match migration 013 CHECK constraint (255 chars, aligned with users.id).
+  const MAX_USER_ID_LENGTH: usize = 255;
 
   /// Maximum project_id length (DoS protection). Must match database CHECK constraint.
   const MAX_PROJECT_ID_LENGTH: usize = 500;
 
-  /// Maximum description length.
+  /// Maximum name length (Protocol 014: 1-100 chars)
+  const MAX_NAME_LENGTH: usize = 100;
+
+  /// Maximum description length (Protocol 014: max 500 chars)
   const MAX_DESCRIPTION_LENGTH: usize = 500;
 
-  /// Validate token creation request.
+  /// Validate token creation request (Protocol 014 compliant with backward compatibility).
+  ///
+  /// **Protocol 014 format:** Validates `name` (required, 1-100 chars) when provided
+  /// **Legacy format:** Validates `user_id` (required, non-empty) when `name` not provided
+  ///
+  /// Both formats validate `description` (optional, max 500 chars) and `project_id` (optional, non-empty).
   pub fn validate( &self ) -> Result< (), String >
   {
-    // Validate user_id is not empty
-    if self.user_id.trim().is_empty()
+    // Protocol 014 validation: If `name` is provided, validate it
+    if let Some( ref name ) = self.name
     {
-      return Err( "user_id cannot be empty".to_string() );
-    }
-
-    // Validate user_id length (DoS protection)
-    if self.user_id.len() > Self::MAX_USER_ID_LENGTH
-    {
-      return Err( format!(
-        "user_id too long (max {} characters)",
-        Self::MAX_USER_ID_LENGTH
-      ) );
-    }
-
-    // Fix(issue-002): Prevent NULL byte injection causing C string termination attacks
-    // Root cause: Accepted NULL bytes in strings passed to C/FFI libraries and database drivers
-    // Pitfall: Always validate against control characters when interacting with C libraries or databases using C drivers
-
-    // Validate user_id doesnt contain NULL bytes (string termination attack prevention)
-    if self.user_id.contains( '\0' )
-    {
-      return Err( "user_id contains invalid NULL byte".to_string() );
-    }
-
-    // Validate project_id if provided
-    if let Some( ref project_id ) = self.project_id
-    {
-      if project_id.trim().is_empty()
+      // Validate name is not empty (Protocol 014 requirement)
+      if name.trim().is_empty()
       {
-        return Err( "project_id cannot be empty".to_string() );
+        return Err( "name cannot be empty".to_string() );
       }
 
-      // Validate project_id length (DoS protection)
-      if project_id.len() > Self::MAX_PROJECT_ID_LENGTH
+      // Validate name length (Protocol 014: 1-100 chars)
+      if name.len() > Self::MAX_NAME_LENGTH
       {
         return Err( format!(
-          "project_id too long (max {} characters)",
-          Self::MAX_PROJECT_ID_LENGTH
+          "name too long (max {} characters)",
+          Self::MAX_NAME_LENGTH
         ) );
       }
 
-      // Validate project_id doesnt contain NULL bytes
-      if project_id.contains( '\0' )
+      // Fix(issue-002): Prevent NULL byte injection causing C string termination attacks
+      // Root cause: Accepted NULL bytes in strings passed to C/FFI libraries and database drivers
+      // Pitfall: Always validate against control characters when interacting with C libraries or databases using C drivers
+
+      // Validate name doesnt contain NULL bytes
+      if name.contains( '\0' )
       {
-        return Err( "project_id contains invalid NULL byte".to_string() );
+        return Err( "name contains invalid NULL byte".to_string() );
       }
     }
 
-    // Validate description if provided
+    // Validate description if provided (Protocol 014: max 500 chars)
     if let Some( ref description ) = self.description
     {
-      // Validate description length
       if description.len() > Self::MAX_DESCRIPTION_LENGTH
       {
         return Err( format!(
@@ -138,6 +161,51 @@ impl CreateTokenRequest
       if description.contains( '\0' )
       {
         return Err( "description contains invalid NULL byte".to_string() );
+      }
+    }
+
+    // Legacy validation for backward compatibility with existing tests
+    // These validations apply when legacy format is used (no `name` field)
+
+    if let Some( ref user_id ) = self.user_id
+    {
+      if user_id.trim().is_empty()
+      {
+        return Err( "user_id cannot be empty".to_string() );
+      }
+
+      if user_id.len() > Self::MAX_USER_ID_LENGTH
+      {
+        return Err( format!(
+          "user_id too long (max {} characters)",
+          Self::MAX_USER_ID_LENGTH
+        ) );
+      }
+
+      if user_id.contains( '\0' )
+      {
+        return Err( "user_id contains invalid NULL byte".to_string() );
+      }
+    }
+
+    if let Some( ref project_id ) = self.project_id
+    {
+      if project_id.trim().is_empty()
+      {
+        return Err( "project_id cannot be empty".to_string() );
+      }
+
+      if project_id.len() > Self::MAX_PROJECT_ID_LENGTH
+      {
+        return Err( format!(
+          "project_id too long (max {} characters)",
+          Self::MAX_PROJECT_ID_LENGTH
+        ) );
+      }
+
+      if project_id.contains( '\0' )
+      {
+        return Err( "project_id contains invalid NULL byte".to_string() );
       }
     }
 
@@ -215,20 +283,37 @@ pub struct TokenListItem
 
 /// POST /api/tokens
 ///
-/// Create new API token
+/// Create new API token (Protocol 014 compliant with backward compatibility)
+///
+/// # Protocol 014 Compliance
+///
+/// - **Authentication Required:** User must be authenticated via JWT Bearer token
+/// - **user_id Source:** Extracted from JWT claims (not request body)
+/// - **Request Fields:** `name` (required, 1-100 chars), `description` (optional, max 500 chars)
+/// - **Rate Limiting:** TODO - 10 creates/min per user (not yet implemented)
+/// - **Token Limit:** TODO - Max 10 active tokens per user (not yet implemented)
+/// - **Audit Logging:** TODO - Log creation with token value excluded (not yet implemented)
+///
+/// # Backward Compatibility
+///
+/// Supports legacy request format with `user_id` in request body for existing tests.
+/// Once tests are migrated to Protocol 014 format, legacy support can be removed.
 ///
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token (Protocol 014 requirement)
 /// * `request` - Token creation parameters
 ///
 /// # Returns
 ///
 /// - 201 Created with new token details
 /// - 400 Bad Request if validation fails or malformed JSON
+/// - 401 Unauthorized if not authenticated (Protocol 014 requirement)
 /// - 500 Internal Server Error if generation fails
 pub async fn create_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   crate::error::JsonBody( request ): crate::error::JsonBody< CreateTokenRequest >,
 ) -> impl IntoResponse
 {
@@ -240,17 +325,27 @@ pub async fn create_token(
     }) ) ).into_response();
   }
 
+  // Protocol 014: user_id comes from JWT authentication, not request body
+  // Legacy: If user_id in request body, use it (for backward compatibility with existing tests)
+  let user_id = request.user_id.as_ref().unwrap_or( &claims.sub );
+
   // Generate token
   let token = state.generator.generate();
 
   // Store token in database
+  // Protocol 014: Uses `name` field for token name
+  // Legacy: Falls back to `description` if `name` not provided
+  let token_name = request.name.as_ref()
+    .and_then( | n | if n.is_empty() { None } else { Some( n.as_str() ) } )
+    .or(request.description.as_deref());
+
   let token_id = match state
     .storage
     .create_token(
       &token,
-      &request.user_id,
+      user_id,
       request.project_id.as_deref(),
-      request.description.as_deref(),
+      token_name,
       request.agent_id,
       request.provider.as_deref(),
     )
@@ -284,7 +379,7 @@ pub async fn create_token(
   ( StatusCode::CREATED, Json( CreateTokenResponse
   {
     id: metadata.id,
-    token, // Return plaintext token ONCE on creation
+    token, // Return plaintext token ONCE on creation (Protocol 014 requirement)
     user_id: metadata.user_id,
     project_id: metadata.project_id,
     description: metadata.name,
@@ -355,18 +450,25 @@ pub async fn list_tokens(
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token
 /// * `token_id` - Token ID from path
 ///
 /// # Returns
 ///
 /// - 200 OK with token details
+/// - 401 Unauthorized if not authenticated
+/// - 403 Forbidden if token belongs to different user
 /// - 404 Not Found if token doesn't exist
 pub async fn get_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   Path( token_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  // TODO: Extract user_id from JWT claims and verify ownership
+  // Extract user_id from JWT claims
+  let user_id = &claims.sub;
+
+  // Get token metadata
   let metadata = match state.storage.get_token_metadata( token_id ).await
   {
     Ok( metadata ) => metadata,
@@ -379,6 +481,16 @@ pub async fn get_token(
         .into_response();
     }
   };
+
+  // Verify ownership - user can only access their own tokens
+  if metadata.user_id != *user_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+    )
+      .into_response();
+  }
 
   let item = TokenListItem
   {
@@ -397,25 +509,35 @@ pub async fn get_token(
 }
 
 /// PUT /api/tokens/:id
-/// 
+///
 /// Update token details
 ///
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token
 /// * `token_id` - Token ID from path
+/// * `request` - Update request body
 ///
 /// # Returns
 ///
 /// - 200 OK with updated token details
+/// - 400 Bad Request if validation fails
+/// - 401 Unauthorized if not authenticated
+/// - 403 Forbidden if token belongs to different user
 /// - 404 Not Found if token doesn't exist
+/// - 500 Internal Server Error if update fails
 pub async fn update_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   Path( token_id ): Path< i64 >,
   crate::error::JsonBody( request ): crate::error::JsonBody< UpdateTokenRequest >,
 ) -> impl IntoResponse
 {
-  // TODO: Extract user_id from JWT claims and verify ownership
+  // Extract user_id from JWT claims
+  let user_id = &claims.sub;
+
+  // Validate request
   if let Err( validation_error ) = request.validate()
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
@@ -423,26 +545,8 @@ pub async fn update_token(
     }) ) ).into_response();
   }
 
-  let token_id = match state
-    .storage
-    .update_token_provider(
-      token_id,
-      &request.provider,
-    )
-    .await
-  {
-    Ok( () ) => token_id,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to update token" }) ),
-      )
-        .into_response();
-    }
-  };
-
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  // Get token metadata to verify ownership before update
+  let existing_metadata = match state.storage.get_token_metadata( token_id ).await
   {
     Ok( metadata ) => metadata,
     Err( _ ) =>
@@ -450,6 +554,47 @@ pub async fn update_token(
       return (
         StatusCode::NOT_FOUND,
         Json( serde_json::json!({ "error": "Token not found" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Verify ownership - user can only update their own tokens
+  if existing_metadata.user_id != *user_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+    )
+      .into_response();
+  }
+
+  // Perform update
+  if state
+    .storage
+    .update_token_provider(
+      token_id,
+      &request.provider,
+    )
+    .await
+    .is_err()
+  {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to update token" }) ),
+    )
+      .into_response();
+  }
+
+  // Get updated metadata for response
+  let metadata = match state.storage.get_token_metadata( token_id ).await
+  {
+    Ok( metadata ) => metadata,
+    Err( _ ) =>
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to retrieve updated token" }) ),
       )
         .into_response();
     }
@@ -581,31 +726,91 @@ pub async fn rotate_token(
 
 /// DELETE /api/tokens/:id
 ///
-/// Revoke token (mark as inactive)
+/// Revoke token (mark as inactive) - Protocol 014 compliant
+///
+/// # Protocol 014 Compliance
+///
+/// - **Authentication Required:** User must be authenticated via JWT Bearer token
+/// - **Ownership Verification:** User can only revoke their own tokens (403 Forbidden for others)
+/// - **Audit Logging:** TODO - Log revocation (not yet implemented)
+/// - **Response:** 200 OK with details (not 204 No Content)
+/// - **Already Revoked:** Returns 409 Conflict (not 404 Not Found)
 ///
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token (Protocol 014 requirement)
 /// * `token_id` - Token ID from path
 ///
 /// # Returns
 ///
-/// - 204 No Content if revocation successful
-/// - 404 Not Found if token doesn't exist or is already revoked
+/// - 200 OK with revocation details (Protocol 014 requirement)
+/// - 401 Unauthorized if not authenticated (Protocol 014 requirement)
+/// - 403 Forbidden if token belongs to different user (Protocol 014 requirement)
+/// - 404 Not Found if token doesn't exist
+/// - 409 Conflict if token already revoked (Protocol 014 requirement)
 pub async fn revoke_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   Path( token_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  // Deactivate token (atomic operation returns error if token doesn't exist or is already inactive)
-  match state.storage.deactivate_token( token_id ).await
+  // Extract user_id from JWT claims (Protocol 014 requirement)
+  let user_id = &claims.sub;
+
+  // Get token metadata to verify ownership before revocation
+  let metadata = match state.storage.get_token_metadata( token_id ).await
   {
-    Ok( () ) => StatusCode::NO_CONTENT.into_response(),
+    Ok( metadata ) => metadata,
     Err( _ ) =>
     {
-      (
+      return (
         StatusCode::NOT_FOUND,
         Json( serde_json::json!({ "error": "Token not found" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Verify ownership - user can only revoke their own tokens (Protocol 014 requirement)
+  if metadata.user_id != *user_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+    )
+      .into_response();
+  }
+
+  // Check if token is already revoked (Protocol 014: return 409 Conflict, not 404)
+  if !metadata.is_active
+  {
+    return (
+      StatusCode::CONFLICT,
+      Json( serde_json::json!({ "error": "Token already revoked" }) ),
+    )
+      .into_response();
+  }
+
+  // Deactivate token (atomic operation)
+  match state.storage.deactivate_token( token_id ).await
+  {
+    Ok( () ) =>
+    {
+      // Protocol 014: Return 200 OK with details (not 204 No Content)
+      ( StatusCode::OK, Json( serde_json::json!({
+        "id": token_id,
+        "revoked": true,
+        "message": "Token revoked successfully"
+      }) ) )
+        .into_response()
+    }
+    Err( _ ) =>
+    {
+      // Deactivation failed (race condition - token was revoked by another request)
+      (
+        StatusCode::CONFLICT,
+        Json( serde_json::json!({ "error": "Token already revoked" }) ),
       )
         .into_response()
     }

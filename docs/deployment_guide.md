@@ -19,7 +19,7 @@
 
 **⚠️ DEPLOYMENT SCOPE:** This guide describes **future production deployment architecture** with 3 modes (Local, On-Premise, SaaS), centralized iron_cage-runtime, K8s orchestration, PostgreSQL + Redis infrastructure.
 
-**For current pilot implementation deployment** (single-process localhost architecture), see [docs/deployment_packages.md](../../docs/deployment_packages.md) § Deployment Modes.
+**For current pilot implementation deployment** (single-process localhost architecture), see project specification for deployment modes.
 
 **Relationship:**
 - **This Guide:** Future production deployment options (Local/On-Premise/SaaS)

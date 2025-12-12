@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -20,7 +21,7 @@ Real-time WebSocket message format for streaming agent state updates, events, an
 
 **Out of Scope:**
 - REST API protocol (see [002_rest_api_protocol.md](002_rest_api_protocol.md))
-- IronLang data protocol (see [001_ironlang_data_protocol.md](001_ironlang_data_protocol.md))
+- IronLang data protocol (see [-archived_001_ironlang_data_protocol.md](-archived_001_ironlang_data_protocol.md))
 - Dashboard UI implementation (see `module/iron_dashboard/`)
 - WebSocket server implementation (see `module/iron_control_api/spec.md` § FR-3)
 
@@ -165,7 +166,3 @@ This protocol adheres to the following Iron Cage standards:
 - Specification: `module/iron_control_api/spec.md` § FR-3 - WebSocket streaming specification
 
 ---
-
-**Last Updated:** 2025-12-09
-**Document Version:** 1.0
-**Status:** Specification complete

@@ -61,6 +61,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
   let provider_key_storage = Arc::new(
     iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
   );
+  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
 
   BudgetState
   {
@@ -70,6 +71,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     agent_budget_manager,
     provider_key_storage,
     db_pool: pool,
+    jwt_secret,
   }
 }
 
@@ -802,6 +804,9 @@ async fn test_refresh_with_insufficient_agent_budget()
 
   let state = create_test_budget_state( pool.clone() ).await;
 
+  // Generate IC Token for agent 1
+  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+
   // Create active lease
   let lease_id = "lease_refresh_test";
   state
@@ -813,7 +818,8 @@ async fn test_refresh_with_insufficient_agent_budget()
   // Try to refresh with $10.00 (exceeds remaining $5.00)
   let request_body = json!(
   {
-    "lease_id": lease_id,
+    "ic_token": ic_token,
+    "current_lease_id": lease_id,
     "requested_budget": 10.0
   } );
 

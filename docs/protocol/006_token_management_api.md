@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -407,8 +408,3 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - Tests: `module/iron_control_api/tests/tokens_test.rs` - Integration tests
 
 ---
-
-**Last Updated:** 2025-12-09
-**Document Version:** 1.0
-**API Version:** v1 (`/api/v1/`)
-**Status:** ✅ Certain (required for Pilot)

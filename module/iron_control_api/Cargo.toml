@@ -101,3 +101,4 @@ hex = { version = "0.4", optional = true }
 tokio = { workspace = true, features = ["full"] }
 hyper = { workspace = true }
 http-body-util = { workspace = true }
+sha2 = { workspace = true }

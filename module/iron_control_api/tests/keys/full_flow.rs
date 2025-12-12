@@ -74,6 +74,58 @@ impl TestState
 
     let rate_limiter = RateLimiter::new( requests, period );
 
+    // Create test users to satisfy foreign key constraints (migration 013)
+    let pool = token_storage.pool();
+    let now = std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .expect( "Time went backwards" )
+      .as_secs() as i64;
+
+    // Create test_user (used in most tests)
+    sqlx::query(
+      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind( "test_user" )
+    .bind( "test_user" )
+    .bind( "test@example.com" )
+    .bind( "hash" )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now )
+    .execute( pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to create test_user" );
+
+    // Create user_a (used in different_projects test)
+    sqlx::query(
+      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind( "user_a" )
+    .bind( "user_a" )
+    .bind( "user_a@example.com" )
+    .bind( "hash" )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now )
+    .execute( pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to create user_a" );
+
+    // Create user_b (used in different_projects test)
+    sqlx::query(
+      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind( "user_b" )
+    .bind( "user_b" )
+    .bind( "user_b@example.com" )
+    .bind( "hash" )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now )
+    .execute( pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to create user_b" );
+
     Self {
       token_storage: Arc::new( token_storage ),
       token_generator: TokenGenerator::new(),

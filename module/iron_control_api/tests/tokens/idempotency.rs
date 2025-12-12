@@ -8,13 +8,13 @@
 //!
 //! | Test Case | Endpoint | Operation | Expected Result | Status |
 //! |-----------|----------|-----------|----------------|--------|
-//! | `test_create_token_same_data_produces_different_tokens` | POST /api/tokens | Create twice with same data | Two different tokens | ✅ |
-//! | `test_revoke_nonexistent_token_returns_404` | DELETE /api/tokens/:id | Delete non-existent | 404 Not Found | ✅ |
+//! | `test_create_token_same_data_produces_different_tokens` | POST /api/v1/api-tokens | Create twice with same data | Two different tokens | ✅ |
+//! | `test_revoke_nonexistent_token_returns_404` | DELETE /api/v1/api-tokens/:id | Delete non-existent | 404 Not Found | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
 //! **Non-Idempotency (by design):**
-//! - ✅ POST /api/tokens is NOT idempotent
+//! - ✅ POST /api/v1/api-tokens is NOT idempotent
 //! - ✅ Same user_id + project_id → Different token each time
 //! - ✅ Security: Prevents token prediction
 //!
@@ -29,29 +29,38 @@
 //! **Note**: Token revocation idempotency (delete twice → 404) is tested
 //! in `state_transitions.rs::test_revoke_already_revoked_token`.
 
-use iron_control_api::routes::tokens::{ TokenState, CreateTokenResponse };
+use iron_control_api::routes::tokens::CreateTokenResponse;
 use axum::{ Router, routing::{ post, delete }, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 use serde_json::json;
 
-/// Create test router with token routes.
-async fn create_test_router() -> Router
+/// Helper: Generate JWT token for a given user_id
+fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token state" );
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+}
 
-  Router::new()
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( token_state )
+/// Create test router with token routes.
+async fn create_test_router() -> ( Router, crate::common::test_state::TestAppState )
+{
+  // Create test application state with auth + token support
+  let app_state = crate::common::test_state::TestAppState::new().await;
+
+  let router = Router::new()
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
 }
 
 #[ tokio::test ]
 async fn test_create_token_same_data_produces_different_tokens()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
 
   let request_body = json!({
     "user_id": "test_user",
@@ -59,10 +68,12 @@ async fn test_create_token_same_data_produces_different_tokens()
   });
 
   // WHY: Create first token
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request1 = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -79,8 +90,9 @@ async fn test_create_token_same_data_produces_different_tokens()
   // WHY: Create second token with SAME data
   let request2 = Request::builder()
     .method( "POST" )
-    .uri( "/api/tokens" )
+    .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -114,12 +126,16 @@ async fn test_create_token_same_data_produces_different_tokens()
 #[ tokio::test ]
 async fn test_revoke_nonexistent_token_returns_404()
 {
-  let router = create_test_router().await;
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for a test user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   // WHY: Revoking a token that never existed should return 404
   let request = Request::builder()
     .method( "DELETE" )
-    .uri( "/api/tokens/999999" )
+    .uri( "/api/v1/api-tokens/999999" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 

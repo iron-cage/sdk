@@ -80,8 +80,40 @@
 //! - Fix comment: `hash_token()` function (lines 148-153)
 
 use rand::{ Rng, thread_rng };
-use base64::{ Engine as _, engine::general_purpose };
 use sha2::{ Sha256, Digest };
+
+/// Base62 alphabet (0-9, A-Z, a-z)
+const BASE62_ALPHABET: &[ u8 ] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/// Encode bytes as Base62
+///
+/// Converts random bytes to Base62 string using custom encoding.
+/// This produces URL-safe tokens without special characters.
+fn encode_base62( bytes: &[ u8 ] ) -> String
+{
+  let mut result = String::new();
+
+  // Simple byte-to-character mapping for deterministic output
+  for chunk in bytes.chunks( 3 )
+  {
+    // Convert up to 3 bytes to a 24-bit number
+    let mut num: u32 = 0;
+    for (i, &byte) in chunk.iter().enumerate()
+    {
+      num |= u32::from( byte ) << ( 8 * ( 2 - i ) );
+    }
+
+    // Extract 4 Base62 characters from 24 bits
+    for _ in 0..4
+    {
+      let idx = ( num % 62 ) as usize;
+      result.push( BASE62_ALPHABET[ idx ] as char );
+      num /= 62;
+    }
+  }
+
+  result
+}
 
 /// Token generator for API access
 ///
@@ -120,17 +152,41 @@ impl TokenGenerator
 
   /// Generate cryptographically secure random token
   ///
-  /// Generates 32 random bytes using `thread_rng()` and encodes as base64.
+  /// Generates 48 random bytes using `thread_rng()` and encodes as Base62 with `apitok_` prefix.
   ///
   /// # Returns
   ///
-  /// Base64-encoded token string (44 characters for 32 bytes)
+  /// Token string in format `apitok_{64 Base62 characters}` (71 characters total)
+  ///
+  /// # Token Format (Protocol 014)
+  ///
+  /// - Prefix: `apitok_` (7 characters)
+  /// - Body: 64 Base62 characters ([0-9A-Za-z])
+  /// - Total length: 71 characters
+  /// - Entropy: 256+ bits (48 random bytes)
   #[ must_use ]
   pub fn generate( &self ) -> String
   {
     let mut rng = thread_rng();
-    let random_bytes : [ u8; 32 ] = rng.gen();
-    general_purpose::STANDARD.encode( random_bytes )
+
+    // Generate 48 random bytes (384 bits entropy)
+    let mut random_bytes = vec![ 0u8; 48 ];
+    rng.fill( &mut random_bytes[ .. ] );
+
+    let encoded = encode_base62( &random_bytes );
+
+    // Ensure exactly 64 characters by padding or truncating
+    let body = if encoded.len() >= 64
+    {
+      encoded[ ..64 ].to_string()
+    }
+    else
+    {
+      // Pad with zeros if needed (should not happen with 48 bytes)
+      format!( "{encoded:0<64}" )
+    };
+
+    format!( "apitok_{body}" )
   }
 
   /// Generate token with custom prefix
@@ -160,7 +216,7 @@ impl TokenGenerator
   ///
   /// # Arguments
   ///
-  /// * `token` - Plaintext token to hash
+  /// * `token` - Plaintext token to hash (with or without `apitok_` prefix)
   ///
   /// # Returns
   ///
@@ -175,11 +231,20 @@ impl TokenGenerator
   /// - No salt needed for high-entropy random values
   ///
   /// For LOW-ENTROPY passwords, use BCrypt/Argon2 instead.
+  ///
+  /// # Backward Compatibility (Protocol 014)
+  ///
+  /// - New tokens (format `apitok_{64 chars}`): Strips `apitok_` prefix before hashing
+  /// - Old tokens (no prefix): Hashes entire token as-is
+  /// - This ensures old tokens continue to authenticate during migration period
   #[ must_use ]
   pub fn hash_token( &self, token: &str ) -> String
   {
+    // Strip apitok_ prefix if present (Protocol 014 new format)
+    let token_body = token.strip_prefix( "apitok_" ).unwrap_or( token );
+
     let mut hasher = Sha256::new();
-    hasher.update( token.as_bytes() );
+    hasher.update( token_body.as_bytes() );
     format!( "{:x}", hasher.finalize() )
   }
 

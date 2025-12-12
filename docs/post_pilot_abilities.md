@@ -260,5 +260,4 @@ Not yet specified
 
 **Related Documents:**
 - Current Pilot scope: [spec/requirements.md](../spec/requirements.md)
-- API specifications: [docs/protocol/](protocol/)
-- REST API decisions: [-rest_api_questions_complete.md](-rest_api_questions_complete.md)
+- API specifications: [docs/protocol/](protocol/readme.md)

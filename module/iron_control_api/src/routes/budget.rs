@@ -7,10 +7,10 @@
 //! - POST /api/budget/report - Report LLM usage cost to Control Panel
 //! - POST /api/budget/refresh - Request additional budget when running low
 
-use crate::{ ic_token::IcTokenManager, ip_token::IpTokenCrypto };
+use crate::{ ic_token::IcTokenManager, ip_token::IpTokenCrypto, jwt_auth::JwtSecret, routes::auth::AuthState };
 use axum::
 {
-  extract::State,
+  extract::{ FromRef, State },
   http::StatusCode,
   response::{ IntoResponse, Json },
 };
@@ -35,6 +35,20 @@ pub struct BudgetState
   pub agent_budget_manager: Arc< AgentBudgetManager >,
   pub provider_key_storage: Arc< ProviderKeyStorage >,
   pub db_pool: SqlitePool,
+  pub jwt_secret: Arc< JwtSecret >,
+}
+
+/// Enable AuthState extraction from BudgetState
+impl FromRef< BudgetState > for AuthState
+{
+  fn from_ref( state: &BudgetState ) -> Self
+  {
+    AuthState
+    {
+      jwt_secret: state.jwt_secret.clone(),
+      db_pool: state.db_pool.clone(),
+    }
+  }
 }
 
 impl BudgetState
@@ -45,6 +59,7 @@ impl BudgetState
   ///
   /// * `ic_token_secret` - Secret key for IC Token JWT signing
   /// * `ip_token_key` - 32-byte encryption key for IP Token AES-256-GCM
+  /// * `jwt_secret` - Secret key for JWT access token signing/verification
   /// * `database_url` - Database connection string
   ///
   /// # Errors
@@ -53,6 +68,7 @@ impl BudgetState
   pub async fn new(
     ic_token_secret: String,
     ip_token_key: &[ u8 ],
+    jwt_secret: Arc< JwtSecret >,
     database_url: &str,
   ) -> Result< Self, Box< dyn std::error::Error > >
   {
@@ -71,6 +87,7 @@ impl BudgetState
       agent_budget_manager,
       provider_key_storage,
       db_pool,
+      jwt_secret,
     } )
   }
 }
@@ -261,17 +278,24 @@ pub struct UsageReportResponse
 #[ derive( Debug, Deserialize ) ]
 pub struct BudgetRefreshRequest
 {
-  pub lease_id: String,
-  pub requested_budget: f64,
+  pub ic_token: String,
+  pub current_lease_id: String,
+  pub requested_budget: Option< f64 >,
 }
 
 impl BudgetRefreshRequest
 {
+  /// Maximum IC Token length
+  const MAX_IC_TOKEN_LENGTH: usize = 2000;
+
   /// Maximum lease_id length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Maximum budget request (USD)
   const MAX_BUDGET_REQUEST: f64 = 1000.0;
+
+  /// Default budget refresh amount (USD)
+  const DEFAULT_REFRESH_BUDGET: f64 = 10.0;
 
   /// Validate budget refresh request parameters
   ///
@@ -280,36 +304,58 @@ impl BudgetRefreshRequest
   /// Returns error if validation fails
   pub fn validate( &self ) -> Result< (), String >
   {
-    // Validate lease_id
-    if self.lease_id.trim().is_empty()
+    // Validate ic_token
+    if self.ic_token.trim().is_empty()
     {
-      return Err( "lease_id cannot be empty".to_string() );
+      return Err( "ic_token cannot be empty".to_string() );
     }
 
-    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
+    if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
     {
       return Err( format!(
-        "lease_id too long (max {} characters)",
+        "ic_token too long (max {} characters)",
+        Self::MAX_IC_TOKEN_LENGTH
+      ) );
+    }
+
+    // Validate current_lease_id
+    if self.current_lease_id.trim().is_empty()
+    {
+      return Err( "current_lease_id cannot be empty".to_string() );
+    }
+
+    if self.current_lease_id.len() > Self::MAX_LEASE_ID_LENGTH
+    {
+      return Err( format!(
+        "current_lease_id too long (max {} characters)",
         Self::MAX_LEASE_ID_LENGTH
       ) );
     }
 
-    // Validate requested_budget is positive
-    if self.requested_budget <= 0.0
+    // Validate requested_budget if provided
+    if let Some( budget ) = self.requested_budget
     {
-      return Err( "requested_budget must be positive".to_string() );
-    }
+      if budget <= 0.0
+      {
+        return Err( "requested_budget must be positive".to_string() );
+      }
 
-    // Validate requested_budget doesnt exceed maximum
-    if self.requested_budget > Self::MAX_BUDGET_REQUEST
-    {
-      return Err( format!(
-        "requested_budget too large (max ${} USD)",
-        Self::MAX_BUDGET_REQUEST
-      ) );
+      if budget > Self::MAX_BUDGET_REQUEST
+      {
+        return Err( format!(
+          "requested_budget too large (max ${} USD)",
+          Self::MAX_BUDGET_REQUEST
+        ) );
+      }
     }
 
     Ok( () )
+  }
+
+  /// Get requested budget or default
+  pub fn get_requested_budget( &self ) -> f64
+  {
+    self.requested_budget.unwrap_or( Self::DEFAULT_REFRESH_BUDGET )
   }
 }
 
@@ -730,8 +776,45 @@ pub async fn refresh_budget(
     } ) ) ).into_response();
   }
 
+  // Verify IC Token
+  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  {
+    Ok( claims ) => claims,
+    Err( _ ) =>
+    {
+      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+      {
+        "error": "Invalid IC Token"
+      } ) ) ).into_response();
+    }
+  };
+
+  // Extract agent_id from IC Token claims
+  // Claims.agent_id format: "agent_<id>"
+  let agent_id = match claims.agent_id.strip_prefix( "agent_" )
+  {
+    Some( id_str ) => match id_str.parse::< i64 >()
+    {
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+        {
+          "error": "Invalid agent ID in IC Token"
+        } ) ) ).into_response();
+      }
+    },
+    None =>
+    {
+      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+      {
+        "error": "Invalid IC Token agent_id format"
+      } ) ) ).into_response();
+    }
+  };
+
   // Get current lease
-  let lease = match state.lease_manager.get_lease( &request.lease_id ).await
+  let lease = match state.lease_manager.get_lease( &request.current_lease_id ).await
   {
     Ok( Some( lease ) ) => lease,
     Ok( None ) =>
@@ -752,6 +835,19 @@ pub async fn refresh_budget(
         .into_response();
     }
   };
+
+  // Verify IC Token agent matches lease owner (authorization check)
+  if lease.agent_id != agent_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!(
+      {
+        "error": "Unauthorized - lease belongs to different agent"
+      } ) ),
+    )
+      .into_response();
+  }
 
   // Get agent budget
   let agent_budget = match state
@@ -779,8 +875,11 @@ pub async fn refresh_budget(
     }
   };
 
+  // Get requested budget amount (with default)
+  let requested_budget = request.get_requested_budget();
+
   // Check if agent has sufficient remaining budget
-  if agent_budget.budget_remaining < request.requested_budget
+  if agent_budget.budget_remaining < requested_budget
   {
     // Deny request
     return ( StatusCode::OK, Json( BudgetRefreshResponse
@@ -803,7 +902,7 @@ pub async fn refresh_budget(
       &new_lease_id,
       lease.agent_id,
       lease.budget_id,
-      request.requested_budget,
+      requested_budget,
       None,
     )
     .await
@@ -817,7 +916,7 @@ pub async fn refresh_budget(
   }
 
   // Expire old lease
-  if let Err( err ) = state.lease_manager.expire_lease( &request.lease_id ).await
+  if let Err( err ) = state.lease_manager.expire_lease( &request.current_lease_id ).await
   {
     tracing::error!( "Database error expiring old lease: {}", err );
     // Continue anyway - new lease was created
@@ -830,8 +929,8 @@ pub async fn refresh_budget(
   ( StatusCode::OK, Json( BudgetRefreshResponse
   {
     status: "approved".to_string(),
-    budget_granted: Some( request.requested_budget ),
-    budget_remaining: agent_budget.budget_remaining - request.requested_budget,
+    budget_granted: Some( requested_budget ),
+    budget_remaining: agent_budget.budget_remaining - requested_budget,
     lease_id: Some( new_lease_id ),
     reason: None,
   } ) )
@@ -963,16 +1062,19 @@ pub struct CreateBudgetRequestResponse
 /// # Arguments
 ///
 /// * `state` - Budget protocol state (database, managers)
+/// * `user` - Authenticated user from JWT
 /// * `request` - Budget request parameters
 ///
 /// # Returns
 ///
 /// - 201 Created with request_id if successful
 /// - 400 Bad Request if validation fails
+/// - 403 Forbidden if user doesn't own agent
 /// - 404 Not Found if agent doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn create_budget_request(
   State( state ): State< BudgetState >,
+  user: crate::jwt_auth::AuthenticatedUser,
   Json( request ): Json< CreateBudgetRequestRequest >,
 ) -> impl IntoResponse
 {
@@ -985,21 +1087,17 @@ pub async fn create_budget_request(
     } ) ) ).into_response();
   }
 
-  // Check if agent exists
-  let agent_check = sqlx::query( "SELECT id FROM agents WHERE id = ?" )
-    .bind( request.agent_id )
-    .fetch_optional( &state.db_pool )
-    .await;
+  // Check if agent exists and verify ownership
+  let agent_owner_result = sqlx::query_scalar::<sqlx::Sqlite, String>(
+    "SELECT owner_id FROM agents WHERE id = ?"
+  )
+  .bind( request.agent_id )
+  .fetch_optional( &state.db_pool )
+  .await;
 
-  match agent_check
+  let agent_owner = match agent_owner_result
   {
-    Ok( None ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
-      {
-        "error": "Agent not found"
-      } ) ) ).into_response();
-    }
+    Ok( owner ) => owner,
     Err( err ) =>
     {
       tracing::error!( "Database error checking agent: {}", err );
@@ -1009,9 +1107,28 @@ pub async fn create_budget_request(
       )
         .into_response();
     }
-    Ok( Some( _ ) ) =>
+  };
+
+  match agent_owner
+  {
+    None =>
     {
-      // Agent exists, continue
+      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
+      {
+        "error": "Agent not found"
+      } ) ) ).into_response();
+    }
+    Some( owner_id ) if user.0.role != "admin" && owner_id != user.0.sub =>
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "You don't own this agent" }) ),
+      )
+        .into_response();
+    }
+    Some( _ ) =>
+    {
+      // Authorized - user owns the agent or is admin
     }
   }
 

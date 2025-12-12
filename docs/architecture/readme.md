@@ -57,5 +57,5 @@
                     +---------------------+
 ```
 
-*For capability concepts, see [capabilities/](../capabilities/)*
-*For deployment concepts, see [deployment/](../deployment/)*
+*For capability concepts, see [capabilities/](../capabilities/readme.md)*
+*For deployment concepts, see [deployment/](../deployment/readme.md)*

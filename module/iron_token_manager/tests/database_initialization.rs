@@ -84,12 +84,12 @@ async fn test_isolated_test_databases()
   let ( pool1, _temp1 ) = create_test_db().await;
   let ( pool2, _temp2 ) = create_test_db().await;
 
-  // Insert data into first database
+  // Insert token into first database (uses user_001 from seed_test_users)
   sqlx::query(
     "INSERT INTO api_tokens (token_hash, user_id, created_at) VALUES ($1, $2, $3)"
   )
   .bind( "test_hash_db1" )
-  .bind( "user_db1" )
+  .bind( "user_001" )
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool1 )
   .await
@@ -156,7 +156,7 @@ async fn test_production_schema_matches_test_schema()
   .await
   .expect( "Failed to count indexes" );
 
-  assert_eq!( index_count, 39, "Should have 39 indexes across all migrations" );
+  assert_eq!( index_count, 40, "Should have 40 indexes across all migrations (migration 013 added idx_api_tokens_agent_id)" );
 }
 
 #[ tokio::test ]

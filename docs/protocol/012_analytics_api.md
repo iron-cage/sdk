@@ -93,7 +93,7 @@ Authorization: Bearer <ic_token>
   "input_tokens": 150,
   "output_tokens": 50,
   "cost_micros": 1250,
-  "agent_id": 42,
+  "agent_id": "agent_abc123",
   "provider_id": "ip_openai-001"
 }
 ```
@@ -110,7 +110,7 @@ Authorization: Bearer <ic_token>
 | `input_tokens` | integer | YES* | Input token count (*required for completed) |
 | `output_tokens` | integer | YES* | Output token count (*required for completed) |
 | `cost_micros` | integer | YES* | Cost in microdollars (1 USD = 1,000,000) |
-| `agent_id` | integer | NO | Agent identifier - references `agents.id` (optional) |
+| `agent_id` | string | NO | Agent identifier (optional) |
 | `provider_id` | string | NO | Provider key identifier (optional) |
 | `error_code` | string | NO | Error code (for failed events) |
 | `error_message` | string | NO | Error message (for failed events) |
@@ -167,37 +167,9 @@ Content-Type: application/json
 **Behavior:**
 
 - **Async processing:** Server accepts immediately (202), processes asynchronously
-- **Idempotent:** Duplicate `(agent_id, event_id)` returns 200 (not error)
-- **Per-agent deduplication:** Same `event_id` from different agents are distinct events
+- **Idempotent:** Duplicate `event_id` returns 200 (not error)
 - **Non-blocking:** LlmRouter sends fire-and-forget, doesn't wait for response
 - **Retry:** On network failure, LlmRouter retries with exponential backoff
-
-**Storage:**
-
-All events stored in single shared `analytics_events` table:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     analytics_events                         │
-├─────────────────────────────────────────────────────────────┤
-│ id │ event_id │ agent_id │ model     │ cost_micros │ ...   │
-├────┼──────────┼──────────┼───────────┼─────────────┼───────┤
-│ 1  │ evt_001  │ 42       │ gpt-4o    │ 1250        │       │
-│ 2  │ evt_002  │ 42       │ gpt-4o    │ 800         │       │
-│ 3  │ evt_001  │ 99       │ claude    │ 2100        │ ✓     │ ← same event_id, different agent
-│ 4  │ evt_003  │ 42       │ gpt-4o    │ 500         │       │
-└─────────────────────────────────────────────────────────────┘
-        ↑
-   UNIQUE(agent_id, event_id)  ← per-agent deduplication
-```
-
-**Deduplication examples:**
-
-```
-Agent 42 sends: { event_id: "evt_001", agent_id: 42 } → 202 Accepted
-Agent 99 sends: { event_id: "evt_001", agent_id: 99 } → 202 Accepted (different agent)
-Agent 42 sends: { event_id: "evt_001", agent_id: 42 } → 200 Duplicate (same agent+event)
-```
 
 **Cost Units:**
 
@@ -217,7 +189,7 @@ $1.00 USD = 1,000,000 microdollars
   "event_type": "llm_request_failed",
   "model": "gpt-4o-mini",
   "provider": "openai",
-  "agent_id": 42,
+  "agent_id": "agent_abc123",
   "provider_id": "ip_openai-001",
   "error_code": "rate_limit_exceeded",
   "error_message": "Rate limit exceeded. Please retry after 60 seconds."
@@ -259,7 +231,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range: `today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time` |
-| `agent_id` | integer | - | Filter by specific agent (optional) |
+| `agent_id` | string | - | Filter by specific agent (optional) |
 | `provider_id` | string | - | Filter by specific provider (optional) |
 
 **Success Response:**
@@ -316,7 +288,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent (returns single result) |
+| `agent_id` | string | - | Filter by specific agent (returns single result) |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -367,7 +339,7 @@ Content-Type: application/json
 | Field | Type | Description |
 |-------|------|-------------|
 | `data[]` | array | Agent spending records (sorted by spending desc) |
-| `data[].agent_id` | integer | Agent identifier |
+| `data[].agent_id` | string | Agent identifier |
 | `data[].agent_name` | string | Agent name |
 | `data[].spending` | number | Amount spent (USD) |
 | `data[].budget` | number | Total budget (USD) |
@@ -405,7 +377,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | integer | - | Filter agents above threshold (e.g., 80 = show agents with >80% budget used) |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `status` | string | - | Filter by status: `active`, `exhausted`, `inactive` |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -508,7 +480,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider (returns single result) |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -593,7 +565,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `today` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -653,7 +625,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -740,7 +712,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -835,7 +807,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -918,7 +890,7 @@ All list endpoints support pagination:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `agent_id` | integer | Filter by specific agent |
+| `agent_id` | string | Filter by specific agent |
 | `provider_id` | string | Filter by specific provider |
 
 **Note:** Filters are optional. Omitting filters returns data for all accessible agents/providers (based on user authorization).
@@ -1073,4 +1045,4 @@ iron analytics budget status --status active
 
 **Protocol 012 Version:** 1.5.0
 **Status:** Specification
-**Last Updated:** 2025-12-11
+**Last Updated:** 2025-12-12

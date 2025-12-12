@@ -133,43 +133,66 @@ fn test_usage_report_request_validation()
 #[ test ]
 fn test_budget_refresh_request_validation()
 {
-  // Valid request
+  // Valid request with explicit budget
   let valid_req = BudgetRefreshRequest
   {
-    lease_id: "lease_abc123".to_string(),
-    requested_budget: 10.0,
+    ic_token: "valid_token_here".to_string(),
+    current_lease_id: "lease_abc123".to_string(),
+    requested_budget: Some( 10.0 ),
   };
   assert!( valid_req.validate().is_ok() );
 
-  // Empty lease_id
+  // Valid request with default budget (None)
+  let default_budget_req = BudgetRefreshRequest
+  {
+    ic_token: "valid_token_here".to_string(),
+    current_lease_id: "lease_abc123".to_string(),
+    requested_budget: None,
+  };
+  assert!( default_budget_req.validate().is_ok() );
+
+  // Empty ic_token
+  let empty_token_req = BudgetRefreshRequest
+  {
+    ic_token: "".to_string(),
+    current_lease_id: "lease_abc123".to_string(),
+    requested_budget: Some( 10.0 ),
+  };
+  assert!( empty_token_req.validate().is_err() );
+
+  // Empty current_lease_id
   let empty_lease_req = BudgetRefreshRequest
   {
-    lease_id: "".to_string(),
-    requested_budget: 10.0,
+    ic_token: "valid_token_here".to_string(),
+    current_lease_id: "".to_string(),
+    requested_budget: Some( 10.0 ),
   };
   assert!( empty_lease_req.validate().is_err() );
 
   // Zero budget request
   let zero_budget_req = BudgetRefreshRequest
   {
-    lease_id: "lease_abc123".to_string(),
-    requested_budget: 0.0,
+    ic_token: "valid_token_here".to_string(),
+    current_lease_id: "lease_abc123".to_string(),
+    requested_budget: Some( 0.0 ),
   };
   assert!( zero_budget_req.validate().is_err() );
 
   // Negative budget request
   let negative_budget_req = BudgetRefreshRequest
   {
-    lease_id: "lease_abc123".to_string(),
-    requested_budget: -10.0,
+    ic_token: "valid_token_here".to_string(),
+    current_lease_id: "lease_abc123".to_string(),
+    requested_budget: Some( -10.0 ),
   };
   assert!( negative_budget_req.validate().is_err() );
 
   // Budget request too large (DoS prevention)
   let large_budget_req = BudgetRefreshRequest
   {
-    lease_id: "lease_abc123".to_string(),
-    requested_budget: 1001.0,
+    ic_token: "valid_token_here".to_string(),
+    current_lease_id: "lease_abc123".to_string(),
+    requested_budget: Some( 1001.0 ),
   };
   assert!( large_budget_req.validate().is_err() );
 }
@@ -304,9 +327,10 @@ async fn test_budget_state_creation()
 {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+  let jwt_secret = std::sync::Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
   let database_url = "sqlite::memory:";
 
-  let state = BudgetState::new( ic_token_secret, &ip_token_key, database_url ).await;
+  let state = BudgetState::new( ic_token_secret, &ip_token_key, jwt_secret, database_url ).await;
   assert!( state.is_ok(), "Should create budget state" );
 }
 

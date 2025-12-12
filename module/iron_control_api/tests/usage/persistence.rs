@@ -148,6 +148,27 @@ async fn test_usage_persists_across_restart()
       .await
       .expect( "LOUD FAILURE: Failed to create token state" );
 
+    // Create test user (required by FK constraint from migration 013)
+    let pool = token_state.storage.pool();
+    let now_ms = std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .unwrap()
+      .as_millis() as i64;
+
+    sqlx::query(
+      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind( "persistence-test-user" )
+    .bind( "persistence-test-user" )
+    .bind( "persistence@example.com" )
+    .bind( "hash" )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now_ms )
+    .execute( pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to create test user" );
+
     // Create token
     let generator = TokenGenerator::new();
     let token = generator.generate();
@@ -286,6 +307,27 @@ async fn test_usage_persists_across_multiple_restarts()
     let usage_state = UsageState::new( &db_url ).await.expect( "Failed cycle 1 create" );
     let token_state = TokenState::new( &db_url ).await.expect( "Failed token create" );
 
+    // Create test user (required by FK constraint from migration 013)
+    let pool = token_state.storage.pool();
+    let now_ms = std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .unwrap()
+      .as_millis() as i64;
+
+    sqlx::query(
+      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind( "multi-restart-user" )
+    .bind( "multi-restart-user" )
+    .bind( "multi1@example.com" )
+    .bind( "hash" )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now_ms )
+    .execute( pool )
+    .await
+    .expect( "Failed to create test user 1" );
+
     let generator = TokenGenerator::new();
     let token = generator.generate();
     let token_id = token_state.storage.create_token(
@@ -313,6 +355,27 @@ async fn test_usage_persists_across_multiple_restarts()
   {
     let usage_state = UsageState::new( &db_url ).await.expect( "Failed cycle 2 create" );
     let token_state = TokenState::new( &db_url ).await.expect( "Failed token state 2" );
+
+    // Create second test user (required by FK constraint from migration 013)
+    let pool = token_state.storage.pool();
+    let now_ms = std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .unwrap()
+      .as_millis() as i64;
+
+    sqlx::query(
+      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind( "multi-restart-user-2" )
+    .bind( "multi-restart-user-2" )
+    .bind( "multi2@example.com" )
+    .bind( "hash" )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now_ms )
+    .execute( pool )
+    .await
+    .expect( "Failed to create test user 2" );
 
     let generator = TokenGenerator::new();
     let token = generator.generate();
