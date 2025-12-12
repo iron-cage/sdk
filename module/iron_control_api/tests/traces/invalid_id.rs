@@ -1,6 +1,12 @@
 //! Tests for invalid ID parameter handling in traces endpoints
 //!
 //! Verifies that non-numeric IDs return JSON error responses per FR-5 specification.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_get_trace_with_non_numeric_id_returns_json_error` | Get trace with non-numeric ID | GET /api/traces/abc with auth | 400 Bad Request, JSON error | ✅ |
 
 use axum::{ http::StatusCode, body::Body, Router };
 use tower::ServiceExt;

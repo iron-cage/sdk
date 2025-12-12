@@ -28,6 +28,13 @@
 //! 1. Cycle 1: `TokenState::new()` runs migrations, creates token, records 150 tokens
 //! 2. Cycle 2: `TokenState::new()` runs migrations AGAIN:
 //!    - Migration 002 drops `api_tokens` table
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_usage_persists_across_restart` | Usage data persists after single restart | Create usage tracker, record usage, drop+recreate tracker, query usage | Usage data still present | ✅ |
+//! | `test_usage_persists_across_multiple_restarts` | Usage data persists after multiple restarts | Record usage, restart 3 times, query usage | Usage data cumulative and correct | ✅ |
 //!    - CASCADE DELETE removes all `token_usage` records (150 tokens lost!)
 //!    - Creates new empty `api_tokens` table
 //!    - Creates new token, records 300 tokens
