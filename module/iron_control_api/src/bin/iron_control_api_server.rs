@@ -442,7 +442,11 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   );
 
   // Initialize analytics state (Protocol 012)
-  let analytics_state = iron_control_api::routes::analytics::AnalyticsState::new( &database_url )
+  // Uses same IC_TOKEN_SECRET as budget module for consistent agent authentication
+  let analytics_state = iron_control_api::routes::analytics::AnalyticsState::new(
+    &database_url,
+    ic_token_secret.clone(),
+  )
     .await
     .expect( "Failed to initialize analytics state" );
 

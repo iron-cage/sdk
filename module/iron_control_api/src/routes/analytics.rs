@@ -19,6 +19,8 @@ use axum::{
 use chrono::{ DateTime, Datelike, Duration, Utc };
 use serde::{ Deserialize, Serialize };
 use sqlx::{ FromRow, SqlitePool, sqlite::SqlitePoolOptions };
+use std::sync::Arc;
+use crate::ic_token::IcTokenManager;
 
 // ============================================================================
 // Types
@@ -148,6 +150,8 @@ pub struct BudgetStatusQuery
 #[derive( Debug, Clone, Deserialize )]
 pub struct AnalyticsEventRequest
 {
+  /// IC Token for authentication (required) - proves agent identity
+  pub ic_token: String,
   pub event_id: String,
   pub timestamp_ms: i64,
   pub event_type: String,
@@ -159,8 +163,7 @@ pub struct AnalyticsEventRequest
   pub output_tokens: Option< i64 >,
   #[serde( default )]
   pub cost_micros: Option< i64 >,
-  #[serde( default )]
-  pub agent_id: Option< i64 >,
+  // agent_id is derived from ic_token claims, not provided by caller
   #[serde( default )]
   pub provider_id: Option< String >,
   #[serde( default )]
@@ -410,17 +413,22 @@ pub struct ModelUsageResponse
 // State
 // ============================================================================
 
-/// Analytics state containing database pool
+/// Analytics state containing database pool and IC token manager
 #[derive( Clone )]
 pub struct AnalyticsState
 {
   pub pool: SqlitePool,
+  pub ic_token_manager: Arc< IcTokenManager >,
 }
 
 impl AnalyticsState
 {
   /// Create new analytics state
-  pub async fn new( database_url: &str ) -> Result< Self, Box< dyn std::error::Error > >
+  ///
+  /// # Arguments
+  /// * `database_url` - SQLite database connection URL
+  /// * `ic_token_secret` - Secret for verifying IC tokens
+  pub async fn new( database_url: &str, ic_token_secret: String ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let pool = SqlitePoolOptions::new()
       .max_connections( 5 )
@@ -431,7 +439,9 @@ impl AnalyticsState
     let migration = include_str!( "../../../iron_token_manager/migrations/011_create_analytics_events.sql" );
     sqlx::raw_sql( migration ).execute( &pool ).await?;
 
-    Ok( Self { pool } )
+    let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
+
+    Ok( Self { pool, ic_token_manager } )
   }
 }
 
@@ -456,12 +466,59 @@ struct AgentBudgetRow
 /// POST /api/v1/analytics/events
 ///
 /// Ingest analytics event from LlmRouter.
+/// Requires valid IC Token for authentication - agent_id is derived from token claims.
 /// Returns 202 Accepted for new events, 200 OK for duplicates.
 pub async fn post_event(
   State( state ): State< AnalyticsState >,
   Json( event ): Json< AnalyticsEventRequest >,
 ) -> impl IntoResponse
 {
+  // Verify IC Token and extract agent identity
+  let claims = match state.ic_token_manager.verify_token( &event.ic_token )
+  {
+    Ok( claims ) => claims,
+    Err( e ) =>
+    {
+      tracing::warn!( "IC Token verification failed: {}", e );
+      return (
+        StatusCode::UNAUTHORIZED,
+        Json( serde_json::json!({
+          "error": "UNAUTHORIZED",
+          "message": "Invalid or expired IC token"
+        }) )
+      ).into_response();
+    }
+  };
+
+  // Extract agent_id from token claims (format: "agent_<id>")
+  let agent_id: i64 = match claims.agent_id.strip_prefix( "agent_" )
+  {
+    Some( id_str ) => match id_str.parse()
+    {
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return (
+          StatusCode::BAD_REQUEST,
+          Json( serde_json::json!({
+            "error": "INVALID_TOKEN",
+            "message": "Invalid agent_id format in token"
+          }) )
+        ).into_response();
+      }
+    },
+    None =>
+    {
+      return (
+        StatusCode::BAD_REQUEST,
+        Json( serde_json::json!({
+          "error": "INVALID_TOKEN",
+          "message": "Invalid agent_id format in token"
+        }) )
+      ).into_response();
+    }
+  };
+
   // Validate event_type
   if event.event_type != "llm_request_completed" && event.event_type != "llm_request_failed"
   {
@@ -503,7 +560,7 @@ pub async fn post_event(
 
   let now_ms = Utc::now().timestamp_millis();
 
-  // INSERT OR IGNORE for deduplication
+  // INSERT OR IGNORE for deduplication (agent_id from verified token)
   let result = sqlx::query(
     r#"INSERT OR IGNORE INTO analytics_events
        (event_id, timestamp_ms, event_type, model, provider,
@@ -519,7 +576,7 @@ pub async fn post_event(
     .bind( event.input_tokens.unwrap_or( 0 ) )
     .bind( event.output_tokens.unwrap_or( 0 ) )
     .bind( event.cost_micros.unwrap_or( 0 ) )
-    .bind( event.agent_id )
+    .bind( agent_id )  // From verified IC token, not request body
     .bind( &event.provider_id )
     .bind( &event.error_code )
     .bind( &event.error_message )
