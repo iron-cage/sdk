@@ -23,16 +23,13 @@ pub struct Agent {
 #[derive(Debug, Deserialize)]
 pub struct CreateAgentRequest {
     pub name: String,
-    pub budget: f64,
-    pub providers: Option<Vec<String>>,
-    pub description: Option<String>,
-    pub tags: Option<Vec<String>>,
+    pub providers: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateAgentRequest {
     pub name: Option<String>,
-    pub providers: Option<
+    pub providers: Option<Vec<String>>,
 }
 
 /// List all agents (filtered by user role)
