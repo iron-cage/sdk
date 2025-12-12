@@ -223,7 +223,7 @@ export function useApi() {
   }
 
   async function getUsageByToken(tokenId: number): Promise<UsageRecord[]> {
-    return fetchApi<UsageRecord[]>(`/api/usage/token/${tokenId}`)
+    return fetchApi<UsageRecord[]>(`/api/v1/usage/token/${tokenId}`)
   }
 
   // Limits API methods
@@ -232,7 +232,7 @@ export function useApi() {
   }
 
   async function getLimit(id: number): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>(`/api/limits/${id}`)
+    return fetchApi<LimitRecord>(`/api/v1/limits/${id}`)
   }
 
   async function createLimit(data: CreateLimitRequest): Promise<LimitRecord> {
@@ -243,14 +243,14 @@ export function useApi() {
   }
 
   async function updateLimit(id: number, data: UpdateLimitRequest): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>(`/api/limits/${id}`, {
+    return fetchApi<LimitRecord>(`/api/v1/limits/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async function deleteLimit(id: number): Promise<void> {
-    await fetchApi<void>(`/api/limits/${id}`, {
+    await fetchApi<void>(`/api/v1/limits/${id}`, {
       method: 'DELETE',
     })
   }
@@ -261,7 +261,7 @@ export function useApi() {
   }
 
   async function getTrace(id: number): Promise<TraceRecord> {
-    return fetchApi<TraceRecord>(`/api/traces/${id}`)
+    return fetchApi<TraceRecord>(`/api/v1/traces/${id}`)
   }
 
   // Provider Key API methods
@@ -294,14 +294,14 @@ export function useApi() {
   }
 
   async function assignProjectProvider(projectId: string, keyId: number): Promise<void> {
-    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+    await fetchApi<void>(`/api/v1/projects/${projectId}/provider`, {
       method: 'POST',
       body: JSON.stringify({ provider_key_id: keyId }),
     })
   }
 
   async function unassignProjectProvider(projectId: string): Promise<void> {
-    await fetchApi<void>(`/api/projects/${projectId}/provider`, {
+    await fetchApi<void>(`/api/v1/projects/${projectId}/provider`, {
       method: 'DELETE',
     })
   }
@@ -372,7 +372,7 @@ export function useApi() {
   }
 
   async function getAgent(id: number): Promise<Agent> {
-    return fetchApi<Agent>(`/api/agents/${id}`)
+    return fetchApi<Agent>(`/api/v1/agents/${id}`)
   }
 
   async function createAgent(data: { name: string; providers: string[] }): Promise<Agent> {
@@ -384,20 +384,20 @@ export function useApi() {
 
   async function updateAgent(data: { id: number; name?: string; providers?: string[] }): Promise<Agent> {
     const { id, ...updateData } = data
-    return fetchApi<Agent>(`/api/agents/${id}`, {
+    return fetchApi<Agent>(`/api/v1/agents/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updateData),
     })
   }
 
   async function deleteAgent(id: number): Promise<void> {
-    await fetchApi<void>(`/api/agents/${id}`, {
+    await fetchApi<void>(`/api/v1/agents/${id}`, {
       method: 'DELETE',
     })
   }
 
   async function getAgentTokens(agentId: number): Promise<TokenMetadata[]> {
-    return fetchApi<TokenMetadata[]>(`/api/agents/${agentId}/tokens`)
+    return fetchApi<TokenMetadata[]>(`/api/v1/agents/${agentId}/tokens`)
   }
 
   async function createAgentToken(data: { agent_id: number; user_id: string; provider: string; description?: string }): Promise<CreateTokenResponse> {
