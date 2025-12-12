@@ -5,20 +5,29 @@
 use axum::{ http::StatusCode, body::Body, Router };
 use tower::ServiceExt;
 use http_body_util::BodyExt;
+use crate::common::test_state::TestTracesAppState;
+
+/// Generate JWT token for test user
+fn generate_jwt_for_user( app_state: &TestTracesAppState, user_id: &str ) -> String
+{
+  app_state.auth.jwt_secret
+    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+}
 
 /// Build minimal test app with traces routes for testing
-async fn build_test_app() -> Router
+async fn build_test_app() -> ( Router, TestTracesAppState )
 {
   use axum::routing::get;
 
-  let traces_state = iron_control_api::routes::traces::TracesState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to initialize traces state" );
+  let app_state = TestTracesAppState::new().await;
 
-  Router::new()
+  let router = Router::new()
     .route( "/api/traces", get( iron_control_api::routes::traces::list_traces ) )
     .route( "/api/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
-    .with_state( traces_state )
+    .with_state( app_state.clone() );
+
+  ( router, app_state )
 }
 
 /// Reproduces Issue #2: Non-JSON error response for invalid path parameters (traces endpoint)
@@ -34,11 +43,13 @@ async fn build_test_app() -> Router
 #[ tokio::test ]
 async fn test_get_trace_with_non_numeric_id_returns_json_error()
 {
-  let app = build_test_app().await;
+  let ( app, app_state ) = build_test_app().await;
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
 
   // Test: GET /api/traces/abc (non-numeric ID)
   let request = axum::http::Request::builder()
     .uri( "/api/traces/abc" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
     .body( Body::empty() )
     .unwrap();
 

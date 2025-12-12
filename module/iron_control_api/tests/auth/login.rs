@@ -1,7 +1,5 @@
 //! Login endpoint tests
 //!
-//! Test Matrix: Login validation
-//!
 //! Corner cases covered:
 //! - Valid credentials (happy path)
 //! - Invalid username (user not found)
@@ -11,6 +9,14 @@
 //! - Empty username
 //! - Empty password
 //! - SQL injection attempts
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_infrastructure_verification` | Verify test infrastructure | Create DB + user, verify password hashing | Password verification works | ✅ |
+//! | `test_jwt_token_infrastructure` | Verify JWT token generation | Create AuthState, generate access+refresh tokens, verify them | Tokens valid and verifiable | ✅ |
+//! | `test_fixtures_infrastructure` | Verify test fixtures | Use valid_login_request + invalid_login_request_missing_username fixtures | Fixtures validate correctly | ✅ |
 
 use crate::common::{ create_test_database, create_test_user, verify_password };
 use crate::common::fixtures::{ valid_login_request, invalid_login_request_missing_username };

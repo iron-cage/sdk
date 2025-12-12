@@ -7,6 +7,20 @@
 //! - Implement role checking middleware
 //! - Add role-based route protection
 //! - Write unit tests for RBAC
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_role_ordering` | Role hierarchy ordering | Compare Admin, User, Viewer roles | Admin > User > Viewer | ✅ |
+//! | `test_admin_has_all_permissions` | Admin role permissions | Check Admin permissions for Read/Write/Stop | All permissions granted | ✅ |
+//! | `test_user_has_standard_permissions` | User role permissions | Check User permissions (Read/Write agents, no Stop) | Standard permissions granted, no Stop | ✅ |
+//! | `test_viewer_has_read_only_permissions` | Viewer role permissions | Check Viewer permissions (Read only, no Write/Stop) | Read-only permissions | ✅ |
+//! | `test_role_from_string` | Parse role from string | "admin", "user", "viewer" strings | Correct Role enum variants | ✅ |
+//! | `test_role_to_string` | Convert role to string | Admin, User, Viewer enums | "admin", "user", "viewer" strings | ✅ |
+//! | `test_permission_from_string` | Parse permission from string | "read_agents", "write_agents" strings | Correct Permission enum variants | ✅ |
+//! | `test_user_context_creation` | Create user context | user_id + email + role | UserContext with correct fields | ✅ |
+//! | `test_middleware_permission_checking` | Middleware permission check | UserContext with role, check permissions | Permissions validated correctly | ✅ |
 
 use iron_control_api::rbac::{ Role, Permission, PermissionChecker };
 use iron_control_api::rbac::middleware::UserContext;

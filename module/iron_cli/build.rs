@@ -100,8 +100,26 @@ fn generate_static_commands( commands_dir : &Path )
       {
         Ok( yaml ) =>
         {
-          // Extract commands array from YAML
-          if let Some( commands ) = yaml.get( "commands" ).and_then( | v | v.as_sequence() )
+          // Extract commands from YAML
+          // Supports both:
+          // - Format A: Root-level array (unilang spec compliant)
+          // - Format B: Legacy format with `commands:` wrapper
+          let commands_seq = if let Some( seq ) = yaml.as_sequence()
+          {
+            // Format A: Root-level array (CORRECT)
+            Some( seq )
+          }
+          else if let Some( commands ) = yaml.get( "commands" ).and_then( | v | v.as_sequence() )
+          {
+            // Format B: Legacy with wrapper (DEPRECATED)
+            Some( commands )
+          }
+          else
+          {
+            None
+          };
+
+          if let Some( commands ) = commands_seq
           {
             for cmd in commands
             {

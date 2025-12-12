@@ -517,6 +517,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
     // Token management endpoints
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens/validate", post( iron_control_api::routes::tokens::validate_token ) )
     .route( "/api/v1/api-tokens", get( iron_control_api::routes::tokens::list_tokens ) )
     .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )

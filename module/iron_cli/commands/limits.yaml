@@ -1,211 +1,253 @@
-#
-# Limits Management Commands
-#
-# Commands for configuring and managing usage limits
-#
-
-commands:
-  - name: ".limits.list"
-    namespace: ""
-    description: "List all configured limits"
-    hint: "Shows limit details (type, max value, time window)"
-    arguments:
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".limits.list"
-      - ".limits.list format::json"
-
-  - name: ".limits.get"
-    namespace: ""
-    description: "Get specific limit details by ID"
-    hint: "Shows type, max value, time window, created timestamp"
-    arguments:
-      - name: "limit_id"
-        description: "Limit ID to retrieve"
-        kind: "Integer"
-        hint: "Numeric limit identifier"
-        attributes:
-          optional: false
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".limits.get limit_id::789"
-      - ".limits.get limit_id::123 format::json"
-
-  - name: ".limits.create"
-    namespace: ""
-    description: "Create new usage limit(s)"
-    hint: "Can specify multiple limit types in one command"
-    arguments:
-      - name: "project"
-        description: "Project ID"
-        kind: "String"
-        hint: "Optional project identifier"
-        attributes:
-          optional: true
-          pattern: "^[a-zA-Z0-9_-]+$"
-          min_length: 1
-          max_length: 100
-
-      - name: "max_tokens"
-        description: "Max tokens per day"
-        kind: "Integer"
-        hint: "Daily token limit"
-        attributes:
-          optional: true
-          min: 1
-
-      - name: "max_requests"
-        description: "Max requests per minute"
-        kind: "Integer"
-        hint: "Rate limit per minute"
-        attributes:
-          optional: true
-          min: 1
-
-      - name: "max_cost"
-        description: "Max cost per month (cents)"
-        kind: "Integer"
-        hint: "Monthly cost limit in cents"
-        attributes:
-          optional: true
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".limits.create max_tokens::1000000"
-      - ".limits.create max_requests::100"
-      - ".limits.create max_cost::10000"
-      - ".limits.create max_tokens::500000 max_cost::5000"
-      - ".limits.create project::myproject max_tokens::1000000"
-
-  - name: ".limits.update"
-    namespace: ""
-    description: "Update existing limit"
-    hint: "Must provide at least one value parameter"
-    arguments:
-      - name: "limit_id"
-        description: "Limit ID to update"
-        kind: "Integer"
-        hint: "Numeric limit identifier"
-        attributes:
-          optional: false
-          min: 1
-
-      - name: "max_tokens"
-        description: "New max tokens value"
-        kind: "Integer"
-        hint: "Daily token limit"
-        attributes:
-          optional: true
-          min: 1
-
-      - name: "max_requests"
-        description: "New max requests value"
-        kind: "Integer"
-        hint: "Rate limit per minute"
-        attributes:
-          optional: true
-          min: 1
-
-      - name: "max_cost"
-        description: "New max cost value (cents)"
-        kind: "Integer"
-        hint: "Monthly cost limit in cents"
-        attributes:
-          optional: true
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".limits.update limit_id::789 max_tokens::2000000"
-      - ".limits.update limit_id::789 max_cost::15000"
-
-  - name: ".limits.delete"
-    namespace: ""
-    description: "Delete limit"
-    hint: "Removes limit permanently"
-    arguments:
-      - name: "limit_id"
-        description: "Limit ID to delete"
-        kind: "Integer"
-        hint: "Numeric limit identifier"
-        attributes:
-          optional: false
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".limits.delete limit_id::789"
-      - ".limits.delete limit_id::123 format::json"
+- name: .limits.list
+  namespace: ''
+  description: List all configured limits
+  hint: Shows limit details (type, max value, time window)
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .limits.list
+  - .limits.list format::json
+  aliases: []
+  tags: []
+- name: .limits.get
+  namespace: ''
+  description: Get specific limit details by ID
+  hint: Shows type, max value, time window, created timestamp
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: limit_id
+    description: Limit ID to retrieve
+    kind: Integer
+    hint: Numeric limit identifier
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .limits.get limit_id::789
+  - .limits.get limit_id::123 format::json
+  aliases: []
+  tags: []
+- name: .limits.create
+  namespace: ''
+  description: Create new usage limit(s)
+  hint: Can specify multiple limit types in one command
+  status: stable
+  version: 1.0.0
+  idempotent: false
+  arguments:
+  - name: project
+    description: Project ID
+    kind: String
+    hint: Optional project identifier
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: max_tokens
+    description: Max tokens per day
+    kind: Integer
+    hint: Daily token limit
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: max_requests
+    description: Max requests per minute
+    kind: Integer
+    hint: Rate limit per minute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: max_cost
+    description: Max cost per month (cents)
+    kind: Integer
+    hint: Monthly cost limit in cents
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .limits.create max_tokens::1000000
+  - .limits.create max_requests::100
+  - .limits.create max_cost::10000
+  - .limits.create max_tokens::500000 max_cost::5000
+  - .limits.create project::myproject max_tokens::1000000
+  aliases: []
+  tags: []
+- name: .limits.update
+  namespace: ''
+  description: Update existing limit
+  hint: Must provide at least one value parameter
+  status: stable
+  version: 1.0.0
+  idempotent: false
+  arguments:
+  - name: limit_id
+    description: Limit ID to update
+    kind: Integer
+    hint: Numeric limit identifier
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: max_tokens
+    description: New max tokens value
+    kind: Integer
+    hint: Daily token limit
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: max_requests
+    description: New max requests value
+    kind: Integer
+    hint: Rate limit per minute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: max_cost
+    description: New max cost value (cents)
+    kind: Integer
+    hint: Monthly cost limit in cents
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .limits.update limit_id::789 max_tokens::2000000
+  - .limits.update limit_id::789 max_cost::15000
+  aliases: []
+  tags: []
+- name: .limits.delete
+  namespace: ''
+  description: Delete limit
+  hint: Removes limit permanently
+  status: stable
+  version: 1.0.0
+  idempotent: false
+  arguments:
+  - name: limit_id
+    description: Limit ID to delete
+    kind: Integer
+    hint: Numeric limit identifier
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .limits.delete limit_id::789
+  - .limits.delete limit_id::123 format::json
+  aliases: []
+  tags: []

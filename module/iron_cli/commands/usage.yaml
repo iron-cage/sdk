@@ -1,143 +1,154 @@
-#
-# Usage Analytics Commands
-#
-# Commands for tracking and analyzing token usage
-#
-
-commands:
-  - name: ".usage.show"
-    namespace: ""
-    description: "Display aggregate usage statistics"
-    hint: "Shows total tokens, requests, cost with provider breakdown"
-    arguments:
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".usage.show"
-      - ".usage.show format::json"
-
-  - name: ".usage.by_project"
-    namespace: ""
-    description: "Get usage statistics for specific project"
-    hint: "Project-specific totals and provider breakdown"
-    arguments:
-      - name: "project_id"
-        description: "Project ID to query"
-        kind: "String"
-        hint: "Project identifier"
-        attributes:
-          optional: false
-          pattern: "^[a-zA-Z0-9_-]+$"
-          min_length: 1
-          max_length: 100
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".usage.by_project project_id::myproject"
-      - ".usage.by_project project_id::prod format::json"
-
-  - name: ".usage.by_provider"
-    namespace: ""
-    description: "Get usage statistics for specific provider"
-    hint: "Provider-specific tokens, requests, cost"
-    arguments:
-      - name: "provider"
-        description: "Provider name"
-        kind: "String"
-        hint: "AI provider identifier"
-        attributes:
-          optional: false
-          enum:
-            - "openai"
-            - "anthropic"
-            - "google"
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".usage.by_provider provider::openai"
-      - ".usage.by_provider provider::anthropic format::json"
-
-  - name: ".usage.export"
-    namespace: ""
-    description: "Export usage data to file or stdout"
-    hint: "Exports data in JSON or CSV format"
-    arguments:
-      - name: "export_format"
-        description: "Export format"
-        kind: "String"
-        hint: "Data format for export"
-        attributes:
-          optional: true
-          default: "json"
-          enum:
-            - "json"
-            - "csv"
-
-      - name: "output"
-        description: "Output file path"
-        kind: "String"
-        hint: "Write to file (stdout if not provided)"
-        attributes:
-          optional: true
-          pattern: "^[^\\0]+$"
-
-      - name: "format"
-        description: "Display format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".usage.export"
-      - ".usage.export export_format::json output::usage.json"
-      - ".usage.export export_format::csv output::usage.csv"
+- name: .usage.show
+  namespace: ''
+  description: Display aggregate usage statistics
+  hint: Shows total tokens, requests, cost with provider breakdown
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .usage.show
+  - .usage.show format::json
+  aliases: []
+  tags: []
+- name: .usage.by_project
+  namespace: ''
+  description: Get usage statistics for specific project
+  hint: Project-specific totals and provider breakdown
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: project_id
+    description: Project ID to query
+    kind: String
+    hint: Project identifier
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .usage.by_project project_id::myproject
+  - .usage.by_project project_id::prod format::json
+  aliases: []
+  tags: []
+- name: .usage.by_provider
+  namespace: ''
+  description: Get usage statistics for specific provider
+  hint: Provider-specific tokens, requests, cost
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: provider
+    description: Provider name
+    kind: String
+    hint: AI provider identifier
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .usage.by_provider provider::openai
+  - .usage.by_provider provider::anthropic format::json
+  aliases: []
+  tags: []
+- name: .usage.export
+  namespace: ''
+  description: Export usage data to file or stdout
+  hint: Exports data in JSON or CSV format
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: export_format
+    description: Export format
+    kind: String
+    hint: Data format for export
+    attributes:
+      optional: true
+      default: json
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: output
+    description: Output file path
+    kind: String
+    hint: Write to file (stdout if not provided)
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Display format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .usage.export
+  - .usage.export export_format::json output::usage.json
+  - .usage.export export_format::csv output::usage.csv
+  aliases: []
+  tags: []

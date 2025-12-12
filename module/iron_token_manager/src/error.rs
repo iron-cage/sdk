@@ -6,15 +6,34 @@
 
 /// Token management error type
 ///
-/// Uses `error_tools` facade for anyhow+thiserror functionality.
+/// Fix(issue-001): Added Database variant to preserve underlying sqlx errors
+/// for proper FK constraint handling
+///
+/// Root cause: Original `TokenError` was a unit struct that discarded all error
+/// details from `SQLite`, making it impossible to distinguish FK constraint
+/// violations from other database errors
+///
+/// Pitfall: Never discard error details when converting between error types.
+/// Always preserve the underlying cause using enum variants or error wrapping
+/// so handlers can make informed decisions about error responses
 #[ derive( Debug ) ]
-pub struct TokenError;
+pub enum TokenError
+{
+  /// Generic token management error
+  Generic,
+  /// Database error preserving sqlx details for FK constraint detection
+  Database( sqlx::Error ),
+}
 
 impl core::fmt::Display for TokenError
 {
   fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
-    write!( f, "Token management error" )
+    match self
+    {
+      Self::Generic => write!( f, "Token management error" ),
+      Self::Database( e ) => write!( f, "Database error: {e}" ),
+    }
   }
 }
 
