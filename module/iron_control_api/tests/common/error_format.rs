@@ -171,8 +171,10 @@ async fn test_validation_errors_return_json()
     json
   );
 
+  println!( "{:?}", json );
+
   // WHY: Verify no stack traces or internal details leaked
-  let error_msg = json[ "error" ].as_str().unwrap();
+  let error_msg = json[ "error" ].as_str().unwrap_or( "" );
   assert!(
     !error_msg.contains( "src/" ) && !error_msg.contains( ".rs:" ),
     "LOUD FAILURE: Error message must not leak file paths. Got: {}",

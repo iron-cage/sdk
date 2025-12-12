@@ -18,6 +18,21 @@ use iron_token_manager::storage::TokenStorage;
 use iron_token_manager::token_generator::TokenGenerator;
 use serde::{ Deserialize, Serialize };
 use std::sync::Arc;
+use std::collections::HashMap;
+
+#[derive(Debug, Serialize)]
+pub struct ApiErrorResponse {
+    pub error: ApiErrorDetail,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApiErrorDetail {
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<HashMap<String, String>>,
+}
+
 
 /// Token management state
 #[ derive( Clone ) ]
@@ -264,6 +279,10 @@ pub struct CreateTokenResponse
   pub agent_id: Option< i64 >,
   pub provider: Option< String >,
   pub created_at: i64,
+  pub rotated_at: Option< i64 >,
+  pub rotated_by: Option< String >,
+  pub status: String,
+  pub warning: Option< String >,
 }
 
 /// Token list item
@@ -320,9 +339,13 @@ pub async fn create_token(
   // Validate request
   if let Err( validation_error ) = request.validate()
   {
-    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
-    }) ) ).into_response();
+    return ( StatusCode::BAD_REQUEST, Json( ApiErrorResponse {
+      error: ApiErrorDetail {
+        code: "VALIDATION_ERROR".to_string(),
+        message: validation_error,
+        fields: None,
+      }
+    } ) ).into_response();
   }
 
   // Protocol 014: user_id comes from JWT authentication, not request body
@@ -356,7 +379,13 @@ pub async fn create_token(
     {
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to create token" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Failed to create token".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -370,7 +399,13 @@ pub async fn create_token(
     {
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to retrieve token metadata" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Failed to retrieve token metadata".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -386,39 +421,127 @@ pub async fn create_token(
     agent_id: metadata.agent_id,
     provider: metadata.provider,
     created_at: metadata.created_at,
+    rotated_at: None,
+    rotated_by: None,
+    status: "active".to_string(),
+    warning: None,
   } ) )
     .into_response()
 }
 
+use axum::extract::Query;
+
+fn default_page() -> u32 { 1 }
+fn default_per_page() -> u32 { 50 }
+
+/// List tokens query parameters
+#[ derive( Debug, Deserialize ) ]
+pub struct ListTokensQuery
+{
+  #[ serde( default = "default_page" ) ]
+  pub page: u32,
+  #[ serde( default = "default_per_page" ) ]
+  pub per_page: u32,
+  pub project_id: Option< String >,
+  pub status: Option< String >,
+  pub agent_id: Option< String >,
+}
+
+/// Pagination metadata
+#[ derive( Debug, Serialize, Deserialize ) ]
+pub struct Pagination
+{
+  pub page: u32,
+  pub per_page: u32,
+  pub total: i64,
+  pub total_pages: u32,
+}
+
+/// Paginated tokens response
+#[ derive( Debug, Serialize, Deserialize ) ]
+pub struct PaginatedTokensResponse
+{
+  pub data: Vec< TokenListItem >,
+  pub pagination: Pagination,
+}
+
 /// GET /api/tokens
 ///
-/// List all active tokens for authenticated user
+/// List all active tokens for authenticated user with pagination and filtering
 ///
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT claims
+/// * `query` - Query parameters (page, per_page, filters)
 ///
 /// # Returns
 ///
-/// - 200 OK with list of tokens
+/// - 200 OK with paginated list of tokens
 /// - 500 Internal Server Error if database query fails
 pub async fn list_tokens(
   State( state ): State< TokenState >,
   crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
+  Query( query ): Query< ListTokensQuery >,
 ) -> impl IntoResponse
 {
   // Extract user_id from JWT claims
   let user_id = &claims.sub;
 
-  // Query tokens from storage
-  let tokens = match state.storage.list_user_tokens( user_id ).await
+  // Parse agent_id if provided
+  let agent_id_filter = match query.agent_id
   {
-    Ok( tokens ) => tokens,
+    Some( ref s ) => match s.parse::< i64 >()
+    {
+      Ok( id ) => Some( id ),
+      Err( _ ) =>
+      {
+        // If agent_id is not a valid integer, we can either return 400 or ignore it.
+        // Given the user example uses "agent_xyz", which is not i64, but the DB expects i64,
+        // we have a conflict. Assuming the DB is correct (i64), we should probably return 400.
+        // However, to be robust, if it's not an integer, it won't match any i64 ID anyway.
+        // But passing None would mean "no filter", which is wrong (it should filter by that ID).
+        // So returning 400 is safer.
+        return (
+          StatusCode::BAD_REQUEST,
+          Json( ApiErrorResponse {
+            error: ApiErrorDetail {
+              code: "VALIDATION_ERROR".to_string(),
+              message: "Invalid agent_id format (must be integer)".to_string(),
+              fields: None,
+            }
+          } ),
+        ).into_response();
+      }
+    },
+    None => None,
+  };
+
+  // Clamp per_page
+  let per_page = query.per_page.clamp( 1, 200 );
+
+  // Query tokens from storage
+  let ( tokens, total ) = match state.storage.list_tokens_filtered(
+    user_id,
+    query.page,
+    per_page,
+    query.project_id,
+    query.status,
+    agent_id_filter,
+  ).await
+  {
+    Ok( result ) => result,
     Err( _ ) =>
     {
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to fetch tokens" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Failed to fetch tokens".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -440,7 +563,17 @@ pub async fn list_tokens(
     } )
     .collect();
 
-  ( StatusCode::OK, Json( token_list ) ).into_response()
+  let total_pages = if total == 0 { 1 } else { ( ( total as f64 ) / ( per_page as f64 ) ).ceil() as u32 };
+
+  ( StatusCode::OK, Json( PaginatedTokensResponse {
+    data: token_list,
+    pagination: Pagination {
+      page: query.page,
+      per_page,
+      total,
+      total_pages,
+    },
+  } ) ).into_response()
 }
 
 /// GET /api/tokens/:id
@@ -476,7 +609,13 @@ pub async fn get_token(
     {
       return (
         StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "TOKEN_NOT_FOUND".to_string(),
+            message: "Token not found".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -487,7 +626,13 @@ pub async fn get_token(
   {
     return (
       StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "ACCESS_DENIED".to_string(),
+          message: "Access denied - token belongs to different user".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -503,6 +648,7 @@ pub async fn get_token(
     created_at: metadata.created_at,
     last_used_at: metadata.last_used_at,
     is_active: metadata.is_active,
+    // TODO: Add usage summary
   };
 
   ( StatusCode::OK, Json( item ) ).into_response()
@@ -540,9 +686,13 @@ pub async fn update_token(
   // Validate request
   if let Err( validation_error ) = request.validate()
   {
-    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
-    }) ) ).into_response();
+    return ( StatusCode::BAD_REQUEST, Json( ApiErrorResponse {
+      error: ApiErrorDetail {
+        code: "VALIDATION_ERROR".to_string(),
+        message: validation_error,
+        fields: None,
+      }
+    } ) ).into_response();
   }
 
   // Get token metadata to verify ownership before update
@@ -553,7 +703,13 @@ pub async fn update_token(
     {
       return (
         StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "TOKEN_NOT_FOUND".to_string(),
+            message: "Token not found".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -564,7 +720,13 @@ pub async fn update_token(
   {
     return (
       StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "ACCESS_DENIED".to_string(),
+          message: "Access denied - token belongs to different user".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -581,7 +743,13 @@ pub async fn update_token(
   {
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to update token" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "INTERNAL_ERROR".to_string(),
+          message: "Failed to update token".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -594,7 +762,13 @@ pub async fn update_token(
     {
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to retrieve updated token" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Failed to retrieve updated token".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -623,6 +797,7 @@ pub async fn update_token(
 /// # Arguments
 ///
 /// * `state` - Token generator state
+/// * `claims` - Authenticated user from JWT token
 /// * `token_id` - Token ID from path
 ///
 /// # Returns
@@ -631,6 +806,7 @@ pub async fn update_token(
 /// - 404 Not Found if token doesn't exist
 pub async fn rotate_token(
   State( state ): State< TokenState >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
   Path( token_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
@@ -642,7 +818,13 @@ pub async fn rotate_token(
     {
       return (
         StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "TOKEN_NOT_FOUND".to_string(),
+            message: "Token not found".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -653,7 +835,28 @@ pub async fn rotate_token(
   {
     return (
       StatusCode::NOT_FOUND,
-      Json( serde_json::json!({ "error": "Token not found" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "TOKEN_NOT_FOUND".to_string(),
+          message: "Token not found".to_string(),
+          fields: None,
+        }
+      } ),
+    )
+      .into_response();
+  }
+
+  if existing_metadata.user_id != claims.sub && claims.role != "admin"
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "ACCESS_DENIED".to_string(),
+          message: "Access denied - token belongs to different user".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -664,7 +867,13 @@ pub async fn rotate_token(
   {
     return (
       StatusCode::NOT_FOUND,
-      Json( serde_json::json!({ "error": "Token not found" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "TOKEN_NOT_FOUND".to_string(),
+          message: "Token not found".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -690,7 +899,13 @@ pub async fn rotate_token(
     {
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to create new token" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Failed to create new token".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -704,7 +919,13 @@ pub async fn rotate_token(
     {
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to retrieve new token metadata" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Failed to retrieve new token metadata".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
@@ -714,12 +935,16 @@ pub async fn rotate_token(
   {
     id: new_metadata.id,
     token: new_token, // Return plaintext token ONCE
+    agent_id: new_metadata.agent_id,
     user_id: new_metadata.user_id,
     project_id: new_metadata.project_id,
     description: new_metadata.name,
-    agent_id: new_metadata.agent_id,
     provider: new_metadata.provider,
-    created_at: new_metadata.created_at,
+    rotated_by: Some(claims.email),
+    rotated_at: Some(new_metadata.created_at),
+    created_at: existing_metadata.created_at,
+    status: "active".to_string(),
+    warning: Some("Old token invalidated - save new token securely".to_string()),
   } ) )
     .into_response()
 }
@@ -766,18 +991,30 @@ pub async fn revoke_token(
     {
       return (
         StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "TOKEN_NOT_FOUND".to_string(),
+            message: "Token not found".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response();
     }
   };
 
   // Verify ownership - user can only revoke their own tokens (Protocol 014 requirement)
-  if metadata.user_id != *user_id
+  if metadata.user_id != *user_id || claims.role != "admin" 
   {
     return (
       StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Access denied - token belongs to different user" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "ACCESS_DENIED".to_string(),
+          message: "Access denied - token belongs to different user".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -787,7 +1024,13 @@ pub async fn revoke_token(
   {
     return (
       StatusCode::CONFLICT,
-      Json( serde_json::json!({ "error": "Token already revoked" }) ),
+      Json( ApiErrorResponse {
+        error: ApiErrorDetail {
+          code: "TOKEN_ALREADY_REVOKED".to_string(),
+          message: "Token already revoked".to_string(),
+          fields: None,
+        }
+      } ),
     )
       .into_response();
   }
@@ -810,7 +1053,13 @@ pub async fn revoke_token(
       // Deactivation failed (race condition - token was revoked by another request)
       (
         StatusCode::CONFLICT,
-        Json( serde_json::json!({ "error": "Token already revoked" }) ),
+        Json( ApiErrorResponse {
+          error: ApiErrorDetail {
+            code: "TOKEN_ALREADY_REVOKED".to_string(),
+            message: "Token already revoked".to_string(),
+            fields: None,
+          }
+        } ),
       )
         .into_response()
     }

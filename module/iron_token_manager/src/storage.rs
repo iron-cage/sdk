@@ -212,7 +212,7 @@ impl TokenStorage
   {
     let now_ms = current_time_ms();
     let token_hash = self.generator.hash_token( plaintext_token );
-
+    
     let result = sqlx::query(
       "INSERT INTO api_tokens (token_hash, user_id, project_id, name, agent_id, provider, created_at) \
        VALUES ($1, $2, $3, $4, $5, $6, $7)"
@@ -460,6 +460,109 @@ impl TokenStorage
         expires_at: row.get( "expires_at" ),
       } ).collect()
     )
+  }
+
+  /// List tokens with pagination and filtering
+  ///
+  /// # Arguments
+  ///
+  /// * `user_id` - User ID to list tokens for
+  /// * `page` - Page number (1-based)
+  /// * `per_page` - Items per page
+  /// * `project_id` - Optional project ID filter
+  /// * `status` - Optional status filter ("active", "revoked")
+  /// * `agent_id` - Optional agent ID filter
+  ///
+  /// # Returns
+  ///
+  /// Tuple of (Vector of token metadata, Total count)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn list_tokens_filtered(
+    &self,
+    user_id: &str,
+    page: u32,
+    per_page: u32,
+    project_id: Option<String>,
+    status: Option<String>,
+    agent_id: Option<i64>,
+  ) -> Result<(Vec<TokenMetadata>, i64)>
+  {
+    // Count query
+    let mut count_qb = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM api_tokens WHERE user_id = ");
+    count_qb.push_bind(user_id);
+
+    if let Some(pid) = &project_id {
+        count_qb.push(" AND project_id = ");
+        count_qb.push_bind(pid);
+    }
+
+    if let Some(stat) = &status {
+        if stat == "active" {
+            count_qb.push(" AND is_active = 1");
+        } else if stat == "revoked" {
+            count_qb.push(" AND is_active = 0");
+        }
+    }
+
+    if let Some(aid) = agent_id {
+        count_qb.push(" AND agent_id = ");
+        count_qb.push_bind(aid);
+    }
+
+    let total: i64 = count_qb.build_query_scalar()
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| crate::error::TokenError)?;
+
+    // Main query
+    let mut qb = sqlx::QueryBuilder::new("SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at FROM api_tokens WHERE user_id = ");
+    qb.push_bind(user_id);
+
+    if let Some(pid) = &project_id {
+        qb.push(" AND project_id = ");
+        qb.push_bind(pid);
+    }
+
+    if let Some(stat) = &status {
+        if stat == "active" {
+            qb.push(" AND is_active = 1");
+        } else if stat == "revoked" {
+            qb.push(" AND is_active = 0");
+        }
+    }
+
+    if let Some(aid) = agent_id {
+        qb.push(" AND agent_id = ");
+        qb.push_bind(aid);
+    }
+
+    qb.push(" ORDER BY created_at DESC LIMIT ");
+    qb.push_bind(per_page);
+    qb.push(" OFFSET ");
+    qb.push_bind((page - 1) * per_page);
+
+    let rows = qb.build()
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| crate::error::TokenError)?;
+
+    let tokens = rows.iter().map(|row| TokenMetadata {
+        id: row.get("id"),
+        user_id: row.get("user_id"),
+        project_id: row.get("project_id"),
+        name: row.get("name"),
+        agent_id: row.get("agent_id"),
+        provider: row.get("provider"),
+        is_active: row.get::<bool, _>("is_active"),
+        created_at: row.get("created_at"),
+        last_used_at: row.get("last_used_at"),
+        expires_at: row.get("expires_at"),
+    }).collect();
+
+    Ok((tokens, total))
   }
 
   /// Delete token permanently
