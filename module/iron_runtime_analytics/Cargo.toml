@@ -14,7 +14,13 @@ enabled = [
   "dep:crossbeam",
   "dep:dashmap",
 ]
-full = [ "enabled" ]
+sync = [
+  "enabled",
+  "dep:reqwest",
+  "dep:tokio",
+  "dep:tracing",
+]
+full = [ "enabled", "sync" ]
 
 [dependencies]
 serde = { workspace = true, features = [ "derive", "rc" ], optional = true }
@@ -23,5 +29,13 @@ iron_cost = { workspace = true, optional = true }
 crossbeam = { workspace = true, optional = true }
 dashmap = { workspace = true, optional = true }
 
+# Sync dependencies
+reqwest = { workspace = true, features = [ "json" ], optional = true }
+tokio = { workspace = true, features = [ "time", "sync", "rt" ], optional = true }
+tracing = { workspace = true, optional = true }
+
 [dev-dependencies]
 iron_cost = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+wiremock = { workspace = true }
+serde_json = { workspace = true }
