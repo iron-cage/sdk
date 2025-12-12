@@ -20,7 +20,7 @@ pub struct TokenMetadata
   /// Optional human-friendly name
   pub name: Option< String >,
   /// Optional agent ID
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option< String >,
   /// Optional provider
   pub provider: Option< String >,
   /// Whether token is active
@@ -31,6 +31,18 @@ pub struct TokenMetadata
   pub last_used_at: Option< i64 >,
   /// Expiration timestamp (milliseconds since epoch)
   pub expires_at: Option< i64 >,
+}
+
+/// Token creation result
+#[ derive( Debug, Clone ) ]
+pub struct CreatedToken
+{
+  /// Database ID
+  pub id: i64,
+  /// Plaintext token
+  pub token: String,
+  /// Creation timestamp (milliseconds since epoch)
+  pub created_at: i64,
 }
 
 /// Token storage layer
@@ -206,9 +218,9 @@ impl TokenStorage
     user_id: &str,
     project_id: Option< &str >,
     name: Option< &str >,
-    agent_id: Option< i64 >,
+    agent_id: Option< &str >,
     provider: Option< &str >,
-  ) -> Result< i64 >
+  ) -> Result< CreatedToken >
   {
     let now_ms = current_time_ms();
     let token_hash = self.generator.hash_token( plaintext_token );
@@ -228,7 +240,11 @@ impl TokenStorage
     .await
     .map_err( |_| crate::error::TokenError )?;
 
-    Ok( result.last_insert_rowid() )
+    Ok( CreatedToken {
+      id: result.last_insert_rowid(),
+      token: plaintext_token.to_string(),
+      created_at: now_ms,
+    } )
   }
 
   /// Create token with custom expiration

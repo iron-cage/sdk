@@ -68,7 +68,7 @@ async fn test_infrastructure_verification()
 
   assert_eq!(
     fetched_user.1,
-    "test_user",
+    "test_user_dynamic",
     "LOUD FAILURE: Fetched username should match"
   );
 }

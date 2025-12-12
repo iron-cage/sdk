@@ -154,7 +154,7 @@ struct AppState
   providers: iron_control_api::routes::providers::ProvidersState,
   keys: iron_control_api::routes::keys::KeysState,
   users: iron_control_api::routes::users::UserManagementState,
-  agents: sqlx::SqlitePool,
+  agents: iron_control_api::routes::agents::AgentState,
   budget: iron_control_api::routes::budget::BudgetState,
 }
 
@@ -237,8 +237,8 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::users::Use
   }
 }
 
-/// Enable agent routes to access SqlitePool from combined AppState
-impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
+/// Enable agent routes to access AgentState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::agents::AgentState
 {
   fn from_ref( state: &AppState ) -> Self
   {
@@ -444,6 +444,12 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   .await
   .expect( "Failed to initialize budget state" );
 
+  // Initialize agent state
+  let agent_state = iron_control_api::routes::agents::AgentState::new(
+      agents_pool,
+      token_state.storage.clone(),
+  );
+
   // Create combined app state
   let app_state = AppState
   {
@@ -455,7 +461,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     providers: providers_state,
     keys: keys_state,
     users: user_management_state,
-    agents: agents_pool,
+    agents: agent_state,
     budget: budget_state,
   };
 

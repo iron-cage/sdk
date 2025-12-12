@@ -72,10 +72,11 @@ async fn test_create_token_stores_hash_not_plaintext()
   let plaintext_token = generator.generate();
 
   // Store token
-  let token_id = storage
+  let created_token = storage
     .create_token( &plaintext_token, "user_001", Some( "project_123" ), Some( "Test Token" ), None, None )
     .await
     .expect( "Failed to create token" );
+  let token_id = created_token.id;
 
   assert!( token_id > 0, "Token ID should be positive" );
 
@@ -100,7 +101,7 @@ async fn test_create_token_with_metadata()
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  let token_id = storage
+  let created_token = storage
     .create_token(
       &token,
       "user_002",
@@ -111,6 +112,7 @@ async fn test_create_token_with_metadata()
     )
     .await
     .expect( "Failed to create token" );
+  let token_id = created_token.id;
 
   // Retrieve token metadata
   let metadata = storage
@@ -131,10 +133,11 @@ async fn test_verify_token_returns_token_id()
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  let created_id = storage
+  let created_token = storage
     .create_token( &token, "user_003", None, None, None, None )
     .await
     .expect( "Failed to create token" );
+  let created_id = created_token.id;
 
   // Verify token returns the ID
   let verified_id = storage
@@ -171,10 +174,11 @@ async fn test_deactivate_token()
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  let token_id = storage
+  let created_token = storage
     .create_token( &token, "user_005", None, None, None, None )
     .await
     .expect( "Failed to create token" );
+  let token_id = created_token.id;
 
   // Deactivate token
   storage
@@ -225,10 +229,11 @@ async fn test_update_last_used_timestamp()
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  let token_id = storage
+  let created_token = storage
     .create_token( &token, "user_008", None, None, None, None )
     .await
     .expect( "Failed to create token" );
+  let token_id = created_token.id;
 
   // Initially last_used_at should be None
   let metadata = storage
@@ -258,10 +263,11 @@ async fn test_delete_token()
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  let token_id = storage
+  let created_token = storage
     .create_token( &token, "user_009", None, None, None, None )
     .await
     .expect( "Failed to create token" );
+  let token_id = created_token.id;
 
   // Delete token
   storage
@@ -331,10 +337,11 @@ async fn test_protocol_014_token_format_integration()
   assert!( body.chars().all( |c| c.is_ascii_alphanumeric() ), "Token body should be Base62" );
 
   // Create token in database (uses user_001 from seed_test_users)
-  let token_id = storage
+  let created_token = storage
     .create_token( &token, "user_001", Some( "project_014" ), Some( "Protocol 014 Token" ), None, None )
     .await
     .expect( "Failed to create Protocol 014 token" );
+  let token_id = created_token.id;
 
   assert!( token_id > 0, "Token ID should be positive" );
 
@@ -390,10 +397,11 @@ async fn test_backward_compatibility_old_token_format()
   let old_token = "xyz789ABC123def456GHI789jkl012MNO345pqr678STU901vwx234YZa567bcd";
 
   // Create old token in database (uses user_002 from seed_test_users)
-  let token_id = storage
+  let created_token = storage
     .create_token( old_token, "user_002", Some( "legacy_project" ), Some( "Old Format Token" ), None, None )
     .await
     .expect( "Failed to create old format token" );
+  let token_id = created_token.id;
 
   assert!( token_id > 0, "Token ID should be positive" );
 
@@ -448,10 +456,11 @@ async fn test_prefix_stripped_before_hashing_integration()
   let body = &token[ 7.. ]; // Extract body (64 chars)
 
   // Create token in database (uses user_003 from seed_test_users)
-  let token_id = storage
+  let created_token = storage
     .create_token( &token, "user_003", None, Some( "Prefix Strip Test" ), None, None )
     .await
     .expect( "Failed to create token" );
+  let token_id = created_token.id;
 
   // Get stored hash
   let stored_hash = storage

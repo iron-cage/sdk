@@ -1,17 +1,32 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::Json,
+    response::{IntoResponse, Json},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use iron_token_manager::agent_service::{
-    AgentService, Agent as ServiceAgent, CreateAgentParams, UpdateAgentParams,
-    ListAgentsFilters, AgentTokenItem as ServiceAgentTokenItem,
-    ICToken as ServiceICToken, ListAgentsResult, AgentSortField, SortDirection,
-};
+use iron_token_manager::{agent_service::{
+    Agent as ServiceAgent, AgentService, AgentSortField, AgentTokenItem as ServiceAgentTokenItem, CreateAgentParams, ICToken as ServiceICToken, ListAgentsFilters, ListAgentsResult, SortDirection, UpdateAgentParams
+}, token_generator::TokenGenerator};
 
 use crate::jwt_auth::AuthenticatedUser;
+use std::sync::Arc;
+use iron_token_manager::storage::TokenStorage;
+
+#[derive(Clone)]
+pub struct AgentState {
+    pub agent_service: Arc<AgentService>,
+    pub token_storage: Arc<TokenStorage>,
+}
+
+impl AgentState {
+    pub fn new(pool: SqlitePool, token_storage: Arc<TokenStorage>) -> Self {
+        Self {
+            agent_service: Arc::new(AgentService::new(pool)),
+            token_storage,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Agent {
@@ -46,24 +61,6 @@ impl From<ServiceICToken> for ICToken {
     }
 }
 
-impl From<ServiceAgent> for Agent {
-    fn from(agent: ServiceAgent) -> Self {
-        Self {
-            id: agent.id,
-            name: agent.name,
-            budget: agent.budget,
-            providers: agent.providers,
-            description: agent.description,
-            tags: agent.tags,
-            owner_id: agent.owner_id,
-            project_id: agent.project_id,
-            ic_token: agent.ic_token.map(ICToken::from),
-            status: agent.status,
-            created_at: agent.created_at,
-            updated_at: agent.updated_at,
-        }
-    }
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateAgentRequest {
@@ -187,7 +184,7 @@ fn parse_sort(sort: &str) -> (AgentSortField, SortDirection) {
 
 /// List all agents (filtered by user role) with pagination and sorting
 pub async fn list_agents(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Query(query): Query<ListAgentsQuery>,
     user: AuthenticatedUser,
 ) -> Result<Json<PaginatedAgentsResponse>, (StatusCode, Json<ErrorResponse>)> {
@@ -219,7 +216,7 @@ pub async fn list_agents(
         ));
     }
 
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     // Parse sort parameter
     let (sort_field, sort_direction) = parse_sort(&query.sort);
@@ -275,11 +272,11 @@ pub async fn list_agents(
 
 /// Get a single agent
 pub async fn get_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     let agent = service.get_agent(&id).await.map_err(|e| {
         (
@@ -297,7 +294,20 @@ pub async fn get_agent(
         ));
     }
 
-    Ok(Json(Agent::from(agent)))
+    Ok(Json(Agent {
+        id: agent.id,
+        name: agent.name,
+        budget: agent.budget,
+        providers: agent.providers,
+        description: agent.description,
+        tags: agent.tags,
+        owner_id: agent.owner_id,
+        project_id: agent.project_id,
+        status: agent.status,
+        created_at: agent.created_at,
+        updated_at: agent.updated_at,
+        ic_token: None,
+    }))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -316,7 +326,7 @@ pub struct ErrorDetail {
 
 /// Create a new agent (admin only)
 pub async fn create_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     user: AuthenticatedUser,
     Json(req): Json<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, Json<ErrorResponse>)> {
@@ -361,7 +371,7 @@ pub async fn create_agent(
         for provider_id in providers {
             let exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
                 .bind(provider_id)
-                .fetch_optional(&pool)
+                .fetch_optional(state.token_storage.pool())
                 .await
                 .map_err(|e| {
                     (
@@ -391,8 +401,25 @@ pub async fn create_agent(
         }
     }
     
-    let service = AgentService::new(pool);
-    
+    let service = &state.agent_service;
+    let generator = TokenGenerator::new();
+    let token_service = &state.token_storage;
+
+    let plaintext_token = generator.generate();
+    let providers_string = serde_json::to_string(&req.providers).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INVALID_PROVIDERS_FORMAT".to_string(),
+                    message: Some(format!("Failed to serialize providers: {}", e)),
+                    fields: None,
+                },
+            }),
+        )
+    })?;
+        
+
     let params = CreateAgentParams {
         name: req.name,
         budget: req.budget,
@@ -415,7 +442,37 @@ pub async fn create_agent(
         )
     })?;
 
-    Ok((StatusCode::CREATED, Json(Agent::from(agent))))
+    let token = token_service.create_token(&plaintext_token, &req.owner_id, None, None, Some(&agent.id), Some(&providers_string)).await.map_err(|e| {
+           (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Failed to create agent token: {}", e)),
+                    fields: None,
+                },
+            }))
+        })?;
+
+    Ok((StatusCode::CREATED, Json(Agent {
+        id: agent.id,
+        name: agent.name,
+        budget: agent.budget,
+        providers: agent.providers,
+        description: agent.description,
+        tags: agent.tags,
+        owner_id: agent.owner_id,
+        project_id: agent.project_id,
+        status: agent.status,
+        created_at: agent.created_at,
+        updated_at: agent.updated_at,
+        ic_token: Some(ICToken { 
+            id: token.id.to_string(), 
+            token: token.token, 
+            created_at: chrono::DateTime::from_timestamp(token.created_at / 1000, ((token.created_at % 1000) * 1_000_000) as u32)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_default()
+        }),
+    })))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -448,11 +505,11 @@ pub struct AgentDetails {
 
 /// Get agent details
 pub async fn get_agent_details(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<AgentDetails>, (StatusCode, Json<ErrorResponse>)> {
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     let agent = service.get_agent_details(&id).await.map_err(|e| {
         (
@@ -518,12 +575,12 @@ pub async fn get_agent_details(
 
 /// Update an agent (admin only)
 pub async fn update_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
     Json(req): Json<UpdateAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     // Fetch agent first to check existence and permissions
     let agent = service.get_agent(&id).await.map_err(|e| {
@@ -636,12 +693,25 @@ pub async fn update_agent(
         }),
     ))?;
     
-    Ok(Json(Agent::from(updated_agent)))
+    Ok(Json(Agent {
+        id: updated_agent.id,
+        name: updated_agent.name,
+        budget: updated_agent.budget,
+        providers: updated_agent.providers,
+        description: updated_agent.description,
+        tags: updated_agent.tags,
+        owner_id: updated_agent.owner_id,
+        project_id: updated_agent.project_id,
+        status: updated_agent.status,
+        created_at: updated_agent.created_at,
+        updated_at: updated_agent.updated_at,
+        ic_token: None,
+    }))
 }
 
 /// Delete an agent (admin only)
 pub async fn delete_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<(StatusCode, String), (StatusCode, String)> {
@@ -653,7 +723,7 @@ pub async fn delete_agent(
         ));
     }
 
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     let deleted = service.delete_agent(&id).await.map_err(|e| {
         (
@@ -697,11 +767,11 @@ impl From<ServiceAgentTokenItem> for AgentTokenItem {
 
 /// Get all tokens for an agent (filtered by user role)
 pub async fn get_agent_tokens(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<AgentTokenItem>>, (StatusCode, String)> {
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     // Check if agent exists and get owner_id for authorization
     let owner_id = service.get_agent_owner(&id).await.map_err(|e| {
@@ -763,11 +833,11 @@ pub struct GetAgentProvidersResponse {
 
 /// Get agent providers
 pub async fn get_agent_providers(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<GetAgentProvidersResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let service = AgentService::new(pool);
+    let service = &state.agent_service;
 
     let agent = service.get_agent_details(&id).await.map_err(|e| {
         (
@@ -953,7 +1023,20 @@ pub async fn assign_providers_to_agent(
         }),
     ))?;
 
-    Ok(Json(Agent::from(agent)))
+    Ok(Json(Agent {
+        id: agent.id,
+        name: agent.name,
+        budget: agent.budget,
+        providers: agent.providers,
+        description: agent.description,
+        tags: agent.tags,
+        owner_id: agent.owner_id,
+        project_id: agent.project_id,
+        status: agent.status,
+        created_at: agent.created_at,
+        updated_at: agent.updated_at,
+        ic_token: None,
+    }))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

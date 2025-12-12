@@ -57,6 +57,16 @@ impl TokenState
       generator: Arc::new( TokenGenerator::new() ),
     } )
   }
+
+  /// Create new token state from existing pool
+  pub fn from_pool( pool: sqlx::SqlitePool ) -> Self
+  {
+    let storage = TokenStorage::from_pool( pool );
+    Self {
+      storage: Arc::new( storage ),
+      generator: Arc::new( TokenGenerator::new() ),
+    }
+  }
 }
 
 /// Create token request (Protocol 014 compliant with backward compatibility)
@@ -95,7 +105,7 @@ pub struct CreateTokenRequest
 
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option< String >,
 
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
@@ -276,7 +286,7 @@ pub struct CreateTokenResponse
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option< String >,
   pub provider: Option< String >,
   pub created_at: i64,
   pub rotated_at: Option< i64 >,
@@ -293,7 +303,7 @@ pub struct TokenListItem
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option< String >,
   pub provider: Option< String >,
   pub created_at: i64,
   pub last_used_at: Option< i64 >,
@@ -369,12 +379,12 @@ pub async fn create_token(
       user_id,
       request.project_id.as_deref(),
       token_name,
-      request.agent_id,
+      request.agent_id.as_deref(),
       request.provider.as_deref(),
     )
     .await
   {
-    Ok( id ) => id,
+    Ok( created_token ) => created_token.id,
     Err( _ ) =>
     {
       return (
@@ -889,7 +899,7 @@ pub async fn rotate_token(
       &existing_metadata.user_id,
       existing_metadata.project_id.as_deref(),
       existing_metadata.name.as_deref(),
-      existing_metadata.agent_id,
+      Some(&existing_metadata.agent_id.unwrap()),
       existing_metadata.provider.as_deref(),
     )
     .await
@@ -912,7 +922,7 @@ pub async fn rotate_token(
   };
 
   // Get new token metadata
-  let new_metadata = match state.storage.get_token_metadata( new_token_id ).await
+  let new_metadata = match state.storage.get_token_metadata( new_token_id.id ).await
   {
     Ok( metadata ) => metadata,
     Err( _ ) =>

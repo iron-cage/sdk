@@ -105,6 +105,14 @@ impl AuthState {
       db_pool,
     })
   }
+
+  /// Create new auth state from existing pool
+  pub fn from_pool(db_pool: Pool<Sqlite>, jwt_secret_key: String) -> Self {
+    Self {
+      jwt_secret: Arc::new(JwtSecret::new(jwt_secret_key)),
+      db_pool,
+    }
+  }
 }
 
 // ============================================================================

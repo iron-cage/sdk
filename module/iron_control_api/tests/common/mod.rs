@@ -136,8 +136,8 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
   sqlx::query(
     "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind("user_123")
-  .bind( "test_user" )
+  .bind("user_dynamic_test")
+  .bind( "test_user_dynamic" )
   .bind( email )
   .bind( &password_hash )
   .bind( "user" )
@@ -150,7 +150,7 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
     email
   ) );
 
-  ( "user_123".to_string(), password_hash )
+  ( "user_dynamic_test".to_string(), password_hash )
 }
 
 /// Generate valid JWT access token for test user.

@@ -186,7 +186,7 @@ async fn test_usage_persists_across_restart()
 
     // Record usage 1: OpenAI
     usage_state.tracker.record_usage_with_cost(
-      token_id,
+      token_id.id,
       "openai",
       "gpt-4",
       500,   // input_tokens
@@ -199,7 +199,7 @@ async fn test_usage_persists_across_restart()
 
     // Record usage 2: Anthropic (different provider)
     usage_state.tracker.record_usage_with_cost(
-      token_id,
+      token_id.id,
       "anthropic",
       "claude-sonnet-4-5",
       1000,  // input_tokens
@@ -342,7 +342,7 @@ async fn test_usage_persists_across_multiple_restarts()
     .expect( "Failed to create token" );
 
     usage_state.tracker.record_usage_with_cost(
-      token_id,
+      token_id.id,
       "openai",
       "gpt-4",
       100, 50, 150, 20
@@ -391,7 +391,7 @@ async fn test_usage_persists_across_multiple_restarts()
     .expect( "Failed to create token 2" );
 
     usage_state.tracker.record_usage_with_cost(
-      token_id,
+      token_id.id,
       "anthropic",
       "claude",
       200, 100, 300, 40

@@ -11,6 +11,7 @@ use sqlx::SqlitePool;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::tokens::TokenState;
 use iron_control_api::routes::usage::UsageState;
+use iron_control_api::routes::agents::AgentState;
 
 /// Test JWT secret for all tests (consistent across test runs).
 pub const TEST_JWT_SECRET: &str = "test_jwt_secret_key_for_testing_12345";
@@ -166,6 +167,7 @@ pub struct TestAppState
   pub auth: AuthState,
   pub tokens: TokenState,
   pub database: SqlitePool,
+  pub agents: AgentState,
 }
 
 impl TestAppState
@@ -173,11 +175,17 @@ impl TestAppState
   /// Create new test application state with in-memory database.
   pub async fn new() -> Self
   {
-    let auth = create_test_auth_state().await;
-    let tokens = create_test_token_state().await;
     let database = super::create_test_database().await;
 
-    Self { auth, tokens, database }
+    let auth = AuthState::from_pool( database.clone(), TEST_JWT_SECRET.to_string() );
+    let tokens = TokenState::from_pool( database.clone() );
+
+    // Seed test users for FK constraint compliance
+    seed_test_users_for_tokens( tokens.storage.pool() ).await;
+
+    let agents = AgentState::new( database.clone(), tokens.storage.clone() );
+
+    Self { auth, tokens, database, agents }
   }
 
   /// Create new test application state with custom database path.
@@ -200,7 +208,9 @@ impl TestAppState
       .await
       .expect( "LOUD FAILURE: Failed to connect to custom database path" );
 
-    Self { auth, tokens, database }
+    let agents = AgentState::new(database.clone(), tokens.storage.clone());
+
+    Self { auth, tokens, database, agents }
   }
 
   /// Get JWT secret for token generation in tests.
@@ -234,6 +244,15 @@ impl axum::extract::FromRef< TestAppState > for SqlitePool
   fn from_ref( state: &TestAppState ) -> Self
   {
     state.database.clone()
+  }
+}
+
+/// Enable AgentState extraction from TestAppState.
+impl axum::extract::FromRef< TestAppState > for AgentState
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    state.agents.clone()
   }
 }
 

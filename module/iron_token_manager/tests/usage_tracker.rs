@@ -65,13 +65,13 @@ async fn test_record_usage()
 
   // Record usage
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed to record usage" );
 
   // Verify usage was recorded
   let usage = tracker
-    .get_token_usage( token_id )
+    .get_token_usage( token_id.id )
     .await
     .expect( "Failed to get usage" );
 
@@ -97,12 +97,12 @@ async fn test_record_usage_with_cost()
 
   // Record usage with cost (in cents)
   tracker
-    .record_usage_with_cost( token_id, "anthropic", "claude-sonnet-4-5-20250929", 200, 100, 300, 45 )
+    .record_usage_with_cost( token_id.id, "anthropic", "claude-sonnet-4-5-20250929", 200, 100, 300, 45 )
     .await
     .expect( "Failed to record usage" );
 
   let usage = tracker
-    .get_token_usage( token_id )
+    .get_token_usage( token_id.id )
     .await
     .expect( "Failed to get usage" );
 
@@ -124,22 +124,22 @@ async fn test_multiple_usage_records()
 
   // Record multiple usage events
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed to record usage 1" );
 
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 200, 100, 300 )
+    .record_usage( token_id.id, "openai", "gpt-4", 200, 100, 300 )
     .await
     .expect( "Failed to record usage 2" );
 
   tracker
-    .record_usage( token_id, "gemini", "gemini-pro", 50, 25, 75 )
+    .record_usage( token_id.id, "gemini", "gemini-pro", 50, 25, 75 )
     .await
     .expect( "Failed to record usage 3" );
 
   let usage = tracker
-    .get_token_usage( token_id )
+    .get_token_usage( token_id.id )
     .await
     .expect( "Failed to get usage" );
 
@@ -160,18 +160,18 @@ async fn test_get_usage_by_provider()
 
   // Record usage for different providers
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed to record usage" );
 
   tracker
-    .record_usage( token_id, "anthropic", "claude-sonnet-4-5-20250929", 200, 100, 300 )
+    .record_usage( token_id.id, "anthropic", "claude-sonnet-4-5-20250929", 200, 100, 300 )
     .await
     .expect( "Failed to record usage" );
 
   // Get usage for specific provider
   let openai_usage = tracker
-    .get_usage_by_provider( token_id, "openai" )
+    .get_usage_by_provider( token_id.id, "openai" )
     .await
     .expect( "Failed to get usage" );
 
@@ -193,18 +193,18 @@ async fn test_aggregate_token_usage()
 
   // Record multiple usage events
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed" );
 
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 200, 100, 300 )
+    .record_usage( token_id.id, "openai", "gpt-4", 200, 100, 300 )
     .await
     .expect( "Failed" );
 
   // Get aggregated stats
   let stats = tracker
-    .get_aggregate_usage( token_id )
+    .get_aggregate_usage( token_id.id )
     .await
     .expect( "Failed to get aggregate" );
 
@@ -229,7 +229,7 @@ async fn test_get_usage_in_time_range()
 
   // Record usage
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed to record usage" );
 
@@ -243,7 +243,7 @@ async fn test_get_usage_in_time_range()
   let end_time = now_ms + ( 3_600_000 );
 
   let usage = tracker
-    .get_usage_in_range( token_id, start_time, end_time )
+    .get_usage_in_range( token_id.id, start_time, end_time )
     .await
     .expect( "Failed to get usage in range" );
 
@@ -264,25 +264,25 @@ async fn test_cascade_delete_usage_on_token_delete()
 
   // Record usage
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed to record usage" );
 
   // Verify usage exists
   let usage_before = tracker
-    .get_token_usage( token_id )
+    .get_token_usage( token_id.id )
     .await
     .expect( "Failed to get usage" );
   assert_eq!( usage_before.len(), 1 );
 
   // Delete token (should cascade to usage)
   storage
-    .delete_token( token_id )
+    .delete_token( token_id.id )
     .await
     .expect( "Failed to delete token" );
 
   // Verify usage was cascade-deleted
-  let usage_after = tracker.get_token_usage( token_id ).await;
+  let usage_after = tracker.get_token_usage( token_id.id ).await;
   assert!( usage_after.is_ok() );
   assert_eq!( usage_after.unwrap().len(), 0, "Usage should be cascade-deleted" );
 }
@@ -300,12 +300,12 @@ async fn test_usage_records_have_timestamps()
     .expect( "Failed to create token" );
 
   tracker
-    .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
+    .record_usage( token_id.id, "openai", "gpt-4", 100, 50, 150 )
     .await
     .expect( "Failed to record usage" );
 
   let usage = tracker
-    .get_token_usage( token_id )
+    .get_token_usage( token_id.id )
     .await
     .expect( "Failed to get usage" );
 

@@ -128,6 +128,7 @@ pub struct ProviderListItem
   pub status: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct AgentDetails
 {
 /// Agent ID (format: agent_<uuid>)
@@ -236,6 +237,7 @@ pub enum AgentServiceError
 #[ derive( Debug, Clone ) ]
 pub struct AgentService
 {
+
   pool: SqlitePool,
 }
 

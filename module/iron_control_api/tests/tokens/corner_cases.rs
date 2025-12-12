@@ -671,7 +671,7 @@ async fn test_create_token_plaintext_never_stored_in_database()
 
   // Query database directly to verify token_hash column
   let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
-    .bind( token_id )
+    .bind( token_id.id )
     .fetch_one( state.tokens.storage.pool() )
     .await
     .expect( "Database query should succeed" );
@@ -753,7 +753,7 @@ async fn test_create_token_uses_sha256_hash()
 
   // Query database directly to verify hash algorithm
   let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
-    .bind( token_id )
+    .bind( token_id.id )
     .fetch_one( state.tokens.storage.pool() )
     .await
     .expect( "Database query should succeed" );
