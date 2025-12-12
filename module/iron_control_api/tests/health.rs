@@ -48,7 +48,7 @@ async fn test_health_endpoint_at_correct_path()
   // Verify response is JSON
   let body = response.into_body().collect().await.unwrap().to_bytes();
   let json: serde_json::Value = serde_json::from_slice( &body )
-    .expect( "Health response should be valid JSON" );
+    .expect("LOUD FAILURE: Health response should be valid JSON");
 
   // Verify response has required fields
   assert!( json.get( "status" ).is_some(), "Health response should have 'status' field" );

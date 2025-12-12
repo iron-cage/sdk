@@ -48,7 +48,7 @@ fn test_all_commands_route_correctly()
   assert!( routing_file.exists(), "Routing file must exist: {:?}", routing_file );
 
   let routing_content = std::fs::read_to_string( &routing_file )
-    .expect( "Failed to read routing file" );
+    .expect("LOUD FAILURE: Failed to read routing file");
 
   // Expected commands (22 total)
   let expected_commands = vec![
@@ -137,7 +137,7 @@ fn test_no_orphaned_adapter_usage()
   let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
 
   let routing_content = std::fs::read_to_string( &routing_file )
-    .expect( "Failed to read routing file" );
+    .expect("LOUD FAILURE: Failed to read routing file");
 
   // List of orphaned adapters (deleted in migration)
   let orphaned_adapters = vec![
@@ -299,7 +299,7 @@ fn bug_reproducer_issue_004_help_syntax_consistency()
     );
 
     let content = std::fs::read_to_string( &path )
-      .expect( "Failed to read binary source" );
+      .expect("LOUD FAILURE: Failed to read binary source");
 
     // Verify help text doesn't contain invalid ?? syntax
     // Search for pattern: ".command ??" in help examples
@@ -326,5 +326,203 @@ fn bug_reproducer_issue_004_help_syntax_consistency()
       "File {} should contain valid single '?' help examples",
       binary_file
     );
+  }
+}
+
+/// Bug reproducer for Issue 7: token_id type mismatch between YAML and handlers
+///
+/// ## Root Cause
+///
+/// Three token command definitions in `commands/tokens.yaml` declared the `token_id`
+/// parameter as `kind: Integer`, but the handler validation code in
+/// `src/handlers/validation.rs` expected String format with "tok_" prefix pattern.
+/// This created a fundamental type contract violation where:
+/// 1. Parser expected numeric input (Integer type)
+/// 2. Handler validation required string format matching "tok_*" pattern
+/// 3. Neither integer values nor string values would satisfy both requirements
+///
+/// Affected commands: .tokens.get, .tokens.rotate, .tokens.revoke
+///
+/// Location: commands/tokens.yaml lines 79-188 (three command definitions)
+///
+/// ## Why Not Caught
+///
+/// 1. **No Parameter Contract Tests**: No automated tests verify type consistency
+///    between YAML parameter declarations and handler validation logic
+/// 2. **Runtime-Only Validation**: Type checking only happens when parsing CLI
+///    arguments, not at build time or in unit tests
+/// 3. **Test Gap**: Integration tests didn't exercise these specific commands
+/// 4. **Manual Discovery**: Found during comprehensive manual testing when
+///    commands failed with both integer and string inputs
+///
+/// ## Fix Applied
+///
+/// Modified `commands/tokens.yaml` for three commands (lines 79-188):
+///
+/// 1. **.tokens.get** (lines 88-89):
+///    - Changed: `kind: Integer` → `kind: String`
+///    - Updated hint: "Numeric token identifier" → "Token identifier (format tok_*)"
+///    - Updated example: `token_id::123` → `token_id::tok_abc123`
+///
+/// 2. **.tokens.rotate** (lines 127-128):
+///    - Changed: `kind: Integer` → `kind: String`
+///    - Updated hint: "Numeric token identifier" → "Token identifier (format tok_*)"
+///    - Updated example: `token_id::123` → `token_id::tok_abc123`
+///
+/// 3. **.tokens.revoke** (lines 163-164):
+///    - Changed: `kind: Integer` → `kind: String`
+///    - Updated hint: "Numeric token identifier" → "Token identifier (format tok_*)"
+///    - Updated example: `token_id::456` → `token_id::tok_def456`
+///
+/// Also updated manual test plan `tests/manual/readme.md` test cases:
+/// TC-3.3, TC-3.4, TC-3.5, TC-7.3 to use string token_id format.
+///
+/// ## Prevention
+///
+/// 1. **Parameter Contract Tests**: Add automated tests that verify YAML parameter
+///    types match handler validation expectations for all commands
+/// 2. **Type Documentation**: Document expected parameter formats in both YAML
+///    (kind + hint) and handler validation code (validation rules)
+/// 3. **Integration Testing**: Test all commands with their documented examples
+///    to catch type mismatches early
+/// 4. **Code Review Checklist**: When adding new commands, verify parameter types
+///    are consistent across YAML definition → parser → handler validation
+///
+/// ## Pitfall
+///
+/// **Parameter type mismatches make commands completely unusable**
+///
+/// When YAML declares one type but handlers expect another, the command cannot
+/// work with ANY input - users get errors regardless of what they try. This is
+/// worse than a logic bug because the command is fundamentally broken at the
+/// interface level.
+///
+/// Always verify the full parameter contract chain:
+/// 1. YAML `kind:` matches actual data type (String/Integer/Boolean)
+/// 2. Handler validation rules match YAML type
+/// 3. Examples in YAML work with the declared type
+/// 4. Manual test plan uses correct format
+///
+/// **Specific lesson**: String-based identifiers with format requirements (like
+/// "tok_*" prefix) must ALWAYS be declared as `kind: String` in YAML, never as
+/// Integer even if they contain numbers. The presence of a prefix pattern
+/// automatically means String type.
+#[ test ]
+fn bug_reproducer_issue_007_token_id_type_mismatch()
+{
+  // Read YAML command definitions
+  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+  let yaml_file = manifest_dir.join( "commands/tokens.yaml" );
+
+  assert!(
+    yaml_file.exists(),
+    "YAML command definitions must exist: {:?}",
+    yaml_file
+  );
+
+  let yaml_content = std::fs::read_to_string( &yaml_file )
+    .expect("LOUD FAILURE: Failed to read YAML file");
+
+  // Commands that require token_id parameter with String type
+  let commands_with_token_id = vec![
+    ".tokens.get",
+    ".tokens.rotate",
+    ".tokens.revoke",
+  ];
+
+  // Verify each command declares token_id as String (not Integer)
+  for command in &commands_with_token_id
+  {
+    // Find command definition section
+    let command_pattern = format!( "name: {}", command );
+    assert!(
+      yaml_content.contains( &command_pattern ),
+      "Command '{}' must exist in YAML",
+      command
+    );
+
+    // Extract section for this command (from "name: .tokens.X" to next "- name:" or EOF)
+    let start_idx = yaml_content.find( &command_pattern )
+      .expect("LOUD FAILURE: Command must exist in YAML");
+
+    let remaining = &yaml_content[ start_idx.. ];
+    let next_command = remaining[ 1.. ].find( "\n- name:" ).unwrap_or( remaining.len() );
+    let command_section = &remaining[ ..next_command ];
+
+    // Verify token_id parameter exists and is String type
+    assert!(
+      command_section.contains( "- name: token_id" ),
+      "Command '{}' must have token_id parameter",
+      command
+    );
+
+    // CRITICAL: Verify kind is String, not Integer
+    // This regex-free check looks for the parameter definition block
+    let token_id_start = command_section.find( "- name: token_id" )
+      .expect("LOUD FAILURE: token_id parameter must exist");
+
+    let param_section = &command_section[ token_id_start.. ];
+    let next_param = param_section[ 1.. ].find( "\n  - name:" )
+      .or_else( || param_section[ 1.. ].find( "\nexamples:" ) )
+      .unwrap_or( param_section.len() );
+
+    let param_def = &param_section[ ..next_param ];
+
+    // Verify String type (not Integer)
+    assert!(
+      param_def.contains( "kind: String" ),
+      "Command '{}' token_id must be 'kind: String' (not Integer). \
+       Handlers expect 'tok_*' format which is a String type.",
+      command
+    );
+
+    // Verify Integer is NOT present (common mistake)
+    assert!(
+      !param_def.contains( "kind: Integer" ),
+      "Command '{}' token_id must NOT be 'kind: Integer'. \
+       The 'tok_*' prefix format requires String type.",
+      command
+    );
+
+    // Verify hint mentions the tok_* format
+    assert!(
+      param_def.contains( "tok_" ),
+      "Command '{}' token_id hint should document 'tok_*' format requirement",
+      command
+    );
+  }
+
+  // Verify examples use string format (tok_*), not numeric format
+  for command in &commands_with_token_id
+  {
+    let command_pattern = format!( "name: {}", command );
+    let start_idx = yaml_content.find( &command_pattern )
+      .expect("LOUD FAILURE: Command must exist");
+
+    let remaining = &yaml_content[ start_idx.. ];
+    let next_command = remaining[ 1.. ].find( "\n- name:" ).unwrap_or( remaining.len() );
+    let command_section = &remaining[ ..next_command ];
+
+    // Check examples section contains tok_ format
+    if let Some( examples_start ) = command_section.find( "examples:" )
+    {
+      let examples_section = &command_section[ examples_start.. ];
+
+      assert!(
+        examples_section.contains( "token_id::tok_" ),
+        "Command '{}' examples must use 'tok_*' string format (not numeric)",
+        command
+      );
+
+      // Verify examples don't use old numeric format
+      // This checks for "token_id::123" or similar numeric patterns
+      assert!(
+        !examples_section.contains( "token_id::123" ) &&
+        !examples_section.contains( "token_id::456" ) &&
+        !examples_section.contains( "token_id::789" ),
+        "Command '{}' examples must NOT use numeric format (use tok_* instead)",
+        command
+      );
+    }
   }
 }

@@ -11,6 +11,9 @@
 //! - Budget spent (USD consumed so far)
 //! - Status (active, expired, revoked)
 //! - Optional expiration time
+//!
+//! **State Machine**: See `docs/state_machine/001_budget_lease_lifecycle.md`
+//! for complete state transition documentation (ACTIVE → EXPIRED → CLOSED lifecycle)
 
 use sqlx::{ SqlitePool, Row };
 use std::time::{ SystemTime, UNIX_EPOCH };
@@ -256,7 +259,7 @@ impl LeaseManager
   /// Close a lease and record returned amount
   ///
   /// Sets the lease status to 'closed', records the returned amount,
-  /// and sets the closed_at timestamp.
+  /// and sets the `closed_at` timestamp.
   ///
   /// # Arguments
   ///
@@ -269,6 +272,10 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database update fails or lease not found
+  ///
+  /// # Panics
+  ///
+  /// Panics if system time is before UNIX epoch (should never happen on modern systems)
   pub async fn close_lease( &self, lease_id: &str ) -> Result< f64, sqlx::Error >
   {
     #[ allow( clippy::cast_possible_truncation ) ]
@@ -320,7 +327,7 @@ impl LeaseManager
     Ok( returned )
   }
 
-  /// Update the updated_at timestamp for a lease (keeps lease alive)
+  /// Update the `updated_at` timestamp for a lease (keeps lease alive)
   ///
   /// Called after each report to prevent stale lease expiration.
   ///
@@ -331,6 +338,10 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database update fails
+  ///
+  /// # Panics
+  ///
+  /// Panics if system time is before UNIX epoch (should never happen on modern systems)
   pub async fn touch_lease( &self, lease_id: &str ) -> Result< (), sqlx::Error >
   {
     #[ allow( clippy::cast_possible_truncation ) ]

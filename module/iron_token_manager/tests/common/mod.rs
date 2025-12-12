@@ -35,7 +35,7 @@ use tempfile::TempDir;
 /// ```
 pub async fn create_test_db() -> ( SqlitePool, TempDir )
 {
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
+  let temp_dir = TempDir::new().expect("LOUD FAILURE: Failed to create temp dir");
   let db_path = temp_dir.path().join( "test.db" );
   let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
 
@@ -43,12 +43,12 @@ pub async fn create_test_db() -> ( SqlitePool, TempDir )
     .max_connections( 5 )
     .connect( &db_url )
     .await
-    .expect( "Failed to connect to test database" );
+    .expect("LOUD FAILURE: Failed to connect to test database");
 
   // Apply all migrations using unified helper
   iron_token_manager::migrations::apply_all_migrations( &pool )
     .await
-    .expect( "Failed to apply migrations" );
+    .expect("LOUD FAILURE: Failed to apply migrations");
 
   // Seed common test users (user_001 through user_010)
   seed_test_users( &pool ).await;
@@ -311,7 +311,7 @@ pub async fn seed_test_agent( pool: &sqlx::SqlitePool, agent_id: i32 )
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( pool )
     .await
-    .expect( "Should insert test agent" );
+    .expect("LOUD FAILURE: Should insert test agent");
 
   sqlx::query( "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" )
     .bind( agent_id )
@@ -322,5 +322,5 @@ pub async fn seed_test_agent( pool: &sqlx::SqlitePool, agent_id: i32 )
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( pool )
     .await
-    .expect( "Should insert agent budget" );
+    .expect("LOUD FAILURE: Should insert agent budget");
 }

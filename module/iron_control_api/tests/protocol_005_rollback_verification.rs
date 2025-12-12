@@ -209,7 +209,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_budget_status( agent_id )
     .await
     .unwrap()
-    .expect( "Budget should exist" );
+    .expect("LOUD FAILURE: Budget should exist");
 
   assert_eq!( budget.total_allocated, 100.0, "Total allocated should be $100" );
   assert_eq!( budget.budget_remaining, 100.0, "Budget remaining should be $100" );
@@ -229,7 +229,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_lease( &lease_id )
     .await
     .unwrap()
-    .expect( "Lease should exist" );
+    .expect("LOUD FAILURE: Lease should exist");
 
   assert_eq!( lease.budget_granted, 10.0, "Lease should have $10 granted" );
   assert_eq!( lease.budget_spent, 0.0, "Lease should have $0 spent initially" );
@@ -250,7 +250,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_lease( &lease_id )
     .await
     .unwrap()
-    .expect( "Lease should exist" );
+    .expect("LOUD FAILURE: Lease should exist");
 
   assert_eq!( updated_lease.budget_spent, 2.5, "Lease should show $2.50 spent" );
 
@@ -258,7 +258,7 @@ async fn test_protocol_005_budget_flow_works()
     .get_budget_status( agent_id )
     .await
     .unwrap()
-    .expect( "Budget should exist" );
+    .expect("LOUD FAILURE: Budget should exist");
 
   assert_eq!( updated_budget.total_spent, 2.5, "Budget should show $2.50 total spent" );
   assert_eq!(

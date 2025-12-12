@@ -113,7 +113,7 @@ fn test_migration_metrics_at_target()
   // M2: Routing counts
   let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
   let routing_content = std::fs::read_to_string( &routing_file )
-    .expect( "Failed to read routing file" );
+    .expect("LOUD FAILURE: Failed to read routing file");
 
   // List of orphaned adapters that should NOT appear in routing
   let orphaned_adapter_names = [
@@ -346,7 +346,7 @@ fn test_ratios_at_target()
   // Check routing
   let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
   let routing_content = std::fs::read_to_string( &routing_file )
-    .expect( "Failed to read routing file" );
+    .expect("LOUD FAILURE: Failed to read routing file");
 
   let orphaned_adapter_names = [
     "show_agent_usage_adapter",

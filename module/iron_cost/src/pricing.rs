@@ -226,7 +226,7 @@ impl PricingManager {
             .unwrap_or_else(|| pricing.max_output_tokens().unwrap_or(MAX_OUTPUT_TOKENS));
 
         // Estimate input tokens from message content
-        let estimated_input = crate::helpers::estimate_input_tokens(&json);
+        let estimated_input = crate::token_estimation::estimate_input_tokens(&json);
         let max_cost = pricing.calculate_cost_micros(estimated_input, max_tokens);
 
         Some(max_cost)

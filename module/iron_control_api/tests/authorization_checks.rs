@@ -73,7 +73,7 @@ async fn setup_database_with_agents_table( pool: &SqlitePool )
   )
   .execute( pool )
   .await
-  .expect( "Failed to create agents table" );
+  .expect("LOUD FAILURE: Failed to create agents table");
 
   // Create index on owner_id for fast lookups
   sqlx::query::<sqlx::Sqlite>(
@@ -81,7 +81,7 @@ async fn setup_database_with_agents_table( pool: &SqlitePool )
   )
   .execute( pool )
   .await
-  .expect( "Failed to create agents owner_id index" );
+  .expect("LOUD FAILURE: Failed to create agents owner_id index");
 
   // Create agent_budgets table for handshake test
   sqlx::query::<sqlx::Sqlite>(
@@ -98,7 +98,7 @@ async fn setup_database_with_agents_table( pool: &SqlitePool )
   )
   .execute( pool )
   .await
-  .expect( "Failed to create agent_budgets table" );
+  .expect("LOUD FAILURE: Failed to create agent_budgets table");
 }
 
 /// Test: User can only create leases for their own agents
@@ -131,7 +131,7 @@ async fn test_user_cannot_access_other_users_agents()
   .bind( chrono::Utc::now().timestamp() )
   .execute( &db_pool )
   .await
-  .expect( "Failed to create user A" );
+  .expect("LOUD FAILURE: Failed to create user A");
 
   sqlx::query::<sqlx::Sqlite>(
     "INSERT INTO users (id, username, password_hash, email, role, created_at)
@@ -145,7 +145,7 @@ async fn test_user_cannot_access_other_users_agents()
   .bind( chrono::Utc::now().timestamp() )
   .execute( &db_pool )
   .await
-  .expect( "Failed to create user B" );
+  .expect("LOUD FAILURE: Failed to create user B");
 
   // Create agent owned by user A
   // GREEN PHASE: This should now succeed because owner_id column exists
@@ -160,7 +160,7 @@ async fn test_user_cannot_access_other_users_agents()
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
-  .expect( "GREEN PHASE: Should create agent with owner_id" );
+  .expect("LOUD FAILURE: GREEN PHASE: Should create agent with owner_id");
 
   // Verify agent was created with correct owner
   let agent_owner : String = sqlx::query_scalar::<sqlx::Sqlite, String>(
@@ -169,7 +169,7 @@ async fn test_user_cannot_access_other_users_agents()
   .bind( agent_id )
   .fetch_one( &db_pool )
   .await
-  .expect( "Should query agent owner" );
+  .expect("LOUD FAILURE: Should query agent owner");
 
   assert_eq!(
     agent_owner, user_a_id,
@@ -213,7 +213,7 @@ async fn test_database_filters_agents_by_owner()
     .bind( chrono::Utc::now().timestamp() )
     .execute( &db_pool )
     .await
-    .expect( "Failed to create user" );
+    .expect("LOUD FAILURE: Failed to create user");
   }
 
   // Create agents for both users
@@ -229,7 +229,7 @@ async fn test_database_filters_agents_by_owner()
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
-  .expect( "Should create agent 1" );
+  .expect("LOUD FAILURE: Should create agent 1");
 
   // Agent 2 owned by user B
   let agent_2_id : i64 = sqlx::query_scalar::<sqlx::Sqlite, i64>(
@@ -243,7 +243,7 @@ async fn test_database_filters_agents_by_owner()
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
-  .expect( "Should create agent 2" );
+  .expect("LOUD FAILURE: Should create agent 2");
 
   // Query for user A's agents - should return only agent 1
   let user_a_agents : Vec< i64 > = sqlx::query_scalar::<sqlx::Sqlite, i64>(
@@ -252,7 +252,7 @@ async fn test_database_filters_agents_by_owner()
   .bind( user_a_id )
   .fetch_all( &db_pool )
   .await
-  .expect( "GREEN PHASE: Query with owner_id should succeed" );
+  .expect("LOUD FAILURE: GREEN PHASE: Query with owner_id should succeed");
 
   assert_eq!(
     user_a_agents.len(),
@@ -271,7 +271,7 @@ async fn test_database_filters_agents_by_owner()
   .bind( user_b_id )
   .fetch_all( &db_pool )
   .await
-  .expect( "Query should succeed" );
+  .expect("LOUD FAILURE: Query should succeed");
 
   assert_eq!(
     user_b_agents.len(),
@@ -312,7 +312,7 @@ async fn test_handshake_rejects_unauthorized_agent_access()
   .bind( chrono::Utc::now().timestamp() )
   .execute( &db_pool )
   .await
-  .expect( "Failed to create user" );
+  .expect("LOUD FAILURE: Failed to create user");
 
   // Create agent (without owner_id for now, will add in GREEN phase)
   let agent_id : i64 = sqlx::query_scalar::<sqlx::Sqlite, i64>(
@@ -325,7 +325,7 @@ async fn test_handshake_rejects_unauthorized_agent_access()
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
-  .expect( "Failed to create agent" );
+  .expect("LOUD FAILURE: Failed to create agent");
 
   // Create agent budget
   sqlx::query::<sqlx::Sqlite>(
@@ -340,7 +340,7 @@ async fn test_handshake_rejects_unauthorized_agent_access()
   .bind( chrono::Utc::now().timestamp_millis() )
   .execute( &db_pool )
   .await
-  .expect( "Failed to create agent budget" );
+  .expect("LOUD FAILURE: Failed to create agent budget");
 
   // Create IC Token for agent
   let ic_token_manager = IcTokenManager::new( "test_secret_123".to_string() );
@@ -352,13 +352,13 @@ async fn test_handshake_rejects_unauthorized_agent_access()
   );
   let ic_token = ic_token_manager
     .generate_token( &claims )
-    .expect( "Failed to generate IC token" );
+    .expect("LOUD FAILURE: Failed to generate IC token");
 
   // For now, just verify we can parse the IC token
   // In GREEN phase, we'll add authorization check that verifies user owns agent
   let verified_claims = ic_token_manager
     .verify_token( &ic_token )
-    .expect( "Should verify IC token" );
+    .expect("LOUD FAILURE: Should verify IC token");
 
   assert_eq!( verified_claims.agent_id, format!( "agent_{}", agent_id ) );
 
@@ -406,7 +406,7 @@ async fn test_budget_request_rejects_unauthorized_agent()
     .bind( chrono::Utc::now().timestamp() )
     .execute( &db_pool )
     .await
-    .expect( "Failed to create user" );
+    .expect("LOUD FAILURE: Failed to create user");
   }
 
   // Create agent (without owner_id for now)
@@ -420,7 +420,7 @@ async fn test_budget_request_rejects_unauthorized_agent()
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
-  .expect( "Failed to create agent" );
+  .expect("LOUD FAILURE: Failed to create agent");
 
   // RED PHASE ASSERTION:
   // Currently there's NO owner_id on agents, so we cant enforce ownership
@@ -471,7 +471,7 @@ async fn test_list_agents_filters_by_owner()
     .bind( chrono::Utc::now().timestamp() )
     .execute( &db_pool )
     .await
-    .expect( "Failed to create user" );
+    .expect("LOUD FAILURE: Failed to create user");
   }
 
   // Create agents for both users
@@ -488,7 +488,7 @@ async fn test_list_agents_filters_by_owner()
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( &db_pool )
     .await
-    .expect( "Should create agent for user A" );
+    .expect("LOUD FAILURE: Should create agent for user A");
   }
 
   // Agent 3 and 4 owned by user B
@@ -504,7 +504,7 @@ async fn test_list_agents_filters_by_owner()
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( &db_pool )
     .await
-    .expect( "Should create agent for user B" );
+    .expect("LOUD FAILURE: Should create agent for user B");
   }
 
   // Verify user A can only see their agents (1, 2)
@@ -514,7 +514,7 @@ async fn test_list_agents_filters_by_owner()
   .bind( user_a_id )
   .fetch_all( &db_pool )
   .await
-  .expect( "GREEN PHASE: Should query agents by owner" );
+  .expect("LOUD FAILURE: GREEN PHASE: Should query agents by owner");
 
   assert_eq!(
     user_a_agents.len(),
@@ -531,7 +531,7 @@ async fn test_list_agents_filters_by_owner()
   .bind( user_b_id )
   .fetch_all( &db_pool )
   .await
-  .expect( "Should query agents by owner" );
+  .expect("LOUD FAILURE: Should query agents by owner");
 
   assert_eq!(
     user_b_agents.len(),

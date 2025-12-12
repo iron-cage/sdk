@@ -6,7 +6,7 @@
 pub mod event;
 
 #[ cfg( feature = "enabled" ) ]
-pub mod helpers;
+pub mod provider_utils;
 
 #[ cfg( feature = "enabled" ) ]
 pub mod stats;
@@ -35,7 +35,7 @@ pub use event_storage::EventStore;
 pub use stats::{ ComputedStats, ModelStats };
 
 #[ cfg( feature = "enabled" ) ]
-pub use helpers::{ Provider, infer_provider, current_time_ms };
+pub use provider_utils::{ Provider, infer_provider, current_time_ms };
 
 #[ cfg( feature = "sync" ) ]
 pub use sync::{ SyncClient, SyncConfig, SyncHandle };

@@ -3,10 +3,10 @@
 use iron_cost::pricing::PricingManager;
 use iron_runtime_analytics::event::EventPayload;
 use iron_runtime_analytics::event_storage::EventStore;
-use iron_runtime_analytics::helpers::Provider;
+use iron_runtime_analytics::provider_utils::Provider;
 
 fn pricing() -> PricingManager {
-    PricingManager::new().expect("Failed to create PricingManager")
+    PricingManager::new().expect("LOUD FAILURE: Failed to create PricingManager")
 }
 
 // ============================================================================
@@ -123,7 +123,7 @@ fn test_record_llm_completed_updates_by_model_stats() {
     store.record_llm_completed(&pricing, "gpt-4", 200, 100, None, None);
 
     let stats = store.stats();
-    let model_stats = stats.by_model.get("gpt-4").expect("Should have gpt-4 stats");
+    let model_stats = stats.by_model.get("gpt-4").expect("LOUD FAILURE: Should have gpt-4 stats");
     assert_eq!(model_stats.request_count, 2);
     assert_eq!(model_stats.input_tokens, 300);
     assert_eq!(model_stats.output_tokens, 150);
@@ -138,7 +138,7 @@ fn test_record_llm_completed_updates_by_provider_stats() {
     store.record_llm_completed(&pricing, "gpt-3.5-turbo", 200, 100, None, None);
 
     let stats = store.stats();
-    let provider_stats = stats.by_provider.get("openai").expect("Should have openai stats");
+    let provider_stats = stats.by_provider.get("openai").expect("LOUD FAILURE: Should have openai stats");
     assert_eq!(provider_stats.request_count, 2);
 }
 
@@ -323,7 +323,7 @@ fn test_record_router_stopped_with_stats() {
     store.record_router_stopped();
 
     let events = store.drain_all();
-    let stopped_event = events.last().expect("Should have events");
+    let stopped_event = events.last().expect("LOUD FAILURE: Should have events");
 
     if let EventPayload::RouterStopped {
         total_requests,

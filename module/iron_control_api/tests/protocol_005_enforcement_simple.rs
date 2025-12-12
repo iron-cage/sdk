@@ -35,7 +35,7 @@ async fn setup_test_db() -> SqlitePool
   let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
   iron_token_manager::migrations::apply_all_migrations( &pool )
     .await
-    .expect( "Failed to apply migrations" );
+    .expect("LOUD FAILURE: Failed to apply migrations");
   pool
 }
 

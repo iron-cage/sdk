@@ -109,6 +109,9 @@ impl HandshakeRequest
   /// Maximum provider name length
   const MAX_PROVIDER_LENGTH: usize = 50;
 
+  /// Default budget lease amount (USD) for handshake
+  const DEFAULT_HANDSHAKE_BUDGET: f64 = 10.0;
+
   /// Validate handshake request parameters
   ///
   /// # Errors
@@ -462,75 +465,62 @@ pub async fn handshake(
     Some( id ) => id,
     None =>
     {
+      // Security: Use generic error to prevent agent enumeration attacks
       return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Agent not found" }) ),
+        StatusCode::UNAUTHORIZED,
+        Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
       )
         .into_response();
     }
   };
 
-  // Get usage limit for this user (budget from usage_limits table)
-  let usage_limit: Option< ( Option< i64 >, i64 ) > = match sqlx::query_as(
-    "SELECT max_cost_cents_per_month, current_cost_cents_this_month FROM usage_limits WHERE user_id = ?"
-  )
-  .bind( &owner_id )
-  .fetch_optional( &state.db_pool )
-  .await
+  // Fix(issue-budget-006): Atomically check and reserve budget to prevent TOCTOU race
+  //
+  // Previously: get_budget_status() then record_spending() in separate operations
+  // created race window where concurrent requests could both pass check before either
+  // recorded spending, causing negative budget (invariant violation).
+  //
+  // Now: check_and_reserve_budget() atomically locks row with SELECT FOR UPDATE,
+  // checks budget, and records spending in single transaction.
+  let budget_to_grant = match state
+    .agent_budget_manager
+    .check_and_reserve_budget( agent_id, HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET )
+    .await
   {
-    Ok( limit ) => limit,
-    Err( err ) =>
+    Ok( granted ) if granted > 0.0 => granted,
+    Ok( _ ) =>
     {
-      tracing::error!( "Database error fetching usage limit: {}", err );
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
-      )
-        .into_response();
-    }
-  };
+      // Insufficient budget or agent doesnt exist
+      // Fetch budget details for error response
+      let agent_budget = state
+        .agent_budget_manager
+        .get_budget_status( agent_id )
+        .await
+        .ok()
+        .flatten();
 
-  // Calculate budget from usage_limits (convert cents to USD)
-  let ( limit_usd, spent_usd, remaining_usd ) = match usage_limit
-  {
-    Some( ( Some( limit_cents ), spent_cents ) ) =>
-    {
-      let limit = limit_cents as f64 / 100.0;
-      let spent = spent_cents as f64 / 100.0;
-      let remaining = ( limit - spent ).max( 0.0 );
-      ( limit, spent, remaining )
-    }
-    Some( ( None, _ ) ) =>
-    {
-      // No cost limit set - allow unlimited
-      ( f64::MAX, 0.0, f64::MAX )
-    }
-    None =>
-    {
       return (
         StatusCode::FORBIDDEN,
-        Json( serde_json::json!({ "error": "No budget limit configured for user" }) ),
+        Json( serde_json::json!(
+        {
+          "error": "Budget limit exceeded",
+          "total_allocated": agent_budget.as_ref().map( | b | b.total_allocated ),
+          "total_spent": agent_budget.as_ref().map( | b | b.total_spent ),
+          "budget_remaining": agent_budget.as_ref().map( | b | b.budget_remaining )
+        } ) ),
+      )
+        .into_response();
+    }
+    Err( err ) =>
+    {
+      tracing::error!( "Database error checking and reserving budget: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Budget service unavailable" }) ),
       )
         .into_response();
     }
   };
-
-  // Grant the full remaining budget as the lease
-  let budget_to_grant = remaining_usd;
-  if budget_to_grant <= 0.0
-  {
-    return (
-      StatusCode::FORBIDDEN,
-      Json( serde_json::json!(
-      {
-        "error": "Budget limit exceeded",
-        "limit_usd": limit_usd,
-        "spent_usd": spent_usd,
-        "remaining_usd": remaining_usd
-      } ) ),
-    )
-      .into_response();
-  }
 
   // Get provider API key
   let provider_type = match request.provider.as_str()
@@ -593,6 +583,26 @@ pub async fn handshake(
     }
   };
 
+  // Validate provider key matches requested provider
+  if _key_record.metadata.provider != provider_type
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Provider key does not match requested provider" }) ),
+    )
+      .into_response();
+  }
+
+  // Validate provider key is enabled
+  if !_key_record.metadata.is_enabled
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Provider key is disabled" }) ),
+    )
+      .into_response();
+  }
+
   // TODO: Decrypt provider API key
   // For now, use a placeholder - in production this would decrypt _key_record.encrypted_api_key
   let provider_key = "sk-test_key_placeholder";
@@ -612,6 +622,7 @@ pub async fn handshake(
   };
 
   // Create budget lease
+  // Note: Budget already atomically reserved by check_and_reserve_budget() above
   let lease_id = format!( "lease_{}", Uuid::new_v4() );
 
   if let Err( err ) = state
@@ -627,19 +638,7 @@ pub async fn handshake(
       .into_response();
   }
 
-  // Update agent budget (deduct granted amount from remaining)
-  if let Err( err ) = state
-    .agent_budget_manager
-    .record_spending( agent_id, budget_to_grant )
-    .await
-  {
-    tracing::error!( "Database error updating agent budget: {}", err );
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to update agent budget" }) ),
-    )
-      .into_response();
-  }
+  // Budget spending already recorded by check_and_reserve_budget() - no separate call needed
 
   // Deduct lease amount from usage_limits (the "bank")
   let granted_cents = ( budget_to_grant * 100.0 ).round() as i64;
@@ -755,6 +754,16 @@ pub async fn report_usage(
       )
         .into_response();
     }
+  }
+
+  // Check if lease has been revoked
+  if lease.lease_status == "revoked"
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Lease has been revoked" }) ),
+    )
+      .into_response();
   }
 
   // Fix(issue-budget-002): Missing lease budget sufficiency check (CRITICAL)

@@ -9,7 +9,7 @@ use iron_cost::pricing::PricingManager;
 
 use crate::event::{ AnalyticsEvent, EventPayload, LlmFailureData, LlmModelMeta, LlmUsageData };
 use crate::event_storage::EventStore;
-use crate::helpers::{ infer_provider, Provider };
+use crate::provider_utils::{ infer_provider, Provider };
 
 /// Build LLM metadata with automatic provider inference.
 fn build_meta( model : &str, provider_id : Option< &str > ) -> LlmModelMeta

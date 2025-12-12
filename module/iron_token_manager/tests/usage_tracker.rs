@@ -61,19 +61,19 @@ async fn test_record_usage()
   let token_id = storage
     .create_token( &token, "user_001", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record usage
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   // Verify usage was recorded
   let usage = tracker
     .get_token_usage( token_id )
     .await
-    .expect( "Failed to get usage" );
+    .expect("LOUD FAILURE: Failed to get usage");
 
   assert_eq!( usage.len(), 1, "Should have 1 usage record" );
   assert_eq!( usage[ 0 ].provider, "openai" );
@@ -93,18 +93,18 @@ async fn test_record_usage_with_cost()
   let token_id = storage
     .create_token( &token, "user_002", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record usage with cost (in cents)
   tracker
     .record_usage_with_cost( token_id, "anthropic", "claude-sonnet-4-5-20250929", 200, 100, 300, 45 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   let usage = tracker
     .get_token_usage( token_id )
     .await
-    .expect( "Failed to get usage" );
+    .expect("LOUD FAILURE: Failed to get usage");
 
   assert_eq!( usage.len(), 1 );
   assert_eq!( usage[ 0 ].cost_cents, 45 );
@@ -120,28 +120,28 @@ async fn test_multiple_usage_records()
   let token_id = storage
     .create_token( &token, "user_003", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record multiple usage events
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed to record usage 1" );
+    .expect("LOUD FAILURE: Failed to record usage 1");
 
   tracker
     .record_usage( token_id, "openai", "gpt-4", 200, 100, 300 )
     .await
-    .expect( "Failed to record usage 2" );
+    .expect("LOUD FAILURE: Failed to record usage 2");
 
   tracker
     .record_usage( token_id, "gemini", "gemini-pro", 50, 25, 75 )
     .await
-    .expect( "Failed to record usage 3" );
+    .expect("LOUD FAILURE: Failed to record usage 3");
 
   let usage = tracker
     .get_token_usage( token_id )
     .await
-    .expect( "Failed to get usage" );
+    .expect("LOUD FAILURE: Failed to get usage");
 
   assert_eq!( usage.len(), 3, "Should have 3 usage records" );
 }
@@ -156,24 +156,24 @@ async fn test_get_usage_by_provider()
   let token_id = storage
     .create_token( &token, "user_004", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record usage for different providers
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   tracker
     .record_usage( token_id, "anthropic", "claude-sonnet-4-5-20250929", 200, 100, 300 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   // Get usage for specific provider
   let openai_usage = tracker
     .get_usage_by_provider( token_id, "openai" )
     .await
-    .expect( "Failed to get usage" );
+    .expect("LOUD FAILURE: Failed to get usage");
 
   assert_eq!( openai_usage.len(), 1 );
   assert_eq!( openai_usage[ 0 ].provider, "openai" );
@@ -189,24 +189,24 @@ async fn test_aggregate_token_usage()
   let token_id = storage
     .create_token( &token, "user_005", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record multiple usage events
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed" );
+    .expect("LOUD FAILURE: Failed");
 
   tracker
     .record_usage( token_id, "openai", "gpt-4", 200, 100, 300 )
     .await
-    .expect( "Failed" );
+    .expect("LOUD FAILURE: Failed");
 
   // Get aggregated stats
   let stats = tracker
     .get_aggregate_usage( token_id )
     .await
-    .expect( "Failed to get aggregate" );
+    .expect("LOUD FAILURE: Failed to get aggregate");
 
   assert_eq!( stats.total_tokens, 450 );
   assert_eq!( stats.total_requests, 2 );
@@ -225,17 +225,17 @@ async fn test_get_usage_in_time_range()
   let token_id = storage
     .create_token( &token, "user_006", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record usage
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   let now_ms = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64;
 
   // Query last hour
@@ -245,7 +245,7 @@ async fn test_get_usage_in_time_range()
   let usage = tracker
     .get_usage_in_range( token_id, start_time, end_time )
     .await
-    .expect( "Failed to get usage in range" );
+    .expect("LOUD FAILURE: Failed to get usage in range");
 
   assert!( !usage.is_empty(), "Should find usage in time range" );
 }
@@ -260,26 +260,26 @@ async fn test_cascade_delete_usage_on_token_delete()
   let token_id = storage
     .create_token( &token, "user_007", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   // Record usage
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   // Verify usage exists
   let usage_before = tracker
     .get_token_usage( token_id )
     .await
-    .expect( "Failed to get usage" );
+    .expect("LOUD FAILURE: Failed to get usage");
   assert_eq!( usage_before.len(), 1 );
 
   // Delete token (should cascade to usage)
   storage
     .delete_token( token_id )
     .await
-    .expect( "Failed to delete token" );
+    .expect("LOUD FAILURE: Failed to delete token");
 
   // Verify usage was cascade-deleted
   let usage_after = tracker.get_token_usage( token_id ).await;
@@ -297,17 +297,17 @@ async fn test_usage_records_have_timestamps()
   let token_id = storage
     .create_token( &token, "user_008", None, None, None, None )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
   tracker
     .record_usage( token_id, "openai", "gpt-4", 100, 50, 150 )
     .await
-    .expect( "Failed to record usage" );
+    .expect("LOUD FAILURE: Failed to record usage");
 
   let usage = tracker
     .get_token_usage( token_id )
     .await
-    .expect( "Failed to get usage" );
+    .expect("LOUD FAILURE: Failed to get usage");
 
   assert!( usage[ 0 ].recorded_at > 0, "Should have valid timestamp" );
 }

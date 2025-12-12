@@ -213,7 +213,7 @@ async fn validate_expired_token_is_expired()
   assert_eq!( expired_token.0, "Expired Token", "Name should match" );
   assert_eq!( expired_token.1, 1, "Token should be marked active (but expired)" );
 
-  let expires_at = expired_token.2.expect( "Expired token should have expires_at timestamp" );
+  let expires_at = expired_token.2.expect("LOUD FAILURE: Expired token should have expires_at timestamp");
   assert!(
     expires_at < now_ms,
     "LOUD FAILURE: Expired token should have expires_at in the past (doc says 30 days ago)"

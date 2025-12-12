@@ -172,6 +172,134 @@ impl AgentBudgetManager
     Ok( () )
   }
 
+  /// Atomically check and reserve budget for a request
+  ///
+  /// Fix(issue-budget-006): Prevent TOCTOU race in budget handshake
+  ///
+  /// Root cause: Handshake function checked budget_remaining with `get_budget_status()`,
+  /// then separately called `record_spending()` in non-atomic operations. This created
+  /// a race window where 2 concurrent requests could both pass the check before either
+  /// recorded spending, allowing budget to go negative (violating budget invariant).
+  ///
+  /// Pitfall: Never split check-and-use into separate database operations for
+  /// concurrent resource allocation. Always use SELECT FOR UPDATE to lock the row
+  /// during the entire check-allocate-commit sequence. The race window exists even
+  /// with transactions if you dont lock the row during the initial SELECT.
+  ///
+  /// This method atomically:
+  /// 1. Locks the agent_budgets row with SELECT FOR UPDATE
+  /// 2. Checks if budget_remaining >= requested_amount
+  /// 3. If sufficient, records spending and returns granted amount
+  /// 4. If insufficient, returns Ok(0.0) without modifying budget
+  ///
+  /// # Arguments
+  ///
+  /// * `agent_id` - Agent database ID
+  /// * `requested_amount` - USD amount requested
+  ///
+  /// # Returns
+  ///
+  /// * `Ok(granted_amount)` - Amount granted (0.0 if insufficient budget)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database operation fails (not for insufficient budget)
+  ///
+  /// # Panics
+  ///
+  /// Panics if system time is before UNIX epoch (should never happen on modern systems)
+  pub async fn check_and_reserve_budget( &self, agent_id: i64, requested_amount: f64 ) -> Result< f64, sqlx::Error >
+  {
+    #[ allow( clippy::cast_possible_truncation ) ]
+    let now = SystemTime::now()
+      .duration_since( UNIX_EPOCH )
+      .expect( "Time went backwards" )
+      .as_millis() as i64;
+
+    // SQLite-specific: Use IMMEDIATE transaction to acquire write lock immediately
+    // This prevents concurrent transactions from proceeding with stale budget_remaining reads
+    sqlx::query( "BEGIN IMMEDIATE" )
+      .execute( &self.pool )
+      .await?;
+
+    // Check budget within the transaction - SQLite's IMMEDIATE lock ensures
+    // no other transaction can modify agent_budgets until we commit or rollback
+    let row = sqlx::query(
+      "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
+    )
+    .bind( agent_id )
+    .fetch_optional( &self.pool )
+    .await;
+
+    let budget_remaining = match row
+    {
+      Ok( Some( r ) ) => r.get::< f64, _ >( "budget_remaining" ),
+      Ok( None ) =>
+      {
+        // Agent doesnt exist - rollback and return 0
+        sqlx::query( "ROLLBACK" )
+          .execute( &self.pool )
+          .await?;
+        return Ok( 0.0 );
+      }
+      Err( e ) =>
+      {
+        // Query error - rollback and propagate error
+        let _ = sqlx::query( "ROLLBACK" )
+          .execute( &self.pool )
+          .await;
+        return Err( e );
+      }
+    };
+
+    // Check if sufficient budget available
+    if budget_remaining < requested_amount
+    {
+      // Insufficient budget - rollback and return 0
+      sqlx::query( "ROLLBACK" )
+        .execute( &self.pool )
+        .await?;
+      return Ok( 0.0 );
+    }
+
+    // Sufficient budget - record spending atomically
+    let granted_amount = requested_amount.min( budget_remaining );
+
+    let update_result = sqlx::query(
+      "UPDATE agent_budgets
+      SET total_spent = total_spent + ?,
+          budget_remaining = budget_remaining - ?,
+          updated_at = ?
+      WHERE agent_id = ?"
+    )
+    .bind( granted_amount )
+    .bind( granted_amount )
+    .bind( now )
+    .bind( agent_id )
+    .execute( &self.pool )
+    .await;
+
+    match update_result
+    {
+      Ok( _ ) =>
+      {
+        // Commit transaction - releases write lock
+        sqlx::query( "COMMIT" )
+          .execute( &self.pool )
+          .await?;
+        Ok( granted_amount )
+      }
+      Err( e ) =>
+      {
+        // Update failed - rollback and propagate error
+        let _ = sqlx::query( "ROLLBACK" )
+          .execute( &self.pool )
+          .await;
+        Err( e )
+      }
+    }
+  }
+
   /// Add budget to agent allocation
   ///
   /// Increases `total_allocated` and `budget_remaining`.

@@ -3,7 +3,7 @@
 use serde::{ Deserialize, Serialize };
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::helpers::current_time_ms;
+use crate::provider_utils::current_time_ms;
 
 /// Unique event identifier for deduplication.
 #[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize ) ]

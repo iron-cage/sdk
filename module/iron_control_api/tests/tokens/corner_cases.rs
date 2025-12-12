@@ -692,14 +692,14 @@ async fn test_create_token_plaintext_never_stored_in_database()
     .storage
     .create_token( &plaintext_token, "user_plaintext_test", None, None, None, None )
     .await
-    .expect( "Token creation should succeed" );
+    .expect("LOUD FAILURE: Token creation should succeed");
 
   // Query database directly to verify token_hash column
   let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
     .bind( token_id )
     .fetch_one( state.tokens.storage.pool() )
     .await
-    .expect( "Database query should succeed" );
+    .expect("LOUD FAILURE: Database query should succeed");
 
   let stored_hash = row.0;
 
@@ -774,14 +774,14 @@ async fn test_create_token_uses_sha256_hash()
     .storage
     .create_token( &plaintext_token, "user_sha256_test", None, None, None, None )
     .await
-    .expect( "Token creation should succeed" );
+    .expect("LOUD FAILURE: Token creation should succeed");
 
   // Query database directly to verify hash algorithm
   let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
     .bind( token_id )
     .fetch_one( state.tokens.storage.pool() )
     .await
-    .expect( "Database query should succeed" );
+    .expect("LOUD FAILURE: Database query should succeed");
 
   let stored_hash = row.0;
 
@@ -897,7 +897,7 @@ async fn test_create_token_concurrent_requests()
   let mut success_count = 0;
   while let Some( result ) = join_set.join_next().await
   {
-    let status = result.expect( "Task should not panic" );
+    let status = result.expect("LOUD FAILURE: Task should not panic");
     if status == StatusCode::CREATED
     {
       success_count += 1;

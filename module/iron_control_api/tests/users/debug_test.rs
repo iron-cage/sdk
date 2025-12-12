@@ -74,7 +74,7 @@ async fn create_test_database() -> SqlitePool
 
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64;
 
   let admin_result = sqlx::query(

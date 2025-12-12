@@ -1083,3 +1083,10 @@ WHERE agent_id = ? AND status = 'pending';
 - **[Error Format Standards](../standards/error_format_standards.md)** - Error response format, HTTP status codes
 - **[Resource Catalog](../architecture/009_resource_catalog.md)** - Complete resource inventory
 - **[Vocabulary](../vocabulary.md)** - Terminology definitions
+
+---
+
+## Cross-References
+
+**State Machines**:
+- **[State Machine 002: Budget Request Workflow](../state_machine/002_budget_request_workflow.md)** - Request lifecycle states (PENDING → APPROVED/REJECTED/CANCELLED) and transitions

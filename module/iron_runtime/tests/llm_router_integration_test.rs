@@ -51,7 +51,7 @@ fn test_router_starts_and_stops()
 {
   let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
   assert!( router.port > 0 );
@@ -75,7 +75,7 @@ fn test_router_provider_detection()
 {
   let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   let provider = &router.provider;
   debug!( "Detected provider: {}", provider );
@@ -95,7 +95,7 @@ fn test_router_base_url_format()
 {
   let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   let base_url = router.get_base_url();
 
@@ -116,7 +116,7 @@ fn test_router_api_key_passthrough()
 {
   let ( token, server ) = require_credentials!();
 
-  let mut router = LlmRouter::create( token.clone(), server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token.clone(), server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   // API key should be the same as the input token
   assert_eq!( router.api_key, token );
@@ -130,7 +130,7 @@ fn test_router_custom_cache_ttl()
   let ( token, server ) = require_credentials!();
 
   // Create with custom cache TTL
-  let mut router = LlmRouter::create( token, server, 60 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 60 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
 
@@ -148,7 +148,7 @@ fn test_router_invalid_server_url()
   let server = "http://invalid-server-that-does-not-exist:9999".to_string();
 
   // Router should still start (connection errors happen on first request)
-  let mut router = LlmRouter::create( token, server, 300 ).expect( "Failed to create router" );
+  let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
   // Provider will be "unknown" since it couldn't fetch the key

@@ -680,4 +680,24 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 ---
 
-*Related: [003_service_boundaries.md](../architecture/003_service_boundaries.md) | [002_layer_model.md](../architecture/002_layer_model.md)*
+### Cross-References
+
+**Dependencies**:
+- Format: Token exchange format (encryption, serialization)
+- Architecture: [002_layer_model.md](../architecture/002_layer_model.md) - Layer responsibilities
+- Architecture: [003_service_boundaries.md](../architecture/003_service_boundaries.md) - Service boundaries
+
+**Used By**:
+- Iron Runtime Client - Implements budget control protocol
+- Iron Control API - Serves budget control endpoints
+
+**Related**:
+- State Machine 001: [Budget Lease Lifecycle](../state_machine/001_budget_lease_lifecycle.md) - Client-side lease lifecycle states and transitions
+
+**Implementation**:
+- Source: `module/iron_control_api/src/routes/budget.rs` - Budget control endpoints
+- Source: `module/iron_token_manager/src/lease_manager.rs` - Lease lifecycle management
+- Tests: `module/iron_control_api/tests/budget_*.rs` - Budget control protocol tests
+
+**Specification**:
+- Requirement: `module/iron_control_api/spec.md` § Budget Control - Protocol requirements

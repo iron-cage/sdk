@@ -24,7 +24,7 @@ use iron_control_api::jwt_auth::JwtSecret;
 fn test_jwt_secret_creation()
 {
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
-  let token = secret.generate_access_token( "user_123", "user@mail.com", "a", "token_id_001" ).expect( "Should generate token" );
+  let token = secret.generate_access_token( "user_123", "user@mail.com", "a", "token_id_001" ).expect("LOUD FAILURE: Should generate token");
   assert!( !token.is_empty() );
 }
 
@@ -34,10 +34,10 @@ fn test_access_token_lifecycle()
   let secret = JwtSecret::new( "test_secret_key_12345".to_string() );
 
   // Generate access token
-  let token = secret.generate_access_token( "user_123", "user@mail.com", "b", "token_id_001" ).expect( "Should generate" );
+  let token = secret.generate_access_token( "user_123", "user@mail.com", "b", "token_id_001" ).expect("LOUD FAILURE: Should generate");
 
   // Verify access token
-  let claims = secret.verify_access_token( &token ).expect( "Should verify" );
+  let claims = secret.verify_access_token( &token ).expect("LOUD FAILURE: Should verify");
   assert_eq!( claims.sub, "user_123".to_string() );
   assert_eq!( claims.email, "user@mail.com" );
   assert_eq!( claims.role, "b" );
@@ -52,10 +52,10 @@ fn test_refresh_token_lifecycle()
   // Generate refresh token
   let token = secret
     .generate_refresh_token( "user_123", "user@mail.com", "b", "token_id_001" )
-    .expect( "Should generate" );
+    .expect("LOUD FAILURE: Should generate");
 
   // Verify refresh token
-  let claims = secret.verify_refresh_token( &token ).expect( "Should verify" );
+  let claims = secret.verify_refresh_token( &token ).expect("LOUD FAILURE: Should verify");
   assert_eq!( claims.sub, "user_123".to_string() );
   assert_eq!( claims.email, "user@mail.com" );
   assert_eq!( claims.role, "b" );
@@ -73,10 +73,10 @@ fn test_login_flow_concept()
   let _user_role = Role::User;
 
   // Server generates access + refresh tokens
-  let access_token = secret.generate_access_token( user_id, "user@mail.com", "c", "token_id_001" ).expect( "Should generate" );
+  let access_token = secret.generate_access_token( user_id, "user@mail.com", "c", "token_id_001" ).expect("LOUD FAILURE: Should generate");
   let refresh_token = secret
     .generate_refresh_token( user_id, "user@mail.com", "c", "token_id_001" )
-    .expect( "Should generate" );
+    .expect("LOUD FAILURE: Should generate");
 
   assert!( !access_token.is_empty() );
   assert!( !refresh_token.is_empty() );
@@ -96,22 +96,22 @@ fn test_token_refresh_flow_concept()
   let user_id = "user_123";
   let old_refresh_token = secret
     .generate_refresh_token( user_id, "user@mail.com", "c", "refresh_001" )
-    .expect( "Should generate" );
+    .expect("LOUD FAILURE: Should generate");
 
   // Server verifies refresh token
   let claims = secret
     .verify_refresh_token( &old_refresh_token )
-    .expect( "Should verify" );
+    .expect("LOUD FAILURE: Should verify");
   assert_eq!( claims.sub, user_id.to_string() );
 
   // Server generates new access token
-  let new_access_token = secret.generate_access_token( user_id, "user@mail.com", "c", "token_id_002" ).expect( "Should generate" );
+  let new_access_token = secret.generate_access_token( user_id, "user@mail.com", "c", "token_id_002" ).expect("LOUD FAILURE: Should generate");
   assert!( !new_access_token.is_empty() );
 
   // Optionally generate new refresh token (rotation)
   let new_refresh_token = secret
     .generate_refresh_token( user_id, "user@mail.com", "c", "refresh_002" )
-    .expect( "Should generate" );
+    .expect("LOUD FAILURE: Should generate");
   assert!( !new_refresh_token.is_empty() );
 }
 
@@ -123,9 +123,9 @@ fn test_logout_flow_concept()
 
   let refresh_token = secret
     .generate_refresh_token( "user_123", "user@mail.com", "c", "refresh_001" )
-    .expect( "Should generate" );
+    .expect("LOUD FAILURE: Should generate");
 
-  let claims = secret.verify_refresh_token( &refresh_token ).expect( "Should verify" );
+  let claims = secret.verify_refresh_token( &refresh_token ).expect("LOUD FAILURE: Should verify");
 
   // Server would add jti to blacklist table
   let token_id_to_blacklist = claims.jti;

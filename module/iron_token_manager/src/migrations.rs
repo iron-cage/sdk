@@ -472,10 +472,10 @@ async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
 
 /// Migration 016: Add lease return columns (Protocol 005)
 ///
-/// Adds columns to budget_leases for tracking lease returns:
-/// - returned_amount: USD returned when lease closed
-/// - closed_at: Timestamp when lease was closed
-/// - updated_at: Last activity timestamp for stale detection
+/// Adds columns to `budget_leases` for tracking lease returns:
+/// - `returned_amount`: USD returned when lease closed
+/// - `closed_at`: Timestamp when lease was closed
+/// - `updated_at`: Last activity timestamp for stale detection
 #[ allow( dead_code ) ]
 async fn apply_migration_016( pool: &SqlitePool ) -> Result< () >
 {
@@ -567,7 +567,7 @@ mod tests
   }
 }
 
-/// Migration 017: Create system_config table and seed development data
+/// Migration 017: Create `system_config` table and seed development data
 #[ allow( dead_code ) ]
 async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
 {
