@@ -50,3 +50,11 @@ serde_yaml = "0.9"
 [dev-dependencies]
 # Test dependencies automatically enable test-adapter feature
 iron_cli = { path = ".", features = ["test-adapter"] }
+
+# Test infrastructure dependencies (real implementations, no mocking)
+axum = { version = "0.7" }
+tower = { version = "0.4" }
+iron_test_db = { path = "../iron_test_db" }
+iron_control_api = { path = "../iron_control_api", features = ["enabled"] }
+reqwest = { version = "0.11", features = ["json"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }

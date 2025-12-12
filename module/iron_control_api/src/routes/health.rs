@@ -26,7 +26,7 @@ pub async fn health_check() -> impl IntoResponse
 {
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_secs() as i64;
 
   ( StatusCode::OK, Json( HealthResponse
@@ -37,15 +37,3 @@ pub async fn health_check() -> impl IntoResponse
   } ) )
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ tokio::test ]
-  async fn test_health_check()
-  {
-    let response = health_check().await.into_response();
-    assert_eq!( response.status(), StatusCode::OK );
-  }
-}

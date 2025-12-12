@@ -6,7 +6,7 @@
 |------|----------------|
 | formatter.rs | Implements output formatting for all formats |
 | mod.rs | Exports formatting module public API |
-| output_format.rs | Defines output format enum and parsing |
+| output_format.rs | Defines output format types |
 
 ## Validation
 

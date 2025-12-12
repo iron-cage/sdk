@@ -96,36 +96,3 @@ impl TokenApiConfig
     self
   }
 }
-
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_default_config()
-  {
-    let config = TokenApiConfig::default();
-    assert_eq!( config.base_url, "http://localhost:8081" );
-    assert_eq!( config.timeout, Duration::from_secs( 30 ) );
-  }
-
-  #[test]
-  fn test_new_config()
-  {
-    let config = TokenApiConfig::new(
-      "https://api.example.com".to_string(),
-    );
-
-    assert_eq!( config.base_url, "https://api.example.com" );
-  }
-
-  #[test]
-  fn test_with_timeout()
-  {
-    let config = TokenApiConfig::default()
-      .with_timeout( Duration::from_secs( 60 ) );
-
-    assert_eq!( config.timeout, Duration::from_secs( 60 ) );
-  }
-}

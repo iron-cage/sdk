@@ -76,11 +76,11 @@ async fn test_record_usage()
     .expect("LOUD FAILURE: Failed to get usage");
 
   assert_eq!( usage.len(), 1, "Should have 1 usage record" );
-  assert_eq!( usage[ 0 ].provider, "openai" );
-  assert_eq!( usage[ 0 ].model, "gpt-4" );
-  assert_eq!( usage[ 0 ].input_tokens, 100 );
-  assert_eq!( usage[ 0 ].output_tokens, 50 );
-  assert_eq!( usage[ 0 ].total_tokens, 150 );
+  assert_eq!( usage[ 0 ].provider, "openai", "Provider should be 'openai' as recorded" );
+  assert_eq!( usage[ 0 ].model, "gpt-4", "Model should be 'gpt-4' as recorded" );
+  assert_eq!( usage[ 0 ].input_tokens, 100, "Input tokens should be 100 as recorded" );
+  assert_eq!( usage[ 0 ].output_tokens, 50, "Output tokens should be 50 as recorded" );
+  assert_eq!( usage[ 0 ].total_tokens, 150, "Total tokens should be 150 (100 + 50)" );
 }
 
 #[ tokio::test ]
@@ -106,8 +106,8 @@ async fn test_record_usage_with_cost()
     .await
     .expect("LOUD FAILURE: Failed to get usage");
 
-  assert_eq!( usage.len(), 1 );
-  assert_eq!( usage[ 0 ].cost_cents, 45 );
+  assert_eq!( usage.len(), 1, "Should have 1 usage record with cost" );
+  assert_eq!( usage[ 0 ].cost_cents, 45, "Cost should be 45 cents as recorded" );
 }
 
 #[ tokio::test ]
@@ -175,8 +175,8 @@ async fn test_get_usage_by_provider()
     .await
     .expect("LOUD FAILURE: Failed to get usage");
 
-  assert_eq!( openai_usage.len(), 1 );
-  assert_eq!( openai_usage[ 0 ].provider, "openai" );
+  assert_eq!( openai_usage.len(), 1, "Should return exactly 1 usage record for 'openai' provider" );
+  assert_eq!( openai_usage[ 0 ].provider, "openai", "Filtered record must be from 'openai' provider" );
 }
 
 #[ tokio::test ]
@@ -208,10 +208,10 @@ async fn test_aggregate_token_usage()
     .await
     .expect("LOUD FAILURE: Failed to get aggregate");
 
-  assert_eq!( stats.total_tokens, 450 );
-  assert_eq!( stats.total_requests, 2 );
-  assert_eq!( stats.input_tokens, 300 );
-  assert_eq!( stats.output_tokens, 150 );
+  assert_eq!( stats.total_tokens, 450, "Total tokens should sum across all requests (150 + 300)" );
+  assert_eq!( stats.total_requests, 2, "Should count 2 separate usage records" );
+  assert_eq!( stats.input_tokens, 300, "Input tokens should sum across requests (100 + 200)" );
+  assert_eq!( stats.output_tokens, 150, "Output tokens should sum across requests (50 + 100)" );
 }
 
 #[ tokio::test ]
@@ -273,7 +273,7 @@ async fn test_cascade_delete_usage_on_token_delete()
     .get_token_usage( token_id )
     .await
     .expect("LOUD FAILURE: Failed to get usage");
-  assert_eq!( usage_before.len(), 1 );
+  assert_eq!( usage_before.len(), 1, "Usage record should exist before token deletion" );
 
   // Delete token (should cascade to usage)
   storage

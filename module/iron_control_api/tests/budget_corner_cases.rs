@@ -28,170 +28,25 @@
 //! | `test_database_foreign_key_constraint_agent` | FK constraint enforcement | Create lease for nonexistent agent_id | Database error (FK violation) | ✅ |
 //! | `test_database_not_null_constraint` | NOT NULL constraint enforcement | Insert lease with NULL required field | Database error (NOT NULL violation) | ✅ |
 
+mod common;
+
 use axum::
 {
   body::Body,
   http::{ Request, StatusCode },
-  Router,
 };
-use iron_control_api::
+use common::budget::
 {
-  ic_token::{ IcTokenClaims, IcTokenManager },
-  routes::budget::{ BudgetState, handshake, report_usage, refresh_budget },
+  setup_test_db,
+  create_test_budget_state,
+  create_ic_token,
+  seed_agent_with_budget,
+  create_budget_router,
 };
-use iron_token_manager::lease_manager::LeaseManager;
+use iron_control_api::ic_token::IcTokenClaims;
 use serde_json::json;
-use sqlx::SqlitePool;
-use std::sync::Arc;
+use sqlx::Row;
 use tower::ServiceExt;
-
-/// Helper: Create test database with all migrations
-async fn setup_test_db() -> SqlitePool
-{
-  let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-  iron_token_manager::migrations::apply_all_migrations( &pool )
-    .await
-    .expect("LOUD FAILURE: Failed to apply migrations");
-  pool
-}
-
-/// Helper: Create test BudgetState
-async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
-{
-  let ic_token_secret = "test_secret_key_12345".to_string();
-  let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
-
-  let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
-  let ip_token_crypto = Arc::new(
-    iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
-  );
-  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let agent_budget_manager = Arc::new(
-    iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
-  );
-  let provider_key_storage = Arc::new(
-    iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
-  );
-  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
-
-  BudgetState
-  {
-    ic_token_manager,
-    ip_token_crypto,
-    lease_manager,
-    agent_budget_manager,
-    provider_key_storage,
-    db_pool: pool,
-    jwt_secret,
-  }
-}
-
-/// Helper: Generate IC Token for test agent
-fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
-{
-  let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
-    None,
-  );
-
-  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
-}
-
-/// Helper: Seed agent with budget and provider key
-///
-/// # Fix(issue-concurrency-001)
-/// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
-/// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
-async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f64 )
-{
-  let now_ms = chrono::Utc::now().timestamp_millis();
-
-  // Create test user if it doesn't exist (required for owner_id foreign key)
-  sqlx::query(
-    "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
-  )
-  .bind( "test_user" )
-  .bind( "test_username" )
-  .bind( "$2b$12$test_password_hash" )
-  .bind( "test@example.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert agent with owner_id
-  sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
-  )
-  .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert agent budget
-  sqlx::query(
-    "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-     VALUES (?, ?, 0.0, ?, ?, ?)"
-  )
-  .bind( agent_id )
-  .bind( budget_usd )
-  .bind( budget_usd )
-  .bind( now_ms )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert provider key
-  // Use unique provider key ID based on agent_id to avoid conflicts between tests
-  sqlx::query(
-    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
-  )
-  .bind( agent_id * 1000 )
-  .bind( "openai" )
-  .bind( "encrypted_test_key_base64" )
-  .bind( "test_nonce_base64" )
-  .bind( 1 )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert usage_limits for test_user (required for budget validation)
-  sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_cents_per_month, current_cost_cents_this_month, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)"
-  )
-  .bind( "test_user" )
-  .bind( 1000000i64 )  // $10,000 USD limit (in cents)
-  .bind( 0i64 )        // No spending yet
-  .bind( now_ms )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-}
-
-/// Helper: Create router for budget endpoints
-async fn create_budget_router( state: BudgetState ) -> Router
-{
-  Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .route( "/api/budget/report", axum::routing::post( report_usage ) )
-    .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
-    .with_state( state )
-}
 
 /// Test: Whitespace-only ic_token input
 ///
@@ -1247,5 +1102,438 @@ async fn test_report_usage_null_cost_usd()
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
     "NULL cost_usd should be rejected with 400 or 422, got: {}", response.status()
+  );
+}
+
+/// Manual Test Gap #5: Cost exactly equals remaining budget
+///
+/// # Corner Case
+/// Lease has budget_granted=10.0, budget_spent=9.5 (remaining=0.5)
+/// Report usage with cost_usd=0.5 (exactly equals remaining)
+///
+/// # Expected Behavior
+/// 200 OK, budget exhausted exactly to 0.0, no off-by-one errors
+///
+/// # Risk
+/// MEDIUM - Off-by-one errors in budget enforcement
+#[ tokio::test ]
+async fn test_cost_exactly_equals_remaining_budget()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 120, 100.0 ).await;
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create lease with $10.00 budget
+  let lease_id = "lease_exact_boundary_test";
+  state
+    .lease_manager
+    .create_lease( lease_id, 120, 120, 10.0, None )
+    .await
+    .expect("LOUD FAILURE: Should create lease");
+
+  // Record $9.50 usage (leaving exactly $0.50 remaining)
+  state
+    .lease_manager
+    .record_usage( lease_id, 9.5 )
+    .await
+    .expect("LOUD FAILURE: Should record partial usage");
+
+  // Report exactly $0.50 usage (exactly equals remaining)
+  let router = create_budget_router( state.clone() ).await;
+  let request_body = json!({
+    "lease_id": lease_id,
+    "request_id": "req_boundary_test",
+    "tokens": 500,
+    "cost_usd": 0.5,
+    "model": "gpt-4",
+    "provider": "openai",
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  // Verify: 200 OK (not 403), budget boundary handled correctly
+  assert_eq!(
+    response.status(),
+    StatusCode::OK,
+    "Cost exactly equals remaining should be accepted with 200 OK"
+  );
+
+  // Verify: Budget exhausted to exactly 0.0
+  let lease_record = sqlx::query(
+    "SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?"
+  )
+  .bind( lease_id )
+  .fetch_one( &pool )
+  .await
+  .expect("LOUD FAILURE: Should fetch lease record");
+
+  let budget_granted: f64 = lease_record.get("budget_granted");
+  let budget_spent: f64 = lease_record.get("budget_spent");
+  let budget_remaining = budget_granted - budget_spent;
+
+  assert_eq!( budget_spent, 10.0, "Budget spent should be 10.0" );
+  assert!(
+    (budget_remaining - 0.0).abs() < 0.0001,
+    "Budget remaining should be exactly 0.0, got: {}", budget_remaining
+  );
+}
+
+/// Manual Test Gap #14: Invalid agent_id format (zero)
+///
+/// # Corner Case
+/// IC Token with agent_id=0
+///
+/// # Expected Behavior
+/// 400 Bad Request "agent_id must be positive"
+///
+/// # Risk
+/// MEDIUM - Invalid database lookups
+#[ tokio::test ]
+async fn test_handshake_invalid_agent_id_zero()
+{
+  let pool = setup_test_db().await;
+  let state = create_test_budget_state( pool ).await;
+
+  // Create IC Token with agent_id=0 (invalid)
+  let zero_claims = IcTokenClaims
+  {
+    agent_id: "0".to_string(),  // Invalid: zero agent_id
+    budget_id: "budget_0".to_string(),
+    issued_at: std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .unwrap()
+      .as_secs(),
+    expires_at: None,
+    issuer: "iron-control-panel".to_string(),
+    permissions: vec![ "llm:call".to_string() ],
+  };
+
+  let ic_token = state.ic_token_manager.generate_token( &zero_claims )
+    .expect("LOUD FAILURE: Should generate token");
+
+  let router = create_budget_router( state ).await;
+  let request_body = json!({
+    "ic_token": ic_token,
+    "provider": "openai",
+    "provider_key_id": 1,
+    "requested_budget_usd": 10.0,
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/handshake" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY
+      || response.status() == StatusCode::UNAUTHORIZED,
+    "Zero agent_id should be rejected with 400/422/401, got: {}", response.status()
+  );
+}
+
+/// Manual Test Gap #14 (variant): Invalid agent_id format (negative)
+///
+/// # Corner Case
+/// IC Token with agent_id=-1
+///
+/// # Expected Behavior
+/// 400 Bad Request "agent_id must be positive"
+///
+/// # Risk
+/// MEDIUM - Invalid database lookups
+#[ tokio::test ]
+async fn test_handshake_invalid_agent_id_negative()
+{
+  let pool = setup_test_db().await;
+  let state = create_test_budget_state( pool ).await;
+
+  // Create IC Token with agent_id=-1 (invalid)
+  let negative_claims = IcTokenClaims
+  {
+    agent_id: "-1".to_string(),  // Invalid: negative agent_id
+    budget_id: "budget_-1".to_string(),
+    issued_at: std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .unwrap()
+      .as_secs(),
+    expires_at: None,
+    issuer: "iron-control-panel".to_string(),
+    permissions: vec![ "llm:call".to_string() ],
+  };
+
+  let ic_token = state.ic_token_manager.generate_token( &negative_claims )
+    .expect("LOUD FAILURE: Should generate token");
+
+  let router = create_budget_router( state ).await;
+  let request_body = json!({
+    "ic_token": ic_token,
+    "provider": "openai",
+    "provider_key_id": 1,
+    "requested_budget_usd": 10.0,
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/handshake" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY
+      || response.status() == StatusCode::UNAUTHORIZED,
+    "Negative agent_id should be rejected with 400/422/401, got: {}", response.status()
+  );
+}
+
+/// Manual Test Gap #17: Integer overflow in tokens_used
+///
+/// # Corner Case
+/// Report usage with tokens_used > i64::MAX
+///
+/// # Expected Behavior
+/// 400 Bad Request OR value clamped to i64::MAX
+///
+/// # Risk
+/// LOW - Token accounting corruption
+#[ tokio::test ]
+async fn test_report_usage_integer_overflow_tokens()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 121, 100.0 ).await;
+  let state = create_test_budget_state( pool ).await;
+
+  // Create lease
+  let lease_id = "lease_tokens_overflow_test";
+  state
+    .lease_manager
+    .create_lease( lease_id, 121, 121, 10.0, None )
+    .await
+    .expect("LOUD FAILURE: Should create lease");
+
+  let router = create_budget_router( state ).await;
+
+  // Attempt to report with tokens_used > i64::MAX
+  // Note: JSON can represent numbers larger than i64::MAX, but Rust deserialization should reject them
+  let request_body = json!({
+    "lease_id": lease_id,
+    "cost_usd": 1.0,
+    "tokens_used": 9_223_372_036_854_775_808_u64,  // i64::MAX + 1
+    "model": "gpt-4",
+    "provider": "openai",
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  // Accept either rejection (400/422) or success (200) with clamping
+  // Both behaviors are acceptable per the manual testing plan
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY
+      || response.status() == StatusCode::OK,
+    "Overflow tokens_used should be rejected or clamped, got: {}", response.status()
+  );
+}
+
+//
+// ROUND 2: PRIORITY 3 - MEDIUM TESTS
+//
+
+/// Manual Test Gap #25: Refresh - NULL additional_budget field
+///
+/// # Corner Case
+/// JSON request with {"agent_id": 101, "additional_budget": null}
+///
+/// # Expected Behavior
+/// 400 Bad Request "additional_budget is required"
+///
+/// # Risk
+/// MEDIUM - Budget corruption
+#[ tokio::test ]
+async fn test_refresh_null_additional_budget()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 122, 100.0 ).await;
+  let state = create_test_budget_state( pool ).await;
+  let router = create_budget_router( state ).await;
+
+  // Craft request with null additional_budget
+  let request_body = json!({
+    "agent_id": 122,
+    "additional_budget": null,
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/refresh" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "NULL additional_budget should be rejected with 400 or 422, got: {}", response.status()
+  );
+}
+
+/// Manual Test Gap #26: Refresh - Float overflow additional_budget (f64::MAX)
+///
+/// # Corner Case
+/// POST /api/budget/refresh with additional_budget=f64::MAX
+///
+/// # Expected Behavior
+/// 400 Bad Request
+///
+/// # Risk
+/// MEDIUM - Budget overflow
+#[ tokio::test ]
+async fn test_refresh_float_overflow_f64_max()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 123, 100.0 ).await;
+  let state = create_test_budget_state( pool ).await;
+  let router = create_budget_router( state ).await;
+
+  let request_body = json!({
+    "agent_id": 123,
+    "additional_budget": f64::MAX,
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/refresh" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "f64::MAX additional_budget should be rejected with 400 or 422, got: {}", response.status()
+  );
+}
+
+/// Manual Test Gap #26 (variant): Refresh - Float overflow additional_budget (Infinity)
+///
+/// # Corner Case
+/// POST /api/budget/refresh with additional_budget=Infinity
+///
+/// # Expected Behavior
+/// 400 Bad Request
+///
+/// # Risk
+/// MEDIUM - Budget overflow
+#[ tokio::test ]
+async fn test_refresh_float_overflow_infinity()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 124, 100.0 ).await;
+  let state = create_test_budget_state( pool ).await;
+  let router = create_budget_router( state ).await;
+
+  let request_body = json!({
+    "agent_id": 124,
+    "additional_budget": f64::INFINITY,
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/refresh" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "Infinity additional_budget should be rejected with 400 or 422, got: {}", response.status()
+  );
+}
+
+/// Manual Test Gap #27: Refresh - NaN additional_budget
+///
+/// # Corner Case
+/// POST /api/budget/refresh with additional_budget=NaN
+///
+/// # Expected Behavior
+/// 400 Bad Request
+///
+/// # Risk
+/// MEDIUM - Budget corruption
+#[ tokio::test ]
+async fn test_refresh_nan_additional_budget()
+{
+  let pool = setup_test_db().await;
+  seed_agent_with_budget( &pool, 125, 100.0 ).await;
+  let state = create_test_budget_state( pool ).await;
+  let router = create_budget_router( state ).await;
+
+  let request_body = json!({
+    "agent_id": 125,
+    "additional_budget": f64::NAN,
+  });
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/refresh" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "NaN additional_budget should be rejected with 400 or 422, got: {}", response.status()
   );
 }

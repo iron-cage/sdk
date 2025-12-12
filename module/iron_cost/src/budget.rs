@@ -1,3 +1,25 @@
+//! Budget control with atomic reservations
+//!
+//! Provides thread-safe budget tracking and enforcement for LLM API costs.
+//! Uses a reservation system to prevent concurrent overspend in multi-threaded environments.
+//!
+//! **Core Concepts:**
+//! - **Microdollar Precision:** All amounts stored as microdollars (1/1,000,000 USD) for financial accuracy
+//! - **Atomic Operations:** Thread-safe budget updates using atomic primitives
+//! - **Reservation Pattern:** Reserve maximum cost before request, commit actual cost after completion
+//! - **Concurrent Safety:** Prevents race conditions when multiple threads access budget simultaneously
+//!
+//! **Typical Workflow:**
+//! 1. `reserve()` - Atomically reserve maximum possible cost before LLM request
+//! 2. Execute LLM request
+//! 3. `commit()` - Add actual cost to spent, release reservation
+//! 4. Or `cancel()` - Release reservation if request failed
+//!
+//! **Why Reservations:**
+//! Without reservations, concurrent requests could all check budget simultaneously
+//! and each proceed thinking budget is available, causing overspend. Reservations
+//! atomically claim budget before the request starts, preventing this race condition.
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::error::CostError;
 use crate::converter::{usd_to_micros, micros_to_usd};

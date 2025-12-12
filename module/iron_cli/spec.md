@@ -86,6 +86,32 @@ All adapters verified to have valid API endpoints. Orphaned adapters (functions 
 - Adapter coverage tests (tests/adapters/coverage.rs): Verify NC-A.1, adapter counts
 - Migration metrics tests (tests/migration/): Verify NC-M.1/2/3, trajectory correctness
 - Manual testing (tests/manual/): 7 categories, 15+ test cases for real API integration
+- Integration tests (tests/integration/): Command-level integration tests (207 minimum, 3 per command)
+- Parameter tests (tests/integration/parameters/): Parameter-level validation tests (2,251 minimum)
+
+**Integration Test Infrastructure:**
+- TestServer: Real Axum HTTP server on random port for integration testing (✅ Implemented)
+- TestData: Real SQLite database fixtures with SQL inserts (✅ Implemented)
+- IntegrationTestHarness: Real CLI binary execution via process spawn (✅ Implemented)
+- Infrastructure tests: 15 tests passing
+
+**Test Quality Gates:**
+- Command coverage: 100% (69/69 commands must have integration tests)
+- Parameter coverage: 100% (250/250 parameters must have validation tests)
+  - Phase 0 (Infrastructure): ✅ Complete (8 infrastructure tests passing)
+  - Phase 1 (String params): 🔄 In Progress - Basic Coverage Complete (197 total tests: 178 passing, 19 RED failures)
+    - Parameters covered (26/26): ✅ ALL unique string parameters tested
+      - Batch 1: format (11), token_id (8), id (8), project (6), description (7), name (9), username (7), password (7), email (7), role (5)
+      - Batch 2: api_key (7), endpoint (9), provider (7), export_format (6), output (6), project_id (6), status (8), reason (7)
+      - Batch 3: period (7), provider_id (7), provider_ids (8), agent_id (7), agent_ids (8), output_file (7), message (7), new_password (8)
+    - Test results: 197 total (8 infra + 189 param), 178 passing, 19 RED failures (expected in TDD RED phase)
+    - Progress: 26/26 string parameters tested (100% basic coverage), 189/850 tests created (22.2%)
+    - Next: Expand to cross-command coverage (format: 68 cmds, id: 25 cmds, etc.) to reach 850-test target
+  - Phase 2 (Integer params): Pending (420 tests planned)
+  - Phase 3 (Attribute tests): Pending (705 tests planned)
+  - Phase 4 (Subtype tests): Pending (226 tests planned)
+- No mocking policy: All tests use real implementations (HTTP server, database, CLI binary)
+- TDD enforcement: Tests written FIRST, then implementation (strict RED-GREEN-REFACTOR)
 
 **Multi-Layer Defense:**
 1. Syntactic: Compiler prevents calling deleted functions

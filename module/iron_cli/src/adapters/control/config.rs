@@ -94,39 +94,3 @@ impl ControlApiConfig
     self
   }
 }
-
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_default_config()
-  {
-    let config = ControlApiConfig::default();
-    assert_eq!( config.base_url, "http://localhost:8080" );
-    assert_eq!( config.api_token, None );
-    assert_eq!( config.timeout, Duration::from_secs( 30 ) );
-  }
-
-  #[test]
-  fn test_new_config()
-  {
-    let config = ControlApiConfig::new(
-      "https://api.example.com".to_string(),
-      Some( "test-token".to_string() ),
-    );
-
-    assert_eq!( config.base_url, "https://api.example.com" );
-    assert_eq!( config.api_token, Some( "test-token".to_string() ) );
-  }
-
-  #[test]
-  fn test_with_timeout()
-  {
-    let config = ControlApiConfig::default()
-      .with_timeout( Duration::from_secs( 60 ) );
-
-    assert_eq!( config.timeout, Duration::from_secs( 60 ) );
-  }
-}

@@ -12,7 +12,7 @@ fn bench_in_memory_creation( c: &mut Criterion )
           .in_memory()
           .build()
           .await
-          .expect( "Failed to create database" );
+          .expect( "LOUD FAILURE: Failed to create database" );
         black_box( db );
       } );
     } );
@@ -28,7 +28,7 @@ fn bench_temp_file_creation( c: &mut Criterion )
           .temp_file()
           .build()
           .await
-          .expect( "Failed to create database" );
+          .expect( "LOUD FAILURE: Failed to create database" );
         black_box( db );
       } );
     } );

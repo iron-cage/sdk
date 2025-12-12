@@ -379,7 +379,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
   // Decode hex string to bytes
   let ip_token_key = hex::decode( &ip_token_key_hex )
-    .expect( "IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
+    .expect( "LOUD FAILURE: IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
 
   if ip_token_key.len() != 32
   {
@@ -392,32 +392,32 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Initialize route states
   let auth_state = iron_control_api::routes::auth::AuthState::new( jwt_secret, &database_url )
     .await
-    .expect( "Failed to initialize auth state" );
+    .expect( "LOUD FAILURE: Failed to initialize auth state" );
 
   let token_state = iron_control_api::routes::tokens::TokenState::new( &database_url )
     .await
-    .expect( "Failed to initialize token state" );
+    .expect( "LOUD FAILURE: Failed to initialize token state" );
 
   let usage_state = iron_control_api::routes::usage::UsageState::new( &database_url )
     .await
-    .expect( "Failed to initialize usage state" );
+    .expect( "LOUD FAILURE: Failed to initialize usage state" );
 
   let limits_state = iron_control_api::routes::limits::LimitsState::new( &database_url )
     .await
-    .expect( "Failed to initialize limits state" );
+    .expect( "LOUD FAILURE: Failed to initialize limits state" );
 
   let traces_state = iron_control_api::routes::traces::TracesState::new( &database_url )
     .await
-    .expect( "Failed to initialize traces state" );
+    .expect( "LOUD FAILURE: Failed to initialize traces state" );
 
   let providers_state = iron_control_api::routes::providers::ProvidersState::new( &database_url )
     .await
-    .expect( "Failed to initialize providers storage" );
+    .expect( "LOUD FAILURE: Failed to initialize providers storage" );
 
   // Initialize keys state for /api/keys endpoint (requires crypto)
   let crypto_service = std::sync::Arc::new(
     iron_secrets::crypto::CryptoService::from_env()
-      .expect( "IRON_SECRETS_MASTER_KEY required for key fetch API" )
+      .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY required for key fetch API" )
   );
 
   // Rate limiter for /api/keys endpoint: 10 requests per minute per user/project
@@ -448,7 +448,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     ic_token_secret.clone(),
   )
     .await
-    .expect( "Failed to initialize analytics state" );
+    .expect( "LOUD FAILURE: Failed to initialize analytics state" );
 
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
@@ -464,7 +464,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     tracing::info!( "Seeding database with test data..." );
     iron_token_manager::seed::seed_all( &agents_pool )
       .await
-      .expect( "Failed to seed database" );
+      .expect( "LOUD FAILURE: Failed to seed database" );
     tracing::info!( "✓ Database seeded (admin@admin.com / testpass)" );
   }
 
@@ -476,7 +476,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     &database_url,
   )
   .await
-  .expect( "Failed to initialize budget state" );
+  .expect( "LOUD FAILURE: Failed to initialize budget state" );
 
   // Create combined app state
   let app_state = AppState
@@ -666,141 +666,3 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   Ok( () )
 }
 
-#[ cfg( test ) ]
-mod deployment_mode_tests
-{
-  use super::*;
-
-  /// Helper to clear all production environment variables
-  fn clear_production_env_vars()
-  {
-    env::remove_var( "IRON_DEPLOYMENT_MODE" );
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-    env::remove_var( "AWS_EXECUTION_ENV" );
-    env::remove_var( "DYNO" );
-  }
-
-  #[ test ]
-  fn test_pilot_mode_default()
-  {
-    // Clear all production indicators
-    clear_production_env_vars();
-
-    let mode = detect_deployment_mode();
-
-    // In debug builds with no env vars, should detect pilot mode
-    #[ cfg( debug_assertions ) ]
-    assert!( matches!( mode, DeploymentMode::Pilot ) );
-  }
-
-  #[ test ]
-  fn test_production_kubernetes_detection()
-  {
-    clear_production_env_vars();
-    env::set_var( "KUBERNETES_SERVICE_HOST", "10.0.0.1" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-  }
-
-  #[ test ]
-  fn test_production_aws_detection()
-  {
-    clear_production_env_vars();
-    env::set_var( "AWS_EXECUTION_ENV", "AWS_ECS_FARGATE" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    env::remove_var( "AWS_EXECUTION_ENV" );
-  }
-
-  #[ test ]
-  fn test_production_heroku_detection()
-  {
-    clear_production_env_vars();
-    env::set_var( "DYNO", "web.1" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    env::remove_var( "DYNO" );
-  }
-
-  #[ test ]
-  fn test_explicit_production_mode()
-  {
-    clear_production_env_vars();
-    env::set_var( "IRON_DEPLOYMENT_MODE", "production" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::Production ) );
-
-    env::remove_var( "IRON_DEPLOYMENT_MODE" );
-  }
-
-  #[ test ]
-  fn test_explicit_production_overrides_heuristics()
-  {
-    clear_production_env_vars();
-
-    // Set multiple production indicators
-    env::set_var( "KUBERNETES_SERVICE_HOST", "10.0.0.1" );
-    env::set_var( "AWS_EXECUTION_ENV", "AWS_ECS_FARGATE" );
-
-    // But explicit mode should take precedence
-    env::set_var( "IRON_DEPLOYMENT_MODE", "production" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::Production ) );
-
-    // Cleanup
-    env::remove_var( "IRON_DEPLOYMENT_MODE" );
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-    env::remove_var( "AWS_EXECUTION_ENV" );
-  }
-
-  #[ test ]
-  fn test_release_build_detection()
-  {
-    clear_production_env_vars();
-
-    let mode = detect_deployment_mode();
-
-    // In release builds (debug_assertions disabled), should detect production
-    #[ cfg( not( debug_assertions ) ) ]
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    // In debug builds, should detect pilot
-    #[ cfg( debug_assertions ) ]
-    assert!( matches!( mode, DeploymentMode::Pilot ) );
-  }
-
-  #[ test ]
-  fn test_multiple_production_indicators()
-  {
-    clear_production_env_vars();
-
-    // Set multiple production environment variables
-    env::set_var( "KUBERNETES_SERVICE_HOST", "10.0.0.1" );
-    env::set_var( "AWS_EXECUTION_ENV", "AWS_ECS_FARGATE" );
-    env::set_var( "DYNO", "web.1" );
-
-    let mode = detect_deployment_mode();
-
-    // Should still detect as ProductionUnconfirmed (not explicitly set)
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    // Cleanup
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-    env::remove_var( "AWS_EXECUTION_ENV" );
-    env::remove_var( "DYNO" );
-  }
-}

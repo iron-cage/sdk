@@ -476,12 +476,13 @@ pub async fn handshake(
 
   // Fix(issue-budget-006): Atomically check and reserve budget to prevent TOCTOU race
   //
-  // Previously: get_budget_status() then record_spending() in separate operations
-  // created race window where concurrent requests could both pass check before either
+  // Root cause: get_budget_status() and record_spending() were separate operations,
+  // creating race window where concurrent requests could both pass budget check before either
   // recorded spending, causing negative budget (invariant violation).
   //
-  // Now: check_and_reserve_budget() atomically locks row with SELECT FOR UPDATE,
-  // checks budget, and records spending in single transaction.
+  // Pitfall: Time-of-check to time-of-use (TOCTOU) races occur when check and update are
+  // separate operations. Always use atomic operations (SELECT FOR UPDATE + UPDATE in single
+  // transaction) for check-then-act patterns on shared resources.
   let budget_to_grant = match state
     .agent_budget_manager
     .check_and_reserve_budget( agent_id, HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET )
@@ -937,6 +938,43 @@ pub async fn refresh_budget(
       {
         "error": "Unauthorized - lease belongs to different agent"
       } ) ),
+    )
+      .into_response();
+  }
+
+  // Fix(issue-budget-007): Missing lease revocation check in refresh_budget
+  //
+  // Root cause: Report usage endpoint had revocation check (issue-budget-001), but refresh_budget
+  // endpoint was missing the same validation. When refresh was implemented, the developer copied
+  // the authorization check pattern from report_usage but forgot to also copy the lease status
+  // validation (expiry + revocation checks). This allowed revoked leases to refresh successfully.
+  //
+  // Pitfall: Incomplete validation copying - when copying validation patterns between similar
+  // endpoints, ensure ALL relevant checks are copied, not just authorization. Pattern: endpoints
+  // operating on same resource type (leases, tokens, sessions) should have consistent validation.
+  // Use checklist: (1) existence, (2) authorization, (3) state (expiry/revocation/enabled),
+  // (4) capacity/limits. Missing ANY check creates security gap.
+  //
+  // Check if lease has expired
+  if let Some( expires_at ) = lease.expires_at
+  {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    if expires_at < now_ms
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "Lease expired" }) ),
+      )
+        .into_response();
+    }
+  }
+
+  // Check if lease has been revoked
+  if lease.lease_status == "revoked"
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Lease has been revoked" }) ),
     )
       .into_response();
   }

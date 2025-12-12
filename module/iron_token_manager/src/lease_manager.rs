@@ -89,7 +89,7 @@ impl LeaseManager
     #[ allow( clippy::cast_possible_truncation ) ]
     let now = SystemTime::now()
       .duration_since( UNIX_EPOCH )
-      .expect( "Time went backwards" )
+      .expect( "LOUD FAILURE: Time went backwards" )
       .as_millis() as i64;
 
     sqlx::query(
@@ -281,7 +281,7 @@ impl LeaseManager
     #[ allow( clippy::cast_possible_truncation ) ]
     let now = SystemTime::now()
       .duration_since( UNIX_EPOCH )
-      .expect( "Time went backwards" )
+      .expect( "LOUD FAILURE: Time went backwards" )
       .as_millis() as i64;
 
     // Use transaction for atomic read-modify-write
@@ -347,7 +347,7 @@ impl LeaseManager
     #[ allow( clippy::cast_possible_truncation ) ]
     let now = SystemTime::now()
       .duration_since( UNIX_EPOCH )
-      .expect( "Time went backwards" )
+      .expect( "LOUD FAILURE: Time went backwards" )
       .as_millis() as i64;
 
     sqlx::query( "UPDATE budget_leases SET updated_at = ? WHERE id = ?" )

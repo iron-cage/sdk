@@ -173,7 +173,7 @@ impl PricingManager {
     /// Can be used to reload pricing from external source.
     pub fn load_from_file(&self, json_str: &str) -> Result<(), String> {
         let raw_map: HashMap<String, Value> = serde_json::from_str(json_str)
-            .map_err(|_| "Failed to parse json".to_string())?;
+            .map_err(|e| format!("Failed to parse json: {}", e))?;
 
         let mut new_map = HashMap::new();
 

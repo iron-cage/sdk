@@ -55,7 +55,7 @@
 mod error;
 pub use error::CliError;
 
-mod validation;
+pub mod validation;
 
 pub mod auth_handlers;
 pub mod token_handlers;
