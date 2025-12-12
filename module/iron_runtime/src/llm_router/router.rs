@@ -325,8 +325,20 @@ impl LlmRouter {
     // Create shutdown channel
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-    // Create cost controller only if budget is specified
-    let cost_controller = budget.map(|budget_usd| Arc::new(CostController::new(budget_usd)));
+    // Determine budget: use explicit budget, or fetch from server handshake, or default to 0
+    let effective_budget = if let Some(b) = budget {
+      b
+    } else if !server_url.is_empty() {
+      // Fetch budget from server handshake (Protocol 005)
+      runtime.block_on(async {
+        fetch_budget_from_handshake(&server_url, &api_key).await
+      }).unwrap_or(0.0)
+    } else {
+      0.0
+    };
+
+    // Create cost controller with effective budget (always created, defaults to 0)
+    let cost_controller = Some(Arc::new(CostController::new(effective_budget)));
 
     // Create analytics event store (feature-gated)
     #[cfg(feature = "analytics")]
@@ -417,4 +429,50 @@ impl LlmRouter {
 fn find_free_port() -> std::io::Result<u16> {
   let listener = TcpListener::bind("127.0.0.1:0")?;
   Ok(listener.local_addr()?.port())
+}
+
+/// Fetch budget from server handshake (Protocol 005)
+async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option<f64> {
+  let client = reqwest::Client::new();
+  let url = format!("{}/api/v1/budget/handshake", server_url);
+
+  let response = match client
+    .post(&url)
+    .header("Authorization", format!("Bearer {}", ic_token))
+    .json(&serde_json::json!({
+      "ic_token": ic_token,
+      "provider": "openai"
+    }))
+    .send()
+    .await
+  {
+    Ok(r) => r,
+    Err(e) => {
+      tracing::warn!("Failed to connect to server for handshake: {}", e);
+      return None;
+    }
+  };
+
+  if !response.status().is_success() {
+    tracing::warn!("Handshake failed with status: {}", response.status());
+    return None;
+  }
+
+  #[derive(serde::Deserialize)]
+  struct HandshakeResponse {
+    budget_granted: f64,
+    #[allow(dead_code)]
+    lease_id: Option<String>,
+  }
+
+  match response.json::<HandshakeResponse>().await {
+    Ok(data) => {
+      tracing::info!("Budget from server handshake: ${:.4}", data.budget_granted);
+      Some(data.budget_granted)
+    }
+    Err(e) => {
+      tracing::warn!("Failed to parse handshake response: {}", e);
+      None
+    }
+  }
 }
