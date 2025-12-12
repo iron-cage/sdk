@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
 from apollo_tools import tools_list
+from iron_cage import LlmRouter
 
 # --- Load Configuration ---
 # Get path to this script
@@ -18,9 +19,28 @@ load_dotenv(secrets_path, override=True)
 
 # Check for OpenAI Token
 if not os.getenv("OPENAI_API_KEY"):
-    clean_path = os.path.normpath(secrets_path)
-    raise ValueError(f"CRITICAL ERROR: OPENAI_API_KEY is missing. Checked file: {clean_path}")
-llm = ChatOpenAI(model="gpt-5-nano", temperature=1, max_retries=2)
+    raise ValueError("CRITICAL ERROR: OPENAI_API_KEY is missing.")
+
+IC_TOKEN = os.getenv("IC_TOKEN")
+if not IC_TOKEN:
+    raise ValueError(f"CRITICAL ERROR: IC_TOKEN is missing in {secrets_path}")
+
+# --- Initialize Iron Cage Router ---
+print("Initializing Iron Cage Router...")
+router = LlmRouter(
+    api_key=IC_TOKEN,         
+    budget_usd=10.0,          # Hard limit
+    pii_detection=True,       # Auto-redact emails/phones
+    circuit_breaker=True      # Handle API failures
+)
+
+# --- Initialize Language Model ---
+llm = ChatOpenAI(
+    model="gpt-5-nano",
+    temperature=0,
+    api_key=router.api_key,
+    base_url=router.base_url
+)
 
 # --- System Prompt for the Agent ---
 # Defines the agent's role, algorithm, and strict output format.
@@ -71,7 +91,8 @@ agent_executor = AgentExecutor(
 # --- Main Execution Function ---
 # Starts the user interaction loop.
 def main():
-    print("LeadGen Agent")
+    print("--------------------------------")
+    print("|         LeadGen Agent         |")
     print("--------------------------------")
     
     while True:
