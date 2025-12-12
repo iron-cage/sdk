@@ -21,6 +21,20 @@ use serde::{ Deserialize, Serialize };
 use sqlx::{ FromRow, SqlitePool, sqlite::SqlitePoolOptions };
 use std::sync::Arc;
 use crate::ic_token::IcTokenManager;
+use crate::jwt_auth::AuthenticatedUser;
+
+// ============================================================================
+// Type Aliases (for complex query result types)
+// ============================================================================
+
+/// Row type for spending by agent: (agent_id, agent_name, spending_micros, request_count, budget)
+type SpendingByAgentRow = ( i64, Option< String >, i64, i64, Option< f64 > );
+
+/// Row type for token usage by agent: (agent_id, agent_name, input_tokens, output_tokens, request_count)
+type TokensByAgentRow = ( i64, Option< String >, i64, i64, i64 );
+
+/// Row type for model usage: (model, provider, request_count, spending_micros, input_tokens, output_tokens)
+type ModelUsageRow = ( String, String, i64, i64, i64, i64 );
 
 // ============================================================================
 // Types
@@ -545,17 +559,15 @@ pub async fn post_event(
 
   // For completed events, require token counts
   if event.event_type == "llm_request_completed"
+    && ( event.input_tokens.is_none() || event.output_tokens.is_none() )
   {
-    if event.input_tokens.is_none() || event.output_tokens.is_none()
-    {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json( serde_json::json!({
-          "error": "VALIDATION_ERROR",
-          "message": "input_tokens and output_tokens required for completed events"
-        }) )
-      ).into_response();
-    }
+    return (
+      StatusCode::BAD_REQUEST,
+      Json( serde_json::json!({
+        "error": "VALIDATION_ERROR",
+        "message": "input_tokens and output_tokens required for completed events"
+      }) )
+    ).into_response();
   }
 
   let now_ms = Utc::now().timestamp_millis();
@@ -615,7 +627,10 @@ pub async fn post_event(
 }
 
 /// GET /api/v1/analytics/spending/total
+///
+/// Requires JWT authentication.
 pub async fn get_spending_total(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
@@ -680,7 +695,10 @@ pub async fn get_spending_total(
 }
 
 /// GET /api/v1/analytics/spending/by-agent
+///
+/// Requires JWT authentication.
 pub async fn get_spending_by_agent(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
   Query( page ): Query< PaginationQuery >,
@@ -690,7 +708,7 @@ pub async fn get_spending_by_agent(
   let offset = ( page.page - 1 ) * page.per_page;
 
   // Query spending by agent with budget info
-  let rows: Result< Vec< ( i64, Option< String >, i64, i64, Option< f64 > ) >, _ > = sqlx::query_as(
+  let rows: Result< Vec< SpendingByAgentRow >, _ > = sqlx::query_as(
     r#"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -777,7 +795,10 @@ pub async fn get_spending_by_agent(
 }
 
 /// GET /api/v1/analytics/spending/by-provider
+///
+/// Requires JWT authentication.
 pub async fn get_spending_by_provider(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
@@ -848,7 +869,10 @@ pub async fn get_spending_by_provider(
 }
 
 /// GET /api/v1/analytics/spending/avg-per-request
+///
+/// Requires JWT authentication.
 pub async fn get_spending_avg(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
@@ -923,7 +947,10 @@ pub async fn get_spending_avg(
 }
 
 /// GET /api/v1/analytics/budget/status
+///
+/// Requires JWT authentication.
 pub async fn get_budget_status(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< BudgetStatusQuery >,
 ) -> impl IntoResponse
@@ -1072,7 +1099,10 @@ pub async fn get_budget_status(
 }
 
 /// GET /api/v1/analytics/usage/requests
+///
+/// Requires JWT authentication.
 pub async fn get_usage_requests(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
@@ -1141,7 +1171,10 @@ pub async fn get_usage_requests(
 }
 
 /// GET /api/v1/analytics/usage/tokens/by-agent
+///
+/// Requires JWT authentication.
 pub async fn get_usage_tokens(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
   Query( page ): Query< PaginationQuery >,
@@ -1150,7 +1183,7 @@ pub async fn get_usage_tokens(
   let ( start_ms, end_ms ) = params.period.to_range();
   let offset = ( page.page - 1 ) * page.per_page;
 
-  let rows: Result< Vec< ( i64, Option< String >, i64, i64, i64 ) >, _ > = sqlx::query_as(
+  let rows: Result< Vec< TokensByAgentRow >, _ > = sqlx::query_as(
     r#"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -1245,7 +1278,10 @@ pub async fn get_usage_tokens(
 }
 
 /// GET /api/v1/analytics/usage/models
+///
+/// Requires JWT authentication.
 pub async fn get_usage_models(
+  _user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
   Query( page ): Query< PaginationQuery >,
@@ -1254,7 +1290,7 @@ pub async fn get_usage_models(
   let ( start_ms, end_ms ) = params.period.to_range();
   let offset = ( page.page - 1 ) * page.per_page;
 
-  let rows: Result< Vec< ( String, String, i64, i64, i64, i64 ) >, _ > = sqlx::query_as(
+  let rows: Result< Vec< ModelUsageRow >, _ > = sqlx::query_as(
     r#"SELECT
          model,
          provider,
