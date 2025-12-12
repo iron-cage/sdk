@@ -429,6 +429,20 @@ impl AgentService
     let now = chrono::Utc::now().timestamp();
     let status = "active".to_string();
 
+    if let Some(providers) = &params.providers {
+      for provider in providers {
+        let provider = sqlx::query("SELECT id FROM ai_provider_keys WHERE id = ?")
+          .bind(provider)
+          .fetch_optional(&self.pool)
+          .await
+          .map_err(|e| { error!("Error getting provider: {}", e); crate::error::TokenError })?;
+
+        if provider.is_none()  {
+          return Err(crate::error::TokenError);
+        }
+      }
+    }
+
     sqlx::query(
       r#"
       INSERT INTO agents (id, name, providers, description, tags, owner_id, project_id, status, created_at, updated_at)
@@ -701,12 +715,31 @@ impl AgentService
   ///
   /// Returns error if database query fails
   pub async fn remove_provider_from_agent(&self, id: &str, provider_id: &str) -> Result<Vec<ProviderListItemBrief>> {
-    let result = sqlx::query("DELETE FROM agent_providers WHERE agent_id = ? AND provider_id = ?")
+    let providers = sqlx::query("SELECT providers FROM agents WHERE id = ?")
       .bind(id)
-      .bind(provider_id)
-      .execute(&self.pool)
+      .fetch_optional(&self.pool)
       .await
       .map_err(|e| { error!("Error removing provider from agent: {}", e); crate::error::TokenError })?;
+
+    if let Some(row) = providers {
+      let providers_json: String = row.get("providers");
+      let mut providers: Vec<String> = serde_json::from_str(&providers_json)
+        .map_err(|e| { error!("Error parsing providers: {}", e); crate::error::TokenError })?;
+
+      if let Some(pos) = providers.iter().position(|x| x == provider_id) {
+        providers.remove(pos);
+
+        let providers_json = serde_json::to_string(&providers)
+          .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError })?;
+
+        sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
+          .bind(providers_json)
+          .bind(id)
+          .execute(&self.pool)
+          .await
+          .map_err(|e| { error!("Error updating agent providers: {}", e); crate::error::TokenError })?;
+      }
+    }
 
     let remaining_providers = self.get_agent_details(id).await?;
 

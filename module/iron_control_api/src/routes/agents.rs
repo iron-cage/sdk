@@ -607,20 +607,19 @@ pub struct RemainedProviderItem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RemoveProviderFromAgentResponse {
-    agent_id: String,
-    provider_id: String,
-    removed: bool,
-    remaining_providers: Vec< RemainedProviderItem >,
-    count: usize,
+    pub agent_id: String,
+    pub provider_id: String,
+    pub removed: bool,
+    pub remaining_providers: Vec< RemainedProviderItem >,
+    pub count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
-    warning: Option<String>,
+    pub warning: Option<String>,
 }
 
 /// Remove provider from an agent
 pub async fn remove_provider_from_agent(
     State(pool): State<SqlitePool>,
-    Path(agent_id): Path<String>,
-    Path(provider_id): Path<String>,
+    Path((agent_id, provider_id)): Path<(String, String)>,
     user: AuthenticatedUser,
 ) -> Result<Json<RemoveProviderFromAgentResponse>, (StatusCode, String)> {
     let service = AgentService::new(pool);

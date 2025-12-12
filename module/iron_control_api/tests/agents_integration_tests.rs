@@ -11,11 +11,11 @@ mod common;
 use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::TestAppState };
 use axum::{
   Router,
-  routing::{ get, post, put, delete as delete_route },
+  routing::{ get, post, put, delete },
   http::{ StatusCode, Request, Method },
   body::Body,
 };
-use iron_control_api::routes::agents::{AgentDetails, AgentProviderItemExtended, CreateAgentRequest, GetAgentProvidersResponse, PaginatedAgentsResponse};
+use iron_control_api::routes::agents::{AgentDetails, AgentProviderItemExtended, CreateAgentRequest, GetAgentProvidersResponse, PaginatedAgentsResponse, RemoveProviderFromAgentResponse};
 use iron_token_manager::agent_service::{AgentService, CreateAgentParams};
 use tower::ServiceExt;
 use serde_json::json;
@@ -45,6 +45,7 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
     // .route( "/api/agents/:id", delete_route( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
     .route( "/api/agents/:id/providers", get( iron_control_api::routes::agents::get_agent_providers ).put( iron_control_api::routes::agents::assign_providers_to_agent ) )
+    .route( "/api/agents/:agent_id/providers/:provider_id", delete( iron_control_api::routes::agents::remove_provider_from_agent ) )
     .with_state( app_state.clone() );
 
   ( router, app_state.database.clone(), admin_token, user_token, admin_id, user_id )
@@ -57,17 +58,28 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
 #[ tokio::test ]
 async fn test_create_agent_as_admin_success()
 {
-  let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let now = chrono::Utc::now().timestamp_millis();
 
   let request_body = CreateAgentRequest {
     name: "Test Agent".to_string(),
     budget: 100.0,
-    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    providers: Some(vec!["openai_1".to_string()]),
     description: None,
     tags: None,
     project_id: None,
     owner_id: _admin_id,
   };
+
+  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( "openai_1" )
+    .bind( "openai" )
+    .bind( "https://api.openai.com/v1" )
+    .bind( now )
+    .bind( "encrypted_api_key" )
+    .bind( "encryption_nonce" )
+    .execute( &pool )
+    .await.unwrap();
 
   let response = app
     .oneshot(
@@ -90,23 +102,34 @@ async fn test_create_agent_as_admin_success()
   let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( agent[ "name" ].as_str().unwrap(), "Test Agent" );
-  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 2 );
+  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 1 );
 }
 
 #[ tokio::test ]
 async fn test_create_agent_as_user_allowed()
 {
-  let ( app, _pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let ( app, pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let now = chrono::Utc::now().timestamp_millis();
 
   let request_body = CreateAgentRequest {
     name: "Test Agent".to_string(),
     budget: 100.0,
-    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    providers: Some(vec!["openai_1".to_string()]),
     description: None,
     tags: None,
     project_id: None,
     owner_id: _user_id,
   };
+
+  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
+      .bind( "openai_1" )
+      .bind( "openai" )
+      .bind( "https://api.openai.com/v1" )
+      .bind( now )
+      .bind( "encrypted_api_key" )
+      .bind( "encryption_nonce" )
+      .execute( &pool )
+      .await.unwrap();
 
   let response = app
     .oneshot(
@@ -160,10 +183,12 @@ async fn test_create_agent_without_auth_unauthorized()
 
 async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &str > ) 
 {
+  let now = chrono::Utc::now().timestamp_millis();
+
   let agent1 = CreateAgentParams {
     name: "Agent 4".to_string(),
     budget: 400.0,
-    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    providers: Some(vec!["openai_1".to_string()]),
     description: None,
     tags: None,
     project_id: None,
@@ -172,7 +197,7 @@ async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &
   let agent2 = CreateAgentParams {
     name: "Agent 4".to_string(),
     budget: 400.0,
-    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    providers: Some(vec!["openai_1".to_string()]),
     description: None,
     tags: None,
     project_id: None,
@@ -181,11 +206,21 @@ async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &
   let agent3 = CreateAgentParams {
     name: "Agent 5".to_string(),
     budget: 400.0,
-    providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
+    providers: Some(vec!["openai_1".to_string()]),
     description: None,
     tags: None,
     project_id: None,
   };
+
+  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( "openai_1" )
+    .bind( "openai" )
+    .bind( "https://api.openai.com/v1" )
+    .bind( now )
+    .bind( "encrypted_api_key" )
+    .bind( "encryption_nonce" )
+    .execute( pool )
+    .await.unwrap();
 
   let service: AgentService = AgentService::new(pool.clone());
 
@@ -995,8 +1030,9 @@ async fn test_remove_provider_from_agent() {
   let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
     .await
     .unwrap();
-  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
 
-  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 0 );
+  let agent: RemoveProviderFromAgentResponse = serde_json::from_slice( &body_bytes ).unwrap();
+
+  assert_eq!( agent.remaining_providers.len(), 0 );
 }
   
