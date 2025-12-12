@@ -198,7 +198,8 @@ async fn apply_migration_004( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-  .unwrap();  }
+    .unwrap();  
+  }
 
   Ok( () )
 }

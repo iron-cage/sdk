@@ -3,8 +3,12 @@
 //! Provides operations for agent lifecycle management: create, update, delete,
 //! list agents, and get agent tokens. Authorization is handled at the service layer.
 
+use std::collections::HashSet;
+
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use iron_cost::budget;
-use sqlx::{ SqlitePool, Row };
+use serde::Serialize;
+use sqlx::{ Row, SqlitePool, sqlite::SqliteRow };
 use crate::error::Result;
 use tracing::error;
 
@@ -82,16 +86,10 @@ pub struct UpdateAgentParams
 {
   /// New name (optional)
   pub name: Option< String >,
-  /// New budget (optional)
-  pub budget: Option< f64 >,
-  /// New providers list (optional)
-  pub providers: Option< Vec< String > >,
   /// New description (optional)
   pub description: Option< String >,
   /// New tags (optional)
   pub tags: Option< Vec< String > >,
-  /// New status (optional)
-  pub status: Option< String >,
 }
 
 /// Token item for agent tokens listing
@@ -112,6 +110,56 @@ pub struct AgentTokenItem
   pub last_used_at: Option< i64 >,
   /// Whether token is active
   pub is_active: bool,
+}
+
+/// Provider item for agent providers listing
+#[ derive( Debug, Clone ) ]
+pub struct ProviderListItem
+{
+  /// Provider ID
+  pub id: String,
+  /// Provider name
+  pub name: String,
+  /// Base url endpoint type
+  pub endpoint: String,
+  /// List of supported models
+  pub models: Vec< String >,
+  /// Status (active/inactive)
+  pub status: String,
+}
+
+pub struct AgentDetails
+{
+/// Agent ID (format: agent_<uuid>)
+  pub id: String,
+  /// Agent name
+  pub name: String,
+  /// Budget allocation in USD (from agent_budgets table)
+  pub budget: f64,
+  /// Amount spent in USD (from agent_budgets table)
+  pub spent: f64,
+  /// Remaining budget in USD (budget - spent)
+  pub remaining: f64,
+  /// Percentage of budget used (0.0 - 100.0)
+  pub percent_used: f64,
+  /// Allowed providers for this agent
+  pub providers: Vec< ProviderListItem >,
+  /// Agent description
+  pub description: Option< String >,
+  /// Tags for categorization
+  pub tags: Option< Vec< String > >,
+  /// Owner user ID
+  pub owner_id: String,
+  /// Associated project ID
+  pub project_id: Option< String >,
+  /// IC Token for agent authentication
+  pub ic_token: Option< ICToken >,
+  /// Agent status (active, exhausted, inactive)
+  pub status: String,
+  /// Creation timestamp (ISO 8601 string)
+  pub created_at: String,
+  /// Last update timestamp (ISO 8601 string)
+  pub updated_at: String,  
 }
 
 /// Sort direction
@@ -149,6 +197,13 @@ pub struct ListAgentsFilters
   pub sort_field: Option< AgentSortField >,
   /// Sort direction
   pub sort_direction: Option< SortDirection >,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProviderListItemBrief
+{
+  pub id: String,
+  pub name: String,
 }
 
 /// Result for paginated agent listing
@@ -218,19 +273,19 @@ impl AgentService
 
     if let Some( ref owner_id ) = filters.owner_id
     {
-      conditions.push( "owner_id = ?" );
+      conditions.push( "a.owner_id = ?" );
       bind_values.push( owner_id.clone() );
     }
 
     if let Some( ref name ) = filters.name
     {
-      conditions.push( "LOWER(name) LIKE LOWER(?)" );
+      conditions.push( "LOWER(a.name) LIKE LOWER(?)" );
       bind_values.push( format!( "%{}%", name ) );
     }
 
     if let Some( ref status ) = filters.status
     {
-      conditions.push( "status = ?" );
+      conditions.push( "a.status = ?" );
       bind_values.push( status.clone() );
     }
 
@@ -249,9 +304,9 @@ impl AgentService
 
     let sort_column = match sort_field
     {
-      AgentSortField::Name => "name",
-      AgentSortField::Budget => "budget",
-      AgentSortField::CreatedAt => "created_at",
+      AgentSortField::Name => "a.name",
+      AgentSortField::Budget => "b.total_allocated",
+      AgentSortField::CreatedAt => "a.created_at",
     };
 
     let sort_dir = match sort_direction
@@ -268,7 +323,7 @@ impl AgentService
     let offset = ( page - 1 ) * per_page;
 
     // Count query
-    let count_sql = format!( "SELECT COUNT(*) as count FROM agents {}", where_clause );
+    let count_sql = format!( "SELECT COUNT(*) as count FROM agents a {}", where_clause );
     let mut count_query = sqlx::query_scalar::< _, i64 >( &count_sql );
     for value in &bind_values
     {
@@ -281,7 +336,16 @@ impl AgentService
 
     // Data query
     let data_sql = format!(
-      "SELECT id, name, budget, providers, description, tags, owner_id, project_id, status, created_at, updated_at FROM agents {} {} LIMIT ? OFFSET ?",
+      r#"
+      SELECT
+        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
+        b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
+      FROM agents a
+      LEFT JOIN agent_budgets b ON a.id = b.agent_id
+      {}
+      {}
+      LIMIT ? OFFSET ?
+      "#,
       where_clause,
       order_clause
     );
@@ -325,9 +389,12 @@ impl AgentService
   {
     let row = sqlx::query(
       r#"
-      SELECT id, name, budget, providers, description, tags, owner_id, project_id, status, created_at, updated_at
-      FROM agents
-      WHERE id = ?
+      SELECT
+        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
+        b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
+      FROM agents a
+      LEFT JOIN agent_budgets b ON a.id = b.agent_id
+      WHERE a.id = ?
       "#
     )
     .bind( id )
@@ -359,7 +426,7 @@ impl AgentService
       .map_err( |e| { error!( "Error serializing providers: {}", e ); crate::error::TokenError } )?;
     let tags_json = serde_json::to_string( &params.tags.clone().unwrap_or_default() )
       .map_err( |e| { error!( "Error serializing tags: {}", e ); crate::error::TokenError } )?;
-    let now = current_time_iso();
+    let now = chrono::Utc::now().timestamp();
     let status = "active".to_string();
 
     sqlx::query(
@@ -380,8 +447,7 @@ impl AgentService
     .bind( &now )
     .execute( &self.pool )
     .await
-    .unwrap();
-    // .map_err( |e| { error!( "Error creating agent: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error creating agent: {}", e ); crate::error::TokenError } )?;
 
     sqlx::query(
       r#"
@@ -395,29 +461,17 @@ impl AgentService
     .bind(&now)
     .execute(&self.pool)
     .await
-    .unwrap();
-    // .map_err(|e| {
-    //   error!("Error creating budget lease: {}", e);
-    //   crate::error::TokenError
-    // })?;
+    .map_err(|e| {
+      error!("Error creating budget lease: {}", e);
+      crate::error::TokenError
+    })?;
 
-    Ok( Agent {
-      id: agent_id,
-      name: params.name,
-      budget: params.budget,
-      providers: params.providers.unwrap_or_default(),
-      description: params.description,
-      tags: params.tags,
-      owner_id: owner_id.to_string(),
-      project_id: params.project_id,
-      ic_token: None,
-      status,
-      created_at: now.clone(),
-      updated_at: now,
-      percent_used: 0.0,
-      spent: 0.0,
-      remaining: params.budget,
-    } )
+    self.get_agent( &agent_id )
+      .await?
+      .ok_or_else( || {
+        error!( "Failed to fetch created agent: {}", agent_id );
+        crate::error::TokenError
+      } )
   }
 
   /// Update an existing agent
@@ -448,7 +502,7 @@ impl AgentService
       return Ok( None );
     }
 
-    let now = current_time_iso();
+    let now = chrono::Utc::now().timestamp();
 
     // Update fields if provided
     if let Some( ref name ) = params.name
@@ -460,30 +514,6 @@ impl AgentService
         .execute( &self.pool )
         .await
         .map_err( |e| { error!( "Error updating agent name: {}", e ); crate::error::TokenError } )?;
-    }
-
-    if let Some( budget ) = params.budget
-    {
-      sqlx::query( "UPDATE agents SET budget = ?, updated_at = ? WHERE id = ?" )
-        .bind( budget )
-        .bind( &now )
-        .bind( id )
-        .execute( &self.pool )
-        .await
-        .map_err( |e| { error!( "Error updating agent budget: {}", e ); crate::error::TokenError } )?;
-    }
-
-    if let Some( ref providers ) = params.providers
-    {
-      let providers_json = serde_json::to_string( providers )
-        .map_err( |e| { error!( "Error serializing providers: {}", e ); crate::error::TokenError } )?;
-      sqlx::query( "UPDATE agents SET providers = ?, updated_at = ? WHERE id = ?" )
-        .bind( &providers_json )
-        .bind( &now )
-        .bind( id )
-        .execute( &self.pool )
-        .await
-        .map_err( |e| { error!( "Error updating agent providers: {}", e ); crate::error::TokenError } )?;
     }
 
     if let Some( ref description ) = params.description
@@ -510,19 +540,189 @@ impl AgentService
         .map_err( |e| { error!( "Error updating agent tags: {}", e ); crate::error::TokenError } )?;
     }
 
-    if let Some( ref status ) = params.status
-    {
-      sqlx::query( "UPDATE agents SET status = ?, updated_at = ? WHERE id = ?" )
-        .bind( status )
-        .bind( &now )
-        .bind( id )
-        .execute( &self.pool )
-        .await
-        .map_err( |e| { error!( "Error updating agent status: {}", e ); crate::error::TokenError } )?;
-    }
-
     // Fetch and return updated agent
     self.get_agent( id ).await
+  }
+
+  /// Get agent details
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - Agent ID to get details for (string format: agent_<uuid>)
+  ///
+  /// # Returns
+  ///
+  /// Agent details if found, None if not found
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn get_agent_details( &self, id: &str ) -> Result< Option< AgentDetails > >
+  {
+    let row = sqlx::query(
+      r#"
+      SELECT
+        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
+        b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
+      FROM agents a
+      LEFT JOIN agent_budgets b ON a.id = b.agent_id
+      WHERE a.id = ?
+      "#
+    )
+    .bind( id )
+    .fetch_optional( &self.pool )
+    .await
+    .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError } )?;
+
+    if let Some(row) = row
+    {
+      let agent = Self::row_to_agent( &row );
+
+      let mut providers: Vec<ProviderListItem> = Vec::new();
+
+      for provider_id in agent.providers.iter()
+      {
+        let row = sqlx::query( "SELECT id, provider, base_url, models, is_enabled FROM ai_provider_keys WHERE id = ?")
+          .bind( provider_id )
+          .fetch_optional( &self.pool )
+          .await
+          .map_err( |e| { error!( "Error getting provider key: {}", e ); crate::error::TokenError } )?;
+
+        if let Some(row) = row {
+          providers.push(Self::row_to_provider_list_item( &row ));
+        }
+      }
+
+      Ok( Some(AgentDetails {
+        id: agent.id,
+        name: agent.name,
+        budget: agent.budget,
+        spent: agent.spent,
+        remaining: agent.remaining,
+        percent_used: agent.percent_used,
+        providers: providers,
+        description: agent.description,
+        tags: agent.tags,
+        owner_id: agent.owner_id,
+        project_id: agent.project_id,
+        ic_token: agent.ic_token,
+        status: agent.status,
+        created_at: agent.created_at,
+        updated_at: agent.updated_at,
+      } ))
+    }
+    else
+    {
+      Ok( None )
+    }
+  }
+
+  fn row_to_provider_list_item(row: &SqliteRow) -> ProviderListItem {
+    let models_json: Option<String> = row.get("models");
+    let models = models_json
+      .as_ref()
+      .and_then(|json| serde_json::from_str(json).ok())
+      .unwrap_or_default();
+
+    let is_enabled: bool = row.get("is_enabled");
+    let status = if is_enabled { "active".to_string() } else { "inactive".to_string() };
+
+    ProviderListItem {
+      id: row.get("id"),
+      name: row.get("provider"),
+      endpoint: row.get("base_url"),
+      models,
+      status,
+    }
+  }
+
+  /// Assign providers to an agent
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - Agent ID to assign providers to (string format: agent_<uuid>)
+  /// * `providers` - Vector of provider IDs to assign to the agent
+  ///
+  /// # Returns
+  ///
+  /// True if providers were assigned successfully, false if not found
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+
+  pub async fn assign_providers_to_agent(&self, id: &str, providers: Vec<String>) -> Result <Option<Agent>> {
+    // Validate providers exist
+    for provider in &providers {
+      let provider = sqlx::query("SELECT id FROM ai_provider_keys WHERE id = ?")
+        .bind(provider)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| { error!("Error getting provider: {}", e); crate::error::TokenError })?;
+
+      if provider.is_none() {
+        return Ok(None);
+      }
+    }
+
+    // Deduplicate providers
+    let providers = providers.into_iter().collect::<HashSet<_>>().into_iter().collect::<Vec<_>>();
+
+    // Convert providers to JSON
+    let providers_json = serde_json::to_string(&providers)
+      .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError })?;
+
+    // Update agent providers
+    let result = sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
+      .bind(providers_json)
+      .bind(id)
+      .execute(&self.pool)
+      .await
+      .map_err(|e| { error!("Error updating agent providers: {}", e); crate::error::TokenError })?;
+
+    self.get_agent(id).await
+  }
+
+
+
+
+  /// Remove provider from agent
+  /// 
+  /// # Arguments
+  ///
+  /// * `id` - Agent ID to remove provider from (string format: agent_<uuid>)
+  /// * `provider_id` - Provider ID to remove from the agent (string format: provider_<uuid>)
+  ///
+  /// # Returns
+  ///
+  /// True if provider was removed, false if not found
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn remove_provider_from_agent(&self, id: &str, provider_id: &str) -> Result<Vec<ProviderListItemBrief>> {
+    let result = sqlx::query("DELETE FROM agent_providers WHERE agent_id = ? AND provider_id = ?")
+      .bind(id)
+      .bind(provider_id)
+      .execute(&self.pool)
+      .await
+      .map_err(|e| { error!("Error removing provider from agent: {}", e); crate::error::TokenError })?;
+
+    let remaining_providers = self.get_agent_details(id).await?;
+
+    let remaining_providers = remaining_providers.map(|agent| {
+      agent.providers.iter().map(|provider| {
+        ProviderListItemBrief {
+          id: provider.id.clone(),
+          name: provider.name.clone(),
+        }
+      }).collect() 
+    });
+
+    match remaining_providers {
+      Some(providers) => Ok(providers),
+      None => Err(crate::error::TokenError),
+    }
   }
 
   /// Delete an agent
@@ -636,6 +836,8 @@ impl AgentService
     Ok( tokens )
   }
 
+  
+
   /// Get database pool for test verification
   ///
   /// **Warning:** Test-only method for accessing internal state
@@ -659,10 +861,23 @@ impl AgentService
       .as_ref()
       .and_then( |json| serde_json::from_str( json ).ok() );
 
+    let budget: f64 = row.get( "budget" );
+    let spent: f64 = row.get( "spent" );
+    let remaining: f64 = row.get( "remaining" );
+    let percent_used = if budget > 0.0 { (spent / budget) * 100.0 } else { 0.0 };
+
+    let ts = row.get( "created_at" );
+    let dt = TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp(ts, 0));
+    let created_at = dt.to_rfc3339();
+
+    let ts = row.get( "updated_at" );
+    let dt = TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp(ts, 0));
+    let updated_at = dt.to_rfc3339();
+
     Agent {
       id: row.get( "id" ),
       name: row.get( "name" ),
-      budget: row.get( "budget" ),
+      budget,
       providers,
       description: row.get( "description" ),
       tags,
@@ -670,13 +885,13 @@ impl AgentService
       project_id: row.get( "project_id" ),
       ic_token: None, // IC tokens are loaded separately if needed
       status: row.get( "status" ),
-      created_at: row.get( "created_at" ),
-      updated_at: row.get( "updated_at" ),
-      percent_used: 0.0,
-      spent: 0.0,
-      remaining: row.get( "budget" ),
+      created_at,
+      updated_at,
+      percent_used,
+      spent,
+      remaining,
     }
-  }
+  }   
 }
 
 /// Get current time as ISO 8601 string with Z suffix

@@ -10,7 +10,7 @@
 CREATE TABLE IF NOT EXISTS ai_provider_keys
 (
   -- Primary key
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY,
 
   -- Provider type (openai, anthropic)
   provider TEXT NOT NULL CHECK ( provider IN ( 'openai', 'anthropic' ) ),
@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS ai_provider_keys
 
   -- Optional custom base URL for proxy/self-hosted endpoints
   base_url TEXT CHECK ( base_url IS NULL OR LENGTH( base_url ) <= 2000 ),
+
+  models TEXT CHECK ( models IS NULL OR LENGTH( models ) <= 2000 ),
 
   -- Human-friendly description
   description TEXT CHECK ( description IS NULL OR LENGTH( description ) <= 500 ),
@@ -38,14 +40,14 @@ CREATE TABLE IF NOT EXISTS ai_provider_keys
   balance_cents INTEGER,
   balance_updated_at INTEGER,
 
-  preview TEXT CHECK ( preview IS NULL OR LENGTH( preview ) <= 10 ),
+  preview TEXT CHECK ( preview IS NULL OR LENGTH( preview ) <= 10 )
 
   -- Owner
-  user_id TEXT NOT NULL CHECK ( LENGTH( user_id ) > 0 AND LENGTH( user_id ) <= 500 )
+  -- user_id TEXT NOT NULL CHECK ( LENGTH( user_id ) > 0 AND LENGTH( user_id ) <= 500 )
 );
 
 -- Indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_user_id ON ai_provider_keys( user_id );
+-- CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_user_id ON ai_provider_keys( user_id );
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_provider ON ai_provider_keys( provider );
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_is_enabled ON ai_provider_keys( is_enabled );
 

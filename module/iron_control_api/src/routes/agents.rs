@@ -73,16 +73,14 @@ pub struct CreateAgentRequest {
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
     pub project_id: Option<String>,
+    pub owner_id: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateAgentRequest {
     pub name: Option<String>,
-    pub budget: Option<f64>,
-    pub providers: Option<Vec<String>>,
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
-    pub status: Option<String>,
 }
 
 /// Query parameters for listing agents
@@ -108,7 +106,7 @@ fn default_per_page() -> u32 { 50 }
 fn default_sort() -> String { "-created_at".to_string() }
 
 /// Pagination metadata
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Pagination {
     pub page: u32,
     pub per_page: u32,
@@ -117,7 +115,7 @@ pub struct Pagination {
 }
 
 /// Agent list item with computed fields
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AgentListItem {
     pub id: String,
     pub name: String,
@@ -161,7 +159,7 @@ impl From<ServiceAgent> for AgentListItem {
 }
 
 /// Paginated response for agent listing
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedAgentsResponse {
     pub data: Vec<AgentListItem>,
     pub pagination: Pagination,
@@ -275,15 +273,15 @@ pub async fn create_agent(
     Json(req): Json<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
     // Only admins can create agents
-    if user.0.role != "admin" {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Only administrators can create agents".to_string(),
-        ));
-    }
-
     let service = AgentService::new(pool);
 
+    if user.0.role != "admin" && user.0.sub != req.owner_id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "You don't have access to create this agent".to_string(),
+        ));
+    }
+    
     let params = CreateAgentParams {
         name: req.name,
         budget: req.budget,
@@ -293,7 +291,7 @@ pub async fn create_agent(
         project_id: None, // leave empty for now as project is not supported yet
     };
 
-    let agent = service.create_agent(params, &user.0.sub).await.map_err(|e| {
+    let agent = service.create_agent(params, &req.owner_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Database error: {}", e),
@@ -303,6 +301,76 @@ pub async fn create_agent(
     Ok((StatusCode::CREATED, Json(Agent::from(agent))))
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProviderListItem {
+    id: String,
+    name: String,
+    endpoint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentDetails {
+    pub id: String,
+    pub name: String,
+    pub budget: f64,
+    pub spent: f64,
+    pub remaining: f64,
+    pub percent_used: f64,
+    pub providers: Vec<ProviderListItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    pub owner_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String
+}
+
+/// Get agent details
+pub async fn get_agent_details(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<String>,
+    user: AuthenticatedUser,
+) -> Result<Json<AgentDetails>, (StatusCode, String)> {
+    let service = AgentService::new(pool);
+
+    let agent = service.get_agent_details(&id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?
+    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+
+    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+    }
+
+    Ok(Json(AgentDetails {
+        id: agent.id,
+        name: agent.name,
+        budget: agent.budget,
+        spent: agent.spent,
+        remaining: agent.remaining,
+        percent_used: agent.percent_used,
+        providers: agent.providers.into_iter().map(|p| ProviderListItem {
+            id: p.id,
+            name: p.name,
+            endpoint: p.endpoint,
+        }).collect(),
+        description: agent.description,
+        tags: agent.tags,
+        owner_id: agent.owner_id,
+        project_id: agent.project_id,
+        status: agent.status,
+        created_at: agent.created_at.to_string(),
+        updated_at: agent.updated_at.to_string(),
+    }))
+}
+
 /// Update an agent (admin only)
 pub async fn update_agent(
     State(pool): State<SqlitePool>,
@@ -310,23 +378,12 @@ pub async fn update_agent(
     user: AuthenticatedUser,
     Json(req): Json<UpdateAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
-    // Only admins can update agents
-    if user.0.role != "admin" {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Only administrators can update agents".to_string(),
-        ));
-    }
-
     let service = AgentService::new(pool);
 
     let params = UpdateAgentParams {
         name: req.name,
-        budget: req.budget,
-        providers: req.providers,
         description: req.description,
         tags: req.tags,
-        status: req.status,
     };
 
     let agent = service.update_agent(&id, params).await.map_err(|e| {
@@ -337,6 +394,13 @@ pub async fn update_agent(
     })?
     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
 
+    if user.0.role != "admin" && user.0.sub != agent.owner_id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Only administrators and the owner can update agents".to_string(),
+        ));
+    }
+    
     Ok(Json(Agent::from(agent)))
 }
 
@@ -345,7 +409,7 @@ pub async fn delete_agent(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> Result<(StatusCode, String), (StatusCode, String)> {
     // Only admins can delete agents
     if user.0.role != "admin" {
         return Err((
@@ -367,7 +431,7 @@ pub async fn delete_agent(
         return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
     }
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok((StatusCode::NO_CONTENT, "Agent deleted successfully".to_string()))
 }
 
 /// Token list item for agent tokens endpoint
@@ -439,3 +503,190 @@ pub async fn get_agent_tokens(
 }
 
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentProviderItem {
+    pub id: String,
+    pub name: String,
+    pub endpoint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentProviderItemExtended {
+    pub id: String,
+    pub name: String,
+    pub endpoint: String,
+    pub models: Vec<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetAgentProvidersResponse {
+    pub agent_id: String,
+    pub providers: Vec<AgentProviderItemExtended>,
+    pub count: usize,
+}
+
+/// Get agent providers
+pub async fn get_agent_providers(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<String>,
+    user: AuthenticatedUser,
+) -> Result<Json<GetAgentProvidersResponse>, (StatusCode, String)> {
+    let service = AgentService::new(pool);
+
+    let agent = service.get_agent_details(&id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?
+    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+
+    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+    }
+
+    let providers: Vec<AgentProviderItemExtended> = agent.providers.into_iter().map(|p| AgentProviderItemExtended {
+        id: p.id,
+        name: p.name,
+        endpoint: p.endpoint,
+        models: p.models,
+        status: p.status,
+    }).collect();
+
+    Ok(Json(GetAgentProvidersResponse {
+        agent_id: agent.id,
+        count: providers.len(),
+        providers,
+    }))
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AssignProvidersToAgentRequest {
+    pub providers: Vec<String>,
+}
+
+/// Assign providers to an agent
+pub async fn assign_providers_to_agent(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<String>,
+    user: AuthenticatedUser,
+    Json(req): Json<AssignProvidersToAgentRequest>,
+) -> Result<Json<Agent>, (StatusCode, String)> {
+    let service = AgentService::new(pool);
+
+    let agent = service.get_agent_details(&id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?
+    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+
+    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+    }
+
+    let agent = service.assign_providers_to_agent(&id, req.providers).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?
+    .ok_or((StatusCode::BAD_REQUEST, "Providers not found".to_string()))?;
+
+    Ok(Json(Agent::from(agent)))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RemainedProviderItem {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RemoveProviderFromAgentResponse {
+    agent_id: String,
+    provider_id: String,
+    removed: bool,
+    remaining_providers: Vec< RemainedProviderItem >,
+    count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warning: Option<String>,
+}
+
+/// Remove provider from an agent
+pub async fn remove_provider_from_agent(
+    State(pool): State<SqlitePool>,
+    Path(agent_id): Path<String>,
+    Path(provider_id): Path<String>,
+    user: AuthenticatedUser,
+) -> Result<Json<RemoveProviderFromAgentResponse>, (StatusCode, String)> {
+    let service = AgentService::new(pool);
+
+    let agent = service.get_agent_details(&agent_id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?
+    .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+
+    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+        return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+    }
+
+    let providers_list: Vec<RemainedProviderItem> = service.remove_provider_from_agent(&agent_id, &provider_id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?.into_iter().map(|p| RemainedProviderItem {
+        id: p.id,
+        name: p.name,
+    }).collect();
+
+    let count = providers_list.len();
+
+    Ok(Json(RemoveProviderFromAgentResponse {
+        agent_id: agent.id,
+        provider_id,
+        removed: true,
+        remaining_providers: providers_list,
+        count,
+        warning: if count == 0 { Some("Agent has zero providers and cannot make inference requests until provider assigned".to_string()) } else { None },
+    }))
+}
+
+// TODO: implement after merge
+
+// pub async fn get_agent_provider_status(
+//     State(pool): State<SqlitePool>,
+//     Path(id): Path<String>,
+//     user: AuthenticatedUser,
+// ) -> Result<Json<Agent>, (StatusCode, String)> {
+//     let service = AgentService::new(pool);
+
+//     let agent = service.get_agent_details(&id).await.map_err(|e| {
+//         (
+//             StatusCode::INTERNAL_SERVER_ERROR,
+//             format!("Database error: {}", e),
+//         )
+//     })?
+//     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
+
+//     if user.0.sub != agent.owner_id && user.0.role != "admin" {
+//         return Err((StatusCode::FORBIDDEN, "You don't have access to this agent".to_string()));
+//     }
+
+//     let agent = service.get_agent_provider_status(&id).await.map_err(|e| {
+//         (
+//             StatusCode::INTERNAL_SERVER_ERROR,
+//             format!("Database error: {}", e),
+//         )
+//     })?
+//     .ok_or((StatusCode::BAD_REQUEST, "Providers not found".to_string()))?;
+
+//     Ok(Json(Agent::from(agent)))
+// }
