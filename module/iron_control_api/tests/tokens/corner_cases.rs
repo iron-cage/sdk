@@ -9,6 +9,31 @@
 //! - State Verification (token storage security, hash algorithm, uniqueness)
 //! - Concurrency (race conditions, transaction integrity)
 //! - HTTP Protocol (malformed JSON, empty body)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_create_token_very_long_user_id_rejected` | DoS: Oversized user_id | user_id with 100K+ chars | 400 Bad Request (length limit) | ✅ |
+//! | `test_create_token_very_long_project_id_rejected` | DoS: Oversized project_id | project_id with 100K+ chars | 400 Bad Request (length limit) | ✅ |
+//! | `test_create_token_very_long_description_rejected` | DoS: Oversized description | description with 100K+ chars | 400 Bad Request (length limit) | ✅ |
+//! | `test_create_token_command_injection_user_id_safe` | Security: Command injection in user_id | user_id="; rm -rf /" | 201 Created, stored safely | ✅ |
+//! | `test_create_token_command_injection_project_id_safe` | Security: Command injection in project_id | project_id="$(whoami)" | 201 Created, stored safely | ✅ |
+//! | `test_create_token_path_traversal_project_id_safe` | Security: Path traversal in project_id | project_id="../../etc/passwd" | 201 Created, stored safely | ✅ |
+//! | `test_create_token_null_byte_user_id_safe` | Security: NULL byte in user_id | user_id with \0 char | 201 Created, stored safely | ✅ |
+//! | `test_create_token_null_byte_project_id_safe` | Security: NULL byte in project_id | project_id with \0 char | 201 Created, stored safely | ✅ |
+//! | `test_create_token_null_byte_at_start` | Security: NULL byte at start | user_id starts with \0 | 201 Created, stored safely | ✅ |
+//! | `test_create_token_null_byte_at_end` | Security: NULL byte at end | user_id ends with \0 | 201 Created, stored safely | ✅ |
+//! | `test_create_token_multiple_null_bytes` | Security: Multiple NULL bytes | user_id with multiple \0 chars | 201 Created, stored safely | ✅ |
+//! | `test_create_token_newline_char_accepted` | Edge case: Newline in description | description with \n char | 201 Created, newline preserved | ✅ |
+//! | `test_create_token_plaintext_never_stored_in_database` | Security: Token storage | Create token, query DB directly | Only SHA-256 hash in DB, never plaintext | ✅ |
+//! | `test_create_token_uses_sha256_hash` | Security: Hash algorithm | Create token, check DB hash format | SHA-256 hash (64 hex chars) | ✅ |
+//! | `test_create_token_unique_generation` | Token uniqueness | Create 100 tokens sequentially | All tokens unique | ✅ |
+//! | `test_create_token_concurrent_requests` | Concurrency: Race conditions | 10 concurrent POST requests | All succeed, no duplicates/conflicts | ✅ |
+//! | `test_create_token_malformed_json_rejected` | HTTP: Malformed JSON | POST with invalid JSON syntax | 400 Bad Request | ✅ |
+//! | `test_create_token_empty_body_rejected` | HTTP: Empty body | POST with empty body | 400/422 error | ✅ |
+//! | `test_create_token_missing_content_type` | HTTP: Missing Content-Type | POST without Content-Type header | 415 Unsupported Media Type | ✅ |
+//! | `test_database_constraints_enforce_length_limits` | Database: Length constraints | Insert oversized data via DB | SQLite constraint violation | ✅ |
 
 use axum::http::{ StatusCode, header };
 use axum::{ Router, routing::{ post, delete } };

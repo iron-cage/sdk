@@ -5,10 +5,24 @@
 //! - Traces endpoints (list, get)
 //! - Path parameter validation (DoS prevention)
 //! - Error cases (400, 404, 500)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_get_usage_aggregate_empty` | Aggregate usage with no data | GET /api/usage/aggregate with admin token, empty database | 200 OK, zero totals | ✅ |
+//! | `test_get_usage_by_project_valid_id` | Usage by valid project ID | GET /api/usage/by-project/:id with admin token, existing project | 200 OK, project-specific usage data | ✅ |
+//! | `test_get_usage_by_project_empty_id` | Usage with empty project ID | GET /api/usage/by-project/ (empty ID) with admin token | 400 Bad Request (path validation) | ✅ |
+//! | `test_get_usage_by_project_too_long` | Usage with oversized project ID (DoS) | GET /api/usage/by-project/:id with 100K+ char ID | 400 Bad Request (DoS prevention) | ✅ |
+//! | `test_get_usage_by_provider_valid` | Usage by valid provider name | GET /api/usage/by-provider/:provider with admin token, valid provider | 200 OK, provider-specific usage data | ✅ |
+//! | `test_get_usage_by_provider_empty` | Usage with empty provider name | GET /api/usage/by-provider/ (empty provider) with admin token | 400 Bad Request (path validation) | ✅ |
+//! | `test_get_usage_by_provider_too_long` | Usage with oversized provider name (DoS) | GET /api/usage/by-provider/:provider with 100K+ char name | 400 Bad Request (DoS prevention) | ✅ |
+//! | `test_list_traces_empty` | List traces with no data | GET /api/traces with admin token, empty database | 200 OK, empty array | ✅ |
+//! | `test_get_trace_not_found` | Get nonexistent trace | GET /api/traces/nonexistent_id with admin token | 404 Not Found | ✅ |
 
 mod common;
 
-use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::TestAppState };
+use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::{ TestAppState, TestTracesAppState } };
 use axum::{
   Router,
   routing::get,
@@ -71,13 +85,7 @@ async fn create_analytics_router() -> ( Router, SqlitePool, String, String )
     .await
     .expect( "Failed to create UsageState" );
 
-  let traces_state = iron_control_api::routes::traces::TracesState {
-    storage: std::sync::Arc::new(
-      iron_token_manager::trace_storage::TraceStorage::new( "sqlite::memory:" )
-        .await
-        .expect( "Failed to create TraceStorage" )
-    )
-  };
+  let traces_app_state = TestTracesAppState::new().await;
 
   let router = Router::new()
     .route( "/api/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
@@ -86,7 +94,7 @@ async fn create_analytics_router() -> ( Router, SqlitePool, String, String )
     .with_state( usage_state.clone() )
     .route( "/api/traces", get( iron_control_api::routes::traces::list_traces ) )
     .route( "/api/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
-    .with_state( traces_state.clone() );
+    .with_state( traces_app_state );
 
   ( router, app_state.database.clone(), admin_token, user_token )
 }
@@ -260,13 +268,14 @@ async fn test_get_usage_by_provider_too_long()
 #[ tokio::test ]
 async fn test_list_traces_empty()
 {
-  let ( app, _pool, _admin_token, _user_token ) = create_analytics_router().await;
+  let ( app, _pool, _admin_token, user_token ) = create_analytics_router().await;
 
   let response = app
     .oneshot(
       Request::builder()
         .method( Method::GET )
         .uri( "/api/traces" )
+        .header( "authorization", format!( "Bearer {}", user_token ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -290,13 +299,14 @@ async fn test_list_traces_empty()
 #[ tokio::test ]
 async fn test_get_trace_not_found()
 {
-  let ( app, _pool, _admin_token, _user_token ) = create_analytics_router().await;
+  let ( app, _pool, _admin_token, user_token ) = create_analytics_router().await;
 
   let response = app
     .oneshot(
       Request::builder()
         .method( Method::GET )
         .uri( "/api/traces/999999" )
+        .header( "authorization", format!( "Bearer {}", user_token ) )
         .body( Body::empty() )
         .unwrap(),
     )

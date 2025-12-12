@@ -13,6 +13,15 @@
 //! 9. Concurrent usage reports on same lease (HIGH - database consistency)
 //! 10. Concurrent report and refresh on same lease (MEDIUM - complex scenario)
 //! 11. Handshake while active lease exists (LOW - design clarification)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_multiple_simultaneous_handshakes` | Race condition prevention for concurrent handshakes | 10 concurrent POST /api/budget/handshake requests, 100 USD budget | All 10 succeed (10 USD each), budget fully allocated | ✅ |
+//! | `test_concurrent_usage_reports_on_same_lease` | Concurrent usage reports on same lease | 2 concurrent POST /api/budget/report requests on same lease_id | Both succeed with atomic updates, no lost data | ✅ |
+//! | `test_concurrent_report_and_refresh` | Concurrent report and refresh operations | Concurrent POST /api/budget/report and POST /api/budget/refresh on same lease | Both succeed, 2 leases total, no lost updates | ✅ |
+//! | `test_handshake_with_existing_active_lease` | Multiple active leases per agent | POST /api/budget/handshake while active lease exists | New lease created, both leases active simultaneously | ✅ |
 
 use axum::
 {

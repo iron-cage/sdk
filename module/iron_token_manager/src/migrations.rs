@@ -61,7 +61,7 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   sqlx::query( "PRAGMA foreign_keys = ON" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Migration 001: Initial schema (5 core tables)
   apply_migration_001( pool ).await?;
@@ -124,7 +124,7 @@ async fn apply_migration_001( pool: &SqlitePool ) -> Result< () >
   sqlx::raw_sql( migration )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
   Ok( () )
 }
 
@@ -145,7 +145,7 @@ async fn apply_migration_002( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -153,7 +153,7 @@ async fn apply_migration_002( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -171,7 +171,7 @@ async fn apply_migration_003( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -179,7 +179,7 @@ async fn apply_migration_003( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -194,7 +194,7 @@ async fn apply_migration_004( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -202,7 +202,7 @@ async fn apply_migration_004( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -217,7 +217,7 @@ async fn apply_migration_005( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -225,7 +225,7 @@ async fn apply_migration_005( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -240,7 +240,7 @@ async fn apply_migration_006( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -248,7 +248,7 @@ async fn apply_migration_006( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -268,7 +268,7 @@ async fn apply_migration_008( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -276,7 +276,7 @@ async fn apply_migration_008( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -293,7 +293,7 @@ async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -301,7 +301,7 @@ async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -317,7 +317,7 @@ async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -325,7 +325,7 @@ async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -341,7 +341,7 @@ async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -349,7 +349,7 @@ async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -365,7 +365,7 @@ async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -373,7 +373,7 @@ async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -392,7 +392,7 @@ async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -400,7 +400,7 @@ async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -419,7 +419,7 @@ async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -427,7 +427,7 @@ async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )
@@ -450,7 +450,7 @@ async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   if completed == 0
   {
@@ -458,7 +458,7 @@ async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   Ok( () )

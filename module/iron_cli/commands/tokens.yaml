@@ -1,171 +1,192 @@
-#
-# Token Management Commands
-#
-# Commands for creating, listing, and managing API tokens
-#
-
-commands:
-  - name: ".tokens.generate"
-    namespace: ""
-    description: "Create new API token"
-    hint: "Token value shown only once - save it securely"
-    arguments:
-      - name: "project"
-        description: "Project ID to associate with token"
-        kind: "String"
-        hint: "Optional project identifier"
-        attributes:
-          optional: true
-          pattern: "^[a-zA-Z0-9_-]+$"
-          min_length: 1
-          max_length: 100
-
-      - name: "description"
-        description: "Human-readable description"
-        kind: "String"
-        hint: "Helps identify token purpose"
-        attributes:
-          optional: true
-          min_length: 1
-          max_length: 256
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".tokens.generate"
-      - ".tokens.generate project::myproject"
-      - ".tokens.generate project::myproject description::\"Production API token\""
-      - ".tokens.generate format::json"
-
-  - name: ".tokens.list"
-    namespace: ""
-    description: "List all tokens for authenticated user"
-    hint: "Shows token metadata (values are never displayed)"
-    arguments:
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".tokens.list"
-      - ".tokens.list format::json"
-
-  - name: ".tokens.get"
-    namespace: ""
-    description: "Get specific token details by ID"
-    hint: "Shows metadata only, not token value"
-    arguments:
-      - name: "token_id"
-        description: "Token ID to retrieve"
-        kind: "Integer"
-        hint: "Numeric token identifier"
-        attributes:
-          optional: false
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".tokens.get token_id::123"
-      - ".tokens.get token_id::456 format::json"
-
-  - name: ".tokens.rotate"
-    namespace: ""
-    description: "Rotate token (generate new value, revoke old)"
-    hint: "New token value shown only once - save it securely"
-    arguments:
-      - name: "token_id"
-        description: "Token ID to rotate"
-        kind: "Integer"
-        hint: "Numeric token identifier"
-        attributes:
-          optional: false
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".tokens.rotate token_id::123"
-      - ".tokens.rotate token_id::456 format::json"
-
-  - name: ".tokens.revoke"
-    namespace: ""
-    description: "Revoke token (cannot be undone)"
-    hint: "Token becomes invalid immediately"
-    arguments:
-      - name: "token_id"
-        description: "Token ID to revoke"
-        kind: "Integer"
-        hint: "Numeric token identifier"
-        attributes:
-          optional: false
-          min: 1
-
-      - name: "format"
-        description: "Output format"
-        kind: "String"
-        hint: "Controls how results are displayed"
-        attributes:
-          optional: true
-          default: "table"
-          enum:
-            - "table"
-            - "expanded"
-            - "json"
-            - "yaml"
-
-    status: "stable"
-    version: "1.0.0"
-    examples:
-      - ".tokens.revoke token_id::123"
-      - ".tokens.revoke token_id::456 format::json"
+- name: .tokens.generate
+  namespace: ''
+  description: Create new API token
+  hint: Token value shown only once - save it securely
+  status: stable
+  version: 1.0.0
+  idempotent: false
+  arguments:
+  - name: project
+    description: Project ID to associate with token
+    kind: String
+    hint: Optional project identifier
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: description
+    description: Human-readable description
+    kind: String
+    hint: Helps identify token purpose
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .tokens.generate
+  - .tokens.generate project::myproject
+  - .tokens.generate project::myproject description::"Production API token"
+  - .tokens.generate format::json
+  aliases: []
+  tags: []
+- name: .tokens.list
+  namespace: ''
+  description: List all tokens for authenticated user
+  hint: Shows token metadata (values are never displayed)
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .tokens.list
+  - .tokens.list format::json
+  aliases: []
+  tags: []
+- name: .tokens.get
+  namespace: ''
+  description: Get specific token details by ID
+  hint: Shows metadata only, not token value
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: token_id
+    description: Token ID to retrieve
+    kind: String
+    hint: Token identifier (format tok_*)
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .tokens.get token_id::tok_abc123
+  - .tokens.get token_id::tok_production format::json
+  aliases: []
+  tags: []
+- name: .tokens.rotate
+  namespace: ''
+  description: Rotate token (generate new value, revoke old)
+  hint: New token value shown only once - save it securely
+  status: stable
+  version: 1.0.0
+  idempotent: false
+  arguments:
+  - name: token_id
+    description: Token ID to rotate
+    kind: String
+    hint: Token identifier (format tok_*)
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .tokens.rotate token_id::tok_abc123
+  - .tokens.rotate token_id::tok_production format::json
+  aliases: []
+  tags: []
+- name: .tokens.revoke
+  namespace: ''
+  description: Revoke token (cannot be undone)
+  hint: Token becomes invalid immediately
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: token_id
+    description: Token ID to revoke
+    kind: String
+    hint: Token identifier (format tok_*)
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .tokens.revoke token_id::tok_abc123
+  - .tokens.revoke token_id::tok_production format::json
+  aliases: []
+  tags: []

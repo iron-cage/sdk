@@ -5,6 +5,17 @@
 //! Per plan:
 //! - Implement authentication endpoints (login, refresh, logout)
 //! - Tests use REAL HTTP requests, REAL JWT tokens
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_jwt_secret_creation` | Create JWT secret and generate token | JwtSecret with test key, generate access token for user | Non-empty token string | ✅ |
+//! | `test_access_token_lifecycle` | Generate and verify access token | Generate access token, verify it | Claims match (sub=user_123) | ✅ |
+//! | `test_refresh_token_lifecycle` | Generate and verify refresh token | Generate refresh token, verify it | Claims match (sub=user_456) | ✅ |
+//! | `test_login_flow_concept` | Login flow with credentials | User credentials → access + refresh tokens | Both tokens generated and verifiable | ✅ |
+//! | `test_token_refresh_flow_concept` | Refresh token flow | Valid refresh token → new access token | New access token generated and verifiable | ✅ |
+//! | `test_logout_flow_concept` | Logout flow with token blacklist | Access token → blacklist → verify blacklisted | Token added to blacklist successfully | ✅ |
 
 use iron_control_api::rbac::Role;
 use iron_control_api::jwt_auth::JwtSecret;

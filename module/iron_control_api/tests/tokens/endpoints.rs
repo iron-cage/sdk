@@ -20,6 +20,29 @@
 //! - JSON response structure
 //! - Database persistence
 //! - Error handling
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_create_token_valid_request` | Create token with valid complete request | POST /api/v1/api-tokens with all fields | 201 Created, token returned | ✅ |
+//! | `test_create_token_minimal_request` | Create token with minimal fields | POST /api/v1/api-tokens with user_id only | 201 Created, token returned | ✅ |
+//! | `test_create_token_empty_user_id_rejected` | Create token with empty user_id | POST with user_id="" | 400 Bad Request "user_id cannot be empty" | ✅ |
+//! | `test_create_token_empty_project_id_rejected` | Create token with empty project_id | POST with project_id="" | 400 Bad Request "project_id cannot be empty" | ✅ |
+//! | `test_create_token_description_too_long_rejected` | Create token with oversized description | POST with description=501 chars | 400 Bad Request "description too long" | ✅ |
+//! | `test_get_token_valid_id_returns_200` | Get token by valid ID | GET /api/v1/api-tokens/:id with existing token | 200 OK, token metadata returned | ✅ |
+//! | `test_get_token_nonexistent_id_returns_404` | Get token by nonexistent ID | GET /api/v1/api-tokens/999999 | 404 Not Found | ✅ |
+//! | `test_revoke_token_valid_id_returns_204` | Revoke token by valid ID | DELETE /api/v1/api-tokens/:id with existing token | 204 No Content, token marked inactive | ✅ |
+//! | `test_revoke_token_nonexistent_id_returns_404` | Revoke token by nonexistent ID | DELETE /api/v1/api-tokens/999999 | 404 Not Found | ✅ |
+//! | `test_token_created_at_timestamp` | Verify created_at timestamp | Create token, check created_at field | Timestamp within last 5 seconds | ✅ |
+//! | `test_token_id_auto_increment` | Verify ID auto-increment | Create 3 tokens sequentially | IDs increment (1, 2, 3) | ✅ |
+//! | `test_rotate_token_valid_id_returns_200` | Rotate token by valid ID | POST /api/v1/api-tokens/:id/rotate | 200 OK, new token returned, old revoked | ✅ |
+//! | `test_rotate_token_nonexistent_id_returns_404` | Rotate token by nonexistent ID | POST /api/v1/api-tokens/999999/rotate | 404 Not Found | ✅ |
+//! | `test_validate_token_valid_returns_metadata` | Validate valid token | POST /api/v1/api-tokens/validate with valid token | 200 OK, metadata returned | ✅ |
+//! | `test_validate_token_invalid_returns_false` | Validate invalid token | POST /api/v1/api-tokens/validate with invalid token | 200 OK, valid=false | ✅ |
+//! | `test_validate_token_revoked_returns_false` | Validate revoked token | POST /api/v1/api-tokens/validate with revoked token | 200 OK, valid=false | ✅ |
+//! | `test_validate_token_missing_token_field_400` | Validate without token field | POST /api/v1/api-tokens/validate with empty body | 400 Bad Request | ✅ |
+//! | `test_validate_token_no_auth_required` | Validate endpoint doesn't require auth | POST /api/v1/api-tokens/validate without auth header | 200 OK (no 401) | ✅ |
 
 use crate::common::{ extract_response, extract_json_response };
 use iron_control_api::routes::tokens::{ CreateTokenResponse, TokenListItem };
@@ -36,6 +59,7 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 
   let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens/validate", post( iron_control_api::routes::tokens::validate_token ) )
     .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
     .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
@@ -598,4 +622,269 @@ async fn test_rotate_token_nonexistent_id_returns_404()
     StatusCode::NOT_FOUND,
     "LOUD FAILURE: POST /api/v1/api-tokens/:id/rotate with non-existent ID must return 404 Not Found"
   );
+}
+
+// --- Validate Endpoint Tests (Deliverable 1.6) ---
+
+/// Test POST /api/v1/api-tokens/validate with valid token returns metadata.
+///
+/// Deliverable 1.6: POST /api/v1/api-tokens/validate endpoint
+///
+/// This endpoint allows external services to validate API tokens without authentication.
+/// It returns token validity status and metadata (user_id, project_id) for valid tokens.
+#[ tokio::test ]
+async fn test_validate_token_valid_returns_metadata()
+{
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for test user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user_validate" );
+
+  // Create a token first
+  let create_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens" )
+    .header( "Content-Type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .body( Body::from( json!({ "user_id": "test_user_validate" }).to_string() ) )
+    .unwrap();
+
+  let create_response = router.clone().oneshot( create_request ).await.unwrap();
+  let ( _status, created ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
+  let token_value = created.token;
+
+  // Now validate the token
+  let validate_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens/validate" )
+    .header( "Content-Type", "application/json" )
+    .body( Body::from( json!({ "token": token_value }).to_string() ) )
+    .unwrap();
+
+  let validate_response = router.oneshot( validate_request ).await.unwrap();
+
+  assert_eq!(
+    validate_response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: POST /api/v1/api-tokens/validate with valid token must return 200 OK"
+  );
+
+  let body_bytes = axum::body::to_bytes( validate_response.into_body(), usize::MAX ).await.unwrap();
+  let result: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+
+  assert_eq!(
+    result[ "valid" ],
+    true,
+    "LOUD FAILURE: Valid token must return {{\"valid\":true}}. Got: {:?}",
+    result
+  );
+
+  assert_eq!(
+    result[ "user_id" ].as_str().unwrap(),
+    "test_user_validate",
+    "LOUD FAILURE: Valid token must return user_id. Got: {:?}",
+    result
+  );
+}
+
+/// Test POST /api/v1/api-tokens/validate with invalid token returns false.
+#[ tokio::test ]
+async fn test_validate_token_invalid_returns_false()
+{
+  let ( router, _app_state ) = create_test_router().await;
+
+  let validate_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens/validate" )
+    .header( "Content-Type", "application/json" )
+    .body( Body::from( json!({ "token": "invalid_token_value" }).to_string() ) )
+    .unwrap();
+
+  let validate_response = router.oneshot( validate_request ).await.unwrap();
+
+  assert_eq!(
+    validate_response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: POST /api/v1/api-tokens/validate must return 200 OK even for invalid tokens"
+  );
+
+  let body_bytes = axum::body::to_bytes( validate_response.into_body(), usize::MAX ).await.unwrap();
+  let result: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+
+  assert_eq!(
+    result[ "valid" ],
+    false,
+    "LOUD FAILURE: Invalid token must return {{\"valid\":false}}. Got: {:?}",
+    result
+  );
+}
+
+/// Test POST /api/v1/api-tokens/validate with revoked token returns false.
+#[ tokio::test ]
+async fn test_validate_token_revoked_returns_false()
+{
+  let ( router, app_state ) = create_test_router().await;
+
+  // Generate JWT for test user
+  let jwt_token = generate_jwt_for_user( &app_state, "test_user_revoke" );
+
+  // Create a token
+  let create_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens" )
+    .header( "Content-Type", "application/json" )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .body( Body::from( json!({ "user_id": "test_user_revoke" }).to_string() ) )
+    .unwrap();
+
+  let create_response = router.clone().oneshot( create_request ).await.unwrap();
+  let ( _status, created ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
+  let token_value = created.token;
+  let token_id = created.id;
+
+  // Revoke the token
+  let revoke_request = Request::builder()
+    .method( "DELETE" )
+    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .body( Body::empty() )
+    .unwrap();
+
+  let _revoke_response = router.clone().oneshot( revoke_request ).await.unwrap();
+
+  // Now validate the revoked token
+  let validate_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens/validate" )
+    .header( "Content-Type", "application/json" )
+    .body( Body::from( json!({ "token": token_value }).to_string() ) )
+    .unwrap();
+
+  let validate_response = router.oneshot( validate_request ).await.unwrap();
+
+  assert_eq!(
+    validate_response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: POST /api/v1/api-tokens/validate with revoked token must return 200 OK"
+  );
+
+  let body_bytes = axum::body::to_bytes( validate_response.into_body(), usize::MAX ).await.unwrap();
+  let result: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+
+  assert_eq!(
+    result[ "valid" ],
+    false,
+    "LOUD FAILURE: Revoked token must return {{\"valid\":false}}. Got: {:?}",
+    result
+  );
+}
+
+/// Test POST /api/v1/api-tokens/validate with missing token field returns 400.
+#[ tokio::test ]
+async fn test_validate_token_missing_token_field_400()
+{
+  let ( router, _app_state ) = create_test_router().await;
+
+  let validate_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens/validate" )
+    .header( "Content-Type", "application/json" )
+    .body( Body::from( json!({}).to_string() ) )
+    .unwrap();
+
+  let validate_response = router.oneshot( validate_request ).await.unwrap();
+
+  assert_eq!(
+    validate_response.status(),
+    StatusCode::BAD_REQUEST,
+    "LOUD FAILURE: POST /api/v1/api-tokens/validate with missing token field must return 400 Bad Request"
+  );
+}
+
+/// Test POST /api/v1/api-tokens/validate doesnt require authentication.
+#[ tokio::test ]
+async fn test_validate_token_no_auth_required()
+{
+  let ( router, _app_state ) = create_test_router().await;
+
+  // Make request WITHOUT Authorization header
+  let validate_request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens/validate" )
+    .header( "Content-Type", "application/json" )
+    .body( Body::from( json!({ "token": "some_token" }).to_string() ) )
+    .unwrap();
+
+  let validate_response = router.oneshot( validate_request ).await.unwrap();
+
+  // Should return 200 OK (not 401 Unauthorized)
+  assert_eq!(
+    validate_response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: POST /api/v1/api-tokens/validate must NOT require authentication. Got status: {}",
+    validate_response.status()
+  );
+}
+
+// --- Bug Reproducer Tests ---
+
+/// Fix(issue-001): Generic error for FK constraint violation when creating token with non-existent user_id
+///
+/// Root cause: The create_token handler in routes/tokens.rs catches database errors with a generic
+/// "Failed to create token" message without distinguishing between different failure modes. When
+/// SQLite's foreign key constraint fails (user_id doesn't exist in users table), the specific
+/// constraint error is swallowed and replaced with a generic message.
+///
+/// Pitfall: Generic error messages make API integration difficult because clients cannot distinguish
+/// between different failure modes (FK constraint vs other database errors). This violates the principle
+/// of actionable error messages and makes debugging significantly harder for API users. Always parse
+/// and expose specific constraint violation details to clients with appropriate HTTP status codes.
+///
+/// Current Behavior: Returns 500 with {"error": "Failed to create token"}
+/// Expected After Fix: Should return 404 with {"error": "User not found: 'nonexistent_user_xyz'", "code": "USER_NOT_FOUND"}
+/// OR: 409 with {"error": "Foreign key constraint failed: user_id 'nonexistent_user_xyz' does not exist", "code": "FK_CONSTRAINT_VIOLATION"}
+#[ tokio::test ]
+#[ ignore ]
+async fn bug_reproducer_issue_001_fk_constraint_generic_error()
+{
+  let ( router, app_state ) = create_test_router().await;
+
+  // Attempt to create token with user_id that doesn't exist in database
+  let request_body = json!({
+    "user_id": "nonexistent_user_xyz",
+    "project_id": "test_project",
+    "description": "Test token with non-existent user",
+  });
+
+  let jwt_token = generate_jwt_for_user( &app_state, "nonexistent_user_xyz" );
+  let request = Request::builder()
+    .method( "POST" )
+    .uri( "/api/v1/api-tokens" )
+    .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .unwrap();
+
+  let response = router.oneshot( request ).await.unwrap();
+
+  // Current buggy behavior: Returns 500 with generic error
+  assert_eq!(
+    response.status(),
+    StatusCode::INTERNAL_SERVER_ERROR,
+    "LOUD FAILURE: Creating token with non-existent user_id currently returns 500"
+  );
+
+  let ( status, body ) = extract_response( response ).await;
+  assert_eq!( status, StatusCode::INTERNAL_SERVER_ERROR );
+  assert!(
+    body.contains( "Failed to create token" ),
+    "LOUD FAILURE: Current error message is generic. Got: {}",
+    body
+  );
+
+  // After fix, this test should be updated to assert:
+  // - Status: 404 NOT_FOUND (or 409 CONFLICT)
+  // - Body contains specific error: "User not found" or "Foreign key constraint failed"
+  // - Body contains the problematic user_id: "nonexistent_user_xyz"
+  // - Body contains error code: "USER_NOT_FOUND" or "FK_CONSTRAINT_VIOLATION"
 }

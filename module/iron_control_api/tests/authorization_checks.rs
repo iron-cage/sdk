@@ -28,6 +28,16 @@
 //! 3. Added database-level filtering by owner_id in all queries
 //! 4. Implemented fail-closed authorization (deny by default)
 //!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_user_cannot_access_other_users_agents` | User tries to access another user's agent | Two users, UserA tries to get UserB's agent via API | 403 Forbidden | ✅ |
+//! | `test_database_filters_agents_by_owner` | Database filters agents by owner_id | Two users with agents, query as UserA | Only UserA's agents returned | ✅ |
+//! | `test_handshake_rejects_unauthorized_agent_access` | Budget handshake with unauthorized agent | UserA tries handshake with UserB's agent | 403 Forbidden | ✅ |
+//! | `test_budget_request_rejects_unauthorized_agent` | Budget request with unauthorized agent | UserA tries budget request for UserB's agent | 403 Forbidden | ✅ |
+//! | `test_list_agents_filters_by_owner` | List agents filters by owner | Two users with agents, UserA lists agents | Only UserA's agents visible | ✅ |
+//!
 //! # Prevention
 //!
 //! - All new endpoints must verify resource ownership before access

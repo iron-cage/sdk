@@ -57,6 +57,44 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 
 ---
 
+## CLI Architecture
+
+**Layer Structure:**
+- **Routing Layer:** 22 CLI commands → adapter function calls (src/bin/iron_token_unilang.rs)
+- **Adapter Layer:** 22 adapter functions → Token Manager API endpoints (src/adapters/*.rs)
+- **Handler Layer:** Business logic and output formatting (src/handlers/*.rs)
+
+**Adapter Organization:**
+- auth_adapters.rs: 3 adapters (login, logout, whoami)
+- token_adapters.rs: 5 adapters (create, list, revoke, show, rotate)
+- usage_adapters.rs: 4 adapters (show, by_project, by_provider, export)
+- limits_adapters.rs: 5 adapters (list, show, create, update, delete)
+- traces_adapters.rs: 3 adapters (list, show, export)
+- health_adapters.rs: 2 adapters (health, status)
+
+**Migration Hardening:**
+
+All adapters verified to have valid API endpoints. Orphaned adapters (functions calling non-existent endpoints) eliminated through migration process (28→22 adapters, 6 deleted).
+
+**Negative Criteria (Zero-Tolerance Checks):**
+- NC-R.1: Zero routes calling orphaned adapters
+- NC-A.1: Zero orphaned adapters exist in codebase
+- NC-M.1/2/3: Migration metrics at target (0% orphaned, 100% correct)
+
+**Test Coverage:**
+- Routing tests (tests/routing/): Verify NC-R.1, all commands route correctly
+- Adapter coverage tests (tests/adapters/coverage.rs): Verify NC-A.1, adapter counts
+- Migration metrics tests (tests/migration/): Verify NC-M.1/2/3, trajectory correctness
+- Manual testing (tests/manual/): 7 categories, 15+ test cases for real API integration
+
+**Multi-Layer Defense:**
+1. Syntactic: Compiler prevents calling deleted functions
+2. Semantic: Routes map to correct API endpoints (404 prevention)
+3. Architectural: Parameter alignment enforced
+4. Operational: Process verification through tests
+
+---
+
 ## Integration Points
 
 **Used by:**
@@ -70,4 +108,3 @@ Binary CLI tool for Iron Cage token management, usage tracking, and limits. Prov
 ---
 
 *For detailed command specifications, see spec/-archived_detailed_spec.md*
-*For wrapper pattern, see docs/decisions/adr_005_cli_architecture.md*

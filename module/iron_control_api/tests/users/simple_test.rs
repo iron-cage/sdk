@@ -1,4 +1,10 @@
 //! Simplified test to isolate the issue
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_direct_handler_call` | Direct UserService integration test | Create user via UserService, suspend via same instance, verify audit log | User suspended (is_active=false), audit log entry created | ✅ |
 
 use iron_control_api::routes::users::{ UserManagementState, CreateUserRequest, SuspendUserRequest };
 use iron_control_api::rbac::PermissionChecker;

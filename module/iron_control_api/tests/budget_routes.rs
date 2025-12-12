@@ -4,6 +4,23 @@
 //!
 //! Tests for budget handshake, usage reporting, and budget refresh endpoints.
 //! These tests validate request validation, IC Token verification, and response formatting.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_handshake_request_validation` | HandshakeRequest validation | Valid/empty/oversized ic_token and provider fields | Valid passes, empty/oversized fail | ✅ |
+//! | `test_usage_report_request_validation` | UsageReportRequest validation | Valid/empty/negative/oversized fields | Valid passes, invalid fail | ✅ |
+//! | `test_budget_refresh_request_validation` | BudgetRefreshRequest validation | Valid/empty/negative/oversized fields | Valid passes, invalid fail | ✅ |
+//! | `test_ic_token_lifecycle` | IC Token generation and validation | Generate IC Token, validate claims | Token valid, claims match input | ✅ |
+//! | `test_ip_token_encryption` | IP Token encryption/decryption | Encrypt lease data, decrypt IP Token | Data round-trips correctly | ✅ |
+//! | `test_ip_token_format_validation` | IP Token format validation | Valid/invalid IP Token formats | Valid passes, malformed fails | ✅ |
+//! | `test_ic_token_expiration` | IC Token expiration handling | Create expired IC Token, validate | Validation fails for expired token | ✅ |
+//! | `test_ic_token_agent_id_format` | IC Token agent_id format validation | Valid/invalid agent_id in claims | Valid passes, invalid fails | ✅ |
+//! | `test_budget_state_creation` | BudgetState initialization | Create BudgetState with all components | State created successfully | ✅ |
+//! | `test_handshake_response_serialization` | HandshakeResponse JSON serialization | Serialize HandshakeResponse to JSON | Valid JSON with required fields | ✅ |
+//! | `test_usage_report_response_serialization` | UsageReportResponse JSON serialization | Serialize UsageReportResponse to JSON | Valid JSON with required fields | ✅ |
+//! | `test_budget_refresh_response_serialization` | BudgetRefreshResponse JSON serialization | Serialize BudgetRefreshResponse to JSON | Valid JSON with required fields | ✅ |
 
 use iron_control_api::
 {
