@@ -13,6 +13,44 @@ This crate provides high-performance analytics storage for LLM request tracking.
 - **Per-model/provider stats** - DashMap for concurrent aggregation
 - **High-level recording API** - automatic provider inference and cost calculation
 - **Protocol 012 compatible** - field compatibility with analytics API
+- **Background sync** - server sync with auto-flush on shutdown (feature: `sync`)
+
+## Background Sync
+
+When enabled with the `sync` feature, events can be automatically synced to Control API:
+
+```rust,ignore
+use iron_runtime_analytics::{EventStore, SyncClient, SyncConfig};
+use std::sync::Arc;
+
+let store = Arc::new(EventStore::new());
+let config = SyncConfig::new("http://localhost:3001", "ic_token_here")
+    .with_interval(Duration::from_secs(30))  // Sync every 30s
+    .with_batch_threshold(10);               // Or when 10 events pending
+
+// Start background sync (requires tokio runtime handle)
+let handle = client.start(&runtime_handle);
+
+// ... use store normally ...
+
+// Stop and flush remaining events
+handle.stop();
+```
+
+### SyncConfig Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `sync_interval` | 30s | How often to sync events |
+| `batch_threshold` | 10 | Sync immediately when this many events pending |
+| `timeout` | 30s | HTTP request timeout |
+
+### Sync Behavior
+
+- Events are synced in batches to `/api/v1/analytics/events`
+- Only `llm_request_completed` and `llm_request_failed` events are synced
+- On shutdown, remaining events are flushed before stopping
+- Failed syncs are retried on next interval (except 4xx errors)
 
 ## Pilot Strategy
 

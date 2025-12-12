@@ -79,21 +79,20 @@ iron_runtime = { path = "../iron_runtime" }
 
 ## Quick Start (Python)
 
+### Server Mode (default)
+
+Keys are fetched from Iron Cage server:
+
 ```python
 import os
 from iron_cage import LlmRouter
 from openai import OpenAI
-
-# Set environment variables
-# export IC_TOKEN=your_iron_cage_token
-# export IC_SERVER=https://your-iron-cage-server.com
 
 router = LlmRouter(
     api_key=os.environ["IC_TOKEN"],
     server_url=os.environ["IC_SERVER"],
 )
 
-# Use with any OpenAI-compatible client
 client = OpenAI(base_url=router.base_url, api_key=router.api_key)
 
 response = client.chat.completions.create(
@@ -103,6 +102,37 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 
 router.stop()
+```
+
+### Direct Mode (with local API key)
+
+Use your own API key with optional budget tracking and analytics sync:
+
+```python
+from iron_cage import LlmRouter
+from openai import OpenAI
+
+router = LlmRouter(
+    provider_key=os.environ["OPENAI_API_KEY"],  # Your actual API key
+    api_key=os.environ["IC_TOKEN"],              # For analytics auth
+    server_url=os.environ["IC_SERVER"],          # Analytics server
+    budget=10.0,                                  # $10 budget limit
+)
+
+client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+
+# Make requests...
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+
+# Check spending
+if router.budget_status:
+    spent, limit = router.budget_status
+    print(f"Spent: ${spent:.4f} / ${limit:.2f}")
+
+router.stop()  # Flushes analytics to server
 ```
 
 **With Anthropic:**
@@ -177,11 +207,17 @@ Local HTTP proxy server for LLM API requests with automatic key management.
 **Constructor:**
 ```python
 LlmRouter(
-    api_key: str,           # Iron Cage token (IC_TOKEN)
-    server_url: str,        # Iron Cage server URL
-    cache_ttl_seconds: int = 300,  # Key cache TTL
+    api_key: str,                    # Iron Cage token (IC_TOKEN)
+    server_url: str,                 # Iron Cage server URL
+    cache_ttl_seconds: int = 300,    # Key cache TTL
+    provider_key: str | None = None, # Direct mode: your API key
+    budget: float | None = None,     # Direct mode: spending limit in USD
 )
 ```
+
+**Modes:**
+- **Server mode** (default): `provider_key` not set - keys fetched from server
+- **Direct mode**: `provider_key` set - use your own API key with local budget tracking
 
 **Properties:**
 | Property | Type | Description |
@@ -191,12 +227,21 @@ LlmRouter(
 | `port` | `int` | Port the proxy is listening on |
 | `provider` | `str` | Auto-detected provider (`"openai"` or `"anthropic"`) |
 | `is_running` | `bool` | Whether the proxy is running |
+| `budget_status` | `tuple[float, float] | None` | Direct mode: `(spent_usd, limit_usd)` |
 
 **Methods:**
 | Method | Description |
 |--------|-------------|
-| `stop()` | Stop the proxy server |
+| `stop()` | Stop the proxy server (flushes analytics in direct mode) |
 | `__enter__()` / `__exit__()` | Context manager support |
+
+**Analytics (Direct Mode):**
+
+In direct mode, the router automatically:
+- Tracks spending per request using iron_cost pricing
+- Records analytics events (completed/failed requests)
+- Syncs events to server every 5 seconds
+- Flushes remaining events on `stop()`
 
 **Provider Auto-Detection:**
 - API keys starting with `sk-ant-` → Anthropic

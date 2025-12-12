@@ -175,6 +175,15 @@ INFO LLM request completed model=gpt-4o-mini input_tokens=11 output_tokens=1 cos
 INFO LlmRouter proxy shutting down
 ```
 
+**Server Sync (Direct Mode):**
+
+When using direct mode with `server_url` and `api_key`, analytics events are automatically synced to Control API:
+- Background sync task runs every 5 seconds
+- Posts events to `POST /api/v1/analytics/events`
+- Auto-flush on `router.stop()` ensures no events lost
+- Only `llm_request_completed` and `llm_request_failed` events are synced
+- Synced events visible in Dashboard usage view
+
 **LlmRouter Rust API:**
 ```rust
 use iron_runtime::LlmRouter;
@@ -241,6 +250,14 @@ router.shutdown();  // Stop the proxy
 - Concurrent overspend demonstration test
 - Env vars: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for direct mode
 - Env vars: `IC_TOKEN` + `IC_SERVER` for Iron Cage mode
+
+**Analytics Sync Tests:** `python/tests/test_analytics_*.py`
+- `test_analytics_sync.py` - Basic sync to Control API
+- `test_analytics_multithread.py` - 5 threads, 3 requests each
+- `test_analytics_models.py` - Multiple OpenAI models
+- `test_analytics_errors.py` - Error scenarios (invalid model, rate limit)
+- `test_analytics_long_prompt.py` - 50k token prompts stress test
+- Env vars: `IC_TOKEN` + `IC_SERVER` + `OPENAI_API_KEY`
 
 ---
 

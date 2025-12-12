@@ -23,13 +23,13 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 - Protocol 012 field compatibility
 - High-level recording API with automatic provider inference
 - Cost calculation via iron_cost integration
+- Background HTTP sync to Control API (feature: `sync`)
 
 **Out of Scope:**
 - Server-side persistence (see iron_control_api)
 - Dashboard WebSocket streaming (see iron_control_api)
 - Agent name/budget lookups (server enrichment)
 - Min/max/median computation (server computes)
-- HTTP sync to server (Python layer responsibility)
 
 ---
 
@@ -41,6 +41,13 @@ Lock-free event-based analytics storage for Python LlmRouter. Provides async-saf
 - `uuid` - Event identifiers (v4)
 - `serde` - Serialization for sync
 - `iron_cost` - LLM pricing data and cost calculation
+
+**Optional (feature: `sync`):**
+- `reqwest` - HTTP client for server sync
+- `tokio` - Async runtime for background sync task
+
+**Features:**
+- `sync` - Enable background HTTP sync to Control API
 
 ---
 
@@ -111,6 +118,42 @@ pub struct ComputedStats {
 }
 ```
 
+### SyncConfig (feature: `sync`)
+
+Configuration for background sync to Control API.
+
+```rust
+pub struct SyncConfig {
+    pub server_url: String,       // Control API server URL
+    pub ic_token: String,         // IC token for authentication
+    pub sync_interval: Duration,  // Sync interval (default: 30s)
+    pub batch_threshold: usize,   // Sync when N events pending (default: 10)
+    pub timeout: Duration,        // HTTP timeout (default: 30s)
+}
+```
+
+### SyncClient (feature: `sync`)
+
+Background sync client for posting events to server.
+
+```rust
+pub struct SyncClient {
+    event_store: Arc<EventStore>,
+    config: SyncConfig,
+    http_client: reqwest::Client,
+}
+```
+
+### SyncHandle (feature: `sync`)
+
+Handle to control running sync task.
+
+```rust
+pub struct SyncHandle {
+    shutdown_tx: Option<oneshot::Sender<()>>,
+}
+```
+
 ---
 
 ## API Surface
@@ -159,6 +202,18 @@ pub struct ComputedStats {
 | `unsynced_events()` | Get unsynced events only |
 | `mark_synced(ids)` | Mark events as synced |
 
+### Sync API (feature: `sync`)
+
+| Method | Description |
+|--------|-------------|
+| `SyncConfig::new(url, token)` | Create config with defaults |
+| `SyncConfig::with_interval(dur)` | Set sync interval |
+| `SyncConfig::with_batch_threshold(n)` | Set batch threshold |
+| `SyncClient::new(store, config)` | Create sync client |
+| `SyncClient::start(runtime_handle)` | Start background sync, returns SyncHandle |
+| `SyncClient::sync_events()` | Manually sync pending events |
+| `SyncHandle::stop()` | Stop sync and flush remaining events |
+
 ---
 
 ## Design Decisions
@@ -186,6 +241,14 @@ pub struct ComputedStats {
 - `gpt-*`, `o1-*`, `o3-*`, `chatgpt-*` → OpenAI
 - `claude-*` → Anthropic
 - Unknown models → Provider::Unknown
+
+### Sync Behavior (feature: `sync`)
+
+- **Interval-based:** Syncs every N seconds (default: 30s)
+- **Threshold-based:** Syncs immediately when N events pending (default: 10)
+- **Auto-flush:** Remaining events flushed on shutdown
+- **Event filtering:** Only `llm_request_completed` and `llm_request_failed` synced
+- **Error handling:** 4xx errors mark event as synced (no retry), 5xx/network errors retry
 
 ---
 
@@ -220,14 +283,16 @@ module/iron_runtime_analytics/
 │   ├── event_storage.rs # EventStore implementation
 │   ├── stats.rs         # AtomicModelStats, ModelStats, ComputedStats
 │   ├── recording.rs     # High-level record_* methods
-│   └── helpers.rs       # Provider, infer_provider, current_time_ms
+│   ├── helpers.rs       # Provider, infer_provider, current_time_ms
+│   └── sync.rs          # SyncClient, SyncConfig, SyncHandle (feature: sync)
 └── tests/
     ├── event_store_test.rs   # Basic operations (23 tests)
     ├── stats_test.rs         # Statistics (23 tests)
     ├── concurrency_test.rs   # Multi-threaded safety (11 tests)
     ├── protocol_012_test.rs  # API compatibility (14 tests)
     ├── helpers_test.rs       # Provider inference (13 tests)
-    └── recording_test.rs     # High-level API (20 tests)
+    ├── recording_test.rs     # High-level API (20 tests)
+    └── sync_test.rs          # Server sync (16 tests, feature: sync)
 ```
 
 ---
@@ -242,7 +307,8 @@ module/iron_runtime_analytics/
 | protocol_012_test.rs | 14 | Field compatibility, serialization |
 | helpers_test.rs | 13 | Provider enum, inference, traits |
 | recording_test.rs | 20 | High-level API, cost calculation |
-| **Total** | **104** | |
+| sync_test.rs | 16 | Server sync, mock server, concurrent sync |
+| **Total** | **120** | |
 
 ---
 
@@ -276,8 +342,11 @@ INFO LlmRouter proxy shutting down
 **Budget Tracking:**
 Budget status is available via `router.budget_status` (uses CostController from iron_cost).
 
-**Internal Storage:**
-Events are stored in EventStore for future server sync (Phase 4 - BACKLOG).
+**Server Sync (Direct Mode):**
+When using direct mode with `server_url` and `api_key`, events are automatically synced to Control API:
+- Background sync every 5 seconds
+- Auto-flush on `router.stop()`
+- Only LLM request events synced (completed/failed)
 
 ---
 
