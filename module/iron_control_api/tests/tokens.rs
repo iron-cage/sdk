@@ -37,3 +37,9 @@ mod idempotency;
 
 #[ path = "tokens/empty_body.rs" ]
 mod empty_body;
+
+#[ path = "tokens/audit_logging.rs" ]
+mod audit_logging;
+
+#[ path = "tokens/rate_limiting.rs" ]
+mod rate_limiting;
