@@ -178,20 +178,22 @@ impl CostController {
 
     /// Commit a reservation with actual cost.
     ///
-    /// Releases the reserved amount and adds the actual cost to spent.
-    /// Call this after an LLM request completes successfully.
+    /// Adds actual cost to spent FIRST, then releases the reservation.
+    /// This ordering is intentional: momentarily "double counts" the usage,
+    /// which is safe (errs on the side of blocking) rather than unsafe
+    /// (allowing overspend during the brief window between operations).
     ///
     /// # Arguments
     ///
     /// * `reservation` - The reservation to commit (consumes it)
     /// * `actual_cost_micros` - Actual cost incurred (usually less than reserved)
     pub fn commit(&self, reservation: Reservation, actual_cost_micros: u64) {
-        // Release reservation
-        self.reserved_micros
-            .fetch_sub(reservation.amount_micros, Ordering::AcqRel);
-        // Add actual cost to spent
+        // Add actual cost to spent FIRST (safe: errs on blocking side)
         self.total_spent_micros
             .fetch_add(actual_cost_micros, Ordering::AcqRel);
+        // Then release reservation
+        self.reserved_micros
+            .fetch_sub(reservation.amount_micros, Ordering::AcqRel);
     }
 
     /// Commit a reservation with actual cost in USD (convenience wrapper)
