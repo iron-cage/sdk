@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** MUST-HAVE
 
 ---
 
@@ -27,6 +28,8 @@ This protocol adheres to the following Iron Cage standards:
 - `provider_id`: `provider_<uuid>` (e.g., `provider_550e8400-e29b-41d4-a716-446655440000`)
 - `agent_id`: `agent_<uuid>`
 - `user_id`: `user_<uuid>`
+
+> **Note:** Examples in this document use simplified provider IDs (e.g., `ip_openai_001`, `ip_anthropic_001`) for readability. Production systems use full UUIDs as specified in ID Format Standards.
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
@@ -1155,10 +1158,6 @@ Content-Type: application/json
 
 **Related Documents:**
 - [007: Entity Model](../architecture/007_entity_model.md) - Provider entity definition
-- [003: Security Architecture](../architecture/003_security_architecture.md) - Credential encryption
+<!-- TODO: Add Security Architecture doc for credential encryption -->
 
 ---
-
-**Protocol 011 Version:** 1.0.0
-**Status:** Specification
-**Last Updated:** 2025-12-10

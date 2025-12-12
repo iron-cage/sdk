@@ -64,3 +64,6 @@ pub mod limits_handlers;
 pub mod traces_handlers;
 pub mod health_handlers;
 pub mod user_handlers;
+
+// Control API handlers (for iron binary)
+pub mod control;

@@ -1,8 +1,9 @@
 # Protocol 016: Settings API
 
-**Status:** POST-PILOT
+**Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** POST-PILOT
 
 ---
 

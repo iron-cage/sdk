@@ -1,0 +1,150 @@
+#
+# API Tokens Commands
+#
+# Commands for managing API access tokens
+# REST API Base: /api/v1/api-tokens
+#
+
+# List API tokens
+- name: ".api_token.list"
+  namespace: ""
+  description: "List all API tokens"
+  hint: "Shows active access tokens"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Create API token
+- name: ".api_token.create"
+  namespace: ""
+  description: "Create new API token"
+  hint: "Generates new access token"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "name"
+      kind: "String"
+      description: "Token name/description"
+      hint: "Descriptive label for token"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get API token details
+- name: ".api_token.get"
+  namespace: ""
+  description: "Get details for specific API token"
+  hint: "Shows token configuration"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "id"
+      kind: "String"
+      description: "Token ID"
+      hint: "UUID of token to retrieve"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Revoke API token
+- name: ".api_token.revoke"
+  namespace: ""
+  description: "Revoke API token"
+  hint: "Permanently disables token"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "id"
+      kind: "String"
+      description: "Token ID"
+      hint: "UUID of token to revoke"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []

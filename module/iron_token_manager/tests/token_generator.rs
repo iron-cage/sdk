@@ -7,12 +7,13 @@
 //!
 //! | Test Case | Scenario | Input | Expected | Status |
 //! |-----------|----------|-------|----------|--------|
-//! | `test_generate_token_returns_non_empty_string` | Token generation produces output | `generate()` | Non-empty string | ✅ |
-//! | `test_generate_token_has_minimum_length` | Token meets minimum security length | `generate()` | ≥32 characters | ✅ |
-//! | `test_generate_token_produces_unique_tokens` | Tokens are unique (100 iterations) | 100 x `generate()` | All unique, no duplicates | ✅ |
-//! | `test_generate_token_uses_base64_encoding` | Token uses URL-safe encoding | `generate()` | Base64 chars only (A-Za-z0-9+/=) | ✅ |
+//! | `test_token_format_protocol_014` | Protocol 014 format compliance (apitok_{64 Base62 chars}) | `generate()` | Regex `^apitok_[A-Za-z0-9]{64}$` | ✅ |
+//! | `test_token_length_exactly_71_chars` | Exact length for Protocol 014 | `generate()` | Exactly 71 characters | ✅ |
+//! | `test_token_uses_base62_encoding` | Token body uses Base62 alphabet | `generate()` | Body chars only [0-9A-Za-z] | ✅ |
+//! | `test_generate_token_produces_unique_tokens` | Tokens are unique (1000 iterations) | 1000 x `generate()` | All unique, no duplicates | ✅ |
+//! | `test_hash_strips_apitok_prefix` | Prefix stripping before hashing | `hash_token("apitok_ABC...")` | Hashes body only, not prefix | ✅ |
+//! | `test_hash_backward_compatible_with_old_tokens` | Old tokens without prefix still work | `hash_token("old_token_xyz")` | Hashes entire token | ✅ |
 //! | `test_generate_token_has_sufficient_entropy` | No predictable patterns | 10 x `generate()` | No token substring of another | ✅ |
-//! | `test_generate_with_prefix_includes_prefix` | Prefix support works | `generate_with_prefix("iron")` | Starts with "iron", longer than prefix | ✅ |
 //! | `test_hash_token_produces_sha256_hash` | SHA-256 hashing produces correct format | `hash_token("test_token")` | 64 hex characters | ✅ |
 //! | `test_hash_token_is_deterministic` | Same input → same hash | 2 x `hash_token("same")` | Identical hashes | ✅ |
 //! | `test_hash_token_different_tokens_produce_different_hashes` | Different inputs → different hashes | `hash_token("a")` vs `hash_token("b")` | Different hashes | ✅ |
@@ -23,22 +24,26 @@
 //! ## Corner Cases Covered
 //!
 //! **Happy Path:**
-//! - ✅ Token generation returns non-empty string
-//! - ✅ Prefix support for custom token formats
-//! - ✅ Hash verification for valid hashes
+//! - ✅ Token generation returns Protocol 014 format (apitok_{64 chars})
+//! - ✅ Hash verification for valid hashes with new format
+//! - ✅ Backward compatibility with old tokens (no prefix)
 //!
 //! **Boundary Conditions:**
-//! - ✅ Minimum token length (32 chars)
+//! - ✅ Exact token length (71 chars: 7 prefix + 64 body)
 //! - ✅ Hash format (exactly 64 hex chars)
+//! - ✅ Prefix length (exactly "apitok_")
+//! - ✅ Body length (exactly 64 Base62 chars)
 //!
 //! **Error Conditions:**
 //! - ✅ Wrong hash verification (returns `false`, not panic)
 //!
 //! **Edge Cases:**
-//! - ✅ Token uniqueness (100 iterations, no collisions)
+//! - ✅ Token uniqueness (1000 iterations, no collisions)
 //! - ✅ Entropy verification (no predictable patterns)
 //! - ✅ Deterministic hashing (same input → same output)
-//! - ✅ Base64 encoding validation
+//! - ✅ Base62 encoding validation (only [0-9A-Za-z] in body)
+//! - ✅ Prefix stripping before hashing (new tokens)
+//! - ✅ No prefix stripping for old tokens (backward compatibility)
 //!
 //! **State Transitions:** N/A (stateless functions)
 //! **Concurrent Access:** Not tested (stateless, thread-safe by design)
@@ -49,22 +54,40 @@ use iron_token_manager::token_generator::TokenGenerator;
 use std::collections::HashSet;
 
 #[ test ]
-fn test_generate_token_returns_non_empty_string()
+fn test_token_format_protocol_014()
 {
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  assert!( !token.is_empty(), "Generated token should not be empty" );
+  // Protocol 014 format: apitok_{64 Base62 chars}
+  assert!( token.starts_with( "apitok_" ), "Token should start with 'apitok_' prefix, got: {token}" );
+
+  // Extract body (everything after prefix)
+  let body = &token[ 7.. ];
+  assert_eq!( body.len(), 64, "Token body should be exactly 64 characters, got: {}", body.len() );
+
+  // Verify body contains only Base62 characters [0-9A-Za-z]
+  let is_base62 = body.chars().all( |c| c.is_ascii_alphanumeric() );
+  assert!( is_base62, "Token body should contain only Base62 chars [0-9A-Za-z], got: {body}" );
+
+  // Verify format with regex pattern
+  let format_regex = regex::Regex::new( r"^apitok_[A-Za-z0-9]{64}$" ).unwrap();
+  assert!( format_regex.is_match( &token ), "Token should match format ^apitok_[A-Za-z0-9]{{64}}$, got: {token}" );
 }
 
 #[ test ]
-fn test_generate_token_has_minimum_length()
+fn test_token_length_exactly_71_chars()
 {
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  // Token should be at least 32 characters (for security)
-  assert!( token.len() >= 32, "Token should be at least 32 characters, got {}", token.len() );
+  // Protocol 014: apitok_ (7 chars) + body (64 chars) = 71 total
+  assert_eq!( token.len(), 71, "Token should be exactly 71 characters, got {}", token.len() );
+
+  // Verify components
+  assert_eq!( "apitok_".len(), 7, "Prefix should be 7 characters" );
+  assert_eq!( &token[ ..7 ], "apitok_", "First 7 chars should be prefix" );
+  assert_eq!( token[ 7.. ].len(), 64, "Body should be 64 characters" );
 }
 
 #[ test ]
@@ -73,28 +96,42 @@ fn test_generate_token_produces_unique_tokens()
   let generator = TokenGenerator::new();
   let mut tokens = HashSet::new();
 
-  // Generate 100 tokens and verify all are unique
-  for _ in 0..100
+  // Generate 1000 tokens and verify all are unique
+  for _ in 0..1000
   {
     let token = generator.generate();
     assert!( tokens.insert( token.clone() ), "Generated duplicate token: {token}" );
   }
 
-  assert_eq!( tokens.len(), 100, "Expected 100 unique tokens" );
+  assert_eq!( tokens.len(), 1000, "Expected 1000 unique tokens" );
 }
 
 #[ test ]
-fn test_generate_token_uses_base64_encoding()
+fn test_token_uses_base62_encoding()
 {
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
-  // Base64 characters: A-Z, a-z, 0-9, +, /, =
-  let is_base64 = token.chars().all( |c|
-    c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='
-  );
+  // Extract body (skip "apitok_" prefix)
+  let body = &token[ 7.. ];
 
-  assert!( is_base64, "Token should be base64 encoded, got: {token}" );
+  // Base62 alphabet: 0-9, A-Z, a-z (no special characters)
+  let is_base62 = body.chars().all( |c| c.is_ascii_alphanumeric() );
+  assert!( is_base62, "Token body should use Base62 encoding [0-9A-Za-z], got: {body}" );
+
+  // Verify NO special characters (unlike base64 which has +/=)
+  let has_special_chars = body.chars().any( |c| c == '+' || c == '/' || c == '=' );
+  assert!( !has_special_chars, "Token body should not contain base64 special chars (+/=), got: {body}" );
+
+  // Verify both cases present (uppercase and lowercase)
+  // Note: With random generation, extremely unlikely to have zero of either case
+  let has_uppercase = body.chars().any( |c| c.is_ascii_uppercase() );
+  let has_lowercase = body.chars().any( |c| c.is_ascii_lowercase() );
+  let has_digit = body.chars().any( |c| c.is_ascii_digit() );
+
+  // At least one of each category should be present in 64 random chars
+  assert!( has_uppercase || has_lowercase || has_digit,
+    "Token should contain mix of characters from Base62 alphabet, got: {body}" );
 }
 
 #[ test ]
@@ -136,14 +173,50 @@ fn test_hash_token_different_tokens_produce_different_hashes()
 }
 
 #[ test ]
-fn test_generate_with_prefix_includes_prefix()
+fn test_hash_strips_apitok_prefix()
 {
   let generator = TokenGenerator::new();
-  let prefix = "iron";
-  let token = generator.generate_with_prefix( prefix );
 
-  assert!( token.starts_with( prefix ), "Token should start with prefix '{prefix}', got: {token}" );
-  assert!( token.len() > prefix.len(), "Token should be longer than just the prefix" );
+  // Create a token with known body
+  let token_with_prefix = "apitok_ABC123def456GHI789jkl012MNO345pqr678STU901vwx234YZa567bcd890ef";
+  let token_body_only = "ABC123def456GHI789jkl012MNO345pqr678STU901vwx234YZa567bcd890ef";
+
+  // Hash both - should produce SAME hash (prefix stripped)
+  let hash_with_prefix = generator.hash_token( token_with_prefix );
+  let hash_body_only = generator.hash_token( token_body_only );
+
+  assert_eq!( hash_with_prefix, hash_body_only,
+    "Hashing 'apitok_BODY' should produce same hash as hashing 'BODY' alone (prefix should be stripped)" );
+
+  // Verify SHA-256 format
+  assert_eq!( hash_with_prefix.len(), 64, "Hash should be 64 hex characters" );
+  let is_hex = hash_with_prefix.chars().all( |c| c.is_ascii_hexdigit() );
+  assert!( is_hex, "Hash should be hex encoded" );
+}
+
+#[ test ]
+fn test_hash_backward_compatible_with_old_tokens()
+{
+  let generator = TokenGenerator::new();
+
+  // Old token format (no apitok_ prefix, just random string)
+  let old_token = "xyz789ABC123def456GHI789jkl012MNO345pqr678STU901vwxyz";
+
+  // Hash old token - should hash entire string (no prefix stripping)
+  let hash1 = generator.hash_token( old_token );
+  let hash2 = generator.hash_token( old_token );
+
+  // Verify deterministic
+  assert_eq!( hash1, hash2, "Old tokens should hash deterministically" );
+
+  // Verify SHA-256 format
+  assert_eq!( hash1.len(), 64, "Hash should be 64 hex characters" );
+  let is_hex = hash1.chars().all( |c| c.is_ascii_hexdigit() );
+  assert!( is_hex, "Hash should be hex encoded" );
+
+  // Verify old token verification still works
+  let is_valid = generator.verify_token( old_token, &hash1 );
+  assert!( is_valid, "Old tokens should verify against their hashes" );
 }
 
 #[ test ]

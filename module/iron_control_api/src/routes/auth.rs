@@ -688,7 +688,7 @@ pub async fn refresh(
     }
   }
 
-  // TODO: Calculate expiration (30 days from now)
+  // Calculate expiration (30 days from now)
   let expires_in = 2592000u64; // 30 days in seconds
   let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in as i64);
 

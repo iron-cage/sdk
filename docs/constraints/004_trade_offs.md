@@ -101,4 +101,4 @@ Understand why certain options were chosen over alternatives and what was sacrif
 
 ---
 
-*Related: [003_scope_boundaries.md](003_scope_boundaries.md) | [../decisions/](../decisions/)*
+*Related: [003_scope_boundaries.md](003_scope_boundaries.md) | [../decisions/](../decisions/readme.md)*

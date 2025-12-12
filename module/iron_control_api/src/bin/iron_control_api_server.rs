@@ -29,11 +29,11 @@
 //! - `POST /api/auth/logout` - Logout (blacklist refresh token)
 //!
 //! ## Token Management (Requires Authentication)
-//! - `GET /api/tokens` - List user's tokens
-//! - `POST /api/tokens` - Create new token
-//! - `GET /api/tokens/:id` - Get specific token
-//! - `POST /api/tokens/:id/rotate` - Rotate token (issue new value)
-//! - `DELETE /api/tokens/:id` - Revoke token (soft delete)
+//! - `GET /api/v1/api-tokens` - List user's tokens
+//! - `POST /api/v1/api-tokens` - Create new token
+//! - `GET /api/v1/api-tokens/:id` - Get specific token
+//! - `POST /api/v1/api-tokens/:id/rotate` - Rotate token (issue new value)
+//! - `DELETE /api/v1/api-tokens/:id` - Revoke token (soft delete)
 //!
 //! ## Health Check (Public)
 //! - `GET /health` - Server health status
@@ -51,7 +51,7 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  Router, http::{ Method, header }, routing::{ delete, get, post, put }
+  Router, http::{ Method, header }, routing::{ delete, get, post, put }, middleware
 };
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
@@ -438,6 +438,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
     &ip_token_key,
+    auth_state.jwt_secret.clone(),
     &database_url,
   )
   .await
@@ -480,53 +481,53 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
 
     // Token management endpoints
-    .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/tokens", get( iron_control_api::routes::tokens::list_tokens ) )
-    .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .route( "/api/tokens/:id", put( iron_control_api::routes::tokens::update_token ) )
+    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens", get( iron_control_api::routes::tokens::list_tokens ) )
+    .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
+    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/v1/api-tokens/:id", put( iron_control_api::routes::tokens::update_token ) )
 
     // Usage analytics endpoints
-    .route( "/api/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
-    .route( "/api/usage/by-project/:project_id", get( iron_control_api::routes::usage::get_usage_by_project ) )
-    .route( "/api/usage/by-provider/:provider", get( iron_control_api::routes::usage::get_usage_by_provider ) )
+    .route( "/api/v1/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
+    .route( "/api/v1/usage/by-project/:project_id", get( iron_control_api::routes::usage::get_usage_by_project ) )
+    .route( "/api/v1/usage/by-provider/:provider", get( iron_control_api::routes::usage::get_usage_by_provider ) )
 
     // Limits management endpoints
-    .route( "/api/limits", get( iron_control_api::routes::limits::list_limits ) )
-    .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits/:id", get( iron_control_api::routes::limits::get_limit ) )
-    .route( "/api/limits/:id", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
-    .route( "/api/limits/:id", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
+    .route( "/api/v1/limits", get( iron_control_api::routes::limits::list_limits ) )
+    .route( "/api/v1/limits", post( iron_control_api::routes::limits::create_limit ) )
+    .route( "/api/v1/limits/:id", get( iron_control_api::routes::limits::get_limit ) )
+    .route( "/api/v1/limits/:id", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
+    .route( "/api/v1/limits/:id", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
 
     // Traces endpoints
-    .route( "/api/traces", get( iron_control_api::routes::traces::list_traces ) )
-    .route( "/api/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
+    .route( "/api/v1/traces", get( iron_control_api::routes::traces::list_traces ) )
+    .route( "/api/v1/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
 
     // Provider key management endpoints
-    .route( "/api/providers", post( iron_control_api::routes::providers::create_provider_key ) )
-    .route( "/api/providers", get( iron_control_api::routes::providers::list_provider_keys ) )
-    .route( "/api/providers/:id", get( iron_control_api::routes::providers::get_provider_key ) )
-    .route( "/api/providers/:id", axum::routing::put( iron_control_api::routes::providers::update_provider_key ) )
-    .route( "/api/providers/:id", delete( iron_control_api::routes::providers::delete_provider_key ) )
-    .route( "/api/projects/:project_id/provider", post( iron_control_api::routes::providers::assign_provider_to_project ) )
-    .route( "/api/projects/:project_id/provider", delete( iron_control_api::routes::providers::unassign_provider_from_project ) )
+    .route( "/api/v1/providers", post( iron_control_api::routes::providers::create_provider_key ) )
+    .route( "/api/v1/providers", get( iron_control_api::routes::providers::list_provider_keys ) )
+    .route( "/api/v1/providers/:id", get( iron_control_api::routes::providers::get_provider_key ) )
+    .route( "/api/v1/providers/:id", axum::routing::put( iron_control_api::routes::providers::update_provider_key ) )
+    .route( "/api/v1/providers/:id", delete( iron_control_api::routes::providers::delete_provider_key ) )
+    .route( "/api/v1/projects/:project_id/provider", post( iron_control_api::routes::providers::assign_provider_to_project ) )
+    .route( "/api/v1/projects/:project_id/provider", delete( iron_control_api::routes::providers::unassign_provider_from_project ) )
 
     // Key fetch endpoint (API token authentication)
-    .route( "/api/keys", get( iron_control_api::routes::keys::get_key ) )
+    .route( "/api/v1/keys", get( iron_control_api::routes::keys::get_key ) )
 
     // Agent management endpoints
-    .route( "/api/agents", get( iron_control_api::routes::agents::list_agents ) )
-    .route( "/api/agents", post( iron_control_api::routes::agents::create_agent ) )
-    .route( "/api/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
-    .route( "/api/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
-    .route( "/api/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
-    .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
+    .route( "/api/v1/agents", get( iron_control_api::routes::agents::list_agents ) )
+    .route( "/api/v1/agents", post( iron_control_api::routes::agents::create_agent ) )
+    .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
+    .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
+    .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
+    .route( "/api/v1/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
 
     // Budget Control Protocol endpoints (Protocol 005)
-    .route( "/api/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
-    .route( "/api/budget/report", post( iron_control_api::routes::budget::report_usage ) )
-    .route( "/api/budget/refresh", post( iron_control_api::routes::budget::refresh_budget ) )
+    .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
+    .route( "/api/v1/budget/report", post( iron_control_api::routes::budget::report_usage ) )
+    .route( "/api/v1/budget/refresh", post( iron_control_api::routes::budget::refresh_budget ) )
 
     // Budget Request Workflow endpoints (Protocol 012)
     .route( "/api/v1/budget/requests", post( iron_control_api::routes::budget::create_budget_request ) )
@@ -537,6 +538,11 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
     // Apply combined state to all routes
     .with_state( app_state )
+
+    // URL redirect middleware for backward compatibility (Protocol 014)
+    // Redirects old /api/tokens paths to new /api/v1/api-tokens paths
+    // Expires 3 months after deployment (2025-03-12)
+    .layer( middleware::from_fn( iron_control_api::middleware::url_redirect::redirect_old_tokens_url ) )
 
     // CORS middleware (FR-4: Restrict to frontend origin for pilot)
     // Pilot configuration: localhost:5173, 5174, 5175 (Vite dev server on any available port)
@@ -554,7 +560,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     );
 
   // Server address (0.0.0.0 for Docker container networking)
-  let addr = SocketAddr::from( ( [0, 0, 0, 0], 3000 ) );
+  let addr = SocketAddr::from( ( [0, 0, 0, 0], 3001 ) );
   
   tracing::info!( "API server listening on http://{}", addr );
   tracing::info!( "Endpoints:" );
@@ -564,11 +570,11 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  POST /api/auth/logout" );
   tracing::info!( "  POST /api/users" );
   tracing::info!( "  GET  /api/users" );
-  tracing::info!( "  GET  /api/tokens" );
-  tracing::info!( "  POST /api/tokens" );
-  tracing::info!( "  GET  /api/tokens/:id" );
-  tracing::info!( "  POST /api/tokens/:id/rotate" );
-  tracing::info!( "  DELETE /api/tokens/:id" );
+  tracing::info!( "  GET  /api/v1/api-tokens" );
+  tracing::info!( "  POST /api/v1/api-tokens" );
+  tracing::info!( "  GET  /api/v1/api-tokens/:id" );
+  tracing::info!( "  POST /api/v1/api-tokens/:id/rotate" );
+  tracing::info!( "  DELETE /api/v1/api-tokens/:id" );
   tracing::info!( "  GET  /api/usage/aggregate" );
   tracing::info!( "  GET  /api/usage/by-project/:project_id" );
   tracing::info!( "  GET  /api/usage/by-provider/:provider" );

@@ -410,7 +410,7 @@ async fn validate_foreign_key_integrity()
   let orphaned_keys: i64 = sqlx::query_scalar(
     "SELECT COUNT(*)
      FROM ai_provider_keys pk
-     WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.username = pk.user_id)"
+     WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = pk.user_id)"
   )
   .fetch_one( db.pool() )
   .await
@@ -422,7 +422,7 @@ async fn validate_foreign_key_integrity()
   let orphaned_tokens: i64 = sqlx::query_scalar(
     "SELECT COUNT(*)
      FROM api_tokens t
-     WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.username = t.user_id)"
+     WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = t.user_id)"
   )
   .fetch_one( db.pool() )
   .await

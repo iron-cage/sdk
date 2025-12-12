@@ -20,7 +20,7 @@ The Iron Control Panel requires a production REST API to manage agents, provider
 - **Consistency:** Uniform patterns across all endpoints (pagination, errors, auth)
 - **Security:** Audit trails, role-based access, budget governance
 
-**Scope:** This ADR documents 61 design decisions across 8 resource categories, totaling 46 user-facing endpoints distributed across 9 protocol files.
+**Scope:** This ADR documents 61 design decisions across 8 resource categories, totaling 46 user-facing endpoints distributed across 9 user-facing REST API protocol files (002, 008, 010-015, 017).
 
 ---
 
@@ -67,7 +67,9 @@ Made 61 design decisions across 8 categories:
    - Soft delete patterns
    - POST-PILOT deferrals
 
-**Implementation:** 9 protocol files (002, 008, 010-015, 017), 3 standards files, 46 user-facing endpoints, 100% CLI parity.
+**Implementation:** 9 user-facing REST API protocol files (002, 008, 010-015, 017), 3 standards files, 46 user-facing endpoints, 100% CLI parity.
+
+> **Note:** The protocol directory contains 16 total files including system protocols (003, 004, 005), reserved slots (009), and archived/draft files. This ADR focuses on the 9 user-facing REST API protocols that implement the 46 CLI-accessible endpoints.
 
 ---
 

@@ -282,7 +282,6 @@ Standards follow semantic versioning:
 
 **Protocol:**
 - [REST API Protocol](../protocol/002_rest_api_protocol.md) - API implementation using these standards
-- [Error Handling Protocol](../protocol/021_error_handling_protocol.md) - Error handling implementation
 
 **Implementation:**
 - [iron_types crate](../../module/iron_types/readme.md) - ID type implementation

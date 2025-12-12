@@ -76,3 +76,4 @@ mod_interface = { workspace = true }
 iron_test_db = { workspace = true }
 tempfile = { workspace = true }
 tokio-test = "0.4"
+regex = "1.10"

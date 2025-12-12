@@ -47,4 +47,4 @@
 ```
 
 *For operational procedures, see [deployment_guide.md](../deployment_guide.md)*
-*For module mappings, see [module_package_matrix.md](../module_package_matrix.md)*
+<!-- TODO: Add module package matrix documentation -->

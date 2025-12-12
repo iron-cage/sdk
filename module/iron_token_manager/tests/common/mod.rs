@@ -25,6 +25,7 @@ use tempfile::TempDir;
 ///
 /// Returns `SQLite` connection pool and temporary directory.
 /// Database is automatically deleted when `TempDir` is dropped.
+/// Automatically seeds common test users (`user_001` through `user_010`).
 ///
 /// # Example
 ///
@@ -49,30 +50,27 @@ pub async fn create_test_db() -> ( SqlitePool, TempDir )
     .await
     .expect( "Failed to apply migrations" );
 
+  // Seed common test users (user_001 through user_010)
+  seed_test_users( &pool ).await;
+
   ( pool, temp_dir )
 }
 
 /// Create test token storage with initialized database
 ///
 /// Returns `TokenStorage` instance and temporary directory.
-/// Database has all migrations applied and is ready for use.
+/// Database has all migrations applied and test users seeded.
 ///
 /// # Example
 ///
 /// ```ignore
 /// let ( storage, _temp ) = create_test_storage().await;
-/// storage.create_token( "token", "user", None, None, None, None ).await?;
+/// storage.create_token( "token", "user_001", None, None, None, None ).await?;
 /// ```
 pub async fn create_test_storage() -> ( TokenStorage, TempDir )
 {
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let storage = TokenStorage::new( &db_url )
-    .await
-    .expect( "Failed to create storage" );
-
+  let ( pool, temp_dir ) = create_test_db().await;
+  let storage = TokenStorage::from_pool( pool );
   ( storage, temp_dir )
 }
 
@@ -80,27 +78,19 @@ pub async fn create_test_storage() -> ( TokenStorage, TempDir )
 ///
 /// Returns `LimitEnforcer`, `TokenStorage`, and temporary directory.
 /// Both components share the same database connection.
+/// Database has all migrations applied and test users seeded.
 ///
 /// # Example
 ///
 /// ```ignore
 /// let ( enforcer, storage, _temp ) = create_test_enforcer().await;
-/// enforcer.create_limit( "user", None, Some( 1000 ), None, None ).await?;
+/// enforcer.create_limit( "user_001", None, Some( 1000 ), None, None ).await?;
 /// ```
 pub async fn create_test_enforcer() -> ( LimitEnforcer, TokenStorage, TempDir )
 {
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let enforcer = LimitEnforcer::new( &db_url )
-    .await
-    .expect( "Failed to create enforcer" );
-
-  let storage = TokenStorage::new( &db_url )
-    .await
-    .expect( "Failed to create storage" );
-
+  let ( pool, temp_dir ) = create_test_db().await;
+  let enforcer = LimitEnforcer::from_pool( pool.clone() );
+  let storage = TokenStorage::from_pool( pool );
   ( enforcer, storage, temp_dir )
 }
 
@@ -108,29 +98,55 @@ pub async fn create_test_enforcer() -> ( LimitEnforcer, TokenStorage, TempDir )
 ///
 /// Returns `UsageTracker`, `TokenStorage`, and temporary directory.
 /// Both components share the same database connection.
+/// Database has all migrations applied and test users seeded.
 ///
 /// # Example
 ///
 /// ```ignore
 /// let ( tracker, storage, _temp ) = create_test_tracker().await;
-/// let token_id = storage.create_token( "token", "user", None, None, None, None ).await?;
+/// let token_id = storage.create_token( "token", "user_001", None, None, None, None ).await?;
 /// tracker.record_usage( token_id, "openai", "gpt-4", 100, 50, 25 ).await?;
 /// ```
 pub async fn create_test_tracker() -> ( UsageTracker, TokenStorage, TempDir )
 {
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let storage = TokenStorage::new( &db_url )
-    .await
-    .expect( "Failed to create storage" );
-
-  let tracker = UsageTracker::new( &db_url )
-    .await
-    .expect( "Failed to create tracker" );
-
+  let ( pool, temp_dir ) = create_test_db().await;
+  let storage = TokenStorage::from_pool( pool.clone() );
+  let tracker = UsageTracker::from_pool( pool );
   ( tracker, storage, temp_dir )
+}
+
+/// Seed common test users
+///
+/// Creates test users `user_001` through `user_010` for use in tests.
+/// Uses predictable IDs to match common test patterns.
+///
+/// # Arguments
+///
+/// * `pool` - Database connection pool
+async fn seed_test_users( pool: &SqlitePool )
+{
+  let now_ms = chrono::Utc::now().timestamp_millis();
+
+  for i in 1..=10
+  {
+    let user_id = format!( "user_{i:03}" );
+    let username = format!( "testuser{i}" );
+    let email = format!( "test{i}@example.com" );
+
+    let _ = sqlx::query(
+      "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7)"
+    )
+    .bind( user_id )
+    .bind( username )
+    .bind( "test_hash" )
+    .bind( email )
+    .bind( "user" )
+    .bind( 1 )
+    .bind( now_ms )
+    .execute( pool )
+    .await;
+  }
 }
 
 // ============================================================================
@@ -141,6 +157,7 @@ pub async fn create_test_tracker() -> ( UsageTracker, TokenStorage, TempDir )
 ///
 /// Returns `TestDatabase` with all migrations applied and automatic cleanup.
 /// Uses in-memory storage by default for maximum speed.
+/// Automatically seeds common test users (`user_001` through `user_010`).
 ///
 /// # Example
 ///
@@ -162,6 +179,9 @@ pub async fn create_test_db_v2() -> TestDatabase
     .await
     .expect( "LOUD FAILURE: Failed to apply migrations" );
 
+  // Seed common test users (user_001 through user_010)
+  seed_test_users( db.pool() ).await;
+
   db
 }
 
@@ -169,6 +189,7 @@ pub async fn create_test_db_v2() -> TestDatabase
 ///
 /// Returns `TestDatabase` with migrations applied and seed data populated.
 /// Useful for tests that need realistic data.
+/// Does NOT seed test users (`user_001`-`user_010`) - only seeds via `seed_all()`.
 ///
 /// # Example
 ///
@@ -178,9 +199,19 @@ pub async fn create_test_db_v2() -> TestDatabase
 /// ```
 pub async fn create_test_db_with_seed() -> TestDatabase
 {
-  let db = create_test_db_v2().await;
+  // Create DB without test users (don't call create_test_db_v2 to avoid double-seeding)
+  let db = TestDatabaseBuilder::new()
+    .in_memory()
+    .build()
+    .await
+    .expect( "LOUD FAILURE: Failed to create test database" );
 
-  // Seed database
+  // Apply migrations
+  iron_token_manager::migrations::apply_all_migrations( db.pool() )
+    .await
+    .expect( "LOUD FAILURE: Failed to apply migrations" );
+
+  // Seed database (creates its own users via seed_all)
   iron_token_manager::seed::seed_all( db.pool() )
     .await
     .expect( "LOUD FAILURE: Failed to seed database" );

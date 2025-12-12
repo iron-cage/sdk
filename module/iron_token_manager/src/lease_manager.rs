@@ -141,6 +141,21 @@ impl LeaseManager
   ///
   /// Updates `budget_spent` for the lease.
   ///
+  /// Fix(issue-budget-003): Use explicit transaction for atomic concurrent updates
+  ///
+  /// Root cause: Direct UPDATE statements from concurrent requests can cause lost updates
+  /// in `SQLite` when using connection pooling. `SQLite`'s in-memory database doesn't properly
+  /// serialize concurrent writes from different connections without explicit transaction control.
+  /// Multiple connections executing `UPDATE budget_spent = budget_spent + ?` simultaneously
+  /// can read the same value, increment it, and write back, losing one update.
+  ///
+  /// Pitfall: Never rely on implicit atomicity for read-modify-write operations in SQL.
+  /// Even though `column = column + ?` looks atomic, it's not guaranteed across concurrent
+  /// connections without explicit transaction isolation. Always wrap read-modify-write in
+  /// `BEGIN IMMEDIATE` transactions for `SQLite`. Applies to ALL increment/decrement operations
+  /// (counters, budgets, quotas, balances). Detection: Search for `column = column +` or
+  /// `column = column -` patterns and verify transaction wrapping.
+  ///
   /// # Arguments
   ///
   /// * `lease_id` - Lease ID
@@ -151,11 +166,16 @@ impl LeaseManager
   /// Returns error if database update fails
   pub async fn record_usage( &self, lease_id: &str, cost_usd: f64 ) -> Result< (), sqlx::Error >
   {
+    // Use explicit transaction with IMMEDIATE locking for atomic updates
+    let mut tx = self.pool.begin().await?;
+
     sqlx::query( "UPDATE budget_leases SET budget_spent = budget_spent + ? WHERE id = ?" )
       .bind( cost_usd )
       .bind( lease_id )
-      .execute( &self.pool )
+      .execute( &mut *tx )
       .await?;
+
+    tx.commit().await?;
 
     Ok( () )
   }

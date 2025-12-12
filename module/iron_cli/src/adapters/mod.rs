@@ -37,5 +37,8 @@ pub mod limits;
 pub mod traces;
 pub mod health;
 
+// Control API adapters (for iron binary)
+pub mod control;
+
 pub use error::{ AdapterError, ServiceError };
 pub use services::{ AuthService, TokenService, UsageService, LimitsService, TracesService, HealthService, StorageService, Services, Tokens, Token, UsageRecord, Limit, Trace, HealthStatus };

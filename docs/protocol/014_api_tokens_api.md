@@ -3,6 +3,7 @@
 **Status:** Specification
 **Version:** 1.0.0
 **Last Updated:** 2025-12-10
+**Priority:** NICE-TO-HAVE
 
 ---
 
@@ -755,7 +756,7 @@ iron agents list
 # ✅ Works
 
 # Revoke old token
-iron api-tokens revoke at-old-token-xyz
+iron api-tokens revoke at-old-token_xyz
 # ✅ Old token revoked
 ```
 
@@ -791,7 +792,7 @@ iron api-tokens revoke at-old-token-xyz
 **Implementation:**
 - Add `permissions` field to token creation
 - Support scopes: `agents:read`, `agents:write`, `analytics:read`, etc.
-- Add `?agent_id=agent-abc` scope for agent-specific tokens
+- Add `?agent_id=agent_abc` scope for agent-specific tokens
 
 ---
 
@@ -816,11 +817,6 @@ iron api-tokens revoke at-old-token-xyz
 - [002: REST API Protocol](002_rest_api_protocol.md) - General standards
 
 **Related Documents:**
-- [003: Security Architecture](../architecture/003_security_architecture.md) - Token security
-- [008: Authentication Model](../architecture/008_authentication_model.md) - Token types
+<!-- TODO: Add Security Architecture and Authentication Model docs for token security and types -->
 
 ---
-
-**Protocol 014 Version:** 1.0.0
-**Status:** Specification
-**Last Updated:** 2025-12-10

@@ -1,0 +1,276 @@
+#
+# Budget Requests Commands
+#
+# Commands for managing budget increase requests
+# REST API Base: /api/v1/budget-requests
+#
+
+# List budget requests
+- name: ".budget_request.list"
+  namespace: ""
+  description: "List all budget requests"
+  hint: "Shows pending and historical requests"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "status"
+      kind: "String"
+      description: "Filter by status"
+      hint: "pending, approved, rejected, or cancelled"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Create budget request
+- name: ".budget_request.create"
+  namespace: ""
+  description: "Create new budget increase request"
+  hint: "Submit request for more tokens"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "amount"
+      kind: "Integer"
+      description: "Requested token amount"
+      hint: "Additional tokens needed"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "reason"
+      kind: "String"
+      description: "Justification for request"
+      hint: "Why more tokens are needed"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Get budget request details
+- name: ".budget_request.get"
+  namespace: ""
+  description: "Get details for specific budget request"
+  hint: "Shows request status and history"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "id"
+      kind: "String"
+      description: "Request ID"
+      hint: "UUID of request to retrieve"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Approve budget request
+- name: ".budget_request.approve"
+  namespace: ""
+  description: "Approve budget increase request"
+  hint: "Grant requested tokens"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "id"
+      kind: "String"
+      description: "Request ID"
+      hint: "UUID of request to approve"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Reject budget request
+- name: ".budget_request.reject"
+  namespace: ""
+  description: "Reject budget increase request"
+  hint: "Deny requested tokens"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "id"
+      kind: "String"
+      description: "Request ID"
+      hint: "UUID of request to reject"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "reason"
+      kind: "String"
+      description: "Rejection reason"
+      hint: "Why request was denied"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+
+# Cancel budget request
+- name: ".budget_request.cancel"
+  namespace: ""
+  description: "Cancel budget increase request"
+  hint: "Withdraw pending request"
+  status: "stable"
+  version: "1.0.0"
+  arguments:
+    - name: "id"
+      kind: "String"
+      description: "Request ID"
+      hint: "UUID of request to cancel"
+      attributes:
+        optional: false
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "dry"
+      kind: "Integer"
+      description: "Dry run mode (0 or 1)"
+      hint: "1 = preview only, 0 = execute"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []
+    - name: "format"
+      kind: "String"
+      description: "Output format"
+      hint: "table, json, or yaml"
+      attributes:
+        optional: true
+        multiple: false
+        interactive: false
+        sensitive: false
+      validation_rules: []
+      aliases: []
+      tags: []

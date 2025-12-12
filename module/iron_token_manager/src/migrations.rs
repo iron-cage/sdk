@@ -40,7 +40,7 @@ use crate::error::Result;
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-012, skipping 007).
+/// Migrations are applied in order (001-013, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -97,6 +97,12 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
 
   // Migration 012: Budget history (Protocol 012)
   apply_migration_012( pool ).await?;
+
+  // Migration 013: Add FK constraint to api_tokens (Protocol 014)
+  apply_migration_013( pool ).await?;
+
+  // Migration 014: Add owner_id to agents table
+  apply_migration_014( pool ).await?;
 
   Ok( () )
 }
@@ -361,6 +367,60 @@ async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
   if completed == 0
   {
     let migration = include_str!( "../migrations/012_create_budget_history.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 013: Add FK constraint from `api_tokens` to users (Protocol 014)
+///
+/// Rebuilds `api_tokens` table with foreign key constraint to users table.
+/// Implements IMPOSSIBLE STATE: "Cannot create token without valid `user_id` (FK constraint fails)"
+#[ allow( dead_code ) ]
+async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_013_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/013_add_api_tokens_fk.sql" );
+    sqlx::raw_sql( migration )
+      .execute( pool )
+      .await
+      .map_err( |_| crate::error::TokenError )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 014: Add `owner_id` to agents table
+///
+/// Adds user ownership to agents table for multi-tenant isolation.
+/// Implements authorization requirement: users can only access their own agents.
+#[ allow( dead_code ) ]
+async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_014_completed'"
+  )
+  .fetch_one( pool )
+  .await
+  .map_err( |_| crate::error::TokenError )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/014_add_agents_owner_id.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
