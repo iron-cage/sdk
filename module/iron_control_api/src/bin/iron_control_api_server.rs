@@ -563,7 +563,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/agents", post( iron_control_api::routes::agents::create_agent ) )
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
-    .route( "/api/v1agents/:id/details", get( iron_control_api::routes::agents::get_agent_details ) )
+    .route( "/api/v1/agents/:id/details", get( iron_control_api::routes::agents::get_agent_details ) )
     .route( "/api/v1/agents/:id/providers", get( iron_control_api::routes::agents::get_agent_providers ) )
     .route( "/api/v1/agents/:agent_id/providers/:provider_id", delete( iron_control_api::routes::agents::remove_provider_from_agent ) )
 
