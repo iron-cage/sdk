@@ -136,14 +136,14 @@ async fn test_error_message_sanitization()
 
   let token_storage = TokenStorage::new( "sqlite::memory:" )
     .await
-    .expect( "Failed to create token storage" );
+    .expect("LOUD FAILURE: Failed to create token storage");
 
   let provider_storage = ProviderKeyStorage::connect( "sqlite::memory:" )
     .await
-    .expect( "Failed to create provider key storage" );
+    .expect("LOUD FAILURE: Failed to create provider key storage");
 
   let crypto = CryptoService::new( &TEST_MASTER_KEY )
-    .expect( "Failed to create crypto service" );
+    .expect("LOUD FAILURE: Failed to create crypto service");
 
   let rate_limiter = RateLimiter::new( 10, Duration::from_secs( 60 ) );
 

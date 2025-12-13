@@ -49,6 +49,7 @@ async fn create_auth_router() -> Router
   {
     jwt_secret: Arc::new( JwtSecret::new( "test_secret_key_12345".to_string() ) ),
     db_pool,
+    rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
   };
 
   Router::new()

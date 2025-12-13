@@ -231,3 +231,20 @@ When adding features:
 ## License
 
 MIT OR Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Test database infrastructure for Iron Runtime crates |
+| builder.rs | Test database builder with fluent API |
+| error.rs | Error types for test database operations |
+| migrations.rs | Migration registry for version tracking and guard management |
+| wipe.rs | Automatic table wiping with dependency detection |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

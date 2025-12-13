@@ -5,14 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-
-[lints]
-workspace = true
-
-[features]
-default = ["enabled"]
-enabled = []
-full = ["enabled"]
+description = "Secrets management and encryption for Iron Cage"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["secrets", "encryption", "key-management", "security"]
+categories = ["cryptography"]
 
 [dependencies]
 # Workspace crates
@@ -47,3 +44,6 @@ mod_interface = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 criterion = "0.5"
+
+[lints]
+workspace = true

@@ -7,6 +7,9 @@
 //! - Operation parity: Commands perform same operations
 //! - Structure parity: Command structure matches API structure
 
+// Test files are allowed to use println! for test output
+#![allow(clippy::disallowed_macros)]
+
 /// API endpoint inventory
 ///
 /// This documents all REST API endpoints that must have CLI equivalents.

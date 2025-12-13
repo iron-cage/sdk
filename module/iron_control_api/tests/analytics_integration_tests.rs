@@ -83,7 +83,7 @@ async fn create_analytics_router() -> ( Router, SqlitePool, String, String )
   // Create usage and traces state
   let usage_state = iron_control_api::routes::usage::UsageState::new( "sqlite::memory:" )
     .await
-    .expect( "Failed to create UsageState" );
+    .expect("LOUD FAILURE: Failed to create UsageState");
 
   let traces_app_state = TestTracesAppState::new().await;
 

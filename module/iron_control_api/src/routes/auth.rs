@@ -45,6 +45,7 @@ use axum_extra::{
 pub struct AuthState {
   pub jwt_secret: Arc<JwtSecret>,
   pub db_pool: Pool<Sqlite>,
+  pub rate_limiter: crate::rate_limiter::LoginRateLimiter,
 }
 
 impl AuthState {
@@ -103,6 +104,7 @@ impl AuthState {
     Ok(Self {
       jwt_secret: Arc::new(JwtSecret::new(jwt_secret_key)),
       db_pool,
+      rate_limiter: crate::rate_limiter::LoginRateLimiter::new(),
     })
   }
 }
@@ -316,8 +318,33 @@ pub async fn login(
       .into_response();
   }
 
-  // TODO: Rate limiting check (5 attempts per 5 minutes per IP)
-  // SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND timestamp > NOW() - INTERVAL 5 MINUTE
+  // GAP-006: Rate limiting check (5 attempts per 5 minutes per IP)
+  // NOTE: Pilot implementation uses placeholder IP (127.0.0.1) for all requests.
+  // POST-PILOT: Extract real client IP from X-Forwarded-For header or ConnectInfo
+  let client_ip = std::net::IpAddr::V4( std::net::Ipv4Addr::new( 127, 0, 0, 1 ) );
+
+  if let Err( retry_after_secs ) = state.rate_limiter.check_and_record( client_ip )
+  {
+    tracing::warn!(
+      email = %request.email,
+      client_ip = %client_ip,
+      retry_after_secs = retry_after_secs,
+      "Rate limit exceeded for login attempt"
+    );
+    return (
+      StatusCode::TOO_MANY_REQUESTS,
+      Json( ErrorResponse {
+        error: ErrorDetail {
+          code: "RATE_LIMIT_EXCEEDED".to_string(),
+          message: format!( "Too many login attempts. Please try again in {} seconds.", retry_after_secs ),
+          details: Some( serde_json::json!({
+            "retry_after": retry_after_secs
+          })),
+        },
+      }),
+    )
+      .into_response();
+  }
 
   // Authenticate user against database
   // Note: Using username field for email (database schema uses username)
@@ -327,7 +354,12 @@ pub async fn login(
     Ok(Some(user)) => user,
     Ok(None) => {
       // Invalid credentials - return 401
-      // TODO: Log failed attempt for security monitoring
+      // GAP-004: Log failed login attempt for security monitoring
+      tracing::warn!(
+        email = %request.email,
+        failure_reason = "invalid_credentials",
+        "Failed login attempt - invalid credentials"
+      );
       return (
         StatusCode::UNAUTHORIZED,
         Json(ErrorResponse {
@@ -359,6 +391,13 @@ pub async fn login(
 
   // Check if account is active
   if !user.is_active {
+    // GAP-004: Log failed login attempt (account disabled)
+    tracing::warn!(
+      email = %request.email,
+      user_id = %user.id,
+      failure_reason = "account_disabled",
+      "Failed login attempt - account disabled"
+    );
     return (
       StatusCode::FORBIDDEN,
       Json(ErrorResponse {
@@ -480,8 +519,19 @@ pub async fn logout(
   // - jti: Token ID from JWT claims
   // - blacklisted_at: Current timestamp
   // - expires_at: Original token expiration (for cleanup)
-  let expires_at = chrono::DateTime::from_timestamp( claims.exp, 0 )
-    .expect( "Invalid expiration timestamp in JWT claims" );
+  let expires_at = match chrono::DateTime::from_timestamp( claims.exp, 0 ) {
+    Some( dt ) => dt,
+    None => {
+      tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
+      return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
+        error: ErrorDetail {
+          code: "INVALID_TOKEN".to_string(),
+          message: "Token contains invalid expiration timestamp".to_string(),
+          details: None,
+        },
+      } ) ).into_response();
+    }
+  };
   match user_auth::add_token_to_blacklist(&state.db_pool, &jti, &user_id, expires_at).await {
     Ok(()) => {},
     Err(err) => {
@@ -500,9 +550,13 @@ pub async fn logout(
     }
   }
 
-  // TODO: Log logout event for security monitoring
-  // INSERT INTO user_audit_log (user_id, action, timestamp) VALUES (?, 'logout', ?)
-  
+  // GAP-005: Log logout event for security monitoring
+  tracing::info!(
+    user_id = %user_id,
+    session_id = %jti,
+    "User logout - session terminated"
+  );
+
   StatusCode::NO_CONTENT.into_response()
 }
 
@@ -649,7 +703,19 @@ pub async fn refresh(
 
   // Generate new User Token (30 days)
   let new_token_id = format!("refresh_{}_{}", user.id, chrono::Utc::now().timestamp());
-  let new_user_token = state.jwt_secret.generate_access_token(&user.id, &user.email, &user.role, &new_token_id).unwrap();
+  let new_user_token = match state.jwt_secret.generate_access_token(&user.id, &user.email, &user.role, &new_token_id) {
+    Ok( token ) => token,
+    Err( e ) => {
+      tracing::error!( "Failed to generate new access token during refresh: {}", e );
+      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( ErrorResponse {
+        error: ErrorDetail {
+          code: "TOKEN_GENERATION_FAILED".to_string(),
+          message: "Failed to generate new access token".to_string(),
+          details: None,
+        },
+      } ) ).into_response();
+    }
+  };
 
   // Blacklist old User Token (atomic operation)
   let expires_at = chrono::Utc::now() + chrono::Duration::seconds(claims.exp as i64);
@@ -843,7 +909,19 @@ pub async fn validate(
     }
   };
 
-  let expires_at = chrono::DateTime::from_timestamp(claims.exp, 0).unwrap();
+  let expires_at = match chrono::DateTime::from_timestamp(claims.exp, 0) {
+    Some( dt ) => dt,
+    None => {
+      tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
+      return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
+        error: ErrorDetail {
+          code: "INVALID_TOKEN".to_string(),
+          message: "Token contains invalid expiration timestamp".to_string(),
+          details: None,
+        },
+      } ) ).into_response();
+    }
+  };
   let expires_in = (expires_at - chrono::Utc::now()).num_seconds() as u64;
 
   // Placeholder response
@@ -859,721 +937,3 @@ pub async fn validate(
     .into_response()
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_login_request_validation_valid() {
-    let request = LoginRequest {
-      email: "developer@example.com".to_string(),
-      password: "secure_password_123".to_string(),
-    };
-    assert!(request.validate().is_ok());
-  }
-
-  #[test]
-  fn test_login_request_validation_empty_email() {
-    let request = LoginRequest {
-      email: "".to_string(),
-      password: "secure_password_123".to_string(),
-    };
-    assert!(request.validate().is_err());
-  }
-
-  #[test]
-  fn test_login_request_validation_empty_password() {
-    let request = LoginRequest {
-      email: "developer@example.com".to_string(),
-      password: "".to_string(),
-    };
-    assert!(request.validate().is_err());
-  }
-
-  #[test]
-  fn test_login_request_validation_email_too_long() {
-    let request = LoginRequest {
-      email: "a".repeat(256),
-      password: "secure_password_123".to_string(),
-    };
-    assert!(request.validate().is_err());
-  }
-
-  #[test]
-  fn test_login_request_validation_password_too_long() {
-    let request = LoginRequest {
-      email: "developer@example.com".to_string(),
-      password: "a".repeat(1001),
-    };
-    assert!(request.validate().is_err());
-  }
-
-  // ============================================================================
-  // Logout Endpoint Tests
-  // ============================================================================
-
-  /// Helper function to create test database with migrations
-  async fn create_test_db() -> Result<SqlitePool, sqlx::Error> {
-    let pool = SqlitePool::connect(":memory:").await?;
-
-    // Run migration 003 (users table)
-    let migration_003 =
-      include_str!("../../../iron_token_manager/migrations/003_create_users_table.sql");
-    sqlx::raw_sql(migration_003).execute(&pool).await?;
-
-    // Run migration 006 (user audit log)
-    let migration_006 =
-      include_str!("../../../iron_token_manager/migrations/006_create_user_audit_log.sql");
-    sqlx::raw_sql(migration_006).execute(&pool).await?;
-
-    // Run migration 007 (blacklist table)
-    let migration_007 =
-      include_str!("../../../iron_token_manager/migrations/007_create_blacklist_table.sql");
-    sqlx::raw_sql(migration_007).execute(&pool).await?;
-
-    Ok(pool)
-  }
-
-  /// Helper function to create test user
-  async fn create_test_user(pool: &SqlitePool, username: &str, email: &str, password: &str, role: &str) -> Result<String, sqlx::Error> {
-    let password_hash = bcrypt::hash(password, bcrypt::DEFAULT_COST).unwrap();
-    let created_at = chrono::Utc::now().timestamp();
-    
-    let mut user_id = username.to_string();
-    user_id.push('_');
-    user_id.push_str(&created_at.to_string());
-
-
-    sqlx::query(
-      "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)"
-    )
-    .bind(&user_id)
-    .bind(username)
-    .bind(email)
-    .bind(password_hash)
-    .bind(role)
-    .bind(created_at)
-    .execute(pool)
-    .await?;
-
-    Ok(user_id)
-  }
-
-  #[tokio::test]
-  async fn test_logout_success() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-    
-    // Create test user
-    let id = create_test_user(&pool, "user1", "test@example.com", "testpass", "developer")
-      .await
-      .expect("Failed to create test user");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool.clone(),
-    };
-
-    // Generate valid token
-    let token_id = "test_token_123";
-    let token = jwt_secret
-      .generate_access_token(&id.to_string(), "test@example.com", "developer", token_id)
-      .expect("Failed to generate token");
-
-    // Create logout request
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/logout", axum::routing::post(logout))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/logout")
-      .header("Authorization", format!("Bearer {}", token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert successful logout (204 No Content)
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
-
-    // Verify token was added to blacklist
-    let blacklisted: Option<(String,)> = sqlx::query_as(
-      "SELECT jti FROM token_blacklist WHERE jti = ?"
-    )
-    .bind(token_id)
-    .fetch_optional(&pool)
-    .await
-    .expect("Failed to query blacklist");
-
-    assert!(blacklisted.is_some(), "Token should be in blacklist");
-    assert_eq!(blacklisted.unwrap().0, token_id);
-  }
-
-  #[tokio::test]
-  async fn test_logout_invalid_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret,
-      db_pool: pool,
-    };
-
-    // Create logout request with invalid token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/logout", axum::routing::post(logout))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/logout")
-      .header("Authorization", "Bearer invalid_token_here")
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert unauthorized (401)
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    // Verify error response contains correct error code
-    assert!(body_str.contains("AUTH_INVALID_TOKEN"));
-  }
-
-  #[tokio::test]
-  async fn test_logout_expired_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool,
-    };
-
-    // Create an expired token manually
-    use jsonwebtoken::{encode, EncodingKey, Header};
-    let claims = crate::jwt_auth::AccessTokenClaims {
-      sub: "test@example.com".to_string(),
-      role: "developer".to_string(),
-      jti: "expired_token_123".to_string(),
-      email: "test@example.com".to_string(),
-      exp: (chrono::Utc::now() - chrono::Duration::hours(1)).timestamp(), // Expired 1 hour ago
-      iat: (chrono::Utc::now() - chrono::Duration::hours(2)).timestamp(),
-    };
-
-    let expired_token = encode(
-      &Header::default(),
-      &claims,
-      &EncodingKey::from_secret("test_secret_key_for_testing".as_bytes()),
-    )
-    .unwrap();
-
-    // Create logout request with expired token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/logout", axum::routing::post(logout))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/logout")
-      .header("Authorization", format!("Bearer {}", expired_token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert unauthorized (401) for expired token
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-  }
-
-  #[tokio::test]
-  async fn test_logout_missing_authorization_header() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret,
-      db_pool: pool,
-    };
-
-    // Create logout request without Authorization header
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/logout", axum::routing::post(logout))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/logout")
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert unauthorized (401) for missing header
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-  }
-
-  // ============================================================================
-  // Refresh Endpoint Tests
-  // ============================================================================
-
-  #[tokio::test]
-  async fn test_refresh_success() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-    
-    // Create test user
-    let user_id = create_test_user(&pool, "user1", "test@example.com", "testpass", "developer")
-      .await
-      .expect("Failed to create test user");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool.clone(),
-    };
-
-    // Generate valid token
-    let token_id = "refresh_test_token_123";
-    let token = jwt_secret
-      .generate_refresh_token(&user_id, "test@example.com", "developer", token_id)
-      .expect("Failed to generate token");
-
-    // Create refresh request
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/refresh", axum::routing::post(refresh))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/refresh")
-      .header("Authorization", format!("Bearer {}", token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert successful refresh (200 OK)
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    // Verify response contains new token
-    assert!(body_str.contains("user_token"));
-    assert!(body_str.contains("Bearer"));
-    assert!(body_str.contains("expires_in"));
-
-    // Verify old token is now blacklisted
-    let blacklisted = user_auth::get_blacklisted_token(&pool, token_id).await
-      .expect("Failed to query blacklist");
-    assert!(blacklisted.is_some(), "Old token should be blacklisted");
-  }
-
-  #[tokio::test]
-  async fn test_refresh_invalid_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret,
-      db_pool: pool,
-    };
-
-    // Create refresh request with invalid token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/refresh", axum::routing::post(refresh))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/refresh")
-      .header("Authorization", "Bearer invalid_token_here")
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert unauthorized (401)
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    // Verify error response
-    assert!(body_str.contains("AUTH_INVALID_TOKEN"));
-  }
-
-  #[tokio::test]
-  async fn test_refresh_expired_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool,
-    };
-
-    // Create an expired token manually
-    use jsonwebtoken::{encode, EncodingKey, Header};
-    let claims = crate::jwt_auth::AccessTokenClaims {
-      sub: "1".to_string(),
-      role: "developer".to_string(),
-      jti: "expired_refresh_token_123".to_string(),
-      email: "test@example.com".to_string(),
-      exp: (chrono::Utc::now() - chrono::Duration::hours(1)).timestamp(),
-      iat: (chrono::Utc::now() - chrono::Duration::hours(2)).timestamp(),
-    };
-
-    let expired_token = encode(
-      &Header::default(),
-      &claims,
-      &EncodingKey::from_secret("test_secret_key_for_testing".as_bytes()),
-    )
-    .unwrap();
-
-    // Create refresh request with expired token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/refresh", axum::routing::post(refresh))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/refresh")
-      .header("Authorization", format!("Bearer {}", expired_token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert unauthorized (401) for expired token
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-  }
-
-  #[tokio::test]
-  async fn test_refresh_blacklisted_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-    
-    // Create test user
-    let user_id = create_test_user(&pool, "user1", "test@example.com", "testpass", "developer")
-      .await
-      .expect("Failed to create test user");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool.clone(),
-    };
-
-    // Generate valid token
-    let token_id = "blacklisted_refresh_token";
-    let token = jwt_secret
-      .generate_refresh_token(&user_id, "test@example.com", "developer", token_id)
-      .expect("Failed to generate token");
-
-    // Blacklist the token
-    let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
-    user_auth::add_token_to_blacklist(&pool, token_id, &user_id, expires_at)
-      .await
-      .expect("Failed to blacklist token");
-
-    // Create refresh request with blacklisted token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/refresh", axum::routing::post(refresh))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/refresh")
-      .header("Authorization", format!("Bearer {}", token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert unauthorized (401) for blacklisted token
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-  }
-
-  // ============================================================================
-  // Validate Endpoint Tests
-  // ============================================================================
-
-  #[tokio::test]
-  async fn test_validate_valid_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-    
-    // Create test user
-    let user_id = create_test_user(&pool, "user1", "test@example.com", "testpass", "developer")
-      .await
-      .expect("Failed to create test user");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool.clone(),
-    };
-
-    // Generate valid token
-    let token_id = "validate_test_token_123";
-    let token = jwt_secret
-      .generate_access_token(&user_id, "test@example.com", "developer", token_id)
-      .expect("Failed to generate token");
-
-    // Create validate request
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/validate", axum::routing::post(validate))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/validate")
-      .header("Authorization", format!("Bearer {}", token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert successful validation (200 OK)
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    // Verify response indicates token is valid
-    assert!(body_str.contains("\"valid\":true"));
-    assert!(body_str.contains("test@example.com"));
-    assert!(body_str.contains("developer"));
-  }
-
-  #[tokio::test]
-  async fn test_validate_invalid_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret,
-      db_pool: pool,
-    };
-
-    // Create validate request with invalid token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/validate", axum::routing::post(validate))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/validate")
-      .header("Authorization", "Bearer invalid_token_here")
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert OK (200) - validate always returns 200, result in body
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    // Verify response indicates token is invalid
-    assert!(body_str.contains("\"valid\":false"));
-    assert!(body_str.contains("TOKEN_EXPIRED"));
-  }
-
-  #[tokio::test]
-  async fn test_validate_expired_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool,
-    };
-
-    // Create an expired token manually
-    use jsonwebtoken::{encode, EncodingKey, Header};
-    let claims = crate::jwt_auth::AccessTokenClaims {
-      sub: "1".to_string(),
-      role: "developer".to_string(),
-      jti: "expired_validate_token_123".to_string(),
-      email: "test@example.com".to_string(),
-      exp: (chrono::Utc::now() - chrono::Duration::hours(1)).timestamp(),
-      iat: (chrono::Utc::now() - chrono::Duration::hours(2)).timestamp(),
-    };
-
-    let expired_token = encode(
-      &Header::default(),
-      &claims,
-      &EncodingKey::from_secret("test_secret_key_for_testing".as_bytes()),
-    )
-    .unwrap();
-
-    // Create validate request with expired token
-    use axum::http::{Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/validate", axum::routing::post(validate))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/validate")
-      .header("Authorization", format!("Bearer {}", expired_token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert OK (200) - validate always returns 200
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-    
-    // Verify response indicates token is expired
-    assert!(body_str.contains("\"valid\":false"));
-    assert!(body_str.contains("TOKEN_EXPIRED"));
-  }
-
-  #[tokio::test]
-  async fn test_validate_blacklisted_token() {
-    // Setup test database
-    let pool = create_test_db().await.expect("Failed to create test database");
-    
-    // Create test user
-    let user_id = create_test_user(&pool, "user1", "test@example.com", "testpass", "developer")
-      .await
-      .expect("Failed to create test user");
-
-    // Create auth state
-    let jwt_secret = Arc::new(JwtSecret::new("test_secret_key_for_testing".to_string()));
-    let state = AuthState {
-      jwt_secret: jwt_secret.clone(),
-      db_pool: pool.clone(),
-    };
-
-    // Generate valid token
-    let token_id = "blacklisted_validate_token";
-    let token = jwt_secret
-      .generate_access_token(&user_id, "test@example.com", "developer", token_id)
-      .expect("Failed to generate token");
-
-    // Blacklist the token
-    let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
-    user_auth::add_token_to_blacklist(&pool, token_id, &user_id, expires_at)
-      .await
-      .expect("Failed to blacklist token");
-
-    // Create validate request with blacklisted token
-    use axum::http::Request;
-    use axum::body::Body;
-    use tower::ServiceExt;
-
-    let app = axum::Router::new()
-      .route("/validate", axum::routing::post(validate))
-      .with_state(state);
-
-    let request = Request::builder()
-      .method("POST")
-      .uri("/validate")
-      .header("Authorization", format!("Bearer {}", token))
-      .body(Body::empty())
-      .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    // Assert OK (200) - validate always returns 200
-    // assert_eq!(response.status(), StatusCode::OK);
-
-    // Read response body
-    use http_body_util::BodyExt;
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-
-    tracing::debug!("{}", body_str);
-    // Verify response indicates token is revoked
-    assert!(body_str.contains("\"valid\":false"));
-    assert!(body_str.contains("TOKEN_REVOKED"));
-    assert!(body_str.contains("revoked_at"));
-  }
-}

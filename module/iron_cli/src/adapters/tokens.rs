@@ -22,7 +22,7 @@ use super::AdapterError;
 use super::services::TokenService;
 use super::auth::HasParams;
 use crate::handlers::token_handlers;
-use crate::formatting::Formatter;
+use crate::formatting::TreeFmtFormatter;
 use std::collections::HashMap;
 
 /// Extract parameters from command
@@ -54,7 +54,7 @@ fn is_dry_run(params: &HashMap<String, String>) -> bool
 pub async fn generate_token_adapter<T, S>(
   command: &T,
   token_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -118,7 +118,7 @@ where
 pub async fn list_tokens_adapter<T, S>(
   command: &T,
   token_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -170,7 +170,7 @@ where
 pub async fn get_token_adapter<T, S>(
   command: &T,
   token_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -215,7 +215,7 @@ where
 pub async fn rotate_token_adapter<T, S>(
   command: &T,
   token_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -275,7 +275,7 @@ where
 pub async fn revoke_token_adapter<T, S>(
   command: &T,
   token_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,

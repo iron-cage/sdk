@@ -29,6 +29,8 @@
 //! | `test_report_usage_exceeding_lease_budget` | Usage exceeds lease budget limit | Lease with 10.0 USD, POST /api/budget/report with cost_usd=15.0 | 403 Forbidden (budget exceeded) | ✅ |
 //! | `test_refresh_with_insufficient_agent_budget` | Refresh with insufficient agent budget | Agent budget=5.0 USD, POST /api/budget/refresh requesting 10.0 USD | 403 Forbidden (insufficient budget) | ✅ |
 
+mod common;
+
 use axum::
 {
   body::Body,
@@ -52,7 +54,7 @@ async fn setup_test_db() -> SqlitePool
   let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
   iron_token_manager::migrations::apply_all_migrations( &pool )
     .await
-    .expect( "Failed to apply migrations" );
+    .expect("LOUD FAILURE: Failed to apply migrations");
   pool
 }
 
@@ -61,10 +63,14 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
 {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ];
 
   let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
   let ip_token_crypto = Arc::new(
     iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
+  );
+  let provider_key_crypto = Arc::new(
+    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
   );
   let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
   let agent_budget_manager = Arc::new(
@@ -82,6 +88,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     lease_manager,
     agent_budget_manager,
     provider_key_storage,
+    provider_key_crypto,
     db_pool: pool,
     jwt_secret,
   }
@@ -97,63 +104,101 @@ fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
     None, // No expiration
   );
 
-  manager.generate_token( &claims ).expect( "Should generate IC Token" )
+  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
 }
 
-/// Helper: Seed agent with specific budget
-async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f64 )
+/// Helper: Seed agent with specific budget and provider key
+///
+/// # Fix(issue-database-state-unique-001)
+/// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
+/// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
+async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microdollars: i64 )
 {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
-  // Insert agent
+  // Create test user if it doesn't exist (required for owner_id foreign key)
   sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at) VALUES (?, ?, ?, ?)"
+    "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( "test_user" )
+  .bind( "test_username" )
+  .bind( "$2b$12$test_password_hash" )
+  .bind( "test@example.com" )
+  .bind( "admin" )
+  .bind( 1 )
+  .bind( now_ms )
+  .execute( pool )
+  .await
+  .unwrap();
+
+  // Insert agent with owner_id
+  sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
   .bind( format!( "test_agent_{}", agent_id ) )
   .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
   .bind( now_ms )
+  .bind( "test_user" )
   .execute( pool )
   .await
   .unwrap();
 
-  // Insert budget (using real column names from migration 010)
+  // Insert agent budget (using microdollars)
   sqlx::query(
     "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)"
+     VALUES (?, ?, 0, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( budget_usd )
-  .bind( 0.0 )
-  .bind( budget_usd )
+  .bind( budget_microdollars )
+  .bind( budget_microdollars )
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )
   .await
   .unwrap();
-}
-
-/// Helper: Seed provider key for testing
-async fn seed_provider_key( pool: &SqlitePool )
-{
-  let now_ms = chrono::Utc::now().timestamp_millis();
 
   // Insert into ai_provider_keys (actual table name from migration 004)
+  // Use unique provider key ID based on agent_id to avoid conflicts between tests
+  // Create real encrypted provider key for testing
+  let test_provider_key = format!( "sk-test_key_for_agent_{}", agent_id );
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key (must match create_test_budget_state)
+  let crypto_service = iron_secrets::crypto::CryptoService::new( &provider_key_master )
+    .expect( "LOUD FAILURE: Should create crypto service" );
+  let encrypted = crypto_service.encrypt( &test_provider_key )
+    .expect( "LOUD FAILURE: Should encrypt provider key" );
+
   sqlx::query(
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 1i64 )
+  .bind( agent_id * 1000 )  // Unique provider key ID per test (e.g., agent 114 → key 114000)
   .bind( "openai" )
-  .bind( "encrypted_test_key_base64" )
-  .bind( "test_nonce_base64" )
+  .bind( encrypted.ciphertext_base64() )
+  .bind( encrypted.nonce_base64() )
   .bind( 1 )
   .bind( now_ms )
   .bind( "test_user" )
   .execute( pool )
   .await
   .unwrap();
+
+  // Insert usage_limits for test_user (required for budget validation)
+  sqlx::query(
+    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_cents_per_month, current_cost_cents_this_month, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)"
+  )
+  .bind( "test_user" )
+  .bind( 1000000i64 )  // $10,000 USD limit (in cents)
+  .bind( 0i64 )        // No spending yet
+  .bind( now_ms )
+  .bind( now_ms )
+  .execute( pool )
+  .await
+  .unwrap();
 }
+
 
 // ============================================================================
 // TEST 1: Handshake with Non-Existent Agent
@@ -180,7 +225,39 @@ async fn seed_provider_key( pool: &SqlitePool )
 async fn test_handshake_with_nonexistent_agent()
 {
   let pool = setup_test_db().await;
-  seed_provider_key( &pool ).await;
+
+  // Create test user and provider key for testing (agent 999 won't exist)
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  sqlx::query(
+    "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( "test_user" )
+  .bind( "test_username" )
+  .bind( "$2b$12$test_password_hash" )
+  .bind( "test@example.com" )
+  .bind( "admin" )
+  .bind( 1 )
+  .bind( now_ms )
+  .execute( &pool )
+  .await
+  .unwrap();
+
+  sqlx::query(
+    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( 999000i64 )
+  .bind( "openai" )
+  .bind( "encrypted_test_key_base64" )
+  .bind( "test_nonce_base64" )
+  .bind( 1 )
+  .bind( now_ms )
+  .bind( "test_user" )
+  .execute( &pool )
+  .await
+  .unwrap();
+
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Create IC Token for agent that doesnt exist (agent_id = 999)
@@ -191,7 +268,7 @@ async fn test_handshake_with_nonexistent_agent()
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 1
+    "provider_key_id": 999000
   } );
 
   let app = Router::new()
@@ -207,19 +284,19 @@ async fn test_handshake_with_nonexistent_agent()
 
   let response = app.oneshot( request ).await.unwrap();
 
-  // Assert: HTTP 403 Forbidden (no budget allocated)
+  // Assert: HTTP 401 Unauthorized (generic error to prevent agent enumeration)
   assert_eq!(
     response.status(),
-    StatusCode::FORBIDDEN,
-    "Handshake with non-existent agent should return 403 Forbidden"
+    StatusCode::UNAUTHORIZED,
+    "Handshake with non-existent agent should return 401 Unauthorized (security: prevent enumeration)"
   );
 
   let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
   let body_str = String::from_utf8( body.to_vec() ).unwrap();
 
   assert!(
-    body_str.contains( "No budget allocated" ),
-    "Error message should indicate no budget allocated: {}",
+    body_str.contains( "Invalid IC Token" ),
+    "Error message should be generic to prevent agent enumeration: {}",
     body_str
   );
 }
@@ -249,19 +326,18 @@ async fn test_handshake_with_nonexistent_agent()
 async fn test_handshake_with_zero_agent_budget()
 {
   let pool = setup_test_db().await;
-  seed_provider_key( &pool ).await;
 
   // Seed agent with exactly $0.00 budget
-  seed_agent_with_budget( &pool, 1, 0.0 ).await;
+  seed_agent_with_budget( &pool, 114, 0 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let ic_token = create_ic_token( 114, &state.ic_token_manager );
 
   let request_body = json!(
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 1
+    "provider_key_id": 114000
   } );
 
   let app = Router::new()
@@ -288,8 +364,8 @@ async fn test_handshake_with_zero_agent_budget()
   let body_str = String::from_utf8( body.to_vec() ).unwrap();
 
   assert!(
-    body_str.contains( "Insufficient budget" ),
-    "Error message should indicate insufficient budget: {}",
+    body_str.contains( "Budget limit exceeded" ),
+    "Error message should indicate budget limit exceeded: {}",
     body_str
   );
 }
@@ -298,40 +374,39 @@ async fn test_handshake_with_zero_agent_budget()
 // TEST 3: Handshake with Insufficient Budget for Lease
 // ============================================================================
 
-/// TEST 3: Handshake with insufficient budget for lease
+/// TEST 3: Handshake with partial budget availability
 ///
 /// # Corner Case
 ///
-/// Agent budget = $5.00, lease requests $10.00 (default lease amount)
+/// Agent budget = $5.00, default lease amount = $10.00
 ///
 /// # Expected Behavior
 ///
-/// - HTTP 403 "Insufficient budget"
-/// - Prevents partial lease allocation
+/// - HTTP 200 OK with granted budget = $5.00
+/// - Implementation grants min(default_lease, remaining_budget) to allow partial leases
 ///
 /// # Root Cause Prevention
 ///
-/// **Why This Test Exists**: Budget must be checked BEFORE lease creation to prevent
-/// over-allocation.
+/// **Why This Test Exists**: Validates that partial leases are granted when remaining budget
+/// is less than default lease amount, enabling multiple concurrent leases.
 ///
-/// **Prevention**: Pre-check ensures atomic budget allocation.
+/// **Prevention**: Ensures implementation uses min(default, remaining) formula correctly.
 #[ tokio::test ]
 async fn test_handshake_with_insufficient_budget_for_lease()
 {
   let pool = setup_test_db().await;
-  seed_provider_key( &pool ).await;
 
-  // Seed agent with $5.00 (insufficient for $10.00 default lease)
-  seed_agent_with_budget( &pool, 1, 5.0 ).await;
+  // Seed agent with $5.00 (less than $10.00 default lease)
+  seed_agent_with_budget( &pool, 115, 5_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let ic_token = create_ic_token( 115, &state.ic_token_manager );
 
   let request_body = json!(
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 1
+    "provider_key_id": 115000
   } );
 
   let app = Router::new()
@@ -347,20 +422,22 @@ async fn test_handshake_with_insufficient_budget_for_lease()
 
   let response = app.oneshot( request ).await.unwrap();
 
-  // Assert: HTTP 403 Forbidden
+  // Assert: HTTP 200 OK (partial lease granted)
   assert_eq!(
     response.status(),
-    StatusCode::FORBIDDEN,
-    "Handshake with insufficient budget should return 403 Forbidden"
+    StatusCode::OK,
+    "Handshake should succeed with partial lease when budget < default"
   );
 
   let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let response_json: serde_json::Value = serde_json::from_slice( &body ).unwrap();
 
-  assert!(
-    body_str.contains( "Insufficient budget" ),
-    "Error message should indicate insufficient budget: {}",
-    body_str
+  // Verify partial lease granted (should be min($10, $5) = $5)
+  let granted = response_json[ "budget_granted" ].as_i64().unwrap();
+  assert_eq!(
+    granted, 5_000_000,
+    "Should grant partial lease of $5, got {} microdollars",
+    granted
   );
 }
 
@@ -397,7 +474,7 @@ async fn test_report_usage_with_nonexistent_lease()
     "lease_id": "lease_00000000-0000-0000-0000-000000000000",
     "request_id": "req_12345",
     "tokens": 1000,
-    "cost_usd": 0.05,
+    "cost_microdollars": 50_000,
     "model": "gpt-4",
     "provider": "openai"
   } );
@@ -463,8 +540,7 @@ async fn test_report_usage_with_nonexistent_lease()
 async fn test_report_usage_on_expired_lease()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 1, 100.0 ).await;
-  seed_provider_key( &pool ).await;
+  seed_agent_with_budget( &pool, 116, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -475,7 +551,7 @@ async fn test_report_usage_on_expired_lease()
 
   state
     .lease_manager
-    .create_lease( lease_id, 1, 1, 10.0, Some( one_hour_ago ) )
+    .create_lease( lease_id, 116, 116, 10_000_000, Some( one_hour_ago ) ) // $10
     .await
     .unwrap();
 
@@ -485,7 +561,7 @@ async fn test_report_usage_on_expired_lease()
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 1000,
-    "cost_usd": 0.05,
+    "cost_microdollars": 50_000,
     "model": "gpt-4",
     "provider": "openai"
   } );
@@ -624,8 +700,7 @@ async fn test_report_usage_on_expired_lease()
 async fn test_report_usage_exceeding_lease_budget()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 1, 100.0 ).await;
-  seed_provider_key( &pool ).await;
+  seed_agent_with_budget( &pool, 117, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -633,12 +708,12 @@ async fn test_report_usage_exceeding_lease_budget()
   let lease_id = "lease_budget_test";
   state
     .lease_manager
-    .create_lease( lease_id, 1, 1, 1.0, None )
+    .create_lease( lease_id, 117, 117, 1_000_000, None ) // $1.00
     .await
     .unwrap();
 
   // Record $0.90 usage (leaving $0.10 remaining)
-  state.lease_manager.record_usage( lease_id, 0.90 ).await.unwrap();
+  state.lease_manager.record_usage( lease_id, 900_000 ).await.unwrap(); // $0.90
 
   // Try to report $0.50 usage (exceeds remaining $0.10)
   let request_body = json!(
@@ -646,7 +721,7 @@ async fn test_report_usage_exceeding_lease_budget()
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 5000,
-    "cost_usd": 0.50,
+    "cost_microdollars": 500_000,
     "model": "gpt-4",
     "provider": "openai"
   } );
@@ -809,31 +884,38 @@ async fn test_report_usage_exceeding_lease_budget()
 async fn test_refresh_with_insufficient_agent_budget()
 {
   let pool = setup_test_db().await;
-  seed_provider_key( &pool ).await;
 
   // Seed agent with $5.00 (insufficient for $10.00 default refresh)
-  seed_agent_with_budget( &pool, 1, 5.0 ).await;
+  seed_agent_with_budget( &pool, 118, 5_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
-  // Generate IC Token for agent 1
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  // Generate IC Token for agent 118
+  let ic_token = create_ic_token( 118, &state.ic_token_manager );
 
   // Create active lease
   let lease_id = "lease_refresh_test";
   state
     .lease_manager
-    .create_lease( lease_id, 1, 1, 10.0, None )
+    .create_lease( lease_id, 118, 118, 10_000_000, None ) // $10
     .await
     .unwrap();
 
-  // Try to refresh with $10.00 (exceeds remaining $5.00)
+  // Try to refresh with $10 (exceeds remaining $5)
   let request_body = json!(
   {
     "ic_token": ic_token,
     "current_lease_id": lease_id,
-    "requested_budget": 10.0
+    "requested_budget": 10_000_000  // $10
   } );
+
+  // Create valid JWT token for authorization (GAP-003: refresh endpoint requires JWT)
+  let access_token = common::create_test_access_token(
+    "test_user",
+    "test@example.com",
+    "admin",
+    "test_jwt_secret"
+  );
 
   let app = Router::new()
     .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
@@ -843,6 +925,7 @@ async fn test_refresh_with_insufficient_agent_budget()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", access_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -860,25 +943,34 @@ async fn test_refresh_with_insufficient_agent_budget()
 
   // Parse JSON response
   let response_json: serde_json::Value = serde_json::from_str( &body_str )
-    .expect( "Response should be valid JSON" );
+    .expect("LOUD FAILURE: Response should be valid JSON");
 
-  // Assert: Status is "denied"
+  // Fix(issue-budget-008): Refresh now reserves budget via check_and_reserve_budget
+  //
+  // Root cause: Test expected denial when budget < requested, but check_and_reserve_budget
+  // supports partial grants. Agent has $5, requests $10, receives $5 granted.
+  //
+  // Pitfall: When fixing budget accounting bugs, check ALL tests that validate budget
+  // enforcement behavior. Partial grant support changes "insufficient budget" semantics
+  // from "deny" to "approve with available amount".
+
+  // Assert: Status is "approved" (partial grant)
   assert_eq!(
     response_json[ "status" ].as_str().unwrap(),
-    "denied",
-    "Refresh with insufficient budget should return status='denied'"
+    "approved",
+    "Refresh with partial budget should return status='approved' (partial grant)"
   );
 
-  // Assert: Reason is "insufficient_budget"
+  // Assert: budget_granted is $5 (partial grant, not full $10)
   assert_eq!(
-    response_json[ "reason" ].as_str().unwrap(),
-    "insufficient_budget",
-    "Denial reason should be 'insufficient_budget'"
+    response_json[ "budget_granted" ].as_i64().unwrap(),
+    5_000_000,
+    "Partial grant should provide available budget ($5, not requested $10)"
   );
 
-  // Assert: budget_granted is None
+  // Assert: Reason is None (approved, not denied)
   assert!(
-    response_json[ "budget_granted" ].is_null(),
-    "No budget should be granted when denied"
+    response_json[ "reason" ].is_null(),
+    "Approved refresh should have no denial reason"
   );
 }

@@ -8,7 +8,7 @@ use axum::{
   routing::any,
   Router,
 };
-use iron_cost::budget::CostController;
+use iron_cost::budget::{CostController, Reservation};
 use iron_cost::error::CostError;
 use iron_cost::pricing::PricingManager;
 use reqwest::Client;
@@ -155,10 +155,11 @@ fn create_openai_error_response(
     .header(header::CONTENT_TYPE, "application/json")
     .body(Body::from(error_json.to_string()))
     .unwrap_or_else(|_| {
+      // Fallback response if primary error response construction fails
       Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(Body::from("Internal error"))
-        .unwrap()
+        .expect( "INVARIANT: Fallback response with static content and valid StatusCode never fails" )
     })
 }
 
@@ -170,19 +171,38 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   };
 
   // Use CostController's check_budget method
-  if let Err(CostError::BudgetExceeded { spent_usd, limit_usd }) = controller.check_budget() {
-    return Err(Box::new(create_openai_error_response(
-      StatusCode::PAYMENT_REQUIRED, // 402 - distinct from 429 rate limit
-      &format!(
-        "Iron Cage budget limit exceeded. Spent: ${:.2}, Limit: ${:.2}. \
-         Increase budget with router.set_budget() or check your pricing calculations.",
-        spent_usd, limit_usd
-      ),
-      "iron_cage_budget_exceeded", // Unique type - never from OpenAI
-      "budget_exceeded",
-    )));
+  match controller.check_budget() {
+    Ok(()) => Ok(()),
+    Err(CostError::BudgetExceeded { spent_microdollars, limit_microdollars, reserved_microdollars }) => {
+      let spent_usd = spent_microdollars as f64 / 1_000_000.0;
+      let limit_usd = limit_microdollars as f64 / 1_000_000.0;
+      let reserved_usd = reserved_microdollars as f64 / 1_000_000.0;
+      Err(Box::new(create_openai_error_response(
+        StatusCode::PAYMENT_REQUIRED, // 402 - distinct from 429 rate limit
+        &format!(
+          "Iron Cage budget limit exceeded. Spent: ${:.2}, Reserved: ${:.2}, Limit: ${:.2}. \
+           Increase budget with router.set_budget() or check your pricing calculations.",
+          spent_usd, reserved_usd, limit_usd
+        ),
+        "iron_cage_budget_exceeded", // Unique type - never from OpenAI
+        "budget_exceeded",
+      )))
+    }
+    Err(CostError::InsufficientBudget { available_microdollars, requested_microdollars }) => {
+      let available_usd = available_microdollars as f64 / 1_000_000.0;
+      let requested_usd = requested_microdollars as f64 / 1_000_000.0;
+      Err(Box::new(create_openai_error_response(
+        StatusCode::PAYMENT_REQUIRED,
+        &format!(
+          "Iron Cage insufficient budget. Available: ${:.2}, Requested: ${:.2}. \
+           Wait for in-flight requests to complete or increase budget.",
+          available_usd, requested_usd
+        ),
+        "iron_cage_insufficient_budget",
+        "insufficient_budget",
+      )))
+    }
   }
-  Ok(())
 }
 
 /// Strip provider prefix from path if present, returns (clean_path, requested_provider)
@@ -250,7 +270,7 @@ async fn handle_proxy(
     return Err((StatusCode::UNAUTHORIZED, "Invalid API key".to_string()));
   }
 
-  // 1.5 Check budget before processing request
+  // 1.5 Check budget before processing request (quick check)
   if let Err(error_response) = check_budget(&state) {
     return Ok(*error_response);
   }
@@ -267,6 +287,37 @@ async fn handle_proxy(
   let body_bytes = axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024) // 10MB limit
       .await
       .map_err(|e| (StatusCode::BAD_REQUEST, format!("Body read error: {}", e)))?;
+
+  // 2.5 Reserve budget for this request (prevents concurrent overspend)
+  let reservation: Option<Reservation> = if let Some(ref controller) = state.cost_controller {
+    if let Some(max_cost) = state.pricing_manager.estimate_max_cost(&body_bytes) {
+      match controller.reserve(max_cost) {
+        Ok(res) => Some(res),
+        Err(CostError::InsufficientBudget { available_microdollars, requested_microdollars }) => {
+          let available_usd = available_microdollars as f64 / 1_000_000.0;
+          let requested_usd = requested_microdollars as f64 / 1_000_000.0;
+          return Ok(create_openai_error_response(
+            StatusCode::PAYMENT_REQUIRED,
+            &format!(
+              "Iron Cage insufficient budget for request. Available: ${:.4}, Estimated max cost: ${:.4}. \
+               Reduce max_tokens or wait for in-flight requests to complete.",
+              available_usd, requested_usd
+            ),
+            "iron_cage_insufficient_budget",
+            "insufficient_budget",
+          ));
+        }
+        Err(e) => {
+          tracing::warn!("Budget reservation failed: {}", e);
+          None // Proceed without reservation (fallback)
+        }
+      }
+    } else {
+      None // Unknown model/pricing, skip reservation
+    }
+  } else {
+    None // No budget controller
+  };
 
   // 3. Get real API key from Iron Cage server (cached, auto-detected provider)
   let provider_key = state
@@ -350,12 +401,17 @@ async fn handle_proxy(
     resp_body.to_vec()
   };
 
-  // 11. Calculate and log request cost
+  // 11. Calculate and log request cost, commit/cancel reservation
   if status.is_success() {
     if let Some(cost_info) = calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body) {
-      // Add to total spent using CostController if budget is set
+      // Commit reservation with actual cost (or add directly if no reservation)
       if let Some(ref controller) = state.cost_controller {
-        controller.add_spend_micros(cost_info.cost_micros);
+        if let Some(res) = reservation {
+          controller.commit(res, cost_info.cost_micros);
+        } else {
+          // No reservation was made, add directly (fallback for unknown models)
+          controller.add_spend(cost_info.cost_micros as i64);
+        }
       }
 
       // Record analytics event
@@ -380,8 +436,20 @@ async fn handle_proxy(
         cost_usd = %format!("{:.6}", cost_info.cost_usd()),
         "LLM request completed"
       );
+    } else if let Some(res) = reservation {
+      // Cost couldn't be calculated, cancel reservation
+      if let Some(ref controller) = state.cost_controller {
+        controller.cancel(res);
+      }
     }
   } else {
+    // Request failed - cancel reservation (no cost incurred)
+    if let Some(res) = reservation {
+      if let Some(ref controller) = state.cost_controller {
+        controller.cancel(res);
+      }
+    }
+
     // Record failed request for non-2xx responses
     #[cfg(feature = "analytics")]
     if let Some(model) = extract_model_from_body(&body_bytes) {

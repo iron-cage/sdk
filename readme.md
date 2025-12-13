@@ -14,28 +14,24 @@ This repository contains the core runtime modules for AI agent management includ
 
 See [`docs/repository_architecture.md`](docs/repository_architecture.md) for complete documentation of the two-repository split.
 
-## Modules
+## Workspace Organization
 
-All modules are located in the `module/` directory.
-
-| Module | Responsibility | Language |
-|--------|----------------|----------|
-| **iron_types** | Shared types, data structures, API contracts | Rust |
-| **iron_cost** | Budget tracking, cost calculation, spending limits | Rust |
-| **iron_telemetry** | Logging, tracing, metrics collection | Rust |
-| **iron_runtime_analytics** | Lock-free analytics for LLM requests (events, stats, cost tracking) | Rust |
-| **iron_runtime_state** | Agent execution state management | Rust |
-| **iron_safety** | PII detection and redaction | Rust |
-| **iron_reliability** | Circuit breaker, retry patterns, fault tolerance | Rust |
-| **iron_secrets** | Encrypted secrets storage, access control | Rust |
-| **iron_token_manager** | User management, API token generation, JWT auth, rate limiting | Rust |
-| **iron_control_api** | REST API server, WebSocket endpoints | Rust |
-| **iron_runtime** | Agent orchestration, LlmRouter proxy, PyO3 Python bridge | Rust |
-| **iron_cli** | Command-line interface for API operations (authoritative) | Rust |
-| **iron_cli_py** | Python CLI with wrapper to iron_cli for operations | Python |
-| **iron_sdk** | Pythonic SDK for Agent Runtime integration (includes examples/) | Python |
-| **iron_testing** | Test utilities, fixtures, mock runtime | Python |
-| **iron_dashboard** | Control Panel web UI | Vue.js |
+| Entity | Responsibility | Input→Output | Scope | Out of Scope |
+|--------|----------------|--------------|-------|--------------|
+| iron_types | Shared type definitions | Raw data → Validated typed structures | Core types (AgentId, ProviderId, Budget) | Business logic, persistence |
+| iron_cost | Cost calculation and tracking | Provider API responses → Cost metrics | Token counting, pricing, budgets | Actual API calls, rate limiting |
+| iron_telemetry | Observability and tracing | Application events → Structured logs/metrics | Tracing, metrics, logging | Log aggregation, alerting |
+| iron_runtime_analytics | Usage analytics and reporting | Raw usage data → Analytics reports | Aggregation, trending, forecasting | Data storage, visualization |
+| iron_runtime_state | Runtime state management | State transitions → Persisted state | Agent state, session state | Long-term persistence, caching |
+| iron_test_db | Test database infrastructure | Test requirements → Isolated DB instances | SQLite test instances, fixtures | Production databases, migrations |
+| iron_safety | Content safety and moderation | User input → Safety verdicts | Content filtering, policy enforcement | Policy definition, training |
+| iron_reliability | Resilience patterns | Unreliable operations → Reliable execution | Circuit breakers, retries, timeouts | Actual service implementations |
+| iron_secrets | Secrets management | Plaintext secrets → Encrypted storage | Encryption, key management, access control | Secret generation, rotation policies |
+| iron_token_manager | API token management | Provider keys → Managed tokens | Token lifecycle, usage tracking, limits | Token generation, provider integration |
+| iron_control_api | HTTP API for control plane | HTTP requests → JSON responses | REST endpoints, auth, validation | CLI implementations, SDK |
+| iron_runtime | Agent runtime and LLM routing | Agent requests → Provider API calls | Request translation, response parsing | Actual LLM provider SDKs |
+| iron_cli | Command-line interface | User commands → API operations | CLI parsing, formatting, output | API implementation, business logic |
+| iron_control_schema | Database schema definitions | Schema changes → SQL migrations | Table definitions, migrations, indexes | Query logic, application code |
 
 ### Layer Organization
 

@@ -21,7 +21,7 @@
 use super::{ AdapterError, ServiceError };
 use super::services::{ AuthService, StorageService };
 use crate::handlers::auth_handlers;
-use crate::formatting::Formatter;
+use crate::formatting::TreeFmtFormatter;
 use std::collections::HashMap;
 
 /// Extract parameters from mock VerifiedCommand
@@ -61,7 +61,7 @@ fn is_dry_run(params: &HashMap<String, String>) -> bool
 pub async fn login_adapter<T, A>(
   command: &T,
   auth_service: A,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -111,7 +111,7 @@ pub async fn refresh_adapter<T, A, S>(
   command: &T,
   auth_service: A,
   storage_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -172,7 +172,7 @@ pub async fn logout_adapter<T, A, S>(
   command: &T,
   auth_service: A,
   storage_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,

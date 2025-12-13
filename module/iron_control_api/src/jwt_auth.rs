@@ -119,7 +119,7 @@ impl JwtSecret
   {
     let now = SystemTime::now()
       .duration_since( UNIX_EPOCH )
-      .expect( "Time went backwards" )
+      .expect( "LOUD FAILURE: Time went backwards" )
       .as_secs();
 
     let claims = RefreshTokenClaims
@@ -304,74 +304,3 @@ where
   }
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ test ]
-  fn test_generate_access_token()
-  {
-    let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( "user_123", "user@example.com", "user", "token_001" ).expect( "Should generate token" );
-    assert!( !token.is_empty(), "Token should not be empty" );
-  }
-
-  #[ test ]
-  fn test_verify_access_token()
-  {
-    let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt.generate_access_token( "user_456", "admin@example.com", "admin", "token_002" ).expect( "Should generate token" );
-
-    let claims = jwt.verify_access_token( &token ).expect( "Should verify token" );
-    assert_eq!( claims.sub, "user_456" );
-    assert_eq!( claims.role, "admin" );
-    assert_eq!( claims.email, "admin@example.com" );
-    assert_eq!( claims.jti, "token_002" );
-  }
-
-  #[ test ]
-  fn test_generate_refresh_token()
-  {
-    let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt
-      .generate_refresh_token( "user_789", "user@example.com", "user", "token_id_001" )
-      .expect( "Should generate token" );
-    assert!( !token.is_empty(), "Token should not be empty" );
-  }
-
-  #[ test ]
-  fn test_verify_refresh_token()
-  {
-    let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let token = jwt
-      .generate_refresh_token( "user_999", "user@example.com", "user", "token_id_002" )
-      .expect( "Should generate token" );
-
-    let claims = jwt.verify_refresh_token( &token ).expect( "Should verify token" );
-    assert_eq!( claims.sub, "user_999" );
-    assert_eq!( claims.email, "user@example.com" );
-    assert_eq!( claims.role, "user" );
-    assert_eq!( claims.jti, "token_id_002" );
-  }
-
-  #[ test ]
-  fn test_invalid_token_fails_verification()
-  {
-    let jwt = JwtSecret::new( "test_secret_key_12345".to_string() );
-    let result = jwt.verify_access_token( "invalid.token.here" );
-    assert!( result.is_err(), "Invalid token should fail verification" );
-  }
-
-  #[ test ]
-  fn test_wrong_secret_fails_verification()
-  {
-    let jwt1 = JwtSecret::new( "secret_1".to_string() );
-    let jwt2 = JwtSecret::new( "secret_2".to_string() );
-
-    let token = jwt1.generate_access_token( "user_123", "user@example.com", "user", "token_003" ).expect( "Should generate" );
-    let result = jwt2.verify_access_token( &token );
-
-    assert!( result.is_err(), "Token signed with different secret should fail" );
-  }
-}

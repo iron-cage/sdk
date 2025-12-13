@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Runtime state management for Iron Cage agents"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["state-management", "runtime", "agent-state"]
+categories = ["data-structures"]
 
 [features]
 default = ["enabled"]
@@ -14,9 +19,8 @@ enabled = [
   "dep:tokio",
   "dep:tracing",
 ]
-full = ["enabled", "sqlite", "redis"]
+full = ["enabled", "sqlite"]
 sqlite = ["dep:sqlx"]
-redis = ["dep:redis"]
 
 [dependencies]
 iron_types = { workspace = true, features = ["full"], optional = true }
@@ -26,7 +30,6 @@ dashmap = { workspace = true, optional = true }
 
 # Persistence (version 0.7 to match iron_safety)
 sqlx = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"], optional = true }
-redis = { workspace = true, features = ["tokio-comp", "connection-manager"], optional = true }
 
 # Serialization
 serde = { workspace = true, features = ["derive"], optional = true }

@@ -74,7 +74,9 @@ pub fn get_access_token() -> Result<String, KeyringError>
     .map_err( |e|
     {
       let error_msg = e.to_string();
-      if error_msg.contains( "NoEntry" ) || error_msg.contains( "not found" )
+      if error_msg.contains( "NoEntry" )
+        || error_msg.contains( "not found" )
+        || error_msg.contains( "No matching entry" )
       {
         KeyringError::NotFound( "Access token not found. Please login first.".to_string() )
       }
@@ -119,7 +121,9 @@ pub fn get_refresh_token() -> Result<String, KeyringError>
     .map_err( |e|
     {
       let error_msg = e.to_string();
-      if error_msg.contains( "NoEntry" ) || error_msg.contains( "not found" )
+      if error_msg.contains( "NoEntry" )
+        || error_msg.contains( "not found" )
+        || error_msg.contains( "No matching entry" )
       {
         KeyringError::NotFound( "Refresh token not found. Please login first.".to_string() )
       }
@@ -201,57 +205,3 @@ impl std::fmt::Display for KeyringError
 }
 
 impl std::error::Error for KeyringError {}
-
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_token_roundtrip()
-  {
-    // Clean state
-    let _ = clear_tokens();
-
-    // Store tokens
-    let access = "test_access_token_12345";
-    let refresh = "test_refresh_token_67890";
-
-    set_access_token( access ).expect( "Failed to store access token" );
-    set_refresh_token( refresh ).expect( "Failed to store refresh token" );
-
-    // Retrieve tokens
-    let retrieved_access = get_access_token().expect( "Failed to retrieve access token" );
-    let retrieved_refresh = get_refresh_token().expect( "Failed to retrieve refresh token" );
-
-    assert_eq!( retrieved_access, access );
-    assert_eq!( retrieved_refresh, refresh );
-
-    // Clear tokens
-    clear_tokens().expect( "Failed to clear tokens" );
-
-    // Verify cleared
-    assert!( get_access_token().is_err() );
-    assert!( get_refresh_token().is_err() );
-  }
-
-  #[test]
-  fn test_get_missing_token()
-  {
-    // Ensure clean state
-    let _ = clear_tokens();
-
-    // Should error on missing token
-    let result = get_access_token();
-    assert!( result.is_err() );
-
-    if let Err( KeyringError::NotFound( msg ) ) = result
-    {
-      assert!( msg.contains( "not found" ) );
-    }
-    else
-    {
-      panic!( "Expected NotFound error" );
-    }
-  }
-}

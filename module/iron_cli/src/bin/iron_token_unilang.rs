@@ -18,6 +18,9 @@
 //! - Traces (3): .traces.{list,get,export}
 //! - Health (2): .health.{check,version}
 //!
+
+// Binary entry points are allowed to use println! for final output
+#![allow(clippy::disallowed_macros)]
 //! Implementation Status: Phase 3 - Runtime YAML loading with command execution
 //! - ✅ Binary entry point created
 //! - ✅ YAML command definitions (22 commands)
@@ -308,16 +311,6 @@ fn route_to_handler(
       runtime.block_on( iron_cli::adapters::health_adapters::version_adapter( params ) )
     }
 
-    // Legacy health commands (if still referenced)
-    ".health.check" =>
-    {
-      runtime.block_on( iron_cli::adapters::health_adapters::health_check_adapter( params ) )
-    }
-    ".health.version" =>
-    {
-      runtime.block_on( iron_cli::adapters::health_adapters::version_adapter( params ) )
-    }
-
     // Default: Command not implemented
     _ =>
     {
@@ -341,8 +334,7 @@ fn print_banner()
   println!();
   println!( "Help:" );
   println!( "  iron-token .help                    # List all commands" );
-  println!( "  iron-token .tokens.list ?           # Quick help" );
-  println!( "  iron-token .tokens.list ??          # Detailed help" );
+  println!( "  iron-token .tokens.list ?           # Command help" );
   println!();
   println!( "Status: Phase 5 - Full adapter integration complete ✓" );
   println!( "All 22 commands integrated with HTTP adapters" );

@@ -92,22 +92,3 @@ where
   }
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ test ]
-  fn api_token_auth_debug()
-  {
-    let auth = ApiTokenAuth {
-      token_id: 123,
-      user_id: "user_abc".to_string(),
-      project_id: Some( "project_xyz".to_string() ),
-    };
-    let debug_str = format!( "{:?}", auth );
-    assert!( debug_str.contains( "ApiTokenAuth" ) );
-    assert!( debug_str.contains( "123" ) );
-    assert!( debug_str.contains( "user_abc" ) );
-  }
-}

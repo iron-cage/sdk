@@ -6,6 +6,9 @@
 use crate::handlers::CliError;
 
 /// Validates that a token ID matches the expected format (tok_*)
+// Fix(corner-case-token-id): Added check for content after "tok_" prefix
+// Root cause: Only validated prefix existence, not that there's actual ID content after it
+// Pitfall: Format validation should verify both structure AND meaningful content
 pub fn validate_token_id(token_id: &str, param_name: &'static str) -> Result<(), CliError>
 {
   if token_id.is_empty()
@@ -24,17 +27,39 @@ pub fn validate_token_id(token_id: &str, param_name: &'static str) -> Result<(),
     });
   }
 
-  Ok(())
-}
-
-/// Validates that a string is non-empty
-pub fn validate_non_empty(value: &str, param_name: &'static str) -> Result<(), CliError>
-{
-  if value.is_empty()
+  // Verify there's content after the "tok_" prefix (minimum length 5: "tok_X")
+  if token_id.len() <= 4
   {
     return Err(CliError::InvalidParameter {
       param: param_name,
-      reason: "cannot be empty",
+      reason: "must have content after 'tok_' prefix",
+    });
+  }
+
+  // Check that suffix is not just whitespace
+  let suffix = &token_id[4..];
+  if suffix.trim().is_empty()
+  {
+    return Err(CliError::InvalidParameter {
+      param: param_name,
+      reason: "suffix cannot be whitespace-only",
+    });
+  }
+
+  Ok(())
+}
+
+/// Validates that a string is non-empty and not whitespace-only
+// Fix(corner-case-whitespace): Added trim() check to reject whitespace-only strings
+// Root cause: is_empty() returns false for strings containing only whitespace
+// Pitfall: Always validate that strings contain meaningful content, not just non-zero length
+pub fn validate_non_empty(value: &str, param_name: &'static str) -> Result<(), CliError>
+{
+  if value.trim().is_empty()
+  {
+    return Err(CliError::InvalidParameter {
+      param: param_name,
+      reason: "cannot be empty or whitespace-only",
     });
   }
 
@@ -141,70 +166,3 @@ fn is_valid_date_format(date: &str) -> bool
   true
 }
 
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_validate_token_id_success()
-  {
-    assert!(validate_token_id("tok_abc123", "token_id").is_ok());
-  }
-
-  #[test]
-  fn test_validate_token_id_empty()
-  {
-    assert!(validate_token_id("", "token_id").is_err());
-  }
-
-  #[test]
-  fn test_validate_token_id_invalid_prefix()
-  {
-    assert!(validate_token_id("invalid", "token_id").is_err());
-  }
-
-  #[test]
-  fn test_validate_non_empty_success()
-  {
-    assert!(validate_non_empty("value", "param").is_ok());
-  }
-
-  #[test]
-  fn test_validate_non_empty_fails()
-  {
-    assert!(validate_non_empty("", "param").is_err());
-  }
-
-  #[test]
-  fn test_validate_non_negative_integer_success()
-  {
-    assert_eq!(validate_non_negative_integer("100", "value").unwrap(), 100);
-  }
-
-  #[test]
-  fn test_validate_non_negative_integer_negative()
-  {
-    assert!(validate_non_negative_integer("-100", "value").is_err());
-  }
-
-  #[test]
-  fn test_validate_non_negative_integer_invalid()
-  {
-    assert!(validate_non_negative_integer("abc", "value").is_err());
-  }
-
-  #[test]
-  fn test_validate_date_format_success()
-  {
-    assert!(validate_date_format("2025-01-15", "date").is_ok());
-  }
-
-  #[test]
-  fn test_validate_date_format_invalid()
-  {
-    assert!(validate_date_format("invalid", "date").is_err());
-    assert!(validate_date_format("2025-13-01", "date").is_err());
-    assert!(validate_date_format("2025-00-01", "date").is_err());
-  }
-}

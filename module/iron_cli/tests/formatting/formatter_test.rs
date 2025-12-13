@@ -14,7 +14,7 @@
 //!
 //! See tests/formatting/-test_matrix.md for complete coverage plan.
 
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 
 // ============================================================================
@@ -59,7 +59,7 @@ fn test_output_format_from_str_invalid()
 #[test]
 fn test_format_single_item_table()
 {
-  let formatter = Formatter::new(OutputFormat::Table);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
   let mut data = HashMap::new();
   data.insert("id".to_string(), "tok_123".to_string());
@@ -76,7 +76,7 @@ fn test_format_single_item_table()
 #[test]
 fn test_format_single_item_expanded()
 {
-  let formatter = Formatter::new(OutputFormat::Expanded);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Expanded);
 
   let mut data = HashMap::new();
   data.insert("id".to_string(), "tok_123".to_string());
@@ -93,7 +93,7 @@ fn test_format_single_item_expanded()
 #[test]
 fn test_format_single_item_json()
 {
-  let formatter = Formatter::new(OutputFormat::Json);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
   let mut data = HashMap::new();
   data.insert("id".to_string(), "tok_123".to_string());
@@ -109,7 +109,7 @@ fn test_format_single_item_json()
 #[test]
 fn test_format_single_item_yaml()
 {
-  let formatter = Formatter::new(OutputFormat::Yaml);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
 
   let mut data = HashMap::new();
   data.insert("id".to_string(), "tok_123".to_string());
@@ -129,7 +129,7 @@ fn test_format_single_item_yaml()
 #[test]
 fn test_format_multiple_items_table()
 {
-  let formatter = Formatter::new(OutputFormat::Table);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
   let items = vec![
     {
@@ -157,7 +157,7 @@ fn test_format_multiple_items_table()
 #[test]
 fn test_format_multiple_items_expanded()
 {
-  let formatter = Formatter::new(OutputFormat::Expanded);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Expanded);
 
   let items = vec![
     {
@@ -183,7 +183,7 @@ fn test_format_multiple_items_expanded()
 #[test]
 fn test_format_multiple_items_json()
 {
-  let formatter = Formatter::new(OutputFormat::Json);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
   let items = vec![
     {
@@ -209,7 +209,7 @@ fn test_format_multiple_items_json()
 #[test]
 fn test_format_multiple_items_yaml()
 {
-  let formatter = Formatter::new(OutputFormat::Yaml);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
 
   let items = vec![
     {
@@ -239,7 +239,7 @@ fn test_format_multiple_items_yaml()
 #[test]
 fn test_format_empty_list_table()
 {
-  let formatter = Formatter::new(OutputFormat::Table);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
   let items: Vec<HashMap<String, String>> = vec![];
 
   let result = formatter.format_list(&items);
@@ -250,7 +250,7 @@ fn test_format_empty_list_table()
 #[test]
 fn test_format_empty_list_expanded()
 {
-  let formatter = Formatter::new(OutputFormat::Expanded);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Expanded);
   let items: Vec<HashMap<String, String>> = vec![];
 
   let result = formatter.format_list(&items);
@@ -261,7 +261,7 @@ fn test_format_empty_list_expanded()
 #[test]
 fn test_format_empty_list_json()
 {
-  let formatter = Formatter::new(OutputFormat::Json);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
   let items: Vec<HashMap<String, String>> = vec![];
 
   let result = formatter.format_list(&items);
@@ -273,7 +273,7 @@ fn test_format_empty_list_json()
 #[test]
 fn test_format_empty_list_yaml()
 {
-  let formatter = Formatter::new(OutputFormat::Yaml);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
   let items: Vec<HashMap<String, String>> = vec![];
 
   let result = formatter.format_list(&items);
@@ -291,7 +291,7 @@ use iron_cli::handlers::CliError;
 #[test]
 fn test_format_error_table()
 {
-  let formatter = Formatter::new(OutputFormat::Table);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
   let error = CliError::MissingParameter("username");
 
   let result = formatter.format_error(&error);
@@ -303,7 +303,7 @@ fn test_format_error_table()
 #[test]
 fn test_format_error_json()
 {
-  let formatter = Formatter::new(OutputFormat::Json);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
   let error = CliError::ValidationError("Invalid input".to_string());
 
   let result = formatter.format_error(&error);
@@ -317,7 +317,7 @@ fn test_format_error_json()
 #[test]
 fn test_format_error_yaml()
 {
-  let formatter = Formatter::new(OutputFormat::Yaml);
+  let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
   let error = CliError::InvalidParameter {
     param: "token_id",
     reason: "must start with tok_",

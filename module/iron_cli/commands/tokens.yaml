@@ -6,6 +6,30 @@
   version: 1.0.0
   idempotent: false
   arguments:
+  - name: name
+    description: Token name/identifier
+    kind: String
+    hint: Descriptive name for the token
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: scope
+    description: Token scope/permissions
+    kind: String
+    hint: Defines what actions token can perform
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
   - name: project
     description: Project ID to associate with token
     kind: String
@@ -86,8 +110,8 @@
   arguments:
   - name: token_id
     description: Token ID to retrieve
-    kind: Integer
-    hint: Numeric token identifier
+    kind: String
+    hint: Token identifier (format tok_*)
     attributes:
       optional: false
       multiple: false
@@ -110,8 +134,8 @@
     aliases: []
     tags: []
   examples:
-  - .tokens.get token_id::123
-  - .tokens.get token_id::456 format::json
+  - .tokens.get token_id::tok_abc123
+  - .tokens.get token_id::tok_production format::json
   aliases: []
   tags: []
 - name: .tokens.rotate
@@ -124,8 +148,8 @@
   arguments:
   - name: token_id
     description: Token ID to rotate
-    kind: Integer
-    hint: Numeric token identifier
+    kind: String
+    hint: Token identifier (format tok_*)
     attributes:
       optional: false
       multiple: false
@@ -148,8 +172,8 @@
     aliases: []
     tags: []
   examples:
-  - .tokens.rotate token_id::123
-  - .tokens.rotate token_id::456 format::json
+  - .tokens.rotate token_id::tok_abc123
+  - .tokens.rotate token_id::tok_production format::json
   aliases: []
   tags: []
 - name: .tokens.revoke
@@ -162,8 +186,8 @@
   arguments:
   - name: token_id
     description: Token ID to revoke
-    kind: Integer
-    hint: Numeric token identifier
+    kind: String
+    hint: Token identifier (format tok_*)
     attributes:
       optional: false
       multiple: false
@@ -186,7 +210,7 @@
     aliases: []
     tags: []
   examples:
-  - .tokens.revoke token_id::123
-  - .tokens.revoke token_id::456 format::json
+  - .tokens.revoke token_id::tok_abc123
+  - .tokens.revoke token_id::tok_production format::json
   aliases: []
   tags: []

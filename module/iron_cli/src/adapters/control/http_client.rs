@@ -52,7 +52,7 @@ impl ControlApiClient
     let client = Client::builder()
       .timeout( config.timeout )
       .build()
-      .expect( "Failed to create HTTP client" );
+      .expect( "LOUD FAILURE: Failed to create HTTP client" );
 
     Self { client, config }
   }
@@ -262,31 +262,3 @@ impl std::fmt::Display for ControlApiError
 }
 
 impl std::error::Error for ControlApiError {}
-
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_client_creation()
-  {
-    let config = ControlApiConfig::default();
-    let client = ControlApiClient::new( config );
-
-    assert_eq!( client.config.base_url, "http://localhost:8080" );
-  }
-
-  #[test]
-  fn test_client_with_token()
-  {
-    let config = ControlApiConfig::new(
-      "https://api.example.com".to_string(),
-      Some( "test-token".to_string() ),
-    );
-
-    let client = ControlApiClient::new( config );
-
-    assert_eq!( client.config.api_token, Some( "test-token".to_string() ) );
-  }
-}

@@ -118,10 +118,13 @@ pub async fn get_key(
   .bind( auth.token_id )
   .fetch_one( pool )
   .await
-  .map_err( |_| (
-    StatusCode::INTERNAL_SERVER_ERROR,
-    Json( serde_json::json!({ "error": "Failed to verify token type" }) ),
-  ) )?;
+  .map_err( |e| {
+    tracing::error!( "Failed to verify token type for token_id {}: {}", auth.token_id, e );
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to verify token type" }) ),
+    )
+  } )?;
 
   if agent_id.is_some()
   {
@@ -145,10 +148,13 @@ pub async fn get_key(
   let provider_key_id = state.provider_storage
     .get_project_key( &project_id )
     .await
-    .map_err( |_| (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to query project key assignment" }) ),
-    ) )?
+    .map_err( |e| {
+      tracing::error!( "Failed to query project key assignment for project {}: {}", project_id, e );
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to query project key assignment" }) ),
+      )
+    } )?
     .ok_or_else( || (
       StatusCode::NOT_FOUND,
       Json( serde_json::json!({ "error": "No provider key assigned to project" }) ),
@@ -158,10 +164,13 @@ pub async fn get_key(
   let key_record = state.provider_storage
     .get_key( provider_key_id )
     .await
-    .map_err( |_| (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to retrieve provider key" }) ),
-    ) )?;
+    .map_err( |e| {
+      tracing::error!( "Failed to retrieve provider key {}: {}", provider_key_id, e );
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to retrieve provider key" }) ),
+      )
+    } )?;
 
   // 4. Check if key is enabled
   if !key_record.metadata.is_enabled
@@ -199,7 +208,7 @@ pub async fn get_key(
   // 7. Log to audit_log
   let now_ms = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_millis() as i64;
 
   let changes = serde_json::json!({
@@ -239,37 +248,3 @@ pub async fn get_key(
   } ) )
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ test ]
-  fn key_response_serializes_correctly()
-  {
-    let response = KeyResponse {
-      provider: "openai".to_string(),
-      api_key: "sk-proj-xxx".to_string(),
-      base_url: None,
-    };
-
-    let json = serde_json::to_string( &response ).unwrap();
-    assert!( json.contains( "openai" ) );
-    assert!( json.contains( "sk-proj-xxx" ) );
-    assert!( !json.contains( "base_url" ) ); // Skipped when None
-  }
-
-  #[ test ]
-  fn key_response_with_base_url()
-  {
-    let response = KeyResponse {
-      provider: "anthropic".to_string(),
-      api_key: "sk-ant-xxx".to_string(),
-      base_url: Some( "https://custom.api.com".to_string() ),
-    };
-
-    let json = serde_json::to_string( &response ).unwrap();
-    assert!( json.contains( "base_url" ) );
-    assert!( json.contains( "https://custom.api.com" ) );
-  }
-}

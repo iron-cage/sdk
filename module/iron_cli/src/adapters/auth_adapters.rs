@@ -60,8 +60,8 @@ pub async fn login_adapter(
     .map_err( |e| e.to_string() )?;
 
   // 2. Extract parameters
-  let username = params.get( "username" ).unwrap(); // Safe: validated by handler
-  let password = params.get( "password" ).unwrap(); // Safe: validated by handler
+  let username = params.get( "username" ).unwrap(); // Already validated
+  let password = params.get( "password" ).unwrap(); // Already validated
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();

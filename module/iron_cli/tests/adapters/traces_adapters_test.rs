@@ -8,7 +8,7 @@
 use iron_cli::adapters::TracesService;
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -64,7 +64,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_list_traces_adapter_success()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".traces.list", &[] );
 
@@ -87,7 +87,7 @@ async fn test_list_traces_adapter_success()
 async fn test_list_traces_adapter_empty()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".traces.list", &[] );
 
@@ -104,7 +104,7 @@ async fn test_list_traces_adapter_empty()
 async fn test_list_traces_adapter_with_filter()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.list",
@@ -124,7 +124,7 @@ async fn test_list_traces_adapter_with_filter()
 async fn test_list_traces_adapter_with_limit()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.list",
@@ -144,7 +144,7 @@ async fn test_list_traces_adapter_with_limit()
 async fn test_list_traces_adapter_json_format()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".traces.list",
@@ -168,7 +168,7 @@ async fn test_list_traces_adapter_json_format()
 async fn test_get_trace_adapter_success()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.get",
@@ -194,7 +194,7 @@ async fn test_get_trace_adapter_success()
 async fn test_get_trace_adapter_missing_trace_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".traces.get", &[] );
 
@@ -211,7 +211,7 @@ async fn test_get_trace_adapter_missing_trace_id()
 async fn test_get_trace_adapter_empty_trace_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.get",
@@ -231,7 +231,7 @@ async fn test_get_trace_adapter_empty_trace_id()
 async fn test_get_trace_adapter_not_found()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.get",
@@ -256,7 +256,7 @@ async fn test_get_trace_adapter_all_formats()
 
   for format_str in formats
   {
-    let formatter = Formatter::new( match format_str
+    let formatter = TreeFmtFormatter::new( match format_str
     {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
@@ -293,7 +293,7 @@ async fn test_get_trace_adapter_all_formats()
 async fn test_export_traces_adapter_success()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.export",
@@ -319,7 +319,7 @@ async fn test_export_traces_adapter_success()
 async fn test_export_traces_adapter_missing_output()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".traces.export", &[] );
 
@@ -336,7 +336,7 @@ async fn test_export_traces_adapter_missing_output()
 async fn test_export_traces_adapter_empty_output()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.export",
@@ -356,7 +356,7 @@ async fn test_export_traces_adapter_empty_output()
 async fn test_export_traces_adapter_format_json()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".traces.export",
@@ -385,7 +385,7 @@ async fn test_export_traces_adapter_format_json()
 async fn test_export_traces_adapter_multiple_traces()
 {
   let adapter = create_adapter_with_traces().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".traces.export",

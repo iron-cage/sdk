@@ -19,7 +19,7 @@ Developers need budget-controlled LLM access without handling provider API keys 
 
 ## Core Idea
 
-**Two-token system with budget borrowing:**
+**Two-token system with budget borrowing (tranche model):**
 
 ```
 Admin (Control Panel)          Developer (Runtime)
@@ -28,20 +28,26 @@ Admin (Control Panel)          Developer (Runtime)
 | Stores IP Token  |           | (visible)        |
 +--------+---------+           +--------+---------+
          |                              |
-         | 1. Token Handshake           |
+         | 1. Handshake (borrow tranche)|
          |<-------- IC Token -----------+
          |                              |
-         +-------- IP Token + $10 ----->|
+         +---- IP Token + $10 tranche ->|
          |        (encrypted)           |
          |                              |
          | 2. LLM Requests              |
-         |<--- Usage: 500 tok, $0.01 ---+
+         |<--- Usage: $0.01, report --->|
+         |     (returns updated limit)  |
          |                              |
-         | 3. Budget Refresh (at $9)    |
+         | 3. Refresh (at $1 remaining) |
          |<-------- Need more ----------+
-         |                              |
          +--------- + $10 more --------->|
+         |                              |
+         | 4. Return (on shutdown)      |
+         |<--- Return $3 unused --------+
+         |     (credit back to budget)  |
 ```
+
+**Dashboard as Bank:** Agent borrows tranches, spends locally, returns unused on shutdown.
 
 ## Standards Compliance
 
@@ -292,15 +298,32 @@ Content-Type: application/json
 | `provider` | string | YES | Provider used | For audit trail |
 | `timestamp` | number | YES | Unix timestamp | When request completed |
 
-**Response:** 200 OK (acknowledgment, no body)
+**Response Schema:**
+```json
+{
+  "success": true,
+  "budget_limit_usd": 100.00,
+  "budget_remaining_usd": 89.95,
+  "lease_spent_usd": 0.0457
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Report accepted |
+| `budget_limit_usd` | number | Current agent budget limit (may change via dashboard) |
+| `budget_remaining_usd` | number | Remaining in agent budget (total - all leases spent) |
+| `lease_spent_usd` | number | Total spent in current lease |
+
+**Runtime Behavior:**
+- Update local CostController with `budget_limit_usd` (syncs dashboard changes)
+- Track spending locally
 
 **Performance:**
 - Async send: 0ms perceived latency (doesn't block agent)
 - Actual network: ~5-20ms (happens in background)
-
-**Runtime Updates Local Budget:**
-- Spent: $0.0457
-- Remaining: $10.00 - $0.0457 = $9.9543
 
 ### Step 3: Budget Refresh
 
@@ -378,6 +401,70 @@ Content-Type: application/json
 **Runtime Behavior:**
 - If approved: Add $10 to local budget, continue processing
 - If denied: Stop accepting new LLM calls, return Error::BudgetExhausted to agent
+
+### Step 4: Budget Return (Tranche Return)
+
+**Trigger:** Runtime shutdown or agent stop
+
+**Message 6: BUDGET_RETURN_REQUEST**
+
+**Direction:** Runtime → Control Panel
+
+**HTTP Request:**
+```http
+POST /api/v1/budget/return
+Content-Type: application/json
+```
+
+**Request Schema:**
+```json
+{
+  "lease_id": "lease_001",
+  "final_spent_usd": 7.00,
+  "returning_usd": 3.00
+}
+```
+
+**Field Specifications:**
+
+| Field | Type | Required | Description | Purpose |
+|-------|------|----------|-------------|---------|
+| `lease_id` | string | YES | Current lease ID | Identify lease to close |
+| `final_spent_usd` | number | YES | Total spent in lease | Final reconciliation |
+| `returning_usd` | number | YES | Unused budget to return | Credit back to agent budget |
+
+**Message 7: BUDGET_RETURN_RESPONSE**
+
+**Direction:** Control Panel → Runtime
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "returned_usd": 3.00,
+  "agent_budget_remaining_usd": 93.00,
+  "lease_status": "closed"
+}
+```
+
+**Field Specifications:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Return processed successfully |
+| `returned_usd` | number | Amount credited back to agent budget |
+| `agent_budget_remaining_usd` | number | Agent's available budget after return |
+| `lease_status` | string | "closed" - lease is now terminated |
+
+**Control Panel Behavior:**
+1. Validate lease exists and is active
+2. Credit `returning_usd` to agent budget (available += returning)
+3. Update lease: `returned_amount = returning_usd`, `status = closed`, `closed_at = now()`
+4. Return confirmation
+
+**Runtime Behavior:**
+- Call on graceful shutdown
+- Best effort on crash (may lose unused budget)
 
 ## Budget Overshoot Prevention
 
@@ -593,4 +680,24 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 ---
 
-*Related: [003_service_boundaries.md](../architecture/003_service_boundaries.md) | [002_layer_model.md](../architecture/002_layer_model.md)*
+### Cross-References
+
+**Dependencies**:
+- Format: Token exchange format (encryption, serialization)
+- Architecture: [002_layer_model.md](../architecture/002_layer_model.md) - Layer responsibilities
+- Architecture: [003_service_boundaries.md](../architecture/003_service_boundaries.md) - Service boundaries
+
+**Used By**:
+- Iron Runtime Client - Implements budget control protocol
+- Iron Control API - Serves budget control endpoints
+
+**Related**:
+- State Machine 001: [Budget Lease Lifecycle](../state_machine/001_budget_lease_lifecycle.md) - Client-side lease lifecycle states and transitions
+
+**Implementation**:
+- Source: `module/iron_control_api/src/routes/budget.rs` - Budget control endpoints
+- Source: `module/iron_token_manager/src/lease_manager.rs` - Lease lifecycle management
+- Tests: `module/iron_control_api/tests/budget_*.rs` - Budget control protocol tests
+
+**Specification**:
+- Requirement: `module/iron_control_api/spec.md` § Budget Control - Protocol requirements

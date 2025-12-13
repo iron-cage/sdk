@@ -37,7 +37,7 @@ impl ProvidersState
   pub async fn new( database_url: &str ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let storage = ProviderKeyStorage::connect( database_url ).await
-      .map_err( |_| "Failed to connect to database" )?;
+      .map_err( |e| Box::new( e ) as Box< dyn std::error::Error > )?;
 
     // Try to initialize crypto, but don't fail if master key not set
     let crypto = match CryptoService::from_env()
@@ -237,15 +237,16 @@ pub async fn create_provider_key(
   // Create masked key for response
   let masked_key = mask_api_key( &request.api_key );
 
-  let keys = state.storage.get_keys_by_provider(provider).await;
-  if keys.is_err()
+  let keys = match state.storage.get_keys_by_provider(provider).await
   {
-    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-      "error": "Failed to get provider keys"
-    }) ) ).into_response();
-  }
-
-  let keys = keys.unwrap();
+    Ok( keys ) => keys,
+    Err( _ ) =>
+    {
+      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+        "error": "Failed to get provider keys"
+      }) ) ).into_response();
+    }
+  };
   let key_id = if !keys.is_empty()
   {
     match state.storage.update_key(

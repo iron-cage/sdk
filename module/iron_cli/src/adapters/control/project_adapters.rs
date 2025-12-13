@@ -1,7 +1,9 @@
 //! Project adapter functions
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::project_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 
 pub async fn list_projects_adapter(
@@ -20,7 +22,9 @@ pub async fn list_projects_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn get_project_adapter(
@@ -33,7 +37,7 @@ pub async fn get_project_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/projects/{}", id );
 
   let response = client
@@ -42,5 +46,7 @@ pub async fn get_project_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

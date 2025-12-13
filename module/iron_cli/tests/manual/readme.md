@@ -136,13 +136,14 @@ iron-token .auth.login username::<test-user> password::<test-pass>
 #### TC-3.1: Generate Token
 
 ```bash
-iron-token .tokens.generate name::"Test Token" scope::"read:write"
+iron-token .tokens.generate description::"Test Token" project::"test-project"
 ```
 
 **Expected:**
 - Exit code: 0
 - Token ID returned in JSON
 - Token visible in list
+- Token value shown only once (save securely)
 
 #### TC-3.2: List Tokens
 
@@ -158,8 +159,8 @@ iron-token .tokens.list format::json
 #### TC-3.3: Get Token Details
 
 ```bash
-# Use token ID from TC-3.1
-iron-token .tokens.get id::<token-id>
+# Use token ID from TC-3.1 (format: tok_xxxxx)
+iron-token .tokens.get token_id::tok_abc123
 ```
 
 **Expected:**
@@ -170,7 +171,7 @@ iron-token .tokens.get id::<token-id>
 #### TC-3.4: Rotate Token
 
 ```bash
-iron-token .tokens.rotate id::<token-id>
+iron-token .tokens.rotate token_id::tok_abc123
 ```
 
 **Expected:**
@@ -181,7 +182,7 @@ iron-token .tokens.rotate id::<token-id>
 #### TC-3.5: Revoke Token
 
 ```bash
-iron-token .tokens.revoke id::<token-id>
+iron-token .tokens.revoke token_id::tok_abc123
 ```
 
 **Expected:**
@@ -229,7 +230,7 @@ iron-token .usage.by_provider provider::anthropic
 #### TC-4.4: Export Usage
 
 ```bash
-iron-token .usage.export output_file::/tmp/usage.json export_format::json
+iron-token .usage.export output::/tmp/usage.json export_format::json
 ```
 
 **Expected:**
@@ -267,7 +268,7 @@ iron-token .limits.list format::json
 #### TC-5.2: Get Limit
 
 ```bash
-iron-token .limits.get id::<limit-id>
+iron-token .limits.get limit_id::<limit-id>
 ```
 
 **Expected:**
@@ -278,7 +279,7 @@ iron-token .limits.get id::<limit-id>
 #### TC-5.3: Create Limit
 
 ```bash
-iron-token .limits.create type::daily value::1000
+iron-token .limits.create max_tokens::1000000 project::"test-project"
 ```
 
 **Expected:**
@@ -286,10 +287,12 @@ iron-token .limits.create type::daily value::1000
 - Limit ID returned
 - Limit visible in list
 
+**Note:** Can also use max_requests or max_cost parameters
+
 #### TC-5.4: Update Limit
 
 ```bash
-iron-token .limits.update id::<limit-id> value::2000
+iron-token .limits.update limit_id::<limit-id> max_tokens::2000000
 ```
 
 **Expected:**
@@ -300,7 +303,7 @@ iron-token .limits.update id::<limit-id> value::2000
 #### TC-5.5: Delete Limit
 
 ```bash
-iron-token .limits.delete id::<limit-id>
+iron-token .limits.delete limit_id::<limit-id>
 ```
 
 **Expected:**
@@ -326,7 +329,7 @@ iron-token .traces.list format::json
 #### TC-6.2: Get Trace Details
 
 ```bash
-iron-token .traces.get id::<trace-id>
+iron-token .traces.get trace_id::<trace-id>
 ```
 
 **Expected:**
@@ -337,7 +340,7 @@ iron-token .traces.get id::<trace-id>
 #### TC-6.3: Export Traces
 
 ```bash
-iron-token .traces.export output_file::/tmp/traces.json export_format::json
+iron-token .traces.export output::/tmp/traces.json export_format::json
 ```
 
 **Expected:**
@@ -388,25 +391,27 @@ iron-token .tokens.list
 #### TC-7.3: Invalid Token ID
 
 ```bash
-iron-token .tokens.get id::invalid-id
+iron-token .tokens.get token_id::invalid_id_without_prefix
 ```
 
 **Expected:**
 - Exit code: 1
-- Error message indicates invalid/not found
-- Clear error description
+- Error message: "must start with 'tok_'"
+- Clear validation error description
 
 #### TC-7.4: Missing Required Parameter
 
 ```bash
-iron-token .tokens.generate name::"Test"
-# Missing required 'scope' parameter
+iron-token .auth.login username::"test-user"
+# Missing required 'password' parameter
 ```
 
 **Expected:**
 - Exit code: 1
 - Error message indicates missing parameter
 - Shows required parameters
+
+**Note:** .tokens.generate has no required parameters, using .auth.login as example
 
 ## Validation Criteria
 

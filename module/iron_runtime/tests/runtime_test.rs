@@ -51,9 +51,9 @@ async fn test_get_metrics()
   assert!(metrics.is_some());
 
   let metrics = metrics.unwrap();
-  assert_eq!(metrics.agent_id, handle.agent_id);
-  assert_eq!(metrics.budget_spent, 0.0);
-  assert_eq!(metrics.pii_detections, 0);
+  assert_eq!(metrics.agent_id, handle.agent_id, "Metrics should have correct agent ID");
+  assert_eq!(metrics.budget_spent, 0.0, "Newly started agent should have no budget spent");
+  assert_eq!(metrics.pii_detections, 0, "Newly started agent should have no PII detections");
 }
 
 #[tokio::test]
@@ -80,5 +80,5 @@ async fn test_stop_agent()
 
   // Check status is Stopped
   let metrics = metrics.unwrap();
-  assert!(matches!(metrics.status, iron_runtime_state::AgentStatus::Stopped));
+  assert!(matches!(metrics.status, iron_runtime_state::AgentStatus::Stopped), "Stopped agent should have Stopped status");
 }

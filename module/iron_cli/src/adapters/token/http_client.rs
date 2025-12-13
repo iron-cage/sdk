@@ -58,7 +58,7 @@ impl TokenApiClient
     let client = Client::builder()
       .timeout( config.timeout )
       .build()
-      .expect( "Failed to create HTTP client" );
+      .expect( "LOUD FAILURE: Failed to create HTTP client" );
 
     Self { client, config }
   }
@@ -276,30 +276,3 @@ impl std::fmt::Display for TokenApiError
 }
 
 impl std::error::Error for TokenApiError {}
-
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_client_creation()
-  {
-    let config = TokenApiConfig::default();
-    let client = TokenApiClient::new( config );
-
-    assert_eq!( client.config.base_url, "http://localhost:8081" );
-  }
-
-  #[test]
-  fn test_client_with_custom_url()
-  {
-    let config = TokenApiConfig::new(
-      "https://api.example.com".to_string(),
-    );
-
-    let client = TokenApiClient::new( config );
-
-    assert_eq!( client.config.base_url, "https://api.example.com" );
-  }
-}
