@@ -16,6 +16,7 @@ pub struct User
   pub password_hash: String,
   pub role: String,
   pub email: String,
+  pub name: Option< String >,
   pub is_active: bool,
 }
 
@@ -67,7 +68,7 @@ pub async fn get_user_by_email(
 {
   let user = sqlx::query_as::<_, User>(
     r#"
-    SELECT id, email, username, password_hash, role, is_active
+    SELECT id, email, username, password_hash, role, name, is_active
     FROM users
     WHERE email = ? AND is_active = 1
     "#
@@ -102,7 +103,7 @@ pub async fn get_user_by_id(
 {
   let user = sqlx::query_as::<_, User>(
     r#"
-    SELECT id, username, password_hash, role, email, is_active
+    SELECT id, username, password_hash, role, email, name, is_active
     FROM users
     WHERE id = ?
     "#

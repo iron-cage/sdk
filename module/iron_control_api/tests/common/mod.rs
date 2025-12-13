@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS users
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL,
   email TEXT,
+  name TEXT,
   last_login INTEGER,
   suspended_at INTEGER,
   suspended_by INTEGER,

@@ -55,6 +55,7 @@ use axum::
   Router,
   routing::{ get, post, put, delete },
   http::{ Request, StatusCode },
+  extract::ConnectInfo,
 };
 use axum::body::Body;
 use tower::ServiceExt;
@@ -62,6 +63,7 @@ use serde_json::json;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 
 use std::sync::Arc;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::extract::FromRef;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::jwt_auth::JwtSecret;
@@ -152,6 +154,7 @@ async fn create_test_router() -> Router
   let auth_state = AuthState {
     db_pool: db_pool.clone(),
     jwt_secret: Arc::new(JwtSecret::new("test_secret".to_string())),
+    rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
   };
 
   let user_state = UserManagementState::new( db_pool, permission_checker );
@@ -160,6 +163,8 @@ async fn create_test_router() -> Router
     auth: auth_state,
     users: user_state,
   };
+
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
   Router::new()
     .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
@@ -171,6 +176,7 @@ async fn create_test_router() -> Router
     .route( "/api/users/:id/role", put( iron_control_api::routes::users::change_user_role ) )
     .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
     .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
+    .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state( state )
 }
 

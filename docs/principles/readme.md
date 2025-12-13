@@ -8,9 +8,9 @@
 
 | ID | Entity | Responsibility |
 |----|--------|----------------|
-| 001 | **001_design_philosophy.md** | Document core design values and patterns (simplicity, fail-safe defaults, observable behavior, minimal dependencies) |
-| 002 | **002_quality_attributes.md** | Define system-wide quality targets (performance, reliability, scalability, security, usability) |
-| 003 | **003_error_handling_principles.md** | Explain error handling philosophy (fail-fast, loud failures, no silent errors, proper fixes only) |
+| 001 | **001_design_philosophy.md** | Document seven core design principles and patterns (simplicity first, fail-safe defaults, observable behavior, minimal dependencies, composition, data privacy, agent-centric control) |
+| 002 | **002_quality_attributes.md** | Define five system-wide quality attributes and targets (performance, reliability, scalability, security, usability) |
+| 003 | **003_error_handling_principles.md** | Define three fundamental error handling principles (fail-fast, loud failures, proper fixes only) implementing Fail-Safe Defaults and Observable Behavior from Principles 001 |
 | 004 | **004_testing_strategy.md** | Document testing approach and philosophy (no mocking, integration-focused, real implementations, module-owned tests) |
 | 005 | **005_development_workflow.md** | Define development process principles (TDD cycle, spec-first, ADR-driven, documentation throughout, file creation protocol) |
 

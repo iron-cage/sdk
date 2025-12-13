@@ -9,9 +9,17 @@
 //! - `create_auth_router()` - Create Axum router with auth endpoints
 
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
-use axum::{ Router, routing::post };
+use axum::
+{
+  Router,
+  routing::post,
+  extract::{ Request, ConnectInfo },
+  middleware::{ self, Next },
+  response::Response,
+};
 use iron_control_api::routes::auth::{ login, logout, refresh, validate, AuthState };
 use std::sync::Arc;
+use std::net::{ SocketAddr, IpAddr, Ipv4Addr };
 
 /// Setup in-memory SQLite database with auth schema for testing
 ///
@@ -41,6 +49,7 @@ pub async fn setup_auth_test_db() -> SqlitePool
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL,
       email TEXT,
+      name TEXT,
       last_login INTEGER,
       suspended_at INTEGER,
       suspended_by INTEGER,
@@ -116,11 +125,14 @@ pub async fn seed_test_user(
 
   let user_id = format!( "user_{}", uuid::Uuid::new_v4() );
 
+  // Extract username from email (before @ sign)
+  let username = email.split('@').next().unwrap_or(email).replace('.', "_");
+
   sqlx::query(
     "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
   .bind( &user_id )
-  .bind( email )  // Use email as username
+  .bind( &username )
   .bind( email )
   .bind( &password_hash )
   .bind( role )
@@ -134,6 +146,85 @@ pub async fn seed_test_user(
   ) );
 
   user_id
+}
+
+/// Seed test user with specified credentials AND name field
+///
+/// # Arguments
+///
+/// * `pool` - Database connection pool
+/// * `email` - User email (also used as username)
+/// * `password` - Plain text password (will be hashed with bcrypt)
+/// * `role` - User role ("admin", "user", etc.)
+/// * `is_active` - Whether account is active
+/// * `name` - User display name
+///
+/// # Returns
+///
+/// User ID (for assertions)
+#[allow(dead_code)]
+pub async fn seed_test_user_with_name(
+  pool: &SqlitePool,
+  email: &str,
+  password: &str,
+  role: &str,
+  is_active: bool,
+  name: &str
+) -> String
+{
+  let password_hash = bcrypt::hash( password, 4 )
+    .expect( "LOUD FAILURE: Failed to hash test password" );
+
+  let now = std::time::SystemTime::now()
+    .duration_since( std::time::UNIX_EPOCH )
+    .expect("LOUD FAILURE: Time went backwards")
+    .as_secs() as i64;
+
+  let user_id = format!( "user_{}", uuid::Uuid::new_v4() );
+
+  // Extract username from email (before @ sign)
+  let username = email.split('@').next().unwrap_or(email).replace('.', "_");
+
+  sqlx::query(
+    "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( &user_id )
+  .bind( &username )
+  .bind( email )
+  .bind( &password_hash )
+  .bind( role )
+  .bind( if is_active { 1 } else { 0 } )
+  .bind( now )
+  .bind( name )
+  .execute( pool )
+  .await
+  .unwrap_or_else( |_| panic!(
+    "LOUD FAILURE: Failed to seed test user '{}' with name '{}'",
+    email,
+    name
+  ) );
+
+  user_id
+}
+
+/// Middleware to inject ConnectInfo for tests
+///
+/// In production, ConnectInfo is provided by `into_make_service_with_connect_info`.
+/// For tests using `oneshot()`, we manually inject a fake SocketAddr.
+///
+/// # Test SocketAddr
+///
+/// Uses 127.0.0.1:54321 as the test client address for all requests.
+async fn inject_connect_info( mut request: Request, next: Next ) -> Response
+{
+  // Create fake test socket address
+  let addr = SocketAddr::new( IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) ), 54321 );
+
+  // Insert ConnectInfo extension
+  request.extensions_mut().insert( ConnectInfo( addr ) );
+
+  // Continue to next middleware/handler
+  next.run( request ).await
 }
 
 /// Create Axum router with auth endpoints for testing
@@ -167,4 +258,5 @@ pub async fn create_auth_router( pool: SqlitePool ) -> Router
     .route( "/api/v1/auth/refresh", post( refresh ) )
     .route( "/api/v1/auth/validate", post( validate ) )
     .with_state( auth_state )
+    .layer( middleware::from_fn( inject_connect_info ) )
 }
