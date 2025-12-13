@@ -1,25 +1,27 @@
-# Configuration Reference for `.secret/-secret.sh`
+# Configuration Reference for `secret/-secret.sh`
 
-This document explains how to configure the `.secret/-secret.sh` file used by the root **Makefile** to deploy the application to cloud providers (Hetzner) with a single command:
+This document explains how to configure the `secret/-secret.sh` file used by the root **Makefile** to deploy the application to cloud providers (Hetzner) with a single command:
 
 ```bash
-make deploy
+make -f Makefile.deploy deploy
 ```
 
-The `.secret/-secret.sh` file contains **all secrets and environment-specific settings**.  
+The `secret/-secret.sh` file contains **all secrets and environment-specific settings**.  
 It is sourced by the Makefile before starting the Docker-based Terraform environment, and its variables are passed into all Terraform modules and helper scripts.
 
 ---
 
 ## Content
 
-- [Recommended `.secret/` Layout](#recommended-secret-layout)
+- [Recommended `secret/` Layout](#recommended-secret-layout)
 - [Required Variables](#required-variables)
     - [1. Project & cloud provider](#1-project--cloud-provider)
     - [2. Archive / state key](#2-archive--state-key)
     - [3. GCP service account](#3-gcp-service-account)
     - [4. SSH keys](#4-ssh-keys)
     - [5. Provider-specific secrets](#5-provider-specific-secrets)
+    - [6. Rust project secrets](#6-rust-project-secrets)
+    - [7. AI Models key](#7-ai-models-key)
 - [Optional Variables & Defaults](#optional-variables--defaults)
     - [1. GCP / Terraform parameters](#1-gcp--terraform-parameters)
     - [2. Docker / Artifact Registry](#2-docker--artifact-registry)
@@ -32,12 +34,12 @@ It is sourced by the Makefile before starting the Docker-based Terraform environ
 
 ---
 
-## Recommended `.secret/` Layout
+## Recommended `secret/` Layout
 
 Example structure:
 
 ```text
-.secret/
+secret/
   |- -secret.sh                 # main secrets file (NOT committed)
   |- readme.md                  # this documentation file
   |- service_account.json       # GCP service account key (name is configurable)
@@ -55,7 +57,7 @@ ANOTHER_KEY=value
 The Makefile essentially does:
 
 ```bash
-source .secret/-secret.sh
+source secret/-secret.sh
 ```
 
 and then uses the exported variables.
@@ -64,7 +66,7 @@ and then uses the exported variables.
 
 ## Required Variables
 
-These **must** be set, otherwise `make deploy` will fail during the environment check.
+These **must** be set, otherwise `make -f Makefile.deploy deploy` will fail during the environment check.
 
 ### 1. Project & cloud provider
 
@@ -78,6 +80,8 @@ These **must** be set, otherwise `make deploy` will fail during the environment 
 | Variable                   | Required | Description                                                                                   |
 |----------------------------|----------|-----------------------------------------------------------------------------------------------|
 | `SECRET_STATE_ARCHIVE_KEY` | Yes      | Secret key used for encrypting archives / backups. Use a strong, random value                |
+
+> To generate use: `openssl rand -hex 32`
 
 ### 3. GCP service account
 
@@ -103,6 +107,31 @@ Depending on the chosen `CSP`, some additional variables are required.
 | Variable                 | Required | Description               |
 |--------------------------|----------|---------------------------|
 | `SECRET_HETZNER_CLOUD_TOKEN`     | Yes      | Hetzner Cloud API Token   |
+
+> Get it from: https://console.hetzner.cloud → Security → API Tokens
+
+### 6. Rust project secrets
+
+| Variable                 | Required | Description               |
+|--------------------------|----------|---------------------------|
+| `DATABASE_URL`            | Yes      | SQLite connection string for pilot mode   |
+| `JWT_SECRET`              | Yes      | JWT secret key for signing access and refresh tokens   |
+| `IRON_SECRETS_MASTER_KEY` | Yes      | Master key for AES-256-GCM encryption of AI provider API keys   |
+
+> Generate secrets:
+- For JWT_SECRET `openssl rand -hex 32` 
+- For IRON_SECRETS_MASTER_KEY `openssl rand -base64 32`
+
+### 7. AI Models key
+
+| Variable                 | Required | Description               |
+|--------------------------|----------|---------------------------|
+| `OPENAI_API_KEY`         | Yes      | OPENAI API key for accessing GPT, DALL·E, etc.   |
+| `APOLLO_API_KEY`         | Yes      | Apollo Studio API key for GraphQL schema publishing and analytics   |
+
+> Generate secrets:
+- For OPENAI_API_KEY: Get it from: https://platform.openai.com/account/api-keys
+- For APOLLO_API_KEY: Get it from: https://studio.apollographql.com → Settings → API Keys
 
 ---
 
@@ -137,7 +166,7 @@ These variables are optional. If omitted, the Makefile / scripts will derive **s
 
 ## Minimal Configuration Examples
 
-- **Minimal `.secret/-secret.sh`**
+- **Minimal `secret/-secret.sh`**
 
 ```bash
 # Cloud provider:  hetzner
@@ -147,14 +176,14 @@ SECRET_HETZNER_CLOUD_TOKEN="YOUR_HETZNER_API_TOKEN"
 PROJECT_NAME="project_name"
 # Required secrets
 SECRET_STATE_ARCHIVE_KEY="change-me-random-string"
-GOOGLE_SE_CREDS_PATH=".secret/service_account.json"
-SECRET_RSA_PRIVATE_KEY_PATH=".secret/id_rsa"
-SECRET_RSA_PUBLIC_KEY_PATH=".secret/id_rsa.pub"
+GOOGLE_SE_CREDS_PATH="secret/service_account.json"
+SECRET_RSA_PRIVATE_KEY_PATH="secret/id_rsa"
+SECRET_RSA_PUBLIC_KEY_PATH="secret/id_rsa.pub"
 
 # Optional (can be miss) overrides
 # Google cloud region
 TF_VAR_REGION="europe-central2"
-# Project id for deployed resources | Can be set in .secret/-secret.sh
+# Project id for deployed resources | Can be set in secret/-secret.sh
 TF_VAR_PROJECT_ID=
 # Artifact Repository name for pushing the Docker images | Should not have "_"
 TF_VAR_REPO_NAME=
@@ -174,11 +203,11 @@ TF_DIR=
 
 ## Retrieving Keys
 
-This section explains **how to obtain all required keys** used in `.secret/-secret.sh`.
+This section explains **how to obtain all required keys** used in `secret/-secret.sh`.
 
 ### How to get `service_account.json` (GCP service account key)
 
-You can place your GCP service account key file under `.secret/` and point `GOOGLE_SE_CREDS_PATH` to it (for example: `.secret/service_account.json`).
+You can place your GCP service account key file under `secret/` and point `GOOGLE_SE_CREDS_PATH` to it (for example: `secret/service_account.json`).
 
 Steps to create a key in the GCP Console:
 
@@ -187,7 +216,7 @@ Steps to create a key in the GCP Console:
 3. Go to **Keys** → **Add Key** → **Create new key**.
 4. Select **JSON** and click **Create**.
 
-Save the downloaded JSON file into `.secret/` and update `GOOGLE_SE_CREDS_PATH` accordingly.
+Save the downloaded JSON file into `secret/` and update `GOOGLE_SE_CREDS_PATH` accordingly.
 
 The actual filename does not matter, as long as `GOOGLE_SE_CREDS_PATH` matches it.
 
@@ -208,7 +237,7 @@ openssl rand -hex 32
 head -c 32 /dev/urandom | base64
 ```
 
-Take the generated value and set it as `SECRET_STATE_ARCHIVE_KEY` in `.secret/-secret.sh`.
+Take the generated value and set it as `SECRET_STATE_ARCHIVE_KEY` in `secret/-secret.sh`.
 
 ### How to get `SECRET_HETZNER_CLOUD_TOKEN` (Hetzner API token)
 
@@ -221,4 +250,4 @@ This key is retrieved from your **Hetzner Cloud Console**:
 5. Select **Read & Write** access (needed to create and manage instances).
 6. Create the token and copy it.
 
-Paste the token value into your `.secret/-secret.sh` as `SECRET_HETZNER_CLOUD_TOKEN` (or the exact variable name used in your Makefile).
+Paste the token value into your `secret/-secret.sh` as `SECRET_HETZNER_CLOUD_TOKEN` (or the exact variable name used in your Makefile).

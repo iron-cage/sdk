@@ -103,5 +103,6 @@ htmlcov/
 **/*.tfstate.backup
 
 # secret
-/.secret/*
-!/.secret/readme.md
+/secret/*
+!/secret/readme.md
+!/secret/secrets.template.sh
