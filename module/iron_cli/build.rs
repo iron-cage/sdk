@@ -5,6 +5,9 @@
 //!
 //! This provides O(1) command lookups at ~80ns vs ~4,000ns for runtime HashMaps.
 
+// Build scripts are allowed to use println! for cargo communication
+#![allow(clippy::disallowed_macros)]
+
 use std::env;
 use std::fs::File;
 use std::io::{ Write, BufWriter };

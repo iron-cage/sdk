@@ -178,7 +178,7 @@ impl LlmRouter {
 
   /// Get total spent in USD (0.0 if no budget set)
   fn total_spent(&self) -> f64 {
-    self.cost_controller.as_ref().map(|c| c.total_spent()).unwrap_or(0.0)
+    self.cost_controller.as_ref().map(|c| c.total_spent() as f64 / 1_000_000.0).unwrap_or(0.0)
   }
 
   /// Set budget limit in USD
@@ -187,21 +187,25 @@ impl LlmRouter {
   /// * `amount_usd` - New budget limit in USD (e.g., 10.0 for $10)
   fn set_budget(&self, amount_usd: f64) {
     if let Some(ref controller) = self.cost_controller {
-      controller.set_budget(amount_usd);
+      let budget_micros = (amount_usd * 1_000_000.0) as i64;
+      controller.set_budget(budget_micros);
     }
   }
 
   /// Get current budget limit in USD (None if no budget set)
   #[getter]
   fn budget(&self) -> Option<f64> {
-    self.cost_controller.as_ref().map(|c| c.budget_limit())
+    self.cost_controller.as_ref().map(|c| c.budget_limit() as f64 / 1_000_000.0)
   }
 
   /// Get budget status as (spent, limit) tuple in USD
   /// Returns None if no budget is set
   #[getter]
   fn budget_status(&self) -> Option<(f64, f64)> {
-    self.cost_controller.as_ref().map(|c| c.get_status())
+    self.cost_controller.as_ref().map(|c| {
+      let (spent_micros, limit_micros) = c.get_status();
+      (spent_micros as f64 / 1_000_000.0, limit_micros as f64 / 1_000_000.0)
+    })
   }
 
   /// Stop the proxy server
@@ -344,7 +348,9 @@ impl LlmRouter {
     };
 
     // Create cost controller with effective budget (always created, defaults to 0)
-    let cost_controller = Some(Arc::new(CostController::new(effective_budget)));
+    // Convert USD to microdollars (1 USD = 1,000,000 microdollars)
+    let budget_micros = (effective_budget * 1_000_000.0) as i64;
+    let cost_controller = Some(Arc::new(CostController::new(budget_micros)));
 
     // Create analytics event store (feature-gated)
     #[cfg(feature = "analytics")]
@@ -419,10 +425,10 @@ impl LlmRouter {
       // Return unused budget to server before shutting down (Protocol 005)
       if let Some(lease_id) = self.lease_id.take() {
         if !self.server_url.is_empty() {
-          // Get spent amount from cost_controller
+          // Get spent amount from cost_controller (convert microdollars to USD)
           let spent_usd = self.cost_controller
             .as_ref()
-            .map(|cc| cc.total_spent())
+            .map(|cc| cc.total_spent() as f64 / 1_000_000.0)
             .unwrap_or(0.0);
 
           let url = format!("{}/api/v1/budget/return", self.server_url);

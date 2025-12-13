@@ -15,7 +15,7 @@ pub fn current_time_ms() -> u64
 }
 
 /// LLM Provider enumeration.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize ) ]
+#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default ) ]
 #[ serde( rename_all = "lowercase" ) ]
 pub enum Provider
 {
@@ -24,6 +24,7 @@ pub enum Provider
 
   /// Fallback for unknown/unsupported providers during deserialization.
   #[ serde( other ) ]
+  #[ default ]
   Unknown,
 }
 
@@ -46,14 +47,6 @@ impl Provider
   pub fn to_arc_str( self ) -> Arc< str >
   {
     Arc::from( self.as_str() )
-  }
-}
-
-impl Default for Provider
-{
-  fn default() -> Self
-  {
-    Self::Unknown
   }
 }
 

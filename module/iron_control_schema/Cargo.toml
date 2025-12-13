@@ -7,8 +7,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "PostgreSQL schema for Iron Cage Control Panel (production mode)"
 
-[lints]
-workspace = true
+[features]
+enabled = []
+full = ["enabled"]
 
 [lib]
 # Spec-only module - no implementation yet
@@ -18,3 +19,6 @@ workspace = true
 # sqlx.workspace = true
 # serde.workspace = true
 # iron_types.workspace = true
+
+[lints]
+workspace = true

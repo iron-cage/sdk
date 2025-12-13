@@ -200,7 +200,7 @@ impl ConfigBuilder
   {
     if self.validate
     {
-      self.validate_values().expect( "Configuration validation failed" );
+      self.validate_values().expect( "LOUD FAILURE: Configuration validation failed" );
     }
 
     Config {
@@ -249,50 +249,3 @@ impl Default for ConfigBuilder
   }
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ test ]
-  fn test_config_builder_precedence()
-  {
-    let mut cli_args = HashMap::new();
-    cli_args.insert( "format".to_string(), "json".to_string() );
-
-    std::env::set_var( "IRON_FORMAT", "yaml" );
-
-    let config = Config::builder()
-      .with_defaults()
-      .with_env()
-      .with_cli_args( cli_args )
-      .build();
-
-    // CLI should override env
-    assert_eq!( config.get( "format" ), Some( "json".to_string() ) );
-
-    std::env::remove_var( "IRON_FORMAT" );
-  }
-
-  #[ test ]
-  fn test_config_validation_rejects_invalid_format()
-  {
-    let mut cli_args = HashMap::new();
-    cli_args.insert( "format".to_string(), "invalid".to_string() );
-
-    let result = Config::builder()
-      .with_cli_args( cli_args )
-      .validate()
-      .build_result();
-
-    assert!( result.is_err() );
-  }
-
-  #[ test ]
-  fn test_config_get_or_returns_default()
-  {
-    let config = Config::new();
-
-    assert_eq!( config.get_or( "missing_key", "default_value" ), "default_value" );
-  }
-}

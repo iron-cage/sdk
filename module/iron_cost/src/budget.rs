@@ -1,6 +1,27 @@
+//! Budget control with atomic reservations
+//!
+//! Provides thread-safe budget tracking and enforcement for LLM API costs.
+//! Uses a reservation system to prevent concurrent overspend in multi-threaded environments.
+//!
+//! **Core Concepts:**
+//! - **Microdollar Precision:** All amounts stored as microdollars (1/1,000,000 USD) for financial accuracy
+//! - **Atomic Operations:** Thread-safe budget updates using atomic primitives
+//! - **Reservation Pattern:** Reserve maximum cost before request, commit actual cost after completion
+//! - **Concurrent Safety:** Prevents race conditions when multiple threads access budget simultaneously
+//!
+//! **Typical Workflow:**
+//! 1. `reserve()` - Atomically reserve maximum possible cost before LLM request
+//! 2. Execute LLM request
+//! 3. `commit()` - Add actual cost to spent, release reservation
+//! 4. Or `cancel()` - Release reservation if request failed
+//!
+//! **Why Reservations:**
+//! Without reservations, concurrent requests could all check budget simultaneously
+//! and each proceed thinking budget is available, causing overspend. Reservations
+//! atomically claim budget before the request starts, preventing this race condition.
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::error::CostError;
-use crate::converter::{usd_to_micros, micros_to_usd};
 
 /// A budget reservation that must be committed or cancelled.
 ///
@@ -13,14 +34,9 @@ pub struct Reservation {
 }
 
 impl Reservation {
-    /// Get the reserved amount in USD
-    pub fn amount_usd(&self) -> f64 {
-        micros_to_usd(self.amount_micros)
-    }
-
     /// Get the reserved amount in microdollars
-    pub fn amount_micros(&self) -> u64 {
-        self.amount_micros
+    pub fn amount(&self) -> i64 {
+        self.amount_micros as i64
     }
 }
 
@@ -35,10 +51,10 @@ pub struct CostController {
 }
 
 impl CostController {
-    /// Create a new controller with a strict starting budget.
-    pub fn new(initial_budget_usd: f64) -> Self {
+    /// Create a new controller with a strict starting budget (in microdollars).
+    pub fn new(initial_budget_micros: i64) -> Self {
         Self {
-            budget_limit_micros: AtomicU64::new(usd_to_micros(initial_budget_usd)),
+            budget_limit_micros: AtomicU64::new(initial_budget_micros as u64),
             total_spent_micros: AtomicU64::new(0),
             reserved_micros: AtomicU64::new(0),
         }
@@ -57,67 +73,59 @@ impl CostController {
         let used = spent.saturating_add(reserved);
         if used >= limit {
             return Err(CostError::BudgetExceeded {
-                spent_usd: micros_to_usd(spent),
-                limit_usd: micros_to_usd(limit),
-                reserved_usd: micros_to_usd(reserved),
+                spent_microdollars: spent as i64,
+                limit_microdollars: limit as i64,
+                reserved_microdollars: reserved as i64,
             });
         }
 
         Ok(())
     }
 
-    /// Add cost after a request finishes (USD)
-    pub fn add_spend(&self, cost_usd: f64) {
-        let cost = usd_to_micros(cost_usd);
-        self.total_spent_micros.fetch_add(cost, Ordering::Relaxed);
+    /// Add cost after a request finishes (in microdollars)
+    pub fn add_spend(&self, cost_micros: i64) {
+        self.total_spent_micros.fetch_add(cost_micros as u64, Ordering::Relaxed);
     }
 
-    /// Add cost after a request finishes (microdollars)
-    /// Use when cost is already calculated in micros to avoid conversion.
-    pub fn add_spend_micros(&self, cost_micros: u64) {
-        self.total_spent_micros.fetch_add(cost_micros, Ordering::Relaxed);
+    /// Get total spent in microdollars
+    pub fn total_spent(&self) -> i64 {
+        self.total_spent_micros.load(Ordering::Relaxed) as i64
     }
 
-    /// Get total spent in USD
-    pub fn total_spent(&self) -> f64 {
-        micros_to_usd(self.total_spent_micros.load(Ordering::Relaxed))
+    /// Get budget limit in microdollars
+    pub fn budget_limit(&self) -> i64 {
+        self.budget_limit_micros.load(Ordering::Relaxed) as i64
     }
 
-    /// Get budget limit in USD
-    pub fn budget_limit(&self) -> f64 {
-        micros_to_usd(self.budget_limit_micros.load(Ordering::Relaxed))
+    /// Update the budget limit (in microdollars)
+    pub fn set_budget(&self, budget_micros: i64) {
+        self.budget_limit_micros.store(budget_micros as u64, Ordering::Relaxed);
     }
 
-    /// Update the strict limit (e.g. from Python)
-    pub fn set_budget(&self, budget_usd: f64) {
-        let limit = usd_to_micros(budget_usd);
-        self.budget_limit_micros.store(limit, Ordering::Relaxed);
-    }
-
-    /// Get current status (for API/Python)
-    /// Returns (spent_usd, limit_usd)
-    pub fn get_status(&self) -> (f64, f64) {
+    /// Get current status
+    /// Returns (spent_microdollars, limit_microdollars)
+    pub fn get_status(&self) -> (i64, i64) {
         let limit = self.budget_limit_micros.load(Ordering::Relaxed);
         let spent = self.total_spent_micros.load(Ordering::Relaxed);
-        (micros_to_usd(spent), micros_to_usd(limit))
+        (spent as i64, limit as i64)
     }
 
-    /// Get current status including reserved (for API/Python)
-    /// Returns (spent_usd, reserved_usd, limit_usd)
-    pub fn get_full_status(&self) -> (f64, f64, f64) {
+    /// Get current status including reserved
+    /// Returns (spent_microdollars, reserved_microdollars, limit_microdollars)
+    pub fn get_full_status(&self) -> (i64, i64, i64) {
         let limit = self.budget_limit_micros.load(Ordering::Acquire);
         let spent = self.total_spent_micros.load(Ordering::Acquire);
         let reserved = self.reserved_micros.load(Ordering::Acquire);
-        (micros_to_usd(spent), micros_to_usd(reserved), micros_to_usd(limit))
+        (spent as i64, reserved as i64, limit as i64)
     }
 
-    /// Get available budget (limit - spent - reserved) in USD
-    pub fn available(&self) -> f64 {
+    /// Get available budget (limit - spent - reserved) in microdollars
+    pub fn available(&self) -> i64 {
         let limit = self.budget_limit_micros.load(Ordering::Acquire);
         let spent = self.total_spent_micros.load(Ordering::Acquire);
         let reserved = self.reserved_micros.load(Ordering::Acquire);
         let available = limit.saturating_sub(spent).saturating_sub(reserved);
-        micros_to_usd(available)
+        available as i64
     }
 
     /// Reserve budget atomically before an LLM call.
@@ -145,8 +153,8 @@ impl CostController {
 
             if max_cost_micros > available {
                 return Err(CostError::InsufficientBudget {
-                    available_usd: micros_to_usd(available),
-                    requested_usd: micros_to_usd(max_cost_micros),
+                    available_microdollars: available as i64,
+                    requested_microdollars: max_cost_micros as i64,
                 });
             }
 
@@ -171,10 +179,6 @@ impl CostController {
         }
     }
 
-    /// Reserve budget in USD (convenience wrapper)
-    pub fn reserve_usd(&self, max_cost_usd: f64) -> Result<Reservation, CostError> {
-        self.reserve(usd_to_micros(max_cost_usd))
-    }
 
     /// Commit a reservation with actual cost.
     ///
@@ -196,10 +200,6 @@ impl CostController {
             .fetch_sub(reservation.amount_micros, Ordering::AcqRel);
     }
 
-    /// Commit a reservation with actual cost in USD (convenience wrapper)
-    pub fn commit_usd(&self, reservation: Reservation, actual_cost_usd: f64) {
-        self.commit(reservation, usd_to_micros(actual_cost_usd));
-    }
 
     /// Cancel a reservation without adding any cost.
     ///
@@ -214,8 +214,8 @@ impl CostController {
             .fetch_sub(reservation.amount_micros, Ordering::AcqRel);
     }
 
-    /// Get total reserved amount in USD
-    pub fn total_reserved(&self) -> f64 {
-        micros_to_usd(self.reserved_micros.load(Ordering::Acquire))
+    /// Get total reserved amount in microdollars
+    pub fn total_reserved(&self) -> i64 {
+        self.reserved_micros.load(Ordering::Acquire) as i64
     }
 }

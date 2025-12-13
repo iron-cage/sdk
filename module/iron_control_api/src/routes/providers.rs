@@ -37,7 +37,7 @@ impl ProvidersState
   pub async fn new( database_url: &str ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let storage = ProviderKeyStorage::connect( database_url ).await
-      .map_err( |_| "Failed to connect to database" )?;
+      .map_err( |e| Box::new( e ) as Box< dyn std::error::Error > )?;
 
     // Try to initialize crypto, but don't fail if master key not set
     let crypto = match CryptoService::from_env()

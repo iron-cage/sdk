@@ -1,7 +1,9 @@
 //! Analytics adapter functions
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::analytics_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 
 pub async fn usage_adapter(
@@ -32,7 +34,9 @@ pub async fn usage_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn spending_adapter(
@@ -63,7 +67,9 @@ pub async fn spending_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn metrics_adapter(
@@ -82,7 +88,9 @@ pub async fn metrics_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn usage_by_agent_adapter(
@@ -113,7 +121,9 @@ pub async fn usage_by_agent_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn usage_by_provider_adapter(
@@ -144,7 +154,9 @@ pub async fn usage_by_provider_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn spending_by_period_adapter(
@@ -157,7 +169,7 @@ pub async fn spending_by_period_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let period = params.get( "period" ).unwrap();
+  let period = params.get( "period" ).unwrap(); // Already validated
 
   let mut query_params = HashMap::new();
   query_params.insert( "period".to_string(), period.clone() );
@@ -178,7 +190,9 @@ pub async fn spending_by_period_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn export_usage_adapter(
@@ -191,7 +205,7 @@ pub async fn export_usage_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let export_format = params.get( "export_format" ).unwrap();
+  let export_format = params.get( "export_format" ).unwrap(); // Already validated
 
   let mut query_params = HashMap::new();
   query_params.insert( "format".to_string(), export_format.clone() );
@@ -212,7 +226,9 @@ pub async fn export_usage_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn export_spending_adapter(
@@ -225,7 +241,7 @@ pub async fn export_spending_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let export_format = params.get( "export_format" ).unwrap();
+  let export_format = params.get( "export_format" ).unwrap(); // Already validated
 
   let mut query_params = HashMap::new();
   query_params.insert( "format".to_string(), export_format.clone() );
@@ -246,5 +262,7 @@ pub async fn export_spending_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

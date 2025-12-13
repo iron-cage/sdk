@@ -101,7 +101,7 @@ async fn test_api_tokens_table_structure()
     .await
     .expect("LOUD FAILURE: Failed to count tokens");
 
-  assert_eq!( count, 1 );
+  assert_eq!( count, 1, "Exactly one token should be inserted" );
 }
 
 #[ tokio::test ]
@@ -217,7 +217,7 @@ async fn test_cascade_delete_removes_usage_records()
     .fetch_one( &pool )
     .await
     .expect("LOUD FAILURE: Count query failed");
-  assert_eq!( count, 1 );
+  assert_eq!( count, 1, "Exactly one usage record should exist for the token" );
 
   // Delete token (should cascade to usage)
   sqlx::query( "DELETE FROM api_tokens WHERE id = 1" )
@@ -362,7 +362,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion()
     .fetch_one( &pool )
     .await
     .expect("LOUD FAILURE: Count query failed");
-  assert_eq!( count, 2 );
+  assert_eq!( count, 2, "Both tokens should exist for the user" );
 
   // Delete user (should cascade to tokens)
   sqlx::query( "DELETE FROM users WHERE id = $1" )

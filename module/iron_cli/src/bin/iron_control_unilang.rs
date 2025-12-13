@@ -18,6 +18,9 @@
 //! - API Tokens (4): .api_token.{list,create,get,revoke}
 //! - Projects (2): .project.{list,get}
 //! - Budget Requests (6): .budget_request.{list,create,get,approve,reject,cancel}
+
+// Binary entry points are allowed to use println! for final output
+#![allow(clippy::disallowed_macros)]
 //! - Users (8): .user.{list,create,get,update,delete,set_role,reset_password,get_permissions}
 //!
 //! Implementation Status: Phase 3 - Command execution
@@ -407,6 +410,20 @@ fn route_to_handler(
     ".user.get_permissions" =>
     {
       runtime.block_on( iron_cli::adapters::control::user_adapters::get_user_permissions_adapter( params ) )
+    }
+
+    // Auth commands
+    ".auth.login" =>
+    {
+      runtime.block_on( iron_cli::adapters::auth_adapters::login_adapter( params ) )
+    }
+    ".auth.logout" =>
+    {
+      runtime.block_on( iron_cli::adapters::auth_adapters::logout_adapter( params ) )
+    }
+    ".auth.refresh" =>
+    {
+      runtime.block_on( iron_cli::adapters::auth_adapters::refresh_adapter( params ) )
     }
 
     // Default: Command not implemented

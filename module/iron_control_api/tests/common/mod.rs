@@ -7,7 +7,9 @@
 //! - Request builders
 //! - Response extractors
 //! - Database test infrastructure and isolation tests
+//! - Budget test infrastructure (Protocol 005)
 
+pub mod budget;
 pub mod corner_cases;
 pub mod database;
 pub mod error_format;

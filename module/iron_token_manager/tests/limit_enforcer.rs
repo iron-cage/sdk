@@ -69,9 +69,9 @@ async fn test_create_limit()
     .await
     .expect("LOUD FAILURE: Failed to get limit");
 
-  assert_eq!( limit.max_tokens_per_day, Some( 10_000 ) );
-  assert_eq!( limit.max_requests_per_minute, Some( 60 ) );
-  assert_eq!( limit.max_cost_cents_per_month, Some( 1_000_000 ) );
+  assert_eq!( limit.max_tokens_per_day, Some( 10_000 ), "Created limit should have correct max tokens per day" );
+  assert_eq!( limit.max_requests_per_minute, Some( 60 ), "Created limit should have correct max requests per minute" );
+  assert_eq!( limit.max_cost_cents_per_month, Some( 1_000_000 ), "Created limit should have correct max cost per month" );
 }
 
 #[ tokio::test ]
@@ -130,7 +130,7 @@ async fn test_increment_tokens()
     .await
     .expect("LOUD FAILURE: Failed to get limit");
 
-  assert_eq!( limit.current_tokens_today, 3_000 );
+  assert_eq!( limit.current_tokens_today, 3_000, "Current tokens should reflect incremented amount" );
 }
 
 #[ tokio::test ]
@@ -275,5 +275,5 @@ async fn test_update_existing_limit()
     .await
     .expect("LOUD FAILURE: Failed to get limit");
 
-  assert_eq!( limit.max_tokens_per_day, Some( 20_000 ) );
+  assert_eq!( limit.max_tokens_per_day, Some( 20_000 ), "Updated limit should have new max tokens value" );
 }

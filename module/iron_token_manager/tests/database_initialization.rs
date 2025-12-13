@@ -74,7 +74,7 @@ async fn test_migrations_are_idempotent()
   .await
   .expect("LOUD FAILURE: Failed to count tables");
 
-  assert_eq!( table_count, 15, "Should have exactly 15 application tables after multiple runs" );
+  assert_eq!( table_count, 16, "Should have exactly 16 application tables after multiple runs" );
 }
 
 #[ tokio::test ]
@@ -139,6 +139,7 @@ async fn test_production_schema_matches_test_schema()
     "budget_leases",
     "budget_modification_history",
     "project_provider_key_assignments",
+    "system_config",
     "token_blacklist",
     "token_usage",
     "usage_limits",

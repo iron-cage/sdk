@@ -101,8 +101,8 @@ pub async fn update_limit_adapter(
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would update token limit",
-      "limit_type": params.get( "limit_type" ).unwrap(),
-      "value": params.get( "value" ).unwrap(),
+      "limit_type": params.get( "limit_type" ).unwrap(), // Already validated
+      "value": params.get( "value" ).unwrap(), // Already validated
     });
 
     return format_response( &dry_data, format );
@@ -118,8 +118,8 @@ pub async fn update_limit_adapter(
 
   // 5. Build request body
   let body = json!({
-    "limit_type": params.get( "limit_type" ).unwrap(),
-    "value": params.get( "value" ).unwrap().parse::<i64>().unwrap(),
+    "limit_type": params.get( "limit_type" ).unwrap(), // Already validated
+    "value": params.get( "value" ).unwrap().parse::<i64>().expect( "value parameter validated by handler" ),
   });
 
   // 6. Make HTTP call

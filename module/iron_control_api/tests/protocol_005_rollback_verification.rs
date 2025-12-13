@@ -200,7 +200,7 @@ async fn test_protocol_005_budget_flow_works()
   // Step 1: Create agent budget
   let budget_manager = Arc::new( AgentBudgetManager::from_pool( pool.clone() ) );
   budget_manager
-    .create_budget( agent_id, 100.0 )
+    .create_budget( agent_id, 100_000_000 )
     .await
     .unwrap();
 
@@ -211,8 +211,8 @@ async fn test_protocol_005_budget_flow_works()
     .unwrap()
     .expect("LOUD FAILURE: Budget should exist");
 
-  assert_eq!( budget.total_allocated, 100.0, "Total allocated should be $100" );
-  assert_eq!( budget.budget_remaining, 100.0, "Budget remaining should be $100" );
+  assert_eq!( budget.total_allocated, 100_000_000, "Total allocated should be $100" );
+  assert_eq!( budget.budget_remaining, 100_000_000, "Budget remaining should be $100" );
 
   // Step 2: Create budget lease
   let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
@@ -220,7 +220,7 @@ async fn test_protocol_005_budget_flow_works()
   let budget_id = agent_id; // budget_id = agent_id (1:1 relationship)
 
   lease_manager
-    .create_lease( &lease_id, agent_id, budget_id, 10.0, None )
+    .create_lease( &lease_id, agent_id, budget_id, 10_000_000, None )
     .await
     .unwrap();
 
@@ -231,17 +231,17 @@ async fn test_protocol_005_budget_flow_works()
     .unwrap()
     .expect("LOUD FAILURE: Lease should exist");
 
-  assert_eq!( lease.budget_granted, 10.0, "Lease should have $10 granted" );
-  assert_eq!( lease.budget_spent, 0.0, "Lease should have $0 spent initially" );
+  assert_eq!( lease.budget_granted, 10_000_000, "Lease should have $10 granted" );
+  assert_eq!( lease.budget_spent, 0, "Lease should have $0 spent initially" );
 
   // Step 3: Record usage
   lease_manager
-    .record_usage( &lease_id, 2.5 )
+    .record_usage( &lease_id, 2_500_000 )
     .await
     .unwrap();
 
   budget_manager
-    .record_spending( agent_id, 2.5 )
+    .record_spending( agent_id, 2_500_000 )
     .await
     .unwrap();
 
@@ -252,7 +252,7 @@ async fn test_protocol_005_budget_flow_works()
     .unwrap()
     .expect("LOUD FAILURE: Lease should exist");
 
-  assert_eq!( updated_lease.budget_spent, 2.5, "Lease should show $2.50 spent" );
+  assert_eq!( updated_lease.budget_spent, 2_500_000, "Lease should show $2.50 spent" );
 
   let updated_budget = budget_manager
     .get_budget_status( agent_id )
@@ -260,9 +260,9 @@ async fn test_protocol_005_budget_flow_works()
     .unwrap()
     .expect("LOUD FAILURE: Budget should exist");
 
-  assert_eq!( updated_budget.total_spent, 2.5, "Budget should show $2.50 total spent" );
+  assert_eq!( updated_budget.total_spent, 2_500_000, "Budget should show $2.50 total spent" );
   assert_eq!(
-    updated_budget.budget_remaining, 97.5,
+    updated_budget.budget_remaining, 97_500_000,
     "Budget remaining should be $97.50"
   );
 

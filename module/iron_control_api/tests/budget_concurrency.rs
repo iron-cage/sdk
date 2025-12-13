@@ -23,170 +23,23 @@
 //! | `test_concurrent_report_and_refresh` | Concurrent report and refresh operations | Concurrent POST /api/budget/report and POST /api/budget/refresh on same lease | Both succeed, 2 leases total, no lost updates | ✅ |
 //! | `test_handshake_with_existing_active_lease` | Multiple active leases per agent | POST /api/budget/handshake while active lease exists | New lease created, both leases active simultaneously | ✅ |
 
+mod common;
+
 use axum::
 {
   body::Body,
   http::{ Request, StatusCode },
-  Router,
 };
-use iron_control_api::
+use common::budget::
 {
-  ic_token::{ IcTokenClaims, IcTokenManager },
-  routes::budget::{ BudgetState, handshake, report_usage, refresh_budget },
+  setup_test_db,
+  create_test_budget_state,
+  create_ic_token,
+  seed_agent_with_budget,
+  create_budget_router,
 };
-use iron_token_manager::lease_manager::LeaseManager;
 use serde_json::json;
-use sqlx::SqlitePool;
-use std::sync::Arc;
 use tower::ServiceExt;
-
-/// Helper: Create test database with all migrations
-async fn setup_test_db() -> SqlitePool
-{
-  let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-  iron_token_manager::migrations::apply_all_migrations( &pool )
-    .await
-    .expect("LOUD FAILURE: Failed to apply migrations");
-  pool
-}
-
-/// Helper: Create test BudgetState
-async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
-{
-  let ic_token_secret = "test_secret_key_12345".to_string();
-  let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
-
-  let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
-  let ip_token_crypto = Arc::new(
-    iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
-  );
-  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let agent_budget_manager = Arc::new(
-    iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
-  );
-  let provider_key_storage = Arc::new(
-    iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
-  );
-  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
-
-  BudgetState
-  {
-    ic_token_manager,
-    ip_token_crypto,
-    lease_manager,
-    agent_budget_manager,
-    provider_key_storage,
-    db_pool: pool,
-    jwt_secret,
-  }
-}
-
-/// Helper: Generate IC Token for test agent
-fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
-{
-  let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
-    None,
-  );
-
-  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
-}
-
-/// Helper: Seed agent with specific budget and provider key
-///
-/// # Fix(issue-concurrency-001)
-/// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
-/// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
-async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f64 )
-{
-  let now_ms = chrono::Utc::now().timestamp_millis();
-
-  // Create test user if it doesn't exist (required for owner_id foreign key)
-  sqlx::query(
-    "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
-  )
-  .bind( "test_user" )
-  .bind( "test_username" )
-  .bind( "$2b$12$test_password_hash" )
-  .bind( "test@example.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert agent with owner_id
-  sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
-  )
-  .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert agent budget
-  sqlx::query(
-    "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-     VALUES (?, ?, 0.0, ?, ?, ?)"
-  )
-  .bind( agent_id )
-  .bind( budget_usd )
-  .bind( budget_usd )
-  .bind( now_ms )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert into ai_provider_keys (actual table name from migration 004)
-  // Use unique provider key ID based on agent_id to avoid conflicts between tests
-  sqlx::query(
-    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
-  )
-  .bind( agent_id * 1000 )  // Unique provider key ID per test (e.g., agent 101 → key 101000)
-  .bind( "openai" )
-  .bind( "encrypted_test_key_base64" )
-  .bind( "test_nonce_base64" )
-  .bind( 1 )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert usage_limits for test_user (required for budget validation)
-  sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_cents_per_month, current_cost_cents_this_month, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)"
-  )
-  .bind( "test_user" )
-  .bind( 1000000i64 )  // $10,000 USD limit (in cents)
-  .bind( 0i64 )        // No spending yet
-  .bind( now_ms )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-}
-
-/// Helper: Create router for budget endpoints
-async fn create_budget_router( state: BudgetState ) -> Router
-{
-  Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .route( "/api/budget/report", axum::routing::post( report_usage ) )
-    .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
-    .with_state( state )
-}
 
 /// Test 8: Multiple simultaneous handshakes for same agent
 ///
@@ -205,7 +58,7 @@ async fn test_multiple_simultaneous_handshakes()
   let agent_id = 101;
 
   // Seed agent with exactly 100 USD budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -277,7 +130,7 @@ async fn test_multiple_simultaneous_handshakes()
   );
 
   // Verify final budget state
-  let remaining : f64 = sqlx::query_scalar(
+  let remaining : i64 = sqlx::query_scalar(
     "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
   )
   .bind( agent_id )
@@ -286,7 +139,7 @@ async fn test_multiple_simultaneous_handshakes()
   .unwrap();
 
   // Budget should be fully allocated (0 remaining)
-  assert_eq!( remaining, 0.0, "Budget should be fully allocated after 10x 10 USD leases" );
+  assert_eq!( remaining, 0, "Budget should be fully allocated after 10x 10 USD leases" );
 }
 
 /// Test 9: Concurrent usage reports on same lease
@@ -306,7 +159,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   let agent_id = 102;
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -350,7 +203,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
             "lease_id": lease_id_clone,
             "request_id": "req_test_001",
             "tokens": 1000,
-            "cost_usd": 5.0,
+            "cost_microdollars": 5_000_000,
             "model": "gpt-4",
             "provider": "openai"
           }).to_string()
@@ -380,7 +233,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   assert_eq!( successful_count, 2, "Both concurrent reports should succeed" );
 
   // Verify lease spent is exactly 10 USD (atomic updates, no lost writes)
-  let budget_spent : f64 = sqlx::query_scalar(
+  let budget_spent : i64 = sqlx::query_scalar(
     "SELECT budget_spent FROM budget_leases WHERE id = ?"
   )
   .bind( &lease_id )
@@ -388,7 +241,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   .await
   .unwrap();
 
-  assert_eq!( budget_spent, 10.0, "Lease should have exactly 10 USD spent (no lost updates)" );
+  assert_eq!( budget_spent, 10_000_000, "Lease should have exactly 10 USD spent (no lost updates)" );
 }
 
 /// Test 10: Concurrent report and refresh on same lease
@@ -408,7 +261,7 @@ async fn test_concurrent_report_and_refresh()
   let agent_id = 103;
 
   // Seed agent with sufficient budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -446,7 +299,7 @@ async fn test_concurrent_report_and_refresh()
           "lease_id": lease_id_report,
           "request_id": "req_test_concurrent",
           "tokens": 500,
-          "cost_usd": 3.0,
+          "cost_microdollars": 3_000_000,
           "model": "gpt-4",
           "provider": "openai"
         }).to_string()
@@ -468,7 +321,7 @@ async fn test_concurrent_report_and_refresh()
         json!({
           "ic_token": ic_token_refresh,
           "current_lease_id": lease_id,
-          "requested_budget": 10.0
+          "requested_budget": 10_000_000
         }).to_string()
       ))
       .unwrap();
@@ -513,7 +366,7 @@ async fn test_handshake_with_existing_active_lease()
   let agent_id = 104;
 
   // Seed agent with sufficient budget for multiple leases
-  seed_agent_with_budget( &pool, agent_id, 50.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 50_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -594,12 +447,19 @@ async fn test_handshake_with_existing_active_lease()
 /// Existing test `test_multiple_simultaneous_handshakes` uses sufficient budget ($100 for 10x$10),
 /// so all requests succeed. Race condition only manifests at budget boundary.
 ///
-/// # Fix Applied (if race exists)
-/// Must wrap check-grant-record sequence in a database transaction with proper locking.
-/// Options:
-/// 1. Explicit transaction around entire handshake logic
-/// 2. SELECT FOR UPDATE on agent_budgets table during check
-/// 3. Optimistic locking with version field
+/// # Fix Applied (issue-budget-006)
+/// Created `AgentBudgetManager::check_and_reserve_budget()` method that atomically
+/// checks and reserves budget using conditional UPDATE with WHERE clause and CASE
+/// expression to calculate partial grants: `min(requested, budget_remaining)`.
+/// SQLite's row-level write lock ensures only one UPDATE succeeds when multiple
+/// transactions compete for insufficient budget. This is the "optimistic concurrency
+/// control" pattern. Replaced separate `get_budget_status()` + `record_spending()`
+/// calls in handshake with single `check_and_reserve_budget()` call.
+///
+/// **Critical discovery**: Under high concurrency (10+ simultaneous requests), SQLite
+/// returns "database is deadlocked" errors (not just "locked" or "busy"). Added retry
+/// logic with exponential backoff (50 retries, max 256ms delay) that detects all three
+/// error types: "database is locked", "database is busy", and "deadlock".
 ///
 /// # Prevention
 /// Always test boundary conditions for concurrent operations:
@@ -618,7 +478,7 @@ async fn test_toctou_race_insufficient_budget()
   let agent_id = 105;
 
   // Seed agent with EXACTLY $10.00 (enough for only 1 handshake)
-  seed_agent_with_budget( &pool, agent_id, 10.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 10_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -695,7 +555,7 @@ async fn test_toctou_race_insufficient_budget()
   );
 
   // Verify final budget state - should be EXACTLY 0 (not negative)
-  let remaining : f64 = sqlx::query_scalar(
+  let remaining : i64 = sqlx::query_scalar(
     "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
   )
   .bind( agent_id )
@@ -704,12 +564,12 @@ async fn test_toctou_race_insufficient_budget()
   .unwrap();
 
   assert!(
-    remaining >= 0.0,
+    remaining >= 0,
     "Budget remaining must not be negative (invariant violation). Got: {remaining}"
   );
 
   assert_eq!(
-    remaining, 0.0,
+    remaining, 0,
     "Budget should be fully allocated after 1x $10 lease from $10 budget. Got: {remaining}"
   );
 }

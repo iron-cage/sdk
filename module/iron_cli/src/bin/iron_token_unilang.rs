@@ -18,6 +18,9 @@
 //! - Traces (3): .traces.{list,get,export}
 //! - Health (2): .health.{check,version}
 //!
+
+// Binary entry points are allowed to use println! for final output
+#![allow(clippy::disallowed_macros)]
 //! Implementation Status: Phase 3 - Runtime YAML loading with command execution
 //! - ✅ Binary entry point created
 //! - ✅ YAML command definitions (22 commands)

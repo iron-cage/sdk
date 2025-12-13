@@ -13,7 +13,7 @@ use super::AdapterError;
 use super::services::UsageService;
 use super::auth::HasParams;
 use crate::handlers::usage_handlers;
-use crate::formatting::Formatter;
+use crate::formatting::TreeFmtFormatter;
 use std::collections::HashMap;
 
 /// Extract parameters from command
@@ -28,7 +28,7 @@ where
 pub async fn show_usage_adapter<T, S>(
   command: &T,
   usage_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -74,7 +74,7 @@ where
 pub async fn usage_by_project_adapter<T, S>(
   command: &T,
   usage_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -111,7 +111,7 @@ where
 pub async fn usage_by_provider_adapter<T, S>(
   command: &T,
   usage_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -153,7 +153,7 @@ where
 pub async fn export_usage_adapter<T, S>(
   command: &T,
   usage_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,

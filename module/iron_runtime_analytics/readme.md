@@ -211,3 +211,22 @@ src/
 ## License
 
 Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Lock-free event-based analytics for Iron Runtime LLM proxy. |
+| event.rs | Analytics event types and payloads. |
+| event_storage.rs | Lock-free event storage with atomic counters. |
+| provider_utils.rs | Utility functions and types for analytics. |
+| recording.rs | High-level recording API for EventStore. |
+| stats.rs | Statistics types for analytics aggregation. |
+| sync.rs | Analytics sync - background sync of events to Control API. |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

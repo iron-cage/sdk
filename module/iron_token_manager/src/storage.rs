@@ -110,7 +110,7 @@ impl TokenStorage
       .max_connections( 5 )
       .connect( database_url )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     // Apply all migrations using unified helper
     crate::migrations::apply_all_migrations( &pool ).await?;
@@ -147,8 +147,7 @@ impl TokenStorage
   /// ```
   pub async fn from_config() -> Result< Self >
   {
-    let config = crate::config::Config::load()
-      .map_err( |_| crate::error::TokenError::Generic )?;
+    let config = crate::config::Config::load()?;
     Self::from_config_object( &config ).await
   }
 
@@ -171,7 +170,7 @@ impl TokenStorage
       .max_connections( config.database.max_connections )
       .connect( &config.database.url )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     // Apply migrations if configured
     if config.database.auto_migrate
@@ -290,7 +289,7 @@ impl TokenStorage
     .bind( expires_at )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok( result.last_insert_rowid() )
   }
@@ -323,7 +322,7 @@ impl TokenStorage
     .bind( now_ms )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     row
       .map( |r| r.get::< i64, _ >( "id" ) )
@@ -349,7 +348,7 @@ impl TokenStorage
       .bind( token_id )
       .fetch_one( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     Ok( row.get::< String, _ >( "token_hash" ) )
   }
@@ -376,7 +375,7 @@ impl TokenStorage
     .bind( token_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok( TokenMetadata {
       id: row.get( "id" ),
@@ -408,7 +407,7 @@ impl TokenStorage
       .bind( token_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     if result.rows_affected() == 0
     {
@@ -441,7 +440,7 @@ impl TokenStorage
     .bind( token_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     if result.rows_affected() == 0
     {
@@ -469,7 +468,7 @@ impl TokenStorage
       .bind( token_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     Ok( () )
   }
@@ -496,7 +495,7 @@ impl TokenStorage
     .bind( user_id )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok(
       rows.iter().map( |row| TokenMetadata {
@@ -634,7 +633,7 @@ impl TokenStorage
       .bind( token_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     if result.rows_affected() == 0
     {
@@ -661,7 +660,7 @@ impl TokenStorage
       .bind( provider )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err( crate::error::TokenError::Database )?;
 
     if result.rows_affected() == 0
     {
@@ -751,7 +750,7 @@ impl TokenStorage
     .bind( logged_at )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok( () )
   }
@@ -779,7 +778,7 @@ impl TokenStorage
     .bind( user_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok( count )
   }
@@ -810,7 +809,7 @@ impl TokenStorage
     .bind( one_minute_ago )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok( count )
   }
@@ -822,6 +821,6 @@ pub( crate ) fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_millis() as i64
 }

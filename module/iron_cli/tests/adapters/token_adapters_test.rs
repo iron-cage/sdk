@@ -27,7 +27,7 @@
 use iron_cli::adapters::{ AdapterError, ServiceError, TokenService };
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -89,7 +89,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_generate_token_adapter_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.generate",
@@ -119,7 +119,7 @@ async fn test_generate_token_adapter_success()
 async fn test_generate_token_adapter_missing_name()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.generate",
@@ -151,7 +151,7 @@ async fn test_generate_token_adapter_missing_name()
 async fn test_generate_token_adapter_invalid_scope()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.generate",
@@ -188,7 +188,7 @@ async fn test_generate_token_adapter_storage_error()
   let adapter = create_test_adapter();
   adapter.set_failure_mode( "database_error" );
 
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.generate",
@@ -220,7 +220,7 @@ async fn test_generate_token_adapter_storage_error()
 async fn test_generate_token_adapter_dry_run()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.generate",
@@ -252,7 +252,7 @@ async fn test_generate_token_adapter_dry_run()
 async fn test_list_tokens_adapter_success_empty()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".tokens.list", &[] );
 
@@ -275,7 +275,7 @@ async fn test_list_tokens_adapter_success_empty()
 async fn test_list_tokens_adapter_success_multiple()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".tokens.list", &[] );
 
@@ -298,7 +298,7 @@ async fn test_list_tokens_adapter_success_multiple()
 async fn test_list_tokens_adapter_with_filter()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.list",
@@ -320,7 +320,7 @@ async fn test_list_tokens_adapter_storage_error()
   let adapter = create_test_adapter();
   adapter.set_failure_mode( "database_error" );
 
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".tokens.list", &[] );
 
@@ -346,7 +346,7 @@ async fn test_list_tokens_adapter_storage_error()
 async fn test_list_tokens_adapter_json_format()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".tokens.list",
@@ -376,7 +376,7 @@ async fn test_list_tokens_adapter_json_format()
 async fn test_get_token_adapter_success()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.get",
@@ -402,7 +402,7 @@ async fn test_get_token_adapter_success()
 async fn test_get_token_adapter_missing_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".tokens.get", &[] );
 
@@ -431,7 +431,7 @@ async fn test_get_token_adapter_missing_id()
 async fn test_get_token_adapter_not_found()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.get",
@@ -460,7 +460,7 @@ async fn test_get_token_adapter_not_found()
 async fn test_get_token_adapter_invalid_format()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.get",
@@ -492,7 +492,7 @@ async fn test_get_token_adapter_invalid_format()
 async fn test_get_token_adapter_expanded_format()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Expanded );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Expanded );
 
   let command = create_verified_command(
     ".tokens.get",
@@ -519,7 +519,7 @@ async fn test_get_token_adapter_expanded_format()
 async fn test_rotate_token_adapter_success()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.rotate",
@@ -545,7 +545,7 @@ async fn test_rotate_token_adapter_success()
 async fn test_rotate_token_adapter_not_found()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.rotate",
@@ -574,7 +574,7 @@ async fn test_rotate_token_adapter_not_found()
 async fn test_rotate_token_adapter_preserves_scope()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Get original scope
   let original_token = adapter.get( "tok_test-token-1" ).await.unwrap();
@@ -608,7 +608,7 @@ async fn test_rotate_token_adapter_storage_error()
   let adapter = create_adapter_with_tokens().await;
   adapter.set_failure_mode( "database_error" );
 
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.rotate",
@@ -637,7 +637,7 @@ async fn test_rotate_token_adapter_storage_error()
 async fn test_rotate_token_adapter_dry_run()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Get original token state
   let original_token = adapter.get( "tok_test-token-1" ).await.unwrap();
@@ -675,7 +675,7 @@ async fn test_rotate_token_adapter_dry_run()
 async fn test_revoke_token_adapter_success()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.revoke",
@@ -699,7 +699,7 @@ async fn test_revoke_token_adapter_success()
 async fn test_revoke_token_adapter_not_found()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.revoke",
@@ -728,7 +728,7 @@ async fn test_revoke_token_adapter_not_found()
 async fn test_revoke_token_adapter_with_reason()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.revoke",
@@ -757,7 +757,7 @@ async fn test_revoke_token_adapter_with_reason()
 async fn test_revoke_token_adapter_already_revoked()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // First revocation
   let command1 = create_verified_command(
@@ -799,7 +799,7 @@ async fn test_revoke_token_adapter_already_revoked()
 async fn test_revoke_token_adapter_dry_run()
 {
   let adapter = create_adapter_with_tokens().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.revoke",

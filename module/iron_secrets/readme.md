@@ -55,3 +55,22 @@ let api_key = manager.get("openai-api-key")?;
 ## License
 
 Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Secure secrets management for AI agents |
+| access_control.rs | Access control for secrets |
+| audit.rs | Audit logging for secrets access |
+| crypto.rs | Cryptographic operations for secret encryption/decryption |
+| error.rs | Error types |
+| secrets_manager.rs | Secrets manager service |
+| storage.rs | Encrypted storage backend |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

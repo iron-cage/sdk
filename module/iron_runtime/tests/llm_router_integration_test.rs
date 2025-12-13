@@ -5,11 +5,7 @@
 //! - IC_SERVER environment variable set (Iron Cage server URL)
 //! - Provider key configured in Iron Cage dashboard
 //!
-//! Run with: cargo test --features integration
-//!
 //! Tests skip gracefully when env vars are not set (for CI compatibility).
-
-#![ cfg( feature = "integration" ) ]
 
 use tracing::debug;
 
@@ -54,7 +50,7 @@ fn test_router_starts_and_stops()
   let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   assert!( router.running() );
-  assert!( router.port > 0 );
+  assert!( router.port > 0, "Router should be assigned a valid port" );
   assert!( router.get_base_url().contains( "127.0.0.1" ) );
   assert!( router.get_base_url().contains( "/v1" ) );
 
@@ -119,7 +115,7 @@ fn test_router_api_key_passthrough()
   let mut router = LlmRouter::create( token.clone(), server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   // API key should be the same as the input token
-  assert_eq!( router.api_key, token );
+  assert_eq!( router.api_key, token, "Router should store the provided API key" );
 
   router.shutdown();
 }
@@ -152,7 +148,7 @@ fn test_router_invalid_server_url()
 
   assert!( router.running() );
   // Provider will be "unknown" since it couldn't fetch the key
-  assert_eq!( router.provider, "unknown" );
+  assert_eq!( router.provider, "unknown", "Provider should be unknown when server is unreachable" );
 
   router.shutdown();
 }

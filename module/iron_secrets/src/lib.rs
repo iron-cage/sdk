@@ -34,11 +34,6 @@
 //!
 //! Follows specification: `module/iron_secrets/spec.md`
 //!
-//! ## Features
-//!
-//! - **`enabled`** (default) - Core secrets management functionality
-//! - **`full`** - All features enabled
-//!
 //! ## Known Pitfalls
 //!
 //! ### Master Key Loss
@@ -64,28 +59,11 @@
 //! 3. Always display masked values in UI
 //! 4. Audit log entries for accidental leaks
 
-#![cfg_attr(not(feature = "enabled"), allow(unused))]
 #![warn(missing_docs)]
 
-#[cfg(feature = "enabled")]
-pub mod error;
-
-/// Secrets management core functionality
-#[cfg(feature = "enabled")]
-pub mod secrets_manager;
-
 /// Cryptographic operations for secret encryption/decryption
-#[cfg(feature = "enabled")]
+///
+/// Provides AES-256-GCM encryption for API keys and secrets.
+/// This is the only implemented module - other features (secrets manager,
+/// audit, access control, storage) are planned for future development.
 pub mod crypto;
-
-/// Encrypted storage backend for secrets
-#[cfg(feature = "enabled")]
-pub mod storage;
-
-/// Access control and authorization for secrets
-#[cfg(feature = "enabled")]
-pub mod access_control;
-
-/// Audit logging for secrets operations
-#[cfg(feature = "enabled")]
-pub mod audit;

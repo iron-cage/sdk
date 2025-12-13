@@ -60,3 +60,16 @@ match cb.call("external_api", || {
 ## License
 
 MIT
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Circuit breaker pattern for preventing cascading failures. |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

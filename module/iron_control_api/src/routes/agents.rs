@@ -1,3 +1,19 @@
+//! Agent management API routes
+//!
+//! Provides REST endpoints for managing AI agents within the Iron Runtime platform.
+//! Agents are the primary control mechanism for budget management and LLM access.
+//!
+//! **Endpoints:**
+//! - `GET /agents` - List agents (filtered by user role)
+//! - `GET /agents/:id` - Get single agent (with access control)
+//! - `POST /agents` - Create agent (admin only)
+//! - `PUT /agents/:id` - Update agent (admin only)
+//! - `DELETE /agents/:id` - Delete agent (admin only)
+//!
+//! **Access Control:**
+//! - Admins: Full access to all agents
+//! - Regular users: Can only view agents they own
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,

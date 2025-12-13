@@ -7,7 +7,7 @@
 
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -54,7 +54,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_health_adapter_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".health", &[] );
 
@@ -77,7 +77,7 @@ async fn test_health_adapter_success()
 async fn test_health_adapter_json_format()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".health",
@@ -102,7 +102,7 @@ async fn test_health_adapter_all_formats()
 
   for format_str in formats
   {
-    let formatter = Formatter::new( match format_str
+    let formatter = TreeFmtFormatter::new( match format_str
     {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
@@ -132,7 +132,7 @@ async fn test_health_adapter_all_formats()
 async fn test_health_adapter_storage_error()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   adapter.set_failure_mode( "storage_error" );
 
@@ -151,7 +151,7 @@ async fn test_health_adapter_storage_error()
 async fn test_health_adapter_with_details()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".health",
@@ -175,7 +175,7 @@ async fn test_health_adapter_with_details()
 async fn test_version_adapter_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".version", &[] );
 
@@ -198,7 +198,7 @@ async fn test_version_adapter_success()
 async fn test_version_adapter_json_format()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".version",
@@ -223,7 +223,7 @@ async fn test_version_adapter_all_formats()
 
   for format_str in formats
   {
-    let formatter = Formatter::new( match format_str
+    let formatter = TreeFmtFormatter::new( match format_str
     {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
@@ -253,7 +253,7 @@ async fn test_version_adapter_all_formats()
 async fn test_version_adapter_storage_error()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   adapter.set_failure_mode( "storage_error" );
 
@@ -272,7 +272,7 @@ async fn test_version_adapter_storage_error()
 async fn test_version_adapter_includes_version_number()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".version", &[] );
 
@@ -351,7 +351,7 @@ async fn bug_reproducer_issue_002_version_requires_api()
   // this test ensures the service-pattern adapter also handles offline scenarios.
 
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   // Simulate offline/API unavailable scenario
   adapter.set_failure_mode( "network_error" );

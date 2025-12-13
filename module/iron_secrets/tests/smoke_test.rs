@@ -1,19 +1,20 @@
 //! Smoke tests for `iron_secrets`
 //!
-//! These tests verify that the crate compiles and placeholder structures exist.
-//! Full functionality will be tested once implementation is complete.
+//! These tests verify that the crate compiles and core functionality exists.
 
-use iron_secrets::error::SecretsError;
+use iron_secrets::crypto::{ CryptoService, KEY_SIZE };
 
-/// Smoke test: Verify `SecretsError` exists and implements Debug
+/// Smoke test: Verify crypto module exists and basic encryption works
 ///
-/// This test ensures the placeholder error type compiles and has required traits.
+/// This test ensures the crypto module compiles and provides basic functionality.
 #[test]
-fn test_secrets_error_exists()
+fn test_crypto_module_works()
 {
-  // Verify SecretsError can be instantiated and formatted (Debug trait)
-  let error = SecretsError;
-  let _ = format!("{error:?}");
+  let key = [ 0x42u8; KEY_SIZE ];
+  let crypto = CryptoService::new( &key ).unwrap();
+  let encrypted = crypto.encrypt( "test" ).unwrap();
+  let decrypted = crypto.decrypt( &encrypted ).unwrap();
+  assert_eq!( &*decrypted, "test" );
 }
 
 /// Smoke test: Verify crate compiles with all features

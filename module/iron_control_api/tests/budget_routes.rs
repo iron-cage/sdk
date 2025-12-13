@@ -91,7 +91,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -103,7 +103,7 @@ fn test_usage_report_request_validation()
     lease_id: "".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -115,7 +115,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: -100,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -127,7 +127,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 0,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -139,7 +139,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
-    cost_usd: -0.05,
+    cost_microdollars: -50_000, // -$0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -155,7 +155,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 10.0 ),
+    requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( valid_req.validate().is_ok() );
 
@@ -173,7 +173,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 10.0 ),
+    requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( empty_token_req.validate().is_err() );
 
@@ -182,7 +182,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "".to_string(),
-    requested_budget: Some( 10.0 ),
+    requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( empty_lease_req.validate().is_err() );
 
@@ -191,7 +191,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 0.0 ),
+    requested_budget: Some( 0 ),
   };
   assert!( zero_budget_req.validate().is_err() );
 
@@ -200,7 +200,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( -10.0 ),
+    requested_budget: Some( -10_000_000 ), // -$10
   };
   assert!( negative_budget_req.validate().is_err() );
 
@@ -209,7 +209,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 1001.0 ),
+    requested_budget: Some( 1_001_000_000 ), // $1001
   };
   assert!( large_budget_req.validate().is_err() );
 }
@@ -359,8 +359,8 @@ fn test_handshake_response_serialization()
   {
     ip_token: "AES256:abc:def:ghi".to_string(),
     lease_id: "lease_123".to_string(),
-    budget_granted: 10.0,
-    budget_remaining: 90.0,
+    budget_granted: 10_000_000, // $10
+    budget_remaining: 90_000_000, // $90
     expires_at: None,
   };
 
@@ -377,7 +377,7 @@ fn test_usage_report_response_serialization()
   let response = UsageReportResponse
   {
     success: true,
-    budget_remaining: 9.5,
+    budget_remaining: 9_500_000, // $9.50
   };
 
   let json = serde_json::to_string( &response ).expect("LOUD FAILURE: Should serialize");
@@ -393,8 +393,8 @@ fn test_budget_refresh_response_serialization()
   let approved = BudgetRefreshResponse
   {
     status: "approved".to_string(),
-    budget_granted: Some( 10.0 ),
-    budget_remaining: 80.0,
+    budget_granted: Some( 10_000_000 ), // $10
+    budget_remaining: 80_000_000, // $80
     lease_id: Some( "lease_456".to_string() ),
     reason: None,
   };
@@ -408,7 +408,7 @@ fn test_budget_refresh_response_serialization()
   {
     status: "denied".to_string(),
     budget_granted: None,
-    budget_remaining: 0.0,
+    budget_remaining: 0,
     lease_id: None,
     reason: Some( "insufficient_budget".to_string() ),
   };

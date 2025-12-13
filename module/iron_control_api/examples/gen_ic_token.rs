@@ -16,6 +16,6 @@ fn main() {
         None, // No expiration
     );
 
-    let token = manager.generate_token(&claims).expect("Failed to generate token");
+    let token = manager.generate_token(&claims).expect("LOUD FAILURE: Failed to generate token");
     println!("IC_TOKEN={}", token);
 }

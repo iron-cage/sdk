@@ -5,7 +5,7 @@
 | File | Responsibility |
 |------|----------------|
 | budget_client.rs | Communicates with dashboard for budget management |
-| budget.rs | Manages budget reservations and atomic spending |
+| budget.rs | Manages budget reservations |
 | converter.rs | Converts between USD and microdollar units |
 | error.rs | Defines cost management error types |
 | lib.rs | Exports cost module public API |

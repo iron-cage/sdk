@@ -27,7 +27,7 @@
 use iron_cli::adapters::{ AdapterError, UsageService };
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -88,7 +88,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_show_usage_adapter_success()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".usage.show", &[] );
 
@@ -111,7 +111,7 @@ async fn test_show_usage_adapter_success()
 async fn test_show_usage_adapter_with_date_range()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.show",
@@ -140,7 +140,7 @@ async fn test_show_usage_adapter_with_date_range()
 async fn test_show_usage_adapter_invalid_date_format()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.show",
@@ -160,7 +160,7 @@ async fn test_show_usage_adapter_invalid_date_format()
 async fn test_show_usage_adapter_backwards_date_range()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.show",
@@ -183,7 +183,7 @@ async fn test_show_usage_adapter_backwards_date_range()
 async fn test_show_usage_adapter_json_format()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".usage.show",
@@ -207,7 +207,7 @@ async fn test_show_usage_adapter_json_format()
 async fn test_usage_by_project_adapter_success()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-project",
@@ -233,7 +233,7 @@ async fn test_usage_by_project_adapter_success()
 async fn test_usage_by_project_adapter_missing_project_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".usage.by-project", &[] );
 
@@ -256,7 +256,7 @@ async fn test_usage_by_project_adapter_missing_project_id()
 async fn test_usage_by_project_adapter_empty_project_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-project",
@@ -276,7 +276,7 @@ async fn test_usage_by_project_adapter_empty_project_id()
 async fn test_usage_by_project_adapter_with_date_range()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-project",
@@ -299,7 +299,7 @@ async fn test_usage_by_project_adapter_with_date_range()
 async fn test_usage_by_project_adapter_not_found()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-project",
@@ -324,7 +324,7 @@ async fn test_usage_by_project_adapter_not_found()
 async fn test_usage_by_provider_adapter_success()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-provider",
@@ -350,7 +350,7 @@ async fn test_usage_by_provider_adapter_success()
 async fn test_usage_by_provider_adapter_missing_provider()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".usage.by-provider", &[] );
 
@@ -367,7 +367,7 @@ async fn test_usage_by_provider_adapter_missing_provider()
 async fn test_usage_by_provider_adapter_invalid_provider()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-provider",
@@ -387,7 +387,7 @@ async fn test_usage_by_provider_adapter_invalid_provider()
 async fn test_usage_by_provider_adapter_with_aggregation()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.by-provider",
@@ -421,7 +421,7 @@ async fn test_usage_by_provider_adapter_all_formats()
 
   for format_str in formats
   {
-    let formatter = Formatter::new( match format_str
+    let formatter = TreeFmtFormatter::new( match format_str
     {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
@@ -458,7 +458,7 @@ async fn test_usage_by_provider_adapter_all_formats()
 async fn test_export_usage_adapter_success()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.export",
@@ -484,7 +484,7 @@ async fn test_export_usage_adapter_success()
 async fn test_export_usage_adapter_missing_output()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".usage.export", &[] );
 
@@ -501,7 +501,7 @@ async fn test_export_usage_adapter_missing_output()
 async fn test_export_usage_adapter_empty_output()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.export",
@@ -521,7 +521,7 @@ async fn test_export_usage_adapter_empty_output()
 async fn test_export_usage_adapter_format_json()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".usage.export",
@@ -550,7 +550,7 @@ async fn test_export_usage_adapter_format_json()
 async fn test_export_usage_adapter_format_csv()
 {
   let adapter = create_adapter_with_usage().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".usage.export",

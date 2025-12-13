@@ -12,7 +12,7 @@
 use iron_cli::adapters::LimitsService;
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -68,7 +68,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_list_limits_adapter_success()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".limits.list", &[] );
 
@@ -91,7 +91,7 @@ async fn test_list_limits_adapter_success()
 async fn test_list_limits_adapter_empty()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".limits.list", &[] );
 
@@ -108,7 +108,7 @@ async fn test_list_limits_adapter_empty()
 async fn test_list_limits_adapter_json_format()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".limits.list",
@@ -128,7 +128,7 @@ async fn test_list_limits_adapter_json_format()
 async fn test_list_limits_adapter_with_count()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".limits.list", &[] );
 
@@ -152,7 +152,7 @@ async fn test_list_limits_adapter_storage_error()
 {
   let adapter = create_test_adapter();
   adapter.set_failure_mode( "database_error" );
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".limits.list", &[] );
 
@@ -173,7 +173,7 @@ async fn test_list_limits_adapter_storage_error()
 async fn test_get_limit_adapter_success()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.get",
@@ -199,7 +199,7 @@ async fn test_get_limit_adapter_success()
 async fn test_get_limit_adapter_missing_limit_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".limits.get", &[] );
 
@@ -216,7 +216,7 @@ async fn test_get_limit_adapter_missing_limit_id()
 async fn test_get_limit_adapter_not_found()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.get",
@@ -236,7 +236,7 @@ async fn test_get_limit_adapter_not_found()
 async fn test_get_limit_adapter_empty_limit_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.get",
@@ -261,7 +261,7 @@ async fn test_get_limit_adapter_all_formats()
 
   for format_str in formats
   {
-    let formatter = Formatter::new( match format_str
+    let formatter = TreeFmtFormatter::new( match format_str
     {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
@@ -298,7 +298,7 @@ async fn test_get_limit_adapter_all_formats()
 async fn test_create_limit_adapter_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.create",
@@ -325,7 +325,7 @@ async fn test_create_limit_adapter_success()
 async fn test_create_limit_adapter_missing_resource_type()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.create",
@@ -345,7 +345,7 @@ async fn test_create_limit_adapter_missing_resource_type()
 async fn test_create_limit_adapter_missing_limit_value()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.create",
@@ -365,7 +365,7 @@ async fn test_create_limit_adapter_missing_limit_value()
 async fn test_create_limit_adapter_invalid_limit_value()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.create",
@@ -388,7 +388,7 @@ async fn test_create_limit_adapter_invalid_limit_value()
 async fn test_create_limit_adapter_negative_value()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.create",
@@ -415,7 +415,7 @@ async fn test_create_limit_adapter_negative_value()
 async fn test_update_limit_adapter_success()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.update",
@@ -438,7 +438,7 @@ async fn test_update_limit_adapter_success()
 async fn test_update_limit_adapter_missing_limit_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.update",
@@ -458,7 +458,7 @@ async fn test_update_limit_adapter_missing_limit_id()
 async fn test_update_limit_adapter_missing_limit_value()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.update",
@@ -478,7 +478,7 @@ async fn test_update_limit_adapter_missing_limit_value()
 async fn test_update_limit_adapter_not_found()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.update",
@@ -501,7 +501,7 @@ async fn test_update_limit_adapter_not_found()
 async fn test_update_limit_adapter_invalid_value()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.update",
@@ -528,7 +528,7 @@ async fn test_update_limit_adapter_invalid_value()
 async fn test_delete_limit_adapter_success()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.delete",
@@ -552,7 +552,7 @@ async fn test_delete_limit_adapter_success()
 async fn test_delete_limit_adapter_missing_limit_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".limits.delete", &[] );
 
@@ -569,7 +569,7 @@ async fn test_delete_limit_adapter_missing_limit_id()
 async fn test_delete_limit_adapter_empty_limit_id()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.delete",
@@ -589,7 +589,7 @@ async fn test_delete_limit_adapter_empty_limit_id()
 async fn test_delete_limit_adapter_not_found()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.delete",
@@ -609,7 +609,7 @@ async fn test_delete_limit_adapter_not_found()
 async fn test_delete_limit_adapter_confirmation()
 {
   let adapter = create_adapter_with_limits().await;
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".limits.delete",

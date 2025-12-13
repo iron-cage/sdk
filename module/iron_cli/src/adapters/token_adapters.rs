@@ -62,8 +62,8 @@ pub async fn generate_token_adapter(
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would generate new IC token",
-      "name": params.get( "name" ).unwrap(),
-      "scope": params.get( "scope" ).unwrap(),
+      "name": params.get( "name" ).unwrap(), // Already validated
+      "scope": params.get( "scope" ).unwrap(), // Already validated
     });
 
     return format_response( &dry_data, format );
@@ -79,8 +79,8 @@ pub async fn generate_token_adapter(
 
   // 5. Build request body
   let mut body = json!({
-    "name": params.get( "name" ).unwrap(),
-    "scope": params.get( "scope" ).unwrap(),
+    "name": params.get( "name" ).unwrap(), // Already validated
+    "scope": params.get( "scope" ).unwrap(), // Already validated
   });
 
   if let Some( expires_in ) = params.get( "expires_in" )
@@ -188,7 +188,7 @@ pub async fn get_token_adapter(
   let client = TokenApiClient::new( config );
 
   // 4. Build path
-  let id = params.get( "id" ).unwrap(); // Safe: validated by handler
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/tokens/{}", id );
 
   // 5. Make HTTP call
@@ -240,7 +240,7 @@ pub async fn rotate_token_adapter(
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would rotate IC token",
-      "id": params.get( "id" ).unwrap(),
+      "id": params.get( "id" ).unwrap(), // Already validated
     });
 
     return format_response( &dry_data, format );
@@ -255,7 +255,7 @@ pub async fn rotate_token_adapter(
   let client = TokenApiClient::new( config );
 
   // 5. Build path
-  let id = params.get( "id" ).unwrap(); // Safe: validated by handler
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/tokens/{}/rotate", id );
 
   // 6. Make HTTP call
@@ -307,7 +307,7 @@ pub async fn revoke_token_adapter(
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would revoke IC token",
-      "id": params.get( "id" ).unwrap(),
+      "id": params.get( "id" ).unwrap(), // Already validated
     });
 
     return format_response( &dry_data, format );
@@ -322,7 +322,7 @@ pub async fn revoke_token_adapter(
   let client = TokenApiClient::new( config );
 
   // 5. Build path
-  let id = params.get( "id" ).unwrap(); // Safe: validated by handler
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/tokens/{}", id );
 
   // 6. Make HTTP call

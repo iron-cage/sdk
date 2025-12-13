@@ -105,7 +105,7 @@ fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
 /// # Fix(issue-database-state-unique-001)
 /// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
 /// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
-async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f64 )
+async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microdollars: i64 )
 {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
@@ -138,14 +138,14 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f
   .await
   .unwrap();
 
-  // Insert agent budget
+  // Insert agent budget (using microdollars)
   sqlx::query(
     "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-     VALUES (?, ?, 0.0, ?, ?, ?)"
+     VALUES (?, ?, 0, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( budget_usd )
-  .bind( budget_usd )
+  .bind( budget_microdollars )
+  .bind( budget_microdollars )
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )
@@ -313,7 +313,7 @@ async fn test_handshake_with_zero_agent_budget()
   let pool = setup_test_db().await;
 
   // Seed agent with exactly $0.00 budget
-  seed_agent_with_budget( &pool, 114, 0.0 ).await;
+  seed_agent_with_budget( &pool, 114, 0 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( 114, &state.ic_token_manager );
@@ -382,7 +382,7 @@ async fn test_handshake_with_insufficient_budget_for_lease()
   let pool = setup_test_db().await;
 
   // Seed agent with $5.00 (less than $10.00 default lease)
-  seed_agent_with_budget( &pool, 115, 5.0 ).await;
+  seed_agent_with_budget( &pool, 115, 5_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( 115, &state.ic_token_manager );
@@ -417,11 +417,11 @@ async fn test_handshake_with_insufficient_budget_for_lease()
   let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
   let response_json: serde_json::Value = serde_json::from_slice( &body ).unwrap();
 
-  // Verify partial lease granted (should be min($10.00, $5.00) = $5.00)
-  let granted = response_json[ "budget_granted" ].as_f64().unwrap();
-  assert!(
-    ( granted - 5.0 ).abs() < 0.01,
-    "Should grant partial lease of $5.00, got ${:.2}",
+  // Verify partial lease granted (should be min($10, $5) = $5)
+  let granted = response_json[ "budget_granted" ].as_i64().unwrap();
+  assert_eq!(
+    granted, 5_000_000,
+    "Should grant partial lease of $5, got {} microdollars",
     granted
   );
 }
@@ -459,7 +459,7 @@ async fn test_report_usage_with_nonexistent_lease()
     "lease_id": "lease_00000000-0000-0000-0000-000000000000",
     "request_id": "req_12345",
     "tokens": 1000,
-    "cost_usd": 0.05,
+    "cost_microdollars": 50_000,
     "model": "gpt-4",
     "provider": "openai"
   } );
@@ -525,7 +525,7 @@ async fn test_report_usage_with_nonexistent_lease()
 async fn test_report_usage_on_expired_lease()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 116, 100.0 ).await;
+  seed_agent_with_budget( &pool, 116, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -536,7 +536,7 @@ async fn test_report_usage_on_expired_lease()
 
   state
     .lease_manager
-    .create_lease( lease_id, 116, 116, 10.0, Some( one_hour_ago ) )
+    .create_lease( lease_id, 116, 116, 10_000_000, Some( one_hour_ago ) ) // $10
     .await
     .unwrap();
 
@@ -546,7 +546,7 @@ async fn test_report_usage_on_expired_lease()
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 1000,
-    "cost_usd": 0.05,
+    "cost_microdollars": 50_000,
     "model": "gpt-4",
     "provider": "openai"
   } );
@@ -685,7 +685,7 @@ async fn test_report_usage_on_expired_lease()
 async fn test_report_usage_exceeding_lease_budget()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 117, 100.0 ).await;
+  seed_agent_with_budget( &pool, 117, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -693,12 +693,12 @@ async fn test_report_usage_exceeding_lease_budget()
   let lease_id = "lease_budget_test";
   state
     .lease_manager
-    .create_lease( lease_id, 117, 117, 1.0, None )
+    .create_lease( lease_id, 117, 117, 1_000_000, None ) // $1.00
     .await
     .unwrap();
 
   // Record $0.90 usage (leaving $0.10 remaining)
-  state.lease_manager.record_usage( lease_id, 0.90 ).await.unwrap();
+  state.lease_manager.record_usage( lease_id, 900_000 ).await.unwrap(); // $0.90
 
   // Try to report $0.50 usage (exceeds remaining $0.10)
   let request_body = json!(
@@ -706,7 +706,7 @@ async fn test_report_usage_exceeding_lease_budget()
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 5000,
-    "cost_usd": 0.50,
+    "cost_microdollars": 500_000,
     "model": "gpt-4",
     "provider": "openai"
   } );
@@ -871,7 +871,7 @@ async fn test_refresh_with_insufficient_agent_budget()
   let pool = setup_test_db().await;
 
   // Seed agent with $5.00 (insufficient for $10.00 default refresh)
-  seed_agent_with_budget( &pool, 118, 5.0 ).await;
+  seed_agent_with_budget( &pool, 118, 5_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -882,16 +882,16 @@ async fn test_refresh_with_insufficient_agent_budget()
   let lease_id = "lease_refresh_test";
   state
     .lease_manager
-    .create_lease( lease_id, 118, 118, 10.0, None )
+    .create_lease( lease_id, 118, 118, 10_000_000, None ) // $10
     .await
     .unwrap();
 
-  // Try to refresh with $10.00 (exceeds remaining $5.00)
+  // Try to refresh with $10 (exceeds remaining $5)
   let request_body = json!(
   {
     "ic_token": ic_token,
     "current_lease_id": lease_id,
-    "requested_budget": 10.0
+    "requested_budget": 10_000_000  // $10
   } );
 
   let app = Router::new()

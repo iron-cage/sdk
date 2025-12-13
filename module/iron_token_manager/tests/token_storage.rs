@@ -124,10 +124,10 @@ async fn test_create_token_with_metadata()
     .await
     .expect("LOUD FAILURE: Failed to get metadata");
 
-  assert_eq!( metadata.user_id, "user_002" );
-  assert_eq!( metadata.project_id, Some( "project_456".to_string() ) );
-  assert_eq!( metadata.name, Some( "Development Token".to_string() ) );
-  assert!( metadata.is_active );
+  assert_eq!( metadata.user_id, "user_002", "Metadata should preserve user_id as stored" );
+  assert_eq!( metadata.project_id, Some( "project_456".to_string() ), "Metadata should preserve project_id as stored" );
+  assert_eq!( metadata.name, Some( "Development Token".to_string() ), "Metadata should preserve token name as stored" );
+  assert!( metadata.is_active, "Newly created token should be active by default" );
 }
 
 #[ tokio::test ]
@@ -317,7 +317,7 @@ async fn test_token_with_expiration()
     .get_token_metadata( token_id )
     .await
     .expect("LOUD FAILURE: Should still retrieve metadata for expired token");
-  assert_eq!( metadata.expires_at, Some( expired_time ) );
+  assert_eq!( metadata.expires_at, Some( expired_time ), "Metadata should preserve expiration timestamp even for expired tokens" );
 }
 
 /// Protocol 014 integration test: verify new token format works end-to-end
@@ -368,10 +368,10 @@ async fn test_protocol_014_token_format_integration()
     .await
     .expect("LOUD FAILURE: Failed to get Protocol 014 token metadata");
 
-  assert_eq!( metadata.user_id, "user_001" );
-  assert_eq!( metadata.project_id, Some( "project_014".to_string() ) );
-  assert_eq!( metadata.name, Some( "Protocol 014 Token".to_string() ) );
-  assert!( metadata.is_active );
+  assert_eq!( metadata.user_id, "user_001", "Protocol 014 token should preserve user_id" );
+  assert_eq!( metadata.project_id, Some( "project_014".to_string() ), "Protocol 014 token should preserve project_id" );
+  assert_eq!( metadata.name, Some( "Protocol 014 Token".to_string() ), "Protocol 014 token should preserve token name" );
+  assert!( metadata.is_active, "Protocol 014 token should be active after creation" );
 
   // Update last used
   storage
@@ -429,10 +429,10 @@ async fn test_backward_compatibility_old_token_format()
     .await
     .expect("LOUD FAILURE: Failed to get old format token metadata");
 
-  assert_eq!( metadata.user_id, "user_002" );
-  assert_eq!( metadata.project_id, Some( "legacy_project".to_string() ) );
-  assert_eq!( metadata.name, Some( "Old Format Token".to_string() ) );
-  assert!( metadata.is_active );
+  assert_eq!( metadata.user_id, "user_002", "Old format token should have correct user_id" );
+  assert_eq!( metadata.project_id, Some( "legacy_project".to_string() ), "Old format token should have correct project_id" );
+  assert_eq!( metadata.name, Some( "Old Format Token".to_string() ), "Old format token should have correct name" );
+  assert!( metadata.is_active, "Old format token should be active by default" );
 
   // Verify hash stored correctly (entire token, no prefix stripping)
   let stored_hash = storage

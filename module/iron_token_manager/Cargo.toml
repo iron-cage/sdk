@@ -5,9 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-
-[lints]
-workspace = true
+description = "API token lifecycle management and usage tracking"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["tokens", "api-keys", "usage-tracking", "limits"]
+categories = ["authentication"]
 
 [features]
 default = ["enabled"]
@@ -33,9 +35,8 @@ iron_cost = { workspace = true }
 error_tools = { workspace = true }
 
 # Crypto for token generation
-rand = "0.8"
+rand.workspace = true
 sha2 = "0.10"
-blake3 = "1.5"
 hex = "0.4"
 base64 = { workspace = true }
 bcrypt = "0.15"
@@ -76,4 +77,9 @@ mod_interface = { workspace = true }
 iron_test_db = { workspace = true }
 tempfile = { workspace = true }
 tokio-test = "0.4"
-regex = "1.10"
+regex.workspace = true
+# Enable test utilities for ID types in tests
+iron_types = { workspace = true, features = ["test-helpers"] }
+
+[lints]
+workspace = true

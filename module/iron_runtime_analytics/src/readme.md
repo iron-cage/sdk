@@ -4,7 +4,7 @@
 
 | File | Responsibility |
 |------|----------------|
-| event.rs | Defines analytics event types and payloads |
+| event.rs | Defines analytics event structures |
 | event_storage.rs | Implements lock-free event storage with counters |
 | lib.rs | Exports analytics module public API |
 | provider_utils.rs | Provides utility functions for analytics |

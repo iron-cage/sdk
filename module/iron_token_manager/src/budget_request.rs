@@ -465,9 +465,8 @@ pub async fn approve_budget_request(
 
   // Calculate budget delta (requested - current)
   let delta_micros = requested_budget_micros - current_budget_micros;
-  let delta_usd = delta_micros as f64 / 1_000_000.0;
 
-  // Update agent budget
+  // Update agent budget (using microdollars directly)
   sqlx::query(
     "UPDATE agent_budgets
      SET total_allocated = total_allocated + ?,
@@ -475,8 +474,8 @@ pub async fn approve_budget_request(
          updated_at = ?
      WHERE agent_id = ?"
   )
-  .bind( delta_usd )
-  .bind( delta_usd )
+  .bind( delta_micros )
+  .bind( delta_micros )
   .bind( updated_at )
   .bind( agent_id )
   .execute( &mut *tx )
