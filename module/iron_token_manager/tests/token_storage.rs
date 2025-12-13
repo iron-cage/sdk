@@ -61,8 +61,6 @@
 
 mod common;
 
-use std::net::ToSocketAddrs;
-
 use iron_token_manager::token_generator::TokenGenerator;
 use common::create_test_storage;
 

@@ -6,7 +6,6 @@
 //! - UsageState (usage tracking)
 //! - Combined application state
 
-use iron_token_manager::migrations::apply_all_migrations;
 use sqlx::SqlitePool;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::tokens::TokenState;
@@ -141,18 +140,6 @@ pub async fn create_test_auth_state() -> AuthState
     .expect( "LOUD FAILURE: Failed to create test AuthState" )
 }
 
-/// Create test TokenState with in-memory database and seed test users.
-pub async fn create_test_token_state() -> TokenState
-{
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create test TokenState" );
-
-  // Seed test users for FK constraint compliance
-  seed_test_users_for_tokens( token_state.storage.pool() ).await;
-
-  token_state
-}
 
 /// Create test UsageState with in-memory database.
 ///

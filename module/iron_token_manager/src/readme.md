@@ -22,6 +22,7 @@
 | trace_storage.rs | Stores API call traces for analysis |
 | usage_tracker.rs | Tracks LLM API usage per user |
 | user_service.rs | Manages user accounts |
+| agent_service.rs | Provides agent CRUD operations and provider assignment |
 
 ## Validation
 

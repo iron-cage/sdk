@@ -32,9 +32,9 @@ pub struct Agent
   pub id: String,
   /// Agent name
   pub name: String,
-  /// Budget allocation in USD (from agent_budgets table)
+  /// Budget allocation in USD (from `agent_budgets` table)
   pub budget: f64,
-  /// Amount spent in USD (from agent_budgets table)
+  /// Amount spent in USD (from `agent_budgets` table)
   pub spent: f64,
   /// Remaining budget in USD (budget - spent)
   pub remaining: f64,
@@ -137,9 +137,9 @@ pub struct AgentDetails
   pub id: String,
   /// Agent name
   pub name: String,
-  /// Budget allocation in USD (from agent_budgets table)
+  /// Budget allocation in USD (from `agent_budgets` table)
   pub budget: f64,
-  /// Amount spent in USD (from agent_budgets table)
+  /// Amount spent in USD (from `agent_budgets` table)
   pub spent: f64,
   /// Remaining budget in USD (budget - spent)
   pub remaining: f64,
@@ -268,7 +268,7 @@ impl AgentService
   ///
   /// # Arguments
   ///
-  /// * `filters` - Filters including owner_id, name, status, pagination, and sorting
+  /// * `filters` - Filters including `owner_id`, `name`, `status`, pagination, and sorting
   ///
   /// # Returns
   ///
@@ -292,7 +292,7 @@ impl AgentService
     if let Some( ref name ) = filters.name
     {
       conditions.push( "LOWER(a.name) LIKE LOWER(?)" );
-      bind_values.push( format!( "%{}%", name ) );
+      bind_values.push( format!( "%{name}%" ) );
     }
 
     if let Some( ref status ) = filters.status
@@ -327,7 +327,7 @@ impl AgentService
       SortDirection::Desc => "DESC",
     };
 
-    let order_clause = format!( "ORDER BY {} {}", sort_column, sort_dir );
+    let order_clause = format!( "ORDER BY {sort_column} {sort_dir}" );
 
     // Pagination
     let page = filters.page.unwrap_or( 1 ).max( 1 );
@@ -335,7 +335,7 @@ impl AgentService
     let offset = ( page - 1 ) * per_page;
 
     // Count query
-    let count_sql = format!( "SELECT COUNT(*) as count FROM agents a {}", where_clause );
+    let count_sql = format!( "SELECT COUNT(*) as count FROM agents a {where_clause}" );
     let mut count_query = sqlx::query_scalar::< _, i64 >( &count_sql );
     for value in &bind_values
     {
@@ -354,12 +354,10 @@ impl AgentService
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
-      {}
-      {}
+      {where_clause}
+      {order_clause}
       LIMIT ? OFFSET ?
-      "#,
-      where_clause,
-      order_clause
+      "#
     );
 
     let mut data_query = sqlx::query( &data_sql );
@@ -469,8 +467,8 @@ impl AgentService
     .bind( owner_id )
     .bind( &params.project_id )
     .bind( &status )
-    .bind( &now )
-    .bind( &now )
+    .bind( now )
+    .bind( now )
     .execute( &self.pool )
     .await
     .map_err( |e| { error!( "Error creating agent: {}", e ); crate::error::TokenError::Generic } )?;
@@ -535,7 +533,7 @@ impl AgentService
     {
       sqlx::query( "UPDATE agents SET name = ?, updated_at = ? WHERE id = ?" )
         .bind( name )
-        .bind( &now )
+        .bind( now )
         .bind( id )
         .execute( &self.pool )
         .await
@@ -546,7 +544,7 @@ impl AgentService
     {
       sqlx::query( "UPDATE agents SET description = ?, updated_at = ? WHERE id = ?" )
         .bind( description )
-        .bind( &now )
+        .bind( now )
         .bind( id )
         .execute( &self.pool )
         .await
@@ -559,7 +557,7 @@ impl AgentService
         .map_err( |e| { error!( "Error serializing tags: {}", e ); crate::error::TokenError::Generic } )?;
       sqlx::query( "UPDATE agents SET tags = ?, updated_at = ? WHERE id = ?" )
         .bind( &tags_json )
-        .bind( &now )
+        .bind( now )
         .bind( id )
         .execute( &self.pool )
         .await

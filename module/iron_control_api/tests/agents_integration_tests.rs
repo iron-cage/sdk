@@ -52,7 +52,7 @@ use axum::{
   http::{ StatusCode, Request, Method },
   body::Body,
 };
-use iron_control_api::routes::agents::{AgentDetails, AgentProviderItemExtended, CreateAgentRequest, GetAgentProvidersResponse, PaginatedAgentsResponse, RemoveProviderFromAgentResponse};
+use iron_control_api::routes::agents::{AgentDetails, CreateAgentRequest, GetAgentProvidersResponse, PaginatedAgentsResponse, RemoveProviderFromAgentResponse};
 use iron_token_manager::agent_service::{AgentService, CreateAgentParams};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;

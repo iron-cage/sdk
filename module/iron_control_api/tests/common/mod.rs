@@ -20,54 +20,6 @@ use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 use axum::{ response::Response, http::StatusCode, body::Body };
 use iron_control_api::jwt_auth::{ JwtSecret, AccessTokenClaims, RefreshTokenClaims };
 
-/// Test database schema for authentication
-const TEST_SCHEMA: &str = r#"
--- Users table for authentication tests
-CREATE TABLE IF NOT EXISTS users
-(
-  id TEXT PRIMARY KEY,
-  username TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user',
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL,
-  email TEXT,
-  last_login INTEGER,
-  suspended_at INTEGER,
-  suspended_by INTEGER,
-  deleted_at INTEGER,
-  deleted_by INTEGER,
-  force_password_change INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-
--- Refresh token blacklist for logout tests
-CREATE TABLE IF NOT EXISTS token_blacklist
-(
-  jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
-  user_id TEXT NOT NULL,
-  blacklisted_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
-
--- User audit log for user management tests
-CREATE TABLE IF NOT EXISTS user_audit_log
-(
-  id TEXT PRIMARY KEY,
-  operation TEXT NOT NULL,
-  target_user_id TEXT NOT NULL,
-  performed_by TEXT NOT NULL,
-  timestamp INTEGER NOT NULL,
-  previous_state TEXT,
-  new_state TEXT,
-  reason TEXT,
-  FOREIGN KEY(target_user_id) REFERENCES users(id),
-  FOREIGN KEY(performed_by) REFERENCES users(id)
-);
-"#;
 
 /// Create in-memory SQLite database with test schema applied.
 ///
