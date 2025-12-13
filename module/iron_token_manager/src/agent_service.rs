@@ -5,8 +5,7 @@
 
 use std::collections::HashSet;
 
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use serde::Serialize;
+use chrono::DateTime;
 use sqlx::{ Row, SqlitePool, sqlite::SqliteRow };
 use crate::error::Result;
 use tracing::error;
@@ -127,6 +126,10 @@ pub struct ProviderListItem
   pub status: String,
 }
 
+
+/// Agent details
+/// 
+/// Represents an agent with additional details for communicating with endpoint providers
 #[derive(Debug, Clone)]
 pub struct AgentDetails
 {
@@ -166,7 +169,9 @@ pub struct AgentDetails
 #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
 pub enum SortDirection
 {
+  /// Ascending sort
   Asc,
+  /// Descending sort
   Desc,
 }
 
@@ -174,8 +179,11 @@ pub enum SortDirection
 #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
 pub enum AgentSortField
 {
+  /// Sort by agent name
   Name,
+  /// Sort by agent budget
   Budget,
+  /// Sort by agent creation time
   CreatedAt,
 }
 
@@ -199,10 +207,13 @@ pub struct ListAgentsFilters
   pub sort_direction: Option< SortDirection >,
 }
 
+/// Brief provider item for agent providers listing
 #[derive(Debug, Clone)]
 pub struct ProviderListItemBrief
 {
+  /// Provider ID
   pub id: String,
+  /// Provider name
   pub name: String,
 }
 
@@ -688,7 +699,7 @@ impl AgentService
       .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError::Generic })?;
 
     // Update agent providers
-    let result = sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
+    sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
       .bind(providers_json)
       .bind(id)
       .execute(&self.pool)
@@ -926,10 +937,4 @@ impl AgentService
       remaining,
     }
   }   
-}
-
-/// Get current time as ISO 8601 string with Z suffix
-fn current_time_iso() -> String
-{
-  chrono::Utc::now().format( "%Y-%m-%dT%H:%M:%SZ" ).to_string()
 }

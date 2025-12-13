@@ -17,12 +17,12 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    response::Json,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use iron_token_manager::{agent_service::{
-    Agent as ServiceAgent, AgentService, AgentSortField, AgentTokenItem as ServiceAgentTokenItem, CreateAgentParams, ICToken as ServiceICToken, ListAgentsFilters, ListAgentsResult, SortDirection, UpdateAgentParams
+    Agent as ServiceAgent, AgentService, AgentSortField, AgentTokenItem as ServiceAgentTokenItem, CreateAgentParams, ICToken as ServiceICToken, ListAgentsFilters, SortDirection, UpdateAgentParams
 }, token_generator::TokenGenerator};
 
 use crate::jwt_auth::AuthenticatedUser;
