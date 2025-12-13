@@ -28,3 +28,12 @@ mod user_name_field;
 
 #[ path = "auth/refresh_token_rotation.rs" ]
 mod refresh_token_rotation;
+
+#[ path = "auth/security_comprehensive.rs" ]
+mod security_comprehensive;
+
+#[ path = "auth/sql_injection_comprehensive.rs" ]
+mod sql_injection_comprehensive;
+
+#[ path = "auth/authorization_bypass_comprehensive.rs" ]
+mod authorization_bypass_comprehensive;
