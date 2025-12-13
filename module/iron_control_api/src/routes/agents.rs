@@ -369,6 +369,8 @@ pub async fn create_agent(
         ));
     }
 
+    println!("role {}", user.0.role);
+
     // Permission check
     if user.0.role != "admin" && user.0.sub != req.owner_id {
         return Err((
@@ -941,7 +943,7 @@ pub async fn assign_providers_to_agent(
             }),
         ));
     }
-
+    
     let agent = service.get_agent_details(&id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -954,6 +956,7 @@ pub async fn assign_providers_to_agent(
             }),
         )
     })?;
+
 
     let agent = match agent {
         Some(a) => a,

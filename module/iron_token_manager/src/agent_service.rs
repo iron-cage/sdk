@@ -668,7 +668,7 @@ impl AgentService
   /// Returns error if database query fails
 
   pub async fn assign_providers_to_agent(&self, id: &str, providers: Vec<String>) -> Result <Option<Agent>> {
-    // Validate providers exist
+    // Validate providers exist    
     for provider in &providers {
       let provider = sqlx::query("SELECT id FROM ai_provider_keys WHERE id = ?")
         .bind(provider)

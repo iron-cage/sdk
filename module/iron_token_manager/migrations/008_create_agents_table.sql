@@ -8,6 +8,11 @@
 -- Create agents table
 CREATE TABLE IF NOT EXISTS agents (
   id TEXT PRIMARY KEY CHECK(id NOT NULL),
+  description TEXT,
+  tags TEXT,
+  status TEXT CHECK(status IN ('active', 'inactive', 'exhausted')),
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+  project_id TEXT,
   name TEXT NOT NULL,
   providers TEXT NOT NULL,  -- JSON array of supported providers
   created_at INTEGER NOT NULL
