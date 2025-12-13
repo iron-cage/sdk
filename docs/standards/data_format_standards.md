@@ -10,7 +10,7 @@
 
 ---
 
-## TL;DR
+### TL;DR
 
 **Timestamps:** ISO 8601 with Z (`2025-12-10T10:30:45Z`)
 **Currency:** Decimal with 2 places (`100.50`)
@@ -20,7 +20,7 @@
 
 ---
 
-## Timestamp Format
+### Timestamp Format
 
 ### Standard Format
 
@@ -165,7 +165,7 @@ timestamp1 < timestamp2  // true (9th < 10th)
 
 ---
 
-## Currency Format
+### Currency Format
 
 ### Standard Format
 
@@ -313,7 +313,7 @@ console.log(new Intl.NumberFormat('en-US', {
 
 ---
 
-## Boolean Format
+### Boolean Format
 
 ### Standard Format
 
@@ -388,7 +388,7 @@ console.log(new Intl.NumberFormat('en-US', {
 
 ---
 
-## Null Handling
+### Null Handling
 
 ### Optional Fields
 
@@ -454,7 +454,7 @@ PUT /api/v1/agents/{id}
 
 ---
 
-## Array Handling
+### Array Handling
 
 ### Empty Arrays
 
@@ -536,7 +536,7 @@ PUT /api/v1/agents/{id}
 
 ---
 
-## Complete Example
+### Complete Example
 
 ### Agent Resource
 
@@ -591,7 +591,7 @@ PUT /api/v1/agents/{id}
 
 ---
 
-## Validation Rules
+### Validation Rules
 
 ### Timestamp Validation
 
@@ -647,7 +647,7 @@ struct Agent {
 
 ---
 
-## Migration and Compatibility
+### Migration and Compatibility
 
 ### Timestamp Migration
 
@@ -695,7 +695,7 @@ fn parse_timestamp_flexible(value: &serde_json::Value) -> Result<DateTime<Utc>, 
 
 ---
 
-## References
+### References
 
 ### Related Documentation
 
