@@ -560,13 +560,12 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Agent management endpoints
     .route( "/api/v1/agents", get( iron_control_api::routes::agents::list_agents ) )
     .route( "/api/v1/agents", post( iron_control_api::routes::agents::create_agent ) )
+    // Agent Provider Key endpoint (Feature 014) - must be before :id routes
+    .route( "/api/v1/agents/provider-key", post( iron_control_api::routes::agent_provider_key::get_provider_key ) )
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/v1/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
-
-    // Agent Provider Key endpoint (Feature 014)
-    .route( "/api/v1/agents/provider-key", post( iron_control_api::routes::agent_provider_key::get_provider_key ) )
 
     // Budget Control Protocol endpoints (Protocol 005)
     .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )

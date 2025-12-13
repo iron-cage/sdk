@@ -116,6 +116,9 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 018: Convert budget columns from REAL to INTEGER (microdollars)
   apply_migration_018( pool ).await?;
 
+  // Migration 019: Add provider_key_id to agents table (Feature 014)
+  apply_migration_019( pool ).await?;
+
   Ok( () )
 }
 
@@ -554,6 +557,39 @@ async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
         .await
         .map_err( |e| {
           eprintln!("Migration 018 failed: {e:?}");
+          crate::error::TokenError::Generic
+        } )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 019: Add provider_key_id to agents table (Feature 014)
+///
+/// Adds FK from agents to ai_provider_keys for provider key assignment.
+/// Each agent can have one assigned provider key.
+#[ allow( dead_code ) ]
+async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
+{
+  // Check if migration has already run using the guard table pattern
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_019_completed'"
+  )
+      .fetch_one( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+  // Only execute if not previously completed
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/019_add_agent_provider_key_id.sql" );
+
+    sqlx::raw_sql( migration )
+        .execute( pool )
+        .await
+        .map_err( |e| {
+          eprintln!("Migration 019 failed: {e:?}");
           crate::error::TokenError::Generic
         } )?;
   }

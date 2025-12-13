@@ -9,3 +9,6 @@ ALTER TABLE agents ADD COLUMN provider_key_id INTEGER REFERENCES ai_provider_key
 
 -- Create index for efficient lookups
 CREATE INDEX IF NOT EXISTS idx_agents_provider_key_id ON agents(provider_key_id);
+
+-- Guard table to prevent re-running migration
+CREATE TABLE IF NOT EXISTS _migration_019_completed ( id INTEGER PRIMARY KEY );

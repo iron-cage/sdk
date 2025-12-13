@@ -63,7 +63,8 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 - **LlmRouter:** Local HTTP proxy server for LLM API requests
   - Starts local server on random available port
   - Accepts IC_TOKEN for authentication
-  - Fetches real API keys from Iron Cage server (cached)
+  - Fetches real API keys from Iron Cage server via agent's assigned provider key (cached)
+  - Each agent has one provider key assigned (`provider_key_id` FK in agents table)
   - Auto-detects provider from API key format (`sk-ant-*` → Anthropic, `sk-*` → OpenAI)
   - Forwards requests to provider with real API key
   - Validates provider/model mismatch with clear error messages
@@ -225,7 +226,7 @@ router.shutdown();  // Stop the proxy
 - iron_reliability - Circuit breaker logic
 - iron_telemetry - Logging infrastructure
 - iron_runtime_analytics - Event recording and stats aggregation
-- Iron Cage Server - Fetches provider API keys via `/api/keys`
+- Iron Cage Server - Fetches provider API keys via `POST /api/v1/agents/provider-key` (Feature 014)
 
 ---
 
