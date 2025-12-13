@@ -20,6 +20,7 @@ pub struct HandshakeRequest
   pub ic_token: String,
   pub provider: String,
   pub provider_key_id: Option< i64 >,
+  pub requested_budget: Option< i64 >,
 }
 
 impl HandshakeRequest
@@ -32,6 +33,9 @@ impl HandshakeRequest
 
   /// Default budget lease amount (microdollars) for handshake
   const DEFAULT_HANDSHAKE_BUDGET: i64 = 10_000_000; // 10 USD
+
+  /// Maximum budget request (microdollars) for handshake (DoS prevention)
+  pub const MAX_HANDSHAKE_BUDGET: i64 = 100_000_000; // 100 USD
 
   /// Validate handshake request parameters
   ///
@@ -68,6 +72,24 @@ impl HandshakeRequest
         "provider too long (max {} characters)",
         Self::MAX_PROVIDER_LENGTH
       ) );
+    }
+
+    // Validate requested_budget if provided
+    if let Some( budget ) = self.requested_budget
+    {
+      if budget <= 0
+      {
+        return Err( "requested_budget must be positive".to_string() );
+      }
+
+      if budget > Self::MAX_HANDSHAKE_BUDGET
+      {
+        return Err( format!(
+          "requested_budget exceeds maximum ({} microdollars / ${:.2} USD)",
+          Self::MAX_HANDSHAKE_BUDGET,
+          Self::MAX_HANDSHAKE_BUDGET as f64 / 1_000_000.0
+        ) );
+      }
     }
 
     Ok( () )
@@ -132,15 +154,42 @@ pub async fn handshake(
   // Get agent_id from IC Token claims
   let agent_id_str = &claims.agent_id;
 
+  // Fix(authorization-bypass-handshake): Reject malformed agent_id instead of defaulting to 1
+  // Root cause: Code used .unwrap_or(1) when parsing agent_id from IC Token,
+  //             defaulting to agent_id=1 on parse failure. This allowed attackers to bypass
+  //             authorization by sending malformed agent_id values (alphabetic, special chars,
+  //             overflow, etc.), which would parse fail and default to using agent_id=1's budget.
+  // Pitfall: Never use fallback values for security-critical parsing. Always reject invalid
+  //          input with explicit error responses. Using .unwrap_or() for authorization data
+  //          is a critical anti-pattern - silently accepts malformed input, creates authorization
+  //          bypass when fallback is privileged, enables billing fraud.
+  // Test coverage: See tests/handshake_malformed_agent_id_test.rs
+  //
   // Parse agent_id (format: agent_<id>) to get database ID
-  // For now, we'll extract the numeric part after "agent_"
   let agent_id : i64 = match agent_id_str.strip_prefix( "agent_" )
   {
     Some( id_part ) =>
     {
-      // Try parsing as i64 directly, or use placeholder if not numeric
-      // In production, you'd look up agent by string ID
-      id_part.parse::< i64 >().unwrap_or( 1 )
+      match id_part.parse::< i64 >()
+      {
+        Ok( id ) if id > 0 => id,  // Valid positive ID
+        Ok( _ ) =>
+        {
+          return (
+            StatusCode::BAD_REQUEST,
+            Json( serde_json::json!({ "error": "Invalid agent_id - must be positive" }) ),
+          )
+            .into_response();
+        }
+        Err( _ ) =>
+        {
+          return (
+            StatusCode::BAD_REQUEST,
+            Json( serde_json::json!({ "error": "Invalid agent_id - must be numeric" }) ),
+          )
+            .into_response();
+        }
+      }
     }
     None =>
     {
@@ -195,9 +244,13 @@ pub async fn handshake(
   // Pitfall: Time-of-check to time-of-use (TOCTOU) races occur when check and update are
   // separate operations. Always use atomic operations (SELECT FOR UPDATE + UPDATE in single
   // transaction) for check-then-act patterns on shared resources.
+
+  // Use requested_budget if provided, otherwise use default
+  let budget_requested = request.requested_budget.unwrap_or( HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET );
+
   let budget_to_grant = match state
     .agent_budget_manager
-    .check_and_reserve_budget( agent_id, HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET )
+    .check_and_reserve_budget( agent_id, budget_requested )
     .await
   {
     Ok( granted ) if granted > 0 => granted,
@@ -316,12 +369,40 @@ pub async fn handshake(
       .into_response();
   }
 
-  // TODO: Decrypt provider API key
-  // For now, use a placeholder - in production this would decrypt _key_record.encrypted_api_key
-  let provider_key = "sk-test_key_placeholder";
+  // Decrypt provider API key from database
+  let encrypted_secret = match iron_secrets::crypto::EncryptedSecret::from_base64(
+    &_key_record.encrypted_api_key,
+    &_key_record.encryption_nonce,
+  )
+  {
+    Ok( secret ) => secret,
+    Err( _ ) =>
+    {
+      tracing::error!( "Failed to decode provider key base64" );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Key storage error" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  let provider_key = match state.provider_key_crypto.decrypt( &encrypted_secret )
+  {
+    Ok( key ) => key,
+    Err( err ) =>
+    {
+      tracing::error!( "Failed to decrypt provider API key: {:?}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to decrypt provider key" }) ),
+      )
+        .into_response();
+    }
+  };
 
   // Encrypt provider API key into IP Token
-  let ip_token = match state.ip_token_crypto.encrypt( provider_key )
+  let ip_token = match state.ip_token_crypto.encrypt( &provider_key )
   {
     Ok( token ) => token,
     Err( _ ) =>

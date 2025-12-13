@@ -1,19 +1,29 @@
-# Layer Model
+# Architecture: Layer Model
 
-**Purpose:** How requests flow through processing layers in the gateway.
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
+### Scope
 
----
+This document defines the six-layer request processing model for Iron Runtime's gateway architecture. It specifies layer responsibilities, failure modes, processing order, and latency budgets for both pilot and production deployments.
 
-## User Need
+**In scope**:
+- Six processing layers (Input Safety, Cost, Reliability, Provider, Output Safety, Observability)
+- Request path processing (layers 1-4)
+- Response path processing (layers 4-6)
+- Layer failure modes and fallback behavior
+- Latency budget per layer (pilot vs production)
+- Design principles (fail-safe, non-blocking, independent, ordered)
 
-Understand which component handles safety, cost, reliability - and in what order.
+**Out of scope**:
+- Detailed layer implementation (see service-specific documentation)
+- Provider-specific routing logic (see Protocol 004: MCP Integration)
+- Budget allocation and IC/IP token system (see Protocol 005: Budget Control)
+- Safety layer detection algorithms (see Security 002: Isolation Layers)
+- Observability backend configuration (see deployment documentation)
 
-## Core Idea
+### Purpose
 
-**Six processing layers with bidirectional request-response flow:**
+**User Need:** Understand which component handles safety, cost, reliability - and in what order.
+
+**Solution:** Six processing layers with bidirectional request-response flow:
 
 ```
 REQUEST PATH (Input Processing):
@@ -35,7 +45,13 @@ RESPONSE PATH (Output Processing):
                   Redact PII            (async)
 ```
 
-## The Six Layers
+**Key Insight:** Each layer has a specific responsibility and failure mode. Safety layers (input/output) are fail-safe (block all if down, never bypass). Observability is async (0ms perceived latency). Processing order ensures defense in depth - safety MUST run before provider access.
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-10
+
+### The Six Layers
 
 | Layer | Phase | Responsibility | Failure Mode |
 |-------|-------|---------------|--------------|
@@ -49,14 +65,14 @@ RESPONSE PATH (Output Processing):
 **Request Path:** Layers 1 → 2 → 3 → 4 → LLM Provider
 **Response Path:** LLM Provider → 4 → 5 → 6 → Agent
 
-## Design Principles
+### Design Principles
 
 - **Fail-safe:** Safety layer down = block all (never bypass)
 - **Non-blocking:** Observability is async, adds 0ms latency
 - **Independent:** Each layer can be deployed/scaled separately
 - **Ordered:** Safety MUST run before provider (defense in depth)
 
-## Latency Budget
+### Latency Budget
 
 | Layer | Pilot Target | Production Target | Notes |
 |-------|--------------|-------------------|-------|
@@ -71,6 +87,21 @@ RESPONSE PATH (Output Processing):
 
 **See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) for authoritative latency reference and rationale.
 
----
+### Cross-References
 
-*Related: [004_data_flow.md](004_data_flow.md) | [005_service_integration.md](005_service_integration.md)*
+**Related Architecture Documents:**
+- [004_data_flow.md](004_data_flow.md) - End-to-end request journey through processing layers
+- [005_service_integration.md](005_service_integration.md) - How gateway services communicate
+- [003_service_boundaries.md](003_service_boundaries.md) - Control/Data/Runtime plane separation
+
+**Used By:**
+- Protocol 005: [Budget Control Protocol](../protocol/005_budget_control_protocol.md) - References layer model for Cost layer responsibilities
+- Security 002: [Isolation Layers](../security/002_isolation_layers.md) - Implements Input/Output Safety layers
+
+**Dependencies:**
+- Constraints 004: [Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) - Authoritative latency budget reference and rationale
+
+**Implementation:**
+- Gateway service: Layer orchestration (module paths TBD)
+- Safety service: Input/Output safety layers (module paths TBD)
+- Cost service: Budget tracking layer (module paths TBD)

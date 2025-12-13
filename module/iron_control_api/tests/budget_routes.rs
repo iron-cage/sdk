@@ -39,6 +39,7 @@ fn test_handshake_request_validation()
     ic_token: "valid_token_string".to_string(),
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( valid_req.validate().is_ok() );
 
@@ -48,6 +49,7 @@ fn test_handshake_request_validation()
     ic_token: "".to_string(),
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( empty_token_req.validate().is_err() );
 
@@ -57,6 +59,7 @@ fn test_handshake_request_validation()
     ic_token: "valid_token".to_string(),
     provider: "".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( empty_provider_req.validate().is_err() );
 
@@ -67,6 +70,7 @@ fn test_handshake_request_validation()
     ic_token: long_token,
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( long_token_req.validate().is_err() );
 
@@ -77,8 +81,49 @@ fn test_handshake_request_validation()
     ic_token: "valid_token".to_string(),
     provider: long_provider,
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( long_provider_req.validate().is_err() );
+
+  // Valid requested_budget
+  let valid_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( 5_000_000 ), // $5
+  };
+  assert!( valid_budget_req.validate().is_ok() );
+
+  // Zero requested_budget
+  let zero_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( 0 ),
+  };
+  assert!( zero_budget_req.validate().is_err() );
+
+  // Negative requested_budget
+  let negative_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( -1000 ),
+  };
+  assert!( negative_budget_req.validate().is_err() );
+
+  // Requested budget exceeds maximum
+  let excessive_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( 101_000_000 ), // $101 (exceeds $100 max)
+  };
+  assert!( excessive_budget_req.validate().is_err() );
 }
 
 /// Test usage report request validation
@@ -344,10 +389,11 @@ async fn test_budget_state_creation()
 {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ];
   let jwt_secret = std::sync::Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
   let database_url = "sqlite::memory:";
 
-  let state = BudgetState::new( ic_token_secret, &ip_token_key, jwt_secret, database_url ).await;
+  let state = BudgetState::new( ic_token_secret, &ip_token_key, &provider_key_master, jwt_secret, database_url ).await;
   assert!( state.is_ok(), "Should create budget state" );
 }
 

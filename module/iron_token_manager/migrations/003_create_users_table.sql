@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users
   -- Authorization
   role TEXT NOT NULL DEFAULT 'user' CHECK (LENGTH(role) > 0 AND LENGTH(role) <= 50),
 
+  -- User profile
+  name TEXT CHECK (LENGTH(name) <= 255),
+
   -- Status
   is_active INTEGER NOT NULL DEFAULT 1,
 

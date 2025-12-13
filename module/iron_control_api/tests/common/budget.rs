@@ -39,6 +39,7 @@ pub async fn setup_test_db() -> SqlitePool
 /// Builds BudgetState with all required managers for budget endpoint testing:
 /// - IC Token manager (JWT generation/validation)
 /// - IP Token crypto (lease encryption)
+/// - Provider key crypto (provider key decryption)
 /// - Lease manager (budget lease tracking)
 /// - Agent budget manager (budget accounting)
 /// - Provider key storage (API key management)
@@ -48,10 +49,14 @@ pub async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
 {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key for provider keys
 
   let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
   let ip_token_crypto = Arc::new(
     iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
+  );
+  let provider_key_crypto = Arc::new(
+    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
   );
   let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
   let agent_budget_manager = Arc::new(
@@ -69,6 +74,7 @@ pub async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     lease_manager,
     agent_budget_manager,
     provider_key_storage,
+    provider_key_crypto,
     db_pool: pool,
     jwt_secret,
   }
@@ -125,7 +131,7 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_mi
 
   // Insert agent with owner_id
   sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
+    "INSERT OR IGNORE INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
   .bind( format!( "test_agent_{}", agent_id ) )
@@ -138,7 +144,7 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_mi
 
   // Insert agent budget (using microdollars)
   sqlx::query(
-    "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+    "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
      VALUES (?, ?, 0, ?, ?, ?)"
   )
   .bind( agent_id )
@@ -152,14 +158,22 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_mi
 
   // Insert provider key
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
+  // Create real encrypted provider key for testing
+  let test_provider_key = format!( "sk-test_key_for_agent_{}", agent_id );
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key (must match create_test_budget_state)
+  let crypto_service = iron_secrets::crypto::CryptoService::new( &provider_key_master )
+    .expect( "LOUD FAILURE: Should create crypto service" );
+  let encrypted = crypto_service.encrypt( &test_provider_key )
+    .expect( "LOUD FAILURE: Should encrypt provider key" );
+
   sqlx::query(
-    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
+    "INSERT OR IGNORE INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
   .bind( agent_id * 1000 )
   .bind( "openai" )
-  .bind( "encrypted_test_key_base64" )
-  .bind( "test_nonce_base64" )
+  .bind( encrypted.ciphertext_base64() )
+  .bind( encrypted.nonce_base64() )
   .bind( 1 )
   .bind( now_ms )
   .bind( "test_user" )
@@ -188,10 +202,17 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_mi
 #[ allow( dead_code ) ]
 pub async fn create_budget_router( state: BudgetState ) -> Router
 {
+  use iron_control_api::routes::budget::request_workflow::{
+    approve_budget_request,
+    reject_budget_request,
+  };
+
   Router::new()
     .route( "/api/budget/handshake", axum::routing::post( handshake ) )
     .route( "/api/budget/report", axum::routing::post( report_usage ) )
     .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
     .route( "/api/budget/return", axum::routing::post( return_budget ) )
+    .route( "/api/v1/budget/requests/:id/approve", axum::routing::patch( approve_budget_request ) )
+    .route( "/api/v1/budget/requests/:id/reject", axum::routing::patch( reject_budget_request ) )
     .with_state( state )
 }

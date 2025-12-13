@@ -19,3 +19,12 @@ mod http_methods;
 
 #[ path = "auth/content_type.rs" ]
 mod content_type;
+
+#[ path = "auth/security.rs" ]
+mod security;
+
+#[ path = "auth/user_name_field.rs" ]
+mod user_name_field;
+
+#[ path = "auth/refresh_token_rotation.rs" ]
+mod refresh_token_rotation;

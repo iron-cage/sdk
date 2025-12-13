@@ -121,6 +121,54 @@ docker compose up -d
 3. **Production security** - Use proper secret management (AWS KMS, HashiCorp Vault, etc.)
 4. **CI/CD** - Use secure environment variables or secret management systems
 
+### ⚠️ Production Secret Validation
+
+**CRITICAL:** The Iron Control API server will **REFUSE TO START** if default development secrets are detected in production environments.
+
+**Validated Secrets:**
+- `JWT_SECRET` - Must not be `dev-secret-change-in-production`
+- `IC_TOKEN_SECRET` - Must not be `dev-ic-token-secret-change-in-production`
+- `IP_TOKEN_KEY` - Must not be all zeros (`0000...0000`)
+
+**Production Mode Detection:**
+The server detects production mode through:
+- `IRON_DEPLOYMENT_MODE=production` environment variable
+- Kubernetes environment (`KUBERNETES_SERVICE_HOST`)
+- AWS environment (`AWS_EXECUTION_ENV`)
+- Heroku environment (`DYNO`)
+- Release builds (`--release` flag)
+
+**What Happens:**
+If the server detects production mode with insecure default secrets, it will:
+1. Log a critical error listing all insecure secrets
+2. Provide remediation instructions (`openssl rand -hex 32`)
+3. **Panic and refuse to start**
+
+**Example Error:**
+```
+❌ CRITICAL SECURITY ERROR: Production deployment with insecure default secrets
+❌ The following secrets are using INSECURE DEFAULT VALUES:
+❌   - JWT_SECRET
+❌   - IC_TOKEN_SECRET
+❌   - IP_TOKEN_KEY
+❌ REFUSING TO START SERVER
+```
+
+**How to Fix:**
+```bash
+# Generate secure secrets
+export JWT_SECRET=$(openssl rand -hex 32)
+export IC_TOKEN_SECRET=$(openssl rand -hex 32)
+export IP_TOKEN_KEY=$(openssl rand -hex 32)
+
+# Or update secret/-iron.sh with generated values
+```
+
+**Implementation Details:**
+- Validation logic: `module/iron_control_api/src/bin/iron_control_api_server.rs:380-452`
+- Test scenarios: `module/iron_control_api/tests/production_secret_validation_test.rs`
+- Security fix: Fix(production-secret-validation) - blocks startup with insecure defaults
+
 ## Migration from .env
 
 If you have an existing `.env` file, migrate your secrets:

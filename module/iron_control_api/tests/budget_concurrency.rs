@@ -311,12 +311,17 @@ async fn test_concurrent_report_and_refresh()
 
   let app_refresh = app.clone();
   let ic_token_refresh = ic_token.clone();
+
+  // Create JWT token for authenticated request (GAP-003: JWT authentication required)
+  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+
   let refresh_handle = tokio::spawn( async move
   {
     let request = Request::builder()
       .method( "POST" )
       .uri( "/api/budget/refresh" )
       .header( "content-type", "application/json" )
+      .header( "authorization", format!( "Bearer {}", access_token ) )
       .body( Body::from(
         json!({
           "ic_token": ic_token_refresh,
@@ -573,3 +578,17 @@ async fn test_toctou_race_insufficient_budget()
     "Budget should be fully allocated after 1x $10 lease from $10 budget. Got: {remaining}"
   );
 }
+
+// xxx: Manual Test Gap #29: Concurrent refreshes - DEFERRED
+//
+// Issue: Agent-level refresh endpoint (agent_id + additional_budget) may not exist
+// or may use different API than lease-level refresh (ic_token + current_lease_id).
+// Need to investigate correct refresh API before implementing concurrent test.
+//
+// Original test attempted to test:
+// - Multiple simultaneous POST /api/budget/refresh with agent_id + additional_budget
+// - Expected all refreshes to succeed (additive operation)
+// - Verify final_budget = initial_budget + (additional_budget × request_count)
+// - Verify budget invariant maintained
+//
+// See also: test_concurrent_report_and_refresh which uses lease-level refresh API

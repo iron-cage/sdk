@@ -209,6 +209,9 @@ pub mod ic_token;
 pub mod ip_token;
 
 #[cfg(feature = "enabled")]
+pub mod rate_limiter;
+
+#[cfg(feature = "enabled")]
 mod implementation
 {
   use axum::{

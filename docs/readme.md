@@ -33,6 +33,7 @@ Root-level reference documents in docs/:
 | **vocabulary.md** | Define canonical project terminology (glossary, naming conventions, project-specific terms) |
 | **deployment_guide.md** | Document operational deployment procedures (configuration, environment setup, troubleshooting) |
 | **post_pilot_abilities.md** | Complete feature catalog with unique codes (F-XYY format) across Pilot and POST-PILOT phases, grouped by actor |
+| **protocol_maturity_matrix.md** | Track protocol implementation maturity across all aspects (spec, endpoints, validation, tests, security, docs, corner cases) |
 
 ---
 

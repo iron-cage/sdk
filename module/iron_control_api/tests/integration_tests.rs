@@ -30,10 +30,12 @@ use axum::{
   routing::{ get, post },
   http::{ StatusCode, Request },
   body::Body,
+  extract::ConnectInfo,
 };
 use tower::ServiceExt;
 use serde_json::json;
 use std::sync::Arc;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /// Helper to create test auth router
 async fn create_auth_router() -> Router
@@ -49,12 +51,16 @@ async fn create_auth_router() -> Router
   {
     jwt_secret: Arc::new( JwtSecret::new( "test_secret_key_12345".to_string() ) ),
     db_pool,
+    rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
   };
+
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
   Router::new()
     .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
     .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
     .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
+    .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state( auth_state )
 }
 

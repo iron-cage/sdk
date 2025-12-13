@@ -34,12 +34,19 @@ impl CreateBudgetRequestRequest
   /// Maximum justification length (database constraint from migration 011)
   const MAX_JUSTIFICATION_LENGTH: usize = 500;
 
-  /// Maximum budget in USD (1 trillion USD = safe limit before i64 overflow in microdollars)
+  /// Maximum budget in USD for pilot deployment ($10,000 = pilot operational limit)
   ///
-  /// Rationale: Microdollar conversion multiplies by 1,000,000, so we need USD values
-  /// that won't overflow i64::MAX (9,223,372,036,854,775,807) when converted.
-  /// 1 trillion USD × 1 million microdollars/USD = 10^18 microdollars (safe margin).
-  const MAX_BUDGET_USD: f64 = 1_000_000_000_000.0;  // 1 trillion USD
+  /// Rationale: Pilot phase restricts individual budget requests to $10K to limit
+  /// financial exposure during initial validation. This is significantly below the
+  /// technical limit of ~9.2 quintillion microdollars (i64::MAX) which allows for
+  /// safe production scaling after pilot phase completes.
+  ///
+  /// Technical note: Microdollar conversion (×1,000,000) means i64::MAX supports
+  /// up to ~$9.2 trillion USD before overflow. Current $10K limit leaves substantial
+  /// headroom for future production use.
+  ///
+  /// GAP-002: Protocol 012 compliance - max budget lowered from $1T to $10K for pilot.
+  const MAX_BUDGET_USD: f64 = 10_000.0;  // $10K pilot limit
 
   /// Validate create budget request parameters
   ///
@@ -588,6 +595,7 @@ pub struct ApproveBudgetRequestResponse
 pub async fn approve_budget_request(
   State( state ): State< BudgetState >,
   axum::extract::Path( request_id ): axum::extract::Path< String >,
+  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
 ) -> impl IntoResponse
 {
   // Fetch request from database
@@ -642,8 +650,7 @@ pub async fn approve_budget_request(
 
   // Update status to approved and apply budget change
   let now_ms = chrono::Utc::now().timestamp_millis();
-  // TODO: Get approver_id from authenticated user context instead of using placeholder
-  let approver_id = "system-admin";
+  let approver_id = &claims.sub; // Extract user ID from JWT claims
   let update_result = iron_token_manager::budget_request::approve_budget_request( &state.db_pool, &request_id, approver_id, now_ms ).await;
 
   match update_result

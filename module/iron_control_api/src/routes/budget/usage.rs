@@ -206,12 +206,21 @@ pub async fn report_usage(
     }
   }
 
-  // Check if lease has been revoked
+  // Check if lease has been revoked or expired
   if lease.lease_status == "revoked"
   {
     return (
       StatusCode::FORBIDDEN,
       Json( serde_json::json!({ "error": "Lease has been revoked" }) ),
+    )
+      .into_response();
+  }
+
+  if lease.lease_status == "expired"
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Lease expired" }) ),
     )
       .into_response();
   }

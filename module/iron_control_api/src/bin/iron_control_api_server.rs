@@ -377,6 +377,78 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let ip_token_key_hex = std::env::var( "IP_TOKEN_KEY" )
     .unwrap_or_else( |_| "0000000000000000000000000000000000000000000000000000000000000000".to_string() );
 
+  // Fix(production-secret-validation): Block server startup if insecure defaults detected in production
+  // Root cause: Server allowed startup with default secrets (dev-secret-change-in-production,
+  //             all-zeros encryption keys) in production environments. This creates multiple attack
+  //             vectors: JWT tokens forged using known default secret, IC Tokens forged for budget
+  //             bypass, IP Tokens decrypted/forged using all-zeros key, session hijacking via
+  //             predictable tokens.
+  // Pitfall: Never allow fallback secrets in production. Production environments MUST have unique,
+  //          cryptographically secure secrets configured. Using defaults is a CRITICAL security
+  //          vulnerability - any attacker with knowledge of defaults can forge authentication tokens,
+  //          bypass budgets, decrypt session data, and impersonate users.
+  // Test coverage: See tests/production_secret_validation_test.rs
+  //
+  // Validate production secrets before server initialization
+  match mode
+  {
+    DeploymentMode::Production | DeploymentMode::ProductionUnconfirmed =>
+    {
+      let mut insecure_secrets = Vec::new();
+
+      // Check JWT_SECRET
+      if jwt_secret == "dev-secret-change-in-production"
+      {
+        insecure_secrets.push( "JWT_SECRET" );
+      }
+
+      // Check IC_TOKEN_SECRET
+      if ic_token_secret == "dev-ic-token-secret-change-in-production"
+      {
+        insecure_secrets.push( "IC_TOKEN_SECRET" );
+      }
+
+      // Check IP_TOKEN_KEY (all zeros)
+      if ip_token_key_hex == "0000000000000000000000000000000000000000000000000000000000000000"
+      {
+        insecure_secrets.push( "IP_TOKEN_KEY" );
+      }
+
+      // Check DATABASE_URL (SQLite defaults)
+      if database_url.contains( "sqlite://" ) && !database_url.contains( "/var/lib/iron" )
+      {
+        tracing::warn!( "⚠️  WARNING: Using SQLite in production (DATABASE_URL={})", database_url );
+        tracing::warn!( "⚠️  Production deployments SHOULD use PostgreSQL for reliability" );
+      }
+
+      // Block startup if any insecure defaults detected
+      if !insecure_secrets.is_empty()
+      {
+        tracing::error!( "❌ CRITICAL SECURITY ERROR: Production deployment with insecure default secrets" );
+        tracing::error!( "❌ The following secrets are using INSECURE DEFAULT VALUES:" );
+        for secret in &insecure_secrets
+        {
+          tracing::error!( "❌   - {}", secret );
+        }
+        tracing::error!( "" );
+        tracing::error!( "❌ REFUSING TO START SERVER" );
+        tracing::error!( "❌ Generate secure secrets with:" );
+        tracing::error!( "❌   JWT_SECRET=$(openssl rand -hex 32)" );
+        tracing::error!( "❌   IC_TOKEN_SECRET=$(openssl rand -hex 32)" );
+        tracing::error!( "❌   IP_TOKEN_KEY=$(openssl rand -hex 32)" );
+        tracing::error!( "" );
+        tracing::error!( "❌ See secret/readme.md for complete setup instructions" );
+        panic!( "Production deployment blocked: {} insecure default secret(s) detected", insecure_secrets.len() );
+      }
+
+      tracing::info!( "✓ Production secret validation passed" );
+    }
+    _ =>
+    {
+      // Development/Pilot mode - defaults are acceptable
+    }
+  }
+
   // Decode hex string to bytes
   let ip_token_key = hex::decode( &ip_token_key_hex )
     .expect( "LOUD FAILURE: IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
@@ -415,9 +487,19 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .expect( "LOUD FAILURE: Failed to initialize providers storage" );
 
   // Initialize keys state for /api/keys endpoint (requires crypto)
+  // Read provider key master key from environment (used for both keys API and budget protocol)
+  let provider_key_master_b64 = std::env::var( "IRON_SECRETS_MASTER_KEY" )
+    .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY required for provider key encryption" );
+
+  let provider_key_master_bytes = base64::Engine::decode(
+    &base64::engine::general_purpose::STANDARD,
+    &provider_key_master_b64
+  )
+    .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY must be valid base64" );
+
   let crypto_service = std::sync::Arc::new(
-    iron_secrets::crypto::CryptoService::from_env()
-      .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY required for key fetch API" )
+    iron_secrets::crypto::CryptoService::new( &provider_key_master_bytes )
+      .expect( "LOUD FAILURE: Failed to create crypto service" )
   );
 
   // Rate limiter for /api/keys endpoint: 10 requests per minute per user/project
@@ -476,6 +558,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
     &ip_token_key,
+    &provider_key_master_bytes,
     auth_state.jwt_secret.clone(),
     &database_url,
     Some( crypto_service_for_budget ),
@@ -606,9 +689,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .layer(
       CorsLayer::new()
         .allow_origin( [
-          "http://localhost:5173".parse::<axum::http::HeaderValue>().unwrap(),
-          "http://localhost:5174".parse::<axum::http::HeaderValue>().unwrap(),
-          "http://localhost:5175".parse::<axum::http::HeaderValue>().unwrap(),
+          "http://localhost:5173".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
+          "http://localhost:5174".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
+          "http://localhost:5175".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
         ] )
         .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH ] )
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )

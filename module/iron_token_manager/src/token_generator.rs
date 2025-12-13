@@ -119,6 +119,7 @@
 
 use rand::{ Rng, thread_rng };
 use sha2::{ Sha256, Digest };
+use subtle::ConstantTimeEq;
 
 /// Base62 alphabet (0-9, A-Z, a-z)
 const BASE62_ALPHABET: &[ u8 ] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -286,7 +287,10 @@ impl TokenGenerator
     format!( "{:x}", hasher.finalize() )
   }
 
-  /// Verify token against stored SHA-256 hash
+  /// Verify token against stored SHA-256 hash using constant-time comparison
+  ///
+  /// Uses constant-time comparison to prevent timing attacks that could
+  /// leak information about the stored hash through timing side-channels.
   ///
   /// # Arguments
   ///
@@ -296,10 +300,17 @@ impl TokenGenerator
   /// # Returns
   ///
   /// `true` if token matches hash, `false` otherwise
+  ///
+  /// # Security
+  ///
+  /// This function uses constant-time comparison via the `subtle` crate
+  /// to prevent timing attacks. The comparison time is independent of
+  /// where the mismatch occurs in the hash strings.
   #[ must_use ]
   pub fn verify_token( &self, token: &str, stored_hash: &str ) -> bool
   {
-    self.hash_token( token ) == stored_hash
+    let computed_hash = self.hash_token( token );
+    computed_hash.as_bytes().ct_eq( stored_hash.as_bytes() ).into()
   }
 }
 

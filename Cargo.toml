@@ -235,9 +235,13 @@ version = "0.4"
 version = "0.54"
 
 ## PyO3 for Python Bindings
+## Fix(pyo3-buffer-overflow): Updated to 0.24.1+ for RUSTSEC-2025-0020
+## - Vulnerability: Buffer overflow in PyString::from_object (missing nul-termination check)
+## - Fix: pyo3 0.24.x adds validation in CStr::from_ptr
+## - Test coverage: module/iron_runtime/tests/pyo3_string_safety_test.rs
 
 [workspace.dependencies.pyo3]
-version = "0.22"
+version = "0.24.1"
 features = ["extension-module"]
 
 ## LLM API Clients (from api_llm workspace)
