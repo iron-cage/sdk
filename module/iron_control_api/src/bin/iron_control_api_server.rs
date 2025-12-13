@@ -568,6 +568,11 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/agents/:id/providers", get( iron_control_api::routes::agents::get_agent_providers ) )
     .route( "/api/v1/agents/:agent_id/providers/:provider_id", delete( iron_control_api::routes::agents::remove_provider_from_agent ) )
 
+    // DEPRECATED ENDPOINTS
+
+    // DELETE /api/v1/agents/:id -- remove agent POST-PILOT feature
+    // GET /api/v1/agents/:id/tokens -- multi-token support POST-PILOT feature
+
     // Budget Control Protocol endpoints (Protocol 005)
     .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
     .route( "/api/v1/budget/report", post( iron_control_api::routes::budget::report_usage ) )
@@ -671,6 +676,4 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let listener = tokio::net::TcpListener::bind( addr ).await?;
   axum::serve( listener, app ).await?;
 
-  Ok( () )
-}
-
+  Ok( 
