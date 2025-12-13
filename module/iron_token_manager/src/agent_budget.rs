@@ -399,4 +399,54 @@ impl AgentBudgetManager
       None => Ok( false ),
     }
   }
+
+  /// Restore reserved budget that was returned unused
+  ///
+  /// Called by `/api/budget/return` endpoint when a lease is closed with unused budget.
+  /// This reverses the reservation made by `check_and_reserve_budget()`.
+  ///
+  /// Updates: `total_spent` -= returned_amount, `budget_remaining` += returned_amount
+  /// Maintains invariant: `total_allocated` = `total_spent` + `budget_remaining`
+  ///
+  /// # Arguments
+  ///
+  /// * `agent_id` - Agent database ID
+  /// * `returned_amount` - Microdollars to restore (amount returned from lease)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  ///
+  /// # Panics
+  ///
+  /// Panics if system time is before UNIX epoch (should never happen on modern systems)
+  pub async fn restore_reserved_budget( &self, agent_id: i64, returned_amount: i64 ) -> Result< (), sqlx::Error >
+  {
+    #[ allow( clippy::cast_possible_truncation ) ]
+    let now = SystemTime::now()
+      .duration_since( UNIX_EPOCH )
+      .expect( "LOUD FAILURE: Time went backwards" )
+      .as_millis() as i64;
+
+    // Use explicit transaction for atomic updates
+    let mut tx = self.pool.begin().await?;
+
+    sqlx::query(
+      "UPDATE agent_budgets
+      SET total_spent = total_spent - ?,
+          budget_remaining = budget_remaining + ?,
+          updated_at = ?
+      WHERE agent_id = ?"
+    )
+    .bind( returned_amount )
+    .bind( returned_amount )
+    .bind( now )
+    .bind( agent_id )
+    .execute( &mut *tx )
+    .await?;
+
+    tx.commit().await?;
+
+    Ok( () )
+  }
 }

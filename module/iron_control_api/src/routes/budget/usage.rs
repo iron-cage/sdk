@@ -417,6 +417,37 @@ pub async fn return_budget(
   // Calculate returned: granted - spent (capped at 0)
   let returned = ( lease.budget_granted - request.spent_microdollars ).max( 0 );
 
+  // Fix(issue-budget-007): Restore returned budget to agent_budgets
+  //
+  // Root cause: return_budget only credited usage_limits but not agent_budgets.
+  // The handshake reserved budget from agent_budgets via check_and_reserve_budget(),
+  // but return_budget never restored the unused portion back.
+  //
+  // Pitfall: When implementing a reserve/return pattern, ensure BOTH reserve AND return
+  // update the same state. Missing return logic causes permanent "budget leak".
+  //
+  // Restore the returned budget to agent_budgets
+  if returned > 0
+  {
+    if let Err( err ) = state
+      .agent_budget_manager
+      .restore_reserved_budget( lease.agent_id, returned )
+      .await
+    {
+      tracing::error!( "Database error restoring agent budget: {}", err );
+      // Continue - lease is closed, log the error but don't fail the return
+    }
+    else
+    {
+      tracing::info!(
+        lease_id = %request.lease_id,
+        agent_id = lease.agent_id,
+        returned_microdollars = %returned,
+        "Budget restored to agent_budgets"
+      );
+    }
+  }
+
   // Credit the returned amount back to usage_limits
   if returned > 0
   {
@@ -440,12 +471,11 @@ pub async fn return_budget(
     if let Some( owner_id ) = owner_id
     {
       // Credit the returned amount back to usage_limits
-      // Convert microdollars to cents: microdollars / 10_000
-      let returned_cents = returned / 10_000;
+      // Both are now in microdollars - no conversion needed
       if let Err( err ) = sqlx::query(
-        "UPDATE usage_limits SET current_cost_cents_this_month = current_cost_cents_this_month - ? WHERE user_id = ?"
+        "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month - ? WHERE user_id = ?"
       )
-      .bind( returned_cents )
+      .bind( returned )
       .bind( &owner_id )
       .execute( &state.db_pool )
       .await
@@ -460,7 +490,6 @@ pub async fn return_budget(
           agent_id = lease.agent_id,
           owner_id = %owner_id,
           returned_microdollars = %returned,
-          returned_cents = %returned_cents,
           "Budget returned and credited to usage_limits"
         );
       }
