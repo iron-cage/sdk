@@ -1,6 +1,6 @@
-use iron_token_manager::*;
+#![allow(missing_docs)]
 
-  use super::*;
+use iron_token_manager::*;
 
   #[ tokio::test ]
   async fn create_and_get_key()
@@ -71,13 +71,13 @@ use iron_token_manager::*;
 
     // Initially no balance
     let meta = storage.get_key_metadata( key_id ).await.unwrap();
-    assert!( meta.balance_cents.is_none() );
+    assert!( meta.balance_cents.is_none(), "Newly created key should have no balance set" );
 
     // Update balance
     storage.update_balance( key_id, 10000 ).await.unwrap();
     let meta = storage.get_key_metadata( key_id ).await.unwrap();
-    assert_eq!( meta.balance_cents, Some( 10000 ) );
-    assert!( meta.balance_updated_at.is_some() );
+    assert_eq!( meta.balance_cents, Some( 10000 ), "Balance should be updated to 10000 cents" );
+    assert!( meta.balance_updated_at.is_some(), "Balance timestamp should be set after update" );
   }
 
   #[ tokio::test ]
@@ -91,7 +91,7 @@ use iron_token_manager::*;
 
     // Should fail to get
     let result = storage.get_key( key_id ).await;
-    assert!( result.is_err() );
+    assert!( result.is_err(), "Getting deleted key should fail" );
   }
 
   #[ tokio::test ]
@@ -102,7 +102,7 @@ use iron_token_manager::*;
 
     // No assignment initially
     let assigned = storage.get_project_key( "project_abc" ).await.unwrap();
-    assert!( assigned.is_none() );
+    assert!( assigned.is_none(), "Project should have no key assigned initially" );
 
     // Assign
     storage.assign_to_project( key_id, "project_abc" ).await.unwrap();
@@ -116,5 +116,5 @@ use iron_token_manager::*;
     // Unassign
     storage.unassign_from_project( key_id, "project_abc" ).await.unwrap();
     let assigned = storage.get_project_key( "project_abc" ).await.unwrap();
-    assert!( assigned.is_none() );
+    assert!( assigned.is_none(), "Project should have no key after unassignment" );
   }

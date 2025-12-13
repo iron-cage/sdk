@@ -113,6 +113,9 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 017: Create system_config table and seed dev data
   apply_migration_017( pool ).await?;
 
+  // Migration 018: Convert budget columns from REAL to INTEGER (microdollars)
+  apply_migration_018( pool ).await?;
+
   Ok( () )
 }
 
@@ -522,6 +525,37 @@ async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
         .execute( pool )
         .await
         .map_err( |_| crate::error::TokenError::Generic )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 018: Convert budget columns from REAL (USD) to INTEGER (microdollars)
+#[ allow( dead_code ) ]
+async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
+{
+  // Check if migration has already run using the guard table pattern
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_018_completed'"
+  )
+      .fetch_one( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+  // Only execute if not previously completed
+  if completed == 0
+  {
+    // The SQL file handles schema conversion and guard table creation
+    let migration = include_str!( "../migrations/018_convert_budgets_to_microdollars.sql" );
+
+    sqlx::raw_sql( migration )
+        .execute( pool )
+        .await
+        .map_err( |e| {
+          eprintln!("Migration 018 failed: {e:?}");
+          crate::error::TokenError::Generic
+        } )?;
   }
 
   Ok( () )

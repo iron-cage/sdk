@@ -48,7 +48,7 @@ use tower::ServiceExt;
 async fn test_refresh_null_additional_budget()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 122, 100.0 ).await;
+  seed_agent_with_budget( &pool, 122, 100_000_000 ).await;
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state ).await;
 
@@ -90,7 +90,7 @@ async fn test_refresh_null_additional_budget()
 async fn test_refresh_float_overflow_f64_max()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 123, 100.0 ).await;
+  seed_agent_with_budget( &pool, 123, 100_000_000 ).await;
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state ).await;
 
@@ -131,7 +131,7 @@ async fn test_refresh_float_overflow_f64_max()
 async fn test_refresh_float_overflow_infinity()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 124, 100.0 ).await;
+  seed_agent_with_budget( &pool, 124, 100_000_000 ).await;
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state ).await;
 
@@ -172,7 +172,7 @@ async fn test_refresh_float_overflow_infinity()
 async fn test_refresh_nan_additional_budget()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 125, 100.0 ).await;
+  seed_agent_with_budget( &pool, 125, 100_000_000 ).await;
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state ).await;
 

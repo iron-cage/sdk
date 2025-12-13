@@ -5,14 +5,14 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+description = "Secrets management and encryption for Iron Cage"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["secrets", "encryption", "key-management", "security"]
+categories = ["cryptography"]
 
 [lints]
 workspace = true
-
-[features]
-default = ["enabled"]
-enabled = []
-full = ["enabled"]
 
 [dependencies]
 # Workspace crates

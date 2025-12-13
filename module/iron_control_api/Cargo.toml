@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "HTTP API for Iron Cage control plane"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["api", "rest", "control-plane", "agent-management"]
+categories = ["web-programming::http-server"]
 
 [[bin]]
 name = "iron_control_api_server"
@@ -43,9 +48,9 @@ full = ["enabled"]
 [dependencies]
 # Iron Cage crates
 iron_types = { workspace = true, features = ["full"], optional = true }
-iron_runtime_state = { workspace = true, features = ["full"], optional = true }
-iron_token_manager = { workspace = true, features = ["full"], optional = true }
-iron_secrets = { workspace = true, features = ["full"], optional = true }
+iron_runtime_state = { workspace = true, features = ["enabled", "sqlite"], optional = true }
+iron_token_manager = { workspace = true, optional = true }
+iron_secrets = { workspace = true, optional = true }
 
 # Web framework
 axum = { workspace = true, features = ["ws"], optional = true }

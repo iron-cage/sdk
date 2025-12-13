@@ -7,7 +7,6 @@
 //! - Return: Return unused budget on shutdown
 
 use crate::budget::{CostController, Reservation};
-use crate::converter::usd_to_micros;
 use crate::error::CostError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -92,9 +91,9 @@ pub struct ProviderKey {
 struct LeaseState {
     /// Lease ID from dashboard
     lease_id: String,
-    /// Budget granted for this lease (USD)
+    /// Budget granted for this lease (microdollars)
     #[allow(dead_code)]
-    budget_granted: f64,
+    budget_granted: i64,
 }
 
 /// Handshake request body
@@ -111,9 +110,9 @@ struct HandshakeRequest {
 struct HandshakeResponse {
     ip_token: String,
     lease_id: String,
-    budget_granted: f64,
+    budget_granted: i64,
     #[allow(dead_code)]
-    budget_remaining: f64,
+    budget_remaining: i64,
     #[allow(dead_code)]
     expires_at: Option<i64>,
 }
@@ -124,7 +123,7 @@ struct ReportRequest {
     lease_id: String,
     request_id: String,
     tokens: i64,
-    cost_usd: f64,
+    cost_microdollars: i64,
     model: String,
     provider: String,
 }
@@ -133,7 +132,7 @@ struct ReportRequest {
 #[derive(Debug, Deserialize)]
 pub struct ReportResponse {
     pub success: bool,
-    pub budget_remaining: f64,
+    pub budget_remaining: i64,
 }
 
 /// Budget refresh request body
@@ -142,15 +141,15 @@ struct RefreshRequest {
     ic_token: String,
     current_lease_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    requested_budget: Option<f64>,
+    requested_budget: Option<i64>,
 }
 
 /// Budget refresh response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct RefreshResponse {
     pub status: String,
-    pub budget_granted: Option<f64>,
-    pub budget_remaining: f64,
+    pub budget_granted: Option<i64>,
+    pub budget_remaining: i64,
     pub lease_id: Option<String>,
     pub reason: Option<String>,
 }
@@ -165,7 +164,7 @@ struct ReturnRequest {
 #[derive(Debug, Deserialize)]
 pub struct ReturnResponse {
     pub success: bool,
-    pub returned: f64,
+    pub returned: i64,
 }
 
 /// Budget client configuration
@@ -178,8 +177,8 @@ pub struct BudgetClientConfig {
     pub provider: String,
     /// Optional specific provider key ID
     pub provider_key_id: Option<i64>,
-    /// Initial budget to request (USD)
-    pub initial_budget: f64,
+    /// Initial budget to request (microdollars)
+    pub initial_budget: i64,
     /// HTTP request timeout
     pub timeout: Duration,
 }
@@ -191,7 +190,7 @@ impl Default for BudgetClientConfig {
             ic_token: String::new(),
             provider: "openai".to_string(),
             provider_key_id: None,
-            initial_budget: 10.0,
+            initial_budget: 10_000_000, // $10 in microdollars
             timeout: Duration::from_secs(30),
         }
     }
@@ -226,7 +225,7 @@ impl BudgetClient {
             .build()?;
 
         // Start with 0 budget - will be set after handshake
-        let cost_controller = CostController::new(0.0);
+        let cost_controller = CostController::new(0);
 
         Ok(Self {
             config,
@@ -299,7 +298,7 @@ impl BudgetClient {
     /// The report is non-blocking to avoid adding latency.
     pub async fn report(
         &self,
-        cost_usd: f64,
+        cost_microdollars: i64,
         tokens: i64,
         model: &str,
         request_id: &str,
@@ -313,7 +312,7 @@ impl BudgetClient {
             lease_id: lease.lease_id.clone(),
             request_id: request_id.to_string(),
             tokens,
-            cost_usd,
+            cost_microdollars,
             model: model.to_string(),
             provider: self.config.provider.clone(),
         };
@@ -335,10 +334,10 @@ impl BudgetClient {
         Ok(data)
     }
 
-    /// Request more budget when running low.
+    /// Request more budget when running low (in microdollars).
     ///
     /// If approved, updates the local cost controller with new budget.
-    pub async fn refresh(&self, requested_budget: Option<f64>) -> Result<RefreshResponse, BudgetClientError> {
+    pub async fn refresh(&self, requested_budget: Option<i64>) -> Result<RefreshResponse, BudgetClientError> {
         let lease = self.lease.read().await;
         let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
 
@@ -427,21 +426,12 @@ impl BudgetClient {
         self.cost_controller.reserve(max_cost_micros)
     }
 
-    /// Reserve budget in USD (convenience wrapper).
-    pub fn reserve_usd(&self, max_cost_usd: f64) -> Result<Reservation, CostError> {
-        self.cost_controller.reserve(usd_to_micros(max_cost_usd))
-    }
 
-    /// Commit a reservation with actual cost.
+    /// Commit a reservation with actual cost (in microdollars).
     ///
     /// Call after an LLM request completes successfully.
     pub fn commit(&self, reservation: Reservation, actual_cost_micros: u64) {
         self.cost_controller.commit(reservation, actual_cost_micros);
-    }
-
-    /// Commit a reservation with actual cost in USD.
-    pub fn commit_usd(&self, reservation: Reservation, actual_cost_usd: f64) {
-        self.cost_controller.commit_usd(reservation, actual_cost_usd);
     }
 
     /// Cancel a reservation without adding cost.
@@ -456,16 +446,11 @@ impl BudgetClient {
         self.cost_controller.check_budget()
     }
 
-    /// Add spend directly (without reservation).
+    /// Add spend directly (without reservation), in microdollars.
     ///
     /// Use this for cases where reservation is not needed.
-    pub fn add_spend(&self, cost_usd: f64) {
-        self.cost_controller.add_spend(cost_usd);
-    }
-
-    /// Add spend in microdollars (without reservation).
-    pub fn add_spend_micros(&self, cost_micros: u64) {
-        self.cost_controller.add_spend_micros(cost_micros);
+    pub fn add_spend(&self, cost_micros: i64) {
+        self.cost_controller.add_spend(cost_micros);
     }
 
     // =========================================================================
@@ -482,28 +467,28 @@ impl BudgetClient {
         self.lease.read().await.as_ref().map(|l| l.lease_id.clone())
     }
 
-    /// Get budget status: (spent_usd, limit_usd).
-    pub fn get_status(&self) -> (f64, f64) {
+    /// Get budget status: (spent_microdollars, limit_microdollars).
+    pub fn get_status(&self) -> (i64, i64) {
         self.cost_controller.get_status()
     }
 
-    /// Get full budget status: (spent_usd, reserved_usd, limit_usd).
-    pub fn get_full_status(&self) -> (f64, f64, f64) {
+    /// Get full budget status: (spent_microdollars, reserved_microdollars, limit_microdollars).
+    pub fn get_full_status(&self) -> (i64, i64, i64) {
         self.cost_controller.get_full_status()
     }
 
-    /// Get available budget in USD.
-    pub fn available(&self) -> f64 {
+    /// Get available budget in microdollars.
+    pub fn available(&self) -> i64 {
         self.cost_controller.available()
     }
 
-    /// Get total spent in USD.
-    pub fn total_spent(&self) -> f64 {
+    /// Get total spent in microdollars.
+    pub fn total_spent(&self) -> i64 {
         self.cost_controller.total_spent()
     }
 
-    /// Get budget limit in USD.
-    pub fn budget_limit(&self) -> f64 {
+    /// Get budget limit in microdollars.
+    pub fn budget_limit(&self) -> i64 {
         self.cost_controller.budget_limit()
     }
 
@@ -550,8 +535,8 @@ impl BudgetClientBuilder {
         self
     }
 
-    pub fn initial_budget(mut self, budget: f64) -> Self {
-        self.config.initial_budget = budget;
+    pub fn initial_budget(mut self, budget_micros: i64) -> Self {
+        self.config.initial_budget = budget_micros;
         self
     }
 
@@ -574,6 +559,6 @@ impl Default for BudgetClientBuilder {
 /// Create a static budget client that doesn't connect to dashboard.
 ///
 /// Useful for testing or standalone mode.
-pub fn create_static_client(budget_usd: f64) -> Arc<CostController> {
-    Arc::new(CostController::new(budget_usd))
+pub fn create_static_client(budget_micros: i64) -> Arc<CostController> {
+    Arc::new(CostController::new(budget_micros))
 }

@@ -74,7 +74,7 @@ async fn test_sql_injection_in_provider_name()
   let agent_id = 201;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -131,8 +131,8 @@ async fn test_ic_token_authorization_enforcement()
   let agent_2 = 203;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed both agents with budgets
-  seed_agent_with_budget( &pool, agent_1, 100.0 ).await;
-  seed_agent_with_budget( &pool, agent_2, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_1, 100_000_000 ).await;
+  seed_agent_with_budget( &pool, agent_2, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -202,7 +202,7 @@ async fn test_ip_token_replay_prevention()
   let agent_id = 204;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with sufficient budget for multiple handshakes
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -273,7 +273,7 @@ async fn test_ic_token_invalid_signature()
   let agent_id = 205;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
 
@@ -334,7 +334,7 @@ async fn test_provider_key_mismatch()
   let now_ms = chrono::Utc::now().timestamp_millis();
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   // Insert additional provider key for anthropic (ID = agent_id * 1000 + 1)
   sqlx::query(
@@ -499,7 +499,7 @@ async fn test_revoked_lease_usage_reporting()
   let agent_id = 208;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -543,7 +543,7 @@ async fn test_revoked_lease_usage_reporting()
         "lease_id": lease_id,
         "request_id": "req_test_001",
         "tokens": 150,
-        "cost_usd": 0.05,
+        "cost_microdollars": 50_000,
         "model": "gpt-4",
         "provider": "openai"
       }).to_string()
@@ -576,7 +576,7 @@ async fn test_sql_injection_in_model_name()
   let agent_id = 209;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -615,7 +615,7 @@ async fn test_sql_injection_in_model_name()
         "lease_id": lease_id,
         "request_id": "req_test_sql_injection",
         "tokens": 150,
-        "cost_usd": 0.05,
+        "cost_microdollars": 50_000,
         "model": malicious_model,
         "provider": "openai"
       }).to_string()
@@ -661,7 +661,7 @@ async fn test_sql_injection_in_reason_field()
   let agent_id = 210;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -787,7 +787,7 @@ async fn test_refresh_on_revoked_lease()
   let agent_id = 211;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -861,7 +861,7 @@ async fn test_return_on_revoked_lease()
   let agent_id = 212;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -935,7 +935,7 @@ async fn test_handshake_after_revocation()
   let agent_id = 213;  // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with sufficient budget for 2 leases
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );

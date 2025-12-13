@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use iron_token_manager::*;
 
 #[ test ]

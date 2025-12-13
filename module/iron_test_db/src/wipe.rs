@@ -47,7 +47,7 @@ pub async fn discover_table_dependencies( pool: &SqlitePool ) -> Result< Vec< St
 }
 
 /// Topological sort in reverse order (children before parents)
-fn topological_sort_reverse(
+pub fn topological_sort_reverse(
   tables: &[ String ],
   dependencies: &HashMap< String, Vec< String > >,
 ) -> Result< Vec< String > >

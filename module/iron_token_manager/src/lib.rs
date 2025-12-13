@@ -36,11 +36,6 @@
 //!
 //! Follows specification: `/home/user1/pro/lib/wip_iron/iron_cage/dev/task/backlog/001_implement_llm_token_management_dashboard_and_backend.md`
 //!
-//! ## Features
-//!
-//! - **`enabled`** (default) - Core token management functionality
-//! - **`full`** - All features enabled
-//!
 //! ## Known Pitfalls
 //!
 //! ### Token Security
@@ -79,56 +74,28 @@
 //!
 //! **Prevention**: Configure bucket size appropriately for use case.
 
-#![cfg_attr(not(feature = "enabled"), allow(unused))]
 #![warn(missing_docs)]
 
-#[cfg(feature = "enabled")]
 pub mod error;
-
-#[cfg(feature = "enabled")]
 pub mod token_generator;
-
-#[cfg(feature = "enabled")]
 pub mod usage_tracker;
-
-#[cfg(feature = "enabled")]
 pub mod limit_enforcer;
-
-#[cfg(feature = "enabled")]
 pub mod storage;
-
-#[cfg(feature = "enabled")]
 pub mod migrations;
-
-#[cfg(feature = "enabled")]
 pub mod config;
-
-#[cfg(feature = "enabled")]
 pub mod seed;
-
-#[cfg(feature = "enabled")]
 pub mod provider_adapter;
-
-#[cfg(feature = "enabled")]
 pub mod rate_limiter;
-
-#[cfg(feature = "enabled")]
 pub mod cost_calculator;
-
-#[cfg(feature = "enabled")]
 pub mod trace_storage;
-
-#[cfg(feature = "enabled")]
 pub mod provider_key_storage;
-
-#[cfg(feature = "enabled")]
 pub mod user_service;
-
-#[cfg(feature = "enabled")]
 pub mod lease_manager;
-
-#[cfg(feature = "enabled")]
 pub mod agent_budget;
-
-#[cfg(feature = "enabled")]
 pub mod budget_request;
+
+// Re-exports for convenient access
+pub use config::Config;
+pub use migrations::apply_all_migrations;
+pub use provider_key_storage::{ ProviderKeyStorage, ProviderType };
+pub use seed::{ wipe_database, seed_all, seed_users };

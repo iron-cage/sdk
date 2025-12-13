@@ -18,6 +18,9 @@
 //! - TestServer: Real Axum HTTP server on random port
 //! - TestData: Real SQLite database with SQL inserts
 //! - IntegrationTestHarness: Real CLI binary execution via `cargo run`
+
+// Test files are allowed to use println!/eprintln! for debugging
+#![allow(clippy::disallowed_macros)]
 //!
 //! ## Coverage Target
 //!

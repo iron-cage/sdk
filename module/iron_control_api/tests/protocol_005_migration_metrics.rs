@@ -67,7 +67,15 @@ async fn metric_1_agent_accessible_credential_endpoints()
 {
   // Read all route files
   let keys_source = include_str!( "../src/routes/keys.rs" );
-  let budget_source = include_str!( "../src/routes/budget.rs" );
+  // Budget module is now split across multiple files - concatenate them
+  let budget_source = concat!(
+    include_str!( "../src/routes/budget/mod.rs" ),
+    include_str!( "../src/routes/budget/state.rs" ),
+    include_str!( "../src/routes/budget/handshake.rs" ),
+    include_str!( "../src/routes/budget/usage.rs" ),
+    include_str!( "../src/routes/budget/refresh.rs" ),
+    include_str!( "../src/routes/budget/request_workflow.rs" )
+  );
 
   // Count endpoints WITHOUT agent token enforcement
   let mut unprotected_count = 0;
@@ -128,7 +136,14 @@ async fn metric_2_budget_control_paths()
   let table_count = budget_tables.len();
 
   // Count budget endpoints
-  let budget_source = include_str!( "../src/routes/budget.rs" );
+  let budget_source = concat!(
+    include_str!( "../src/routes/budget/mod.rs" ),
+    include_str!( "../src/routes/budget/state.rs" ),
+    include_str!( "../src/routes/budget/handshake.rs" ),
+    include_str!( "../src/routes/budget/usage.rs" ),
+    include_str!( "../src/routes/budget/refresh.rs" ),
+    include_str!( "../src/routes/budget/request_workflow.rs" )
+  );
   let mut endpoint_count = 0;
 
   if budget_source.contains( "pub async fn handshake" )
@@ -271,7 +286,14 @@ async fn metric_4_migration_ratio_shift()
   let bypass_paths = if has_agent_enforcement { 0 } else { 1 };
 
   // Count new pattern (Protocol 005 paths)
-  let budget_source = include_str!( "../src/routes/budget.rs" );
+  let budget_source = concat!(
+    include_str!( "../src/routes/budget/mod.rs" ),
+    include_str!( "../src/routes/budget/state.rs" ),
+    include_str!( "../src/routes/budget/handshake.rs" ),
+    include_str!( "../src/routes/budget/usage.rs" ),
+    include_str!( "../src/routes/budget/refresh.rs" ),
+    include_str!( "../src/routes/budget/request_workflow.rs" )
+  );
   let has_handshake = budget_source.contains( "pub async fn handshake" );
   let protocol_paths = if has_handshake { 1 } else { 0 };
 
@@ -437,7 +459,14 @@ async fn metric_summary_migration_score()
   }
 
   // Check 2: Protocol 005 exists (20 points)
-  let budget_source = include_str!( "../src/routes/budget.rs" );
+  let budget_source = concat!(
+    include_str!( "../src/routes/budget/mod.rs" ),
+    include_str!( "../src/routes/budget/state.rs" ),
+    include_str!( "../src/routes/budget/handshake.rs" ),
+    include_str!( "../src/routes/budget/usage.rs" ),
+    include_str!( "../src/routes/budget/refresh.rs" ),
+    include_str!( "../src/routes/budget/request_workflow.rs" )
+  );
   let protocol_exists = budget_source.contains( "pub async fn handshake" );
   if protocol_exists
   {

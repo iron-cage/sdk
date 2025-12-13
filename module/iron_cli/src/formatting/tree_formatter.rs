@@ -9,7 +9,7 @@
 use super::OutputFormat;
 use crate::handlers::CliError;
 use std::collections::HashMap;
-use tree_fmt::{ RowBuilder, TableView, Format };
+use tree_fmt::{ RowBuilder, TableView };
 
 /// Universal formatter using tree_fmt library
 pub struct TreeFmtFormatter
@@ -129,12 +129,12 @@ impl TreeFmtFormatter
 
   fn format_table_view( &self, view: &TableView ) -> String
   {
-    use tree_fmt::{ TableFormatter, TableConfig };
+    use tree_fmt::{ TableFormatter, TableConfig, Format };
 
     let config = TableConfig::plain();
     let formatter = TableFormatter::with_config( config );
 
-    formatter.format( view )
+    Format::format( &formatter, view )
       .unwrap_or_else( | _ | "Format error".to_string() )
   }
 
@@ -149,9 +149,9 @@ impl TreeFmtFormatter
       return String::new();
     }
 
-    // Build table view for expanded formatter
-    let mut builder = RowBuilder::new( vec![ "Key".into(), "Value".into() ] );
+    let mut lines = Vec::new();
 
+    // Get keys in sorted order
     let mut keys: Vec< _ > = data.keys().collect();
     keys.sort();
 
@@ -159,12 +159,11 @@ impl TreeFmtFormatter
     {
       if let Some( value ) = data.get( key.as_str() )
       {
-        builder.add_row_mut( vec![ key.clone(), value.clone() ] );
+        lines.push( format!( "{}: {}", key, value ) );
       }
     }
 
-    let view = builder.build_view();
-    self.format_expanded_view( &view )
+    lines.join( "\n" )
   }
 
   fn format_list_expanded( &self, items: &[ HashMap< String, String > ] ) -> String
@@ -174,24 +173,28 @@ impl TreeFmtFormatter
       return "No items found".to_string();
     }
 
-    // Format each item as a separate expanded block
-    let blocks: Vec< String > = items
-      .iter()
-      .map( | item | self.format_single_expanded( item ) )
-      .collect();
+    let mut blocks = Vec::new();
+
+    for ( i, item ) in items.iter().enumerate()
+    {
+      let mut lines = vec![ format!( "Item {}:", i + 1 ) ];
+
+      // Get keys in sorted order
+      let mut keys: Vec< _ > = item.keys().collect();
+      keys.sort();
+
+      for key in keys
+      {
+        if let Some( value ) = item.get( key.as_str() )
+        {
+          lines.push( format!( "  {}: {}", key, value ) );
+        }
+      }
+
+      blocks.push( lines.join( "\n" ) );
+    }
 
     blocks.join( "\n\n" )
-  }
-
-  fn format_expanded_view( &self, view: &TableView ) -> String
-  {
-    use tree_fmt::{ ExpandedFormatter, ExpandedConfig };
-
-    let config = ExpandedConfig::postgres();
-    let formatter = ExpandedFormatter::with_config( config );
-
-    formatter.format( view )
-      .unwrap_or_else( | _ | "Format error".to_string() )
   }
 
   // ============================================================================

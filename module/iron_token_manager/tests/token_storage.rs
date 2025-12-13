@@ -411,10 +411,10 @@ async fn test_backward_compatibility_old_token_format()
     .await
     .expect("LOUD FAILURE: Failed to get old format token metadata");
 
-  assert_eq!( metadata.user_id, "user_002" );
-  assert_eq!( metadata.project_id, Some( "legacy_project".to_string() ) );
-  assert_eq!( metadata.name, Some( "Old Format Token".to_string() ) );
-  assert!( metadata.is_active );
+  assert_eq!( metadata.user_id, "user_002", "Old format token should have correct user_id" );
+  assert_eq!( metadata.project_id, Some( "legacy_project".to_string() ), "Old format token should have correct project_id" );
+  assert_eq!( metadata.name, Some( "Old Format Token".to_string() ), "Old format token should have correct name" );
+  assert!( metadata.is_active, "Old format token should be active by default" );
 
   // Verify hash stored correctly (entire token, no prefix stripping)
   let stored_hash = storage

@@ -39,7 +39,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["iron_cage contributors"]
-license = "Apache-2.0"
+license = "MIT"
 
 [workspace.metadata]
 branches = ["master"]
@@ -151,7 +151,7 @@ version = "0.8"
 features = ["sqlite", "runtime-tokio-rustls"]
 
 [workspace.dependencies.redis]
-version = "0.27"
+version = "1.0"
 features = ["tokio-comp", "connection-manager"]
 
 ## Additional Error Handling
@@ -203,9 +203,6 @@ version = "0.8"
 [workspace.dependencies.sha2]
 version = "0.10"
 
-[workspace.dependencies.blake3]
-version = "1.5"
-
 [workspace.dependencies.aes-gcm]
 version = "0.10"
 
@@ -247,18 +244,19 @@ features = ["extension-module"]
 
 [workspace.dependencies.api_openai]
 version = "0.3.0"
-path = "../../../api_llm/dev/api/openai"
+# path = "../../../api_llm/dev/api/openai"  # Removed - use crates.io version
 default-features = false
 features = [ "enabled" ]
 
 [workspace.dependencies.api_claude]
 version = "0.4.0"
-path = "../../../api_llm/dev/api/claude"
+# path = "../../../api_llm/dev/api/claude"  # Removed - use crates.io version
 default-features = false
 features = [ "enabled" ]
 
 [workspace.dependencies.api_gemini]
-path = "../../../api_llm/dev/api/gemini"
+version = "0.5.0"
+# path = "../../../api_llm/dev/api/gemini"  # Removed - use crates.io version
 default-features = false
 features = [ "enabled" ]
 

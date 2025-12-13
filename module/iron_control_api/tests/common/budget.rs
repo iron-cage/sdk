@@ -103,7 +103,7 @@ pub fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
 /// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
 /// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
 #[ allow( dead_code ) ]
-pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_usd: f64 )
+pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microdollars: i64 )
 {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
@@ -136,14 +136,14 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_us
   .await
   .unwrap();
 
-  // Insert agent budget
+  // Insert agent budget (using microdollars)
   sqlx::query(
     "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-     VALUES (?, ?, 0.0, ?, ?, ?)"
+     VALUES (?, ?, 0, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( budget_usd )
-  .bind( budget_usd )
+  .bind( budget_microdollars )
+  .bind( budget_microdollars )
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )

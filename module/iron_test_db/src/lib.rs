@@ -30,7 +30,7 @@ mod wipe;
 pub use builder::{ TestDatabaseBuilder, StorageMode };
 pub use error::{ TestDbError, Result };
 pub use migrations::{ MigrationRegistry, Migration, MigrationRecord };
-pub use wipe::{ discover_table_dependencies, wipe_all_tables };
+pub use wipe::{ discover_table_dependencies, wipe_all_tables, topological_sort_reverse };
 
 use sqlx::SqlitePool;
 use tempfile::TempDir;

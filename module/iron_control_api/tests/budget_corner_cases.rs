@@ -22,9 +22,9 @@
 //! | `test_handshake_provider_over_max_length` | Provider DoS protection | POST /api/budget/handshake with provider >1KB | 400 Bad Request (length limit) | ✅ |
 //! | `test_handshake_malformed_jwt_missing_segments` | Malformed JWT handling | POST /api/budget/handshake with ic_token="invalid.jwt" | 400 Bad Request (JWT validation) | ✅ |
 //! | `test_report_usage_negative_tokens` | Negative token value validation | POST /api/budget/report with tokens=-100 | 400 Bad Request | ✅ |
-//! | `test_report_usage_negative_cost` | Negative cost value validation | POST /api/budget/report with cost_usd=-5.0 | 400 Bad Request | ✅ |
+//! | `test_report_usage_negative_cost` | Negative cost value validation | POST /api/budget/report with cost_microdollars=-5_000_000 | 400 Bad Request | ✅ |
 //! | `test_error_messages_no_sensitive_data_leak` | Error message security | Invalid handshake request | Error message contains no sensitive data (tokens, keys) | ✅ |
-//! | `test_report_usage_zero_cost_cached_response` | Zero cost cached response | POST /api/budget/report with cost_usd=0.0 | 200 OK (cached responses valid) | ✅ |
+//! | `test_report_usage_zero_cost_cached_response` | Zero cost cached response | POST /api/budget/report with cost_microdollars=0 | 200 OK (cached responses valid) | ✅ |
 //! | `test_database_foreign_key_constraint_agent` | FK constraint enforcement | Create lease for nonexistent agent_id | Database error (FK violation) | ✅ |
 //! | `test_database_not_null_constraint` | NOT NULL constraint enforcement | Insert lease with NULL required field | Database error (NOT NULL violation) | ✅ |
 
@@ -62,7 +62,7 @@ use tower::ServiceExt;
 async fn test_handshake_whitespace_only_ic_token()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 106, 100.0 ).await;
+  seed_agent_with_budget( &pool, 106, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let app = create_budget_router( state ).await;
@@ -107,7 +107,7 @@ async fn test_handshake_whitespace_only_ic_token()
 async fn test_handshake_whitespace_only_provider()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 107, 100.0 ).await;
+  seed_agent_with_budget( &pool, 107, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let ic_token = create_ic_token( 1, &state.ic_token_manager );
@@ -147,7 +147,7 @@ async fn test_handshake_whitespace_only_provider()
 async fn test_handshake_ic_token_over_max_length()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 108, 100.0 ).await;
+  seed_agent_with_budget( &pool, 108, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let app = create_budget_router( state ).await;
@@ -194,7 +194,7 @@ async fn test_handshake_ic_token_over_max_length()
 async fn test_handshake_provider_over_max_length()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 109, 100.0 ).await;
+  seed_agent_with_budget( &pool, 109, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let ic_token = create_ic_token( 1, &state.ic_token_manager );
@@ -234,7 +234,7 @@ async fn test_handshake_provider_over_max_length()
 async fn test_handshake_malformed_jwt_missing_segments()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 110, 100.0 ).await;
+  seed_agent_with_budget( &pool, 110, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let app = create_budget_router( state ).await;
@@ -273,7 +273,7 @@ async fn test_handshake_malformed_jwt_missing_segments()
 async fn test_report_usage_negative_tokens()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 111, 100.0 ).await;
+  seed_agent_with_budget( &pool, 111, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( 1, &state.ic_token_manager );
@@ -308,7 +308,7 @@ async fn test_report_usage_negative_tokens()
         "lease_id": lease_id,
         "request_id": "req_test_001",
         "tokens": -1000,  // NEGATIVE VALUE
-        "cost_usd": 5.0,
+        "cost_microdollars": 5_000_000,
         "model": "gpt-4",
         "provider": "openai"
       }).to_string()
@@ -333,18 +333,18 @@ async fn test_report_usage_negative_tokens()
   );
 }
 
-/// Test: Negative cost_usd value in usage report
+/// Test: Negative cost_microdollars value in usage report
 ///
 /// # Corner Case
-/// cost_usd field is negative (-5.0)
+/// cost_microdollars field is negative (-5_000_000)
 ///
 /// # Expected Behavior
-/// HTTP 400 Bad Request "cost_usd cannot be negative"
+/// HTTP 400 Bad Request "cost_microdollars cannot be negative"
 #[ tokio::test ]
 async fn test_report_usage_negative_cost()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 112, 100.0 ).await;
+  seed_agent_with_budget( &pool, 112, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( 1, &state.ic_token_manager );
@@ -379,7 +379,7 @@ async fn test_report_usage_negative_cost()
         "lease_id": lease_id,
         "request_id": "req_test_001",
         "tokens": 1000,
-        "cost_usd": -5.0,  // NEGATIVE VALUE
+        "cost_microdollars": -5_000_000,  // NEGATIVE VALUE
         "model": "gpt-4",
         "provider": "openai"
       }).to_string()
@@ -454,7 +454,7 @@ async fn test_error_messages_no_sensitive_data_leak()
 /// Test: Zero-cost usage reports (cached responses, free tier)
 ///
 /// # Corner Case
-/// Report usage with tokens > 0 but cost_usd = 0.0 (cached response, free tier)
+/// Report usage with tokens > 0 but cost_microdollars = 0 (cached response, free tier)
 ///
 /// # Expected Behavior
 /// Accepted (HTTP 200), budget accounting handles $0.00 correctly
@@ -465,7 +465,7 @@ async fn test_error_messages_no_sensitive_data_leak()
 async fn test_report_usage_zero_cost_cached_response()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 113, 100.0 ).await;
+  seed_agent_with_budget( &pool, 113, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( 1, &state.ic_token_manager );
@@ -502,7 +502,7 @@ async fn test_report_usage_zero_cost_cached_response()
         "lease_id": lease_id,
         "request_id": "req_cached_001",
         "tokens": 1000,       // Tokens used but cached
-        "cost_usd": 0.0,      // ZERO COST
+        "cost_microdollars": 0,      // ZERO COST
         "model": "gpt-4",
         "provider": "openai"
       }).to_string()
@@ -517,7 +517,7 @@ async fn test_report_usage_zero_cost_cached_response()
   );
 
   // Verify lease budget didn't change
-  let lease_check : ( f64, f64 ) = sqlx::query_as(
+  let lease_check : ( i64, i64 ) = sqlx::query_as(
     "SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?"
   )
   .bind( lease_id )
@@ -525,8 +525,8 @@ async fn test_report_usage_zero_cost_cached_response()
   .await
   .unwrap();
 
-  assert!( lease_check.0 > 0.0, "Granted should be positive" );
-  assert_eq!( lease_check.1, 0.0, "Spent should remain 0.0 for zero-cost request" );
+  assert!( lease_check.0 > 0, "Granted should be positive" );
+  assert_eq!( lease_check.1, 0, "Spent should remain 0 for zero-cost request" );
 }
 
 /// Test: Database foreign key constraint enforcement
@@ -586,7 +586,7 @@ async fn test_database_foreign_key_constraint_agent()
 async fn test_database_not_null_constraint()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 105, 100.0 ).await;
+  seed_agent_with_budget( &pool, 105, 100_000_000 ).await;
 
   // Attempt to insert NULL into budget_granted (NOT NULL column)
   let result = sqlx::query(
@@ -632,7 +632,7 @@ async fn test_database_not_null_constraint()
 async fn test_handshake_future_dated_ic_token()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 201, 100.0 ).await;
+  seed_agent_with_budget( &pool, 201, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state.clone() ).await;
@@ -746,7 +746,7 @@ async fn test_handshake_null_ic_token_field()
 async fn test_handshake_null_provider_field()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 202, 100.0 ).await;
+  seed_agent_with_budget( &pool, 202, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state.clone() ).await;
@@ -928,13 +928,13 @@ async fn test_handshake_missing_budget_id_claim()
   );
 }
 
-/// Manual Test Gap #8/#9: Float overflow and NaN in cost_usd
+/// Manual Test Gap #8: Integer overflow in cost_microdollars
 ///
 /// # Corner Case
-/// cost_usd = f64::INFINITY or NaN
+/// cost_microdollars = i64::MAX
 ///
 /// # Expected Behavior
-/// 400 Bad Request - reject non-finite values
+/// 400 Bad Request - reject overflow values
 ///
 /// # Risk
 /// MEDIUM - Budget accounting corruption
@@ -942,7 +942,7 @@ async fn test_handshake_missing_budget_id_claim()
 async fn test_report_usage_non_finite_cost()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 205, 100.0 ).await;
+  seed_agent_with_budget( &pool, 205, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
@@ -974,11 +974,11 @@ async fn test_report_usage_non_finite_cost()
   let handshake_result : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
   let lease_id = handshake_result[ "lease_id" ].as_str().unwrap();
 
-  // Test 1: Infinity
+  // Test 1: Overflow (i64::MAX microdollars)
   let router_report_inf = create_budget_router( state.clone() ).await;
   let report_infinity = json!({
     "lease_id": lease_id,
-    "cost_usd": f64::INFINITY,
+    "cost_microdollars": i64::MAX,
   });
 
   let response_inf = router_report_inf
@@ -995,38 +995,14 @@ async fn test_report_usage_non_finite_cost()
 
   assert!(
     response_inf.status() == StatusCode::BAD_REQUEST || response_inf.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "Infinity cost should be rejected with 400 or 422, got: {}", response_inf.status()
-  );
-
-  // Test 2: NaN
-  let router_report_nan = create_budget_router( state.clone() ).await;
-  let report_nan = json!({
-    "lease_id": lease_id,
-    "cost_usd": f64::NAN,
-  });
-
-  let response_nan = router_report_nan
-    .oneshot(
-      Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &report_nan ).unwrap() ) )
-        .unwrap()
-    )
-    .await
-    .unwrap();
-
-  assert!(
-    response_nan.status() == StatusCode::BAD_REQUEST || response_nan.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NaN cost should be rejected with 400 or 422, got: {}", response_nan.status()
+    "Overflow cost should be rejected with 400 or 422, got: {}", response_inf.status()
   );
 }
 
 /// Manual Test Gap #15: NULL lease_id field
 ///
 /// # Corner Case
-/// JSON request with {"lease_id": null, "cost_usd": 5.0}
+/// JSON request with {"lease_id": null, "cost_microdollars": 5_000_000}
 ///
 /// # Expected Behavior
 /// 400 Bad Request "lease_id is required"
@@ -1043,7 +1019,7 @@ async fn test_report_usage_null_lease_id()
   // Craft request with null lease_id
   let request_body = json!({
     "lease_id": null,
-    "cost_usd": 5.0,
+    "cost_microdollars": 5_000_000,
   });
 
   let response = router
@@ -1064,27 +1040,27 @@ async fn test_report_usage_null_lease_id()
   );
 }
 
-/// Manual Test Gap #16: NULL cost_usd field
+/// Manual Test Gap #16: NULL cost_microdollars field
 ///
 /// # Corner Case
-/// JSON request with {"lease_id": "<valid>", "cost_usd": null}
+/// JSON request with {"lease_id": "<valid>", "cost_microdollars": null}
 ///
 /// # Expected Behavior
-/// 400 Bad Request "cost_usd is required"
+/// 400 Bad Request "cost_microdollars is required"
 ///
 /// # Risk
 /// MEDIUM - Budget accounting corruption
 #[ tokio::test ]
-async fn test_report_usage_null_cost_usd()
+async fn test_report_usage_null_cost_microdollars()
 {
   let pool = setup_test_db().await;
   let state = create_test_budget_state( pool ).await;
   let router = create_budget_router( state ).await;
 
-  // Craft request with null cost_usd
+  // Craft request with null cost_microdollars
   let request_body = json!({
     "lease_id": "test_lease_id",
-    "cost_usd": null,
+    "cost_microdollars": null,
   });
 
   let response = router
@@ -1101,7 +1077,7 @@ async fn test_report_usage_null_cost_usd()
 
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL cost_usd should be rejected with 400 or 422, got: {}", response.status()
+    "NULL cost_microdollars should be rejected with 400 or 422, got: {}", response.status()
   );
 }
 
@@ -1120,21 +1096,21 @@ async fn test_report_usage_null_cost_usd()
 async fn test_cost_exactly_equals_remaining_budget()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 120, 100.0 ).await;
+  seed_agent_with_budget( &pool, 120, 100_000_000 ).await;
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Create lease with $10.00 budget
   let lease_id = "lease_exact_boundary_test";
   state
     .lease_manager
-    .create_lease( lease_id, 120, 120, 10.0, None )
+    .create_lease( lease_id, 120, 120, 10_000_000, None )
     .await
     .expect("LOUD FAILURE: Should create lease");
 
   // Record $9.50 usage (leaving exactly $0.50 remaining)
   state
     .lease_manager
-    .record_usage( lease_id, 9.5 )
+    .record_usage( lease_id, 9_500_000 )
     .await
     .expect("LOUD FAILURE: Should record partial usage");
 
@@ -1144,7 +1120,7 @@ async fn test_cost_exactly_equals_remaining_budget()
     "lease_id": lease_id,
     "request_id": "req_boundary_test",
     "tokens": 500,
-    "cost_usd": 0.5,
+    "cost_microdollars": 500_000,  // $0.50
     "model": "gpt-4",
     "provider": "openai",
   });
@@ -1168,7 +1144,7 @@ async fn test_cost_exactly_equals_remaining_budget()
     "Cost exactly equals remaining should be accepted with 200 OK"
   );
 
-  // Verify: Budget exhausted to exactly 0.0
+  // Verify: Budget exhausted to exactly 0
   let lease_record = sqlx::query(
     "SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?"
   )
@@ -1177,14 +1153,14 @@ async fn test_cost_exactly_equals_remaining_budget()
   .await
   .expect("LOUD FAILURE: Should fetch lease record");
 
-  let budget_granted: f64 = lease_record.get("budget_granted");
-  let budget_spent: f64 = lease_record.get("budget_spent");
+  let budget_granted: i64 = lease_record.get("budget_granted");
+  let budget_spent: i64 = lease_record.get("budget_spent");
   let budget_remaining = budget_granted - budget_spent;
 
-  assert_eq!( budget_spent, 10.0, "Budget spent should be 10.0" );
-  assert!(
-    (budget_remaining - 0.0).abs() < 0.0001,
-    "Budget remaining should be exactly 0.0, got: {}", budget_remaining
+  assert_eq!( budget_spent, 10_000_000, "Budget spent should be $10" );
+  assert_eq!(
+    budget_remaining, 0,
+    "Budget remaining should be exactly 0, got: {}", budget_remaining
   );
 }
 
@@ -1324,14 +1300,14 @@ async fn test_handshake_invalid_agent_id_negative()
 async fn test_report_usage_integer_overflow_tokens()
 {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 121, 100.0 ).await;
+  seed_agent_with_budget( &pool, 121, 100_000_000 ).await;
   let state = create_test_budget_state( pool ).await;
 
   // Create lease
   let lease_id = "lease_tokens_overflow_test";
   state
     .lease_manager
-    .create_lease( lease_id, 121, 121, 10.0, None )
+    .create_lease( lease_id, 121, 121, 10_000_000, None )
     .await
     .expect("LOUD FAILURE: Should create lease");
 
@@ -1341,7 +1317,7 @@ async fn test_report_usage_integer_overflow_tokens()
   // Note: JSON can represent numbers larger than i64::MAX, but Rust deserialization should reject them
   let request_body = json!({
     "lease_id": lease_id,
-    "cost_usd": 1.0,
+    "cost_microdollars": 1_000_000,
     "tokens_used": 9_223_372_036_854_775_808_u64,  // i64::MAX + 1
     "model": "gpt-4",
     "provider": "openai",

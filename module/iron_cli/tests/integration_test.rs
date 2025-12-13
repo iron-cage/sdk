@@ -18,6 +18,9 @@
 //! - Fast: No network I/O overhead
 //! - Deterministic: Same behavior every run
 //! - Self-contained: No external dependencies (no API server needed)
+
+// Test files are allowed to use println!/eprintln! for debugging
+#![allow(clippy::disallowed_macros)]
 //! - Real implementation: Not a mock - uses actual HashMap storage
 //!
 //! **Important: Feature Flag Required**
@@ -32,7 +35,7 @@
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::{ AuthService, StorageService };
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use iron_cli::config::Config;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -80,7 +83,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_login_integration_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Setup: register user
   adapter.seed_user( "alice", "password123" );
@@ -109,7 +112,7 @@ async fn test_login_integration_success()
 async fn test_login_integration_invalid_credentials()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Don't register user - should fail
 
@@ -134,7 +137,7 @@ async fn test_login_integration_invalid_credentials()
 async fn test_logout_integration_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Setup: login first
   adapter.seed_user( "bob", "secret" );
@@ -162,7 +165,7 @@ async fn test_logout_integration_success()
 async fn test_refresh_integration_success()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Setup: login first
   adapter.seed_user( "charlie", "pass123" );
@@ -190,7 +193,7 @@ async fn test_refresh_integration_success()
 async fn test_list_tokens_integration()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".tokens.list", &[] );
 
@@ -207,7 +210,7 @@ async fn test_list_tokens_integration()
 async fn test_generate_token_integration()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.generate",
@@ -233,7 +236,7 @@ async fn test_generate_token_integration()
 async fn test_revoke_token_integration_not_found()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".tokens.revoke",
@@ -306,7 +309,7 @@ fn test_config_integration_precedence()
 async fn test_full_auth_workflow()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   // 1. Register user
   adapter.seed_user( "workflow-user", "pass" );
@@ -371,7 +374,7 @@ async fn test_formatter_integration_all_formats()
 
   for format in formats
   {
-    let formatter = Formatter::new( format );
+    let formatter = TreeFmtFormatter::new( format );
     let command = create_verified_command( ".tokens.list", &[] );
 
     let result = iron_cli::adapters::tokens::list_tokens_adapter(

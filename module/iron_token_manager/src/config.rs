@@ -243,7 +243,7 @@ impl Config
   /// - `DATABASE_MAX_CONNECTIONS` → `database.max_connections`
   /// - `DATABASE_AUTO_MIGRATE` → `database.auto_migrate`
   /// - `DATABASE_FOREIGN_KEYS` → `database.foreign_keys`
-  fn apply_env_overrides( &mut self )
+  pub fn apply_env_overrides( &mut self )
   {
     if let Ok( url ) = std::env::var( "DATABASE_URL" )
     {

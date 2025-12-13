@@ -1,0 +1,339 @@
+//! Budget refresh endpoint (Protocol 005)
+//!
+//! Request additional budget allocation
+
+use super::state::BudgetState;
+use axum::
+{
+  extract::State,
+  http::StatusCode,
+  response::{ IntoResponse, Json },
+};
+use serde::{ Deserialize, Serialize };
+use uuid::Uuid;
+
+/// Budget refresh request (Step 3: Request More Budget)
+#[ derive( Debug, Deserialize ) ]
+pub struct BudgetRefreshRequest
+{
+  pub ic_token: String,
+  pub current_lease_id: String,
+  pub requested_budget: Option< i64 >,
+}
+
+impl BudgetRefreshRequest
+{
+  /// Maximum IC Token length
+  const MAX_IC_TOKEN_LENGTH: usize = 2000;
+
+  /// Maximum lease_id length
+  const MAX_LEASE_ID_LENGTH: usize = 100;
+
+  /// Maximum budget request (microdollars)
+  const MAX_BUDGET_REQUEST: i64 = 1_000_000_000; // 1000 USD
+
+  /// Default budget refresh amount (microdollars)
+  const DEFAULT_REFRESH_BUDGET: i64 = 10_000_000; // 10 USD
+
+  /// Validate budget refresh request parameters
+  ///
+  /// # Errors
+  ///
+  /// Returns error if validation fails
+  pub fn validate( &self ) -> Result< (), String >
+  {
+    // Validate ic_token
+    if self.ic_token.trim().is_empty()
+    {
+      return Err( "ic_token cannot be empty".to_string() );
+    }
+
+    if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
+    {
+      return Err( format!(
+        "ic_token too long (max {} characters)",
+        Self::MAX_IC_TOKEN_LENGTH
+      ) );
+    }
+
+    // Validate current_lease_id
+    if self.current_lease_id.trim().is_empty()
+    {
+      return Err( "current_lease_id cannot be empty".to_string() );
+    }
+
+    if self.current_lease_id.len() > Self::MAX_LEASE_ID_LENGTH
+    {
+      return Err( format!(
+        "current_lease_id too long (max {} characters)",
+        Self::MAX_LEASE_ID_LENGTH
+      ) );
+    }
+
+    // Validate requested_budget if provided
+    if let Some( budget ) = self.requested_budget
+    {
+      if budget <= 0
+      {
+        return Err( "requested_budget must be positive".to_string() );
+      }
+
+      if budget > Self::MAX_BUDGET_REQUEST
+      {
+        return Err( format!(
+          "requested_budget too large (max {} microdollars)",
+          Self::MAX_BUDGET_REQUEST
+        ) );
+      }
+    }
+
+    Ok( () )
+  }
+
+  /// Get requested budget or default
+  pub fn get_requested_budget( &self ) -> i64
+  {
+    self.requested_budget.unwrap_or( Self::DEFAULT_REFRESH_BUDGET )
+  }
+}
+
+/// Budget refresh response (approved)
+#[ derive( Debug, Serialize ) ]
+pub struct BudgetRefreshResponse
+{
+  pub status: String,
+  pub budget_granted: Option< i64 >,
+  pub budget_remaining: i64,
+  pub lease_id: Option< String >,
+  pub reason: Option< String >,
+}
+
+/// POST /api/budget/refresh
+///
+/// Request additional budget
+///
+/// # Arguments
+///
+/// * `state` - Budget protocol state
+/// * `request` - Budget refresh request
+///
+/// # Returns
+///
+/// - 200 OK with approval/denial status
+/// - 400 Bad Request if validation fails
+/// - 404 Not Found if lease doesnt exist
+/// - 500 Internal Server Error if database fails
+pub async fn refresh_budget(
+  State( state ): State< BudgetState >,
+  Json( request ): Json< BudgetRefreshRequest >,
+) -> impl IntoResponse
+{
+  // Validate request
+  if let Err( validation_error ) = request.validate()
+  {
+    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+    {
+      "error": validation_error
+    } ) ) ).into_response();
+  }
+
+  // Verify IC Token
+  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  {
+    Ok( claims ) => claims,
+    Err( _ ) =>
+    {
+      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+      {
+        "error": "Invalid IC Token"
+      } ) ) ).into_response();
+    }
+  };
+
+  // Extract agent_id from IC Token claims
+  // Claims.agent_id format: "agent_<id>"
+  let agent_id = match claims.agent_id.strip_prefix( "agent_" )
+  {
+    Some( id_str ) => match id_str.parse::< i64 >()
+    {
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+        {
+          "error": "Invalid agent ID in IC Token"
+        } ) ) ).into_response();
+      }
+    },
+    None =>
+    {
+      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
+      {
+        "error": "Invalid IC Token agent_id format"
+      } ) ) ).into_response();
+    }
+  };
+
+  // Get current lease
+  let lease = match state.lease_manager.get_lease( &request.current_lease_id ).await
+  {
+    Ok( Some( lease ) ) => lease,
+    Ok( None ) =>
+    {
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Lease not found" }) ),
+      )
+        .into_response();
+    }
+    Err( err ) =>
+    {
+      tracing::error!( "Database error fetching lease: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Lease service unavailable" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Verify IC Token agent matches lease owner (authorization check)
+  if lease.agent_id != agent_id
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!(
+      {
+        "error": "Unauthorized - lease belongs to different agent"
+      } ) ),
+    )
+      .into_response();
+  }
+
+  // Fix(issue-budget-007): Missing lease revocation check in refresh_budget
+  //
+  // Root cause: Report usage endpoint had revocation check (issue-budget-001), but refresh_budget
+  // endpoint was missing the same validation. When refresh was implemented, the developer copied
+  // the authorization check pattern from report_usage but forgot to also copy the lease status
+  // validation (expiry + revocation checks). This allowed revoked leases to refresh successfully.
+  //
+  // Pitfall: Incomplete validation copying - when copying validation patterns between similar
+  // endpoints, ensure ALL relevant checks are copied, not just authorization. Pattern: endpoints
+  // operating on same resource type (leases, tokens, sessions) should have consistent validation.
+  // Use checklist: (1) existence, (2) authorization, (3) state (expiry/revocation/enabled),
+  // (4) capacity/limits. Missing ANY check creates security gap.
+  //
+  // Check if lease has expired
+  if let Some( expires_at ) = lease.expires_at
+  {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    if expires_at < now_ms
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "Lease expired" }) ),
+      )
+        .into_response();
+    }
+  }
+
+  // Check if lease has been revoked
+  if lease.lease_status == "revoked"
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Lease has been revoked" }) ),
+    )
+      .into_response();
+  }
+
+  // Get agent budget
+  let agent_budget = match state
+    .agent_budget_manager
+    .get_budget_status( lease.agent_id )
+    .await
+  {
+    Ok( Some( budget ) ) => budget,
+    Ok( None ) =>
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "No budget allocated" }) ),
+      )
+        .into_response();
+    }
+    Err( err ) =>
+    {
+      tracing::error!( "Database error fetching agent budget: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Budget service unavailable" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Get requested budget amount (with default)
+  let requested_budget = request.get_requested_budget();
+
+  // Check if agent has sufficient remaining budget
+  if agent_budget.budget_remaining < requested_budget
+  {
+    // Deny request
+    return ( StatusCode::OK, Json( BudgetRefreshResponse
+    {
+      status: "denied".to_string(),
+      budget_granted: None,
+      budget_remaining: agent_budget.budget_remaining,
+      lease_id: None,
+      reason: Some( "insufficient_budget".to_string() ),
+    } ) )
+      .into_response();
+  }
+
+  // Approve request - create new lease
+  let new_lease_id = format!( "lease_{}", Uuid::new_v4() );
+
+  if let Err( err ) = state
+    .lease_manager
+    .create_lease(
+      &new_lease_id,
+      lease.agent_id,
+      lease.budget_id,
+      requested_budget,
+      None,
+    )
+    .await
+  {
+    tracing::error!( "Database error creating new lease: {}", err );
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to create new lease" }) ),
+    )
+      .into_response();
+  }
+
+  // Expire old lease
+  if let Err( err ) = state.lease_manager.expire_lease( &request.current_lease_id ).await
+  {
+    tracing::error!( "Database error expiring old lease: {}", err );
+    // Continue anyway - new lease was created
+  }
+
+  // Update agent budget (deduct granted amount from remaining)
+  // Note: The budget was already deducted during handshake, so we dont double-deduct here
+  // Instead, we just return the current status
+
+  // Calculate new remaining budget after this grant
+  let new_remaining = agent_budget.budget_remaining.saturating_sub( requested_budget );
+
+  ( StatusCode::OK, Json( BudgetRefreshResponse
+  {
+    status: "approved".to_string(),
+    budget_granted: Some( requested_budget ),
+    budget_remaining: new_remaining,
+    lease_id: Some( new_lease_id ),
+    reason: None,
+  } ) )
+    .into_response()
+}

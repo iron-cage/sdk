@@ -43,14 +43,14 @@
 //! ```rust,no_run
 //! use iron_cost::budget::CostController;
 //!
-//! // Create controller with $10 budget
-//! let controller = CostController::new_usd(10.0);
+//! // Create controller with $10 budget (10 million microdollars)
+//! let controller = CostController::new(10_000_000);
 //!
-//! // Reserve budget for max possible cost
-//! let reservation = controller.reserve_usd(0.50)?;
+//! // Reserve budget for max possible cost ($0.50 = 500k microdollars)
+//! let reservation = controller.reserve(500_000)?;
 //!
-//! // After actual usage known, commit actual cost
-//! reservation.commit_usd(0.32);
+//! // After actual usage known, commit actual cost ($0.32 = 320k microdollars)
+//! controller.commit(reservation, 320_000);
 //! // Unused $0.18 automatically returned to budget
 //! # Ok::<(), iron_cost::error::CostError>(())
 //! ```

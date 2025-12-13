@@ -157,7 +157,11 @@ pub async fn seed_all( pool: &SqlitePool ) -> Result< () >
 /// - `guest` (role: user, active, no tokens)
 ///
 /// Passwords are bcrypt hashed "password123" (DO NOT use in production!)
-async fn seed_users( pool: &SqlitePool ) -> Result< () >
+///
+/// # Errors
+///
+/// Returns error if database insertion fails
+pub async fn seed_users( pool: &SqlitePool ) -> Result< () >
 {
   let now_ms = crate::storage::current_time_ms();
   let day_ms = 24 * 60 * 60 * 1000;

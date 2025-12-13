@@ -58,7 +58,7 @@ async fn test_multiple_simultaneous_handshakes()
   let agent_id = 101;
 
   // Seed agent with exactly 100 USD budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -130,7 +130,7 @@ async fn test_multiple_simultaneous_handshakes()
   );
 
   // Verify final budget state
-  let remaining : f64 = sqlx::query_scalar(
+  let remaining : i64 = sqlx::query_scalar(
     "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
   )
   .bind( agent_id )
@@ -139,7 +139,7 @@ async fn test_multiple_simultaneous_handshakes()
   .unwrap();
 
   // Budget should be fully allocated (0 remaining)
-  assert_eq!( remaining, 0.0, "Budget should be fully allocated after 10x 10 USD leases" );
+  assert_eq!( remaining, 0, "Budget should be fully allocated after 10x 10 USD leases" );
 }
 
 /// Test 9: Concurrent usage reports on same lease
@@ -159,7 +159,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   let agent_id = 102;
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -203,7 +203,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
             "lease_id": lease_id_clone,
             "request_id": "req_test_001",
             "tokens": 1000,
-            "cost_usd": 5.0,
+            "cost_microdollars": 5_000_000,
             "model": "gpt-4",
             "provider": "openai"
           }).to_string()
@@ -233,7 +233,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   assert_eq!( successful_count, 2, "Both concurrent reports should succeed" );
 
   // Verify lease spent is exactly 10 USD (atomic updates, no lost writes)
-  let budget_spent : f64 = sqlx::query_scalar(
+  let budget_spent : i64 = sqlx::query_scalar(
     "SELECT budget_spent FROM budget_leases WHERE id = ?"
   )
   .bind( &lease_id )
@@ -241,7 +241,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   .await
   .unwrap();
 
-  assert_eq!( budget_spent, 10.0, "Lease should have exactly 10 USD spent (no lost updates)" );
+  assert_eq!( budget_spent, 10_000_000, "Lease should have exactly 10 USD spent (no lost updates)" );
 }
 
 /// Test 10: Concurrent report and refresh on same lease
@@ -261,7 +261,7 @@ async fn test_concurrent_report_and_refresh()
   let agent_id = 103;
 
   // Seed agent with sufficient budget
-  seed_agent_with_budget( &pool, agent_id, 100.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -299,7 +299,7 @@ async fn test_concurrent_report_and_refresh()
           "lease_id": lease_id_report,
           "request_id": "req_test_concurrent",
           "tokens": 500,
-          "cost_usd": 3.0,
+          "cost_microdollars": 3_000_000,
           "model": "gpt-4",
           "provider": "openai"
         }).to_string()
@@ -321,7 +321,7 @@ async fn test_concurrent_report_and_refresh()
         json!({
           "ic_token": ic_token_refresh,
           "current_lease_id": lease_id,
-          "requested_budget": 10.0
+          "requested_budget": 10_000_000
         }).to_string()
       ))
       .unwrap();
@@ -366,7 +366,7 @@ async fn test_handshake_with_existing_active_lease()
   let agent_id = 104;
 
   // Seed agent with sufficient budget for multiple leases
-  seed_agent_with_budget( &pool, agent_id, 50.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 50_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -478,7 +478,7 @@ async fn test_toctou_race_insufficient_budget()
   let agent_id = 105;
 
   // Seed agent with EXACTLY $10.00 (enough for only 1 handshake)
-  seed_agent_with_budget( &pool, agent_id, 10.0 ).await;
+  seed_agent_with_budget( &pool, agent_id, 10_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -555,7 +555,7 @@ async fn test_toctou_race_insufficient_budget()
   );
 
   // Verify final budget state - should be EXACTLY 0 (not negative)
-  let remaining : f64 = sqlx::query_scalar(
+  let remaining : i64 = sqlx::query_scalar(
     "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
   )
   .bind( agent_id )
@@ -564,12 +564,12 @@ async fn test_toctou_race_insufficient_budget()
   .unwrap();
 
   assert!(
-    remaining >= 0.0,
+    remaining >= 0,
     "Budget remaining must not be negative (invariant violation). Got: {remaining}"
   );
 
   assert_eq!(
-    remaining, 0.0,
+    remaining, 0,
     "Budget should be fully allocated after 1x $10 lease from $10 budget. Got: {remaining}"
   );
 }

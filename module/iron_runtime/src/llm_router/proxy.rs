@@ -172,7 +172,10 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   // Use CostController's check_budget method
   match controller.check_budget() {
     Ok(()) => Ok(()),
-    Err(CostError::BudgetExceeded { spent_usd, limit_usd, reserved_usd }) => {
+    Err(CostError::BudgetExceeded { spent_microdollars, limit_microdollars, reserved_microdollars }) => {
+      let spent_usd = spent_microdollars as f64 / 1_000_000.0;
+      let limit_usd = limit_microdollars as f64 / 1_000_000.0;
+      let reserved_usd = reserved_microdollars as f64 / 1_000_000.0;
       Err(Box::new(create_openai_error_response(
         StatusCode::PAYMENT_REQUIRED, // 402 - distinct from 429 rate limit
         &format!(
@@ -184,7 +187,9 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
         "budget_exceeded",
       )))
     }
-    Err(CostError::InsufficientBudget { available_usd, requested_usd }) => {
+    Err(CostError::InsufficientBudget { available_microdollars, requested_microdollars }) => {
+      let available_usd = available_microdollars as f64 / 1_000_000.0;
+      let requested_usd = requested_microdollars as f64 / 1_000_000.0;
       Err(Box::new(create_openai_error_response(
         StatusCode::PAYMENT_REQUIRED,
         &format!(
@@ -287,7 +292,9 @@ async fn handle_proxy(
     if let Some(max_cost) = state.pricing_manager.estimate_max_cost(&body_bytes) {
       match controller.reserve(max_cost) {
         Ok(res) => Some(res),
-        Err(CostError::InsufficientBudget { available_usd, requested_usd }) => {
+        Err(CostError::InsufficientBudget { available_microdollars, requested_microdollars }) => {
+          let available_usd = available_microdollars as f64 / 1_000_000.0;
+          let requested_usd = requested_microdollars as f64 / 1_000_000.0;
           return Ok(create_openai_error_response(
             StatusCode::PAYMENT_REQUIRED,
             &format!(
@@ -402,7 +409,7 @@ async fn handle_proxy(
           controller.commit(res, cost_info.cost_micros);
         } else {
           // No reservation was made, add directly (fallback for unknown models)
-          controller.add_spend_micros(cost_info.cost_micros);
+          controller.add_spend(cost_info.cost_micros as i64);
         }
       }
 

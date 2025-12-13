@@ -1,8 +1,7 @@
+#![allow(missing_docs)]
+
 use iron_token_manager::*;
 use sqlx::SqlitePool;
-
-  use super::*;
-  use sqlx::SqlitePool;
 
   #[ tokio::test ]
   async fn test_wipe_database()

@@ -1,4 +1,6 @@
-use iron_secrets::*;
+#![allow(missing_docs)]
+
+use iron_secrets::crypto::{ CryptoService, CryptoError, EncryptedSecret, mask_api_key, KEY_SIZE };
 
 fn test_key() -> [ u8; KEY_SIZE ]
 {
@@ -14,7 +16,7 @@ fn encrypt_decrypt_roundtrip()
   let encrypted = crypto.encrypt( plaintext ).unwrap();
   let decrypted = crypto.decrypt( &encrypted ).unwrap();
 
-  assert_eq!( &*decrypted, plaintext );
+  assert_eq!( &*decrypted, plaintext, "Decrypted text should match original plaintext" );
 }
 
 #[ test ]
@@ -26,8 +28,8 @@ fn different_encryptions_have_different_nonces()
   let encrypted1 = crypto.encrypt( plaintext ).unwrap();
   let encrypted2 = crypto.encrypt( plaintext ).unwrap();
 
-  assert_ne!( encrypted1.nonce, encrypted2.nonce );
-  assert_ne!( encrypted1.ciphertext, encrypted2.ciphertext );
+  assert_ne!( encrypted1.nonce, encrypted2.nonce, "Each encryption should use different nonce" );
+  assert_ne!( encrypted1.ciphertext, encrypted2.ciphertext, "Different nonces should produce different ciphertexts" );
 }
 
 #[ test ]
@@ -69,19 +71,19 @@ fn base64_roundtrip()
   let restored = EncryptedSecret::from_base64( &ciphertext_b64, &nonce_b64 ).unwrap();
   let decrypted = crypto.decrypt( &restored ).unwrap();
 
-  assert_eq!( &*decrypted, plaintext );
+  assert_eq!( &*decrypted, plaintext, "Base64 roundtrip should preserve plaintext" );
 }
 
 #[ test ]
 fn mask_short_key()
 {
-  assert_eq!( mask_api_key( "short" ), "***" );
-  assert_eq!( mask_api_key( "12345678" ), "***" );
+  assert_eq!( mask_api_key( "short" ), "***", "Short keys should be fully masked" );
+  assert_eq!( mask_api_key( "12345678" ), "***", "8-character keys should be fully masked" );
 }
 
 #[ test ]
 fn mask_long_key()
 {
-  assert_eq!( mask_api_key( "sk-proj-abc123xyz" ), "sk-p...xyz" );
-  assert_eq!( mask_api_key( "sk-ant-api-key-12345" ), "sk-a...345" );
+  assert_eq!( mask_api_key( "sk-proj-abc123xyz" ), "sk-p...xyz", "Long keys should show prefix and suffix" );
+  assert_eq!( mask_api_key( "sk-ant-api-key-12345" ), "sk-a...345", "API keys should preserve recognizable prefix" );
 }

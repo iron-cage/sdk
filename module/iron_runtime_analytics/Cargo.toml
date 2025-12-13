@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Usage analytics and reporting for Iron Cage agent runtime"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["analytics", "reporting", "metrics", "agent-runtime"]
+categories = ["development-tools::profiling"]
 
 [features]
 default = [ "enabled" ]

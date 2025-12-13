@@ -46,7 +46,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "enabled")]
-//! # {
+//! # fn main() -> Result< (), serde_json::Error > {
 //! use iron_types::Config;
 //! use serde_json;
 //!
@@ -67,7 +67,7 @@
 //!
 //! let config: Config = serde_json::from_str(json)?;
 //! assert_eq!(config.cost.budget_usd, 100.0);
-//! # Ok::<(), serde_json::Error>(())
+//! # Ok( () )
 //! # }
 //! ```
 //!
@@ -100,7 +100,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "enabled")]
-//! # {
+//! # fn main() -> Result< (), iron_types::IdError > {
 //! use iron_types::{AgentId, ProjectId};
 //!
 //! // Generate new IDs
@@ -117,7 +117,7 @@
 //!
 //! // Parse from strings with validation
 //! let parsed = AgentId::parse("agent_550e8400-e29b-41d4-a716-446655440000")?;
-//! # Ok::<(), iron_types::IdError>(())
+//! # Ok( () )
 //! # }
 //! ```
 //!

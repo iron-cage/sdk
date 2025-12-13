@@ -10,7 +10,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! let formatter = Formatter::new(OutputFormat::Json);
+//! let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 //! let output = formatter.format_single(&data);
 //! ```
 //!
@@ -28,9 +28,7 @@
 //! - Professional table styling
 
 mod output_format;
-mod formatter;
 mod tree_formatter;
 
 pub use output_format::OutputFormat;
-pub use formatter::Formatter;
 pub use tree_formatter::TreeFmtFormatter;

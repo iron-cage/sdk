@@ -147,7 +147,7 @@
       interactive: false
       sensitive: false
     validation_rules: []
-    aliases: []
+    aliases: ["agent_id"]
     tags: []
   - name: format
     kind: String
@@ -183,7 +183,7 @@
       interactive: false
       sensitive: false
     validation_rules: []
-    aliases: []
+    aliases: ["agent_id"]
     tags: []
   - name: name
     kind: String
@@ -255,7 +255,7 @@
       interactive: false
       sensitive: false
     validation_rules: []
-    aliases: []
+    aliases: ["agent_id"]
     tags: []
   - name: dry
     kind: Integer

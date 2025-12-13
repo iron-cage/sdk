@@ -643,7 +643,7 @@ define_id!
 );
 
 // Test utilities for all ID types
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 macro_rules! impl_test_utilities
 {
   ( $name:ident, $prefix:expr ) =>
@@ -708,19 +708,19 @@ macro_rules! impl_test_utilities
   };
 }
 
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( AgentId, prefix::AGENT );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( ProviderId, prefix::PROVIDER );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( ProjectId, prefix::PROJECT );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( ApiTokenId, prefix::API_TOKEN );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( BudgetRequestId, prefix::BUDGET_REQUEST );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( LeaseId, prefix::LEASE );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( RequestId, prefix::REQUEST );
-#[cfg( test )]
+#[cfg( any( test, feature = "test-helpers" ) )]
 impl_test_utilities!( IcTokenId, prefix::IC_TOKEN );

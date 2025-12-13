@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Resilience patterns for distributed systems"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["resilience", "circuit-breaker", "retry", "reliability"]
+categories = ["asynchronous"]
 
 [features]
 default = ["enabled"]
