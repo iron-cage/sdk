@@ -406,6 +406,7 @@ async fn test_all_indexes_created()
   // Migration 012: 1 index (budget_modification_history)
   // Migration 013: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
   // Migration 014: 1 index (idx_agents_owner_id for agents.owner_id)
-  // Total: 15 + 2 + 4 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 1 = 39... but actual is 40 (recounted from DB)
-  assert_eq!( index_count, 40, "Expected 40 indexes to be created across all migrations" );
+  // Migration 018: 1 index (converted budget tables)
+  // Total: 15 + 2 + 4 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 1 + 1 = 41
+  assert_eq!( index_count, 41, "Expected 41 indexes to be created across all migrations" );
 }

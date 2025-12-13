@@ -71,7 +71,7 @@ async fn test_create_limit()
 
   assert_eq!( limit.max_tokens_per_day, Some( 10_000 ), "Created limit should have correct max tokens per day" );
   assert_eq!( limit.max_requests_per_minute, Some( 60 ), "Created limit should have correct max requests per minute" );
-  assert_eq!( limit.max_cost_cents_per_month, Some( 1_000_000 ), "Created limit should have correct max cost per month" );
+  assert_eq!( limit.max_cost_microdollars_per_month, Some( 1_000_000 ), "Created limit should have correct max cost per month" );
 }
 
 #[ tokio::test ]

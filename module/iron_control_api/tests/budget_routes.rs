@@ -393,7 +393,7 @@ async fn test_budget_state_creation()
   let jwt_secret = std::sync::Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
   let database_url = "sqlite::memory:";
 
-  let state = BudgetState::new( ic_token_secret, &ip_token_key, &provider_key_master, jwt_secret, database_url ).await;
+  let state = BudgetState::new( ic_token_secret, &ip_token_key, &provider_key_master, jwt_secret, database_url, None ).await;
   assert!( state.is_ok(), "Should create budget state" );
 }
 

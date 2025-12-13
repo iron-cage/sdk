@@ -100,12 +100,8 @@ impl LimitEnforcer
       .await
       .map_err( |_| crate::error::TokenError::Generic )?;
 
-    // Run migrations
-    let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
-    sqlx::raw_sql( migration_sql )
-      .execute( &pool )
-      .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+    // Run all migrations to ensure schema is up to date
+    crate::migrations::apply_all_migrations( &pool ).await?;
 
     Ok( Self { pool } )
   }
