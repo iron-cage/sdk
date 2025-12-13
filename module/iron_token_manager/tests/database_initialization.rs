@@ -54,7 +54,7 @@ async fn test_migrations_are_idempotent()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Apply migrations a second time (should be no-op)
   let result = iron_token_manager::migrations::apply_all_migrations( &pool ).await;
@@ -85,11 +85,11 @@ async fn test_isolated_test_databases()
   // Create two independent test databases
   let db1 = create_test_db().await;
   let pool1 = db1.pool().clone();
-  std::mem::forget( db1 );
+  core::mem::forget( db1 );
 
   let db2 = create_test_db().await;
   let pool2 = db2.pool().clone();
-  std::mem::forget( db2 );
+  core::mem::forget( db2 );
 
   // Insert token into first database (uses user_001 from seed_test_users)
   sqlx::query(
@@ -122,7 +122,7 @@ async fn test_production_schema_matches_test_schema()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Get all application table names (exclude migration guards and sqlite internals)
   let tables: Vec< String > = sqlx::query_scalar(
@@ -209,7 +209,7 @@ async fn test_all_migrations_have_guards()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Verify guard tables exist for migrations that need them
   let guard_tables = vec![
@@ -242,7 +242,7 @@ async fn test_foreign_keys_enabled()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Check that foreign keys are enabled
   let foreign_keys_on: i64 = query_scalar( "PRAGMA foreign_keys" )

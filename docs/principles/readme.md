@@ -12,7 +12,7 @@
 | 002 | **002_quality_attributes.md** | Define five system-wide quality attributes and targets (performance, reliability, scalability, security, usability) |
 | 003 | **003_error_handling_principles.md** | Define three fundamental error handling principles (fail-fast, loud failures, proper fixes only) implementing Fail-Safe Defaults and Observable Behavior from Principles 001 |
 | 004 | **004_testing_strategy.md** | Define three testing principles (no mocking, module-owned tests, loud test failures) implementing Observable Behavior from Principles 001 and validating Reliability from Principles 002 |
-| 005 | **005_development_workflow.md** | Define development process principles (TDD cycle, spec-first, ADR-driven, documentation throughout, file creation protocol) |
+| 005 | **005_development_workflow.md** | Define six workflow principles (TDD cycle, spec-first, ADR-driven, documentation throughout, file creation protocol, knowledge preservation) integrating all previous Principles 001-004 into cohesive development process |
 
 ---
 

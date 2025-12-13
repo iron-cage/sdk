@@ -186,7 +186,7 @@ impl TestAppState
     let database = db.pool().clone();
 
     // Keep TestDatabase alive (prevents pool from being invalidated)
-    std::mem::forget( db );
+    core::mem::forget( db );
 
     Self { auth, tokens, database }
   }

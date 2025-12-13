@@ -62,7 +62,7 @@ async fn test_schema_creates_all_tables()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Verify all 5 tables exist
   let table_count : i64 = sqlx::query_scalar(
@@ -81,7 +81,7 @@ async fn test_api_tokens_table_structure()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert test token
   let result = sqlx::query(
@@ -113,7 +113,7 @@ async fn test_token_hash_uniqueness_constraint()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert first token
   sqlx::query(
@@ -144,7 +144,7 @@ async fn test_token_usage_foreign_key_constraint()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert token first
   sqlx::query(
@@ -194,7 +194,7 @@ async fn test_cascade_delete_removes_usage_records()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert token
   sqlx::query(
@@ -248,7 +248,7 @@ async fn test_usage_limits_unique_constraint()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert first limit
   sqlx::query(
@@ -285,7 +285,7 @@ async fn test_api_tokens_user_fk_constraint()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert a user first
   sqlx::query(
@@ -333,7 +333,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Insert user
   sqlx::query(
@@ -401,7 +401,7 @@ async fn test_all_indexes_created()
 {
   let db = create_test_db().await;
   let pool = db.pool().clone();
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   // Count indexes (excluding sqlite internal indexes)
   let index_count : i64 = sqlx::query_scalar(

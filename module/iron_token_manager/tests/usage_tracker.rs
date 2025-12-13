@@ -54,7 +54,7 @@ use common::create_test_tracker;
 async fn test_record_usage()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -88,7 +88,7 @@ async fn test_record_usage()
 async fn test_record_usage_with_cost()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -116,7 +116,7 @@ async fn test_record_usage_with_cost()
 async fn test_multiple_usage_records()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -153,7 +153,7 @@ async fn test_multiple_usage_records()
 async fn test_get_usage_by_provider()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -187,7 +187,7 @@ async fn test_get_usage_by_provider()
 async fn test_aggregate_token_usage()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -224,7 +224,7 @@ async fn test_aggregate_token_usage()
 async fn test_get_usage_in_time_range()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -260,7 +260,7 @@ async fn test_get_usage_in_time_range()
 async fn test_cascade_delete_usage_on_token_delete()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -298,7 +298,7 @@ async fn test_cascade_delete_usage_on_token_delete()
 async fn test_usage_records_have_timestamps()
 {
   let ( tracker, storage, db ) = create_test_tracker().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 

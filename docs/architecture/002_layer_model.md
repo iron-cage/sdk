@@ -49,7 +49,7 @@ RESPONSE PATH (Output Processing):
 
 **Status:** Specification
 **Version:** 1.0.0
-**Last Updated:** 2025-12-10
+**Last Updated:** 2025-12-13
 
 ### The Six Layers
 
@@ -89,19 +89,27 @@ RESPONSE PATH (Output Processing):
 
 ### Cross-References
 
+#### Related Principles Documents
+- [Principles: Design Philosophy](../principles/001_design_philosophy.md) - Fail-Safe Defaults principle reflected in fail-safe safety layers (block all if down), Observable Behavior via observability layer
+- [Principles: Quality Attributes](../principles/002_quality_attributes.md) - Reliability via circuit breaker/retry logic, Security via input/output safety layers, Performance via latency budgets
+- [Principles: Development Workflow](../principles/005_development_workflow.md) - Specification-first approach applied to this architecture document
+
 **Related Architecture Documents:**
-- [004_data_flow.md](004_data_flow.md) - End-to-end request journey through processing layers
-- [005_service_integration.md](005_service_integration.md) - How gateway services communicate
-- [003_service_boundaries.md](003_service_boundaries.md) - Control/Data/Runtime plane separation
+- [Architecture: Data Flow](004_data_flow.md) - End-to-end request journey through these processing layers
+- [Architecture: Service Integration](005_service_integration.md) - How gateway services communicate using this layer model
+- [Architecture: Service Boundaries](003_service_boundaries.md) - Control/Data/Runtime plane separation context for layers
 
-**Used By:**
-- Protocol 005: [Budget Control Protocol](../protocol/005_budget_control_protocol.md) - References layer model for Cost layer responsibilities
-- Security 002: [Isolation Layers](../security/002_isolation_layers.md) - Implements Input/Output Safety layers
+#### Used By
+- [Protocol: Budget Control Protocol](../protocol/005_budget_control_protocol.md) - References layer model for Cost layer responsibilities
+- [Security: Isolation Layers](../security/002_isolation_layers.md) - Implements Input/Output Safety layers
+- [Architecture: Data Flow](004_data_flow.md) - Traces request journey through these six layers
+- [Architecture: Service Integration](005_service_integration.md) - Uses layer model to explain service communication
 
-**Dependencies:**
-- Constraints 004: [Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) - Authoritative latency budget reference and rationale
+#### Dependencies
+- [Constraints: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) - Authoritative latency budget reference and rationale
+- [Architecture: Service Boundaries](003_service_boundaries.md) - Plane separation architecture that layers operate within
 
-**Implementation:**
+#### Implementation
 - Gateway service: Layer orchestration (module paths TBD)
 - Safety service: Input/Output safety layers (module paths TBD)
 - Cost service: Budget tracking layer (module paths TBD)

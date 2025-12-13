@@ -58,7 +58,7 @@ use common::create_test_enforcer;
 async fn test_create_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_001", None, Some( 10_000 ), Some( 60 ), Some( 1_000_000 ) )
@@ -79,7 +79,7 @@ async fn test_create_limit()
 async fn test_check_tokens_within_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_002", None, Some( 10_000 ), None, None )
@@ -98,7 +98,7 @@ async fn test_check_tokens_within_limit()
 async fn test_check_tokens_exceeds_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_003", None, Some( 10_000 ), None, None )
@@ -117,7 +117,7 @@ async fn test_check_tokens_exceeds_limit()
 async fn test_increment_tokens()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_004", None, Some( 10_000 ), None, None )
@@ -141,7 +141,7 @@ async fn test_increment_tokens()
 async fn test_check_requests_within_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_005", None, None, Some( 60 ), None )
@@ -160,7 +160,7 @@ async fn test_check_requests_within_limit()
 async fn test_check_requests_exceeds_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_006", None, None, Some( 2 ), None )
@@ -183,7 +183,7 @@ async fn test_check_requests_exceeds_limit()
 async fn test_check_cost_within_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_007", None, None, None, Some( 100_000 ) )
@@ -202,7 +202,7 @@ async fn test_check_cost_within_limit()
 async fn test_unlimited_when_no_limit_set()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_008", None, None, None, None )
@@ -221,7 +221,7 @@ async fn test_unlimited_when_no_limit_set()
 async fn test_project_level_limits()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_009", Some( "project_alpha" ), Some( 5_000 ), None, None )
@@ -240,7 +240,7 @@ async fn test_project_level_limits()
 async fn test_reset_daily_tokens()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_010", None, Some( 10_000 ), None, None )
@@ -269,7 +269,7 @@ async fn test_reset_daily_tokens()
 async fn test_update_existing_limit()
 {
   let ( enforcer, _storage, db ) = create_test_enforcer().await;
-  std::mem::forget( db );
+  core::mem::forget( db );
 
   enforcer
     .create_limit( "user_011", None, Some( 10_000 ), None, None )

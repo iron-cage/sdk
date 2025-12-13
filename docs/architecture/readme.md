@@ -8,9 +8,9 @@
 
 | ID | Entity | Responsibility |
 |----|--------|----------------|
-| 001 | **001_execution_models.md** | Explain agent execution location options (local primary, server future, Control Panel role, runtime modes) |
+| 001 | **001_execution_models.md** | Define WHERE agents execute (local primary 95%, server future 5%) and ALWAYS-present Control Panel architecture managing budgets via IC Token/IP Token protocol across two runtime modes (Router, Library) |
 | 002 | **002_layer_model.md** | Document six request processing layers (Safety, Cost, Reliability, Provider, Output Safety, Observability) with failure modes |
-| 003 | **003_service_boundaries.md** | Define three plane separation (Control, Data, Runtime) and communication patterns |
+| 003 | **003_service_boundaries.md** | Define three plane separation (Control Plane for admin, Data Plane for processing, Agent Runtime for execution) with communication patterns, role access (Admin/Super User/Developer via CLI+Dashboard), and scaling characteristics (replicas, load, HPA) |
 | 004 | **004_data_flow.md** | Trace end-to-end request journey through eleven processing steps with latency analysis |
 | 005 | **005_service_integration.md** | Explain how five core services communicate (Gateway orchestrates Safety, Cost, Tool Proxy, Audit) |
 | 006 | **006_roles_and_permissions.md** | Define three access roles (Admin, User, Viewer) with RBAC, user management, and permission boundaries |
