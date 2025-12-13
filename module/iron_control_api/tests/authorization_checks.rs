@@ -53,6 +53,7 @@
 //! access resource Y?" must be explicitly checked, not assumed from request validity.
 
 use iron_control_api::ic_token::{ IcTokenClaims, IcTokenManager };
+use crate::common::test_db;
 use sqlx::SqlitePool;
 
 mod common;
@@ -112,7 +113,8 @@ async fn setup_database_with_agents_table( pool: &SqlitePool )
 #[ tokio::test ]
 async fn test_user_cannot_access_other_users_agents()
 {
-  let db_pool = common::create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool().clone();
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
@@ -189,7 +191,8 @@ async fn test_user_cannot_access_other_users_agents()
 #[ tokio::test ]
 async fn test_database_filters_agents_by_owner()
 {
-  let db_pool = common::create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool().clone();
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
@@ -295,7 +298,8 @@ async fn test_database_filters_agents_by_owner()
 #[ tokio::test ]
 async fn test_handshake_rejects_unauthorized_agent_access()
 {
-  let db_pool = common::create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool().clone();
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create user
@@ -382,7 +386,8 @@ async fn test_handshake_rejects_unauthorized_agent_access()
 #[ tokio::test ]
 async fn test_budget_request_rejects_unauthorized_agent()
 {
-  let db_pool = common::create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool().clone();
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
@@ -447,7 +452,8 @@ async fn test_budget_request_rejects_unauthorized_agent()
 #[ tokio::test ]
 async fn test_list_agents_filters_by_owner()
 {
-  let db_pool = common::create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool().clone();
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users

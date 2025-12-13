@@ -180,7 +180,7 @@ uv sync  # Installs dependencies and creates .venv
 ```
 
 **Next:**
-- [CONTRIBUTING.md](../CONTRIBUTING.md)
+- [contributing.md](../contributing.md)
 - [Architecture Docs](architecture/readme.md)
 
 ---

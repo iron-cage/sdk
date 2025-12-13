@@ -67,7 +67,8 @@ use common::create_test_storage;
 #[ tokio::test ]
 async fn test_create_token_stores_hash_not_plaintext()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let plaintext_token = generator.generate();
 
@@ -96,7 +97,8 @@ async fn test_create_token_stores_hash_not_plaintext()
 #[ tokio::test ]
 async fn test_create_token_with_metadata()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -127,7 +129,8 @@ async fn test_create_token_with_metadata()
 #[ tokio::test ]
 async fn test_verify_token_returns_token_id()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -148,7 +151,8 @@ async fn test_verify_token_returns_token_id()
 #[ tokio::test ]
 async fn test_verify_token_fails_for_invalid_token()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
 
   // Create valid token
@@ -167,7 +171,8 @@ async fn test_verify_token_fails_for_invalid_token()
 #[ tokio::test ]
 async fn test_deactivate_token()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -190,7 +195,8 @@ async fn test_deactivate_token()
 #[ tokio::test ]
 async fn test_list_user_tokens()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
 
   // Create multiple tokens for same user
@@ -221,7 +227,8 @@ async fn test_list_user_tokens()
 #[ tokio::test ]
 async fn test_update_last_used_timestamp()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -254,7 +261,8 @@ async fn test_update_last_used_timestamp()
 #[ tokio::test ]
 async fn test_delete_token()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -278,7 +286,8 @@ async fn test_delete_token()
 #[ allow( clippy::cast_possible_truncation ) ]
 async fn test_token_with_expiration()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -316,7 +325,8 @@ async fn test_token_with_expiration()
 #[ tokio::test ]
 async fn test_protocol_014_token_format_integration()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
 
   // Generate token in Protocol 014 format
@@ -382,7 +392,8 @@ async fn test_protocol_014_token_format_integration()
 #[ tokio::test ]
 async fn test_backward_compatibility_old_token_format()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
 
   // Simulate old token format (no apitok_ prefix, random Base64-like string)
@@ -440,7 +451,8 @@ async fn test_backward_compatibility_old_token_format()
 #[ tokio::test ]
 async fn test_prefix_stripped_before_hashing_integration()
 {
-  let ( storage, _temp ) = create_test_storage().await;
+  let ( storage, db ) = create_test_storage().await;
+  std::mem::forget( db );
   let generator = TokenGenerator::new();
 
   // Generate token with apitok_ prefix

@@ -60,7 +60,9 @@ use common::create_test_db;
 #[ tokio::test ]
 async fn test_schema_creates_all_tables()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Verify all 5 tables exist
   let table_count : i64 = sqlx::query_scalar(
@@ -77,7 +79,9 @@ async fn test_schema_creates_all_tables()
 #[ tokio::test ]
 async fn test_api_tokens_table_structure()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert test token
   let result = sqlx::query(
@@ -107,7 +111,9 @@ async fn test_api_tokens_table_structure()
 #[ tokio::test ]
 async fn test_token_hash_uniqueness_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert first token
   sqlx::query(
@@ -136,7 +142,9 @@ async fn test_token_hash_uniqueness_constraint()
 #[ tokio::test ]
 async fn test_token_usage_foreign_key_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert token first
   sqlx::query(
@@ -184,7 +192,9 @@ async fn test_token_usage_foreign_key_constraint()
 #[ tokio::test ]
 async fn test_cascade_delete_removes_usage_records()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert token
   sqlx::query(
@@ -236,7 +246,9 @@ async fn test_cascade_delete_removes_usage_records()
 #[ tokio::test ]
 async fn test_usage_limits_unique_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert first limit
   sqlx::query(
@@ -271,7 +283,9 @@ async fn test_usage_limits_unique_constraint()
 #[ tokio::test ]
 async fn test_api_tokens_user_fk_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert a user first
   sqlx::query(
@@ -317,7 +331,9 @@ async fn test_api_tokens_user_fk_constraint()
 #[ tokio::test ]
 async fn test_api_tokens_cascade_delete_on_user_deletion()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Insert user
   sqlx::query(
@@ -383,7 +399,9 @@ async fn test_api_tokens_cascade_delete_on_user_deletion()
 #[ tokio::test ]
 async fn test_all_indexes_created()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  std::mem::forget( db );
 
   // Count indexes (excluding sqlite internal indexes)
   let index_count : i64 = sqlx::query_scalar(

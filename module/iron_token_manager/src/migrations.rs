@@ -61,22 +61,40 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   sqlx::query( "PRAGMA foreign_keys = ON" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( |e| {
+      eprintln!("PRAGMA foreign_keys failed: {e:?}");
+      crate::error::TokenError::Generic
+    } )?;
 
   // Migration 001: Initial schema (5 core tables)
-  apply_migration_001( pool ).await?;
+  apply_migration_001( pool ).await.map_err( |e| {
+    eprintln!("Migration 001 failed: {e:?}");
+    e
+  } )?;
 
   // Migration 002: Length constraints (guarded)
-  apply_migration_002( pool ).await?;
+  apply_migration_002( pool ).await.map_err( |e| {
+    eprintln!("Migration 002 failed: {e:?}");
+    e
+  } )?;
 
   // Migration 003: Users table (guarded)
-  apply_migration_003( pool ).await?;
+  apply_migration_003( pool ).await.map_err( |e| {
+    eprintln!("Migration 003 failed: {e:?}");
+    e
+  } )?;
 
   // Migration 004: AI provider keys
-  apply_migration_004( pool ).await?;
+  apply_migration_004( pool ).await.map_err( |e| {
+    eprintln!("Migration 004 failed: {e:?}");
+    e
+  } )?;
 
   // Migration 005: Enhanced users table
-  apply_migration_005( pool ).await?;
+  apply_migration_005( pool ).await.map_err( |e| {
+    eprintln!("Migration 005 failed: {e:?}");
+    e
+  } )?;
 
   // Migration 006: User audit log
   apply_migration_006( pool ).await?;
@@ -86,11 +104,11 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 008: Agents table
   apply_migration_008( pool ).await?;
 
-  // // Migration 009: Budget leases (Protocol 005)
-  // apply_migration_009( pool ).await?;
+  // Migration 009: Budget leases (Protocol 005)
+  apply_migration_009( pool ).await?;
 
-  // // Migration 010: Agent budgets (Protocol 005)
-  // apply_migration_010( pool ).await?;
+  // Migration 010: Agent budgets (Protocol 005)
+  apply_migration_010( pool ).await?;
 
   // Migration 011: Budget requests (Protocol 012)
   apply_migration_011( pool ).await?;

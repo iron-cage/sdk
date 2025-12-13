@@ -180,7 +180,13 @@ impl TestAppState
   {
     let auth = create_test_auth_state().await;
     let tokens = create_test_token_state().await;
-    let database = super::create_test_database().await;
+
+    // Create database using iron_test_db
+    let db = super::test_db::create_test_db().await;
+    let database = db.pool().clone();
+
+    // Keep TestDatabase alive (prevents pool from being invalidated)
+    std::mem::forget( db );
 
     Self { auth, tokens, database }
   }

@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: module/iron_control_api/Dockerfile
-    container_name: iron_backend
+    container_name: iron_cp_backend
     environment:
       DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
       JWT_SECRET: ${JWT_SECRET}
@@ -28,7 +28,7 @@ services:
       dockerfile: module/iron_dashboard/Dockerfile
       args:
         VITE_API_URL: /api
-    container_name: iron_frontend
+    container_name: iron_cp_frontend
     ports:
       - "8080:80"
     depends_on:
