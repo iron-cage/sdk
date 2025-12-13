@@ -499,7 +499,7 @@ pub async fn create_token(
   };
 
   // Get metadata for response
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  let metadata = match state.storage.get_token_metadata( token_id.id ).await
   {
     Ok( metadata ) => metadata,
     Err( _ ) =>
@@ -530,14 +530,14 @@ pub async fn create_token(
 
   if state.storage.log_audit_event(
     "token",
-    token_id,
+    token_id.id,
     "created",
     user_id,
     Some( &changes_json ),
   ).await.is_err()
   {
     // Log error but don't fail request (audit logging is not critical path)
-    tracing::error!( "Failed to log token creation to audit_log (token_id={})", token_id );
+    tracing::error!( "Failed to log token creation to audit_log (token_id={})", token_id.id );
   }
 
   ( StatusCode::CREATED, Json( CreateTokenResponse

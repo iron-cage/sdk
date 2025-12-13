@@ -568,10 +568,10 @@ impl TokenStorage
     let total: i64 = count_qb.build_query_scalar()
         .fetch_one(&self.pool)
         .await
-        .map_err(|_| crate::error::TokenError)?;
+        .map_err(|_| crate::error::TokenError::Generic)?;
 
     // Main query
-    let mut qb = sqlx::QueryBuilder::new("SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at FROM api_tokens WHERE user_id = ");
+    let mut qb = sqlx::QueryBuilder::new("SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at, revoked_at FROM api_tokens WHERE user_id = ");
     qb.push_bind(user_id);
 
     if let Some(pid) = &project_id {
@@ -600,7 +600,7 @@ impl TokenStorage
     let rows = qb.build()
         .fetch_all(&self.pool)
         .await
-        .map_err(|_| crate::error::TokenError)?;
+        .map_err(|_| crate::error::TokenError::Generic)?;
 
     let tokens = rows.iter().map(|row| TokenMetadata {
         id: row.get("id"),
@@ -613,6 +613,7 @@ impl TokenStorage
         created_at: row.get("created_at"),
         last_used_at: row.get("last_used_at"),
         expires_at: row.get("expires_at"),
+        revoked_at: row.get("revoked_at"),
     }).collect();
 
     Ok((tokens, total))

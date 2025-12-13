@@ -334,7 +334,7 @@ impl AgentService
     let total: i64 = count_query
       .fetch_one( &self.pool )
       .await
-      .map_err( |e| { error!( "Error counting agents: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error counting agents: {}", e ); crate::error::TokenError::Generic } )?;
 
     // Data query
     let data_sql = format!(
@@ -362,7 +362,7 @@ impl AgentService
     let rows = data_query
       .fetch_all( &self.pool )
       .await
-      .map_err( |e| { error!( "Error listing agents: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error listing agents: {}", e ); crate::error::TokenError::Generic } )?;
 
     let agents = rows.iter().map( |row| {
       Self::row_to_agent( row )
@@ -402,7 +402,7 @@ impl AgentService
     .bind( id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError::Generic } )?;
 
     Ok( row.map( |row| Self::row_to_agent( &row ) ) )
   }
@@ -425,9 +425,9 @@ impl AgentService
   {
     let agent_id = format!( "agent_{}", uuid::Uuid::new_v4() );
     let providers_json = serde_json::to_string( &params.providers.clone().unwrap_or_default() )
-      .map_err( |e| { error!( "Error serializing providers: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error serializing providers: {}", e ); crate::error::TokenError::Generic } )?;
     let tags_json = serde_json::to_string( &params.tags.clone().unwrap_or_default() )
-      .map_err( |e| { error!( "Error serializing tags: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error serializing tags: {}", e ); crate::error::TokenError::Generic } )?;
     let now = chrono::Utc::now().timestamp();
     let status = "active".to_string();
 
@@ -437,10 +437,10 @@ impl AgentService
           .bind(provider)
           .fetch_optional(&self.pool)
           .await
-          .map_err(|e| { error!("Error getting provider: {}", e); crate::error::TokenError })?;
+          .map_err(|e| { error!("Error getting provider: {}", e); crate::error::TokenError::Generic })?;
 
         if provider.is_none()  {
-          return Err(crate::error::TokenError);
+          return Err(crate::error::TokenError::Generic);
         }
       }
     }
@@ -463,7 +463,7 @@ impl AgentService
     .bind( &now )
     .execute( &self.pool )
     .await
-    .map_err( |e| { error!( "Error creating agent: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error creating agent: {}", e ); crate::error::TokenError::Generic } )?;
 
     sqlx::query(
       r#"
@@ -479,14 +479,14 @@ impl AgentService
     .await
     .map_err(|e| {
       error!("Error creating budget lease: {}", e);
-      crate::error::TokenError
+      crate::error::TokenError::Generic 
     })?;
 
     self.get_agent( &agent_id )
       .await?
       .ok_or_else( || {
         error!( "Failed to fetch created agent: {}", agent_id );
-        crate::error::TokenError
+        crate::error::TokenError::Generic 
       } )
   }
 
@@ -511,7 +511,7 @@ impl AgentService
       .bind( id )
       .fetch_optional( &self.pool )
       .await
-      .map_err( |e| { error!( "Error checking agent exists: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error checking agent exists: {}", e ); crate::error::TokenError::Generic } )?;
 
     if existing.is_none()
     {
@@ -529,7 +529,7 @@ impl AgentService
         .bind( id )
         .execute( &self.pool )
         .await
-        .map_err( |e| { error!( "Error updating agent name: {}", e ); crate::error::TokenError } )?;
+        .map_err( |e| { error!( "Error updating agent name: {}", e ); crate::error::TokenError::Generic } )?;
     }
 
     if let Some( ref description ) = params.description
@@ -540,20 +540,20 @@ impl AgentService
         .bind( id )
         .execute( &self.pool )
         .await
-        .map_err( |e| { error!( "Error updating agent description: {}", e ); crate::error::TokenError } )?;
+        .map_err( |e| { error!( "Error updating agent description: {}", e ); crate::error::TokenError::Generic } )?;
     }
 
     if let Some( ref tags ) = params.tags
     {
       let tags_json = serde_json::to_string( tags )
-        .map_err( |e| { error!( "Error serializing tags: {}", e ); crate::error::TokenError } )?;
+        .map_err( |e| { error!( "Error serializing tags: {}", e ); crate::error::TokenError::Generic } )?;
       sqlx::query( "UPDATE agents SET tags = ?, updated_at = ? WHERE id = ?" )
         .bind( &tags_json )
         .bind( &now )
         .bind( id )
         .execute( &self.pool )
         .await
-        .map_err( |e| { error!( "Error updating agent tags: {}", e ); crate::error::TokenError } )?;
+        .map_err( |e| { error!( "Error updating agent tags: {}", e ); crate::error::TokenError::Generic } )?;
     }
 
     // Fetch and return updated agent
@@ -588,7 +588,7 @@ impl AgentService
     .bind( id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError::Generic } )?;
 
     if let Some(row) = row
     {
@@ -602,7 +602,7 @@ impl AgentService
           .bind( provider_id )
           .fetch_optional( &self.pool )
           .await
-          .map_err( |e| { error!( "Error getting provider key: {}", e ); crate::error::TokenError } )?;
+          .map_err( |e| { error!( "Error getting provider key: {}", e ); crate::error::TokenError::Generic } )?;
 
         if let Some(row) = row {
           providers.push(Self::row_to_provider_list_item( &row ));
@@ -674,7 +674,7 @@ impl AgentService
         .bind(provider)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| { error!("Error getting provider: {}", e); crate::error::TokenError })?;
+        .map_err(|e| { error!("Error getting provider: {}", e); crate::error::TokenError::Generic })?;
 
       if provider.is_none() {
         return Ok(None);
@@ -686,7 +686,7 @@ impl AgentService
 
     // Convert providers to JSON
     let providers_json = serde_json::to_string(&providers)
-      .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError })?;
+      .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError::Generic })?;
 
     // Update agent providers
     let result = sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
@@ -694,7 +694,7 @@ impl AgentService
       .bind(id)
       .execute(&self.pool)
       .await
-      .map_err(|e| { error!("Error updating agent providers: {}", e); crate::error::TokenError })?;
+      .map_err(|e| { error!("Error updating agent providers: {}", e); crate::error::TokenError::Generic })?;
 
     self.get_agent(id).await
   }
@@ -721,25 +721,25 @@ impl AgentService
       .bind(id)
       .fetch_optional(&self.pool)
       .await
-      .map_err(|e| { error!("Error removing provider from agent: {}", e); crate::error::TokenError })?;
+      .map_err(|e| { error!("Error removing provider from agent: {}", e); crate::error::TokenError::Generic })?;
 
     if let Some(row) = providers {
       let providers_json: String = row.get("providers");
       let mut providers: Vec<String> = serde_json::from_str(&providers_json)
-        .map_err(|e| { error!("Error parsing providers: {}", e); crate::error::TokenError })?;
+        .map_err(|e| { error!("Error parsing providers: {}", e); crate::error::TokenError::Generic })?;
 
       if let Some(pos) = providers.iter().position(|x| x == provider_id) {
         providers.remove(pos);
 
         let providers_json = serde_json::to_string(&providers)
-          .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError })?;
+          .map_err(|e| { error!("Error serializing providers: {}", e); crate::error::TokenError::Generic })?;
 
         sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
           .bind(providers_json)
           .bind(id)
           .execute(&self.pool)
           .await
-          .map_err(|e| { error!("Error updating agent providers: {}", e); crate::error::TokenError })?;
+          .map_err(|e| { error!("Error updating agent providers: {}", e); crate::error::TokenError::Generic })?;
       }
     }
 
@@ -756,7 +756,7 @@ impl AgentService
 
     match remaining_providers {
       Some(providers) => Ok(providers),
-      None => Err(crate::error::TokenError),
+      None => Err(crate::error::TokenError::Generic ),
     }
   }
 
@@ -779,7 +779,7 @@ impl AgentService
       .bind( id )
       .execute( &self.pool )
       .await
-      .map_err( |e| { error!( "Error deleting agent: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error deleting agent: {}", e ); crate::error::TokenError::Generic } )?;
 
     Ok( result.rows_affected() > 0 )
   }
@@ -803,7 +803,7 @@ impl AgentService
       .bind( id )
       .fetch_optional( &self.pool )
       .await
-      .map_err( |e| { error!( "Error getting agent owner: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error getting agent owner: {}", e ); crate::error::TokenError::Generic } )?;
 
     Ok( owner )
   }
@@ -839,7 +839,7 @@ impl AgentService
       .bind( user_id )
       .fetch_all( &self.pool )
       .await
-      .map_err( |e| { error!( "Error getting agent tokens: {}", e ); crate::error::TokenError } )?
+      .map_err( |e| { error!( "Error getting agent tokens: {}", e ); crate::error::TokenError::Generic } )?
     }
     else
     {
@@ -855,7 +855,7 @@ impl AgentService
       .bind( agent_id )
       .fetch_all( &self.pool )
       .await
-      .map_err( |e| { error!( "Error getting agent tokens: {}", e ); crate::error::TokenError } )?
+      .map_err( |e| { error!( "Error getting agent tokens: {}", e ); crate::error::TokenError::Generic } )?
     };
 
     let tokens = rows.iter().map( |row| AgentTokenItem {
