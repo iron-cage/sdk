@@ -902,11 +902,11 @@ impl AgentService
     let percent_used = if budget > 0.0 { (spent / budget) * 100.0 } else { 0.0 };
 
     let ts = row.get( "created_at" );
-    let dt = TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp(ts, 0));
+    let dt = &DateTime::from_timestamp(ts, 0).unwrap_or_default();
     let created_at = dt.to_rfc3339();
 
     let ts = row.get( "updated_at" );
-    let dt = TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp(ts, 0));
+    let dt = &DateTime::from_timestamp(ts, 0).unwrap_or_default();
     let updated_at = dt.to_rfc3339();
 
     Agent {
