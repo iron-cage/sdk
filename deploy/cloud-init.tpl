@@ -20,6 +20,15 @@ write_files:
     content: |
       ${service_account_creds_b64}
 
+  - path: /deploy/.secret
+    permissions: '0600'
+    owner: root:root
+    content: |
+      TAG=${tag}
+      JWT_SECRET=${jwt_secret}
+      IRON_SECRETS_MASTER_KEY=${iron_secrets_master_key}
+      DATABASE_URL=${database_url}
+
   - path: /root/init.sh
     permissions: '0700'
     owner: root:root
@@ -30,15 +39,6 @@ write_files:
       # decode service account creds
       base64 -d /root/service_account.json.b64 > /root/service_account.json
       chmod 600 /root/service_account.json
-
-      # env for redeploy
-      {
-        echo "DOCKER_IMAGE=${tag}"
-        echo "DOCKER_IMAGE_NAME=${image_name}"
-        echo "JWT_SECRET=${jwt_secret}"
-        echo "IRON_SECRETS_MASTER_KEY=${iron_secrets_master_key}"
-        echo "DATABASE_URL=${database_url}"
-      } >> /etc/environment
 
       apt update
       apt install -y apt-transport-https ca-certificates curl software-properties-common gnupg

@@ -75,7 +75,7 @@ resource "terraform_data" "redeploy" {
 
   provisioner "file" {
     source      = "${path.module}/../redeploy.sh"
-    destination = "/tmp/redeploy.sh"
+    destination = "/deploy/redeploy.sh"
   }
 
   provisioner "remote-exec" {
@@ -83,7 +83,7 @@ resource "terraform_data" "redeploy" {
       # Wait cloud-init to finish
       "bash -lc 'command -v cloud-init >/dev/null 2>&1 && timeout 30m cloud-init status --wait || true'",
       # Run /tmp/redeploy.sh script
-      "bash -lc 'set -a; source /etc/environment; set +a; chmod +x /tmp/redeploy.sh; /tmp/redeploy.sh' ",
+      "bash -lc 'set -a; source /deploy/.secret; set +a; chmod +x /deploy/redeploy.sh; /deploy/redeploy.sh' ",
     ]
   }
 }

@@ -20,12 +20,12 @@ setup() {
 JWT_SECRET=dummy-jwt
 IRON_SECRETS_MASTER_KEY=secret_jwt_master_key
 DATABASE_URL=postgres://u:p@db/test_db
-DOCKER_IMAGE=example.com/app
+TAG=example.com/app
 EOF
 
   cp "$FULL_ENV" "$TEST_DIR/etc-environment"
 
-  sed -i "s#/etc/environment#$TEST_DIR/etc-environment#g" "$SCRIPT_UNDER_TEST"
+  sed -i "s#/deploy/.secret#$TEST_DIR/etc-environment#g" "$SCRIPT_UNDER_TEST"
 
   # stub docker setup
   DOCKER_CALLS="$TEST_DIR/docker-calls.log"
@@ -55,7 +55,7 @@ teardown() {
 
 @test "succeeds with valid inputs" {
   cp "$FULL_ENV" "$TEST_DIR/etc-environment"
-  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   
   echo "$output"
   echo "Status: $status"
@@ -63,40 +63,39 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
-@test "fails when DOCKER_IMAGE is not set" {
-  env_without "DOCKER_IMAGE"
+@test "fails when TAG is not set" {
+  env_without "TAG"
   run bash -c "set -a && source '$TEST_DIR/etc-environment' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"DOCKER_IMAGE is not set in the environment"* ]]
+  [[ "$output" == *"TAG is not set in the environment"* ]]
 }
 
 @test "cleanup commands are called" {
   cp "$FULL_ENV" "$TEST_DIR/etc-environment"
-  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -eq 0 ]
 
   calls="$(cat "$DOCKER_CALLS")"
-  [[ "$calls" == *"docker volume rm sqlite_data"* ]]
   [[ "$calls" == *"docker compose down"* ]]
 }
 
 @test "missing JWT_SECRET" {
   env_without "JWT_SECRET"
-  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -ne 0 ]
   [[ "$output" == *"JWT_SECRET is not set in the environment"* ]]
 }
 
 @test "missing IRON_SECRETS_MASTER_KEY" {
   env_without "IRON_SECRETS_MASTER_KEY"
-  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -ne 0 ]
   [[ "$output" == *"IRON_SECRETS_MASTER_KEY is not set in the environment"* ]]
 }
 
 @test "missing DATABASE_URL" {
   env_without "DATABASE_URL"
-  run env DOCKER_IMAGE="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -ne 0 ]
   [[ "$output" == *"DATABASE_URL is not set in the environment"* ]]
 }

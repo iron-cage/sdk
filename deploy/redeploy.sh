@@ -39,16 +39,16 @@ function __msg_success() {
 
 # ==============================================================================================
 # ================== Set up main file ==========================================================
-# Load environment variables exported in /etc/environment into this shell.
+# Load environment variables exported in /deploy/.secret into this shell.
 set -a
-. /etc/environment
+. /deploy/.secret
 set +a
 
 
 # Required env vars (fail fast if missing):
-# - DOCKER_IMAGE: base name used to pull the image.
+# - TAG: base name used to pull the image.
 for var in \
-  DOCKER_IMAGE \
+  TAG \
   JWT_SECRET \
   IRON_SECRETS_MASTER_KEY \
   DATABASE_URL
@@ -60,23 +60,22 @@ done
 
 # Stop and remove previous container if it exists
 __msg_info "Removing old docker compose"
-docker volume rm sqlite_data || true
 docker compose down -v || echo "Nothing to remove"
 
 
-__msg_info "Remove Docker image on the host: ${DOCKER_IMAGE}"
-docker rmi "${DOCKER_IMAGE}_front"  || true
-docker rmi "${DOCKER_IMAGE}_back"   || true
+__msg_info "Remove Docker image on the host: ${TAG}"
+docker rmi "${TAG}_front"  || true
+docker rmi "${TAG}_back"   || true
 
-__msg_info "Pulling Docker image: ${DOCKER_IMAGE}"
-docker pull "${DOCKER_IMAGE}_front" || { echo "ERROR: Failed to pull front image"; exit 1; }
-docker pull "${DOCKER_IMAGE}_back"  || { echo "ERROR: Failed to pull backend image"; exit 1; }
+__msg_info "Pulling Docker image: ${TAG}"
+docker pull "${TAG}_front" || { echo "ERROR: Failed to pull front image"; exit 1; }
+docker pull "${TAG}_back"  || { echo "ERROR: Failed to pull backend image"; exit 1; }
 
 # ----------------------------------------------------------------------------------------------
 cat <<EOF > compose.yml
 services:
   backend:
-    image: ${DOCKER_IMAGE}_back
+    image: ${TAG}_back
     container_name: iron_backend
     environment:
       DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
@@ -97,7 +96,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ${DOCKER_IMAGE}_front
+    image: ${TAG}_front
     container_name: iron_frontend
     ports:
       - "80:80"

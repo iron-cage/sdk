@@ -150,8 +150,8 @@ check_gcp_keys:
 
 ## Deploys everything and updates terraform states (called inside deploy container)
 deploy_in_container: lock_check gcp_service state_storage_init check_keys_$(CSP) gcp_docker push_image
-	$(MAKE) create_$(CSP) || { echo "Deployment failed"; exit 1; }
-	$(MAKE) show_state_info || { echo "Showing state info failed"; exit 1; }
+	$(MAKE) -f Makefile.deploy create_$(CSP) || { echo "Deployment failed"; exit 1; }
+	$(MAKE) -f Makefile.deploy show_state_info || { echo "Showing state info failed"; exit 1; }
 ## Authorize to GCP with service account
 gcp_service:
 	gcloud auth activate-service-account --key-file=$(GOOGLE_APPLICATION_CREDENTIALS)
