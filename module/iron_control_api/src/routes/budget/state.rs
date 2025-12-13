@@ -5,6 +5,7 @@
 
 use crate::{ ic_token::IcTokenManager, ip_token::IpTokenCrypto, jwt_auth::JwtSecret, routes::auth::AuthState };
 use axum::extract::FromRef;
+use iron_secrets::crypto::CryptoService;
 use iron_token_manager::
 {
   agent_budget::AgentBudgetManager,
@@ -25,6 +26,8 @@ pub struct BudgetState
   pub provider_key_storage: Arc< ProviderKeyStorage >,
   pub db_pool: SqlitePool,
   pub jwt_secret: Arc< JwtSecret >,
+  /// Crypto service for decrypting provider keys (Feature 014)
+  pub crypto_service: Option< Arc< CryptoService > >,
 }
 
 /// Enable AuthState extraction from BudgetState
@@ -50,6 +53,7 @@ impl BudgetState
   /// * `ip_token_key` - 32-byte encryption key for IP Token AES-256-GCM
   /// * `jwt_secret` - Secret key for JWT access token signing/verification
   /// * `database_url` - Database connection string
+  /// * `crypto_service` - Optional crypto service for provider key decryption
   ///
   /// # Errors
   ///
@@ -59,6 +63,7 @@ impl BudgetState
     ip_token_key: &[ u8 ],
     jwt_secret: Arc< JwtSecret >,
     database_url: &str,
+    crypto_service: Option< Arc< CryptoService > >,
   ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let db_pool = SqlitePool::connect( database_url ).await?;
@@ -77,6 +82,7 @@ impl BudgetState
       provider_key_storage,
       db_pool,
       jwt_secret,
+      crypto_service,
     } )
   }
 }

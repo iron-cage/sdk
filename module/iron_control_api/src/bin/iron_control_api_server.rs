@@ -426,6 +426,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     std::time::Duration::from_secs( 60 ),
   );
 
+  // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
+  let crypto_service_for_budget = crypto_service.clone();
+
   let keys_state = iron_control_api::routes::keys::KeysState
   {
     token_storage: token_state.storage.clone(),
@@ -469,11 +472,13 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   }
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
+  // crypto_service_for_budget enables Feature 014: Agent Provider Key retrieval
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
     &ip_token_key,
     auth_state.jwt_secret.clone(),
     &database_url,
+    Some( crypto_service_for_budget ),
   )
   .await
   .expect( "LOUD FAILURE: Failed to initialize budget state" );
@@ -559,6 +564,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/v1/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
+
+    // Agent Provider Key endpoint (Feature 014)
+    .route( "/api/v1/agents/provider-key", post( iron_control_api::routes::agent_provider_key::get_provider_key ) )
 
     // Budget Control Protocol endpoints (Protocol 005)
     .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
