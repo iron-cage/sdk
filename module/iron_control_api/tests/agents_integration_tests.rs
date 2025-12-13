@@ -80,7 +80,6 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
     .route( "/api/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/agents/:id/details", get( iron_control_api::routes::agents::get_agent_details ) )
     .route( "/api/agents/:id", put( iron_control_api::routes::agents::update_agent ) )
-    // .route( "/api/agents/:id", delete_route( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
     .route( "/api/agents/:id/providers", get( iron_control_api::routes::agents::get_agent_providers ).put( iron_control_api::routes::agents::assign_providers_to_agent ) )
     .route( "/api/agents/:agent_id/providers/:provider_id", delete( iron_control_api::routes::agents::remove_provider_from_agent ) )

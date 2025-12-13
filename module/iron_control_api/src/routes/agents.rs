@@ -12,20 +12,37 @@ use iron_token_manager::{agent_service::{
 use crate::jwt_auth::AuthenticatedUser;
 use std::sync::Arc;
 use iron_token_manager::storage::TokenStorage;
+use crate::{ jwt_auth::JwtSecret, routes::auth::AuthState };
 
 #[derive(Clone)]
 pub struct AgentState {
     pub agent_service: Arc<AgentService>,
     pub token_storage: Arc<TokenStorage>,
+    pub db_pool: SqlitePool,
+    pub jwt_secret: Arc< JwtSecret >,
 }
 
 impl AgentState {
-    pub fn new(pool: SqlitePool, token_storage: Arc<TokenStorage>) -> Self {
+    pub fn new(pool: SqlitePool, token_storage: Arc<TokenStorage>, jwt_secret: Arc< JwtSecret >) -> Self {
         Self {
-            agent_service: Arc::new(AgentService::new(pool)),
+            agent_service: Arc::new(AgentService::new(pool.clone())),
             token_storage,
+            db_pool: pool,
+            jwt_secret,
         }
     }
+}
+
+impl axum::extract::FromRef< AgentState > for AuthState
+{
+  fn from_ref( state: &AgentState ) -> Self
+  {
+    AuthState
+    {
+      jwt_secret: state.jwt_secret.clone(),
+      db_pool: state.db_pool.clone(),
+    }
+  }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -902,12 +919,12 @@ pub struct AssignProvidersToAgentRequest {
 
 /// Assign providers to an agent
 pub async fn assign_providers_to_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<String>,
     user: AuthenticatedUser,
     Json(req): Json<AssignProvidersToAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
-    let service = AgentService::new(pool.clone());
+    let service = AgentService::new(state.db_pool.clone());
 
     // Validation
     if req.providers.is_empty() {
@@ -969,7 +986,7 @@ pub async fn assign_providers_to_agent(
     for provider_id in &req.providers {
         let exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
             .bind(provider_id)
-            .fetch_optional(&pool)
+            .fetch_optional(&state.db_pool)
             .await
             .map_err(|e| {
                 (

@@ -482,6 +482,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let agent_state = iron_control_api::routes::agents::AgentState::new(
       agents_pool,
       token_state.storage.clone(),
+      auth_state.jwt_secret.clone(),
   );
 
   // Create combined app state

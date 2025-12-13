@@ -61,6 +61,8 @@
 
 mod common;
 
+use std::net::ToSocketAddrs;
+
 use iron_token_manager::token_generator::TokenGenerator;
 use common::create_test_storage;
 
@@ -76,6 +78,8 @@ async fn test_create_token_stores_hash_not_plaintext()
     .create_token( &plaintext_token, "user_001", Some( "project_123" ), Some( "Test Token" ), None, None )
     .await
     .expect("LOUD FAILURE: Failed to create token");
+
+  let token_id = created_token.id;
 
   assert!( token_id > 0, "Token ID should be positive" );
 
@@ -112,6 +116,8 @@ async fn test_create_token_with_metadata()
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
+  let token_id = created_token.id;  
+
   // Retrieve token metadata
   let metadata = storage
     .get_token_metadata( token_id )
@@ -135,6 +141,8 @@ async fn test_verify_token_returns_token_id()
     .create_token( &token, "user_003", None, None, None, None )
     .await
     .expect("LOUD FAILURE: Failed to create token");
+
+   let created_id = created_token.id;
 
   // Verify token returns the ID
   let verified_id = storage
@@ -175,6 +183,8 @@ async fn test_deactivate_token()
     .create_token( &token, "user_005", None, None, None, None )
     .await
     .expect("LOUD FAILURE: Failed to create token");
+
+  let token_id = created_token.id;
 
   // Deactivate token
   storage
@@ -230,6 +240,8 @@ async fn test_update_last_used_timestamp()
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
+  let token_id = created_token.id;
+
   // Initially last_used_at should be None
   let metadata = storage
     .get_token_metadata( token_id )
@@ -262,6 +274,8 @@ async fn test_delete_token()
     .create_token( &token, "user_009", None, None, None, None )
     .await
     .expect("LOUD FAILURE: Failed to create token");
+
+  let token_id = created_token.id;
 
   // Delete token
   storage
@@ -336,6 +350,8 @@ async fn test_protocol_014_token_format_integration()
     .await
     .expect("LOUD FAILURE: Failed to create Protocol 014 token");
 
+  let token_id = created_token.id;
+
   assert!( token_id > 0, "Token ID should be positive" );
 
   // Verify token works end-to-end
@@ -395,6 +411,8 @@ async fn test_backward_compatibility_old_token_format()
     .await
     .expect("LOUD FAILURE: Failed to create old format token");
 
+  let token_id = created_token.id;
+
   assert!( token_id > 0, "Token ID should be positive" );
 
   // Verify old token still works (hash_token should NOT strip prefix from old tokens)
@@ -452,6 +470,8 @@ async fn test_prefix_stripped_before_hashing_integration()
     .create_token( &token, "user_003", None, Some( "Prefix Strip Test" ), None, None )
     .await
     .expect("LOUD FAILURE: Failed to create token");
+
+  let token_id = created_token.id;
 
   // Get stored hash
   let stored_hash = storage

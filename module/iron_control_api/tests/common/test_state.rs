@@ -189,7 +189,7 @@ impl TestAppState
     // Seed test users for FK constraint compliance
     seed_test_users_for_tokens( tokens.storage.pool() ).await;
 
-    let agents = AgentState::new( database.clone(), tokens.storage.clone() );
+    let agents = AgentState::new( database.clone(), tokens.storage.clone(), auth.jwt_secret.clone() );
 
     Self { auth, tokens, database, agents }
   }
@@ -214,7 +214,7 @@ impl TestAppState
       .await
       .expect( "LOUD FAILURE: Failed to connect to custom database path" );
 
-    let agents = AgentState::new(database.clone(), tokens.storage.clone());
+    let agents = AgentState::new(database.clone(), tokens.storage.clone(), auth.jwt_secret.clone());
 
     Self { auth, tokens, database, agents }
   }
@@ -232,6 +232,15 @@ impl axum::extract::FromRef< TestAppState > for AuthState
   fn from_ref( state: &TestAppState ) -> Self
   {
     state.auth.clone()
+  }
+}
+
+/// Enable AgentState extraction from TestAppState.
+impl axum::extract::FromRef< TestAppState > for AgentState
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    state.agents.clone()
   }
 }
 
