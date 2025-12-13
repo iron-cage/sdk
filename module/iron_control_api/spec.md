@@ -68,6 +68,9 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 - `GET /api/v1/analytics/spending/*` - Spending metrics endpoints
 - `GET /api/v1/analytics/usage/*` - Usage metrics endpoints
 
+**Agent Provider Keys (Feature 014):**
+- `POST /api/v1/agents/provider-key` - Retrieve assigned provider API key for agent (IC Token auth)
+
 ---
 
 ### Integration Points
