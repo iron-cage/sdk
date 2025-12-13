@@ -1,4 +1,5 @@
 import sys
+import os
 import json
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_tool_calling_agent, AgentExecutor
@@ -6,12 +7,61 @@ from langchain_core.prompts import ChatPromptTemplate
 from apollo_tools import tools_list
 from config import IC_TOKEN, OPENAI_API_KEY
 
+# --- 1. INTELLIGENT PATH SETUP ---
 # Check if Iron Cage library is available
-try:
-    from iron_cage import LlmRouter
-    IRON_CAGE_AVAILABLE = True
-except ImportError:
-    IRON_CAGE_AVAILABLE = False
+def setup_python_paths():
+    current = os.path.dirname(os.path.abspath(__file__))
+    module_root = None
+
+    while True:
+        possible_sdk = os.path.join(current, "iron_sdk")
+        if os.path.exists(possible_sdk):
+            module_root = current
+            break
+        parent = os.path.dirname(current)
+        if parent == current: break
+        current = parent
+
+    if module_root:
+        print(f"DEBUG: Found module root at: {module_root}")
+        
+        if module_root not in sys.path:
+            sys.path.insert(0, module_root)
+
+        runtime_python_path = os.path.join(module_root, "iron_runtime", "python")
+        if os.path.exists(runtime_python_path):
+            print(f"DEBUG: Found Python runtime wrapper at: {runtime_python_path}")
+            sys.path.insert(0, runtime_python_path)
+        else:
+            print("DEBUG: iron_runtime/python folder not found (maybe pure Rust?)")
+            
+        return True
+    else:
+        print("DEBUG: Could not auto-detect 'module' folder structure.")
+        return False
+
+paths_configured = setup_python_paths()
+
+LlmRouter = None
+IRON_CAGE_AVAILABLE = False
+
+if paths_configured:
+    try:
+        try:
+            import iron_runtime
+            print("✅ Successfully imported iron_runtime")
+        except ImportError as e:
+            print(f"⚠️  Still cannot import iron_runtime: {e}")
+
+        from iron_sdk import LlmRouter
+        
+        IRON_CAGE_AVAILABLE = True
+        print("✅ Iron SDK & Runtime loaded.")
+        
+    except ImportError as e:
+        print(f"⚠️  Import Failed: {e}")
+        print("   Running in Direct Mode only.")
+        IRON_CAGE_AVAILABLE = False
 
 # Validation
 if not OPENAI_API_KEY:
@@ -56,35 +106,37 @@ def setup_llm():
     
     # --- OPTION 2: IRON CAGE ---
     if choice == "2":
-        if not IRON_CAGE_AVAILABLE:
-            print("Error: 'iron_cage' library is not installed (pip install iron-cage).")
-            sys.exit(1)
-            
         if not IC_TOKEN:
-            print("Error: IC_TOKEN is missing in secrets file")
+            print("Error: IC_TOKEN is missing in secrets")
             sys.exit(1)
 
         print("\n> Initializing Iron Cage Router...")
-        router = LlmRouter(
-            api_key=IC_TOKEN,
-            budget_usd=10.0,
-            pii_detection=True,
-            circuit_breaker=True
-        )
         
-        print("> Connected via Iron Cage Proxy")
-        return ChatOpenAI(
-            model="gpt-5-nano",
-            temperature=0,
-            base_url=router.base_url,
-            api_key=router.api_key
-        )
+        server_url = "http://localhost:8080" 
+        
+        try:
+            router = LlmRouter(
+                api_key=IC_TOKEN,
+                server_url=server_url, 
+                budget=10.0
+            )
+            
+            print(f"> Connected via Iron Cage Proxy on port {router.port}")
+            return ChatOpenAI(
+                model="gpt-5-nano",
+                temperature=0,
+                base_url=router.base_url,
+                api_key=router.api_key
+            )
+        except Exception as e:
+            print(f"Error initializing Router: {e}")
+            sys.exit(1)
 
-    # --- OPTION 1: DIRECT (Default) ---
+    # --- OPTION 1: DIRECT MODE ---
     else:
         print("\n> Initializing Direct OpenAI Connection...")
         return ChatOpenAI(
-            model="gpt-4o-mini", 
+            model="gpt-5-nano", 
             temperature=0
         )
 
@@ -122,7 +174,7 @@ def main():
 
             print("Processing request...")
             
-      # --- Run the Agent to Process the Request ---
+            # --- Run the Agent to Process the Request ---
             # Passes the user's query to the agent for execution.
             result = agent_executor.invoke({"input": user_query})
             
