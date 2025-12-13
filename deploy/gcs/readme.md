@@ -6,6 +6,17 @@ This repository contains Terraform configuration for provisioning a **Google Clo
 
 ---
 
+## Directory Contents
+
+| File | Responsibility |
+|---|---|
+| `main.tf` | Defines the Hetzner cloud server (`hcloud_server`), SSH key, and other related resources. |
+| `variables.tf` | Declares input variables for the module, such as server type, image, and SSH keys. |
+| `outputs.tf` | Defines module outputs, primarily the public IPv4 address of the created server. |
+| `versions.tf` | Specifies the required version of Terraform and the Hetzner Provider. |
+
+---
+
 ## Prerequisites
 
 Before you start, make sure you have:
@@ -34,10 +45,10 @@ This means:
 - The **project ID** is passed via the `PROJECT_ID` variable.
 - Credentials are picked up from your environment (Application Default Credentials, `GOOGLE_APPLICATION_CREDENTIALS`, etc.).
 
-This repository assumes you configure your environment via a shell script at `./.secret/-secret.sh`:
+This repository assumes you configure your environment via a shell script at `./secret/-secret.sh`:
 
 ```sh
-# Example: ./.secret/-secret.sh
+# Example: ./secret/-secret.sh
 
 # Path to your service account JSON key (or rely on gcloud ADC instead)
 GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/tf-sa.json"
@@ -52,12 +63,12 @@ Typical usage:
 
 ```sh
 # 1. Create and edit the secret file
-nano .secret/-secret.sh   # or use your preferred editor
+nano secret/-secret.sh   # or use your preferred editor
 ```
 
 Make sure that:
 
-- The `.secret` directory (and `-secret.sh`) is **ignored by git** so keys and IDs are never committed.
+- The `secret` directory (and `-secret.sh`) is **ignored by git** so keys and IDs are never committed.
 - The script exports whatever variables your Terraform configuration expects:
   - `TF_VAR_PROJECT_ID`
   - `TF_VAR_REGION`
@@ -97,10 +108,10 @@ terraform init   -backend-config="bucket=${TF_VAR_BUCKET_NAME}"   -backend-confi
 
 2. **Configure credentials and variables**
 
-   Create `./.secret/-secret.sh` as shown above and load it:
+   Create `./secret/-secret.sh` as shown above and load it:
 
    ```sh
-   source .secret/-secret.sh
+   source secret/-secret.sh
    ```
 
 3. **Initialize Terraform**
@@ -169,7 +180,7 @@ variable "PROJECT_ID" {
 
 You can set these:
 
-- via `TF_VAR_...` environment variables (as in `.secret/-secret.sh`), or  
+- via `TF_VAR_...` environment variables (as in `secret/-secret.sh`), or  
 - via `terraform.tfvars`, or  
 - via `-var` flags on the command line.
 
@@ -207,6 +218,6 @@ terraform output bucket_name
 ## Security Notes
 
 - **Never commit secrets** (service account keys, `GOOGLE_APPLICATION_CREDENTIALS` paths, etc.) to the repository.
-- Keep `.secret/` and any other sensitive files in your `.gitignore`.
+- Keep `secret/` and any other sensitive files in your `.gitignore`.
 - Prefer using minimally-privileged service accounts (just enough permissions to manage the bucket).
 - Rotate service account keys / credentials if you suspect they have been exposed.

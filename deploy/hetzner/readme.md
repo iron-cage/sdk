@@ -4,6 +4,19 @@ This repository contains Terraform configuration for provisioning and managing i
 
 > ⚠️ This project assumes you already have a Hetzner Cloud account and an API token.
 
+---
+
+## Directory Contents
+
+| File | Responsibility |
+|---|---|
+| `main.tf` | Defines the Hetzner cloud server (`hcloud_server`), SSH key, and other related resources. |
+| `variables.tf` | Declares input variables for the module, such as server type, image, and SSH keys. |
+| `outputs.tf` | Defines module outputs, primarily the public IPv4 address of the created server. |
+| `versions.tf` | Specifies the required version of Terraform and the Hetzner Provider. |
+
+---
+
 ## Prerequisites
 
 Before you start, make sure you have:
@@ -17,7 +30,7 @@ Before you start, make sure you have:
 
 The Hetzner Terraform provider requires an API token for authentication.
 
-This repository expects the token to be set via a shell script at `./.secret/-secret.sh`:
+This repository expects the token to be set via a shell script at `./secret/-secret.sh`:
 
 ```sh
 SECRET_HETZNER_CLOUD_TOKEN="YOUR_HETZNER_API_TOKEN"
@@ -27,12 +40,12 @@ Typical usage:
 
 ```sh
 # 1. Create and edit the secret file
-nano .secret/-secret.sh   # or use your preferred editor
+nano secret/-secret.sh   # or use your preferred editor
 ```
 
 Make sure that:
 
-- The `.secret` directory (and `-secret.sh`) is **ignored by git** so your token is never committed.
+- The `secret` directory (and `-secret.sh`) is **ignored by git** so your token is never committed.
 - The script exports or sets whatever variable your Terraform configuration expects  
   (for example, you might export `HCLOUD_TOKEN` or pass the value into a Terraform variable).
 
@@ -49,7 +62,7 @@ You can also provide the token via environment variables or Terraform variables 
 
 2. **Configure your API token**
 
-   Set up `./.secret/-secret.sh` as described above and `source` it, or configure your token/variables in another secure way.
+   Set up `./secret/-secret.sh` as described above and `source` it, or configure your token/variables in another secure way.
 
 3. **Initialize Terraform**
 
@@ -128,5 +141,5 @@ You can then use `ipv4` to connect to the server (for example via SSH), or integ
 ## Security Notes
 
 - **Never commit secrets** (API tokens, private keys, etc.) to the repository.
-- Keep `.secret/` and any other secret files in your `.gitignore`.
+- Keep `secret/` and any other secret files in your `.gitignore`.
 - Rotate your Hetzner API token if you suspect it has been exposed.

@@ -1,8 +1,19 @@
 # Google Artifact Registry (GAR) Terraform Infrastructure
 
-This repository contains Terraform configuration for provisioning a **Google Artifact Registry (GAR) repository** to store **Docker container images** (for example, images used by your GCE deployments).
+This repository contains Terraform configuration for provisioning a **Google Artifact Registry (GAR) repository** to store **Docker container images** (for example, images used by your HETZNER deployments).
 
 > ⚠️ This project assumes you already have a Google Cloud project, valid credentials, and (optionally) an existing GCS bucket for the Terraform backend.
+
+---
+
+## Directory Contents
+
+| File | Responsibility |
+|---|---|
+| `main.tf` | Defines the `google_artifact_registry_repository` resource and the Google provider configuration. |
+| `variables.tf` | Declares input variables used by the module, such as `PROJECT_ID`, `REGION`, and `REPO_NAME`. |
+| `outputs.tf` | Defines the outputs of the module, like the name of the created repository. |
+| `versions.tf` | Specifies the required version of Terraform and the Google Provider. |
 
 ---
 
@@ -36,10 +47,10 @@ This means:
 - The **project ID** and **region** are taken from Terraform variables `PROJECT_ID` and `REGION`.
 - Credentials are read from a **service account JSON key file** whose path is provided via `GOOGLE_SE_CREDS_PATH`.
 
-A convenient way to configure your environment is a shell script at `./.secret/-secret.sh`, for example:
+A convenient way to configure your environment is a shell script at `./secret/-secret.sh`, for example:
 
 ```sh
-# Example: ./.secret/-secret.sh
+# Example: ./secret/-secret.sh
 
 # Path to your service account JSON key
 TF_VAR_GOOGLE_SE_CREDS_PATH="$HOME/.config/gcloud/tf-sa.json"
@@ -55,15 +66,15 @@ Typical usage:
 
 ```sh
 # 1. Create and edit the secret file
-nano .secret/-secret.sh   # or use your preferred editor
+nano secret/-secret.sh   # or use your preferred editor
 
 # 2. Load the environment
-source .secret/-secret.sh
+source secret/-secret.sh
 ```
 
 Make sure that:
 
-- The `.secret` directory (and `-secret.sh`) is **ignored by git** so keys and IDs are never committed.
+- The `secret` directory (and `-secret.sh`) is **ignored by git** so keys and IDs are never committed.
 - The script exports all variables your Terraform configuration expects:
   - `TF_VAR_PROJECT_ID`
   - `TF_VAR_REGION`
@@ -91,7 +102,7 @@ Backend details (like the bucket name and prefix) are provided when you run **`t
 terraform init   -backend-config="bucket=${TF_VAR_BUCKET_NAME}"   -backend-config="prefix=gar/state"
 ```
 
-> 💡 You can reuse the same **GCS backend bucket** that you created in your GCS or GCE Terraform projects.
+> 💡 You can reuse the same **GCS backend bucket** that you created in your GCS or HETZNER Terraform projects.
 
 If you prefer **local state**, you can remove or adjust the backend block in `main.tf`.
 
@@ -119,7 +130,7 @@ This resource:
 - Names the repository using `REPO_NAME` (e.g. `demo-images`).
 - Sets the repository format to **DOCKER**, so it can store Docker container images.
 
-You can then **push images** to this repository and pull them from other modules (like your GCE Terraform project) using standard Artifact Registry URLs.
+You can then **push images** to this repository and pull them from other modules (like your HETZNER Terraform project) using standard Artifact Registry URLs.
 
 ---
 
@@ -134,10 +145,10 @@ You can then **push images** to this repository and pull them from other modules
 
 2. **Configure credentials and variables**
 
-   Create `./.secret/-secret.sh` as shown above and load it:
+   Create `./secret/-secret.sh` as shown above and load it:
 
    ```sh
-   source .secret/-secret.sh
+   source secret/-secret.sh
    ```
 
 3. **Initialize Terraform**
@@ -222,7 +233,7 @@ variable "GOOGLE_SE_CREDS_PATH" {
 
 You can set these:
 
-- via `TF_VAR_...` environment variables (as in `.secret/-secret.sh`), or  
+- via `TF_VAR_...` environment variables (as in `secret/-secret.sh`), or  
 - via `terraform.tfvars`, or  
 - via `-var` flags on the command line.
 
@@ -260,7 +271,7 @@ This is useful for verifying the created repository or passing it to other tools
 ## Security Notes
 
 - **Never commit secrets** (service account keys, JSON files, etc.) to the repository.
-- Keep `.secret/` and any other sensitive files in your `.gitignore`.
+- Keep `secret/` and any other sensitive files in your `.gitignore`.
 - Use minimally-privileged service accounts (only the permissions your Artifact Registry / backend actually need).
 - Rotate service account keys / credentials if you suspect they have been exposed.
 - Be careful when granting access to the Artifact Registry repository, especially if it hosts production images.

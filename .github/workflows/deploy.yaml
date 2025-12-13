@@ -2,7 +2,7 @@ name: Deploy CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "feat/deploy" ]
 
   workflow_dispatch:
 
@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Create .secret.sh file
+    - name: Create secret.sh file
       run: |
         {
           echo "SECRET_STATE_ARCHIVE_KEY=${{ secrets.SECRET_STATE_ARCHIVE_KEY }}"
@@ -26,7 +26,7 @@ jobs:
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
           echo "IRON_SECRETS_MASTER_KEY=${{ secrets.IRON_SECRETS_MASTER_KEY }}"
-        } > .secret/-secret.sh
+        } > secret/-secret.sh
 
     - name: Create key files
       run: |
@@ -35,4 +35,4 @@ jobs:
         echo "${{ secrets.SECRET_RSA_PUBLIC_KEY }}"   > ${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}
 
     - name: 'Build the image, push and deploy'
-      run: 'make deploy'
+      run: 'make -f Makefile.deploy deploy'

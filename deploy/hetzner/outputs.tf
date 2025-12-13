@@ -3,7 +3,7 @@ locals {
 }
 
 # Output that we get after applying.
-# IPv4 address of the created GCE instance.
+# IPv4 address of the created HETZNER instance.
 output "ipv4" {
   description = "The public IP address of the deployed instance"
   value       = local.ip

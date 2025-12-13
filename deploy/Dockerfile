@@ -24,4 +24,5 @@ WORKDIR /app
 
 VOLUME /var/run/docker.sock
 
-CMD [ "make", "deploy_in_container" ]
+# make -f Makefile.deploy deploy
+CMD [ "make", "-f", "Makefile.deploy", "deploy_in_container" ]

@@ -1,0 +1,295 @@
+# ============================================================================
+# Deploy
+# ============================================================================
+
+## --------------------------------------------------------------------------------------
+## READ variables from secret/-secret.sh
+
+## Configuration variables for deployment. Can be edited for desired behavior.
+SHELL := /usr/bin/env bash
+## Local secrets file for development (NOT committed; secret/ is ignored).
+LOCAL_SECRETS_FILE ?= secret/-secret.sh
+
+ifneq ("$(wildcard $(LOCAL_SECRETS_FILE))","")
+	include $(LOCAL_SECRETS_FILE)
+else
+	$(error "Secrets file $(LOCAL_SECRETS_FILE) not found")
+endif
+
+strip_quotes = $(subst ",,$(1))
+
+## --------------------------------------------------------------------------------------
+## Required Parameters
+## GOOGLE_SE_CREDS_PATH
+REQUIRED_SECRET_VARIABLES:= \
+	SECRET_STATE_ARCHIVE_KEY \
+	GOOGLE_SE_CREDS_PATH \
+	SECRET_RSA_PRIVATE_KEY_PATH \
+	SECRET_RSA_PUBLIC_KEY_PATH \
+	CSP \
+	PROJECT_NAME \
+	DATABASE_URL \
+	JWT_SECRET \
+	IRON_SECRETS_MASTER_KEY \
+
+$(foreach v,$(REQUIRED_SECRET_VARIABLES),\
+  $(if $($v),,$(error Required secret variable '$(v)' is missing or empty after including $(LOCAL_SECRETS_FILE))))
+
+SECRET_STATE_ARCHIVE_KEY 	:= $(call strip_quotes,$(SECRET_STATE_ARCHIVE_KEY))
+GOOGLE_SE_CREDS_PATH 		:= $(call strip_quotes,$(GOOGLE_SE_CREDS_PATH))
+SECRET_RSA_PRIVATE_KEY_PATH := $(call strip_quotes,$(SECRET_RSA_PRIVATE_KEY_PATH))
+SECRET_RSA_PUBLIC_KEY_PATH 	:= $(call strip_quotes,$(SECRET_RSA_PUBLIC_KEY_PATH))
+CSP 						:= $(call strip_quotes,$(CSP))
+PROJECT_NAME 				:= $(call strip_quotes,$(PROJECT_NAME))
+DATABASE_URL 				:= $(call strip_quotes,$(DATABASE_URL))
+JWT_SECRET 					:= $(call strip_quotes,$(JWT_SECRET))
+IRON_SECRETS_MASTER_KEY 	:= $(call strip_quotes,$(IRON_SECRETS_MASTER_KEY))
+
+export ENVIRONMENT ?= test
+ENVIRONMENT 				:= $(call strip_quotes,$(ENVIRONMENT))
+
+## --------------------------------------------------------------------------------------
+## Check that secret files exist
+REQUIRED_SECRET_FILES := \
+	$(GOOGLE_SE_CREDS_PATH) \
+	$(SECRET_RSA_PRIVATE_KEY_PATH) \
+	$(SECRET_RSA_PUBLIC_KEY_PATH)
+
+define check_file_exists
+  $(if $(wildcard $(call strip_quotes,$1)),, \
+    $(error Required secret file '$(call strip_quotes,$1)' does not exist. Please check path.))
+endef
+
+$(foreach file,$(REQUIRED_SECRET_FILES),$(eval $(call check_file_exists,$(file))))
+
+## --------------------------------------------------------------------------------------
+## Optional Parameters
+OPTIONAL_SECRET_VARIABLES:= \
+	TF_VAR_PROJECT_ID \
+	TF_VAR_REGION \
+	SECRET_HETZNER_CLOUD_TOKEN \
+	TF_VAR_REPO_NAME \
+	TF_VAR_IMAGE_NAME \
+	TAG \
+	TF_VAR_ZONE \
+	TF_VAR_BUCKET_NAME \
+	TF_DIR
+	
+## Project id for deployed resources | Can be set in secret/-secret.sh
+TF_VAR_PROJECT_ID := $(or $(call strip_quotes,$(TF_VAR_PROJECT_ID)),$(shell jq -r '.project_id' "$(GOOGLE_SE_CREDS_PATH)"))
+## Location for deployed resources | Can be set in secret/-secret.sh
+TF_VAR_REGION := $(or $(call strip_quotes,$(TF_VAR_REGION)),"europe-central2")
+## Artifact Repository name for pushing the Docker images | Should not have "_"
+TF_VAR_REPO_NAME := $(or $(call strip_quotes,$(TF_VAR_REPO_NAME)),$(subst _,-,$(PROJECT_NAME)))
+## Pushed image name | Can be set in secret/-secret.sh
+TF_VAR_IMAGE_NAME := $(or $(call strip_quotes,$(TF_VAR_IMAGE_NAME)),$(PROJECT_NAME))
+## Helper var for tagging local image
+TAG := $(or $(call strip_quotes,$(TAG)),$(TF_VAR_REGION)-docker.pkg.dev/$(TF_VAR_PROJECT_ID)/$(TF_VAR_REPO_NAME)/$(TF_VAR_IMAGE_NAME))/$(ENVIRONMENT)
+## Zone location for the resource
+TF_VAR_ZONE := $(or $(call strip_quotes,$(TF_VAR_ZONE)),$(TF_VAR_REGION)-a)
+## Cloud Storage bucket name
+TF_VAR_BUCKET_NAME := $(or $(call strip_quotes,$(TF_VAR_BUCKET_NAME)),bucket-$(TF_VAR_REPO_NAME)-$(ENVIRONMENT))
+## Base terraform directory
+TF_DIR := $(or $(call strip_quotes,$(TF_DIR)),deploy)
+## IMAGE BUILD
+export GOOGLE_APPLICATION_CREDENTIALS=$(TF_VAR_GOOGLE_SE_CREDS_PATH)
+
+build_image: ## Builds uarust_conf_site image
+	docker build . \
+		-f module/iron_dashboard/Dockerfile \
+		-t name:$(TF_VAR_IMAGE_NAME)_front \
+		--build-arg VITE_API_URL="/api" \
+		-t $(TAG)_front
+	docker build . \
+		-f module/iron_control_api/Dockerfile \
+		-t name:$(TF_VAR_IMAGE_NAME)_back \
+		-t $(TAG)_back
+
+## Deploys using tools from the container
+deploy: check_gcp_keys check_env_variables build_image
+	docker build . \
+	  -t deploy-$(TF_VAR_IMAGE_NAME) \
+	  -f ./$(TF_DIR)/Dockerfile \
+	  --build-arg google_se_creds="$(GOOGLE_SE_CREDS_PATH)"
+	@docker run --rm \
+	-v /var/run/docker.sock:/var/run/docker.sock \
+	-v $(CURDIR):/app \
+	-e HOME=/app/.gcloud-home \
+	--user $(shell id -u):$(shell id -g) \
+	-e SECRET_STATE_ARCHIVE_KEY="$(SECRET_STATE_ARCHIVE_KEY)" \
+	-e TF_VAR_HETZNER_CLOUD_TOKEN="$(SECRET_HETZNER_CLOUD_TOKEN)" \
+	-e TF_VAR_BUCKET_NAME="$(TF_VAR_BUCKET_NAME)" \
+	-e TF_VAR_PROJECT_ID="$(TF_VAR_PROJECT_ID)" \
+	-e TF_VAR_PROJECT_NAME="$(PROJECT_NAME)" \
+	-e TF_VAR_REGION="$(TF_VAR_REGION)" \
+	-e TF_VAR_REPO_NAME="$(TF_VAR_REPO_NAME)" \
+	-e TF_VAR_IMAGE_NAME="$(TF_VAR_IMAGE_NAME)" \
+	-e TF_VAR_JWT_SECRET="$(JWT_SECRET)" \
+	-e TF_VAR_IRON_SECRETS_MASTER_KEY="$(IRON_SECRETS_MASTER_KEY)" \
+	-e TF_VAR_DATABASE_URL="$(DATABASE_URL)" \
+	-e TF_VAR_ENVIRONMENT="$(ENVIRONMENT)" \
+	-e TF_VAR_TAG="$(TAG)" \
+	-e CSP="$(CSP)" \
+	-e TF_VAR_GOOGLE_SE_CREDS_PATH="/app/$(GOOGLE_SE_CREDS_PATH)" \
+	-e GOOGLE_APPLICATION_CREDENTIALS="/app/$(GOOGLE_SE_CREDS_PATH)" \
+	-e TF_VAR_SECRET_RSA_PRIVATE_KEY_PATH="/app/$(SECRET_RSA_PRIVATE_KEY_PATH)" \
+	-e TF_VAR_SECRET_RSA_PUBLIC_KEY_PATH="/app/$(SECRET_RSA_PUBLIC_KEY_PATH)" \
+	-t deploy-$(TF_VAR_IMAGE_NAME)
+
+## Check if required GCP keys are present
+check_gcp_keys:
+	@[ -f "$(GOOGLE_SE_CREDS_PATH)" ] \
+		|| echo "ERROR: Key file $(GOOGLE_SE_CREDS_PATH) does not exist"
+	@[ ! -z "${SECRET_STATE_ARCHIVE_KEY}" ] \
+		|| echo "ERROR: Key SECRET_STATE_ARCHIVE_KEY does not exist"
+	@[ -f "$(GOOGLE_SE_CREDS_PATH)" ] || exit 1
+	@[ ! -z "${SECRET_STATE_ARCHIVE_KEY}" ] || exit 1
+
+## --------------------------------------------------------------------
+## DEPLOY IN DOCKER CONTAINER
+
+## Deploys everything and updates terraform states (called inside deploy container)
+deploy_in_container: lock_check gcp_service state_storage_init check_keys_$(CSP) gcp_docker push_image
+	$(MAKE) create_$(CSP) || { echo "Deployment failed"; exit 1; }
+	$(MAKE) show_state_info || { echo "Showing state info failed"; exit 1; }
+## Authorize to GCP with service account
+gcp_service:
+	gcloud auth activate-service-account --key-file=$(GOOGLE_APPLICATION_CREDENTIALS)
+## Creates GCS Bucket for terraform states
+state_storage_init:
+	@if gsutil ls -b "gs://$(TF_VAR_BUCKET_NAME)" > /dev/null 2>&1; then \
+		echo "GCS bucket $(TF_VAR_BUCKET_NAME) already exists. Skipping creation."; \
+	else \
+		echo "Creating GCS bucket $(TF_VAR_BUCKET_NAME)..."; \
+		gcloud storage buckets create gs://$(TF_VAR_BUCKET_NAME) \
+			--project=$(TF_VAR_PROJECT_ID) \
+			--location=$(TF_VAR_REGION) \
+			--uniform-bucket-level-access; \
+	fi
+## Builds and pushes local docker image to the private repository
+push_image: tf_init create_artifact_repo
+	docker push $(TAG)_front
+	docker push $(TAG)_back
+## Initializes all terraform projects. Downloads required modules and validates .tf files
+tf_init:
+	@for dir in gar hetzner; do \
+	  terraform -chdir=$(TF_DIR)/$$dir init \
+	    -backend-config="bucket=$(TF_VAR_BUCKET_NAME)" \
+	    -backend-config="prefix=$$dir"; \
+	done
+## Creates Artifact Registry repository on GCP in specified location
+create_artifact_repo:
+	terraform -chdir=$(TF_DIR)/gar apply -auto-approve
+## Add docker repo auth helper
+gcp_docker:
+	gcloud auth configure-docker $(TF_VAR_REGION)-docker.pkg.dev --quiet
+## Creates Hetzner instance with the website configured on boot
+create_hetzner: 
+	terraform -chdir=$(TF_DIR)/hetzner apply -auto-approve
+
+## --------------------------------------------------------------------
+## KEY / SECRETS CHECKS
+## Check Hetzner and deployment related keys
+check_keys_hetzner:
+	@[ ! -z "${SECRET_HETZNER_CLOUD_TOKEN}" ] \
+		|| { echo "ERROR: Key SECRET_HETZNER_CLOUD_TOKEN does not exist"; exit 1; }
+
+check_env_variables:
+	@[ ! -z "${JWT_SECRET}" ] \
+		|| { echo "ERROR: Key JWT_SECRET does not exist. Set the variable in .env"; exit 1; }
+	@[ ! -z "${IRON_SECRETS_MASTER_KEY}" ] \
+		|| { echo "ERROR: Key IRON_SECRETS_MASTER_KEY does not exist. Set the variable in .env"; exit 1; }
+	@[ ! -z "${DATABASE_URL}" ] \
+		|| { echo "ERROR: Key DATABASE_URL does not exist. Set the variable in .env"; exit 1; }
+
+## --------------------------------------------------------------------
+## TERRAFORM STATE STORAGE
+show_state_info:
+	@echo "Terraform states are now stored in:"
+	@echo "gs://$(TF_VAR_BUCKET_NAME)/gar/default.tfstate"
+	@echo "gs://$(TF_VAR_BUCKET_NAME)/hetzner/default.tfstate"
+
+## --------------------------------------------------------------------
+## TERRAFORM PLAN / DESTROY
+## Review changes that terraform will do on apply
+tf_plan: tf_init
+	terraform -chdir=$(TF_DIR)/gar plan
+	terraform -chdir=$(TF_DIR)/hetzner plan
+
+ABS_GOOGLE_SE_CREDS_PATH := $(abspath $(GOOGLE_SE_CREDS_PATH))
+## Destroy created infrastructure on all supported providers and finally GCS bucket
+z_destroy_all:
+	@echo "⚠️  WARNING: This will destroy ALL cloud resources and terraform state!"
+	@read -p "❓ Are you sure you want to continue? Type 'destroy' to proceed: " confirm; \
+	if [ "$$confirm" != "destroy" ]; then echo "❌ Aborted by user."; exit 1; fi
+	@echo "🧨 Destroying all infrastructure across modules..."
+	@for dir in hetzner gar; do \
+		echo "🔻 Destroying: $$dir..."; \
+		docker run --rm \
+			-v /var/run/docker.sock:/var/run/docker.sock \
+			-v $(CURDIR):/app \
+			-w /app/deploy/$$dir \
+			-e GOOGLE_APPLICATION_CREDENTIALS="/app/$(GOOGLE_SE_CREDS_PATH)" \
+			-e TF_VAR_GOOGLE_SE_CREDS_PATH="/app/$(GOOGLE_SE_CREDS_PATH)" \
+			-e TF_VAR_REGION="$(TF_VAR_REGION)" \
+			-e TF_VAR_ZONE="$(TF_VAR_ZONE)" \
+			-e TF_VAR_PROJECT_ID="$(TF_VAR_PROJECT_ID)" \
+			-e TF_VAR_REPO_NAME="$(TF_VAR_REPO_NAME)" \
+			-e TF_VAR_IMAGE_NAME="$(TF_VAR_IMAGE_NAME)" \
+			-e TF_VAR_BUCKET_NAME="$(TF_VAR_BUCKET_NAME)" \
+			-e SECRET_STATE_ARCHIVE_KEY="$(SECRET_STATE_ARCHIVE_KEY)" \
+			-e TF_VAR_HETZNER_CLOUD_TOKEN="$(SECRET_HETZNER_CLOUD_TOKEN)" \
+			-e TF_VAR_PROJECT_NAME="$(PROJECT_NAME)" \
+			-e TF_VAR_JWT_SECRET="$(JWT_SECRET)" \
+			-e TF_VAR_IRON_SECRETS_MASTER_KEY="$(IRON_SECRETS_MASTER_KEY)" \
+			-e TF_VAR_DATABASE_URL="$(DATABASE_URL)" \
+			-e CSP="$(CSP)" \
+			-e TF_VAR_SECRET_RSA_PRIVATE_KEY_PATH="/app/$(SECRET_RSA_PRIVATE_KEY_PATH)" \
+			-e TF_VAR_SECRET_RSA_PUBLIC_KEY_PATH="/app/$(SECRET_RSA_PUBLIC_KEY_PATH)" \
+			-v $(CURDIR)/$(GOOGLE_SE_CREDS_PATH):/app/$(GOOGLE_SE_CREDS_PATH) \
+			-it hashicorp/terraform:1.7.4 destroy -auto-approve \
+		|| echo "⚠️  Warning: Failed to destroy $$dir. Skipping."; \
+	done
+	@echo "🗑️  Destroying GCS backend bucket (if exists)..."
+	gsutil -m rm -r gs://$(TF_VAR_BUCKET_NAME) || echo "⚠️ GCS destroy skipped or failed"
+	@echo "✅ All resources destroyed successfully."
+
+## --------------------------------------------------------------------
+## CHECK | DESTROY LOCK
+
+## Check if any Terraform state lock files exist
+lock_check:
+	@echo "🔍 Checking for active Terraform state locks in bucket: $(TF_VAR_BUCKET_NAME)..."
+	@FOUND_LOCKS=0; \
+	for dir in gar hetzner; do \
+	  LOCK_PATH=gs://$(TF_VAR_BUCKET_NAME)/$$dir/default.tflock; \
+	  if gsutil stat $$LOCK_PATH > /dev/null 2>&1; then \
+	    echo "⚠️  Lock found in module: $$dir"; \
+	    echo "    ➤ To unlock: make lock_unlock"; \
+	    echo "    ➤ Or manually: terraform -chdir=$(TF_DIR)/$$dir force-unlock <LOCK_ID>"; \
+	    echo "    ➤ To get LOCK_ID: gsutil cat $$LOCK_PATH | grep '\"ID\"'"; \
+	    FOUND_LOCKS=1; \
+	  else \
+	    echo "✅ No lock in module: $$dir"; \
+	  fi \
+	done; \
+	if [ $$FOUND_LOCKS -eq 1 ]; then \
+	  echo "💡 Some locks are active. Please, run <make lock_unlock> to unlock before retrying apply."; \
+	  exit 1; \
+	else \
+	  echo "🎉 No active locks detected."; \
+	fi
+
+## Force unlock Terraform state (tries to find lock for all modules)
+lock_unlock:
+	@for dir in gar hetzner; do \
+	  LOCK_FILE=gs://$(TF_VAR_BUCKET_NAME)/$$dir/default.tflock; \
+	  if gsutil stat $$LOCK_FILE > /dev/null 2>&1; then \
+	    echo "⚠️ Found lock file in: $$LOCK_FILE"; \
+	    LOCK_ID=$$(gsutil cat $$LOCK_FILE | grep '"ID"' | sed -E 's/.*"ID": ?"([^"]+)".*/\1/'); \
+	    echo "🛠️ Forcing unlock: $$LOCK_ID in $$dir"; \
+	    terraform -chdir=$(TF_DIR)/$$dir force-unlock $$LOCK_ID || true; \
+	  else \
+	    echo "✅ No lock in $$dir"; \
+	  fi \
+	done
