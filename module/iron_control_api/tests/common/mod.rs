@@ -8,7 +8,9 @@
 //! - Response extractors
 //! - Database test infrastructure and isolation tests
 //! - Budget test infrastructure (Protocol 005)
+//! - Authentication test infrastructure (Protocol 007)
 
+pub mod auth;
 pub mod budget;
 pub mod corner_cases;
 pub mod database;

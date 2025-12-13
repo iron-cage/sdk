@@ -35,7 +35,10 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
   let path = uri.path();
 
   // Check if redirect has expired
-  let now = SystemTime::now().duration_since( UNIX_EPOCH ).unwrap().as_secs();
+  let now = SystemTime::now()
+    .duration_since( UNIX_EPOCH )
+    .expect( "INVARIANT: SystemTime is always after UNIX_EPOCH (system clock would need to be set before 1970-01-01)" )
+    .as_secs();
   let redirect_expired = now > DEPLOYMENT_DATE + EXPIRATION_SECONDS;
 
   if redirect_expired
@@ -46,7 +49,7 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
       return Response::builder()
         .status( StatusCode::NOT_FOUND )
         .body( Body::empty() )
-        .unwrap();
+        .expect( "INVARIANT: Response with valid StatusCode and empty Body never fails" );
     }
   }
   else
@@ -59,7 +62,7 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
         .status( StatusCode::PERMANENT_REDIRECT )
         .header( "Location", new_uri )
         .body( Body::empty() )
-        .unwrap();
+        .expect( "INVARIANT: Response with valid StatusCode, Location header, and empty Body never fails" );
     }
   }
 

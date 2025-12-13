@@ -5,32 +5,38 @@ use iron_test_db::TestDatabaseBuilder;
 
 fn bench_in_memory_creation( c: &mut Criterion )
 {
+  let runtime = tokio::runtime::Builder::new_current_thread()
+    .enable_all()
+    .build()
+    .expect( "LOUD FAILURE: Failed to create tokio runtime" );
+
   c.bench_function( "create_in_memory_db", |b| {
-    b.iter( || {
-      tokio::runtime::Runtime::new().unwrap().block_on( async {
-        let db = TestDatabaseBuilder::new()
-          .in_memory()
-          .build()
-          .await
-          .expect( "LOUD FAILURE: Failed to create database" );
-        black_box( db );
-      } );
+    b.to_async( &runtime ).iter( || async {
+      let db = TestDatabaseBuilder::new()
+        .in_memory()
+        .build()
+        .await
+        .expect( "LOUD FAILURE: Failed to create database" );
+      black_box( db );
     } );
   } );
 }
 
 fn bench_temp_file_creation( c: &mut Criterion )
 {
+  let runtime = tokio::runtime::Builder::new_current_thread()
+    .enable_all()
+    .build()
+    .expect( "LOUD FAILURE: Failed to create tokio runtime" );
+
   c.bench_function( "create_temp_file_db", |b| {
-    b.iter( || {
-      tokio::runtime::Runtime::new().unwrap().block_on( async {
-        let db = TestDatabaseBuilder::new()
-          .temp_file()
-          .build()
-          .await
-          .expect( "LOUD FAILURE: Failed to create database" );
-        black_box( db );
-      } );
+    b.to_async( &runtime ).iter( || async {
+      let db = TestDatabaseBuilder::new()
+        .temp_file()
+        .build()
+        .await
+        .expect( "LOUD FAILURE: Failed to create database" );
+      black_box( db );
     } );
   } );
 }

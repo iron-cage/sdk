@@ -19,3 +19,6 @@ mod http_methods;
 
 #[ path = "auth/content_type.rs" ]
 mod content_type;
+
+#[ path = "auth/security.rs" ]
+mod security;

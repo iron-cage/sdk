@@ -1344,3 +1344,128 @@ async fn test_report_usage_integer_overflow_tokens()
     "Overflow tokens_used should be rejected or clamped, got: {}", response.status()
   );
 }
+
+// xxx: Manual Test Gap #24: Idempotency - duplicate event_id in report - DEFERRED
+//
+// Test implementation COMPLETE and WORKING. Test correctly detects that idempotency
+// is NOT yet implemented in POST /api/budget/report endpoint.
+//
+// Current behavior: Second report with same event_id DOUBLE-CHARGES budget (fails test)
+// Expected behavior: Second report with same event_id should be idempotent (no double-charge)
+//
+// Defer until idempotency support is implemented in report endpoint.
+// When implemented, change #[ignore] to #[tokio::test]
+//
+/// Manual Test Gap #24: Idempotency - duplicate event_id in report
+///
+/// # Corner Case
+/// POST /api/budget/report with same event_id twice
+///
+/// # Expected Behavior
+/// First report: Succeeds, budget charged
+/// Second report (same event_id): Idempotent - returns 200 OK but does NOT double-charge budget
+///
+/// # Risk
+/// HIGH - Budget double-charging from duplicate events
+#[ tokio::test ]
+#[ ignore ]
+async fn test_idempotency_duplicate_event_id()
+{
+  let pool = setup_test_db().await;
+  let agent_id = 132i64;
+  let initial_budget = 100_000_000i64;  // $100 USD
+  seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+
+  // Create lease manually
+  let lease_id = "lease_idempotency_test";
+  let budget_granted = 10_000_000i64;  // $10 USD
+  state
+    .lease_manager
+    .create_lease( lease_id, agent_id, agent_id, budget_granted, None )
+    .await
+    .expect("LOUD FAILURE: Should create lease");
+
+  let router = create_budget_router( state ).await;
+
+  // First report with event_id
+  let event_id = "event_unique_12345";
+  let cost_microdollars = 2_000_000i64;  // $2 USD
+  let request_body = json!({
+    "lease_id": lease_id,
+    "request_id": "req_idempotency_test",
+    "tokens": 1000,
+    "cost_microdollars": cost_microdollars,
+    "model": "gpt-4",
+    "provider": "openai",
+    "event_id": event_id,
+  });
+
+  let response = router
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(), StatusCode::OK,
+    "LOUD FAILURE: First report should succeed"
+  );
+
+  // Get budget after first report
+  let budget_after_first = sqlx::query( "SELECT total_spent FROM agent_budgets WHERE agent_id = ?" )
+    .bind( agent_id )
+    .fetch_one( &pool )
+    .await
+    .expect("LOUD FAILURE: Should fetch agent budget");
+
+  let total_spent_after_first : i64 = budget_after_first.get( "total_spent" );
+
+  assert_eq!(
+    total_spent_after_first, cost_microdollars,
+    "LOUD FAILURE: total_spent after first report should equal cost. Expected: {}, Actual: {}",
+    cost_microdollars, total_spent_after_first
+  );
+
+  // Second report with SAME event_id (should be idempotent)
+  let response2 = router
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response2.status(), StatusCode::OK,
+    "LOUD FAILURE: Duplicate event_id report should return 200 OK (idempotent)"
+  );
+
+  // Get budget after second report
+  let budget_after_second = sqlx::query( "SELECT total_spent FROM agent_budgets WHERE agent_id = ?" )
+    .bind( agent_id )
+    .fetch_one( &pool )
+    .await
+    .expect("LOUD FAILURE: Should fetch agent budget");
+
+  let total_spent_after_second : i64 = budget_after_second.get( "total_spent" );
+
+  // CRITICAL: Budget should NOT be double-charged
+  assert_eq!(
+    total_spent_after_second, cost_microdollars,
+    "LOUD FAILURE: Idempotency violation - budget was double-charged! Expected: {}, Actual: {}",
+    cost_microdollars, total_spent_after_second
+  );
+}

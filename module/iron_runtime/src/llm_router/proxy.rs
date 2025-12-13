@@ -155,10 +155,11 @@ fn create_openai_error_response(
     .header(header::CONTENT_TYPE, "application/json")
     .body(Body::from(error_json.to_string()))
     .unwrap_or_else(|_| {
+      // Fallback response if primary error response construction fails
       Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(Body::from("Internal error"))
-        .unwrap()
+        .expect( "INVARIANT: Fallback response with static content and valid StatusCode never fails" )
     })
 }
 
