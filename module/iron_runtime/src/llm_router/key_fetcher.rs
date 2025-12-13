@@ -142,33 +142,46 @@ impl KeyFetcher
     Ok(key)
   }
 
-  /// Fetch key from Iron Cage server (auto-detect provider from key format)
+  /// Fetch key from Iron Cage server using POST /api/v1/agents/provider-key (Feature 014)
   async fn fetch_from_server(&self) -> Result<ProviderKey, LlmRouterError>
   {
-    let url = format!("{}/api/keys", self.server_url);
+    let url = format!("{}/api/v1/agents/provider-key", self.server_url);
+
+    #[derive(serde::Serialize)]
+    struct ProviderKeyRequest<'a>
+    {
+      ic_token: &'a str,
+    }
 
     let response = self
       .client
-      .get(&url)
-      .header("Authorization", format!("Bearer {}", self.ic_token))
+      .post(&url)
+      .header("Content-Type", "application/json")
+      .json(&ProviderKeyRequest { ic_token: &self.ic_token })
       .send()
       .await
       .map_err(|e| LlmRouterError::KeyFetch(e.to_string()))?;
 
     if !response.status().is_success()
     {
-      return Err(LlmRouterError::KeyFetch(format!(
-        "Server returned status {}",
-        response.status()
-      )));
+      // Parse error response for better error message
+      let status = response.status();
+      let error_msg = match response.json::<serde_json::Value>().await {
+        Ok(json) => {
+          let error = json.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+          let code = json.get("code").and_then(|v| v.as_str()).unwrap_or("UNKNOWN");
+          format!("{}: {} ({})", status, error, code)
+        }
+        Err(_) => format!("Server returned status {}", status),
+      };
+      return Err(LlmRouterError::KeyFetch(error_msg));
     }
 
     #[derive(serde::Deserialize)]
     struct KeyResponse
     {
-      #[serde(default)]
-      provider: Option<String>,
-      api_key: String,
+      provider_key: String,
+      provider: String,
       #[serde(default)]
       base_url: Option<String>,
     }
@@ -178,14 +191,9 @@ impl KeyFetcher
       .await
       .map_err(|e| LlmRouterError::KeyFetch(e.to_string()))?;
 
-    // Auto-detect provider from key format if not specified
-    let provider = data
-      .provider
-      .unwrap_or_else(|| ProviderKey::detect_provider_from_key(&data.api_key).to_string());
-
     Ok(ProviderKey {
-      provider,
-      api_key: data.api_key,
+      provider: data.provider,
+      api_key: data.provider_key,
       base_url: data.base_url,
     })
   }
