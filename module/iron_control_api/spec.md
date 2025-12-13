@@ -96,7 +96,8 @@ Exchange IC Token for IP Token (encrypted provider API key).
 {
   "ip_token": "ip_v1:AQIDBAUGBwgJ...",
   "lease_id": "lease_abc123-def4-5678-90ab-cdef12345678",
-  "budget_granted": 10.0,
+  "budget_granted": 10000000,
+  "budget_remaining": 0,
   "expires_at": 1735689600000
 }
 ```
@@ -104,7 +105,8 @@ Exchange IC Token for IP Token (encrypted provider API key).
 **Response Fields:**
 - `ip_token` (string): AES-256-GCM encrypted provider API key. Format: `ip_v1:<base64_ciphertext>`
 - `lease_id` (string): Budget lease identifier. Format: `lease_<uuid>`
-- `budget_granted` (float): USD allocated for this session
+- `budget_granted` (integer): Microdollars allocated for this session (1 USD = 1,000,000 microdollars)
+- `budget_remaining` (integer): Remaining agent budget in microdollars after lease allocation
 - `expires_at` (integer, nullable): Expiration timestamp in milliseconds since epoch. NULL = no expiration.
 
 **Error Responses:**
@@ -128,42 +130,84 @@ Report LLM usage for a budget lease.
 ```json
 {
   "lease_id": "lease_abc123-def4-5678-90ab-cdef12345678",
-  "cost_usd": 2.5,
-  "tokens_used": 10000,
-  "model": "gpt-4"
+  "request_id": "req_abc123",
+  "tokens": 10000,
+  "cost_microdollars": 2500000,
+  "model": "gpt-4",
+  "provider": "openai"
 }
 ```
 
 **Request Fields:**
 - `lease_id` (string, required): Budget lease identifier from handshake response
-- `cost_usd` (float, required): USD cost of this usage event. Must be > 0.
-- `tokens_used` (integer, optional): Total tokens consumed (prompt + completion)
-- `model` (string, optional): Model identifier used for this request
+- `request_id` (string, required): Unique request identifier
+- `tokens` (integer, required): Total tokens consumed (prompt + completion). Must be > 0.
+- `cost_microdollars` (integer, required): Cost in microdollars (1 USD = 1,000,000). Must be >= 0.
+- `model` (string, required): Model identifier used for this request
+- `provider` (string, required): Provider name (e.g., "openai", "anthropic")
 
 **Response (200 OK):**
 ```json
 {
-  "budget_spent": 2.5,
-  "budget_remaining": 7.5,
-  "lease_status": "active"
+  "success": true,
+  "budget_remaining": 7500000
 }
 ```
 
 **Response Fields:**
-- `budget_spent` (float): Total USD spent in this lease so far
-- `budget_remaining` (float): Remaining budget for this lease (granted - spent)
-- `lease_status` (string): Lease status: "active" | "expired" | "revoked"
+- `success` (boolean): Whether usage was recorded successfully
+- `budget_remaining` (integer): Remaining agent budget in microdollars
 
 **Error Responses:**
-- `400 Bad Request`: Invalid lease_id format or negative cost_usd
+- `400 Bad Request`: Invalid lease_id format, missing fields, or validation errors
+- `403 Forbidden`: Lease expired, revoked, or insufficient budget
 - `404 Not Found`: Lease not found in database
-- `409 Conflict`: Budget exceeded (cost_usd > budget_remaining)
 - `500 Internal Server Error`: Database error during usage recording
 
 **Side Effects:**
 - Updates budget_spent in budget_leases table
 - Updates total_spent and budget_remaining in agent_budgets table
 - Maintains budget invariant: total_allocated = total_spent + budget_remaining
+
+---
+
+#### POST /api/budget/return
+
+Return unused budget when a lease is closed.
+
+**Request:**
+```json
+{
+  "lease_id": "lease_abc123-def4-5678-90ab-cdef12345678",
+  "spent_microdollars": 2500000
+}
+```
+
+**Request Fields:**
+- `lease_id` (string, required): Budget lease identifier from handshake response
+- `spent_microdollars` (integer, optional): Actual amount spent in microdollars. Default: 0.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "returned": 7500000
+}
+```
+
+**Response Fields:**
+- `success` (boolean): Whether budget was returned successfully
+- `returned` (integer): Microdollars returned to agent budget (granted - spent)
+
+**Error Responses:**
+- `400 Bad Request`: Invalid lease_id format, lease not active, or validation errors
+- `404 Not Found`: Lease not found in database
+- `500 Internal Server Error`: Database error during budget return
+
+**Side Effects:**
+- Closes the lease (sets status to "closed")
+- Returns unused budget to agent_budgets (budget_remaining += returned)
+- Credits usage_limits (current_cost_microdollars_this_month -= returned)
 
 ---
 
@@ -175,28 +219,28 @@ Request additional budget allocation for an agent.
 ```json
 {
   "agent_id": 42,
-  "additional_budget": 20.0,
+  "additional_budget": 20000000,
   "reason": "Extended task execution"
 }
 ```
 
 **Request Fields:**
 - `agent_id` (integer, required): Agent database ID
-- `additional_budget` (float, required): Additional USD to allocate. Must be > 0.
+- `additional_budget` (integer, required): Additional microdollars to allocate. Must be > 0.
 - `reason` (string, optional): Human-readable justification for budget increase
 
 **Response (200 OK):**
 ```json
 {
-  "total_allocated": 30.0,
-  "budget_remaining": 27.5,
+  "total_allocated": 30000000,
+  "budget_remaining": 27500000,
   "updated_at": 1735689700000
 }
 ```
 
 **Response Fields:**
-- `total_allocated` (float): New total allocated budget (old + additional)
-- `budget_remaining` (float): Updated remaining budget
+- `total_allocated` (integer): New total allocated budget in microdollars (old + additional)
+- `budget_remaining` (integer): Updated remaining budget in microdollars
 - `updated_at` (integer): Timestamp of budget update in milliseconds since epoch
 
 **Error Responses:**
@@ -223,7 +267,7 @@ Create a new budget change request.
 {
   "agent_id": 1,
   "requester_id": "user-123",
-  "requested_budget_usd": 250.0,
+  "requested_budget_micros": 250000000,
   "justification": "Need increased budget for expanded testing and model experimentation"
 }
 ```
@@ -231,7 +275,7 @@ Create a new budget change request.
 **Request Fields:**
 - `agent_id` (integer, required): Agent database ID
 - `requester_id` (string, required): ID of user creating the request
-- `requested_budget_usd` (float, required): Requested budget amount in USD. Must be > 0.
+- `requested_budget_micros` (integer, required): Requested budget amount in microdollars (1 USD = 1,000,000). Must be > 0.
 - `justification` (string, required): Reason for budget request. Length: 20-500 characters.
 
 **Response (201 Created):**
@@ -268,8 +312,8 @@ Get a budget change request by ID.
   "id": "breq_550e8400-e29b-41d4-a716-446655440000",
   "agent_id": 1,
   "requester_id": "user-123",
-  "current_budget_usd": 100.0,
-  "requested_budget_usd": 250.0,
+  "current_budget_micros": 100000000,
+  "requested_budget_micros": 250000000,
   "justification": "Need increased budget for expanded testing",
   "status": "pending",
   "created_at": 1735689600000,
@@ -281,8 +325,8 @@ Get a budget change request by ID.
 - `id` (string): Request identifier
 - `agent_id` (integer): Agent database ID
 - `requester_id` (string): User who created the request
-- `current_budget_usd` (float): Budget at time of request creation
-- `requested_budget_usd` (float): Requested budget amount
+- `current_budget_micros` (integer): Budget in microdollars at time of request creation
+- `requested_budget_micros` (integer): Requested budget amount in microdollars
 - `justification` (string): Request justification
 - `status` (string): Current status: "pending" | "approved" | "rejected" | "cancelled"
 - `created_at` (integer): Creation timestamp
@@ -310,8 +354,8 @@ List budget change requests with optional filtering.
       "id": "breq_550e8400-e29b-41d4-a716-446655440000",
       "agent_id": 1,
       "requester_id": "user-123",
-      "current_budget_usd": 100.0,
-      "requested_budget_usd": 250.0,
+      "current_budget_micros": 100000000,
+      "requested_budget_micros": 250000000,
       "justification": "Need increased budget for expanded testing",
       "status": "pending",
       "created_at": 1735689600000,

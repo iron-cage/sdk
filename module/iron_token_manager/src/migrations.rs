@@ -564,9 +564,9 @@ async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 019: Add provider_key_id to agents table (Feature 014)
+/// Migration 019: Add `provider_key_id` to agents table (Feature 014)
 ///
-/// Adds FK from agents to ai_provider_keys for provider key assignment.
+/// Adds FK from agents to `ai_provider_keys` for provider key assignment.
 /// Each agent can have one assigned provider key.
 #[ allow( dead_code ) ]
 async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >

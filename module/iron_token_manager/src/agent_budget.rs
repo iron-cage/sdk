@@ -405,7 +405,7 @@ impl AgentBudgetManager
   /// Called by `/api/budget/return` endpoint when a lease is closed with unused budget.
   /// This reverses the reservation made by `check_and_reserve_budget()`.
   ///
-  /// Updates: `total_spent` -= returned_amount, `budget_remaining` += returned_amount
+  /// Updates: `total_spent` -= `returned_amount`, `budget_remaining` += `returned_amount`
   /// Maintains invariant: `total_allocated` = `total_spent` + `budget_remaining`
   ///
   /// # Arguments

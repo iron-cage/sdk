@@ -179,15 +179,29 @@ timestamp1 < timestamp2  // true (9th < 10th)
 }
 ```
 
-**Decimal precision:** Always 2 decimal places (cents precision)
+**Display format:** 2 decimal places for USD display
 
 ```json
-✅ "budget": 100.00  // OK (even if zero cents)
-✅ "budget": 100.50  // OK
-❌ "budget": 100     // ❌ Missing decimal places
-❌ "budget": 100.5   // ❌ Only 1 decimal place
-❌ "budget": 100.505 // ❌ Too many decimal places
+✅ "budget_usd": 100.00  // OK (display format)
+✅ "budget_usd": 100.50  // OK
 ```
+
+### Internal Storage: Microdollars
+
+**All budget values stored as integers in microdollars** (1 USD = 1,000,000 microdollars).
+This avoids floating-point precision errors for sub-cent amounts.
+
+```json
+{
+  "budget_granted": 10000000,      // $10.00 in microdollars
+  "cost_microdollars": 2500000,    // $2.50 in microdollars
+  "budget_remaining": 7500000      // $7.50 in microdollars
+}
+```
+
+**Conversion:**
+- Display: `microdollars / 1_000_000.0` → USD (e.g., 2500000 → $2.50)
+- Storage: `usd * 1_000_000` → microdollars (e.g., $2.50 → 2500000)
 
 ### Currency Code
 
