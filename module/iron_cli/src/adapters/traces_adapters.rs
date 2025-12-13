@@ -122,7 +122,7 @@ pub async fn get_trace_adapter(
   let client = TokenApiClient::new( config );
 
   // 4. Build path
-  let id = params.get( "id" ).unwrap(); // Safe: validated by handler
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/traces/{}", id );
 
   // 5. Make HTTP call

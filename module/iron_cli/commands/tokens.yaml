@@ -6,6 +6,30 @@
   version: 1.0.0
   idempotent: false
   arguments:
+  - name: name
+    description: Token name/identifier
+    kind: String
+    hint: Descriptive name for the token
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: scope
+    description: Token scope/permissions
+    kind: String
+    hint: Defines what actions token can perform
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
   - name: project
     description: Project ID to associate with token
     kind: String

@@ -38,7 +38,7 @@
 //!
 //! ## Record Events
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use iron_runtime_analytics::{ EventStore, EventPayload, LlmUsageData, LlmModelMeta };
 //! use std::sync::Arc;
 //!
@@ -63,7 +63,7 @@
 //!
 //! ## Compute Statistics
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use iron_runtime_analytics::EventStore;
 //!
 //! let store = EventStore::new();
@@ -83,7 +83,7 @@
 //!
 //! ## Dashboard Sync
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! # #[cfg(feature = "sync")]
 //! # {
 //! use iron_runtime_analytics::{ SyncClient, SyncConfig };

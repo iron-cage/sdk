@@ -3,8 +3,10 @@
 //! Bridge agent handlers with Control API HTTP client.
 //! Async functions that validate params, make HTTP calls, and format output.
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::agent_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -43,7 +45,9 @@ pub async fn list_agents_adapter(
   // Format output based on format parameter
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Create new agent
@@ -76,7 +80,7 @@ pub async fn create_agent_adapter(
 
   let mut body = json!({
     "name": name,
-    "budget": budget.parse::< i64 >().unwrap(),
+    "budget": budget.parse::< i64 >().expect( "Budget parameter validated by handler" ),
   });
 
   // Add optional provider_ids
@@ -99,7 +103,9 @@ pub async fn create_agent_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Get agent by ID
@@ -128,7 +134,9 @@ pub async fn get_agent_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Update agent
@@ -168,7 +176,7 @@ pub async fn update_agent_adapter(
 
   if let Some( budget ) = params.get( "budget" )
   {
-    body[ "budget" ] = json!( budget.parse::< i64 >().unwrap() );
+    body[ "budget" ] = json!( budget.parse::< i64 >().expect( "Budget parameter validated by handler" ) );
   }
 
   // Make HTTP PUT request
@@ -181,7 +189,9 @@ pub async fn update_agent_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Delete agent
@@ -221,7 +231,9 @@ pub async fn delete_agent_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Assign providers to agent
@@ -273,7 +285,9 @@ pub async fn assign_providers_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// List providers for agent
@@ -302,7 +316,9 @@ pub async fn list_agent_providers_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Remove provider from agent
@@ -343,5 +359,7 @@ pub async fn remove_provider_adapter(
   // Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
 
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

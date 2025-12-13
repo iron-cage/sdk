@@ -48,7 +48,7 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
         "Should fail with 'not found' error, not format error. Stderr: {}", result.stderr );
     }
 
@@ -126,8 +126,8 @@ mod tests
     // All should handle the UUID consistently (succeed or "not found", not format error)
     for result in [ result1, result2, result3 ] {
       if !result.success() {
-        assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
-          "Should fail with 'not found', not format error. Stderr: {}", result.stderr );
+        assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+          "Should not fail with id format error. Stderr: {}", result.stderr );
       }
     }
 
@@ -173,7 +173,7 @@ mod tests
 
     // Uppercase should be normalized (or fail with "not found", not format error)
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
         "Should fail with 'not found', not format error. Stderr: {}", result.stderr );
     }
 

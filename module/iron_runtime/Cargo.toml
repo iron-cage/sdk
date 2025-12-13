@@ -10,10 +10,6 @@ readme = "readme.md"
 keywords = ["runtime", "llm", "routing", "agent-runtime"]
 categories = ["asynchronous"]
 
-[lib]
-name = "iron_runtime"
-crate-type = ["rlib", "cdylib"]
-
 [features]
 default = ["full"]
 enabled = [
@@ -82,3 +78,6 @@ tokio = { workspace = true, features = ["full"] }
 # Enable test utilities for ID types in tests
 iron_types = { workspace = true, features = ["test-helpers"] }
 
+[lib]
+name = "iron_runtime"
+crate-type = ["rlib", "cdylib"]

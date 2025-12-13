@@ -11,9 +11,6 @@ readme = "readme.md"
 keywords = ["secrets", "encryption", "key-management", "security"]
 categories = ["cryptography"]
 
-[lints]
-workspace = true
-
 [dependencies]
 # Workspace crates
 iron_types = { workspace = true }
@@ -47,3 +44,6 @@ mod_interface = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 criterion = "0.5"
+
+[lints]
+workspace = true

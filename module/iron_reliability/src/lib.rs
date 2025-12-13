@@ -38,6 +38,7 @@
 //!
 //! ```rust
 //! use iron_reliability::CircuitBreaker;
+//! # fn main() -> Result<(), &'static str> {
 //!
 //! // Create breaker: 5 failures triggers open, 60s timeout
 //! let breaker = CircuitBreaker::new(5, 60);
@@ -59,8 +60,8 @@
 //!     Err(e)
 //!   }
 //! }
+//! # }
 //! # fn make_llm_request() -> Result<(), &'static str> { Ok(()) }
-//! # Ok::<(), &str>(())
 //! ```
 //!
 //! ## Integration Pattern

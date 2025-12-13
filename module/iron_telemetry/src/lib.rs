@@ -107,12 +107,12 @@
 //! );
 //!
 //! // Error with details
+//! # let err = std::io::Error::from(std::io::ErrorKind::Other);
 //! error!(
 //!   agent_id = "agent_550e8400-...",
 //!   error = %err,
 //!   "Request failed"
 //! );
-//! # let err = std::io::Error::from(std::io::ErrorKind::Other);
 //! # }
 //! ```
 //!

@@ -10,6 +10,7 @@ use super::OutputFormat;
 use crate::handlers::CliError;
 use std::collections::HashMap;
 use tree_fmt::{ RowBuilder, TableView };
+use serde_json::Value;
 
 /// Universal formatter using tree_fmt library
 pub struct TreeFmtFormatter
@@ -58,6 +59,70 @@ impl TreeFmtFormatter
       OutputFormat::Json => self.format_error_json( error ),
       OutputFormat::Yaml => self.format_error_yaml( error ),
     }
+  }
+
+  /// Format a serde_json::Value (auto-detect array vs object)
+  pub fn format_value( &self, value: &Value ) -> Result< String, String >
+  {
+    match value
+    {
+      Value::Array( items ) => self.format_value_array( items ),
+      Value::Object( _ ) => self.format_value_object( value ),
+      _ => Ok( value.to_string() ),
+    }
+  }
+
+  /// Format a JSON object as single item
+  fn format_value_object( &self, obj: &Value ) -> Result< String, String >
+  {
+    let obj_map = match obj.as_object()
+    {
+      Some( map ) => map,
+      None => return match self.format
+      {
+        OutputFormat::Json => Ok( serde_json::to_string_pretty( obj ).unwrap_or_else( |_| "{}".to_string() ) ),
+        OutputFormat::Yaml => Ok( serde_yaml::to_string( obj ).unwrap_or_else( |_| "{}".to_string() ) ),
+        _ => Ok( obj.to_string() ),
+      },
+    };
+
+    if obj_map.is_empty()
+    {
+      return Ok( "Empty object.".to_string() );
+    }
+
+    // Convert JSON object to HashMap<String, String>
+    let data = convert_json_to_hashmap( obj_map );
+
+    Ok( self.format_single( &data ) )
+  }
+
+  /// Format a JSON array as list
+  fn format_value_array( &self, items: &[ Value ] ) -> Result< String, String >
+  {
+    if items.is_empty()
+    {
+      return Ok( "No results found.".to_string() );
+    }
+
+    // Convert JSON array to Vec<HashMap<String, String>>
+    let data: Vec< HashMap< String, String > > = items
+      .iter()
+      .filter_map( |item| item.as_object().map( convert_json_to_hashmap ) )
+      .collect();
+
+    if data.is_empty()
+    {
+      // Array of non-objects, use JSON/YAML
+      return match self.format
+      {
+        OutputFormat::Json => Ok( serde_json::to_string_pretty( items ).unwrap_or_else( |_| "[]".to_string() ) ),
+        OutputFormat::Yaml => Ok( serde_yaml::to_string( items ).unwrap_or_else( |_| "[]".to_string() ) ),
+        _ => Ok( format!( "[{} items]", items.len() ) ),
+      };
+    }
+
+    Ok( self.format_list( &data ) )
   }
 
   // ============================================================================
@@ -238,4 +303,65 @@ impl TreeFmtFormatter
     let error_obj: HashMap< String, String > = [ ( "error".to_string(), error_msg ) ].iter().cloned().collect();
     serde_yaml::to_string( &error_obj ).unwrap_or_else( | _ | "error: unknown".to_string() )
   }
+}
+
+// ============================================================================
+// Helper functions for JSON conversion
+// ============================================================================
+
+/// Convert serde_json::Map to HashMap<String, String>
+///
+/// Handles nested structures by converting them to strings:
+/// - Objects: Convert to JSON string
+/// - Arrays: Convert to comma-separated list or JSON string
+/// - Primitives: Convert to string representation
+fn convert_json_to_hashmap( map: &serde_json::Map< String, Value > ) -> HashMap< String, String >
+{
+  map
+    .iter()
+    .map( |( key, value )|
+    {
+      let value_str = match value
+      {
+        Value::Null => "null".to_string(),
+        Value::Bool( b ) => b.to_string(),
+        Value::Number( n ) => n.to_string(),
+        Value::String( s ) => s.clone(),
+        Value::Array( arr ) =>
+        {
+          if arr.is_empty()
+          {
+            "[]".to_string()
+          }
+          else if arr.iter().all( |v| v.is_string() || v.is_number() || v.is_boolean() )
+          {
+            // Display array as comma-separated values for primitive types
+            arr
+              .iter()
+              .map( |v| match v
+              {
+                Value::String( s ) => s.clone(),
+                Value::Number( n ) => n.to_string(),
+                Value::Bool( b ) => b.to_string(),
+                _ => v.to_string(),
+              } )
+              .collect::< Vec< _ > >()
+              .join( ", " )
+          }
+          else
+          {
+            // For complex arrays, show JSON
+            serde_json::to_string( arr ).unwrap_or_else( |_| "[]".to_string() )
+          }
+        }
+        Value::Object( _ ) =>
+        {
+          // For nested objects, show JSON
+          serde_json::to_string( value ).unwrap_or_else( |_| "{}".to_string() )
+        }
+      };
+
+      ( key.clone(), value_str )
+    } )
+    .collect()
 }

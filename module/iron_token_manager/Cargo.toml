@@ -11,9 +11,6 @@ readme = "readme.md"
 keywords = ["tokens", "api-keys", "usage-tracking", "limits"]
 categories = ["authentication"]
 
-[lints]
-workspace = true
-
 [features]
 default = ["enabled"]
 enabled = []
@@ -83,3 +80,6 @@ tokio-test = "0.4"
 regex.workspace = true
 # Enable test utilities for ID types in tests
 iron_types = { workspace = true, features = ["test-helpers"] }
+
+[lints]
+workspace = true

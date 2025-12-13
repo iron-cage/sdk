@@ -5,11 +5,7 @@
 //! - IC_SERVER environment variable set (Iron Cage server URL)
 //! - Provider key configured in Iron Cage dashboard
 //!
-//! Run with: cargo test --features integration
-//!
 //! Tests skip gracefully when env vars are not set (for CI compatibility).
-
-#![ cfg( feature = "integration" ) ]
 
 use tracing::debug;
 

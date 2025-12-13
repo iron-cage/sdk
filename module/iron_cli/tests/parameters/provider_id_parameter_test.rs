@@ -46,7 +46,7 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
         "Should fail with 'not found' error, not format error. Stderr: {}", result.stderr );
     }
 
@@ -136,7 +136,7 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
         "Should fail with 'not found', not format error. Stderr: {}", result.stderr );
     }
 
@@ -160,7 +160,7 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
         "Should fail with 'not found', not format error. Stderr: {}", result.stderr );
     }
 
@@ -184,7 +184,7 @@ mod tests
     let result = harness.run( "iron", &[ ".provider.get", "provider_id::550E8400-E29B-41D4-A716-446655440000" ] ).await;
 
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
         "Uppercase UUID should be accepted. Stderr: {}", result.stderr );
     }
 

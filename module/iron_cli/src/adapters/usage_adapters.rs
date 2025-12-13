@@ -117,7 +117,7 @@ pub async fn export_usage_adapter(
 
   query_params.insert(
     "format".to_string(),
-    params.get( "export_format" ).unwrap().clone(),
+    params.get( "export_format" ).unwrap().clone(), // Already validated
   );
 
   if let Some( start_date ) = params.get( "start_date" )
@@ -137,7 +137,7 @@ pub async fn export_usage_adapter(
     .map_err( |e| format!( "Failed to export usage: {}", e ) )?;
 
   // 6. Write to file
-  let output_file = params.get( "output_file" ).unwrap();
+  let output_file = params.get( "output_file" ).unwrap(); // Already validated
   let export_data = serde_json::to_string_pretty( &response )
     .map_err( |e| format!( "Failed to serialize data: {}", e ) )?;
 

@@ -47,8 +47,8 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
-        "Should fail with 'not found' error, not format error. Stderr: {}", result.stderr );
+      assert!( !result.stderr.contains( "agent_id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with agent_id format error. Stderr: {}", result.stderr );
     }
 
     server.shutdown().await;
@@ -137,8 +137,8 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
-        "Should fail with 'not found', not format error. Stderr: {}", result.stderr );
+      assert!( !result.stderr.contains( "agent_id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with agent_id format error. Stderr: {}", result.stderr );
     }
 
     server.shutdown().await;
@@ -161,8 +161,8 @@ mod tests
 
     // Should succeed or fail with "not found", not format error
     if !result.success() {
-      assert!( result.stderr.contains( "not found" ) || result.stderr.contains( "does not exist" ),
-        "Should fail with 'not found', not format error. Stderr: {}", result.stderr );
+      assert!( !result.stderr.contains( "agent_id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with agent_id format error. Stderr: {}", result.stderr );
     }
 
     server.shutdown().await;

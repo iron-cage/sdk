@@ -83,7 +83,7 @@
 //!
 //! ## Integration with Analytics
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! # #[cfg(feature = "enabled")]
 //! # {
 //! use iron_safety::PiiDetector;

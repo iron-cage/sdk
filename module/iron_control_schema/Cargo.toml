@@ -11,9 +11,6 @@ description = "PostgreSQL schema for Iron Cage Control Panel (production mode)"
 enabled = []
 full = ["enabled"]
 
-[lints]
-workspace = true
-
 [lib]
 # Spec-only module - no implementation yet
 
@@ -22,3 +19,6 @@ workspace = true
 # sqlx.workspace = true
 # serde.workspace = true
 # iron_types.workspace = true
+
+[lints]
+workspace = true

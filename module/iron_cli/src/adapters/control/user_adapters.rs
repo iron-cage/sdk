@@ -1,7 +1,9 @@
 //! User adapter functions
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::control_user_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -21,7 +23,9 @@ pub async fn list_users_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn create_user_adapter(
@@ -44,9 +48,9 @@ pub async fn create_user_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let username = params.get( "username" ).unwrap();
-  let email = params.get( "email" ).unwrap();
-  let password = params.get( "password" ).unwrap();
+  let username = params.get( "username" ).unwrap(); // Already validated
+  let email = params.get( "email" ).unwrap(); // Already validated
+  let password = params.get( "password" ).unwrap(); // Already validated
 
   let mut body = json!({
     "username": username,
@@ -65,7 +69,9 @@ pub async fn create_user_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn get_user_adapter(
@@ -78,7 +84,7 @@ pub async fn get_user_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/users/{}", id );
 
   let response = client
@@ -87,7 +93,9 @@ pub async fn get_user_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn update_user_adapter(
@@ -110,7 +118,7 @@ pub async fn update_user_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
 
   let mut body = json!({});
 
@@ -126,7 +134,9 @@ pub async fn update_user_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn delete_user_adapter(
@@ -149,7 +159,7 @@ pub async fn delete_user_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/users/{}", id );
 
   let response = client
@@ -158,7 +168,9 @@ pub async fn delete_user_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn set_user_role_adapter(
@@ -181,8 +193,8 @@ pub async fn set_user_role_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
-  let role = params.get( "role" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
+  let role = params.get( "role" ).unwrap(); // Already validated
 
   let body = json!({
     "role": role,
@@ -195,7 +207,9 @@ pub async fn set_user_role_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn reset_user_password_adapter(
@@ -218,8 +232,8 @@ pub async fn reset_user_password_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
-  let new_password = params.get( "new_password" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
+  let new_password = params.get( "new_password" ).unwrap(); // Already validated
 
   let body = json!({
     "new_password": new_password,
@@ -232,7 +246,9 @@ pub async fn reset_user_password_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn get_user_permissions_adapter(
@@ -245,7 +261,7 @@ pub async fn get_user_permissions_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/users/{}/permissions", id );
 
   let response = client
@@ -254,5 +270,7 @@ pub async fn get_user_permissions_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

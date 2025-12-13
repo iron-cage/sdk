@@ -275,5 +275,5 @@ async fn test_update_existing_limit()
     .await
     .expect("LOUD FAILURE: Failed to get limit");
 
-  assert_eq!( limit.max_tokens_per_day, Some( 20_000 ) );
+  assert_eq!( limit.max_tokens_per_day, Some( 20_000 ), "Updated limit should have new max tokens value" );
 }

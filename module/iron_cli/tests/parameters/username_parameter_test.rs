@@ -37,7 +37,7 @@ mod tests
     let harness = IntegrationTestHarness::new()
       .server_url( server.url() );
 
-    let result = harness.run( "iron", &[ ".auth.login", "username::testuser", "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", "password::testpass123" ] ).await;
 
     // Should succeed or fail with auth error, not validation error
     if !result.success() {
@@ -57,7 +57,7 @@ mod tests
     let harness = IntegrationTestHarness::new()
       .server_url( server.url() );
 
-    let result = harness.run( "iron", &[ ".auth.login", "username::", "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", "username::", "password::testpass123" ] ).await;
 
     assert!( !result.success(), "Empty username should fail" );
     assert!( result.stderr.contains( "username" ) || result.stderr.contains( "empty" ) || result.stderr.contains( "required" ),
@@ -75,7 +75,7 @@ mod tests
     let harness = IntegrationTestHarness::new()
       .server_url( server.url() );
 
-    let result = harness.run( "iron", &[ ".auth.login", "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", "password::testpass123" ] ).await;
 
     assert!( !result.success(), "Missing required username should fail" );
     assert!( result.stderr.contains( "username" ) || result.stderr.contains( "required" ),
@@ -93,7 +93,7 @@ mod tests
     let harness = IntegrationTestHarness::new()
       .server_url( server.url() );
 
-    let result = harness.run( "iron", &[ ".auth.login", "username::test@user!", "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", "username::test@user!", "password::testpass123" ] ).await;
 
     // Special characters may be rejected depending on policy
     if !result.success() && result.stderr.contains( "username" ) && result.stderr.contains( "invalid" ) {
@@ -112,7 +112,7 @@ mod tests
     let harness = IntegrationTestHarness::new()
       .server_url( server.url() );
 
-    let result = harness.run( "iron", &[ ".auth.login", "username::test user", "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", "username::test user", "password::testpass123" ] ).await;
 
     if !result.success() {
       assert!( result.stderr.contains( "username" ) || result.stderr.contains( "invalid" ) || result.stderr.contains( "whitespace" ),
@@ -132,7 +132,7 @@ mod tests
       .server_url( server.url() );
 
     let long_username = "a".repeat( 300 );
-    let result = harness.run( "iron", &[ ".auth.login", &format!( "username::{}", long_username ), "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", &format!( "username::{}", long_username ), "password::testpass123" ] ).await;
 
     if !result.success() {
       assert!( result.stderr.contains( "username" ) || result.stderr.contains( "too long" ) || result.stderr.contains( "length" ),
@@ -151,7 +151,7 @@ mod tests
     let harness = IntegrationTestHarness::new()
       .server_url( server.url() );
 
-    let result = harness.run( "iron", &[ ".auth.login", "username::test@example.com", "password::testpass123" ] ).await;
+    let result = harness.run( "iron-token", &[ ".auth.login", "username::test@example.com", "password::testpass123" ] ).await;
 
     // Email-style usernames might be allowed
     if !result.success() {

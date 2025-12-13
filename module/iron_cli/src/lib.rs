@@ -112,10 +112,11 @@
 //!
 //! let mut params = HashMap::new();
 //! params.insert("name".to_string(), "Production API".to_string());
+//! params.insert("scope".to_string(), "read:tokens".to_string());
 //! params.insert("project_id".to_string(), "proj_123".to_string());
 //!
 //! // Pure handler function (no I/O)
-//! let formatted_request = token_handlers::handle_token_create(&params)?;
+//! let formatted_request = token_handlers::generate_token_handler(&params)?;
 //! # Ok::<(), iron_cli::handlers::CliError>(())
 //! ```
 //!

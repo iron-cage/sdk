@@ -1,7 +1,9 @@
 //! Budget limit adapter functions
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::budget_limit_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -21,7 +23,9 @@ pub async fn get_budget_limit_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn set_budget_limit_adapter(
@@ -44,10 +48,10 @@ pub async fn set_budget_limit_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let limit = params.get( "limit" ).unwrap();
+  let limit = params.get( "limit" ).unwrap(); // Already validated
 
   let body = json!({
-    "limit": limit.parse::< i64 >().unwrap(),
+    "limit": limit.parse::< i64 >().expect( "limit parameter validated by handler" ),
   });
 
   let response = client
@@ -56,5 +60,7 @@ pub async fn set_budget_limit_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

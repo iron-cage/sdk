@@ -10,10 +10,6 @@ readme = "readme.md"
 keywords = ["api", "rest", "control-plane", "agent-management"]
 categories = ["web-programming::http-server"]
 
-[[bin]]
-name = "iron_control_api_server"
-path = "src/bin/iron_control_api_server.rs"
-
 [features]
 default = ["enabled"]
 enabled = [
@@ -107,3 +103,7 @@ tokio = { workspace = true, features = ["full"] }
 hyper = { workspace = true }
 http-body-util = { workspace = true }
 sha2 = { workspace = true }
+
+[[bin]]
+name = "iron_control_api_server"
+path = "src/bin/iron_control_api_server.rs"
