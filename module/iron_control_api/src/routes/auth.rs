@@ -516,23 +516,6 @@ pub async fn logout(
   State(state): State<AuthState>,
   AuthenticatedUser( claims ): AuthenticatedUser
 ) -> impl IntoResponse {
-//   let claims = match state.jwt_secret.verify_access_token(&bearer.token()) {
-//     Ok(claims) => claims,
-//     Err(_) => {
-//       return (
-//         StatusCode::UNAUTHORIZED,
-//         Json(ErrorResponse {
-//           error: ErrorDetail {
-//             code: "AUTH_INVALID_TOKEN".to_string(),
-//             message: "Invalid or expired authentication token".to_string(),
-//             details: None,
-//           },
-//         }),
-//       )
-//         .into_response();
-//     }
-//   };
-
   let jti = claims.jti;
   let user_id = claims.sub;
 
