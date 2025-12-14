@@ -6,7 +6,7 @@
 
 REST API endpoints for User authentication and User Token lifecycle management (login, logout, refresh, validate).
 
-**In Scope:**
+#### In Scope
 - User login (email/password → User Token)
 - User logout (invalidate User Token)
 - User Token refresh (extend expiration)
@@ -14,7 +14,7 @@ REST API endpoints for User authentication and User Token lifecycle management (
 - Request/response schemas
 - User Token format and lifetime
 
-**Out of Scope:**
+#### Out of Scope
 - IC Token authentication (agent authentication, see [005_budget_control_protocol.md](005_budget_control_protocol.md))
 - User registration/account creation (admin-managed, separate endpoint)
 - Password reset (future feature)
@@ -44,8 +44,19 @@ This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
 - All entity IDs use `prefix_uuid` format with underscore separator
-- `user_id`: `user_<uuid>` (e.g., `user_550e8400-e29b-41d4-a716-446655440000`)
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API) - defined here
+  - Usage: User identifier for authentication and authorization across all Iron Cage APIs
 - `session_id`: `session_<uuid>` (if applicable)
+
+- User Token value: JWT token (e.g., `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`)
+  - Format: JSON Web Token (JWT) with HS256 signature
+  - Pattern: `^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$`
+  - Source: Protocol 007 (Authentication API) - defined here
+  - Usage: Authentication credential for user access to Control Panel APIs
+  - Lifetime: 30 days (2592000 seconds), auto-refresh when < 7 days remaining
+  - Claims: sub (user_id), email, role, iat, exp, jti (see JWT structure lines 128-138)
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
@@ -55,7 +66,7 @@ This protocol adheres to the following Iron Cage standards:
 **Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
 - Consistent error response structure across all endpoints
 - Machine-readable error codes: `AUTH_INVALID_CREDENTIALS`, `AUTH_TOKEN_EXPIRED`, `AUTH_INVALID_TOKEN`, `AUTH_ACCOUNT_DISABLED`, `RATE_LIMIT_EXCEEDED`
-- HTTP status codes: 200, 400, 401
+- HTTP status codes: 200, 204, 400, 401, 403, 429, 500
 
 **API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
 - URL structure: `/api/v1/auth/login`, `/api/v1/auth/logout`, `/api/v1/auth/refresh`
@@ -78,11 +89,10 @@ Request:
 
 Response: 200 OK
 {
-  "user_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyX2FiYzEyMyIsImVtYWlsIjoiZGV2QGV4YW1wbGUuY29tIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTczMzc0MDgwMCwiZXhwIjoxNzM2MzMyODAwLCJqdGkiOiJ0b2tlbl94eXo3ODkifQ.aB2cD4eF6gH8iJ0kL2mN4oP6qR8sT0uV2wX4yZ6zA8b",
   "token_type": "Bearer",
   "expires_in": 2592000,  // 30 days in seconds
-  "expires_at": "2026-01-08T09:00:00Z",
-  "refresh_token": "refresh_abc123def456...",  (optional, future)
+  "expires_at": "2026-01-08T09:00:00.000Z",
   "user": {
     "id": "user_abc123",
     "email": "developer@example.com",
@@ -176,10 +186,10 @@ Authorization: Bearer <USER_TOKEN>
 
 Response: 200 OK
 {
-  "user_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  // NEW token
+  "user_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyX2FiYzEyMyIsImVtYWlsIjoiZGV2QGV4YW1wbGUuY29tIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTczMzc2MTIwMCwiZXhwIjoxNzM2MzUzMjAwLCJqdGkiOiJ0b2tlbl9uZXc5ODcifQ.cD4eF6gH8iJ0kL2mN4oP6qR8sT0uV2wX4yZ6zA8bC0d",  // NEW token
   "token_type": "Bearer",
   "expires_in": 2592000,  // 30 days from now
-  "expires_at": "2026-01-08T15:00:00Z",
+  "expires_at": "2026-01-08T15:00:00.000Z",
   "user": {
     "id": "user_abc123",
     "email": "developer@example.com",
@@ -194,7 +204,7 @@ Error: 401 Unauthorized (Token expired)
     "code": "AUTH_TOKEN_EXPIRED",
     "message": "Authentication token has expired",
     "details": {
-      "expired_at": "2025-12-09T09:00:00Z"
+      "expired_at": "2025-12-09T09:00:00.000Z"
     }
   }
 }
@@ -225,7 +235,7 @@ Response: 200 OK
     "email": "developer@example.com",
     "role": "developer"
   },
-  "expires_at": "2026-01-08T09:00:00Z",
+  "expires_at": "2026-01-08T09:00:00.000Z",
   "expires_in": 2500000  // seconds remaining
 }
 
@@ -233,14 +243,14 @@ Response: 200 OK (Invalid token)
 {
   "valid": false,
   "reason": "TOKEN_EXPIRED",
-  "expired_at": "2025-12-09T09:00:00Z"
+  "expired_at": "2025-12-09T09:00:00.000Z"
 }
 
 Response: 200 OK (Blacklisted token)
 {
   "valid": false,
   "reason": "TOKEN_REVOKED",
-  "revoked_at": "2025-12-09T10:00:00Z"
+  "revoked_at": "2025-12-09T10:00:00.000Z"
 }
 ```
 
@@ -366,7 +376,7 @@ Response: 200 OK (Blacklisted token)
 - [Protocol: REST API Protocol](002_rest_api_protocol.md) - Overall API overview, rate limiting standards (5 attempts per 5 minutes per IP, 429 Too Many Requests response format), error response format standards, authentication pattern guidance
 - [Protocol: Token Management API](006_token_management_api.md) - IC Token management (different token type from User Token), User Token required for IC Token API authentication to avoid circular dependency
 - [Protocol: Budget Control Protocol](005_budget_control_protocol.md) - IC Token used for budget protocol handshakes (not User Token), clarifies token type separation
-- [Standards: ID Format Standards](../standards/id_format_standards.md) - Entity ID formats: `user_<uuid>`, `session_<uuid>` (if applicable) with underscore separator
+- [Standards: ID Format Standards](../standards/id_format_standards.md) - Entity ID formats: `user_<alphanumeric>`, `session_<uuid>` (if applicable) with underscore separator
 - [Standards: Data Format Standards](../standards/data_format_standards.md) - ISO 8601 timestamp format with Z suffix, token lifetime as integer seconds (2592000 for 30 days), JSON boolean true/false (not strings)
 - [Standards: Error Format Standards](../standards/error_format_standards.md) - Machine-readable error codes (AUTH_INVALID_CREDENTIALS, AUTH_TOKEN_EXPIRED, AUTH_INVALID_TOKEN, AUTH_ACCOUNT_DISABLED, RATE_LIMIT_EXCEEDED), consistent error response structure
 - [Standards: API Design Standards](../standards/api_design_standards.md) - URL structure conventions (/api/v1/auth/login, /api/v1/auth/logout, /api/v1/auth/refresh, /api/v1/auth/validate), standard HTTP methods (POST for all authentication operations)

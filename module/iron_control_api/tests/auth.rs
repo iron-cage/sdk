@@ -55,3 +55,6 @@ mod test_sql_injection_helpers;
 
 #[ path = "auth/test_skeleton_generator.rs" ]
 mod test_skeleton_generator;
+
+#[ path = "auth/-compilation_verification_sample.rs" ]
+mod compilation_verification_sample;

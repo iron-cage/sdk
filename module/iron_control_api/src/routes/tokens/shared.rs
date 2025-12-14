@@ -218,6 +218,30 @@ impl CreateTokenRequest
       }
     }
 
+    // Fix(token-name-required): Reject truly empty requests
+    // Root cause: Validation only checked field validity IF present, but didnt enforce any fields exist.
+    //             An empty request `{}` was accepted even though it has no useful information.
+    // Pitfall: Never assume `Option<T>` validates presence - `if let Some(x)` only validates when present.
+    //          Always explicitly check that at least SOME fields are provided.
+    //
+    // Require at least ONE field to be present (name, description, user_id, or project_id)
+    // This prevents empty requests while supporting both Protocol 014 and legacy formats:
+    // - Protocol 014: name required (enforced by handler after JWT auth)
+    // - Legacy: user_id typically present (but validation doesn't enforce since it's format-agnostic)
+    let has_any_field = self.name.is_some()
+      || self.description.is_some()
+      || self.user_id.is_some()
+      || self.project_id.is_some()
+      || self.agent_id.is_some()
+      || self.provider.is_some();
+
+    if !has_any_field
+    {
+      return Err( ValidationError::MissingField(
+        "at least one field required (name, description, user_id, project_id, agent_id, or provider)".to_string()
+      ) );
+    }
+
     Ok( () )
   }
 }

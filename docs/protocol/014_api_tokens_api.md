@@ -1,28 +1,83 @@
-# Protocol 014: API Tokens API
+# Protocol: API Tokens API
 
-**Status:** Specification
-**Version:** 1.1.0
-**Last Updated:** 2025-12-12
-**Priority:** NICE-TO-HAVE
+Manages persistent authentication tokens for accessing the Iron Control Panel API.
+
+### Scope
+
+#### In Scope
+
+- API token creation with user permissions inheritance (SAME-AS-USER scope)
+- Token lifecycle management (create, list, get, validate, revoke)
+- Token authentication for dashboard and automation scripts
+- Token value security (shown once on creation, GitHub pattern)
+- User-scoped token management (users see own tokens only)
+- Admin-scoped token listing (admins can list all users' tokens)
+- Token usage tracking and statistics
+- Token validation endpoint (public, for external services)
+
+#### Out of Scope
+
+- IC Token management (agent authentication tokens - see Protocol 006)
+- Token expiration and automatic rotation (post-pilot feature)
+- Fine-grained permission scopes (post-pilot feature)
+- Token renewal without revocation (post-pilot feature)
+- User session management (see Protocol 007)
+- Password reset workflows (see Protocol 007)
+
+### Purpose
+
+**User Need:** Users need secure, long-lived credentials for API authentication without exposing passwords in dashboard configurations or automation scripts. Applications need programmatic access tokens that work across sessions without requiring repeated login prompts. Monitoring systems need to validate tokens without their own authentication.
+
+**Solution:** Protocol 014 provides RESTful API for creating, managing, and validating API tokens with SAME-AS-USER permission inheritance. Tokens use Bearer authentication with SHA-256 hashing for secure storage. Token values are shown only once at creation (GitHub pattern) to prevent accidental exposure, and validation endpoint allows external services to verify tokens without authentication. Users manage their own tokens with full lifecycle support (create, list, get, revoke).
+
+**Key Insight:** API tokens separate authentication identity (who you are) from authorization credentials (what you can access). The SAME-AS-USER scope ensures tokens inherit user's role and permissions, enabling principle of least privilege while maintaining simplicity. The one-time display pattern (show token value once, never again) forces secure storage practices and prevents token leakage through logs or repeated API calls. The public validation endpoint enables external services to verify tokens without requiring their own authentication credentials.
 
 ---
 
-## Overview
+**Status:** Certain (Required for dashboard and automation workflows)
+**Version:** 1.2.0
+**Last Updated:** 2025-12-14
+**Priority:** MUST-HAVE
 
-The API Tokens API manages persistent authentication tokens for accessing the Iron Control Panel API. API Tokens are used primarily by dashboards and admin automation scripts. Each token inherits the permissions of the user who created it (SAME-AS-USER scope).
+### Standards Compliance
 
-**Key characteristics:**
-- **SAME-AS-USER scope:** Token inherits user's role and permissions
-- **Primary use case:** Dashboard authentication (persistent sessions)
-- **Secondary use case:** Admin automation (scripts, monitoring)
-- **Security:** Token value shown ONLY on creation (GitHub pattern)
-- **Lifecycle:** Create, List, Get, Validate, Revoke operations
+This protocol defines the following ID formats:
 
----
+- `token_id`: `at_<alphanumeric>` (e.g., `at_abc123`)
+  - Pattern: `^at_[a-z0-9]{6,32}$`
+  - Source: Protocol 014 (API Tokens API) - defined here
+  - Usage: Database entity identifier for API tokens
+  - Appears in: API responses (`id` field), database primary key
 
-## Token vs IC Token
+- Token value: `apitok_<base62_64chars>`
+  - Pattern: `^apitok_[a-zA-Z0-9]{64}$`
+  - Source: Protocol 014 (API Tokens API) - defined here
+  - Usage: Authentication credential sent in Bearer header
+  - Example: `apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH`
+  - Security: Shown once at creation, hashed for storage, never retrievable
 
-**Clarification:** This protocol defines **API Tokens** (user authentication for Control Panel API). For agent authentication tokens, see [006: Token Management API](006_token_management_api.md) (IC Tokens).
+- `user_id`: `user_<alphanumeric>` (e.g., `user_xyz789`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: Owner of API token
+
+- `project_id`: `project_<alphanumeric>` (e.g., `project_abc456`)
+  - Pattern: `^project_[a-z0-9_]{3,32}$`
+  - Source: Protocol 015 (Projects API)
+  - Usage: Associated project for scoped API tokens (nullable)
+
+**Data Format Standards:**
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page, max 100)
+
+**Error Format Standards:**
+- Consistent error response structure with `error.code` and `error.message`
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 409, 429, 500
+
+### Token vs IC Token Comparison
+
+This protocol defines **API Tokens** (user authentication for Control Panel API). For agent authentication tokens, see Protocol 006 (IC Tokens).
 
 | Feature | API Token | IC Token |
 |---------|-----------|----------|
@@ -31,44 +86,21 @@ The API Tokens API manages persistent authentication tokens for accessing the Ir
 | **Scope** | Inherits user permissions (SAME-AS-USER) | Agent-specific (1:1 with agent) |
 | **Use case** | Dashboard, admin scripts | AI inference requests |
 | **Prefix** | `apitok_` | `ic_` |
+| **Token ID prefix** | `at_` | (varies) |
 
----
+### Endpoints
 
-## Standards Compliance
-
-This protocol adheres to the following Iron Cage standards:
-
-**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `token_id`: `apitoken_<uuid>` (e.g., `apitoken_550e8400-e29b-41d4-a716-446655440000`)
-- `user_id`: `user_<uuid>`
-
-**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
-- Token format: `at_<random_base64_32chars>` (e.g., `at_rY8xKpQm3nZ5vD9wF2sL7h`)
-- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
-- Booleans: JSON boolean `true`/`false` (not strings)
-
-**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
-- Consistent error response structure across all endpoints
-- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `TOKEN_REVOKED`
-- HTTP status codes: 200, 201, 400, 401, 403, 404
-
-**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
-- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
-- Filtering: Query parameters for `status`
-- URL structure: `/api/v1/tokens/api`, `/api/v1/tokens/api/{id}`
-
----
-
-## Endpoints
-
-### Create API Token
+#### Create API Token
 
 **Endpoint:** `POST /api/v1/api-tokens`
 
 **Description:** Creates a new API token with user's permissions. Token value returned ONLY on creation (never retrievable again).
 
-**Request:**
+##### Authentication
+
+Requires user authentication via `Authorization: Bearer <user-token>` header.
+
+##### Request
 
 ```json
 POST /api/v1/api-tokens
@@ -81,14 +113,14 @@ Content-Type: application/json
 }
 ```
 
-**Request Parameters:**
+##### Request Parameters
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
 | `name` | string | Yes | 1-100 chars | Human-readable token name |
 | `description` | string | No | Max 500 chars | Optional token description |
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 201 Created
@@ -96,7 +128,7 @@ Content-Type: application/json
 
 {
   "id": "at_abc123",
-  "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
+  "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
   "user_id": "user_xyz789",
@@ -106,22 +138,22 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
+##### Response Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique token identifier (at- prefix) |
+| `id` | string | Unique token identifier (at_ prefix) |
 | `token` | string | Token value (shown ONCE, never again) |
 | `name` | string | Token name |
 | `description` | string | Token description (omitted if empty) |
 | `user_id` | string | User who created token |
 | `created_at` | string | ISO 8601 timestamp |
-| `last_used` | string | Last usage timestamp (null for new tokens) |
+| `last_used` | string\|null | Last usage timestamp (null for new tokens) |
 | `message` | string | Warning to save token |
 
 **Important:** The `token` field is returned ONLY in this response. It cannot be retrieved later via `GET /api/v1/api-tokens/{id}`. If lost, the token must be revoked and a new one created.
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -146,20 +178,26 @@ HTTP 401 Unauthorized
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Any authenticated user:** Can create API tokens for themselves
+- **Admins:** Can create API tokens for themselves (not for other users)
 
-**Audit Log:** Yes (mutation operation, token value EXCLUDED from log)
+##### Audit Log
 
----
+Yes (mutation operation, token value EXCLUDED from log for security)
 
-### List API Tokens
+#### List API Tokens
 
 **Endpoint:** `GET /api/v1/api-tokens`
 
 **Description:** Returns paginated list of API tokens. Users see only their own tokens; admins see all tokens. Token values NOT included (only metadata).
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```
 GET /api/v1/api-tokens?page=1&per_page=50&sort=-created_at
@@ -170,7 +208,7 @@ GET /api/v1/api-tokens?user_id=user_xyz789&page=1&per_page=50
 Authorization: Bearer <admin-user-token>
 ```
 
-**Query Parameters:**
+##### Query Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -179,7 +217,7 @@ Authorization: Bearer <admin-user-token>
 | `user_id` | string | - | Filter by user ID (admin-only, ignored for regular users) |
 | `sort` | string | `-created_at` | Sort field: `name`, `created_at`, `last_used` (prefix `-` for desc) |
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -220,13 +258,13 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
+##### Response Fields
 
 - **`data[]`:** Array of token metadata objects (NO token values)
 - Token value NEVER included in list response
 - **Scoping:** Users see only `user_id` matching their own; admins see tokens from all users
 
-**Empty Results:**
+##### Empty Results
 
 ```json
 HTTP 200 OK
@@ -241,7 +279,7 @@ HTTP 200 OK
 }
 ```
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -256,28 +294,33 @@ HTTP 400 Bad Request
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **User:** Can list own API tokens only
 - **Admin:** Can list all API tokens (from all users)
 
-**Audit Log:** No (read operation)
+##### Audit Log
 
----
+No (read operation)
 
-### Get API Token Details
+#### Get API Token Details
 
 **Endpoint:** `GET /api/v1/api-tokens/{id}`
 
 **Description:** Returns metadata for a specific API token. Token value NOT included.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```
-GET /api/v1/api-tokens/at-abc123
+GET /api/v1/api-tokens/at_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -298,7 +341,7 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields (additional vs List):**
+##### Response Fields (additional vs List)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -307,14 +350,14 @@ Content-Type: application/json
 | `usage_stats.requests_today` | integer | Requests today |
 | `usage_stats.requests_last_hour` | integer | Requests in last 60 minutes |
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 404 Not Found
 {
   "error": {
     "code": "TOKEN_NOT_FOUND",
-    "message": "API token 'at-invalid' does not exist"
+    "message": "API token 'at_invalid' does not exist"
   }
 }
 ```
@@ -329,28 +372,33 @@ HTTP 403 Forbidden
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Token Owner:** Can view own tokens
 - **Other Users:** 403 Forbidden (including admins - token privacy)
 
-**Audit Log:** No (read operation)
+##### Audit Log
 
----
+No (read operation)
 
-### Revoke API Token
+#### Revoke API Token
 
 **Endpoint:** `DELETE /api/v1/api-tokens/{id}`
 
 **Description:** Revokes (soft deletes) an API token. Token becomes invalid immediately. Audit trail preserved.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```
-DELETE /api/v1/api-tokens/at-abc123
+DELETE /api/v1/api-tokens/at_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -365,7 +413,7 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
+##### Response Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -375,14 +423,14 @@ Content-Type: application/json
 | `revoked_at` | string | ISO 8601 timestamp of revocation |
 | `message` | string | Confirmation message |
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 404 Not Found
 {
   "error": {
     "code": "TOKEN_NOT_FOUND",
-    "message": "API token 'at-invalid' does not exist"
+    "message": "API token 'at_invalid' does not exist"
   }
 }
 ```
@@ -402,44 +450,49 @@ HTTP 409 Conflict
 {
   "error": {
     "code": "TOKEN_ALREADY_REVOKED",
-    "message": "Token 'at-abc123' is already revoked",
+    "message": "Token 'at_abc123' is already revoked",
     "revoked_at": "2025-12-09T10:00:00Z"
   }
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Token Owner:** Can revoke own tokens
 - **Other Users:** 403 Forbidden (including admins - token privacy)
 
-**Audit Log:** Yes (mutation operation)
+##### Audit Log
 
----
+Yes (mutation operation)
 
-### Validate API Token
+#### Validate API Token
 
 **Endpoint:** `POST /api/v1/api-tokens/validate`
 
 **Description:** Validates an API token without authentication. Returns token validity status and metadata if valid. This public endpoint allows external services to verify tokens without requiring their own authentication.
 
-**Request:**
+##### Authentication
+
+**No authentication required** - public endpoint for external validation.
+
+##### Request
 
 ```json
 POST /api/v1/api-tokens/validate
 Content-Type: application/json
 
 {
-  "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+  "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH"
 }
 ```
 
-**Request Parameters:**
+##### Request Parameters
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
 | `token` | string | Yes | 1-500 chars | API token value to validate |
 
-**Success Response (Valid Token):**
+##### Success Response (Valid Token)
 
 ```json
 HTTP 200 OK
@@ -453,7 +506,7 @@ Content-Type: application/json
 }
 ```
 
-**Success Response (Invalid Token):**
+##### Success Response (Invalid Token)
 
 ```json
 HTTP 200 OK
@@ -464,22 +517,23 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
+##### Response Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `valid` | boolean | Token validity status |
 | `user_id` | string | User who created token (only if valid) |
 | `project_id` | string | Associated project ID (only if valid, nullable) |
-| `token_id` | integer | Token database ID (only if valid) |
+| `token_id` | integer | Internal database ID (only if valid) |
 
-**Important:**
+##### Important Notes
+
 - **Public endpoint:** No authentication required (allows external services to validate tokens)
 - **Always 200 OK:** Returns success status even for invalid tokens (prevents information leakage)
 - **Minimal metadata:** Only returns essential information for valid tokens
 - **Security:** Uses constant-time comparison to prevent timing attacks
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -491,23 +545,27 @@ HTTP 400 Bad Request
 }
 ```
 
-**Authorization:**
-- **No authentication required:** Public endpoint for external validation
+##### Authorization
 
-**Audit Log:** No (read-only operation, public endpoint)
+No authentication required - public endpoint for external validation.
 
-**Rate Limiting:** Recommend external rate limiting at reverse proxy (e.g., 100 requests/min per IP)
+##### Audit Log
 
-**Use Cases:**
+No (read-only operation, public endpoint)
+
+##### Rate Limiting
+
+Recommend external rate limiting at reverse proxy (e.g., 100 requests/min per IP)
+
+##### Use Cases
+
 1. **External services:** Validate tokens before processing requests
 2. **Load balancers:** Health check token validity before routing
 3. **Monitoring systems:** Verify token status without authentication
 
----
+### Data Models
 
-## Data Models
-
-### API Token Object
+#### API Token Object
 
 ```json
 {
@@ -525,12 +583,12 @@ HTTP 400 Bad Request
 }
 ```
 
-### API Token Creation Response
+#### API Token Creation Response
 
 ```json
 {
   "id": "at_abc123",
-  "token": "apitok_xyz789abc123def456...",
+  "token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH",
   "name": "Dashboard Token",
   "description": "Token for production dashboard",
   "user_id": "user_xyz789",
@@ -540,11 +598,9 @@ HTTP 400 Bad Request
 }
 ```
 
----
+### Security
 
-## Security
-
-### Token Storage
+#### Token Storage
 
 **At Rest:**
 - Stored as hash (bcrypt or Argon2)
@@ -556,13 +612,13 @@ HTTP 400 Bad Request
 - Token value transmitted only during creation
 - Token value never included in logs
 
-**Token Format:**
+**Token Value Format:**
 - Prefix: `apitok_` (identifies as API token)
 - Length: 64 characters (after prefix)
 - Character set: Base62 (alphanumeric, case-sensitive)
-- Example: `apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz`
+- Example: `apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH`
 
-### Token Lifecycle
+#### Token Lifecycle
 
 1. **Creation:** User creates token via `POST /api/v1/api-tokens`
 2. **Initial Display:** Token value shown once in creation response
@@ -573,7 +629,7 @@ HTTP 400 Bad Request
 7. **Revocation:** User revokes token via `DELETE /api/v1/api-tokens/{id}`
 8. **Invalidation:** Token immediately invalid, requests fail with 401
 
-### Token Permissions
+#### Token Permissions
 
 **SAME-AS-USER scope:**
 - Token inherits user's role (User, Admin)
@@ -598,22 +654,20 @@ HTTP 400 Bad Request
   - ✅ Modify any agent
   - ✅ Access admin-only endpoints
 
-### Authorization Matrix
+#### Authorization Matrix
 
 | Operation | Token Owner | Other User | Admin |
 |-----------|-------------|------------|-------|
 | Create token | ✅ | ❌ | ✅ (own) |
 | List tokens | ✅ (own) | ❌ | ✅ (all) |
-| Get token details | ✅ (own) | ❌ | ✅ (own) |
-| Revoke token | ✅ (own) | ❌ | ✅ (own) |
+| Get token details | ✅ (own) | ❌ | ❌ |
+| Revoke token | ✅ (own) | ❌ | ❌ |
 
 **Note:** Admins can LIST all users' tokens (metadata only) but can only view details or revoke their own tokens (privacy/security).
 
----
+### Error Handling
 
-## Error Handling
-
-### Error Codes
+#### Error Codes
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
@@ -626,7 +680,7 @@ HTTP 400 Bad Request
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
-### Authentication with Revoked Token
+#### Authentication with Revoked Token
 
 When a revoked token is used:
 
@@ -643,11 +697,9 @@ HTTP 401 Unauthorized
 }
 ```
 
----
+### Rate Limiting
 
-## Rate Limiting
-
-### Limits (per user)
+#### Limits (per user)
 
 | Endpoint | Limit | Window | Reasoning |
 |----------|-------|--------|-----------|
@@ -656,11 +708,9 @@ HTTP 401 Unauthorized
 | `GET /api/v1/api-tokens/{id}` | 60 | 1 minute | Standard read rate |
 | `DELETE /api/v1/api-tokens/{id}` | 10 | 1 minute | Token revocation rare |
 
----
+### Audit Logging
 
-## Audit Logging
-
-### Logged Operations
+#### Logged Operations
 
 | Endpoint | Method | Logged | Special Fields |
 |----------|--------|--------|----------------|
@@ -669,7 +719,7 @@ HTTP 401 Unauthorized
 | `GET /api/v1/api-tokens/{id}` | GET | ❌ No | N/A |
 | `DELETE /api/v1/api-tokens/{id}` | DELETE | ✅ Yes | N/A |
 
-### Audit Log Entry (Token Creation)
+#### Audit Log Entry (Token Creation)
 
 ```json
 {
@@ -691,11 +741,9 @@ HTTP 401 Unauthorized
 }
 ```
 
----
+### CLI Integration
 
-## CLI Integration
-
-### iron api-tokens create
+#### iron api-tokens create
 
 ```bash
 iron api-tokens create \
@@ -703,8 +751,8 @@ iron api-tokens create \
   --description "Token for production dashboard"
 
 # Output:
-# API Token created: at-abc123
-# Token: apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+# API Token created: at_abc123
+# Token: apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH
 #
 # ⚠️  IMPORTANT: Save this token now. You won't be able to see it again.
 #
@@ -713,7 +761,7 @@ iron api-tokens create \
 #   iron agents list
 ```
 
-### iron api-tokens list
+#### iron api-tokens list
 
 ```bash
 iron api-tokens list
@@ -721,18 +769,18 @@ iron api-tokens list --sort -last_used
 
 # Output:
 # ID          NAME               CREATED              LAST USED
-# at-abc123   Dashboard Token    2025-12-10 10:30:45  2025-12-10 15:22:10
-# at-def456   Monitoring Script  2025-12-09 14:20:30  2025-12-10 15:00:00
-# at-ghi789   Old Token          2025-11-01 08:15:00  Never used
+# at_abc123   Dashboard Token    2025-12-10 10:30:45  2025-12-10 15:22:10
+# at_def456   Monitoring Script  2025-12-09 14:20:30  2025-12-10 15:00:00
+# at_ghi789   Old Token          2025-11-01 08:15:00  Never used
 ```
 
-### iron api-tokens get
+#### iron api-tokens get
 
 ```bash
-iron api-tokens get at-abc123
+iron api-tokens get at_abc123
 
 # Output:
-# ID:          at-abc123
+# ID:          at_abc123
 # Name:        Dashboard Token
 # Description: Token for production dashboard
 # User:        user_xyz789
@@ -745,23 +793,21 @@ iron api-tokens get at-abc123
 #   Requests Last Hour: 12
 ```
 
-### iron api-tokens revoke
+#### iron api-tokens revoke
 
 ```bash
-iron api-tokens revoke at-abc123
+iron api-tokens revoke at_abc123
 
 # Output:
-# API Token revoked: at-abc123 (Dashboard Token)
+# API Token revoked: at_abc123 (Dashboard Token)
 # Revoked at: 2025-12-10 15:30:45
 #
 # ⚠️  All requests using this token will now fail.
 ```
 
----
+### Use Case Examples
 
-## Use Case Examples
-
-### Example 1: Dashboard Authentication
+#### Example 1: Dashboard Authentication
 
 **Scenario:** Web dashboard needs persistent authentication
 
@@ -774,23 +820,21 @@ iron api-tokens revoke at-abc123
 ```json
 {
   "api_endpoint": "https://api.ironcage.ai/v1",
-  "api_token": "apitok_xyz789abc123def456..."
+  "api_token": "apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH"
 }
 ```
 
 **Dashboard API requests:**
 ```bash
 # All requests use same token
-curl -H "Authorization: Bearer apitok_xyz789..." \
+curl -H "Authorization: Bearer apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH" \
   https://api.ironcage.ai/v1/agents
 
-curl -H "Authorization: Bearer apitok_xyz789..." \
+curl -H "Authorization: Bearer apitok_xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx234yzABCDEFGH" \
   https://api.ironcage.ai/v1/analytics/spending/total
 ```
 
----
-
-### Example 2: Admin Automation Script
+#### Example 2: Admin Automation Script
 
 **Scenario:** Monitoring script checks budget status every 5 minutes
 
@@ -799,7 +843,7 @@ curl -H "Authorization: Bearer apitok_xyz789..." \
 #!/bin/bash
 # budget-monitor.sh
 
-IRON_API_TOKEN="apitok_monitoring_script_xyz..."
+IRON_API_TOKEN="apitok_M0n1t0r1ngScr1ptXyz789abc123def456ghi789jkl012mno345pqr678uvw901"
 API_URL="https://api.ironcage.ai/v1"
 
 # Check budget status
@@ -819,9 +863,7 @@ fi
 */5 * * * * /path/to/budget-monitor.sh
 ```
 
----
-
-### Example 3: Token Rotation
+#### Example 3: Token Rotation
 
 **Scenario:** Security policy requires token rotation every 90 days
 
@@ -845,15 +887,13 @@ iron agents list
 # ✅ Works
 
 # Revoke old token
-iron api-tokens revoke at-old-token_xyz
+iron api-tokens revoke at_old_token_xyz
 # ✅ Old token revoked
 ```
 
----
+### Future Enhancements (Post-Pilot)
 
-## Future Enhancements (Post-Pilot)
-
-### Token Expiration
+#### Token Expiration
 
 **Feature:** Tokens expire after N days (configurable)
 
@@ -867,9 +907,7 @@ iron api-tokens revoke at-old-token_xyz
 - Return 401 TOKEN_EXPIRED for expired tokens
 - Add `POST /api/v1/api-tokens/{id}/renew` endpoint
 
----
-
-### Fine-Grained Permissions
+#### Fine-Grained Permissions
 
 **Feature:** Tokens with custom permission sets (not SAME-AS-USER)
 
@@ -883,9 +921,7 @@ iron api-tokens revoke at-old-token_xyz
 - Support scopes: `agents:read`, `agents:write`, `analytics:read`, etc.
 - Add `?agent_id=agent_abc` scope for agent-specific tokens
 
----
-
-### Token Rotation
+#### Token Rotation
 
 **Endpoint:** `POST /api/v1/api-tokens/{id}/rotate`
 
@@ -895,17 +931,36 @@ iron api-tokens revoke at-old-token_xyz
 - No downtime during rotation (old and new both valid temporarily)
 - Automatic credential rotation for compliance
 
----
+### Cross-References
 
-## References
+#### Related Principles Documents
 
-**Related Protocols:**
-- [006: Token Management API](006_token_management_api.md) - IC Tokens (agent authentication)
-- [007: Authentication API](007_authentication_api.md) - User authentication (login, logout)
-- [010: Agents API](010_agents_api.md) - Agent management (API tokens used for access)
-- [002: REST API Protocol](002_rest_api_protocol.md) - General standards
+None
 
-**Related Documents:**
-<!-- TODO: Add Security Architecture and Authentication Model docs for token security and types -->
+#### Related Architecture Documents
 
----
+None
+
+#### Used By
+
+- Dashboard applications (web UI for Iron Control Panel)
+- CLI tools (iron command-line interface)
+- Admin automation scripts (monitoring, alerts, reporting)
+- Third-party integrations (external services using Iron Control Panel API)
+
+#### Dependencies
+
+- Protocol 007: Authentication API (User authentication, user roles)
+- Protocol 006: Token Management API (IC Tokens comparison, agent authentication)
+- Protocol 010: Agents API (API tokens used for agent management access)
+- Protocol 002: REST API Protocol (General REST standards, pagination, error formats)
+
+#### Implementation
+
+**Status:** Specified (Not yet implemented)
+
+**Planned Files:**
+- `module/iron_control_api/src/routes/api_tokens.rs` - Endpoint implementation
+- `module/iron_control_api/src/services/token_service.rs` - Token business logic
+- `module/iron_control_api/tests/api_tokens/endpoints.rs` - Integration tests
+- `module/iron_control_api/tests/api_tokens/security.rs` - Security tests

@@ -4,7 +4,7 @@
 
 This protocol defines how Iron Runtime and Control Panel communicate to enforce budget limits without exposing provider API keys. It implements a two-token system (IC Token for authentication, IP Token for provider access) with budget borrowing via a tranche model, enabling secure budget-controlled LLM access.
 
-**In scope**:
+#### In Scope
 - Token handshake and budget initialization
 - Budget borrowing lifecycle (borrow → spend → refresh → return)
 - Usage reporting and cost tracking
@@ -14,7 +14,7 @@ This protocol defines how Iron Runtime and Control Panel communicate to enforce 
 - Implementation variants (pilot per-request vs production batched reporting)
 - Failure handling and retry logic
 
-**Out of scope**:
+#### Out of Scope
 - Admin budget allocation UI (see Control Panel user guide)
 - Provider pricing rate calculations (see billing documentation)
 - LLM request routing and model selection (see Runtime architecture docs)
@@ -70,9 +70,18 @@ This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
 - Budget protocol uses short alphanumeric IDs for performance and readability
-- `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
-- `budget_id`: `budget_<alphanumeric>` with regex `^budget_[a-z0-9]{6,32}$` (e.g., `budget_xyz789`)
-- `lease_id`: `lease_<numeric>` for sequential lease tracking (e.g., `lease_001`, `lease_002`)
+- `agent_id`: `agent_<alphanumeric>` (e.g., `agent_abc123`)
+  - Pattern: `^agent_[a-z0-9]{6,32}$`
+  - Source: Protocol 010 (Agents API)
+  - Usage: Agent identifier for budget allocation and lease tracking
+- `budget_id`: `budget_<alphanumeric>` (e.g., `budget_xyz789`)
+  - Pattern: `^budget_[a-z0-9]{6,32}$`
+  - Source: Protocol 005 (Budget Control Protocol) - defined here
+  - Usage: Budget allocation identifier for agent budget tracking
+- `lease_id`: `lease_<numeric>` (e.g., `lease_001`, `lease_002`)
+  - Pattern: `^lease_[0-9]{3,6}$`
+  - Source: Protocol 005 (Budget Control Protocol) - defined here
+  - Usage: Sequential lease identifier for budget tranche tracking
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `10.00`, `9.15`)
@@ -178,7 +187,7 @@ This protocol adheres to the following Iron Cage standards:
 | Claim | Type | Format | Example | Purpose |
 |-------|------|--------|---------|---------|
 | `agent_id` | string | `^agent_[a-z0-9]{6,32}$` | "agent_abc123" | Unique agent identifier |
-| `budget_id` | string | `^budget-[a-z0-9]{6,32}$` | "budget_xyz789" | Links to budget allocation |
+| `budget_id` | string | `^budget_[a-z0-9]{6,32}$` | "budget_xyz789" | Links to budget allocation |
 | `issued_at` | number | Unix timestamp (seconds) | 1702123456 | Token creation time |
 | `expires_at` | number or null | Unix timestamp or null | null | Optional expiration (null = long-lived, no auto-expiration) |
 | `issuer` | string | Literal "iron-control-panel" | "iron-control-panel" | Token source validation |

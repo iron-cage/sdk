@@ -1,60 +1,91 @@
-# Protocol 017: Budget Change Requests API
+# Protocol: Budget Change Requests API
+
+Provides request/approval workflow for developers to request budget increases for their agents, requiring admin approval for governance and audit trails.
+
+### Scope
+
+#### In Scope
+
+- Request/approval workflow (developers create, admins approve/reject)
+- Admin-only approval authority
+- Required justification for all requests (20-500 characters)
+- Complete audit trail (request history + approval notes + budget modification history)
+- State machine (pending → approved/rejected/cancelled terminal states)
+- Integration with budget history (automatic budget updates on approval)
+- Agent owner permissions (create requests for own agents)
+- Admin override permissions (approve/reject any request, create for any agent)
+- Request lifecycle management (create, list, get, approve, reject, cancel)
+- Request scoping (users see own requests, admins see all)
+- Budget snapshot preservation (current_budget at request time vs live agent budget)
+
+#### Out of Scope
+
+- Direct budget modification without approval (see Protocol 013: Budget Limits API)
+- Budget decreases via request workflow (use direct modification with force flag)
+- Automatic request expiration (POST-PILOT feature)
+- Bulk approval/rejection operations (POST-PILOT feature)
+- Request templates and pre-filled justifications (POST-PILOT feature)
+- Approval delegation to non-admins (POST-PILOT feature)
+- Webhook events for request lifecycle (POST-PILOT feature)
+- Request discussion threads (POST-PILOT feature)
+
+### Purpose
+
+**User Need:** Developers need ability to request budget increases for their agents when workload increases or agents approach budget limits, while admins need governance oversight and centralized budget control. Without request workflow, developers either (1) wait for admin-initiated emergency top-ups causing task failures or (2) bypass budget governance creating spending accountability gaps. Both scenarios result in poor operational efficiency and weak audit trails. The request/approval workflow enables developer self-service while maintaining admin oversight and complete audit history.
+
+**Solution:** Protocol 017 provides request/approval workflow with 6 endpoints: developers create budget increase requests (POST /api/v1/budget-requests) with required business justification (20-500 chars), admins approve (PUT .../approve) or reject (PUT .../reject) with review notes, and either party cancels pending requests (DELETE). Approved requests automatically update agent budgets and create budget modification history entries with request_id linkback. State machine enforces terminal states (approved/rejected/cancelled immutable), request scoping ensures privacy (users see own, admins see all), and validation prevents budget decreases (increases-only policy). Integration with Protocol 013 maintains bidirectional audit trail (request → budget history, history → request).
+
+**Key Insight:** The request workflow separates two paths for budget modification: emergency (admin direct modification via Protocol 013) and planned (developer request via Protocol 017). This dual-path design enables both rapid response (admin bypasses workflow for critical situations) and governance (developer requests require approval and justification). The increases-only policy (no decreases via requests) prevents accidental agent shutdowns while allowing admin emergency corrections via force flag in direct modification. The current_budget snapshot (budget at request creation time) preserves historical context even when admin directly modifies budget mid-review, maintaining accurate audit trail of developer's original intent despite stale data.
+
+---
 
 **Status:** Specification
 **Version:** 1.0.0
-**Last Updated:** 2025-12-10
+**Last Updated:** 2025-12-14
 **Priority:** MUST-HAVE
 
----
+### Standards Compliance
 
-## Overview
+This protocol defines the following ID formats:
 
-The Budget Change Requests API provides a workflow for developers to request budget increases for their agents, requiring admin approval. This enables governance and audit trails for budget modifications while allowing developer self-service.
+- `request_id`: `breq_<alphanumeric>` (e.g., `breq_xyz789`)
+  - Pattern: `^breq_[a-z0-9]{6,32}$`
+  - Usage: Database entity identifier for budget change requests
+  - Appears in: API responses (`id` field), budget history linkback (`request_id` field)
 
-**Key characteristics:**
-- **Request/Approval workflow:** Developers create requests, admins approve/reject
-- **Admin-only approval:** Only admins can approve budget changes
-- **Required justification:** All requests must include business justification (20-500 chars)
-- **Complete audit trail:** Request history + approval notes + budget modification history
-- **State machine:** pending → approved/rejected/cancelled (terminal states)
-- **Integration:** Approved requests automatically update agent budgets and create budget history entries
+- `history_id`: `bh_<alphanumeric>` (e.g., `bh_uvw012`)
+  - Pattern: `^bh_[a-z0-9]{6,32}$`
+  - Usage: Budget modification history entry identifier
+  - Source: Protocol 013 (Budget Limits API)
+  - Appears in: Approval response (`history_entry_id` field)
 
-**Use cases:**
-- Emergency budget top-up for agents approaching limits
-- Planned budget increase for upcoming workload
-- Budget governance (admin oversight of all budget changes)
+- `agent_id`: `agent_<alphanumeric>` (e.g., `agent_abc123`)
+  - Pattern: `^agent_[a-z0-9]{6,32}$`
+  - Source: Protocol 010 (Agents API)
+  - Usage: Agent identifier for budget request association
 
----
+- `user_id`: `user_<alphanumeric>` (e.g., `user_dev123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: Requester and reviewer identifiers
 
-## Standards Compliance
-
-This protocol adheres to the following Iron Cage standards:
-
-**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `request_id`: `budgetreq_<uuid>` (e.g., `budgetreq_550e8400-e29b-41d4-a716-446655440000`)
-- `agent_id`: `agent_<uuid>`
-- `user_id`: `user_<uuid>`
-
-**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
+**Data Format Standards:**
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
 - Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
 - Booleans: JSON boolean `true`/`false` (not strings)
 
-**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
-- Consistent error response structure across all endpoints
+**Error Format Standards:**
+- Consistent error response structure with `error.code` and `error.message`
 - Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `INVALID_STATE_TRANSITION`, `INSUFFICIENT_PERMISSIONS`
 - HTTP status codes: 200, 201, 400, 401, 403, 404, 409
 
-**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
+**API Design Standards:**
 - Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
 - Filtering: Query parameters for `status`, `agent_id`, `requester_id`
 - Sorting: Optional `?sort=-created_at` (newest first, default)
 - URL structure: `/api/v1/budget-requests`, `/api/v1/budget-requests/{id}`
 
----
-
-## Relationship to Direct Budget Modification
+### Relationship to Direct Budget Modification
 
 **Two paths for budget modification:**
 
@@ -67,11 +98,9 @@ This protocol adheres to the following Iron Cage standards:
 - Direct modifications bypass request workflow (admin convenience)
 - Direct modifications do NOT auto-cancel pending requests
 - Pending requests show snapshot of budget at creation time (may become stale)
-- See [Protocol 013: Budget Limits API](013_budget_limits_api.md) for direct modification
+- See Protocol 013: Budget Limits API for direct modification
 
----
-
-## State Machine
+### State Machine
 
 ```
 ┌─────────┐
@@ -95,17 +124,19 @@ Transitions:
 No transitions FROM terminal states (approved/rejected/cancelled immutable)
 ```
 
----
+### Endpoints
 
-## Endpoints
-
-### Create Budget Request
+#### Create Budget Request
 
 **Endpoint:** `POST /api/v1/budget-requests`
 
 **Description:** Creates a new budget change request for an agent. Requester must own the agent (or be admin). Request includes current budget snapshot, requested budget, and required justification.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```json
 POST /api/v1/budget-requests
@@ -119,7 +150,7 @@ Content-Type: application/json
 }
 ```
 
-**Request Fields:**
+##### Request Fields
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
@@ -127,7 +158,7 @@ Content-Type: application/json
 | `requested_budget` | decimal | Yes | > 0, > current_budget, 2 decimal places | Desired budget amount (absolute, not delta) |
 | `justification` | string | Yes | Min 20 chars, max 500 chars | Business justification for increase |
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 201 Created
@@ -151,13 +182,28 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
-- **`id`:** Unique request identifier (breq_ prefix)
-- **`current_budget`:** Agent budget at time of request (snapshot, may become stale)
-- **`status`:** Always "pending" on creation
-- **All review fields null:** reviewed_at, reviewed_by, review_notes, approved_budget
+##### Response Fields
 
-**Error Responses:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Request ID (format: `breq_<alphanumeric>`) |
+| `agent_id` | string | Agent identifier |
+| `agent_name` | string | Agent display name |
+| `requester_id` | string | User who created request |
+| `requester_name` | string | Requester display name |
+| `current_budget` | number | Agent budget at request time (snapshot) |
+| `requested_budget` | number | Developer's requested amount |
+| `justification` | string | Business justification |
+| `status` | string | Always "pending" on creation |
+| `created_at` | string | ISO 8601 timestamp with Z |
+| `reviewed_at` | string | null (not yet reviewed) |
+| `reviewed_by` | string | null (not yet reviewed) |
+| `review_notes` | string | null (not yet reviewed) |
+| `approved_budget` | number | null (not yet approved) |
+
+**Note:** All review fields are null on creation (reviewed_at, reviewed_by, review_notes, approved_budget).
+
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -202,24 +248,31 @@ HTTP 404 Not Found
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Agent Owner:** Can create request for own agents
 - **Admin:** Can create request for any agent (typically uses direct modification instead)
 - **Other users:** 403 Forbidden
 
-**Audit Log:** Yes (request creation tracked)
+##### Audit Log
 
-**Rate Limiting:** 10 requests per hour per user
+Yes (request creation tracked)
 
----
+##### Rate Limiting
 
-### List Budget Requests
+10 requests per hour per user
+
+#### List Budget Requests
 
 **Endpoint:** `GET /api/v1/budget-requests`
 
 **Description:** Returns paginated list of budget requests. Users see only their own requests; admins see all requests.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```
 GET /api/v1/budget-requests?status=pending&page=1&per_page=50&sort=-created_at
@@ -230,7 +283,7 @@ GET /api/v1/budget-requests?agent_id=agent_abc123&status=pending
 Authorization: Bearer <admin-user-token>
 ```
 
-**Query Parameters:**
+##### Query Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -240,7 +293,7 @@ Authorization: Bearer <admin-user-token>
 | `agent_id` | string | - | Filter by agent ID (admin sees all, users see own) |
 | `sort` | string | `-created_at` | Sort field: `created_at`, `requested_budget` (prefix `-` for desc) |
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -292,12 +345,16 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
-- **`data[]`:** Array of budget request objects
-- **Scoping:** Users see only requests they created; admins see all requests
-- **Agent filtering:** Respects user permissions (users can only filter by agents they own)
+##### Response Fields
 
-**Empty Results:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `data[]` | array | Array of budget request objects |
+| `pagination` | object | Pagination metadata |
+
+**Note:** Users see only requests they created; admins see all requests. Agent filtering respects user permissions (users can only filter by agents they own).
+
+##### Empty Results
 
 ```json
 HTTP 200 OK
@@ -312,7 +369,7 @@ HTTP 200 OK
 }
 ```
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -328,30 +385,43 @@ HTTP 400 Bad Request
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **User:** Can list own budget requests only
 - **Admin:** Can list all budget requests
 
-**Audit Log:** No (read operation)
+##### Audit Log
 
-**Rate Limiting:** 60 requests per minute per user
+No (read operation)
 
----
+##### Rate Limiting
 
-### Get Budget Request Details
+60 requests per minute per user
+
+#### Get Budget Request Details
 
 **Endpoint:** `GET /api/v1/budget-requests/{id}`
 
 **Description:** Returns detailed information about a specific budget request, including current agent budget status.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```
 GET /api/v1/budget-requests/breq_xyz789
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Success Response:**
+##### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Request ID (format: `breq_<alphanumeric>`) |
+
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -380,16 +450,33 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
-- **`agent_current_budget`:** Current agent budget (may differ from `current_budget` snapshot)
-- **`agent_spent`:** Current agent spending
-- **`agent_remaining`:** Current agent remaining budget
-- **`agent_status`:** Current agent status
-- **`current_budget`:** Budget at time of request creation (snapshot, may be stale)
+##### Response Fields
 
-**Note:** If agent budget was modified after request creation, `agent_current_budget` will differ from `current_budget` snapshot.
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Request ID |
+| `agent_id` | string | Agent identifier |
+| `agent_name` | string | Agent display name |
+| `agent_current_budget` | number | Current agent budget (may differ from snapshot) |
+| `agent_spent` | number | Current agent spending |
+| `agent_remaining` | number | Current agent remaining budget |
+| `agent_status` | string | Current agent status |
+| `requester_id` | string | User who created request |
+| `requester_name` | string | Requester display name |
+| `current_budget` | number | Budget at request creation (snapshot, may be stale) |
+| `requested_budget` | number | Developer's requested amount |
+| `justification` | string | Business justification |
+| `status` | string | Request status |
+| `created_at` | string | ISO 8601 timestamp |
+| `reviewed_at` | string | Review timestamp (null if pending) |
+| `reviewed_by` | string | Reviewer user ID (null if pending) |
+| `reviewed_by_name` | string | Reviewer display name (null if pending) |
+| `review_notes` | string | Admin comments (null if pending/approved without notes) |
+| `approved_budget` | number | Final approved amount (null if pending/rejected/cancelled) |
 
-**Error Responses:**
+**Note:** If agent budget was modified after request creation, `agent_current_budget` will differ from `current_budget` snapshot. The `current_budget` field preserves historical context (budget at time of request creation).
+
+##### Error Responses
 
 ```json
 HTTP 404 Not Found
@@ -411,24 +498,31 @@ HTTP 403 Forbidden
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Requester:** Can view own requests
 - **Admin:** Can view any request
 - **Other users:** 403 Forbidden
 
-**Audit Log:** No (read operation)
+##### Audit Log
 
-**Rate Limiting:** 60 requests per minute per user
+No (read operation)
 
----
+##### Rate Limiting
 
-### Approve Budget Request
+60 requests per minute per user
+
+#### Approve Budget Request
 
 **Endpoint:** `PUT /api/v1/budget-requests/{id}/approve`
 
 **Description:** Approves a budget request. Updates agent budget automatically and creates budget modification history entry. Admin-only operation.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <admin-user-token>` header.
+
+##### Request
 
 ```json
 PUT /api/v1/budget-requests/breq_xyz789/approve
@@ -441,7 +535,7 @@ Content-Type: application/json
 }
 ```
 
-**Request Fields (all optional):**
+##### Request Fields
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
@@ -450,7 +544,7 @@ Content-Type: application/json
 
 **Note:** In Pilot, `approved_budget` parameter is accepted but typically equals `requested_budget`. POST-PILOT will support flexible approval (admin can modify amount).
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -471,15 +565,28 @@ Content-Type: application/json
     "old_budget": 100.00,
     "new_budget": 140.00
   },
-  "history_entry_id": "bh-uvw012"
+  "history_entry_id": "bh_uvw012"
 }
 ```
 
-**Response Fields:**
-- **`budget_updated`:** Always true (budget automatically updated)
-- **`agent.old_budget`:** Budget before approval
-- **`agent.new_budget`:** Budget after approval
-- **`history_entry_id`:** Created budget modification history entry ID
+##### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Request ID |
+| `status` | string | Always "approved" |
+| `approved_budget` | number | Final approved amount |
+| `reviewed_at` | string | Review timestamp |
+| `reviewed_by` | string | Admin user ID |
+| `reviewed_by_name` | string | Admin display name |
+| `review_notes` | string | Admin comments |
+| `budget_updated` | boolean | Always true (budget automatically updated) |
+| `agent` | object | Agent budget change details |
+| `agent.id` | string | Agent ID |
+| `agent.name` | string | Agent name |
+| `agent.old_budget` | number | Budget before approval |
+| `agent.new_budget` | number | Budget after approval |
+| `history_entry_id` | string | Created budget modification history entry ID |
 
 **Automatic Actions:**
 1. Update request: status=approved, reviewed_at=now, reviewed_by=admin_id
@@ -487,7 +594,7 @@ Content-Type: application/json
 3. Create budget modification history entry with request_id link
 4. Optional: Send email notification to requester
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -535,29 +642,37 @@ HTTP 403 Forbidden
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Admin only:** Must have admin role
 - **Non-admin:** 403 Forbidden
 
-**Validation:**
+##### Validation
+
 - Request must exist
 - Request status must be "pending"
 - approved_budget (if provided) must be > current agent budget
 - approved_budget (if provided) must have max 2 decimal places
 
-**Audit Log:** Yes (approval + budget modification both logged)
+##### Audit Log
 
-**Rate Limiting:** 30 requests per minute per user
+Yes (approval + budget modification both logged)
 
----
+##### Rate Limiting
 
-### Reject Budget Request
+30 requests per minute per user
+
+#### Reject Budget Request
 
 **Endpoint:** `PUT /api/v1/budget-requests/{id}/reject`
 
 **Description:** Rejects a budget request with required review notes explaining why. Agent budget NOT changed. Admin-only operation.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <admin-user-token>` header.
+
+##### Request
 
 ```json
 PUT /api/v1/budget-requests/breq_xyz789/reject
@@ -569,13 +684,13 @@ Content-Type: application/json
 }
 ```
 
-**Request Fields:**
+##### Request Fields
 
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
 | `review_notes` | string | Yes | Min 20 chars, max 1000 chars | Admin explanation for rejection (REQUIRED) |
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -596,14 +711,26 @@ Content-Type: application/json
 }
 ```
 
-**Response Fields:**
-- **`agent.budget`:** Unchanged (rejection does NOT modify budget)
+##### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Request ID |
+| `status` | string | Always "rejected" |
+| `reviewed_at` | string | Review timestamp |
+| `reviewed_by` | string | Admin user ID |
+| `reviewed_by_name` | string | Admin display name |
+| `review_notes` | string | Admin explanation |
+| `agent` | object | Agent details |
+| `agent.id` | string | Agent ID |
+| `agent.name` | string | Agent name |
+| `agent.budget` | number | Unchanged budget (rejection does NOT modify) |
 
 **Automatic Actions:**
 1. Update request: status=rejected, reviewed_at=now, reviewed_by=admin_id, review_notes
 2. Optional: Send email notification to requester with review_notes
 
-**Error Responses:**
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -651,35 +778,43 @@ HTTP 403 Forbidden
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Admin only:** Must have admin role
 - **Non-admin:** 403 Forbidden
 
-**Validation:**
+##### Validation
+
 - Request must exist
 - Request status must be "pending"
 - review_notes required, min 20 chars, max 1000 chars
 
-**Audit Log:** Yes (rejection logged)
+##### Audit Log
 
-**Rate Limiting:** 30 requests per minute per user
+Yes (rejection logged)
 
----
+##### Rate Limiting
 
-### Cancel Budget Request
+30 requests per minute per user
+
+#### Cancel Budget Request
 
 **Endpoint:** `DELETE /api/v1/budget-requests/{id}`
 
 **Description:** Cancels a pending budget request. Only requester or admin can cancel. Cannot cancel already-reviewed requests.
 
-**Request:**
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
 
 ```
 DELETE /api/v1/budget-requests/breq_xyz789
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Success Response:**
+##### Success Response
 
 ```json
 HTTP 200 OK
@@ -694,7 +829,17 @@ Content-Type: application/json
 }
 ```
 
-**Error Responses:**
+##### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Request ID |
+| `status` | string | Always "cancelled" |
+| `cancelled_at` | string | Cancellation timestamp |
+| `cancelled_by` | string | User ID who cancelled |
+| `cancelled_by_name` | string | User name who cancelled |
+
+##### Error Responses
 
 ```json
 HTTP 400 Bad Request
@@ -729,24 +874,28 @@ HTTP 403 Forbidden
 }
 ```
 
-**Authorization:**
+##### Authorization
+
 - **Requester:** Can cancel own pending requests
 - **Admin:** Can cancel any pending request
 - **Other users:** 403 Forbidden
 
-**Validation:**
+##### Validation
+
 - Request must exist
 - Request status must be "pending" (cannot cancel approved/rejected)
 
-**Audit Log:** Yes (cancellation logged)
+##### Audit Log
 
-**Rate Limiting:** 30 requests per minute per user
+Yes (cancellation logged)
 
----
+##### Rate Limiting
 
-## Data Models
+30 requests per minute per user
 
-### Budget Request Object
+### Data Models
+
+#### Budget Request Object
 
 ```json
 {
@@ -768,17 +917,17 @@ HTTP 403 Forbidden
 }
 ```
 
-**Fields:**
+**Field Descriptions:**
 
 | Field | Type | Always Present | Description |
 |-------|------|----------------|-------------|
-| `id` | string | Yes | Unique request ID (breq_ prefix) |
+| `id` | string | Yes | Request ID (format: `breq_<alphanumeric>`) |
 | `agent_id` | string | Yes | Agent being requested budget for |
 | `agent_name` | string | Yes | Agent display name (denormalized) |
 | `requester_id` | string | Yes | User who created request |
 | `requester_name` | string | Yes | Requester display name (denormalized) |
-| `current_budget` | decimal | Yes | Agent budget at request time (snapshot) |
-| `requested_budget` | decimal | Yes | Developer's requested amount |
+| `current_budget` | number | Yes | Agent budget at request time (snapshot) |
+| `requested_budget` | number | Yes | Developer's requested amount |
 | `justification` | string | Yes | Business justification (20-500 chars) |
 | `status` | string | Yes | "pending", "approved", "rejected", "cancelled" |
 | `created_at` | string | Yes | ISO 8601 timestamp with Z |
@@ -786,13 +935,11 @@ HTTP 403 Forbidden
 | `reviewed_by` | string | No | Admin user ID (null if pending) |
 | `reviewed_by_name` | string | No | Admin display name (null if pending) |
 | `review_notes` | string | No | Admin comments (null if pending/approved without notes) |
-| `approved_budget` | decimal | No | Final approved amount (null if pending/rejected/cancelled) |
+| `approved_budget` | number | No | Final approved amount (null if pending/rejected/cancelled) |
 
----
+### Security
 
-## Security
-
-### Authorization Matrix
+#### Authorization Matrix
 
 | Operation | Requester | Admin | Other User |
 |-----------|-----------|-------|------------|
@@ -809,7 +956,7 @@ HTTP 403 Forbidden
 - **Privacy:** Users cannot see other users' requests
 - **Audit trail:** All actions logged with user_id and timestamp
 
-### Justification Requirements
+#### Justification Requirements
 
 **Purpose:** Ensure all budget changes have business rationale (governance + audit)
 
@@ -828,7 +975,7 @@ HTTP 403 Forbidden
 - ❌ "Increase to 150" (states WHAT, not WHY)
 - ❌ "asdfghjkl" (meaningless)
 
-### Sensitive Data
+#### Sensitive Data
 
 **NOT exposed via API:**
 - Token values (IC tokens, API tokens)
@@ -840,11 +987,9 @@ HTTP 403 Forbidden
 - Spending amounts (requester can already see via analytics)
 - Request justifications (audit trail requirement)
 
----
+### Error Handling
 
-## Error Handling
-
-### Error Codes
+#### Error Codes
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
@@ -861,7 +1006,7 @@ HTTP 403 Forbidden
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
-### Common Error Scenarios
+#### Common Error Scenarios
 
 **Scenario 1: Request for non-existent agent**
 ```json
@@ -904,11 +1049,9 @@ Admin B → 409 Conflict
 }
 ```
 
----
+### Rate Limiting
 
-## Rate Limiting
-
-### Limits (per user)
+#### Limits (per user)
 
 | Endpoint | Limit | Window | Scope |
 |----------|-------|--------|-------|
@@ -931,18 +1074,16 @@ HTTP 429 Too Many Requests
 }
 ```
 
----
+### Integration with Budget Modification History
 
-## Integration with Budget Modification History
-
-### Linking Requests to Budget History
+#### Linking Requests to Budget History
 
 When request is approved, system creates budget modification history entry with `request_id` field:
 
 **Budget history entry:**
 ```json
 {
-  "id": "bh-uvw012",
+  "id": "bh_uvw012",
   "agent_id": "agent_abc123",
   "previous_budget": 100.00,
   "new_budget": 150.00,
@@ -966,11 +1107,9 @@ GET /api/v1/budget-requests/breq_xyz789
 To see full justification and approval notes.
 ```
 
----
+### Notifications (Optional for Pilot)
 
-## Notifications (Optional for Pilot)
-
-### Email Notifications
+#### Email Notifications
 
 **Trigger: Request Created**
 - To: All admin users
@@ -992,11 +1131,9 @@ To see full justification and approval notes.
 - Can be enabled/disabled per user in settings
 - Default: Enabled for admins, disabled for users
 
----
+### Edge Cases
 
-## Edge Cases
-
-### Agent Deleted While Request Pending
+#### Agent Deleted While Request Pending
 
 **Behavior:** Request auto-cancelled with review_notes="Auto-cancelled: Agent was deleted"
 
@@ -1009,7 +1146,7 @@ SET status = 'cancelled',
 WHERE agent_id = ? AND status = 'pending';
 ```
 
-### Multiple Pending Requests for Same Agent
+#### Multiple Pending Requests for Same Agent
 
 **Allowed:** Yes, no restriction on number of pending requests per agent
 
@@ -1018,7 +1155,7 @@ WHERE agent_id = ? AND status = 'pending';
 - Admin can see evolution of budget requirements
 - Developer can cancel old request after creating new one
 
-### Budget Modified While Request Pending
+#### Budget Modified While Request Pending
 
 **Behavior:** Request shows stale `current_budget` snapshot, acceptable
 
@@ -1030,17 +1167,15 @@ WHERE agent_id = ? AND status = 'pending';
 
 **Note:** `current_budget` is historical snapshot (budget AT TIME OF REQUEST), not live value
 
-### Approval Amount Less Than Current Budget
+#### Approval Amount Less Than Current Budget
 
 **Validation:** Error 400 APPROVAL_DECREASES_BUDGET
 
 **Rationale:** Requests are for INCREASES only. Use direct modification with force flag for decreases.
 
----
+### Pilot vs POST-PILOT Features
 
-## Pilot vs POST-PILOT Features
-
-### Pilot (MUST-HAVE)
+#### Pilot (MUST-HAVE)
 
 **Included:**
 - All 6 endpoints (Create, List, Get, Approve, Reject, Cancel)
@@ -1058,7 +1193,7 @@ WHERE agent_id = ? AND status = 'pending';
 - `approved_budget` defaults to `requested_budget`
 - Admin can specify different amount, but typically doesn't
 
-### POST-PILOT Enhancements
+#### POST-PILOT Enhancements
 
 **Deferred features:**
 1. **Flexible approval amount** - Admin routinely modifies amount during approval
@@ -1071,22 +1206,43 @@ WHERE agent_id = ? AND status = 'pending';
 8. **Webhook events** - budget_request.created, approved, rejected, cancelled
 9. **Request comments** - Discussion thread on requests (requester ↔ admin conversation)
 
----
+### Cross-References
 
-## Related Documentation
+#### Related Principles Documents
 
-- **[Protocol 010: Agents API](010_agents_api.md)** - Agent management (request references agents)
-- **[Protocol 013: Budget Limits API](013_budget_limits_api.md)** - Direct budget modification (admin path)
-- **[Protocol 008: User Management API](008_user_management_api.md)** - User roles (admin authorization)
-- **[Protocol 002: REST API Protocol](002_rest_api_protocol.md)** - Cross-cutting standards (audit logging, CLI parity, system resources, rate limiting)
-- **[API Design Standards](../standards/api_design_standards.md)** - Pagination, sorting, filtering patterns
-- **[Error Format Standards](../standards/error_format_standards.md)** - Error response format, HTTP status codes
-- **[Resource Catalog](../architecture/009_resource_catalog.md)** - Complete resource inventory
-- **[Vocabulary](../vocabulary.md)** - Terminology definitions
+None
 
----
+#### Related Architecture Documents
 
-## Cross-References
+- Architecture 007: Entity Model (Budget Request entity definition)
 
-**State Machines**:
-- **[State Machine 002: Budget Request Workflow](../state_machine/002_budget_request_workflow.md)** - Request lifecycle states (PENDING → APPROVED/REJECTED/CANCELLED) and transitions
+#### Used By
+
+None currently. Budget request workflow consumed by admin dashboard UI and developer CLI (not yet documented).
+
+#### Dependencies
+
+- Protocol 002: REST API Protocol (General REST API standards and conventions)
+- Protocol 005: Budget Control Protocol (Budget enforcement context)
+- Protocol 007: Authentication API (User authentication, user roles, admin authorization)
+- Protocol 008: User Management API (User roles for admin authorization)
+- Protocol 010: Agents API (Agent entity for budget request association)
+- Protocol 012: Analytics API (Budget status monitoring referenced in request context)
+- Protocol 013: Budget Limits API (Direct budget modification alternative, budget history integration)
+
+#### Implementation
+
+**Status:** Specified (Not yet implemented)
+
+**Planned Files:**
+- `module/iron_control_api/src/routes/budget_requests.rs` - Endpoint implementation
+- `module/iron_control_api/src/services/budget_request_service.rs` - Request workflow business logic
+- `module/iron_control_api/tests/budget_requests/endpoints.rs` - Integration tests
+- `module/iron_control_api/tests/budget_requests/state_machine.rs` - State transition tests
+- `module/iron_control_api/tests/budget_requests/authorization.rs` - Authorization tests
+
+**Database Migration:**
+- Create budget_change_requests table
+- Add foreign keys to agents and users tables
+- Create indexes for filtering (status, agent_id, requester_id)
+- Add request_id field to budget modification history table

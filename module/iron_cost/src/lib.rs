@@ -66,7 +66,7 @@
 //!   let cost = model.calculate_cost(1000, 500); // input/output tokens
 //!   println!("Cost: ${:.6}", cost);
 //! }
-//! # Ok::<(), String>(())
+//! # Ok::<(), iron_cost::error::CostError>(())
 //! ```
 //!
 //! ## Request Cost Estimation
@@ -81,7 +81,7 @@
 //! if let Some(max_cost_micros) = pricing.estimate_max_cost(request_body) {
 //!   println!("Max cost: {} microdollars", max_cost_micros);
 //! }
-//! # Ok::<(), String>(())
+//! # Ok::<(), iron_cost::error::CostError>(())
 //! ```
 //!
 //! # Feature Flags

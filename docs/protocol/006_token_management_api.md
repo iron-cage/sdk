@@ -6,14 +6,14 @@
 
 REST API endpoints for IC Token lifecycle management (create, list, get, delete, rotate).
 
-**In Scope:**
+#### In Scope
 - IC Token CRUD operations (create, read, delete)
 - IC Token rotation (regenerate while invalidating old)
 - User Token authentication
 - Permission-based access (admin vs developer)
 - Request/response schemas
 
-**Out of Scope:**
+#### Out of Scope
 - User Token management (separate endpoint, see [007_authentication_api.md](007_authentication_api.md))
 - IP Token management (vault-only, never exposed via API)
 - Budget protocol (see [005_budget_control_protocol.md](005_budget_control_protocol.md))
@@ -24,7 +24,7 @@ REST API endpoints for IC Token lifecycle management (create, list, get, delete,
 
 **User Need**: Developers (building agent applications) and admins (managing organizational infrastructure) need secure IC Token lifecycle management enabling token creation for new agents, token rotation when credentials compromised, token deletion when agents decommissioned, and token listing/viewing for audit trails, with permission-based access controls ensuring developers manage only their own tokens (for owned agents) while admins manage all tokens across organization, without exposing token values after initial creation (preventing credential leakage from API responses or logs), while maintaining User Token authentication (developers authenticate via CLI login, not IC Token) to avoid circular dependency where IC Tokens manage themselves.
 
-**Solution**: RESTful CRUD API with 5 HTTP endpoints implementing IC Token lifecycle operations. Provide GET /api/v1/tokens (list with pagination, filters for project_id/status/agent_id, permission-based scoping: developers see own, admins see all), GET /api/v1/tokens/{id} (detail with usage_summary, 403 Forbidden for unauthorized access), POST /api/v1/tokens (create with agent_id/project_id, returns token value ONLY on creation with warning message, enforces 1:1 agent-token constraint via 409 Conflict), DELETE /api/v1/tokens/{id} (immediate invalidation with 204 No Content, budget protocol calls return 401 Unauthorized), PUT /api/v1/tokens/{id}/rotate (atomic operation: generate new value, invalidate old, update database, return new token with rotated_at timestamp). Authenticate all requests with User Token (not IC Token) to avoid self-management paradox. Enforce permissions on EVERY request: developers access only owned agent tokens, admins access all tokens, return 403 Forbidden for unauthorized attempts. Adhere to ID Format Standards (token_<uuid>, agent_<uuid>), Data Format Standards (ISO 8601 timestamps, JSON booleans), Error Format Standards (machine-readable codes: VALIDATION_ERROR, UNAUTHORIZED, NOT_FOUND, DUPLICATE_NAME), API Design Standards (offset pagination ?page=N&per_page=M default 50 items).
+**Solution**: RESTful CRUD API with 5 HTTP endpoints implementing IC Token lifecycle operations. Provide GET /api/v1/tokens (list with pagination, filters for project_id/status/agent_id, permission-based scoping: developers see own, admins see all), GET /api/v1/tokens/{id} (detail with usage_summary, 403 Forbidden for unauthorized access), POST /api/v1/tokens (create with agent_id/project_id, returns token value ONLY on creation with warning message, enforces 1:1 agent-token constraint via 409 Conflict), DELETE /api/v1/tokens/{id} (immediate invalidation with 204 No Content, budget protocol calls return 401 Unauthorized), PUT /api/v1/tokens/{id}/rotate (atomic operation: generate new value, invalidate old, update database, return new token with rotated_at timestamp). Authenticate all requests with User Token (not IC Token) to avoid self-management paradox. Enforce permissions on EVERY request: developers access only owned agent tokens, admins access all tokens, return 403 Forbidden for unauthorized attempts. Adhere to ID Format Standards (token_<alphanumeric>, agent_<alphanumeric>, project_<alphanumeric>, user_<alphanumeric>), Data Format Standards (ISO 8601 timestamps, JSON booleans), Error Format Standards (machine-readable codes: VALIDATION_ERROR, UNAUTHORIZED, NOT_FOUND, DUPLICATE_NAME), API Design Standards (offset pagination ?page=N&per_page=M default 50 items).
 
 **Key Insight**: User Token authentication (not IC Token) prevents circular dependency paradox where IC Tokens would manage themselves (POST /api/tokens with IC Token header would create token to create token), enabling clean separation where developers use CLI login flow (iron login → User Token → iron tokens create) without exposing provider credentials. Token value security model (value ONLY in POST create and PUT rotate responses, NEVER in GET/LIST endpoints) prevents credential leakage from logs, audit trails, or accidental exposure while allowing secure distribution during provisioning. Permission enforcement on every request (developer role scoped to owned agents via agent ownership check, admin role unrestricted) prevents unauthorized token access without requiring complex RBAC inheritance, implemented via database query filtering (developer: WHERE agent_id IN owned_agents, admin: no WHERE clause). Atomic rotation (4-step transaction: generate new, invalidate old, update database, return new) eliminates race conditions where both old and new tokens temporarily valid, preventing security window where compromised token still usable. The 1:1 agent-token relationship (enforced via database unique constraint, 409 Conflict error) simplifies budget control (one IC Token maps to one agent budget) and prevents token proliferation (can't create backup tokens, must use rotation).
 
@@ -42,10 +42,31 @@ This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
 - All entity IDs use `prefix_uuid` format with underscore separator
-- `token_id`: `token_<uuid>` (e.g., `token_550e8400-e29b-41d4-a716-446655440000`)
-- `agent_id`: `agent_<uuid>`
-- `project_id`: `project_<uuid>`
-- `user_id`: `user_<uuid>`
+- `token_id`: `token_<alphanumeric>` (e.g., `token_abc123`, `token_xyz789`)
+  - Pattern: `^token_[a-z0-9]{6,32}$`
+  - Source: Protocol 006 (Token Management API) - defined here
+  - Usage: IC Token identifier for token lifecycle management and database operations
+- `agent_id`: `agent_<alphanumeric>` (e.g., `agent_abc123`, `agent_xyz789`)
+  - Pattern: `^agent_[a-z0-9]{6,32}$`
+  - Source: Protocol 010 (Agents API)
+  - Usage: Agent identifier for permission checks and ownership validation
+- `project_id`: `project_<alphanumeric>` (e.g., `project_abc123`, `project_456`)
+  - Pattern: `^project_[a-z0-9_]{3,32}$`
+  - Source: Protocol 015 (Projects API)
+  - Usage: Project identifier for organizational grouping and filtering
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: User identifier for permission checks and audit logging
+
+- IC Token value: JWT token (e.g., `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`)
+  - Format: JSON Web Token (JWT) with HS256 signature
+  - Pattern: `^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$`
+  - Source: Protocol 006 (Token Management API) - defined here
+  - Usage: Authentication credential for agent-to-control-panel communication
+  - Length: 200-400 bytes (typical)
+  - Security: Shown once at creation/rotation, never retrievable again
+  - Ref: Protocol 005 (Budget Control Protocol) for usage in handshake
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
@@ -54,7 +75,7 @@ This protocol adheres to the following Iron Cage standards:
 
 **Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
 - Consistent error response structure across all endpoints
-- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `DUPLICATE_NAME`
+- Machine-readable error codes: `RESOURCE_NOT_FOUND`, `PERMISSION_DENIED`, `RESOURCE_CONFLICT`, `VALIDATION_INVALID_REFERENCE`
 - HTTP status codes: 200, 201, 400, 401, 403, 404, 409
 
 **API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
@@ -82,13 +103,13 @@ Response: 200 OK
 {
   "data": [
     {
-      "id": "tok-abc123",
+      "id": "token_abc123",
       "agent_id": "agent_xyz789",
-      "project_id": "proj_456",
+      "project_id": "project_456",
       "status": "active",
-      "created_at": "2025-12-09T09:00:00Z",
+      "created_at": "2025-12-09T09:00:00.000Z",
       "created_by": "user_admin",
-      "last_used_at": "2025-12-09T12:30:00Z"
+      "last_used_at": "2025-12-09T12:30:00.000Z"
     }
   ],
   "pagination": {
@@ -112,13 +133,13 @@ Authorization: Bearer <USER_TOKEN>
 
 Response: 200 OK
 {
-  "id": "tok-abc123",
+  "id": "token_abc123",
   "agent_id": "agent_xyz789",
-  "project_id": "proj_456",
+  "project_id": "project_456",
   "status": "active",
-  "created_at": "2025-12-09T09:00:00Z",
+  "created_at": "2025-12-09T09:00:00.000Z",
   "created_by": "user_admin",
-  "last_used_at": "2025-12-09T12:30:00Z",
+  "last_used_at": "2025-12-09T12:30:00.000Z",
   "usage_summary": {
     "total_requests": 1543,
     "total_cost_usd": 42.35
@@ -146,7 +167,7 @@ Error: 403 Forbidden (Developer accessing another user's token)
 - Developer: Can only access own IC Tokens
 - Admin: Can access any IC Token
 
-**Note:** Token value (`ic_abc123...`) NOT included in GET response (only in POST create response)
+**Note:** Token value (JWT format) NOT included in GET response (only in POST create response)
 
 #### Create IC Token
 
@@ -158,18 +179,18 @@ Content-Type: application/json
 Request:
 {
   "agent_id": "agent_xyz789",
-  "project_id": "proj_456",
+  "project_id": "project_456",
   "description": "Production agent for project X" (optional)
 }
 
 Response: 201 Created
 {
-  "id": "tok-abc123",
-  "token": "ic_abc123def456ghi789...",  // ⚠️ ONLY returned on creation
+  "id": "token_abc123",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94eXo3ODkiLCJpYXQiOjE3MDI5ODAwMDB9.Xj-K8vR9mN2pQ5wB7cL0aE3fG6hI9jD1kU4sT8bY7zM",  // ⚠️ ONLY returned on creation
   "agent_id": "agent_xyz789",
-  "project_id": "proj_456",
+  "project_id": "project_456",
   "status": "active",
-  "created_at": "2025-12-09T09:00:00Z",
+  "created_at": "2025-12-09T09:00:00.000Z",
   "created_by": "user_admin",
   "warning": "Save this token securely - it will NOT be shown again"
 }
@@ -181,7 +202,7 @@ Error: 409 Conflict (Agent already has IC Token)
     "message": "IC Token already exists for agent",
     "details": {
       "agent_id": "agent_xyz789",
-      "existing_token_id": "tok-old123"
+      "existing_token_id": "token_old123"
     }
   }
 }
@@ -252,13 +273,13 @@ Authorization: Bearer <USER_TOKEN>
 
 Response: 200 OK
 {
-  "id": "tok-abc123",  // Same token ID
-  "token": "ic_new456def789ghi012...",  // ⚠️ NEW token value
+  "id": "token_abc123",  // Same token ID
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94eXo3ODkiLCJpYXQiOjE3MDI5OTgwMDB9.aB4cD8eF2gH6iJ0kL5mN9oP3qR7sT1uV6wX2yZ4zA8b",  // ⚠️ NEW token value
   "agent_id": "agent_xyz789",
-  "project_id": "proj_456",
+  "project_id": "project_456",
   "status": "active",
-  "created_at": "2025-12-09T09:00:00Z",  // Original creation date preserved
-  "rotated_at": "2025-12-09T14:00:00Z",
+  "created_at": "2025-12-09T09:00:00.000Z",  // Original creation date preserved
+  "rotated_at": "2025-12-09T14:00:00.000Z",
   "rotated_by": "user_admin",
   "warning": "Old token invalidated - save new token securely"
 }
@@ -381,7 +402,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - [Protocol: REST API Protocol](002_rest_api_protocol.md) - Overall API overview, rate limiting standards, authentication patterns, error response format standards
 - [Protocol: Budget Control Protocol](005_budget_control_protocol.md) - IC Token used for budget handshake authentication, token invalidation (DELETE) causes budget protocol calls to return 401 Unauthorized
 - [Protocol: Authentication API](007_authentication_api.md) - User Token management (different token type from IC Token), login flow providing User Token for this API's authentication
-- [Standards: ID Format Standards](../standards/id_format_standards.md) - Entity ID formats: `token_<uuid>`, `agent_<uuid>`, `project_<uuid>`, `user_<uuid>` with underscore separator
+- [Standards: ID Format Standards](../standards/id_format_standards.md) - Entity ID formats: `token_<alphanumeric>` (^token_[a-z0-9]{6,32}$), `agent_<alphanumeric>` (^agent_[a-z0-9]{6,32}$), `project_<alphanumeric>` (^project_[a-z0-9_]{3,32}$), `user_<alphanumeric>` (^user_[a-z0-9_]{3,32}$) with underscore separator
 - [Standards: Data Format Standards](../standards/data_format_standards.md) - ISO 8601 timestamp format with Z suffix, JSON boolean true/false (not strings), omit optional fields when empty (not null)
 - [Standards: Error Format Standards](../standards/error_format_standards.md) - Machine-readable error codes (VALIDATION_ERROR, UNAUTHORIZED, NOT_FOUND, DUPLICATE_NAME, PERMISSION_DENIED, RESOURCE_CONFLICT), consistent error response structure
 - [Standards: API Design Standards](../standards/api_design_standards.md) - Offset-based pagination (?page=N&per_page=M default 50 max 200), query parameter filtering (project_id, status, agent_id), URL structure conventions (/api/v1/tokens, /api/v1/tokens/{id})

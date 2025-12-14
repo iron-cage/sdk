@@ -4,7 +4,8 @@
 
 This protocol defines the HTTP API for analytics event ingestion and query endpoints providing insights into agent spending, provider usage, budget status, and request patterns.
 
-**In scope**:
+#### In Scope
+
 - Event ingestion endpoint (POST /api/v1/analytics/events) for LlmRouter reporting with IC token authentication
 - 8 query endpoints answering critical questions (total spend, spend by agent, budget status, spend by provider, request count, token usage, model usage, average cost)
 - Period-based filtering (today, yesterday, last-7-days, last-30-days, all-time) across all query endpoints
@@ -14,7 +15,8 @@ This protocol defines the HTTP API for analytics event ingestion and query endpo
 - Cost tracking in microdollars (1 USD = 1,000,000 microdollars) for precision
 - Pagination (offset-based, default 50 items/page, max 100) and filtering (agent_id, provider_id)
 
-**Out of scope**:
+#### Out of Scope
+
 - Event storage implementation details (see Database Schema reference in Event Ingestion section)
 - Real-time streaming analytics (current implementation query-based)
 - Custom aggregation periods beyond 5 standard periods (Future Enhancement)
@@ -45,9 +47,21 @@ This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
 - Analytics API uses short alphanumeric IDs for provider (IP Token) and agent identifiers to optimize performance, readability, and operational clarity
-- `provider_id`: `ip_<name>_<numeric>` for IP Token identifiers with regex `^ip_[a-z0-9-]+_[0-9]{3}$` (e.g., `ip_openai_001`, `ip_anthropic_001`)
-- `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
-- `user_id`: `user_<uuid>` for cross-system compatibility
+
+- `provider_id`: `ip_<name>_<numeric>` (e.g., `ip_openai_001`, `ip_anthropic_001`)
+  - Pattern: `^ip_[a-z0-9-]+_[0-9]{3}$`
+  - Source: Protocol 011 (Providers API)
+  - Usage: IP Token identifier for provider association and cost attribution
+
+- `agent_id`: `agent_<alphanumeric>` (e.g., `agent_abc123`)
+  - Pattern: `^agent_[a-z0-9]{6,32}$`
+  - Source: Protocol 010 (Agents API)
+  - Usage: Agent identifier for analytics event association and spending attribution
+
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: User identifier for authorization checks and data filtering
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
@@ -110,7 +124,7 @@ Content-Type: application/json
   "input_tokens": 150,
   "output_tokens": 50,
   "cost_micros": 1250,
-  "provider_id": "ip_openai-001"
+  "provider_id": "ip_openai_001"
 }
 ```
 
@@ -238,7 +252,7 @@ $1.00 USD = 1,000,000 microdollars
   "event_type": "llm_request_failed",
   "model": "gpt-4o-mini",
   "provider": "openai",
-  "provider_id": "ip_openai-001",
+  "provider_id": "ip_openai_001",
   "error_code": "rate_limit_exceeded",
   "error_message": "Rate limit exceeded. Please retry after 60 seconds."
 }
@@ -270,7 +284,7 @@ $1.00 USD = 1,000,000 microdollars
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/total?period=today&agent_id=agent-abc123
+GET /api/v1/analytics/spending/total?period=today&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -279,7 +293,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range: `today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time` |
-| `agent_id` | integer | - | Filter by specific agent (optional) |
+| `agent_id` | string | - | Filter by specific agent (optional) |
 | `provider_id` | string | - | Filter by specific provider (optional) |
 
 **Success Response:**
@@ -335,7 +349,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent (returns single result) |
+| `agent_id` | string | - | Filter by specific agent (returns single result) |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -386,7 +400,7 @@ Content-Type: application/json
 | Field | Type | Description |
 |-------|------|-------------|
 | `data[]` | array | Agent spending records (sorted by spending desc) |
-| `data[].agent_id` | integer | Agent identifier |
+| `data[].agent_id` | string | Agent identifier |
 | `data[].agent_name` | string | Agent name |
 | `data[].spending` | number | Amount spent (USD) |
 | `data[].budget` | number | Total budget (USD) |
@@ -423,7 +437,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | integer | - | Filter agents above threshold (e.g., 80 = show agents with >80% budget used) |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `status` | string | - | Filter by status: `active`, `exhausted`, `inactive` |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -525,7 +539,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider (returns single result) |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -539,7 +553,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "provider_id": "ip_openai-001",
+      "provider_id": "ip_openai_001",
       "provider_name": "openai",
       "spending": 789.45,
       "request_count": 12456,
@@ -547,7 +561,7 @@ Content-Type: application/json
       "agent_count": 8
     },
     {
-      "provider_id": "ip_anthropic-001",
+      "provider_id": "ip_anthropic_001",
       "provider_name": "anthropic",
       "spending": 456.22,
       "request_count": 9123,
@@ -600,7 +614,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/usage/requests?period=today&agent_id=agent-abc123
+GET /api/v1/analytics/usage/requests?period=today&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -609,7 +623,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `today` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -668,7 +682,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -754,7 +768,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -769,7 +783,7 @@ Content-Type: application/json
   "data": [
     {
       "model": "gpt-4",
-      "provider_id": "ip_openai-001",
+      "provider_id": "ip_openai_001",
       "provider_name": "openai",
       "request_count": 8945,
       "spending": 567.89,
@@ -780,7 +794,7 @@ Content-Type: application/json
     },
     {
       "model": "claude-3-opus",
-      "provider_id": "ip_anthropic-001",
+      "provider_id": "ip_anthropic_001",
       "provider_name": "anthropic",
       "request_count": 5234,
       "spending": 345.67,
@@ -839,7 +853,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent-abc123
+GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -848,7 +862,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -930,7 +944,7 @@ All list endpoints support pagination:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `agent_id` | integer | Filter by specific agent |
+| `agent_id` | string | Filter by specific agent |
 | `provider_id` | string | Filter by specific provider |
 
 **Note:** Filters are optional. Omitting filters returns data for all accessible agents/providers (based on user authorization).
@@ -1015,7 +1029,7 @@ HTTP 200 OK
 # Total spend
 iron analytics spending total
 iron analytics spending total --period today
-iron analytics spending total --agent agent-abc123
+iron analytics spending total --agent agent_abc123
 
 # By agent
 iron analytics spending by-agent
@@ -1025,7 +1039,7 @@ iron analytics spending by-agent --provider ip_openai_001
 # By provider
 iron analytics spending by-provider
 iron analytics spending by-provider --period last-30-days
-iron analytics spending by-provider --agent agent-abc123
+iron analytics spending by-provider --agent agent_abc123
 
 # Average cost
 iron analytics spending avg-per-request
@@ -1038,7 +1052,7 @@ iron analytics spending avg-per-request --period today
 # Requests
 iron analytics usage requests
 iron analytics usage requests --period today
-iron analytics usage requests --agent agent-abc123
+iron analytics usage requests --agent agent_abc123
 
 # Tokens
 iron analytics usage tokens by-agent
@@ -1060,9 +1074,9 @@ iron analytics budget status --status active
 
 # Output:
 # AGENT                 BUDGET    SPENT     REMAINING  USED    RISK
-# agent-abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
-# agent-def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
-# agent-ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
+# agent_abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
+# agent_def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
+# agent_ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
 #
 # Summary: 3 agents (2 active, 1 exhausted, 1 critical, 1 high)
 ```
@@ -1072,7 +1086,7 @@ iron analytics budget status --status active
 
 The Iron Cage API provides two distinct endpoint families for tracking usage and analytics. They serve different purposes and use different data sources.
 
-#### `/api/usage/*` - Project-Level Usage Tracking - Project-Level Usage Tracking
+#### /api/usage/* - Project-Level Usage Tracking
 
 **Purpose:** Simple token usage tracking at project/provider level
 
@@ -1093,7 +1107,7 @@ The Iron Cage API provides two distinct endpoint families for tracking usage and
 
 **Use Case:** Basic project-level usage reporting and cost tracking for API token usage
 
-#### `/api/v1/analytics/*` - Comprehensive Analytics Platform - Comprehensive Analytics Platform
+#### /api/v1/analytics/* - Comprehensive Analytics Platform
 
 **Purpose:** Full-featured analytics with spending, budgets, agent breakdowns, and event ingestion
 

@@ -4,7 +4,8 @@
 
 This protocol defines the HTTP API for managing Inference Providers (IPs) - external AI services that agents use for LLM inference requests.
 
-**In scope**:
+#### In Scope
+
 - Provider CRUD operations (create, list, get details, update, delete)
 - Provider credential management (secure storage, encryption at rest, HTTPS transmission)
 - Provider-agent assignment operations (assign, list, remove)
@@ -14,7 +15,8 @@ This protocol defines the HTTP API for managing Inference Providers (IPs) - exte
 - Credential security model (AES-256-GCM encryption, never in responses)
 - Audit logging for mutation operations (credentials excluded)
 
-**Out of scope**:
+#### Out of Scope
+
 - Provider deletion dry-run preview (Future Enhancement - see lines 1103-1148)
 - Provider usage analytics (see Protocol 012: Analytics API)
 - Agent management (see Protocol 010: Agents API)
@@ -46,7 +48,10 @@ This protocol adheres to the following Iron Cage standards:
 - Providers API uses short alphanumeric IDs for provider (IP Token) and agent identifiers to optimize performance, readability, and operational clarity
 - `provider_id`: `ip_<name>_<numeric>` for IP Token identifiers with regex `^ip_[a-z0-9-]+_[0-9]{3}$` (e.g., `ip_openai_001`, `ip_anthropic_001`)
 - `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
-- `user_id`: `user_<uuid>` for cross-system compatibility
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: User identifier for audit logs and authorization checks
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
@@ -113,7 +118,7 @@ HTTP 201 Created
 Content-Type: application/json
 
 {
-  "id": "ip_openai-001",
+  "id": "ip_openai_001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -213,7 +218,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "id": "ip_openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -224,7 +229,7 @@ Content-Type: application/json
       "updated_at": "2025-12-10T10:30:45Z"
     },
     {
-      "id": "ip_anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1",
       "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
@@ -295,7 +300,7 @@ HTTP 400 Bad Request
 **Request:**
 
 ```
-GET /api/v1/providers/ip_openai-001
+GET /api/v1/providers/ip_openai_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -306,7 +311,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "ip_openai-001",
+  "id": "ip_openai_001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -362,7 +367,7 @@ HTTP 404 Not Found
 **Request:**
 
 ```json
-PUT /api/v1/providers/ip_openai-001
+PUT /api/v1/providers/ip_openai_001
 Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
@@ -394,7 +399,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "ip_openai-001",
+  "id": "ip_openai_001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v2",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-3.5-turbo"],
@@ -465,7 +470,7 @@ HTTP 404 Not Found
 **Request:**
 
 ```
-DELETE /api/v1/providers/ip_openai-001
+DELETE /api/v1/providers/ip_openai_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -476,7 +481,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "id": "ip_openai-001",
+  "id": "ip_openai_001",
   "name": "openai",
   "deleted": true,
   "agents_affected": ["agent_abc123", "agent_def456", "agent_ghi789"],
@@ -547,7 +552,7 @@ HTTP 404 Not Found
 ```json
 {
   "action": "DELETE_PROVIDER",
-  "provider_id": "ip_openai-001",
+  "provider_id": "ip_openai_001",
   "provider_name": "openai",
   "user_id": "user_admin",
   "agents_affected": ["agent_abc123", "agent_def456", "agent_ghi789"],
@@ -579,7 +584,7 @@ Authorization: Bearer <user-token or api-token>
 Content-Type: application/json
 
 {
-  "providers": ["ip_openai-001", "ip_anthropic-001"]
+  "providers": ["ip_openai_001", "ip_anthropic_001"]
 }
 ```
 
@@ -599,12 +604,12 @@ Content-Type: application/json
   "agent_id": "agent_abc123",
   "providers": [
     {
-      "id": "ip_openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1"
     },
     {
-      "id": "ip_anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1"
     }
@@ -687,13 +692,13 @@ Content-Type: application/json
   "agent_id": "agent_abc123",
   "providers": [
     {
-      "id": "ip_openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
     },
     {
-      "id": "ip_anthropic-001",
+      "id": "ip_anthropic_001",
       "name": "anthropic",
       "endpoint": "https://api.anthropic.com/v1",
       "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
@@ -740,7 +745,7 @@ HTTP 403 Forbidden
 **Request:**
 
 ```
-DELETE /api/v1/agents/agent_abc123/providers/ip_openai-001
+DELETE /api/v1/agents/agent_abc123/providers/ip_openai_001
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -752,8 +757,8 @@ Content-Type: application/json
 
 {
   "agent_id": "agent_abc123",
-  "removed_provider": "ip_openai-001",
-  "remaining_providers": ["ip_anthropic-001"]
+  "removed_provider": "ip_openai_001",
+  "remaining_providers": ["ip_anthropic_001"]
 }
 ```
 
@@ -764,7 +769,7 @@ HTTP 404 Not Found
 {
   "error": {
     "code": "PROVIDER_NOT_ASSIGNED",
-    "message": "Provider 'ip_openai-001' is not assigned to agent 'agent_abc123'"
+    "message": "Provider 'ip_openai_001' is not assigned to agent 'agent_abc123'"
   }
 }
 ```
@@ -782,7 +787,7 @@ HTTP 404 Not Found
 
 ```json
 {
-  "id": "ip_openai-001",
+  "id": "ip_openai_001",
   "name": "openai",
   "endpoint": "https://api.openai.com/v1",
   "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -807,7 +812,7 @@ HTTP 404 Not Found
   "agent_id": "agent_abc123",
   "providers": [
     {
-      "id": "ip_openai-001",
+      "id": "ip_openai_001",
       "name": "openai",
       "endpoint": "https://api.openai.com/v1",
       "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
@@ -916,7 +921,7 @@ HTTP 404 Not Found
   "endpoint": "POST /api/v1/providers",
   "method": "POST",
   "resource_type": "provider",
-  "resource_id": "ip_openai-001",
+  "resource_id": "ip_openai_001",
   "action": "create",
   "parameters": {
     "name": "openai",
@@ -943,7 +948,7 @@ iron providers create \
   --models gpt-4,gpt-4-turbo,gpt-3.5-turbo
 
 # Output:
-# Provider created: ip_openai-001
+# Provider created: ip_openai_001
 # Name: openai
 # Endpoint: https://api.openai.com/v1
 # Models: gpt-4, gpt-4-turbo, gpt-3.5-turbo
@@ -959,17 +964,17 @@ iron providers list --status active
 
 # Output:
 # ID               NAME        AGENTS  STATUS
-# ip_openai-001    openai      12      active
-# ip_anthropic-001 anthropic   8       active
+# ip_openai_001    openai      12      active
+# ip_anthropic_001 anthropic   8       active
 ```
 
 #### iron providers get
 
 ```bash
-iron providers get ip_openai-001
+iron providers get ip_openai_001
 
 # Output:
-# ID:       ip_openai-001
+# ID:       ip_openai_001
 # Name:     openai
 # Endpoint: https://api.openai.com/v1
 # Models:   gpt-4, gpt-4-turbo, gpt-3.5-turbo
@@ -986,25 +991,25 @@ iron providers get ip_openai-001
 #### iron providers update
 
 ```bash
-iron providers update ip_openai-001 \
+iron providers update ip_openai_001 \
   --endpoint https://api.openai.com/v2 \
   --models gpt-4,gpt-4-turbo,gpt-4o,gpt-3.5-turbo
 
 # Rotate credentials
-iron providers update ip_openai-001 \
+iron providers update ip_openai_001 \
   --api-key sk-proj_new-key-abc123...
 
 # Output:
-# Provider updated: ip_openai-001
+# Provider updated: ip_openai_001
 ```
 
 #### iron providers delete
 
 ```bash
-iron providers delete ip_openai-001
+iron providers delete ip_openai_001
 
 # Confirmation prompt (if provider has agents):
-# Delete provider 'openai' (ip_openai-001)?
+# Delete provider 'openai' (ip_openai_001)?
 # This will affect 3 agents:
 #   - agent_abc123 (Production Agent 1)
 #   - agent_def456 (Test Agent)
@@ -1013,7 +1018,7 @@ iron providers delete ip_openai-001
 # Continue? [y/N]
 
 # Output (after confirmation):
-# Provider deleted: ip_openai-001
+# Provider deleted: ip_openai_001
 # Affected agents: 3
 #   - agent_abc123 (has 2 remaining providers)
 #   - agent_def456 (has 1 remaining provider)
@@ -1025,19 +1030,19 @@ iron providers delete ip_openai-001
 ```bash
 # Replace provider list
 iron agents assign-providers agent_abc123 \
-  --providers ip_openai-001,ip_anthropic-001
+  --providers ip_openai_001,ip_anthropic_001
 
 # Add provider (read current, append new, update)
-iron agents assign-providers agent_abc123 --add ip_anthropic-001
+iron agents assign-providers agent_abc123 --add ip_anthropic_001
 
 # Remove provider
-iron agents assign-providers agent_abc123 --remove ip_openai-001
+iron agents assign-providers agent_abc123 --remove ip_openai_001
 
 # Output:
 # Providers updated for agent_abc123
 # Current providers:
-#   - ip_openai-001 (openai)
-#   - ip_anthropic-001 (anthropic)
+#   - ip_openai_001 (openai)
+#   - ip_anthropic_001 (anthropic)
 ```
 
 
@@ -1047,7 +1052,7 @@ iron agents assign-providers agent_abc123 --remove ip_openai-001
 
 ```sql
 CREATE TABLE providers (
-  id VARCHAR(50) PRIMARY KEY,           -- 'ip_openai-001'
+  id VARCHAR(50) PRIMARY KEY,           -- 'ip_openai_001'
   name VARCHAR(255) NOT NULL UNIQUE,    -- 'openai'
   endpoint VARCHAR(500) NOT NULL,       -- 'https://api.openai.com/v1'
   credentials TEXT NOT NULL,            -- Encrypted JSON (AES-256-GCM)
@@ -1111,7 +1116,7 @@ CREATE INDEX idx_agent_providers_provider ON agent_providers(provider_id);
 
 **Request:**
 ```
-GET /api/v1/providers/ip_openai-001/deletion-impact
+GET /api/v1/providers/ip_openai_001/deletion-impact
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -1121,7 +1126,7 @@ HTTP 200 OK
 Content-Type: application/json
 
 {
-  "provider_id": "ip_openai-001",
+  "provider_id": "ip_openai_001",
   "provider_name": "openai",
   "agents_affected": ["agent_abc123", "agent_def456", "agent_ghi789"],
   "agents_count": 3,
@@ -1174,4 +1179,3 @@ None.
 - `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_control_api/src/routes/providers.rs` - Providers API endpoint handlers
 - `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_control_api/src/routes/agent_provider_key.rs` - Agent-provider assignment handlers
 - `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_types/src/provider.rs` - Provider data structures
-

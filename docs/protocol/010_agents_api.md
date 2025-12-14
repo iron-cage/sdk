@@ -4,7 +4,7 @@
 
 This protocol defines the HTTP API for managing agents in the Iron Control Panel. Agents are autonomous entities that consume LLM provider services within budget constraints.
 
-**In scope**:
+#### In Scope
 - Agent lifecycle operations (create, list, get, update)
 - Agent-provider assignments (add, list, remove providers)
 - Agent-budget relationship (view budget status, spending)
@@ -14,10 +14,10 @@ This protocol defines the HTTP API for managing agents in the Iron Control Panel
 - CLI integration commands
 - Audit logging for mutation operations
 
-**Out of scope**:
-- Agent deletion (Future Enhancement - see lines 1304-1316)
-- Agent activation/deactivation (Future Enhancement - see lines 1319-1326)
-- Multi-project support (Future Enhancement - see lines 1329-1335)
+#### Out of Scope
+- Agent deletion (Future Enhancement - see lines 1307-1319)
+- Agent activation/deactivation (Future Enhancement - see lines 1322-1329)
+- Multi-project support (Future Enhancement - see lines 1332-1338)
 - Budget modification (see Protocol 013: Budget Limits API)
 - IC Token rotation (see Protocol 006: Token Management API)
 - Provider management (see Protocol 011: Providers API)
@@ -47,7 +47,10 @@ This protocol adheres to the following Iron Cage standards:
 - `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
 - `ic_token_id`: `ic_<alphanumeric>` with regex `^ic_[a-z0-9]{6,32}$` (e.g., `ic_def456ghi789`)
 - `provider_id`: `ip_<name>_<numeric>` for IP Token identifiers (e.g., `ip_openai_001`, `ip_anthropic_001`)
-- `user_id`: `user_<uuid>` for cross-system compatibility
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: User identifier for authorization checks and ownership tracking
 - `project_id`: `project_<uuid>` for cross-system compatibility
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))

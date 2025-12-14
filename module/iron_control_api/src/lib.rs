@@ -71,7 +71,6 @@
 //! ```text
 //! GET /api/analytics           - Get aggregated stats
 //! GET /api/usage               - Get usage metrics
-//! GET /api/traces              - Get request traces
 //! ```
 //!
 //! ### Budget & Limits

@@ -731,9 +731,21 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  GET  /api/v1/analytics/usage/tokens/by-agent" );
   tracing::info!( "  GET  /api/v1/analytics/usage/models" );
 
-  // Start server
+  // Fix(login-connect-info): Enable ConnectInfo extraction for per-IP rate limiting
+  // Root cause: Login handler uses ConnectInfo<SocketAddr> for per-IP rate limiting
+  //             (Fix issue-GAP-006), but axum::serve() doesnt provide ConnectInfo by
+  //             default. Must explicitly opt-in via into_make_service_with_connect_info.
+  // Pitfall: Never use axum::serve(listener, app) when handlers need ConnectInfo.
+  //          Always use app.into_make_service_with_connect_info::<SocketAddr>() to
+  //          make client addresses available. Without this, requests fail with 500
+  //          "Missing request extension: ConnectInfo<SocketAddr>".
+  //
+  // Start server with ConnectInfo support
   let listener = tokio::net::TcpListener::bind( addr ).await?;
-  axum::serve( listener, app ).await?;
+  axum::serve(
+    listener,
+    app.into_make_service_with_connect_info::<SocketAddr>()
+  ).await?;
 
   Ok( () )
 }

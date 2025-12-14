@@ -1,3 +1,8 @@
+<!-- AUTOMATED VERIFICATION ENFORCED -->
+<!-- ⚠️  Do not manually update status codes without corresponding implementation -->
+<!-- ⚠️  Git pre-commit hook will reject inconsistencies -->
+<!-- ⚠️  CI/CD will fail if table does not match filesystem -->
+
 # Protocol Implementation Maturity Matrix
 
 **Date:** 2025-12-14
@@ -50,16 +55,22 @@
 | **Protocol 008: User Management** | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | **100%** |
 | **Protocol 010: Agent Management** | 🟡 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | **98%** |
 | **Protocol 012: Analytics API** | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟡 | **95%** |
-| **Protocol 012: Budget Requests** | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | ⚫ | ⚫ | 🟢 | **100%** |
+| **Protocol 012: Budget Requests** | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | **100%** |
 | **Protocol 014: API Tokens** | 🟡 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | **98%** |
-| **Protocol 018: Keys API** | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | ⚫ | ⚫ | 🟢 | **100%** |
+| **Protocol 018: Keys API** | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | **100%** |
 | **FR-8: Usage Analytics** | 🟡 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟢 | 🟡 | 🟢 | **95%** |
 | **FR-9: Budget Limits** | 🟡 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟢 | 🟡 | 🟢 | **95%** |
 | **FR-10: Request Traces** | 🟡 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟢 | 🟡 | 🟢 | **95%** |
 
 **Overall Backend Maturity: 98%**
-**Overall Frontend Maturity: 87.5%**
-**Overall System Maturity: 93%**
+**Overall Frontend Maturity: 83%**
+**Overall System Maturity: 90.5%**
+
+**Recent Implementation Updates (2025-12-14):**
+- ✅ Budget Request Workflow frontend completed (BudgetRequestsView.vue)
+- ✅ Keys API integrated via Agent Tokens view (AgentTokensView.vue)
+- 🟡 Manual testing procedures documented, execution pending
+- ⚫ Automated E2E testing infrastructure deferred to post-pilot
 
 ---
 
@@ -439,9 +450,10 @@ All pilot-required gaps have been resolved. System is production-ready for pilot
 | **Providers** | 011 (Provider Management) | 🟢 Complete | src/views/ProvidersView.vue |
 | **Usage Analytics** | 012 (Analytics API), FR-8 | 🟢 Complete | src/views/UsageView.vue |
 | **Budget Limits** | 013 (Budget Limits), FR-9 | 🟢 Complete | src/views/LimitsView.vue |
+| **Budget Requests** | Protocol 012 (Budget Request Workflow) | 🟢 Complete | src/views/BudgetRequestsView.vue |
 | **Request Traces** | FR-10 (Traces) | 🟢 Complete | src/views/TracesView.vue |
 
-**View Count:** 10/10 implemented (100%)
+**View Count:** 11/11 implemented (100%)
 
 #### REST API Integration
 
@@ -452,6 +464,7 @@ All implemented views consume iron_control_api REST endpoints:
 - ✅ Token management endpoints (create, rotate, revoke, list)
 - ✅ Usage analytics endpoints (spending, budget status)
 - ✅ Budget limit endpoints (create, update, delete)
+- ✅ Budget request endpoints (create, list, approve, reject)
 - ✅ Traces endpoints (list, get by ID)
 
 **Integration Method:** `composables/useApi.ts` with TanStack Vue Query for async state management
@@ -514,12 +527,12 @@ All implemented views consume iron_control_api REST endpoints:
 | **REST Integration** | 🟢 100% | All endpoints consumed |
 | **WebSocket Integration** | 🟢 100% | Real-time updates working |
 | **Accessibility** | 🟢 100% | WCAG 2.1 AA compliant |
-| **Manual Testing** | 🟢 100% | 8 test categories passing |
+| **Manual Testing** | 🟡 63% | 8 categories defined, Budget Requests execution pending |
 | **Automated Tests** | 🟡 0% | Deferred to post-pilot |
 | **Production Build** | 🟢 100% | Vite build configured |
 | **Browser Compatibility** | 🟢 100% | Chrome/Firefox/Safari/Edge |
 
-**Overall Frontend Maturity:** 🟢 **87.5%** (7/8 aspects complete)
+**Overall Frontend Maturity:** 🟡 **83%** (6.5/8 aspects complete - manual testing in progress)
 
 **Pilot Launch Status:** ✅ **APPROVED** - Manual testing sufficient for pilot demo. Automated tests provide long-term value but not required for 5-minute conference demo.
 
@@ -622,7 +635,7 @@ The iron_control_api module is **98% production-ready** with comprehensive test 
 
 ### Frontend Implementation
 
-The iron_dashboard module is **87.5% production-ready** (7/8 aspects complete) with all UI views implemented, full REST/WebSocket integration, and WCAG 2.1 AA accessibility compliance.
+The iron_dashboard module is **83% production-ready** (6.5/8 aspects complete) with all UI views implemented, full REST/WebSocket integration, and WCAG 2.1 AA accessibility compliance. Manual testing execution pending for Budget Request Workflow.
 
 **Dashboard Views - ✅ UI COMPLETE:**
 - ✅ 10/10 views implemented (100%)
@@ -639,9 +652,9 @@ The iron_dashboard module is **87.5% production-ready** (7/8 aspects complete) w
 
 ### Overall System Maturity
 
-**Backend + Frontend Integration:** 🟢 **93% production-ready**
+**Backend + Frontend Integration:** 🟡 **90.5% production-ready**
 - Backend API: 98% (1074 tests passing)
-- Frontend UI: 87.5% (manual testing only)
+- Frontend UI: 83% (manual testing in progress)
 - REST Integration: 100% (all endpoints consumed)
 - WebSocket Integration: 100% (real-time updates working)
 - E2E Coverage: 🟡 Manual only (automated tests deferred)
