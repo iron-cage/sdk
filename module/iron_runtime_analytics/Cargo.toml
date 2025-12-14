@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+description = "Usage analytics and reporting for Iron Cage agent runtime"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["analytics", "reporting", "metrics", "agent-runtime"]
+categories = ["development-tools::profiling"]
 
 [features]
 default = [ "enabled" ]
@@ -14,7 +19,13 @@ enabled = [
   "dep:crossbeam",
   "dep:dashmap",
 ]
-full = [ "enabled" ]
+sync = [
+  "enabled",
+  "dep:reqwest",
+  "dep:tokio",
+  "dep:tracing",
+]
+full = [ "enabled", "sync" ]
 
 [dependencies]
 serde = { workspace = true, features = [ "derive", "rc" ], optional = true }
@@ -23,5 +34,13 @@ iron_cost = { workspace = true, optional = true }
 crossbeam = { workspace = true, optional = true }
 dashmap = { workspace = true, optional = true }
 
+# Sync dependencies
+reqwest = { workspace = true, features = [ "json" ], optional = true }
+tokio = { workspace = true, features = [ "time", "sync", "rt" ], optional = true }
+tracing = { workspace = true, optional = true }
+
 [dev-dependencies]
 iron_cost = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+wiremock = { workspace = true }
+serde_json = { workspace = true }

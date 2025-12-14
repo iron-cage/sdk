@@ -27,7 +27,7 @@
 use iron_cli::adapters::{ AdapterError, ServiceError, AuthService };
 use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ Formatter, OutputFormat };
+use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -84,7 +84,7 @@ impl HasParams for MockVerifiedCommand
 async fn test_login_adapter_success()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".auth.login",
@@ -113,7 +113,7 @@ async fn test_login_adapter_success()
 async fn test_login_adapter_missing_username()
 {
   let adapter = create_test_adapter();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".auth.login",
@@ -145,7 +145,7 @@ async fn test_login_adapter_missing_username()
 async fn test_login_adapter_invalid_credentials()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".auth.login",
@@ -182,7 +182,7 @@ async fn test_login_adapter_network_error()
   let adapter = create_test_adapter();
   adapter.set_failure_mode( "network_error" ); // InMemoryAdapter simulates failures
 
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command(
     ".auth.login",
@@ -214,7 +214,7 @@ async fn test_login_adapter_network_error()
 async fn test_login_adapter_json_format()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
 
   let command = create_verified_command(
     ".auth.login",
@@ -248,7 +248,7 @@ async fn test_login_adapter_json_format()
 async fn test_refresh_adapter_success()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // First login to get tokens
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -275,7 +275,7 @@ async fn test_refresh_adapter_success()
 async fn test_refresh_adapter_no_stored_token()
 {
   let adapter = create_test_adapter(); // No login, no tokens
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".auth.refresh", &[] );
 
@@ -302,7 +302,7 @@ async fn test_refresh_adapter_no_stored_token()
 async fn test_refresh_adapter_expired_token()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Login and then expire the token
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -333,7 +333,7 @@ async fn test_refresh_adapter_expired_token()
 async fn test_refresh_adapter_dry_run()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Login to get initial tokens
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -366,7 +366,7 @@ async fn test_refresh_adapter_dry_run()
 async fn test_refresh_adapter_yaml_format()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Yaml );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Yaml );
 
   // Login first
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -402,7 +402,7 @@ async fn test_refresh_adapter_yaml_format()
 async fn test_logout_adapter_success()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Login first
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -430,7 +430,7 @@ async fn test_logout_adapter_success()
 async fn test_logout_adapter_no_token()
 {
   let adapter = create_test_adapter(); // No login
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   let command = create_verified_command( ".auth.logout", &[] );
 
@@ -455,7 +455,7 @@ async fn test_logout_adapter_no_token()
 async fn test_logout_adapter_clears_storage()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Login and verify tokens exist
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -487,7 +487,7 @@ async fn test_logout_adapter_clears_storage()
 async fn test_logout_adapter_dry_run()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Login first
   adapter.login( "alice@example.com", "password123" ).await.unwrap();
@@ -518,7 +518,7 @@ async fn test_logout_adapter_dry_run()
 async fn test_logout_adapter_table_format()
 {
   let adapter = create_adapter_with_user();
-  let formatter = Formatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
 
   // Login first
   adapter.login( "alice@example.com", "password123" ).await.unwrap();

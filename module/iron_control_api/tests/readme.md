@@ -2,7 +2,7 @@
 
 ## Organization
 
-This directory contains ALL tests for iron_control_api crate following domain-based organization with comprehensive endpoint coverage for FR-7/8/9/10.
+This directory contains ALL tests for iron_control_api crate following domain-based organization with comprehensive endpoint coverage for Protocol 014 (API Tokens), Protocol 010 (Agents), Protocol 012 (Analytics), and legacy FR-8/9/10 (Usage/Limits/Traces).
 
 ### Directory Structure
 
@@ -18,10 +18,20 @@ tests/
 │   └── validation.rs       # Auth validation tests
 ├── auth.rs                 # Auth test suite entry point
 ├── auth_endpoints.rs       # Auth endpoint integration tests
-├── tokens/                 # FR-7: Token Management API
-│   ├── endpoints.rs        # Token CRUD endpoint tests (13 tests)
-│   └── validation.rs       # Token validation logic tests
+├── tokens/                 # Protocol 014: API Token Management
+│   ├── endpoints.rs        # Token CRUD + validate endpoint tests (111 tests total)
+│   ├── validation.rs       # Token validation logic tests
+│   └── readme.md           # Token test documentation
 ├── tokens.rs               # Token test suite entry point
+├── agents/                 # Protocol 010: Agent Management API
+│   ├── endpoints.rs        # Agent CRUD endpoint tests (39 tests)
+│   └── mod.rs              # Agent test module
+├── agents.rs               # Agent test suite entry point
+├── analytics/              # Protocol 012: Analytics API
+│   ├── spending.rs         # Spending analytics tests
+│   ├── usage.rs            # Usage analytics tests
+│   └── mod.rs              # Analytics test module
+├── analytics.rs            # Analytics test suite entry point
 ├── usage/                  # FR-8: Usage Analytics API
 │   ├── aggregate.rs        # Aggregate usage endpoint tests
 │   ├── by_project.rs       # Project-specific usage tests
@@ -49,7 +59,9 @@ tests/
 
 | Entity | Responsibility | Input→Output | Out of Scope |
 |--------|----------------|--------------|--------------|
-| `tokens/` | Test token management API endpoints and validation | Token scenarios → Test results | NOT auth flows (auth/), NOT usage analytics (usage/), NOT limits management (limits/), NOT traces (traces/) |
+| `tokens/` | Test Protocol 014 API token endpoints including validate | Token scenarios → Test results | NOT auth flows (auth/), NOT agents (agents/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/), NOT traces (traces/) |
+| `agents/` | Test Protocol 010 agent CRUD endpoints and budgets | Agent scenarios → Test results | NOT tokens (tokens/), NOT auth (auth/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
+| `analytics/` | Test Protocol 012 analytics endpoints (spending, usage, budget status) | Analytics scenarios → Test results | NOT agents (agents/), NOT tokens (tokens/), NOT usage (usage/), NOT auth (auth/) |
 | `usage/` | Test usage analytics endpoints and aggregation | Usage scenarios → Analytics validation | NOT token CRUD (tokens/), NOT auth (auth/), NOT limits (limits/), NOT manual procedures (manual/) |
 | `limits/` | Test budget limits CRUD and validation | Limits scenarios → Constraint validation | NOT tokens (tokens/), NOT usage analytics (usage/), NOT traces (traces/), NOT integration flows (integration_tests.rs) |
 | `traces/` | Test request traces listing and retrieval | Trace scenarios → Trace validation | NOT tokens (tokens/), NOT usage (usage/), NOT limits (limits/), NOT auth (auth/) |
@@ -64,8 +76,13 @@ tests/
 | `protocol_005_migration_metrics.rs` | Test Protocol 005 migration completeness metrics | Migration metrics → Quantitative validation | NOT enforcement (protocol_005_enforcement_simple.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT types (budget_routes.rs) |
 | `protocol_005_rollback_verification.rs` | Test Protocol 005 rollback impossibility | Rollback attempts → Prevention validation | NOT enforcement checks (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types (budget_routes.rs) |
 | `budget_database_state.rs` | Test Protocol 005 database state corner cases | Database state scenarios → Enforcement validation | NOT enforcement layers (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types/crypto (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs) |
+| `budget_concurrency.rs` | Test Protocol 005 concurrent access scenarios | Concurrent requests → Race condition prevention | NOT database state (budget_database_state.rs), NOT input validation (budget_corner_cases.rs), NOT security (budget_security.rs), NOT types/crypto (budget_routes.rs) |
+| `budget_corner_cases.rs` | Test Protocol 005 input validation edge cases | Edge case inputs → Validation robustness | NOT concurrency (budget_concurrency.rs), NOT database state (budget_database_state.rs), NOT security (budget_security.rs), NOT types (budget_routes.rs) |
+| `budget_security.rs` | Test Protocol 005 security-critical scenarios | Security attacks → Attack prevention | NOT concurrency (budget_concurrency.rs), NOT database state (budget_database_state.rs), NOT input validation (budget_corner_cases.rs), NOT types (budget_routes.rs) |
 | `auth_endpoints.rs` | Test authentication endpoint JWT token lifecycle | JWT scenarios → Token validation | NOT auth flows (auth/), NOT user management (users.rs), NOT RBAC (rbac.rs), NOT integration (integration_tests.rs) |
 | `users.rs` | Test user management CRUD endpoints | User management scenarios → CRUD validation | NOT auth (auth/, auth_endpoints.rs), NOT tokens (tokens/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
+| `auth_rate_limiting.rs` | Test Protocol 007 login rate limiting for brute force prevention | Login rate limit scenarios → Attack prevention validation | NOT token rate limiting (tokens/rate_limiting.rs), NOT auth flows (auth/), NOT JWT lifecycle (auth_endpoints.rs), NOT user management (users.rs) |
+| `agent_provider_key_tests.rs` | Test provider API key retrieval endpoint | Key fetch scenarios → Retrieval validation | Feature 014 provider key tests | NOT budget (budget_*), NOT auth (auth/), NOT tokens (tokens/) |
 
 ## Test Coverage Summary
 
@@ -133,16 +150,27 @@ tests/
 - **Phase 5 Complete:** 353 tests → **Protocol 005 Complete:** 379 tests (+26 tests, +7%)
 - **Status:** All Protocol 005 tests passing, 100% migration score, rollback impossible
 
-### By Functional Requirement
+### By Protocol and Functional Requirement
 
-- **FR-7 (Token Management):** 99 tests (+30 new in Phases 2-4)
-  - Endpoints: POST /api/tokens (create), GET /api/tokens/:id (get), POST /api/tokens/:id/rotate, DELETE /api/tokens/:id (revoke)
+- **Protocol 014 (API Token Management):** 111 tests (+12 new in Phase 1 Deliverable 1.6)
+  - Endpoints: POST /api/v1/api-tokens (create), GET /api/v1/api-tokens/:id (get), POST /api/v1/api-tokens/:id/rotate, DELETE /api/v1/api-tokens/:id (revoke), **POST /api/v1/api-tokens/validate** (Deliverable 1.6)
   - Validation: user_id/project_id length limits (500 chars), NULL byte rejection, empty string handling
   - Security: DoS protection (issue-001), NULL byte injection (issue-002), SQL injection, XSS, command injection, path traversal
   - Corner cases: Concurrent requests, unique token generation, Unicode handling, very long inputs
-  - **NEW Phase 2**: State transitions (7), Concurrency (4), Malformed JSON (6), HTTP methods (6)
-  - **NEW Phase 3-4**: Content-Type (3), Idempotency (2), Empty body (2)
-  - GET /api/tokens (list) requires auth, tested manually
+  - State transitions: Token lifecycle (create → rotate → revoke), revoked token validation (5 tests)
+  - **NEW Deliverable 1.6**: Validate endpoint (5 tests) - valid token returns metadata, invalid/revoked tokens return false, no auth required
+  - GET /api/v1/api-tokens (list) requires auth, tested manually
+
+- **Protocol 010 (Agent Management):** 39 tests (Phase 2 complete)
+  - Endpoints: POST /api/v1/agents (create), GET /api/v1/agents (list), GET /api/v1/agents/:id (get), PUT /api/v1/agents/:id (update), DELETE /api/v1/agents/:id (delete)
+  - Integration tests comprehensive: Agent CRUD, budget management, provider configuration
+  - Validation: Required fields, constraints, error handling
+  - Security: Input validation, SQL injection prevention
+
+- **Protocol 012 (Analytics):** 30 tests (Phase 4 complete)
+  - Endpoints: GET /api/v1/analytics/spending/*, GET /api/v1/analytics/usage/*, GET /api/v1/analytics/budget/status
+  - Coverage: Spending total, by-agent, by-provider, average per request, budget status, usage requests, token usage, model usage
+  - Validation: Time ranges, aggregation accuracy, filtering
 
 - **FR-8 (Usage Analytics):** 39 tests
   - GET /api/usage/aggregate

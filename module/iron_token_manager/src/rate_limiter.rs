@@ -83,9 +83,9 @@ impl RateLimiter
       // Zero quota = always reject
       None
     } else {
-      let max_burst = NonZeroU32::new( requests_per_period ).expect( "Should be non-zero" );
+      let max_burst = NonZeroU32::new( requests_per_period ).expect( "LOUD FAILURE: Should be non-zero" );
       let quota = Quota::with_period( period )
-        .expect( "Period must be valid" )
+        .expect( "LOUD FAILURE: Period must be valid" )
         .allow_burst( max_burst );
       Some( Arc::new( GovernorRateLimiter::keyed( quota ) ) )
     };

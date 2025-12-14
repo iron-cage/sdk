@@ -1,6 +1,6 @@
 //! Unilang-based CLI entry point for iron (Control API)
 //!
-//! This CLI provides access to the Iron Cage Control API with 46 commands
+//! This CLI provides access to the Iron Cage Control API with 47 commands
 //! for managing agents, providers, analytics, budgets, projects, and users.
 //!
 //! Architecture:
@@ -10,7 +10,7 @@
 //! - Handlers are pure functions (no I/O, no async)
 //! - Adapters bridge handlers to REST API (I/O layer)
 //!
-//! Commands (46 total):
+//! Commands (47 total):
 //! - Agents (8): .agent.{list,create,get,update,delete,assign_providers,list_providers,remove_provider}
 //! - Providers (8): .provider.{list,create,get,update,delete,assign_agents,list_agents,remove_agent}
 //! - Analytics (8): .analytics.{usage,spending,metrics,usage_by_agent,usage_by_provider,spending_by_period,export_usage,export_spending}
@@ -18,12 +18,15 @@
 //! - API Tokens (4): .api_token.{list,create,get,revoke}
 //! - Projects (2): .project.{list,get}
 //! - Budget Requests (6): .budget_request.{list,create,get,approve,reject,cancel}
+
+// Binary entry points are allowed to use println! for final output
+#![allow(clippy::disallowed_macros)]
 //! - Users (8): .user.{list,create,get,update,delete,set_role,reset_password,get_permissions}
 //!
 //! Implementation Status: Phase 3 - Command execution
 //! - ✅ Binary entry point created
-//! - ✅ YAML command definitions (46 commands)
-//! - ✅ Handler implementations (46 handlers)
+//! - ✅ YAML command definitions (47 commands)
+//! - ✅ Handler implementations (47 handlers)
 //! - ✅ HTTP adapter infrastructure
 //! - 🔄 Pipeline integration (in progress)
 
@@ -409,6 +412,20 @@ fn route_to_handler(
       runtime.block_on( iron_cli::adapters::control::user_adapters::get_user_permissions_adapter( params ) )
     }
 
+    // Auth commands
+    ".auth.login" =>
+    {
+      runtime.block_on( iron_cli::adapters::auth_adapters::login_adapter( params ) )
+    }
+    ".auth.logout" =>
+    {
+      runtime.block_on( iron_cli::adapters::auth_adapters::logout_adapter( params ) )
+    }
+    ".auth.refresh" =>
+    {
+      runtime.block_on( iron_cli::adapters::auth_adapters::refresh_adapter( params ) )
+    }
+
     // Default: Command not implemented
     _ =>
     {
@@ -432,8 +449,7 @@ fn print_banner()
   println!();
   println!( "Help:" );
   println!( "  iron .help                    # List all commands" );
-  println!( "  iron .agent.list ?            # Quick help" );
-  println!( "  iron .agent.list ??           # Detailed help" );
+  println!( "  iron .agent.list ?            # Command help" );
   println!();
   println!( "Status: Phase 3 - Command execution framework complete" );
   println!( "Pipeline integration successful ✓" );

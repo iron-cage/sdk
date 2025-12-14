@@ -22,6 +22,9 @@ use crate::llm_router::proxy::{run_proxy, ProxyConfig};
 #[cfg(feature = "analytics")]
 use iron_runtime_analytics::EventStore;
 
+#[cfg(feature = "analytics")]
+use iron_runtime_analytics::{SyncClient, SyncConfig, SyncHandle};
+
 /// LLM Router - Local proxy server for OpenAI/Anthropic API requests
 ///
 /// Creates a local HTTP server that intercepts LLM API requests,
@@ -71,6 +74,12 @@ pub struct LlmRouter {
   #[cfg(feature = "analytics")]
   #[allow(dead_code)]
   provider_id: Option<Arc<str>>,
+  /// Analytics sync handle - auto-flushes on drop
+  #[cfg(feature = "analytics")]
+  #[allow(dead_code)] // Used for Drop behavior
+  sync_handle: Option<SyncHandle>,
+  /// Lease ID from server handshake (for budget return on shutdown)
+  lease_id: Option<String>,
 }
 
 #[pymethods]
@@ -114,9 +123,11 @@ impl LlmRouter {
     provider_key: Option<String>,
   ) -> PyResult<Self> {
     // Validate: either provider_key OR (api_key + server_url) must be provided
+    // Can also use provider_key + api_key + server_url for direct mode with analytics sync
     if provider_key.is_none() && (api_key.is_none() || server_url.is_none()) {
       return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-        "Either 'provider_key' or both 'api_key' and 'server_url' must be provided"
+        "Either 'provider_key' or both 'api_key' and 'server_url' must be provided. \
+         Use provider_key + api_key + server_url for direct mode with analytics sync."
       ));
     }
 
@@ -167,7 +178,7 @@ impl LlmRouter {
 
   /// Get total spent in USD (0.0 if no budget set)
   fn total_spent(&self) -> f64 {
-    self.cost_controller.as_ref().map(|c| c.total_spent()).unwrap_or(0.0)
+    self.cost_controller.as_ref().map(|c| c.total_spent() as f64 / 1_000_000.0).unwrap_or(0.0)
   }
 
   /// Set budget limit in USD
@@ -176,21 +187,25 @@ impl LlmRouter {
   /// * `amount_usd` - New budget limit in USD (e.g., 10.0 for $10)
   fn set_budget(&self, amount_usd: f64) {
     if let Some(ref controller) = self.cost_controller {
-      controller.set_budget(amount_usd);
+      let budget_micros = (amount_usd * 1_000_000.0) as i64;
+      controller.set_budget(budget_micros);
     }
   }
 
   /// Get current budget limit in USD (None if no budget set)
   #[getter]
   fn budget(&self) -> Option<f64> {
-    self.cost_controller.as_ref().map(|c| c.budget_limit())
+    self.cost_controller.as_ref().map(|c| c.budget_limit() as f64 / 1_000_000.0)
   }
 
   /// Get budget status as (spent, limit) tuple in USD
   /// Returns None if no budget is set
   #[getter]
   fn budget_status(&self) -> Option<(f64, f64)> {
-    self.cost_controller.as_ref().map(|c| c.get_status())
+    self.cost_controller.as_ref().map(|c| {
+      let (spent_micros, limit_micros) = c.get_status();
+      (spent_micros as f64 / 1_000_000.0, limit_micros as f64 / 1_000_000.0)
+    })
   }
 
   /// Stop the proxy server
@@ -316,8 +331,26 @@ impl LlmRouter {
     // Create shutdown channel
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-    // Create cost controller only if budget is specified
-    let cost_controller = budget.map(|budget_usd| Arc::new(CostController::new(budget_usd)));
+    // Determine budget: use explicit budget, or fetch from server handshake, or default to 0
+    // Also capture lease_id from handshake for budget return on shutdown
+    // Note: Python API accepts dollars (f64), server returns microdollars (i64)
+    let (effective_budget_micros, lease_id): (i64, Option<String>) = if let Some(b) = budget {
+      // Convert dollars from Python API to microdollars
+      ((b * 1_000_000.0) as i64, None)
+    } else if !server_url.is_empty() {
+      // Fetch budget from server handshake (Protocol 005) - already in microdollars
+      match runtime.block_on(async {
+        fetch_budget_from_handshake(&server_url, &api_key).await
+      }) {
+        Some(result) => (result.budget, Some(result.lease_id)),
+        None => (0, None),
+      }
+    } else {
+      (0, None)
+    };
+
+    // Create cost controller with effective budget (always created, defaults to 0)
+    let cost_controller = Some(Arc::new(CostController::new(effective_budget_micros)));
 
     // Create analytics event store (feature-gated)
     #[cfg(feature = "analytics")]
@@ -354,6 +387,16 @@ impl LlmRouter {
       }
     });
 
+    // Start analytics sync (if server_url is provided)
+    #[cfg(feature = "analytics")]
+    let sync_handle = if !server_url.is_empty() {
+      let sync_config = SyncConfig::new(&server_url, &api_key);
+      let sync_client = SyncClient::new(event_store.clone(), sync_config);
+      Some(sync_client.start(runtime.handle()))
+    } else {
+      None
+    };
+
     // Wait for server to start
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -371,13 +414,69 @@ impl LlmRouter {
       agent_id: agent_id_arc,
       #[cfg(feature = "analytics")]
       provider_id: provider_id_arc,
+      #[cfg(feature = "analytics")]
+      sync_handle,
+      lease_id,
     })
   }
 
   fn stop_inner(&mut self) {
     if let Some(tx) = self.shutdown_tx.take() {
+      // Return unused budget to server before shutting down (Protocol 005)
+      if let Some(lease_id) = self.lease_id.take() {
+        if !self.server_url.is_empty() {
+          // Get spent amount from cost_controller (already in microdollars)
+          let spent_microdollars = self.cost_controller
+            .as_ref()
+            .map(|cc| cc.total_spent())
+            .unwrap_or(0);
+
+          let url = format!("{}/api/v1/budget/return", self.server_url);
+          let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build();
+
+          match client {
+            Ok(client) => {
+              match client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .json(&serde_json::json!({"lease_id": lease_id, "spent_microdollars": spent_microdollars}))
+                .send()
+              {
+                Ok(resp) if resp.status().is_success() => {
+                  if let Ok(body) = resp.json::<serde_json::Value>() {
+                    if let Some(returned) = body.get("returned").and_then(|v| v.as_i64()) {
+                      tracing::info!("Budget returned to server: ${:.6} (spent: ${:.6})",
+                        returned as f64 / 1_000_000.0, spent_microdollars as f64 / 1_000_000.0);
+                    }
+                  }
+                }
+                Ok(resp) => {
+                  tracing::warn!("Budget return failed with status: {}", resp.status());
+                }
+                Err(e) => {
+                  tracing::warn!("Budget return request failed: {}", e);
+                }
+              }
+            }
+            Err(e) => {
+              tracing::warn!("Failed to create HTTP client for budget return: {}", e);
+            }
+          }
+        }
+      }
+
       #[cfg(feature = "analytics")]
       self.event_store.record_router_stopped();
+
+      // Stop analytics sync (triggers flush) before stopping proxy
+      #[cfg(feature = "analytics")]
+      if let Some(handle) = self.sync_handle.take() {
+        handle.stop(); // This triggers flush
+        // Give sync task time to complete flush
+        std::thread::sleep(std::time::Duration::from_millis(500));
+      }
 
       let _ = tx.send(());
     }
@@ -388,4 +487,59 @@ impl LlmRouter {
 fn find_free_port() -> std::io::Result<u16> {
   let listener = TcpListener::bind("127.0.0.1:0")?;
   Ok(listener.local_addr()?.port())
+}
+
+/// Result from server handshake containing budget and lease info
+struct HandshakeResult {
+  budget: i64,  // microdollars
+  lease_id: String,
+}
+
+/// Fetch budget from server handshake (Protocol 005)
+async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option<HandshakeResult> {
+  let client = reqwest::Client::new();
+  let url = format!("{}/api/v1/budget/handshake", server_url);
+
+  let response = match client
+    .post(&url)
+    .header("Authorization", format!("Bearer {}", ic_token))
+    .json(&serde_json::json!({
+      "ic_token": ic_token,
+      "provider": "openai"
+    }))
+    .send()
+    .await
+  {
+    Ok(r) => r,
+    Err(e) => {
+      tracing::warn!("Failed to connect to server for handshake: {}", e);
+      return None;
+    }
+  };
+
+  if !response.status().is_success() {
+    tracing::warn!("Handshake failed with status: {}", response.status());
+    return None;
+  }
+
+  #[derive(serde::Deserialize)]
+  struct HandshakeResponse {
+    budget_granted: i64,  // microdollars
+    lease_id: String,
+  }
+
+  match response.json::<HandshakeResponse>().await {
+    Ok(data) => {
+      tracing::info!("Budget from server handshake: ${:.6} ({}μ$), lease_id: {}",
+        data.budget_granted as f64 / 1_000_000.0, data.budget_granted, data.lease_id);
+      Some(HandshakeResult {
+        budget: data.budget_granted,
+        lease_id: data.lease_id,
+      })
+    }
+    Err(e) => {
+      tracing::warn!("Failed to parse handshake response: {}", e);
+      None
+    }
+  }
 }

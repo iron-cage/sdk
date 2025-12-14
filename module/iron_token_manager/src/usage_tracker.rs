@@ -106,14 +106,14 @@ impl UsageTracker
       .max_connections( 5 )
       .connect( database_url )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Run migrations
     let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
     sqlx::raw_sql( migration_sql )
       .execute( &pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( Self { pool } )
   }
@@ -188,7 +188,7 @@ impl UsageTracker
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -215,7 +215,7 @@ impl UsageTracker
     .bind( token_id )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| UsageRecord {
@@ -257,7 +257,7 @@ impl UsageTracker
     .bind( provider )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| UsageRecord {
@@ -302,7 +302,7 @@ impl UsageTracker
     .bind( token_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( AggregateUsage {
       input_tokens: row.get( "input_tokens" ),
@@ -344,7 +344,7 @@ impl UsageTracker
     .bind( end_time )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| UsageRecord {
@@ -384,7 +384,7 @@ impl UsageTracker
     )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( AggregateUsage {
       input_tokens: row.get( "input_tokens" ),
@@ -419,7 +419,7 @@ impl UsageTracker
     )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| {
@@ -464,7 +464,7 @@ impl UsageTracker
     .bind( provider )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( AggregateUsage {
       input_tokens: row.get( "input_tokens" ),
@@ -504,7 +504,7 @@ impl UsageTracker
     .bind( project_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( AggregateUsage {
       input_tokens: row.get( "input_tokens" ),
@@ -545,7 +545,7 @@ impl UsageTracker
     .bind( project_id )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| {
@@ -569,6 +569,6 @@ fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_millis() as i64
 }

@@ -62,3 +62,17 @@ let json = serde_json::to_string(&config)?;
 ## License
 
 MIT
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Foundational types and type-safe identifiers for Iron Runtime |
+| ids.rs | Type-safe entity identifiers with validation |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

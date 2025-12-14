@@ -1,6 +1,14 @@
 //! Tests for invalid ID parameter handling in limits endpoints
 //!
 //! Verifies that non-numeric IDs return JSON error responses per FR-5 specification.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_get_limit_with_non_numeric_id_returns_json_error` | Get limit with non-numeric ID | GET /api/limits/abc | 400 Bad Request, JSON error with deserialize message | ✅ |
+//! | `test_update_limit_with_non_numeric_id_returns_json_error` | Update limit with non-numeric ID | PUT /api/limits/xyz | 400 Bad Request, JSON error with deserialize message | ✅ |
+//! | `test_delete_limit_with_non_numeric_id_returns_json_error` | Delete limit with non-numeric ID | DELETE /api/limits/foo | 400 Bad Request, JSON error with deserialize message | ✅ |
 
 use axum::{ http::StatusCode, body::Body, Router };
 use tower::ServiceExt;
@@ -74,7 +82,7 @@ async fn test_get_limit_with_non_numeric_id_returns_json_error()
   // Response body should be valid JSON
   let body = response.into_body().collect().await.unwrap().to_bytes();
   let json: serde_json::Value = serde_json::from_slice( &body )
-    .expect( "Error response should be valid JSON, got plain text" );
+    .expect("LOUD FAILURE: Error response should be valid JSON, got plain text");
 
   // Verify JSON has error field
   assert!( json.get( "error" ).is_some(),
@@ -95,7 +103,7 @@ async fn test_update_limit_with_non_numeric_id_returns_json_error()
     .method( "PUT" )
     .uri( "/api/limits/xyz" )
     .header( "content-type", "application/json" )
-    .body( Body::from( r#"{"user_id":"user_1","max_cost_per_month_cents":1000}"# ) )
+    .body( Body::from( r#"{"user_id":"user_1","max_cost_per_month_microdollars":1000}"# ) )
     .unwrap();
 
   let response = app.clone().oneshot( request ).await.unwrap();
@@ -104,7 +112,7 @@ async fn test_update_limit_with_non_numeric_id_returns_json_error()
 
   let body = response.into_body().collect().await.unwrap().to_bytes();
   let json: serde_json::Value = serde_json::from_slice( &body )
-    .expect( "Error response should be valid JSON" );
+    .expect("LOUD FAILURE: Error response should be valid JSON");
 
   assert!( json.get( "error" ).is_some() );
 }
@@ -127,7 +135,7 @@ async fn test_delete_limit_with_non_numeric_id_returns_json_error()
 
   let body = response.into_body().collect().await.unwrap().to_bytes();
   let json: serde_json::Value = serde_json::from_slice( &body )
-    .expect( "Error response should be valid JSON" );
+    .expect("LOUD FAILURE: Error response should be valid JSON");
 
   assert!( json.get( "error" ).is_some() );
 }

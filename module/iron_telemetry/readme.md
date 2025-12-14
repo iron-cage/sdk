@@ -53,3 +53,16 @@ log_pii_detection("agent_001", "email", "john@example.com");
 ## License
 
 Apache-2.0
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Centralized structured logging and tracing for Iron Runtime. |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

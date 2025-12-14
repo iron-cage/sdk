@@ -16,6 +16,7 @@ pub struct User
   pub password_hash: String,
   pub role: String,
   pub email: String,
+  pub name: Option< String >,
   pub is_active: bool,
 }
 
@@ -67,7 +68,7 @@ pub async fn get_user_by_email(
 {
   let user = sqlx::query_as::<_, User>(
     r#"
-    SELECT id, email, username, password_hash, role, is_active
+    SELECT id, email, username, password_hash, role, name, is_active
     FROM users
     WHERE email = ? AND is_active = 1
     "#
@@ -102,7 +103,7 @@ pub async fn get_user_by_id(
 {
   let user = sqlx::query_as::<_, User>(
     r#"
-    SELECT id, username, password_hash, role, email, is_active
+    SELECT id, username, password_hash, role, email, name, is_active
     FROM users
     WHERE id = ?
     "#
@@ -227,146 +228,3 @@ pub async fn get_blacklisted_token(
   Ok( blacklisted )
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use sqlx::SqlitePool;
-
-  use super::*;
-
-  async fn create_test_db() -> Result<SqlitePool, sqlx::Error> {
-    let pool = SqlitePool::connect(":memory:").await?;
-
-    // Run migration 003 (users table)
-    let migration_003 =
-      include_str!("../../iron_token_manager/migrations/003_create_users_table.sql");
-    sqlx::raw_sql(migration_003).execute(&pool).await?;
-
-    // Run migration 006 (user audit log)
-    let migration_006 =
-      include_str!("../../iron_token_manager/migrations/006_create_user_audit_log.sql");
-    sqlx::raw_sql(migration_006).execute(&pool).await?;
-
-    Ok(pool)
-  }
-
-  #[ test ]
-  fn test_verify_password_valid()
-  {
-    // Hash for "testpass"
-    let hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
-    assert!( verify_password( "testpass", hash ) );
-  }
-
-  #[ test ]
-  fn test_verify_password_invalid()
-  {
-    // Hash for "testpass"
-    let hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
-    assert!( !verify_password( "wrongpass", hash ) );
-  }
-
-  #[ test ]
-  fn test_verify_password_malformed_hash()
-  {
-    assert!( !verify_password( "anypass", "not-a-valid-hash" ) );
-  }
-
-
-#[tokio::test]
-  async fn test_add_token_to_blacklist_success() {
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    let jti = "test_token_jti_123";
-    let user_id = "user_123";
-    let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
-
-    // Add token to blacklist
-    let result = add_token_to_blacklist(&pool, jti, user_id, expires_at).await;
-    assert!(result.is_ok(), "Failed to add token to blacklist");
-
-    // Verify token is in blacklist
-    let blacklisted: Option<(String, String, i64, i64)> = sqlx::query_as(
-      "SELECT jti, user_id, blacklisted_at, expires_at FROM token_blacklist WHERE jti = ?"
-    )
-    .bind(jti)
-    .fetch_optional(&pool)
-    .await
-    .expect("Failed to query blacklist");
-
-    assert!(blacklisted.is_some(), "Token should be in blacklist");
-    let (db_jti, db_user_id, db_blacklisted_at, db_expires_at) = blacklisted.unwrap();
-    
-    assert_eq!(db_jti, jti);
-    assert_eq!(db_user_id, user_id);
-    assert!(db_blacklisted_at > 0, "Blacklisted timestamp should be set");
-    assert!(db_expires_at > 0, "Expiration timestamp should be set");
-  }
-
-  #[tokio::test]
-  async fn test_add_token_to_blacklist_duplicate() {
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    let jti = "duplicate_token_jti";
-    let user_id = "user_123";
-    let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
-
-    // Add token to blacklist first time
-    let result1 = add_token_to_blacklist(&pool, jti, user_id, expires_at).await;
-    assert!(result1.is_ok(), "First insert should succeed");
-
-    // Try to add same token again (should fail due to unique constraint)
-    let result2 = add_token_to_blacklist(&pool, jti, user_id, expires_at).await;
-    assert!(result2.is_err(), "Duplicate insert should fail");
-  }
-
-  #[tokio::test]
-  async fn test_add_multiple_tokens_to_blacklist() {
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    let user_id = "user_123";
-    let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
-
-    // Add multiple tokens
-    for i in 0..5 {
-      let jti = format!("token_{}", i);
-      let result = add_token_to_blacklist(&pool, &jti, user_id, expires_at).await;
-      assert!(result.is_ok(), "Failed to add token {} to blacklist", i);
-    }
-
-    // Verify all tokens are in blacklist
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM token_blacklist WHERE user_id = ?")
-      .bind(user_id)
-      .fetch_one(&pool)
-      .await
-      .expect("Failed to count blacklisted tokens");
-
-    assert_eq!(count.0, 5, "Should have 5 tokens in blacklist");
-  }
-
-  #[tokio::test]
-  async fn test_blacklist_token_expiration_timestamp() {
-    let pool = create_test_db().await.expect("Failed to create test database");
-
-    let jti = "expiry_test_token";
-    let user_id = "user_123";
-    let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
-    let expected_expiry = expires_at.timestamp();
-
-    // Add token to blacklist
-    add_token_to_blacklist(&pool, jti, user_id, expires_at)
-      .await
-      .expect("Failed to add token to blacklist");
-
-    // Verify expiration timestamp is correct
-    let (db_expires_at,): (i64,) = sqlx::query_as(
-      "SELECT expires_at FROM token_blacklist WHERE jti = ?"
-    )
-    .bind(jti)
-    .fetch_one(&pool)
-    .await
-    .expect("Failed to query blacklist");
-
-    assert_eq!(db_expires_at, expected_expiry, "Expiration timestamp should match");
-  }
-}

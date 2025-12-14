@@ -1,7 +1,9 @@
 //! Budget request adapter functions
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::budget_request_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -28,7 +30,9 @@ pub async fn list_budget_requests_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn create_budget_request_adapter(
@@ -51,13 +55,13 @@ pub async fn create_budget_request_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let agent_id = params.get( "agent_id" ).unwrap();
-  let amount = params.get( "amount" ).unwrap();
-  let reason = params.get( "reason" ).unwrap();
+  let agent_id = params.get( "agent_id" ).unwrap(); // Already validated
+  let amount = params.get( "amount" ).unwrap(); // Already validated
+  let reason = params.get( "reason" ).unwrap(); // Already validated
 
   let body = json!({
     "agent_id": agent_id,
-    "amount": amount.parse::< i64 >().unwrap(),
+    "amount": amount.parse::< i64 >().expect( "amount parameter validated by handler" ),
     "reason": reason,
   });
 
@@ -67,7 +71,9 @@ pub async fn create_budget_request_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn get_budget_request_adapter(
@@ -80,7 +86,7 @@ pub async fn get_budget_request_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/budget/requests/{}", id );
 
   let response = client
@@ -89,7 +95,9 @@ pub async fn get_budget_request_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn approve_budget_request_adapter(
@@ -112,7 +120,7 @@ pub async fn approve_budget_request_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/budget/requests/{}/approve", id );
 
   let response = client
@@ -121,7 +129,9 @@ pub async fn approve_budget_request_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn reject_budget_request_adapter(
@@ -144,8 +154,8 @@ pub async fn reject_budget_request_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
-  let reason = params.get( "reason" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
+  let reason = params.get( "reason" ).unwrap(); // Already validated
 
   let body = json!({
     "reason": reason,
@@ -159,7 +169,9 @@ pub async fn reject_budget_request_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 pub async fn cancel_budget_request_adapter(
@@ -182,7 +194,7 @@ pub async fn cancel_budget_request_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/budget/requests/{}/cancel", id );
 
   let response = client
@@ -191,5 +203,7 @@ pub async fn cancel_budget_request_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

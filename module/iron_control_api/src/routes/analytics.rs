@@ -65,24 +65,24 @@ impl Period
 
     let start = match self
     {
-      Period::Today => now.date_naive().and_hms_opt( 0, 0, 0 ).unwrap(),
+      Period::Today => now.date_naive().and_hms_opt( 0, 0, 0 ).expect( "INVARIANT: midnight (00:00:00) is always valid" ),
       Period::Yesterday =>
       {
         let yesterday = now - Duration::days( 1 );
-        yesterday.date_naive().and_hms_opt( 0, 0, 0 ).unwrap()
+        yesterday.date_naive().and_hms_opt( 0, 0, 0 ).expect( "INVARIANT: midnight (00:00:00) is always valid" )
       }
       Period::Last7Days => ( now - Duration::days( 7 ) ).naive_utc(),
       Period::Last30Days => ( now - Duration::days( 30 ) ).naive_utc(),
       Period::ThisMonth =>
       {
-        let first_of_month = now.date_naive().with_day( 1 ).unwrap();
-        first_of_month.and_hms_opt( 0, 0, 0 ).unwrap()
+        let first_of_month = now.date_naive().with_day( 1 ).expect( "INVARIANT: day 1 is valid for all months" );
+        first_of_month.and_hms_opt( 0, 0, 0 ).expect( "INVARIANT: midnight (00:00:00) is always valid" )
       }
       Period::LastMonth =>
       {
-        let first_of_this_month = now.date_naive().with_day( 1 ).unwrap();
+        let first_of_this_month = now.date_naive().with_day( 1 ).expect( "INVARIANT: day 1 is valid for all months" );
         let last_month = first_of_this_month - Duration::days( 1 );
-        last_month.with_day( 1 ).unwrap().and_hms_opt( 0, 0, 0 ).unwrap()
+        last_month.with_day( 1 ).expect( "INVARIANT: day 1 is valid for all months" ).and_hms_opt( 0, 0, 0 ).expect( "INVARIANT: midnight (00:00:00) is always valid" )
       }
       Period::AllTime => return ( 0, end_ms ),
     };
@@ -92,14 +92,14 @@ impl Period
     // For Yesterday, end at end of yesterday
     let end_ms = if *self == Period::Yesterday
     {
-      let today_start = now.date_naive().and_hms_opt( 0, 0, 0 ).unwrap();
+      let today_start = now.date_naive().and_hms_opt( 0, 0, 0 ).expect( "INVARIANT: midnight (00:00:00) is always valid" );
       DateTime::<Utc>::from_naive_utc_and_offset( today_start, Utc ).timestamp_millis() - 1
     }
     else if *self == Period::LastMonth
     {
-      let first_of_this_month = now.date_naive().with_day( 1 ).unwrap();
+      let first_of_this_month = now.date_naive().with_day( 1 ).expect( "INVARIANT: day 1 is valid for all months" );
       DateTime::<Utc>::from_naive_utc_and_offset(
-        first_of_this_month.and_hms_opt( 0, 0, 0 ).unwrap(),
+        first_of_this_month.and_hms_opt( 0, 0, 0 ).expect( "INVARIANT: midnight (00:00:00) is always valid" ),
         Utc
       ).timestamp_millis() - 1
     }

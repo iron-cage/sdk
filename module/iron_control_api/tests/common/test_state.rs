@@ -46,6 +46,8 @@ async fn seed_test_users_for_tokens( pool: &SqlitePool )
     "user_audit_test", "user_revoke_audit",
     // Rate limiting test users
     "user_rate_limit_test", "user_rate_limit_creation",
+    // Validate endpoint test users (Deliverable 1.6)
+    "test_user_validate", "test_user_revoke",
   ];
 
   // Security test users (command injection, SQL injection, XSS, unicode, etc.)
@@ -178,7 +180,13 @@ impl TestAppState
   {
     let auth = create_test_auth_state().await;
     let tokens = create_test_token_state().await;
-    let database = super::create_test_database().await;
+
+    // Create database using iron_test_db
+    let db = super::test_db::create_test_db().await;
+    let database = db.pool().clone();
+
+    // Keep TestDatabase alive (prevents pool from being invalidated)
+    core::mem::forget( db );
 
     Self { auth, tokens, database }
   }
@@ -237,6 +245,46 @@ impl axum::extract::FromRef< TestAppState > for SqlitePool
   fn from_ref( state: &TestAppState ) -> Self
   {
     state.database.clone()
+  }
+}
+
+/// Combined application state for traces integration tests.
+#[ derive( Clone ) ]
+pub struct TestTracesAppState
+{
+  pub auth: AuthState,
+  pub traces: iron_control_api::routes::traces::TracesState,
+}
+
+impl TestTracesAppState
+{
+  /// Create new test traces application state with in-memory database.
+  pub async fn new() -> Self
+  {
+    let auth = create_test_auth_state().await;
+    let traces = iron_control_api::routes::traces::TracesState::new( "sqlite::memory:" )
+      .await
+      .expect( "LOUD FAILURE: Failed to create test TracesState" );
+
+    Self { auth, traces }
+  }
+}
+
+/// Enable AuthState extraction from TestTracesAppState.
+impl axum::extract::FromRef< TestTracesAppState > for AuthState
+{
+  fn from_ref( state: &TestTracesAppState ) -> Self
+  {
+    state.auth.clone()
+  }
+}
+
+/// Enable TracesState extraction from TestTracesAppState.
+impl axum::extract::FromRef< TestTracesAppState > for iron_control_api::routes::traces::TracesState
+{
+  fn from_ref( state: &TestTracesAppState ) -> Self
+  {
+    state.traces.clone()
   }
 }
 

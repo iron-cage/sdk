@@ -1,426 +1,444 @@
-#
-# Agent Management Commands
-#
-# Commands for managing LLM agents (creation, configuration, provider assignment)
-# REST API Base: /api/v1/agents
-#
-
-# List all agents
-- name: ".agent.list"
-  namespace: ""
-  description: "List all agents with optional filtering and pagination"
-  hint: "Shows agents in table format by default"
-  status: "stable"
-  version: "1.0.0"
+- name: .agent.list
+  namespace: ''
+  description: List all agents with optional filtering and pagination
+  hint: Shows agents in table format by default
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "v"
-      kind: "Integer"
-      description: "Verbosity level (0-5)"
-      hint: "0=silent, 1=count, 2=table, 3=detailed, 4=verbose, 5=debug"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "page"
-      kind: "Integer"
-      description: "Page number (1-based)"
-      hint: "For pagination"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "limit"
-      kind: "Integer"
-      description: "Results per page"
-      hint: "Maximum agents to return"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Create new agent
-- name: ".agent.create"
-  namespace: ""
-  description: "Create new agent with specified configuration"
-  hint: "Creates agent with budget and optional providers"
-  status: "stable"
-  version: "1.0.0"
+  - name: v
+    kind: Integer
+    description: Verbosity level (0-5)
+    hint: 0=silent, 1=count, 2=table, 3=detailed, 4=verbose, 5=debug
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: page
+    kind: Integer
+    description: Page number (1-based)
+    hint: For pagination
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: limit
+    kind: Integer
+    description: Results per page
+    hint: Maximum agents to return
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .agent.list
+  aliases: []
+  tags: []
+- name: .agent.create
+  namespace: ''
+  description: Create new agent with specified configuration
+  hint: Creates agent with budget and optional providers
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "name"
-      kind: "String"
-      description: "Agent name"
-      hint: "Unique identifier (3-100 chars)"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "budget"
-      kind: "Integer"
-      description: "Token budget"
-      hint: "Maximum tokens this agent can use"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "provider_ids"
-      kind: "String"
-      description: "Comma-separated provider IDs"
-      hint: "Optional list of provider IDs to assign"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "dry"
-      kind: "Integer"
-      description: "Dry run mode (0 or 1)"
-      hint: "1 = preview only, 0 = execute"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Get agent details
-- name: ".agent.get"
-  namespace: ""
-  description: "Get details for specific agent"
-  hint: "Shows complete agent configuration"
-  status: "stable"
-  version: "1.0.0"
+  - name: name
+    kind: String
+    description: Agent name
+    hint: Unique identifier (3-100 chars)
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: budget
+    kind: Integer
+    description: Token budget
+    hint: Maximum tokens this agent can use
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: provider_ids
+    kind: String
+    description: Comma-separated provider IDs
+    hint: Optional list of provider IDs to assign
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.create name::example_name budget::123
+  aliases: []
+  tags: []
+- name: .agent.get
+  namespace: ''
+  description: Get details for specific agent
+  hint: Shows complete agent configuration
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Agent ID"
-      hint: "UUID of agent to retrieve"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Update agent
-- name: ".agent.update"
-  namespace: ""
-  description: "Update agent configuration"
-  hint: "Modify name or budget"
-  status: "stable"
-  version: "1.0.0"
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to retrieve
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .agent.get id::abc123
+  aliases: []
+  tags: []
+- name: .agent.update
+  namespace: ''
+  description: Update agent configuration
+  hint: Modify name or budget
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Agent ID"
-      hint: "UUID of agent to update"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "name"
-      kind: "String"
-      description: "New agent name"
-      hint: "Optional new name"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "budget"
-      kind: "Integer"
-      description: "New token budget"
-      hint: "Optional new budget"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "dry"
-      kind: "Integer"
-      description: "Dry run mode (0 or 1)"
-      hint: "1 = preview only, 0 = execute"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Delete agent
-- name: ".agent.delete"
-  namespace: ""
-  description: "Delete agent by ID"
-  hint: "Permanently removes agent"
-  status: "stable"
-  version: "1.0.0"
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to update
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: name
+    kind: String
+    description: New agent name
+    hint: Optional new name
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: budget
+    kind: Integer
+    description: New token budget
+    hint: Optional new budget
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.update id::abc123
+  aliases: []
+  tags: []
+- name: .agent.delete
+  namespace: ''
+  description: Delete agent by ID
+  hint: Permanently removes agent
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Agent ID"
-      hint: "UUID of agent to delete"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "dry"
-      kind: "Integer"
-      description: "Dry run mode (0 or 1)"
-      hint: "1 = preview only, 0 = execute"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Assign providers to agent
-- name: ".agent.assign_providers"
-  namespace: ""
-  description: "Assign providers to agent"
-  hint: "Links one or more providers to agent"
-  status: "stable"
-  version: "1.0.0"
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to delete
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.delete id::abc123
+  aliases: []
+  tags: []
+- name: .agent.assign_providers
+  namespace: ''
+  description: Assign providers to agent
+  hint: Links one or more providers to agent
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Agent ID"
-      hint: "UUID of agent"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "provider_ids"
-      kind: "String"
-      description: "Comma-separated provider IDs"
-      hint: "UUIDs of providers to assign"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "dry"
-      kind: "Integer"
-      description: "Dry run mode (0 or 1)"
-      hint: "1 = preview only, 0 = execute"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# List providers for agent
-- name: ".agent.list_providers"
-  namespace: ""
-  description: "List providers assigned to agent"
-  hint: "Shows all linked providers"
-  status: "stable"
-  version: "1.0.0"
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: provider_ids
+    kind: String
+    description: Comma-separated provider IDs
+    hint: UUIDs of providers to assign
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.assign_providers id::abc123 provider_ids::abc123
+  aliases: []
+  tags: []
+- name: .agent.list_providers
+  namespace: ''
+  description: List providers assigned to agent
+  hint: Shows all linked providers
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Agent ID"
-      hint: "UUID of agent"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-
-# Remove provider from agent
-- name: ".agent.remove_provider"
-  namespace: ""
-  description: "Remove provider from agent"
-  hint: "Unlinks specific provider"
-  status: "stable"
-  version: "1.0.0"
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .agent.list_providers id::abc123
+  aliases: []
+  tags: []
+- name: .agent.remove_provider
+  namespace: ''
+  description: Remove provider from agent
+  hint: Unlinks specific provider
+  status: stable
+  version: 1.0.0
   arguments:
-    - name: "id"
-      kind: "String"
-      description: "Agent ID"
-      hint: "UUID of agent"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "provider_id"
-      kind: "String"
-      description: "Provider ID to remove"
-      hint: "UUID of provider to unlink"
-      attributes:
-        optional: false
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "dry"
-      kind: "Integer"
-      description: "Dry run mode (0 or 1)"
-      hint: "1 = preview only, 0 = execute"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
-    - name: "format"
-      kind: "String"
-      description: "Output format"
-      hint: "table, json, or yaml"
-      attributes:
-        optional: true
-        multiple: false
-        interactive: false
-        sensitive: false
-      validation_rules: []
-      aliases: []
-      tags: []
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: provider_id
+    kind: String
+    description: Provider ID to remove
+    hint: UUID of provider to unlink
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.remove_provider id::abc123 provider_id::abc123
+  aliases: []
+  tags: []

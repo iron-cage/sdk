@@ -4,13 +4,8 @@
 //! All helpers use the unified migrations module to ensure test databases
 //! match production schema exactly.
 //!
-//! # Migration to `iron_test_db`
-//!
-//! This module is being incrementally migrated to use the new `iron_test_db` crate.
-//! New functions use `_v2` suffix and return `TestDatabase` instead of `( pool, TempDir )`.
-//!
-//! Prefer using the new `*_v2()` functions for new tests. Old functions maintained
-//! for backward compatibility.
+//! All functions use `iron_test_db` infrastructure for automatic cleanup
+//! and isolated test databases.
 
 #![ allow( dead_code ) ]
 
@@ -18,102 +13,7 @@ use iron_token_manager::limit_enforcer::LimitEnforcer;
 use iron_token_manager::storage::TokenStorage;
 use iron_token_manager::usage_tracker::UsageTracker;
 use iron_test_db::{ TestDatabase, TestDatabaseBuilder };
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
-use tempfile::TempDir;
-
-/// Create test database pool with all migrations applied
-///
-/// Returns `SQLite` connection pool and temporary directory.
-/// Database is automatically deleted when `TempDir` is dropped.
-/// Automatically seeds common test users (`user_001` through `user_010`).
-///
-/// # Example
-///
-/// ```ignore
-/// let ( pool, _temp ) = create_test_db().await;
-/// // Use pool for direct SQL queries
-/// ```
-pub async fn create_test_db() -> ( SqlitePool, TempDir )
-{
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
-  let db_path = temp_dir.path().join( "test.db" );
-  let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( &db_url )
-    .await
-    .expect( "Failed to connect to test database" );
-
-  // Apply all migrations using unified helper
-  iron_token_manager::migrations::apply_all_migrations( &pool )
-    .await
-    .expect( "Failed to apply migrations" );
-
-  // Seed common test users (user_001 through user_010)
-  seed_test_users( &pool ).await;
-
-  ( pool, temp_dir )
-}
-
-/// Create test token storage with initialized database
-///
-/// Returns `TokenStorage` instance and temporary directory.
-/// Database has all migrations applied and test users seeded.
-///
-/// # Example
-///
-/// ```ignore
-/// let ( storage, _temp ) = create_test_storage().await;
-/// storage.create_token( "token", "user_001", None, None, None, None ).await?;
-/// ```
-pub async fn create_test_storage() -> ( TokenStorage, TempDir )
-{
-  let ( pool, temp_dir ) = create_test_db().await;
-  let storage = TokenStorage::from_pool( pool );
-  ( storage, temp_dir )
-}
-
-/// Create test limit enforcer with initialized database
-///
-/// Returns `LimitEnforcer`, `TokenStorage`, and temporary directory.
-/// Both components share the same database connection.
-/// Database has all migrations applied and test users seeded.
-///
-/// # Example
-///
-/// ```ignore
-/// let ( enforcer, storage, _temp ) = create_test_enforcer().await;
-/// enforcer.create_limit( "user_001", None, Some( 1000 ), None, None ).await?;
-/// ```
-pub async fn create_test_enforcer() -> ( LimitEnforcer, TokenStorage, TempDir )
-{
-  let ( pool, temp_dir ) = create_test_db().await;
-  let enforcer = LimitEnforcer::from_pool( pool.clone() );
-  let storage = TokenStorage::from_pool( pool );
-  ( enforcer, storage, temp_dir )
-}
-
-/// Create test usage tracker with initialized database
-///
-/// Returns `UsageTracker`, `TokenStorage`, and temporary directory.
-/// Both components share the same database connection.
-/// Database has all migrations applied and test users seeded.
-///
-/// # Example
-///
-/// ```ignore
-/// let ( tracker, storage, _temp ) = create_test_tracker().await;
-/// let token_id = storage.create_token( "token", "user_001", None, None, None, None ).await?;
-/// tracker.record_usage( token_id, "openai", "gpt-4", 100, 50, 25 ).await?;
-/// ```
-pub async fn create_test_tracker() -> ( UsageTracker, TokenStorage, TempDir )
-{
-  let ( pool, temp_dir ) = create_test_db().await;
-  let storage = TokenStorage::from_pool( pool.clone() );
-  let tracker = UsageTracker::from_pool( pool );
-  ( tracker, storage, temp_dir )
-}
+use sqlx::SqlitePool;
 
 /// Seed common test users
 ///
@@ -149,10 +49,6 @@ async fn seed_test_users( pool: &SqlitePool )
   }
 }
 
-// ============================================================================
-// New iron_test_db-based helpers (v2)
-// ============================================================================
-
 /// Create test database using `iron_test_db` infrastructure
 ///
 /// Returns `TestDatabase` with all migrations applied and automatic cleanup.
@@ -166,7 +62,7 @@ async fn seed_test_users( pool: &SqlitePool )
 /// let pool = db.pool();
 /// // Use pool for direct SQL queries
 /// ```
-pub async fn create_test_db_v2() -> TestDatabase
+pub async fn create_test_db() -> TestDatabase
 {
   let db = TestDatabaseBuilder::new()
     .in_memory()
@@ -230,9 +126,9 @@ pub async fn create_test_db_with_seed() -> TestDatabase
 /// let ( storage, db ) = create_test_storage_v2().await;
 /// storage.create_token( "token", "user", None, None, None, None ).await?;
 /// ```
-pub async fn create_test_storage_v2() -> ( TokenStorage, TestDatabase )
+pub async fn create_test_storage() -> ( TokenStorage, TestDatabase )
 {
-  let db = create_test_db_v2().await;
+  let db = create_test_db().await;
 
   // Use from_pool to share the same database connection
   let storage = TokenStorage::from_pool( db.pool().clone() );
@@ -251,9 +147,9 @@ pub async fn create_test_storage_v2() -> ( TokenStorage, TestDatabase )
 /// let ( enforcer, storage, db ) = create_test_enforcer_v2().await;
 /// enforcer.create_limit( "user", None, Some( 1000 ), None, None ).await?;
 /// ```
-pub async fn create_test_enforcer_v2() -> ( LimitEnforcer, TokenStorage, TestDatabase )
+pub async fn create_test_enforcer() -> ( LimitEnforcer, TokenStorage, TestDatabase )
 {
-  let db = create_test_db_v2().await;
+  let db = create_test_db().await;
 
   // Use from_pool to share the same database connection
   let enforcer = LimitEnforcer::from_pool( db.pool().clone() );
@@ -274,9 +170,9 @@ pub async fn create_test_enforcer_v2() -> ( LimitEnforcer, TokenStorage, TestDat
 /// let token_id = storage.create_token( "token", "user", None, None, None, None ).await?;
 /// tracker.record_usage( token_id, "openai", "gpt-4", 100, 50, 25 ).await?;
 /// ```
-pub async fn create_test_tracker_v2() -> ( UsageTracker, TokenStorage, TestDatabase )
+pub async fn create_test_tracker() -> ( UsageTracker, TokenStorage, TestDatabase )
 {
-  let db = create_test_db_v2().await;
+  let db = create_test_db().await;
 
   // Use from_pool to share the same database connection
   let storage = TokenStorage::from_pool( db.pool().clone() );
@@ -311,7 +207,7 @@ pub async fn seed_test_agent( pool: &sqlx::SqlitePool, agent_id: i32 )
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( pool )
     .await
-    .expect( "Should insert test agent" );
+    .expect("LOUD FAILURE: Should insert test agent");
 
   sqlx::query( "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" )
     .bind( agent_id )
@@ -322,5 +218,5 @@ pub async fn seed_test_agent( pool: &sqlx::SqlitePool, agent_id: i32 )
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( pool )
     .await
-    .expect( "Should insert agent budget" );
+    .expect("LOUD FAILURE: Should insert agent budget");
 }

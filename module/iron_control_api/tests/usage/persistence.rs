@@ -28,6 +28,13 @@
 //! 1. Cycle 1: `TokenState::new()` runs migrations, creates token, records 150 tokens
 //! 2. Cycle 2: `TokenState::new()` runs migrations AGAIN:
 //!    - Migration 002 drops `api_tokens` table
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_usage_persists_across_restart` | Usage data persists after single restart | Create usage tracker, record usage, drop+recreate tracker, query usage | Usage data still present | ✅ |
+//! | `test_usage_persists_across_multiple_restarts` | Usage data persists after multiple restarts | Record usage, restart 3 times, query usage | Usage data cumulative and correct | ✅ |
 //!    - CASCADE DELETE removes all `token_usage` records (150 tokens lost!)
 //!    - Creates new empty `api_tokens` table
 //!    - Creates new token, records 300 tokens
@@ -304,8 +311,8 @@ async fn test_usage_persists_across_multiple_restarts()
 
   // Restart cycle 1: Create initial data
   {
-    let usage_state = UsageState::new( &db_url ).await.expect( "Failed cycle 1 create" );
-    let token_state = TokenState::new( &db_url ).await.expect( "Failed token create" );
+    let usage_state = UsageState::new( &db_url ).await.expect("LOUD FAILURE: Failed cycle 1 create");
+    let token_state = TokenState::new( &db_url ).await.expect("LOUD FAILURE: Failed token create");
 
     // Create test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
@@ -326,7 +333,7 @@ async fn test_usage_persists_across_multiple_restarts()
     .bind( now_ms )
     .execute( pool )
     .await
-    .expect( "Failed to create test user 1" );
+    .expect("LOUD FAILURE: Failed to create test user 1");
 
     let generator = TokenGenerator::new();
     let token = generator.generate();
@@ -339,7 +346,7 @@ async fn test_usage_persists_across_multiple_restarts()
       None
     )
     .await
-    .expect( "Failed to create token" );
+    .expect("LOUD FAILURE: Failed to create token");
 
     usage_state.tracker.record_usage_with_cost(
       token_id,
@@ -348,13 +355,13 @@ async fn test_usage_persists_across_multiple_restarts()
       100, 50, 150, 20
     )
     .await
-    .expect( "Failed record 1" );
+    .expect("LOUD FAILURE: Failed record 1");
   }
 
   // Restart cycle 2: Add more data
   {
-    let usage_state = UsageState::new( &db_url ).await.expect( "Failed cycle 2 create" );
-    let token_state = TokenState::new( &db_url ).await.expect( "Failed token state 2" );
+    let usage_state = UsageState::new( &db_url ).await.expect("LOUD FAILURE: Failed cycle 2 create");
+    let token_state = TokenState::new( &db_url ).await.expect("LOUD FAILURE: Failed token state 2");
 
     // Create second test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
@@ -375,7 +382,7 @@ async fn test_usage_persists_across_multiple_restarts()
     .bind( now_ms )
     .execute( pool )
     .await
-    .expect( "Failed to create test user 2" );
+    .expect("LOUD FAILURE: Failed to create test user 2");
 
     let generator = TokenGenerator::new();
     let token = generator.generate();
@@ -388,7 +395,7 @@ async fn test_usage_persists_across_multiple_restarts()
       None
     )
     .await
-    .expect( "Failed to create token 2" );
+    .expect("LOUD FAILURE: Failed to create token 2");
 
     usage_state.tracker.record_usage_with_cost(
       token_id,
@@ -397,7 +404,7 @@ async fn test_usage_persists_across_multiple_restarts()
       200, 100, 300, 40
     )
     .await
-    .expect( "Failed record 2" );
+    .expect("LOUD FAILURE: Failed record 2");
 
     // Verify cumulative data
     let aggregate = usage_state.tracker.get_all_aggregate_usage().await.unwrap();
@@ -406,7 +413,7 @@ async fn test_usage_persists_across_multiple_restarts()
 
   // Restart cycle 3: Verify all data still persists
   {
-    let usage_state = UsageState::new( &db_url ).await.expect( "Failed cycle 3 create" );
+    let usage_state = UsageState::new( &db_url ).await.expect("LOUD FAILURE: Failed cycle 3 create");
 
     let aggregate = usage_state.tracker.get_all_aggregate_usage().await.unwrap();
     assert_eq!(

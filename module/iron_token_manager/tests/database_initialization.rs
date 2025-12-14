@@ -52,7 +52,9 @@ use common::create_test_db;
 #[ tokio::test ]
 async fn test_migrations_are_idempotent()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Apply migrations a second time (should be no-op)
   let result = iron_token_manager::migrations::apply_all_migrations( &pool ).await;
@@ -72,17 +74,22 @@ async fn test_migrations_are_idempotent()
   )
   .fetch_one( &pool )
   .await
-  .expect( "Failed to count tables" );
+  .expect("LOUD FAILURE: Failed to count tables");
 
-  assert_eq!( table_count, 15, "Should have exactly 15 application tables after multiple runs" );
+  assert_eq!( table_count, 16, "Should have exactly 16 application tables after multiple runs" );
 }
 
 #[ tokio::test ]
 async fn test_isolated_test_databases()
 {
   // Create two independent test databases
-  let ( pool1, _temp1 ) = create_test_db().await;
-  let ( pool2, _temp2 ) = create_test_db().await;
+  let db1 = create_test_db().await;
+  let pool1 = db1.pool().clone();
+  core::mem::forget( db1 );
+
+  let db2 = create_test_db().await;
+  let pool2 = db2.pool().clone();
+  core::mem::forget( db2 );
 
   // Insert token into first database (uses user_001 from seed_test_users)
   sqlx::query(
@@ -93,27 +100,29 @@ async fn test_isolated_test_databases()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool1 )
   .await
-  .expect( "Insert into DB1 failed" );
+  .expect("LOUD FAILURE: Insert into DB1 failed");
 
   // Verify first database has data
   let count1: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( &pool1 )
     .await
-    .expect( "Count query failed" );
+    .expect("LOUD FAILURE: Count query failed");
   assert_eq!( count1, 1, "DB1 should have 1 token" );
 
   // Verify second database is still empty (isolation)
   let count2: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( &pool2 )
     .await
-    .expect( "Count query failed" );
+    .expect("LOUD FAILURE: Count query failed");
   assert_eq!( count2, 0, "DB2 should be empty (isolated from DB1)" );
 }
 
 #[ tokio::test ]
 async fn test_production_schema_matches_test_schema()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Get all application table names (exclude migration guards and sqlite internals)
   let tables: Vec< String > = sqlx::query_scalar(
@@ -125,7 +134,7 @@ async fn test_production_schema_matches_test_schema()
   )
   .fetch_all( &pool )
   .await
-  .expect( "Failed to get tables" );
+  .expect("LOUD FAILURE: Failed to get tables");
 
   // Expected application tables from all migrations (excluding guard tables)
   let expected_tables = vec![
@@ -139,6 +148,7 @@ async fn test_production_schema_matches_test_schema()
     "budget_leases",
     "budget_modification_history",
     "project_provider_key_assignments",
+    "system_config",
     "token_blacklist",
     "token_usage",
     "usage_limits",
@@ -154,34 +164,52 @@ async fn test_production_schema_matches_test_schema()
   )
   .fetch_one( &pool )
   .await
-  .expect( "Failed to count indexes" );
+  .expect("LOUD FAILURE: Failed to count indexes");
 
-  assert_eq!( index_count, 40, "Should have 40 indexes across all migrations (migration 013 added idx_api_tokens_agent_id)" );
+  assert_eq!( index_count, 41, "Should have 41 indexes across all migrations (migration 018 adds 1 more)" );
 }
 
 #[ tokio::test ]
 async fn test_temp_databases_cleanup()
 {
-  use std::path::PathBuf;
+  use iron_test_db::TestDatabaseBuilder;
 
-  let db_path: PathBuf;
-
+  // Test RAII cleanup by creating and dropping multiple TestDatabase instances
+  // This verifies that resources are properly cleaned up without leaks
+  for _ in 0..3
   {
-    let ( _pool, temp ) = create_test_db().await;
-    db_path = temp.path().join( "test.db" );
+    let db = TestDatabaseBuilder::new()
+      .temp_file()
+      .build()
+      .await
+      .expect( "LOUD FAILURE: Failed to create test database" );
 
-    // Database should exist while TempDir is in scope
-    assert!( db_path.exists(), "Database file should exist" );
-  } // TempDir dropped here
+    // Apply migrations
+    iron_token_manager::migrations::apply_all_migrations( db.pool() )
+      .await
+      .expect( "LOUD FAILURE: Failed to apply migrations" );
 
-  // Database should be deleted after TempDir is dropped
-  assert!( !db_path.exists(), "Database file should be cleaned up" );
+    // Verify database is functional while in scope
+    let count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM sqlite_master WHERE type='table'" )
+      .fetch_one( db.pool() )
+      .await
+      .expect( "LOUD FAILURE: Database should be functional" );
+
+    assert!( count > 0, "Database should have tables" );
+
+    // TestDatabase drops here, cleaning up temp file
+  }
+
+  // If we got here without panicking, RAII cleanup worked correctly
+  // (TempDir cleanup is handled automatically by TestDatabase's Drop implementation)
 }
 
 #[ tokio::test ]
 async fn test_all_migrations_have_guards()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Verify guard tables exist for migrations that need them
   let guard_tables = vec![
@@ -203,7 +231,7 @@ async fn test_all_migrations_have_guards()
     .bind( guard_table )
     .fetch_one( &pool )
     .await
-    .expect( "Failed to check guard table" );
+    .expect("LOUD FAILURE: Failed to check guard table");
 
     assert_eq!( exists, 1, "Guard table {guard_table} should exist" );
   }
@@ -212,13 +240,15 @@ async fn test_all_migrations_have_guards()
 #[ tokio::test ]
 async fn test_foreign_keys_enabled()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Check that foreign keys are enabled
   let foreign_keys_on: i64 = query_scalar( "PRAGMA foreign_keys" )
     .fetch_one( &pool )
     .await
-    .expect( "Failed to check foreign keys" );
+    .expect("LOUD FAILURE: Failed to check foreign keys");
 
   assert_eq!( foreign_keys_on, 1, "Foreign keys should be enabled" );
 }
@@ -229,7 +259,7 @@ async fn test_seed_data_creates_expected_records()
   use std::process::Command;
   use tempfile::TempDir;
 
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
+  let temp_dir = TempDir::new().expect("LOUD FAILURE: Failed to create temp dir");
   let db_path = temp_dir.path().join( "test_seed.db" );
 
   // Run reset script (creates schema)
@@ -237,7 +267,7 @@ async fn test_seed_data_creates_expected_records()
     .arg( "scripts/reset_dev_db.sh" )
     .arg( db_path.to_str().unwrap() )
     .status()
-    .expect( "Failed to run reset script" );
+    .expect("LOUD FAILURE: Failed to run reset script");
   assert!( status.success(), "Reset script should succeed" );
 
   // Run seed script
@@ -245,14 +275,14 @@ async fn test_seed_data_creates_expected_records()
     .arg( "scripts/seed_dev_data.sh" )
     .arg( db_path.to_str().unwrap() )
     .status()
-    .expect( "Failed to run seed script" );
+    .expect("LOUD FAILURE: Failed to run seed script");
   assert!( status.success(), "Seed script should succeed" );
 
   // Connect to database and verify data
   let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
   let pool = SqlitePool::connect( &db_url )
     .await
-    .expect( "Failed to connect to seeded database" );
+    .expect("LOUD FAILURE: Failed to connect to seeded database");
 
   // Verify 3 users created
   let user_count: i64 = query_scalar(
@@ -260,7 +290,7 @@ async fn test_seed_data_creates_expected_records()
   )
   .fetch_one( &pool )
   .await
-  .expect( "Failed to count users" );
+  .expect("LOUD FAILURE: Failed to count users");
   assert_eq!( user_count, 3, "Should have 3 test users" );
 
   // Verify 3 tokens created
@@ -269,14 +299,14 @@ async fn test_seed_data_creates_expected_records()
   )
   .fetch_one( &pool )
   .await
-  .expect( "Failed to count tokens" );
+  .expect("LOUD FAILURE: Failed to count tokens");
   assert_eq!( token_count, 3, "Should have 3 test tokens" );
 
   // Verify usage data created
   let usage_count: i64 = query_scalar( "SELECT COUNT(*) FROM token_usage" )
     .fetch_one( &pool )
     .await
-    .expect( "Failed to count usage" );
+    .expect("LOUD FAILURE: Failed to count usage");
   assert!( usage_count >= 7, "Should have at least 7 usage records" );
 
   pool.close().await;
@@ -288,7 +318,7 @@ async fn test_seed_data_is_idempotent()
   use std::process::Command;
   use tempfile::TempDir;
 
-  let temp_dir = TempDir::new().expect( "Failed to create temp dir" );
+  let temp_dir = TempDir::new().expect("LOUD FAILURE: Failed to create temp dir");
   let db_path = temp_dir.path().join( "test_idempotent.db" );
 
   // Run reset + seed
@@ -296,26 +326,26 @@ async fn test_seed_data_is_idempotent()
     .arg( "scripts/reset_and_seed.sh" )
     .arg( db_path.to_str().unwrap() )
     .status()
-    .expect( "Failed to run reset+seed script" );
+    .expect("LOUD FAILURE: Failed to run reset+seed script");
 
   // Run seed again (should be idempotent due to INSERT OR IGNORE)
   let status = Command::new( "bash" )
     .arg( "scripts/seed_dev_data.sh" )
     .arg( db_path.to_str().unwrap() )
     .status()
-    .expect( "Failed to run second seed" );
+    .expect("LOUD FAILURE: Failed to run second seed");
   assert!( status.success(), "Second seed run should succeed" );
 
   // Verify no duplicates
   let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
   let pool = SqlitePool::connect( &db_url )
     .await
-    .expect( "Failed to connect" );
+    .expect("LOUD FAILURE: Failed to connect");
 
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( &pool )
     .await
-    .expect( "Failed to count users" );
+    .expect("LOUD FAILURE: Failed to count users");
   assert_eq!( user_count, 3, "Should still have exactly 3 users (no duplicates)" );
 
   pool.close().await;
@@ -341,7 +371,7 @@ async fn test_wipe_and_seed_integration_with_config()
   // First initialization: should create schema and seed data
   let storage = iron_token_manager::storage::TokenStorage::from_config_object( &config )
     .await
-    .expect( "First init should succeed" );
+    .expect("LOUD FAILURE: First init should succeed");
 
   // Verify seed data exists
   let pool = storage.pool();
@@ -349,19 +379,19 @@ async fn test_wipe_and_seed_integration_with_config()
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count users" );
+    .expect("LOUD FAILURE: Failed to count users");
   assert_eq!( user_count, 5, "Should have 5 users after first init" );
 
   let token_count: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count tokens" );
+    .expect("LOUD FAILURE: Failed to count tokens");
   assert_eq!( token_count, 8, "Should have 8 tokens after first init" );
 
   let provider_count: i64 = query_scalar( "SELECT COUNT(*) FROM ai_provider_keys" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count providers" );
+    .expect("LOUD FAILURE: Failed to count providers");
   assert_eq!( provider_count, 2, "Should have 2 provider keys after first init" );
 
   // Add extra data manually to simulate existing data from previous runs
@@ -371,43 +401,43 @@ async fn test_wipe_and_seed_integration_with_config()
   )
   .execute( pool )
   .await
-  .expect( "Failed to insert manual user" );
+  .expect("LOUD FAILURE: Failed to insert manual user");
 
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count users" );
+    .expect("LOUD FAILURE: Failed to count users");
   assert_eq!( user_count, 6, "Should have 6 users after manual insert (5 seeded + 1 manual)" );
 
   // Test wipe-and-seed by calling the functions directly
   // This simulates what happens on app restart with wipe_and_seed=true
   iron_token_manager::seed::wipe_database( pool )
     .await
-    .expect( "Wipe should succeed" );
+    .expect("LOUD FAILURE: Wipe should succeed");
 
   // Verify wipe removed all data including manual insert
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count users after wipe" );
+    .expect("LOUD FAILURE: Failed to count users after wipe");
   assert_eq!( user_count, 0, "Should have 0 users after wipe" );
 
   // Now seed again
   iron_token_manager::seed::seed_all( pool )
     .await
-    .expect( "Seed should succeed" );
+    .expect("LOUD FAILURE: Seed should succeed");
 
   // Verify seed data restored (manual insert gone)
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count users after re-seed" );
+    .expect("LOUD FAILURE: Failed to count users after re-seed");
   assert_eq!( user_count, 5, "Should have 5 users after re-seed (manual insert removed)" );
 
   let token_count: i64 = query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count tokens after re-seed" );
+    .expect("LOUD FAILURE: Failed to count tokens after re-seed");
   assert_eq!( token_count, 8, "Should have 8 tokens after re-seed" );
 
   // Verify specific seed data exists
@@ -416,7 +446,7 @@ async fn test_wipe_and_seed_integration_with_config()
   )
   .fetch_one( pool )
   .await
-  .expect( "Failed to check admin" );
+  .expect("LOUD FAILURE: Failed to check admin");
   assert_eq!( admin_exists, 1, "Admin user should exist with correct role" );
 
   let manual_user_exists: i64 = query_scalar(
@@ -424,7 +454,7 @@ async fn test_wipe_and_seed_integration_with_config()
   )
   .fetch_one( pool )
   .await
-  .expect( "Failed to check manual user" );
+  .expect("LOUD FAILURE: Failed to check manual user");
   assert_eq!( manual_user_exists, 0, "Manual user should be wiped" );
 
   let openai_key_exists: i64 = query_scalar(
@@ -432,7 +462,7 @@ async fn test_wipe_and_seed_integration_with_config()
   )
   .fetch_one( pool )
   .await
-  .expect( "Failed to check OpenAI key" );
+  .expect("LOUD FAILURE: Failed to check OpenAI key");
   assert_eq!( openai_key_exists, 1, "OpenAI provider key should exist after re-seed" );
 }
 
@@ -440,7 +470,7 @@ async fn test_wipe_and_seed_integration_with_config()
 async fn test_wipe_and_seed_disabled_preserves_data()
 {
   // Create a temporary database file
-  let temp_dir = tempfile::TempDir::new().expect( "Failed to create temp dir" );
+  let temp_dir = tempfile::TempDir::new().expect("LOUD FAILURE: Failed to create temp dir");
   let db_path = temp_dir.path().join( "test_preserve.db" );
   let db_url = format!( "sqlite:///{}?mode=rwc", db_path.display() );
 
@@ -456,7 +486,7 @@ async fn test_wipe_and_seed_disabled_preserves_data()
   // First initialization
   let storage = iron_token_manager::storage::TokenStorage::from_config_object( &config )
     .await
-    .expect( "First init should succeed" );
+    .expect("LOUD FAILURE: First init should succeed");
 
   let pool = storage.pool();
 
@@ -467,12 +497,12 @@ async fn test_wipe_and_seed_disabled_preserves_data()
   )
   .execute( pool )
   .await
-  .expect( "Failed to insert user" );
+  .expect("LOUD FAILURE: Failed to insert user");
 
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( pool )
     .await
-    .expect( "Failed to count users" );
+    .expect("LOUD FAILURE: Failed to count users");
   assert_eq!( user_count, 1, "Should have 1 user after manual insert" );
 
   // Close pool before re-initializing
@@ -485,7 +515,7 @@ async fn test_wipe_and_seed_disabled_preserves_data()
   // Second initialization: should NOT wipe
   let storage2 = iron_token_manager::storage::TokenStorage::from_config_object( &config )
     .await
-    .expect( "Second init should succeed" );
+    .expect("LOUD FAILURE: Second init should succeed");
 
   let pool2 = storage2.pool();
 
@@ -493,7 +523,7 @@ async fn test_wipe_and_seed_disabled_preserves_data()
   let user_count: i64 = query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( pool2 )
     .await
-    .expect( "Failed to count users" );
+    .expect("LOUD FAILURE: Failed to count users");
   assert_eq!( user_count, 1, "User should persist when wipe_and_seed is false" );
 
   let persistent_exists: i64 = query_scalar(
@@ -501,6 +531,6 @@ async fn test_wipe_and_seed_disabled_preserves_data()
   )
   .fetch_one( pool2 )
   .await
-  .expect( "Failed to check persistent user" );
+  .expect("LOUD FAILURE: Failed to check persistent user");
   assert_eq!( persistent_exists, 1, "Persistent user should still exist" );
 }

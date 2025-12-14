@@ -211,7 +211,7 @@ docker compose -f docker-compose.dev.yml up
 Check logs for database wiping message:
 
 ```bash
-docker logs iron_backend_dev | grep "Cleared"
+docker logs iron_cp_backend_dev | grep "Cleared"
 # Expected: "✓ Cleared /app/data/iron.db"
 ```
 
@@ -282,8 +282,8 @@ docker compose ps
 
 ```
 NAME                IMAGE                      STATUS         PORTS
-iron_backend        dev-backend:latest         Up (healthy)   3000/tcp
-iron_frontend       dev-frontend:latest        Up (healthy)   0.0.0.0:8080->80/tcp
+iron_cp_backend        dev-backend:latest         Up (healthy)   3000/tcp
+iron_cp_frontend       dev-frontend:latest        Up (healthy)   0.0.0.0:8080->80/tcp
 ```
 
 **Step 4: Access Dashboard**

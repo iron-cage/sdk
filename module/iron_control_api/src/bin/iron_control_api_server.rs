@@ -377,9 +377,81 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let ip_token_key_hex = std::env::var( "IP_TOKEN_KEY" )
     .unwrap_or_else( |_| "0000000000000000000000000000000000000000000000000000000000000000".to_string() );
 
+  // Fix(production-secret-validation): Block server startup if insecure defaults detected in production
+  // Root cause: Server allowed startup with default secrets (dev-secret-change-in-production,
+  //             all-zeros encryption keys) in production environments. This creates multiple attack
+  //             vectors: JWT tokens forged using known default secret, IC Tokens forged for budget
+  //             bypass, IP Tokens decrypted/forged using all-zeros key, session hijacking via
+  //             predictable tokens.
+  // Pitfall: Never allow fallback secrets in production. Production environments MUST have unique,
+  //          cryptographically secure secrets configured. Using defaults is a CRITICAL security
+  //          vulnerability - any attacker with knowledge of defaults can forge authentication tokens,
+  //          bypass budgets, decrypt session data, and impersonate users.
+  // Test coverage: See tests/production_secret_validation_test.rs
+  //
+  // Validate production secrets before server initialization
+  match mode
+  {
+    DeploymentMode::Production | DeploymentMode::ProductionUnconfirmed =>
+    {
+      let mut insecure_secrets = Vec::new();
+
+      // Check JWT_SECRET
+      if jwt_secret == "dev-secret-change-in-production"
+      {
+        insecure_secrets.push( "JWT_SECRET" );
+      }
+
+      // Check IC_TOKEN_SECRET
+      if ic_token_secret == "dev-ic-token-secret-change-in-production"
+      {
+        insecure_secrets.push( "IC_TOKEN_SECRET" );
+      }
+
+      // Check IP_TOKEN_KEY (all zeros)
+      if ip_token_key_hex == "0000000000000000000000000000000000000000000000000000000000000000"
+      {
+        insecure_secrets.push( "IP_TOKEN_KEY" );
+      }
+
+      // Check DATABASE_URL (SQLite defaults)
+      if database_url.contains( "sqlite://" ) && !database_url.contains( "/var/lib/iron" )
+      {
+        tracing::warn!( "⚠️  WARNING: Using SQLite in production (DATABASE_URL={})", database_url );
+        tracing::warn!( "⚠️  Production deployments SHOULD use PostgreSQL for reliability" );
+      }
+
+      // Block startup if any insecure defaults detected
+      if !insecure_secrets.is_empty()
+      {
+        tracing::error!( "❌ CRITICAL SECURITY ERROR: Production deployment with insecure default secrets" );
+        tracing::error!( "❌ The following secrets are using INSECURE DEFAULT VALUES:" );
+        for secret in &insecure_secrets
+        {
+          tracing::error!( "❌   - {}", secret );
+        }
+        tracing::error!( "" );
+        tracing::error!( "❌ REFUSING TO START SERVER" );
+        tracing::error!( "❌ Generate secure secrets with:" );
+        tracing::error!( "❌   JWT_SECRET=$(openssl rand -hex 32)" );
+        tracing::error!( "❌   IC_TOKEN_SECRET=$(openssl rand -hex 32)" );
+        tracing::error!( "❌   IP_TOKEN_KEY=$(openssl rand -hex 32)" );
+        tracing::error!( "" );
+        tracing::error!( "❌ See secret/readme.md for complete setup instructions" );
+        panic!( "Production deployment blocked: {} insecure default secret(s) detected", insecure_secrets.len() );
+      }
+
+      tracing::info!( "✓ Production secret validation passed" );
+    }
+    _ =>
+    {
+      // Development/Pilot mode - defaults are acceptable
+    }
+  }
+
   // Decode hex string to bytes
   let ip_token_key = hex::decode( &ip_token_key_hex )
-    .expect( "IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
+    .expect( "LOUD FAILURE: IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
 
   if ip_token_key.len() != 32
   {
@@ -392,32 +464,42 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Initialize route states
   let auth_state = iron_control_api::routes::auth::AuthState::new( jwt_secret, &database_url )
     .await
-    .expect( "Failed to initialize auth state" );
+    .expect( "LOUD FAILURE: Failed to initialize auth state" );
 
   let token_state = iron_control_api::routes::tokens::TokenState::new( &database_url )
     .await
-    .expect( "Failed to initialize token state" );
+    .expect( "LOUD FAILURE: Failed to initialize token state" );
 
   let usage_state = iron_control_api::routes::usage::UsageState::new( &database_url )
     .await
-    .expect( "Failed to initialize usage state" );
+    .expect( "LOUD FAILURE: Failed to initialize usage state" );
 
   let limits_state = iron_control_api::routes::limits::LimitsState::new( &database_url )
     .await
-    .expect( "Failed to initialize limits state" );
+    .expect( "LOUD FAILURE: Failed to initialize limits state" );
 
   let traces_state = iron_control_api::routes::traces::TracesState::new( &database_url )
     .await
-    .expect( "Failed to initialize traces state" );
+    .expect( "LOUD FAILURE: Failed to initialize traces state" );
 
   let providers_state = iron_control_api::routes::providers::ProvidersState::new( &database_url )
     .await
-    .expect( "Failed to initialize providers storage" );
+    .expect( "LOUD FAILURE: Failed to initialize providers storage" );
 
   // Initialize keys state for /api/keys endpoint (requires crypto)
+  // Read provider key master key from environment (used for both keys API and budget protocol)
+  let provider_key_master_b64 = std::env::var( "IRON_SECRETS_MASTER_KEY" )
+    .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY required for provider key encryption" );
+
+  let provider_key_master_bytes = base64::Engine::decode(
+    &base64::engine::general_purpose::STANDARD,
+    &provider_key_master_b64
+  )
+    .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY must be valid base64" );
+
   let crypto_service = std::sync::Arc::new(
-    iron_secrets::crypto::CryptoService::from_env()
-      .expect( "IRON_SECRETS_MASTER_KEY required for key fetch API" )
+    iron_secrets::crypto::CryptoService::new( &provider_key_master_bytes )
+      .expect( "LOUD FAILURE: Failed to create crypto service" )
   );
 
   // Rate limiter for /api/keys endpoint: 10 requests per minute per user/project
@@ -425,6 +507,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     10,
     std::time::Duration::from_secs( 60 ),
   );
+
+  // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
+  let crypto_service_for_budget = crypto_service.clone();
 
   let keys_state = iron_control_api::routes::keys::KeysState
   {
@@ -448,7 +533,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     ic_token_secret.clone(),
   )
     .await
-    .expect( "Failed to initialize analytics state" );
+    .expect( "LOUD FAILURE: Failed to initialize analytics state" );
 
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
@@ -464,19 +549,22 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     tracing::info!( "Seeding database with test data..." );
     iron_token_manager::seed::seed_all( &agents_pool )
       .await
-      .expect( "Failed to seed database" );
+      .expect( "LOUD FAILURE: Failed to seed database" );
     tracing::info!( "✓ Database seeded (admin@admin.com / testpass)" );
   }
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
+  // crypto_service_for_budget enables Feature 014: Agent Provider Key retrieval
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
     &ip_token_key,
+    &provider_key_master_bytes,
     auth_state.jwt_secret.clone(),
     &database_url,
+    Some( crypto_service_for_budget ),
   )
   .await
-  .expect( "Failed to initialize budget state" );
+  .expect( "LOUD FAILURE: Failed to initialize budget state" );
 
   // Create combined app state
   let app_state = AppState
@@ -499,6 +587,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Health check (FR-2: Health endpoint at /api/health)
     .route( "/api/health", get( iron_control_api::routes::health::health_check ) )
 
+    // Version endpoint (API version discovery)
+    .route( "/api/v1/version", get( iron_control_api::routes::version::get_version ) )
+
     // Authentication endpoints
     .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
     .route( "/api/v1/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
@@ -517,6 +608,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
     // Token management endpoints
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route( "/api/v1/api-tokens/validate", post( iron_control_api::routes::tokens::validate_token ) )
     .route( "/api/v1/api-tokens", get( iron_control_api::routes::tokens::list_tokens ) )
     .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
     .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
@@ -554,6 +646,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Agent management endpoints
     .route( "/api/v1/agents", get( iron_control_api::routes::agents::list_agents ) )
     .route( "/api/v1/agents", post( iron_control_api::routes::agents::create_agent ) )
+    // Agent Provider Key endpoint (Feature 014) - must be before :id routes
+    .route( "/api/v1/agents/provider-key", post( iron_control_api::routes::agent_provider_key::get_provider_key ) )
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
@@ -563,6 +657,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
     .route( "/api/v1/budget/report", post( iron_control_api::routes::budget::report_usage ) )
     .route( "/api/v1/budget/refresh", post( iron_control_api::routes::budget::refresh_budget ) )
+    .route( "/api/v1/budget/return", post( iron_control_api::routes::budget::return_budget ) )
 
     // Budget Request Workflow endpoints (Protocol 012)
     .route( "/api/v1/budget/requests", post( iron_control_api::routes::budget::create_budget_request ) )
@@ -597,9 +692,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .layer(
       CorsLayer::new()
         .allow_origin( [
-          "http://localhost:5173".parse::<axum::http::HeaderValue>().unwrap(),
-          "http://localhost:5174".parse::<axum::http::HeaderValue>().unwrap(),
-          "http://localhost:5175".parse::<axum::http::HeaderValue>().unwrap(),
+          "http://localhost:5173".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
+          "http://localhost:5174".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
+          "http://localhost:5175".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
         ] )
         .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH ] )
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
@@ -664,141 +759,3 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   Ok( () )
 }
 
-#[ cfg( test ) ]
-mod deployment_mode_tests
-{
-  use super::*;
-
-  /// Helper to clear all production environment variables
-  fn clear_production_env_vars()
-  {
-    env::remove_var( "IRON_DEPLOYMENT_MODE" );
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-    env::remove_var( "AWS_EXECUTION_ENV" );
-    env::remove_var( "DYNO" );
-  }
-
-  #[ test ]
-  fn test_pilot_mode_default()
-  {
-    // Clear all production indicators
-    clear_production_env_vars();
-
-    let mode = detect_deployment_mode();
-
-    // In debug builds with no env vars, should detect pilot mode
-    #[ cfg( debug_assertions ) ]
-    assert!( matches!( mode, DeploymentMode::Pilot ) );
-  }
-
-  #[ test ]
-  fn test_production_kubernetes_detection()
-  {
-    clear_production_env_vars();
-    env::set_var( "KUBERNETES_SERVICE_HOST", "10.0.0.1" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-  }
-
-  #[ test ]
-  fn test_production_aws_detection()
-  {
-    clear_production_env_vars();
-    env::set_var( "AWS_EXECUTION_ENV", "AWS_ECS_FARGATE" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    env::remove_var( "AWS_EXECUTION_ENV" );
-  }
-
-  #[ test ]
-  fn test_production_heroku_detection()
-  {
-    clear_production_env_vars();
-    env::set_var( "DYNO", "web.1" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    env::remove_var( "DYNO" );
-  }
-
-  #[ test ]
-  fn test_explicit_production_mode()
-  {
-    clear_production_env_vars();
-    env::set_var( "IRON_DEPLOYMENT_MODE", "production" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::Production ) );
-
-    env::remove_var( "IRON_DEPLOYMENT_MODE" );
-  }
-
-  #[ test ]
-  fn test_explicit_production_overrides_heuristics()
-  {
-    clear_production_env_vars();
-
-    // Set multiple production indicators
-    env::set_var( "KUBERNETES_SERVICE_HOST", "10.0.0.1" );
-    env::set_var( "AWS_EXECUTION_ENV", "AWS_ECS_FARGATE" );
-
-    // But explicit mode should take precedence
-    env::set_var( "IRON_DEPLOYMENT_MODE", "production" );
-
-    let mode = detect_deployment_mode();
-
-    assert!( matches!( mode, DeploymentMode::Production ) );
-
-    // Cleanup
-    env::remove_var( "IRON_DEPLOYMENT_MODE" );
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-    env::remove_var( "AWS_EXECUTION_ENV" );
-  }
-
-  #[ test ]
-  fn test_release_build_detection()
-  {
-    clear_production_env_vars();
-
-    let mode = detect_deployment_mode();
-
-    // In release builds (debug_assertions disabled), should detect production
-    #[ cfg( not( debug_assertions ) ) ]
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    // In debug builds, should detect pilot
-    #[ cfg( debug_assertions ) ]
-    assert!( matches!( mode, DeploymentMode::Pilot ) );
-  }
-
-  #[ test ]
-  fn test_multiple_production_indicators()
-  {
-    clear_production_env_vars();
-
-    // Set multiple production environment variables
-    env::set_var( "KUBERNETES_SERVICE_HOST", "10.0.0.1" );
-    env::set_var( "AWS_EXECUTION_ENV", "AWS_ECS_FARGATE" );
-    env::set_var( "DYNO", "web.1" );
-
-    let mode = detect_deployment_mode();
-
-    // Should still detect as ProductionUnconfirmed (not explicitly set)
-    assert!( matches!( mode, DeploymentMode::ProductionUnconfirmed ) );
-
-    // Cleanup
-    env::remove_var( "KUBERNETES_SERVICE_HOST" );
-    env::remove_var( "AWS_EXECUTION_ENV" );
-    env::remove_var( "DYNO" );
-  }
-}

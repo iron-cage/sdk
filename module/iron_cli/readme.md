@@ -331,3 +331,21 @@ tests/
 ## License
 
 MIT
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | Command-line interface for token management |
+| config.rs | Configuration system with hierarchical precedence |
+| adapters/ | Adapter layer for unilang CLI |
+| bin/ | CLI binary entry points for iron-token and iron commands |
+| formatting/ | Universal formatter supporting 4 output formats |
+| handlers/ | Pure business logic handlers for CLI commands |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

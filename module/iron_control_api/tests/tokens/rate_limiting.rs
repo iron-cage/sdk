@@ -3,6 +3,13 @@
 //! Tests Protocol 014 rate limiting requirements:
 //! 1. Max 10 active tokens per user (token limit)
 //! 2. Max 10 token creates per minute per user (rate limiting)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_max_active_tokens_per_user` | User exceeds 10 active tokens limit | Create 10 tokens successfully, attempt 11th | First 10: 201 Created, 11th: 429 Too Many Requests | ✅ |
+//! | `test_token_creation_rate_limit` | User exceeds 10 creates/minute rate limit | Create 10 tokens within 1 minute, attempt 11th | First 10: 201 Created, 11th: 429 Too Many Requests | ✅ |
 
 use axum::{ Router, routing::post, http::{ Request, StatusCode }, body::Body };
 use tower::ServiceExt;

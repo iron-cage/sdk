@@ -3,7 +3,7 @@
 use serde::{ Deserialize, Serialize };
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::helpers::current_time_ms;
+use crate::provider_utils::current_time_ms;
 
 /// Unique event identifier for deduplication.
 #[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize ) ]
@@ -13,6 +13,17 @@ pub struct EventId( Uuid );
 impl EventId
 {
   pub fn new() -> Self { Self( Uuid::new_v4() ) }
+
+  /// Get UUID as string
+  pub fn to_uuid_string( &self ) -> String { self.0.to_string() }
+}
+
+impl std::fmt::Display for EventId
+{
+  fn fmt( &self, f : &mut std::fmt::Formatter<'_> ) -> std::fmt::Result
+  {
+    write!( f, "{}", self.0 )
+  }
 }
 
 impl Default for EventId

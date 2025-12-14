@@ -7,6 +7,20 @@
 //! | user_id | Non-empty string | "" (empty) | 1 char OK |
 //! | project_id | None, Some(non-empty) | Some("") | - |
 //! | description | None, Some(≤500 chars) | Some(>500 chars) | Exactly 500 OK |
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input | Expected | Status |
+//! |-----------|----------|-------|----------|--------|
+//! | `test_valid_minimal_request` | Valid request with only user_id | user_id=Some("user_test"), all else None | Validation passes | ✅ |
+//! | `test_valid_complete_request` | Valid request with all fields | All fields populated with valid values | Validation passes | ✅ |
+//! | `test_empty_user_id_rejected` | Empty user_id validation | user_id=Some("") | Validation error "user_id cannot be empty" | ✅ |
+//! | `test_empty_project_id_rejected` | Empty project_id validation | project_id=Some("") | Validation error "project_id cannot be empty" | ✅ |
+//! | `test_description_too_long_rejected` | Description exceeds max length | description=Some(501 chars) | Validation error "description too long (max 500)" | ✅ |
+//! | `test_description_max_length_accepted` | Description at max length | description=Some(500 chars) | Validation passes | ✅ |
+//! | `test_single_char_user_id_accepted` | Minimal user_id length | user_id=Some("a") | Validation passes | ✅ |
+//! | `test_whitespace_user_id_rejected` | Whitespace-only user_id | user_id=Some("   ") | Validation error "user_id cannot be empty" | ✅ |
+//! | `test_whitespace_project_id_rejected` | Whitespace-only project_id | project_id=Some("   ") | Validation error "project_id cannot be empty" | ✅ |
 
 use iron_control_api::routes::tokens::CreateTokenRequest;
 

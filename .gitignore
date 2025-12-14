@@ -82,7 +82,16 @@ htmlcov/
 *.db-shm
 *.db-wal
 
-# Temporary files (all hyphenated files)
+# Database backups (NEVER commit)
+backups/
+*_backup*.db
+*.db.backup
+*.bak
+*.orig
+
+# Secrets directory: hyphenated files contain sensitive credentials
+# Files like secret/-iron.sh, secret/-api_keys.sh are gitignored via -* pattern
+# secret/readme.md (documentation) is tracked - no hyphen prefix
 -*
 
 # Build artifacts
@@ -95,3 +104,14 @@ htmlcov/
 # SQLite
 *.sqlite
 *.sqlite3
+
+# Ignore Terraform state files
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.backup
+
+# secret
+/secret/*
+!/secret/readme.md
+!/secret/secrets.template.sh

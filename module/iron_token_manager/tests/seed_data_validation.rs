@@ -213,7 +213,7 @@ async fn validate_expired_token_is_expired()
   assert_eq!( expired_token.0, "Expired Token", "Name should match" );
   assert_eq!( expired_token.1, 1, "Token should be marked active (but expired)" );
 
-  let expires_at = expired_token.2.expect( "Expired token should have expires_at timestamp" );
+  let expires_at = expired_token.2.expect("LOUD FAILURE: Expired token should have expires_at timestamp");
   assert!(
     expires_at < now_ms,
     "LOUD FAILURE: Expired token should have expires_at in the past (doc says 30 days ago)"
@@ -242,7 +242,7 @@ async fn validate_admin_unlimited_limits()
   let db = create_test_db_with_seed().await;
 
   let admin_limit: ( String, Option< i64 >, Option< i64 >, Option< i64 > ) = sqlx::query_as(
-    "SELECT user_id, max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month
+    "SELECT user_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month
      FROM usage_limits
      WHERE user_id = 'admin'"
   )
@@ -263,8 +263,8 @@ async fn validate_developer_standard_tier()
 
   let dev_limit: ( String, Option< i64 >, Option< i64 >, Option< i64 >, i64, i64, i64 ) =
     sqlx::query_as(
-      "SELECT user_id, max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month,
-              current_tokens_today, current_requests_this_minute, current_cost_cents_this_month
+      "SELECT user_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month,
+              current_tokens_today, current_requests_this_minute, current_cost_microdollars_this_month
        FROM usage_limits
        WHERE user_id = 'developer'"
     )
@@ -275,10 +275,10 @@ async fn validate_developer_standard_tier()
   assert_eq!( dev_limit.0, "developer", "User ID should match" );
   assert_eq!( dev_limit.1, Some( 1_000_000 ), "Max tokens should be 1M/day" );
   assert_eq!( dev_limit.2, Some( 60 ), "Max requests should be 60/minute" );
-  assert_eq!( dev_limit.3, Some( 5000 ), "Max cost should be $50/month (5000 cents)" );
+  assert_eq!( dev_limit.3, Some( 50_000_000 ), "Max cost should be $50/month (50M microdollars)" );
   assert_eq!( dev_limit.4, 250_000, "Current tokens should be 250k (25% used)" );
   assert_eq!( dev_limit.5, 15, "Current requests should be 15 (25% used)" );
-  assert_eq!( dev_limit.6, 1250, "Current cost should be $12.50 (1250 cents, 25% used)" );
+  assert_eq!( dev_limit.6, 12_500_000, "Current cost should be $12.50 (12.5M microdollars, 25% used)" );
 }
 
 #[ tokio::test ]

@@ -2,8 +2,10 @@
 //!
 //! Bridge provider handlers with Control API HTTP client.
 
-use super::{ ControlApiClient, ControlApiConfig, format_output };
+use super::{ ControlApiClient, ControlApiConfig };
 use crate::handlers::control::provider_handlers;
+use crate::formatting::{ TreeFmtFormatter, OutputFormat };
+use std::str::FromStr;
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -24,7 +26,9 @@ pub async fn list_providers_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Create new provider
@@ -48,8 +52,8 @@ pub async fn create_provider_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let name = params.get( "name" ).unwrap();
-  let api_key = params.get( "api_key" ).unwrap();
+  let name = params.get( "name" ).unwrap(); // Already validated
+  let api_key = params.get( "api_key" ).unwrap(); // Already validated
 
   let mut body = json!({
     "name": name,
@@ -67,7 +71,9 @@ pub async fn create_provider_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Get provider by ID
@@ -81,7 +87,7 @@ pub async fn get_provider_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/providers/{}", id );
 
   let response = client
@@ -90,7 +96,9 @@ pub async fn get_provider_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Update provider
@@ -114,7 +122,7 @@ pub async fn update_provider_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
 
   let mut body = json!({});
 
@@ -140,7 +148,9 @@ pub async fn update_provider_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Delete provider
@@ -164,7 +174,7 @@ pub async fn delete_provider_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/providers/{}", id );
 
   let response = client
@@ -173,7 +183,9 @@ pub async fn delete_provider_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Assign agents to provider
@@ -197,8 +209,8 @@ pub async fn assign_agents_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
-  let agent_ids = params.get( "agent_ids" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
+  let agent_ids = params.get( "agent_ids" ).unwrap(); // Already validated
 
   let ids: Vec< String > = agent_ids
     .split( ',' )
@@ -216,7 +228,9 @@ pub async fn assign_agents_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// List agents for provider
@@ -230,7 +244,7 @@ pub async fn list_provider_agents_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
   let path = format!( "/api/v1/providers/{}/agents", id );
 
   let response = client
@@ -239,7 +253,9 @@ pub async fn list_provider_agents_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }
 
 /// Remove agent from provider
@@ -263,8 +279,8 @@ pub async fn remove_agent_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let id = params.get( "id" ).unwrap();
-  let agent_id = params.get( "agent_id" ).unwrap();
+  let id = params.get( "id" ).unwrap(); // Already validated
+  let agent_id = params.get( "agent_id" ).unwrap(); // Already validated
 
   let path = format!( "/api/v1/providers/{}/agents/{}", id, agent_id );
   let response = client
@@ -273,5 +289,7 @@ pub async fn remove_agent_adapter(
     .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
 
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
-  format_output( &response, format )
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
 }

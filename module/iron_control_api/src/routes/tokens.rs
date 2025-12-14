@@ -252,6 +252,26 @@ impl UpdateTokenRequest
   }
 }
 
+/// Validate token request (Deliverable 1.6)
+#[ derive( Debug, Deserialize ) ]
+pub struct ValidateTokenRequest
+{
+  pub token: String,
+}
+
+/// Validate token response (Deliverable 1.6)
+#[ derive( Debug, Serialize ) ]
+pub struct ValidateTokenResponse
+{
+  pub valid: bool,
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  pub user_id: Option< String >,
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  pub project_id: Option< String >,
+  #[ serde( skip_serializing_if = "Option::is_none" ) ]
+  pub token_id: Option< i64 >,
+}
+
 /// Create token response
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct CreateTokenResponse
@@ -402,6 +422,33 @@ pub async fn create_token(
     .await
   {
     Ok( id ) => id,
+    Err( iron_token_manager::error::TokenError::Database( db_err ) ) =>
+    {
+      // Check if this is an FK constraint violation
+      let err_msg = db_err.to_string();
+      if err_msg.contains( "FOREIGN KEY constraint failed" )
+      {
+        // Parse constraint details to provide specific error
+        return (
+          StatusCode::NOT_FOUND,
+          Json( serde_json::json!({
+            "error": format!( "User not found: '{}'", user_id ),
+            "code": "USER_NOT_FOUND"
+          }) ),
+        )
+          .into_response();
+      }
+
+      // Other database errors
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({
+          "error": "Database error occurred",
+          "code": "DATABASE_ERROR"
+        }) ),
+      )
+        .into_response();
+    }
     Err( _ ) =>
     {
       return (
@@ -949,4 +996,81 @@ pub async fn revoke_token(
       }
     }
   }
+}
+
+/// POST /api/v1/api-tokens/validate
+///
+/// Validate API token without authentication (Deliverable 1.6)
+///
+/// # Purpose
+///
+/// External services can verify token validity without making authenticated requests.
+/// This is a public endpoint (no JWT required) that returns token validation status.
+///
+/// # Arguments
+///
+/// * `state` - Token generator state
+/// * `request` - Validation request with token string
+///
+/// # Returns
+///
+/// - 200 OK with {"valid":true,...} if token is valid and active
+/// - 200 OK with {"valid":false} if token is invalid, expired, or revoked
+/// - 400 Bad Request if request body is malformed
+///
+/// # Security
+///
+/// - No authentication required (public endpoint)
+/// - Constant-time comparison prevents timing attacks
+/// - Rate limiting should be applied at reverse proxy level (100 validates/min per IP)
+pub async fn validate_token(
+  State( state ): State< TokenState >,
+  crate::error::JsonBody( request ): crate::error::JsonBody< ValidateTokenRequest >,
+) -> impl IntoResponse
+{
+  // Verify token using storage layer
+  let token_id = match state.storage.verify_token( &request.token ).await
+  {
+    Ok( id ) => id,
+    Err( _ ) =>
+    {
+      // Token is invalid, expired, or revoked - return {"valid":false}
+      return ( StatusCode::OK, Json( ValidateTokenResponse
+      {
+        valid: false,
+        user_id: None,
+        project_id: None,
+        token_id: None,
+      } ) )
+        .into_response();
+    }
+  };
+
+  // Token is valid - get metadata
+  let metadata = match state.storage.get_token_metadata( token_id ).await
+  {
+    Ok( metadata ) => metadata,
+    Err( _ ) =>
+    {
+      // Token exists but metadata fetch failed - return {"valid":false}
+      return ( StatusCode::OK, Json( ValidateTokenResponse
+      {
+        valid: false,
+        user_id: None,
+        project_id: None,
+        token_id: None,
+      } ) )
+        .into_response();
+    }
+  };
+
+  // Return success with metadata
+  ( StatusCode::OK, Json( ValidateTokenResponse
+  {
+    valid: true,
+    user_id: Some( metadata.user_id ),
+    project_id: metadata.project_id,
+    token_id: Some( token_id ),
+  } ) )
+    .into_response()
 }

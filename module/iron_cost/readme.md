@@ -59,3 +59,21 @@ if let Some(model) = pricing.get("gpt-4-turbo") {
 ## License
 
 MIT
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | LLM cost tracking and budget management for Iron Runtime. |
+| budget_client.rs | Budget Client for Protocol 005: Budget Control Protocol |
+| budget.rs | Budget control with atomic reservations |
+| converter.rs | Currency conversion utilities for microdollar arithmetic. |
+| error.rs | Error types for cost management |
+| pricing.rs | LLM model pricing management. |
+| token_estimation.rs | Helper utilities for cost estimation |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

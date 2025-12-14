@@ -10,7 +10,6 @@ use serde::{ Serialize };
 pub struct HealthResponse
 {
   pub status: String,
-  pub version: String,
   pub timestamp: i64,
 }
 
@@ -26,26 +25,13 @@ pub async fn health_check() -> impl IntoResponse
 {
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_secs() as i64;
 
   ( StatusCode::OK, Json( HealthResponse
   {
     status: "healthy".to_string(),
-    version: env!( "CARGO_PKG_VERSION" ).to_string(),
     timestamp: now,
   } ) )
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ tokio::test ]
-  async fn test_health_check()
-  {
-    let response = health_check().await.into_response();
-    assert_eq!( response.status(), StatusCode::OK );
-  }
-}

@@ -19,6 +19,12 @@
 //! - RBAC enforcement (Admin-only operations)
 //! - Database persistence and audit logging
 //! - Edge cases (self-deletion, duplicate usernames, invalid filters)
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_create_and_list_users` | User creation and listing integration | POST /api/v1/users with valid user data (username="newuser", email="newuser@example.com"), then GET /api/v1/users | User created with 201 Created, appears in user list | ✅ |
 
 #[ path = "common/mod.rs" ]
 mod common;
@@ -36,7 +42,7 @@ use iron_control_api::rbac::PermissionChecker;
 use tower::ServiceExt;
 use std::sync::Arc;
 use axum::extract::FromRef;
-use common::{create_test_database, create_test_access_token, extract_json_response};
+use common::{test_db, create_test_access_token, extract_json_response};
 
 #[derive(Clone)]
 struct TestAppState {
@@ -57,16 +63,18 @@ impl FromRef<TestAppState> for UserManagementState {
 }
 
 async fn create_test_app() -> (Router, TestAppState) {
-    let db_pool = create_test_database().await;
+    let db = test_db::create_test_db().await;
+  let db_pool = db.pool();
     let jwt_secret = Arc::new(JwtSecret::new("test_secret".to_string()));
     
     let auth_state = AuthState {
         db_pool: db_pool.clone(),
         jwt_secret,
+        rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
     };
 
     let permission_checker = Arc::new(PermissionChecker::new());
-    let user_state = UserManagementState::new(db_pool, permission_checker);
+    let user_state = UserManagementState::new(db_pool.clone(), permission_checker);
 
     let state = TestAppState {
         auth: auth_state,

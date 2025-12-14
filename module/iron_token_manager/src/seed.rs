@@ -50,58 +50,58 @@ pub async fn wipe_database( pool: &SqlitePool ) -> Result< () >
   sqlx::query( "DELETE FROM token_usage" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM api_call_traces" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM audit_log" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM project_provider_key_assignments" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM token_blacklist" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM user_audit_log" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Parent tables (referenced by foreign keys)
   sqlx::query( "DELETE FROM api_tokens" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM ai_provider_keys" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM usage_limits" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM users" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   sqlx::query( "DELETE FROM agents" )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -157,7 +157,11 @@ pub async fn seed_all( pool: &SqlitePool ) -> Result< () >
 /// - `guest` (role: user, active, no tokens)
 ///
 /// Passwords are bcrypt hashed "password123" (DO NOT use in production!)
-async fn seed_users( pool: &SqlitePool ) -> Result< () >
+///
+/// # Errors
+///
+/// Returns error if database insertion fails
+pub async fn seed_users( pool: &SqlitePool ) -> Result< () >
 {
   let now_ms = crate::storage::current_time_ms();
   let day_ms = 24 * 60 * 60 * 1000;
@@ -179,7 +183,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Developer user
   sqlx::query(
@@ -195,7 +199,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Inactive viewer user
   sqlx::query(
@@ -211,7 +215,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Tester user (no usage limits - unlimited testing)
   sqlx::query(
@@ -227,7 +231,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms - ( 7 * day_ms ) )  // Created a week ago
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Guest user (no tokens - just registered)
   sqlx::query(
@@ -243,7 +247,7 @@ async fn seed_users( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms - ( 60 * 60 * 1000 ) )  // Created 1 hour ago
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -280,7 +284,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( "user_admin" )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Anthropic key
   let anthropic_encrypted = "ZmFrZV9lbmNyeXB0ZWRfa2V5X2FudGhyb3BpYw==";
@@ -303,7 +307,7 @@ async fn seed_provider_keys( pool: &SqlitePool ) -> Result< () >
   .bind( "user_admin" )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -338,7 +342,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )  // Never expires
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 2: Developer token (expires in 30 days)
   let token_hash_2 = "dev_token_hash_placeholder_bbb222";
@@ -356,7 +360,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms + ( 30 * day_ms ) )  // Expires in 30 days
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 3: Project token
   let token_hash_3 = "project_token_hash_placeholder_ccc333";
@@ -374,7 +378,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 4: Inactive token
   let token_hash_4 = "inactive_token_hash_placeholder_ddd444";
@@ -392,7 +396,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 5: Expired token
   let token_hash_5 = "expired_token_hash_placeholder_eee555";
@@ -410,7 +414,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms - ( 30 * day_ms ) )  // Expired 30 days ago
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 6: Expiring soon (within 7 days)
   let token_hash_6 = "expiring_soon_token_hash_placeholder_fff666";
@@ -428,7 +432,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms + ( 7 * day_ms ) )  // Expires in 7 days
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 7: Tester token (unlimited user, short expiry)
   let token_hash_7 = "tester_token_hash_placeholder_ggg777";
@@ -446,7 +450,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms + ( 14 * day_ms ) )  // Expires in 14 days
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Token 8: Second tester token (for rotation testing)
   let token_hash_8 = "tester_token_2_hash_placeholder_hhh888";
@@ -464,7 +468,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
   .bind::< Option< i64 > >( None )  // Never expires
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Note: guest user deliberately has NO tokens (edge case testing)
 
@@ -485,8 +489,8 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
-      max_cost_cents_per_month, current_tokens_today, current_requests_this_minute, \
-      current_cost_cents_this_month, created_at, updated_at) \
+      max_cost_microdollars_per_month, current_tokens_today, current_requests_this_minute, \
+      current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
   .bind( "admin" )
@@ -501,36 +505,36 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Limit 2: Developer standard tier
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
-      max_cost_cents_per_month, current_tokens_today, current_requests_this_minute, \
-      current_cost_cents_this_month, created_at, updated_at) \
+      max_cost_microdollars_per_month, current_tokens_today, current_requests_this_minute, \
+      current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
   .bind( "developer" )
   .bind::< Option< &str > >( None )
   .bind( 1_000_000 )  // 1M tokens/day
   .bind( 60 )  // 60 requests/minute
-  .bind( 5000 )  // $50/month
+  .bind( 50_000_000_i64 )  // $50/month in microdollars
   .bind( 250_000 )  // Current: 250k tokens used today
   .bind( 15 )  // Current: 15 requests this minute
-  .bind( 1250 )  // Current: $12.50 this month
+  .bind( 12_500_000_i64 )  // Current: $12.50 this month in microdollars
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Limit 3: Free tier
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
-      max_cost_cents_per_month, current_tokens_today, current_requests_this_minute, \
-      current_cost_cents_this_month, created_at, updated_at) \
+      max_cost_microdollars_per_month, current_tokens_today, current_requests_this_minute, \
+      current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
   .bind( "viewer" )
@@ -545,7 +549,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -567,7 +571,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Get Anthropic key ID
   let anthropic_key_id: i64 = sqlx::query_scalar(
@@ -575,7 +579,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_one( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Assignment 1: project_alpha -> OpenAI
   sqlx::query(
@@ -588,7 +592,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Assignment 2: project_alpha -> Anthropic
   sqlx::query(
@@ -601,7 +605,7 @@ async fn seed_project_assignments( pool: &SqlitePool ) -> Result< () >
   .bind( now_ms )
   .execute( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   Ok( () )
 }
@@ -628,28 +632,28 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   let dev_token_id: Option< i64 > = sqlx::query_scalar(
     "SELECT id FROM api_tokens WHERE token_hash = 'dev_token_hash_placeholder_bbb222' LIMIT 1"
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   let project_token_id: Option< i64 > = sqlx::query_scalar(
     "SELECT id FROM api_tokens WHERE token_hash = 'project_token_hash_placeholder_ccc333' LIMIT 1"
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   let tester_token_id: Option< i64 > = sqlx::query_scalar(
     "SELECT id FROM api_tokens WHERE token_hash = 'tester_token_hash_placeholder_ggg777' LIMIT 1"
   )
   .fetch_optional( pool )
   .await
-  .map_err( |_| crate::error::TokenError )?;
+  .map_err( |_| crate::error::TokenError::Generic )?;
 
   // Pattern 1: Admin token - moderate usage over 7 days
   if let Some( token_id ) = admin_token_id
@@ -673,7 +677,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
       .bind( now_ms - ( day_offset * day_ms ) )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     }
   }
 
@@ -699,7 +703,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
       .bind( now_ms - ( day_offset * day_ms ) )
       .execute( pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
     }
   }
 
@@ -724,7 +728,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Day 3 - low usage
     sqlx::query(
@@ -744,7 +748,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms - ( 3 * day_ms ) )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   // Pattern 4: Tester token - mixed provider usage
@@ -768,7 +772,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms - ( 2 * day_ms ) )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Anthropic usage
     sqlx::query(
@@ -788,7 +792,7 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
     .bind( now_ms - day_ms )
     .execute( pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
   }
 
   // Note: Some tokens deliberately have ZERO usage (newly created tokens, inactive tokens, etc.)
@@ -797,131 +801,3 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-  use sqlx::SqlitePool;
-
-  #[ tokio::test ]
-  async fn test_wipe_database()
-  {
-    let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-    crate::migrations::apply_all_migrations( &pool ).await.unwrap();
-
-    // Seed database
-    seed_all( &pool ).await.unwrap();
-
-    // Verify data exists
-    let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert!( user_count > 0, "Users should exist before wipe" );
-
-    // Wipe database
-    wipe_database( &pool ).await.unwrap();
-
-    // Verify all tables empty
-    let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert_eq!( user_count, 0, "Users table should be empty after wipe" );
-
-    let token_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM api_tokens" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert_eq!( token_count, 0, "Tokens table should be empty after wipe" );
-  }
-
-  #[ tokio::test ]
-  async fn test_seed_all()
-  {
-    let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-    crate::migrations::apply_all_migrations( &pool ).await.unwrap();
-
-    seed_all( &pool ).await.unwrap();
-
-    // Verify users created
-    let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert_eq!( user_count, 5, "Should create 5 users (admin, developer, viewer, tester, guest)" );
-
-    // Verify provider keys created
-    let provider_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM ai_provider_keys" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert_eq!( provider_count, 2, "Should create 2 provider keys" );
-
-    // Verify tokens created
-    let token_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM api_tokens" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert_eq!( token_count, 8, "Should create 8 tokens (guest user has none)" );
-
-    // Verify usage limits created
-    let limit_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM usage_limits" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert_eq!( limit_count, 3, "Should create 3 usage limits" );
-
-    // Verify project assignments created
-    let assignment_count: i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM project_provider_key_assignments"
-    )
-    .fetch_one( &pool )
-    .await
-    .unwrap();
-    assert_eq!( assignment_count, 2, "Should create 2 project assignments" );
-
-    // Verify usage records created
-    let usage_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM token_usage" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
-    assert!( usage_count >= 10, "Should create at least 10 usage records, got {usage_count}" );
-  }
-
-  #[ tokio::test ]
-  async fn test_seed_users_creates_correct_roles()
-  {
-    let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-    crate::migrations::apply_all_migrations( &pool ).await.unwrap();
-
-    seed_users( &pool ).await.unwrap();
-
-    // Verify admin role
-    let admin_role: String = sqlx::query_scalar(
-      "SELECT role FROM users WHERE username = 'admin'"
-    )
-    .fetch_one( &pool )
-    .await
-    .unwrap();
-    assert_eq!( admin_role, "admin", "Admin should have admin role" );
-
-    // Verify developer role
-    let dev_role: String = sqlx::query_scalar(
-      "SELECT role FROM users WHERE username = 'developer'"
-    )
-    .fetch_one( &pool )
-    .await
-    .unwrap();
-    assert_eq!( dev_role, "user", "Developer should have user role" );
-
-    // Verify inactive user
-    let viewer_active: i64 = sqlx::query_scalar(
-      "SELECT is_active FROM users WHERE username = 'viewer'"
-    )
-    .fetch_one( &pool )
-    .await
-    .unwrap();
-    assert_eq!( viewer_active, 0, "Viewer should be inactive" );
-  }
-}

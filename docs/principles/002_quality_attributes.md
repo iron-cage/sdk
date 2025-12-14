@@ -1,23 +1,47 @@
-# Quality Attributes
+# Principles: Quality Attributes
 
-**Purpose:** System-wide non-functional requirements and quality targets.
+### Scope
 
----
+This document defines system-wide non-functional requirements and quality targets across five key attributes: Performance, Reliability, Scalability, Security, and Usability. These quality attributes translate the design principles from Principles 001 into measurable targets and concrete constraints that guide all implementation choices.
 
-## User Need
+**In scope**:
+- Performance targets (latency, overhead, throughput) for pilot and production deployments
+- Reliability metrics (availability, durability, fail-safe behavior, error recovery)
+- Scalability dimensions (agents, requests, storage, tokens) with architectural approaches
+- Security principles (defense in depth, least privilege, input validation, encryption, audit)
+- Usability aspects (installation, configuration, API style, error messages, developer experience)
+- Pilot vs production trade-offs for each quality attribute
 
-Understand performance, reliability, scalability, security, and usability targets that constrain implementation.
+**Out of scope**:
+- Authoritative latency budget values (see Constraints 004: Trade-offs for complete latency reference)
+- Implementation-specific performance optimization techniques (see Architecture collection)
+- Security threat modeling and attack scenarios (see Security 001: Threat Model)
+- Detailed API specifications and endpoints (see Protocol collection)
+- Technology selection rationale for achieving quality targets (see Technology collection)
+- Testing strategies for validating quality attributes (see Principles 004: Testing Strategy)
 
-## Core Idea
+### Purpose
 
-**Five quality attributes define system constraints:**
+**User Need:** Understand performance, reliability, scalability, security, and usability targets that constrain implementation across the Iron Cage platform.
+
+**Solution:** Five quality attributes define system constraints:
 
 ```
 Performance + Reliability + Scalability + Security + Usability = System Quality
    <10ms        99.9%          10K agents      Defense      Pythonic API
 ```
 
-## Performance
+Each quality attribute translates abstract design principles (from Principles 001) into concrete, measurable targets. Performance defines latency and overhead budgets. Reliability establishes availability and fail-safe guarantees. Scalability sets capacity targets for agents, requests, and storage. Security implements defense-in-depth principles. Usability ensures developer-friendly interfaces and transparent operation.
+
+**Key Insight:** Quality attributes are not wish-list items - they are enforceable constraints with specific numeric targets. Pilot targets prioritize simplicity and demo-readiness (Simplicity First principle). Production targets prioritize scale and compliance (Fail-Safe Defaults principle). Every implementation choice must satisfy applicable quality targets or document the conscious trade-off.
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-13
+
+---
+
+### Performance
 
 | Metric | Pilot Target | Production Target | Rationale |
 |--------|--------------|-------------------|-----------|
@@ -29,7 +53,7 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 
 **See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) for complete latency budget and decision rationale.
 
-## Reliability
+### Reliability
 
 | Metric | Target | Implementation |
 |--------|--------|----------------|
@@ -38,7 +62,7 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 | **Fail-Safe** | 100% | Safety layer down = block all |
 | **Error Recovery** | Automatic | Retry logic, exponential backoff |
 
-## Scalability
+### Scalability
 
 | Dimension | Target | Architecture |
 |-----------|--------|--------------|
@@ -47,7 +71,7 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 | **Storage** | Millions of audit records | Database (partitioned tables), Object Storage (archives) |
 | **Tokens** | 10,000+ active tokens | Indexed lookups, Cache layer |
 
-## Security
+### Security
 
 | Principle | Implementation |
 |-----------|----------------|
@@ -57,7 +81,7 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 | **Encrypt Secrets** | IP Token encrypted in memory, never on disk |
 | **Audit Everything** | Immutable logs for compliance |
 
-## Usability
+### Usability
 
 | Aspect | Target | Example |
 |--------|--------|---------|
@@ -69,4 +93,33 @@ Performance + Reliability + Scalability + Security + Usability = System Quality
 
 ---
 
-*Related: [001_design_philosophy.md](001_design_philosophy.md) | [../architecture/002_layer_model.md](../architecture/002_layer_model.md)*
+### Cross-References
+
+#### Related Principles Documents
+
+- [001_design_philosophy.md](001_design_philosophy.md) - Seven core design principles that these quality attributes make measurable and enforceable
+- [003_error_handling_principles.md](003_error_handling_principles.md) - Error handling philosophy supporting Reliability quality attribute
+- [004_testing_strategy.md](004_testing_strategy.md) - Testing approach for validating quality attributes
+- [005_development_workflow.md](005_development_workflow.md) - Development workflow ensuring quality attribute compliance
+
+#### Used By
+
+- Architecture 002: [Layer Model](../architecture/002_layer_model.md) - References performance targets for each processing layer
+- Protocol: All API specifications reference usability and performance targets
+- Security: Security documents reference defense-in-depth and encryption requirements
+- Deployment: Scaling patterns reference scalability targets (10K agents, 1K RPS)
+- Capabilities: All capability specifications demonstrate quality attribute compliance
+
+#### Dependencies
+
+- **Authoritative Reference:** Constraints 004: [Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) - Provides authoritative latency budget values referenced in Performance section
+- Principles 001: [Design Philosophy](001_design_philosophy.md) - Foundational principles translated into measurable quality attributes
+- Architecture 002: [Layer Model](../architecture/002_layer_model.md) - Layer architecture implementing quality targets
+
+#### Implementation
+
+- Performance targets validated via observability metrics and load testing
+- Reliability metrics enforced via circuit breakers, fallback chains, and fail-safe defaults
+- Scalability targets validated via horizontal scaling tests and capacity planning
+- Security principles implemented via isolation layers (Security 002) and audit logging
+- Usability targets validated via developer feedback and API ergonomics review

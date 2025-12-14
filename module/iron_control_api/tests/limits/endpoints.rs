@@ -9,6 +9,21 @@
 //! | Zero value | tokens=0 | 400 Bad Request | "positive number" |
 //! | Negative value | tokens=-100 | 400 Bad Request | "positive number" |
 //! | Overflow | tokens=i64::MAX | 400 Bad Request | "too large" |
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_endpoint_valid_request_accepted` | Create limit with valid request | POST /api/limits with tokens=1000000 | 201 Created, LimitResponse returned | ✅ |
+//! | `test_endpoint_all_none_rejected` | Create limit with all None fields | POST /api/limits with all fields None | 422 Unprocessable Entity | ✅ |
+//! | `test_endpoint_zero_value_rejected` | Create limit with zero value | POST /api/limits with tokens=0 | 400 Bad Request "positive number" | ✅ |
+//! | `test_endpoint_negative_value_rejected` | Create limit with negative value | POST /api/limits with tokens=-100 | 400 Bad Request "positive number" | ✅ |
+//! | `test_endpoint_overflow_rejected` | Create limit with overflow value | POST /api/limits with tokens=i64::MAX | 400 Bad Request "too large" | ✅ |
+//! | `test_endpoint_valid_multiple_limits_accepted` | Create limit with multiple fields | POST /api/limits with multiple valid limits | 201 Created | ✅ |
+//! | `test_endpoint_mixed_valid_invalid_rejected` | Create limit with mixed valid/invalid | POST /api/limits with valid + invalid fields | 400 Bad Request | ✅ |
+//! | `test_update_limit_all_none_rejected` | Update limit with all None | PUT /api/limits/:id with all fields None | 422 Unprocessable Entity | ✅ |
+//! | `test_update_limit_negative_value_rejected` | Update limit with negative value | PUT /api/limits/:id with tokens=-100 | 400 Bad Request "positive number" | ✅ |
+//! | `test_update_limit_overflow_rejected` | Update limit with overflow value | PUT /api/limits/:id with tokens=i64::MAX | 400 Bad Request "too large" | ✅ |
 
 use crate::common::{ extract_response, extract_json_response };
 use iron_control_api::routes::limits::{ LimitsState, LimitResponse };
@@ -41,7 +56,7 @@ async fn test_endpoint_valid_request_accepted()
     "project_id": null,
     "max_tokens_per_day": 1000000,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -76,7 +91,7 @@ async fn test_endpoint_all_none_rejected()
     "project_id": null,
     "max_tokens_per_day": null,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -114,7 +129,7 @@ async fn test_endpoint_zero_value_rejected()
     "project_id": null,
     "max_tokens_per_day": 0,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -152,7 +167,7 @@ async fn test_endpoint_negative_value_rejected()
     "project_id": null,
     "max_tokens_per_day": -100,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -190,7 +205,7 @@ async fn test_endpoint_overflow_rejected()
     "project_id": null,
     "max_tokens_per_day": i64::MAX,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -228,7 +243,7 @@ async fn test_endpoint_valid_multiple_limits_accepted()
     "project_id": "project_abc",
     "max_tokens_per_day": 1000000,
     "max_requests_per_minute": 100,
-    "max_cost_per_month_cents": 50000,
+    "max_cost_per_month_microdollars": 50000,
   });
 
   let request = Request::builder()
@@ -250,7 +265,7 @@ async fn test_endpoint_valid_multiple_limits_accepted()
   assert_eq!( status, StatusCode::CREATED );
   assert_eq!( body.max_tokens_per_day, Some( 1000000 ) );
   assert_eq!( body.max_requests_per_minute, Some( 100 ) );
-  assert_eq!( body.max_cost_per_month_cents, Some( 50000 ) );
+  assert_eq!( body.max_cost_per_month_microdollars, Some( 50000 ) );
 }
 
 /// Test mixed valid/invalid rejected.
@@ -264,7 +279,7 @@ async fn test_endpoint_mixed_valid_invalid_rejected()
     "project_id": null,
     "max_tokens_per_day": 1000000,
     "max_requests_per_minute": 0,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -317,7 +332,7 @@ async fn test_update_limit_all_none_rejected()
   let request_body = json!({
     "max_tokens_per_day": null,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -353,7 +368,7 @@ async fn test_update_limit_negative_value_rejected()
   let request_body = json!({
     "max_tokens_per_day": -100,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -389,7 +404,7 @@ async fn test_update_limit_overflow_rejected()
   let request_body = json!({
     "max_tokens_per_day": i64::MAX,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()

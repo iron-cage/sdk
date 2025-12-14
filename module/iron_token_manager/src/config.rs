@@ -221,14 +221,14 @@ impl Config
 
     if !config_path.exists()
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
 
     let contents = std::fs::read_to_string( config_path )
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     let mut config: Config = toml::from_str( &contents )
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Apply environment variable overrides
     config.apply_env_overrides();
@@ -243,7 +243,7 @@ impl Config
   /// - `DATABASE_MAX_CONNECTIONS` → `database.max_connections`
   /// - `DATABASE_AUTO_MIGRATE` → `database.auto_migrate`
   /// - `DATABASE_FOREIGN_KEYS` → `database.foreign_keys`
-  fn apply_env_overrides( &mut self )
+  pub fn apply_env_overrides( &mut self )
   {
     if let Ok( url ) = std::env::var( "DATABASE_URL" )
     {
@@ -326,67 +326,5 @@ impl Config
         wipe_and_seed: false,
       } ),
     }
-  }
-}
-
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ test ]
-  fn test_default_dev_config()
-  {
-    let config = Config::default_dev();
-    assert_eq!( config.database.url, "sqlite:///./iron.db?mode=rwc" );
-    assert_eq!( config.database.max_connections, 5 );
-    assert!( config.database.auto_migrate );
-    assert!( config.database.foreign_keys );
-    assert!( config.development.is_some() );
-  }
-
-  #[ test ]
-  fn test_default_test_config()
-  {
-    let config = Config::default_test();
-    assert_eq!( config.database.url, "sqlite:///:memory:?mode=rwc" );
-    assert_eq!( config.database.max_connections, 5 );
-    assert!( config.database.auto_migrate );
-    assert!( config.test.is_some() );
-  }
-
-  #[ test ]
-  fn test_load_dev_config_file()
-  {
-    let config = Config::from_file( "config.dev.toml" );
-    assert!( config.is_ok(), "Should load dev config file" );
-
-    let config = config.unwrap();
-    assert!( config.database.url.contains( "iron.db" ) );
-    assert_eq!( config.database.max_connections, 5 );
-  }
-
-  #[ test ]
-  fn test_env_override()
-  {
-    std::env::set_var( "DATABASE_URL", "sqlite:///override.db?mode=rwc" );
-    std::env::set_var( "DATABASE_MAX_CONNECTIONS", "10" );
-
-    let mut config = Config::default_dev();
-    config.apply_env_overrides();
-
-    assert_eq!( config.database.url, "sqlite:///override.db?mode=rwc" );
-    assert_eq!( config.database.max_connections, 10 );
-
-    // Cleanup
-    std::env::remove_var( "DATABASE_URL" );
-    std::env::remove_var( "DATABASE_MAX_CONNECTIONS" );
-  }
-
-  #[ test ]
-  fn test_missing_config_file()
-  {
-    let config = Config::from_file( "nonexistent.toml" );
-    assert!( config.is_err(), "Should error on missing config file" );
   }
 }

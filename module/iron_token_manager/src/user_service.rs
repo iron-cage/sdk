@@ -148,7 +148,7 @@ impl UserService
   {
     // Hash password with BCrypt
     let password_hash = bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )
-      .map_err( |e| { error!( "Error hashing password: {}", e ); crate::error::TokenError } )?;
+      .map_err( |e| { error!( "Error hashing password: {}", e ); crate::error::TokenError::Generic } )?;
 
     let now_ms = current_time_ms();
 
@@ -169,7 +169,7 @@ impl UserService
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |e| { error!( "Error creating user: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error creating user: {}", e ); crate::error::TokenError::Generic } )?;
 
     let user_id = user_prefix;
 
@@ -242,13 +242,13 @@ impl UserService
     let total : i64 = sqlx::query_scalar( &count_query )
       .fetch_one( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Get users
     let rows = sqlx::raw_sql( &query )
       .fetch_all( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     let users = rows.iter().map( |row| User {
       id: row.get( "id" ),
@@ -292,7 +292,7 @@ impl UserService
     .bind( user_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( User {
       id: row.get( "id" ),
@@ -339,7 +339,7 @@ impl UserService
     // Check if already suspended
     if !user.is_active
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
 
     // Suspend user
@@ -351,7 +351,7 @@ impl UserService
     .bind( user_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Audit log
     self.log_audit(
@@ -391,7 +391,7 @@ impl UserService
     // Check if already active
     if user.is_active
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
 
     // Activate user
@@ -401,7 +401,7 @@ impl UserService
     .bind( user_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Audit log
     self.log_audit(
@@ -438,7 +438,7 @@ impl UserService
     // Prevent deleting self
     if user_id == admin_id
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
 
     let now_ms = current_time_ms();
@@ -452,7 +452,7 @@ impl UserService
     .bind( user_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Audit log
     self.log_audit(
@@ -490,7 +490,7 @@ impl UserService
     // Prevent changing own role
     if user_id == admin_id
     {
-      return Err( crate::error::TokenError );
+      return Err( crate::error::TokenError::Generic );
     }
 
     // Get current user state
@@ -503,7 +503,7 @@ impl UserService
       .bind( user_id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Audit log
     self.log_audit(
@@ -547,7 +547,7 @@ impl UserService
   {
     // Hash new password
     let password_hash = bcrypt::hash( &new_password, bcrypt::DEFAULT_COST )
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     let force_change_val = i32::from( force_change );
 
@@ -560,7 +560,7 @@ impl UserService
     .bind( user_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     // Audit log
     self.log_audit(
@@ -617,7 +617,7 @@ impl UserService
     .bind( reason )
     .execute( &self.pool )
     .await
-    .map_err( |e| { error!( "Error logging audit: {}", e ); crate::error::TokenError } )?;
+    .map_err( |e| { error!( "Error logging audit: {}", e ); crate::error::TokenError::Generic } )?;
 
     Ok( () )
   }
@@ -638,6 +638,6 @@ fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_millis() as i64
 }

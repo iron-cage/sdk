@@ -4,10 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-
-[[bin]]
-name = "iron_control_api_server"
-path = "src/bin/iron_control_api_server.rs"
+description = "HTTP API for Iron Cage control plane"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["api", "rest", "control-plane", "agent-management"]
+categories = ["web-programming::http-server"]
 
 [features]
 default = ["enabled"]
@@ -43,9 +44,9 @@ full = ["enabled"]
 [dependencies]
 # Iron Cage crates
 iron_types = { workspace = true, features = ["full"], optional = true }
-iron_runtime_state = { workspace = true, features = ["full"], optional = true }
-iron_token_manager = { workspace = true, features = ["full"], optional = true }
-iron_secrets = { workspace = true, features = ["full"], optional = true }
+iron_runtime_state = { workspace = true, features = ["enabled", "sqlite"], optional = true }
+iron_token_manager = { workspace = true, optional = true }
+iron_secrets = { workspace = true, optional = true }
 
 # Web framework
 axum = { workspace = true, features = ["ws"], optional = true }
@@ -97,8 +98,17 @@ base64 = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["v4"], optional = true }
 hex = { version = "0.4", optional = true }
 
+[build-dependencies]
+vergen = { version = "8.0", features = ["build", "git", "gitcl"] }
+
 [dev-dependencies]
+iron_token_manager = { path = "../iron_token_manager" }
+iron_test_db = { path = "../iron_test_db", features = ["enabled"] }
 tokio = { workspace = true, features = ["full"] }
 hyper = { workspace = true }
 http-body-util = { workspace = true }
 sha2 = { workspace = true }
+
+[[bin]]
+name = "iron_control_api_server"
+path = "src/bin/iron_control_api_server.rs"

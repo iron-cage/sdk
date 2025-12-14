@@ -54,54 +54,124 @@ iron_control_api = { version = "0.1", features = ["enabled"] }
 
 ## API Endpoints
 
-**Token Management (FR-7):**
-- `POST /v1/tokens` - Create new API token
-- `POST /v1/tokens/:id/rotate` - Rotate token secret
-- `POST /v1/tokens/:id/revoke` - Revoke token
-- `GET /v1/tokens` - List all tokens
-- `GET /v1/tokens/:id` - Get token details
+**Health Check:**
+- `GET /api/health` - Server health status
+
+**Authentication (Protocol 014):**
+- `POST /api/v1/auth/login` - User authentication
+- `POST /api/v1/auth/refresh` - Refresh JWT token
+- `POST /api/v1/auth/logout` - User logout
+- `POST /api/v1/auth/validate` - Validate JWT token
+
+**User Management:**
+- `POST /api/v1/users` - Create user
+- `GET /api/v1/users` - List users
+- `GET /api/v1/users/:id` - Get user details
+- `DELETE /api/v1/users/:id` - Delete user
+- `PUT /api/v1/users/:id/suspend` - Suspend user
+- `PUT /api/v1/users/:id/activate` - Activate user
+- `PUT /api/v1/users/:id/role` - Change user role
+- `POST /api/v1/users/:id/reset-password` - Reset password
+
+**API Token Management (Protocol 014):**
+- `POST /api/v1/api-tokens` - Create new API token
+- `POST /api/v1/api-tokens/validate` - Validate API token (public endpoint)
+- `GET /api/v1/api-tokens` - List all tokens (requires auth)
+- `GET /api/v1/api-tokens/:id` - Get token details
+- `POST /api/v1/api-tokens/:id/rotate` - Rotate token secret
+- `DELETE /api/v1/api-tokens/:id` - Revoke token
+- `PUT /api/v1/api-tokens/:id` - Update token metadata
+
+**Agent Management (Protocol 010):**
+- `POST /api/v1/agents` - Create agent
+- `GET /api/v1/agents` - List agents
+- `GET /api/v1/agents/:id` - Get agent details
+- `PUT /api/v1/agents/:id` - Update agent
+- `DELETE /api/v1/agents/:id` - Delete agent
+- `GET /api/v1/agents/:id/tokens` - Get agent tokens
+
+**Provider Key Management:**
+- `POST /api/v1/providers` - Create provider key
+- `GET /api/v1/providers` - List provider keys
+- `GET /api/v1/providers/:id` - Get provider key
+- `PUT /api/v1/providers/:id` - Update provider key
+- `DELETE /api/v1/providers/:id` - Delete provider key
+- `POST /api/v1/projects/:project_id/provider` - Assign provider to project
+- `DELETE /api/v1/projects/:project_id/provider` - Unassign provider from project
+
+**Key Fetch (API Token Auth):**
+- `GET /api/v1/keys` - Fetch provider key by API token
 
 **Usage Analytics (FR-8):**
-- `GET /v1/usage/aggregate` - Get aggregate usage metrics
-- `GET /v1/usage/by-project/:id` - Get usage by project
-- `GET /v1/usage/by-provider/:name` - Get usage by provider
+- `GET /api/v1/usage/aggregate` - Get aggregate usage metrics
+- `GET /api/v1/usage/by-project/:project_id` - Get usage by project
+- `GET /api/v1/usage/by-provider/:provider` - Get usage by provider
 
 **Budget Limits (FR-9):**
-- `POST /v1/limits` - Create budget limit
-- `GET /v1/limits` - List all limits
-- `GET /v1/limits/:id` - Get limit details
-- `PUT /v1/limits/:id` - Update limit
-- `DELETE /v1/limits/:id` - Delete limit
+- `POST /api/v1/limits` - Create budget limit
+- `GET /api/v1/limits` - List all limits
+- `GET /api/v1/limits/:id` - Get limit details
+- `PUT /api/v1/limits/:id` - Update limit
+- `DELETE /api/v1/limits/:id` - Delete limit
 
 **Request Traces (FR-10):**
-- `GET /v1/traces` - List request traces
-- `GET /v1/traces/:id` - Get trace details
+- `GET /api/v1/traces` - List request traces
+- `GET /api/v1/traces/:id` - Get trace details
+
+**Budget Control (Protocol 005 & 012):**
+- `POST /api/v1/budget/handshake` - Agent budget handshake
+- `POST /api/v1/budget/report` - Report usage
+- `POST /api/v1/budget/refresh` - Refresh budget
+- `POST /api/v1/budget/requests` - Create budget request
+- `GET /api/v1/budget/requests` - List budget requests
+- `GET /api/v1/budget/requests/:id` - Get budget request
+- `PATCH /api/v1/budget/requests/:id/approve` - Approve request
+- `PATCH /api/v1/budget/requests/:id/reject` - Reject request
+
+**Analytics (Protocol 012):**
+- `POST /api/v1/analytics/events` - Post analytics event
+- `GET /api/v1/analytics/spending/total` - Total spending
+- `GET /api/v1/analytics/spending/by-agent` - Spending by agent
+- `GET /api/v1/analytics/spending/by-provider` - Spending by provider
+- `GET /api/v1/analytics/spending/avg-per-request` - Average spending
+- `GET /api/v1/analytics/budget/status` - Budget status
+- `GET /api/v1/analytics/usage/requests` - Usage requests
+- `GET /api/v1/analytics/usage/tokens/by-agent` - Token usage by agent
+- `GET /api/v1/analytics/usage/models` - Model usage
 
 ## Example
 
 ```rust
 use iron_control_api::routes;
-use axum::Router;
+use axum::{Router, routing::{get, post}};
 
-// Create API router with all endpoints
+// Create API router with endpoints
 let app = Router::new()
-  .nest("/v1/tokens", routes::tokens::router())
-  .nest("/v1/usage", routes::usage::router())
-  .nest("/v1/limits", routes::limits::router())
-  .nest("/v1/traces", routes::traces::router());
+  // Token management
+  .route( "/api/v1/api-tokens", post( routes::tokens::create_token ) )
+  .route( "/api/v1/api-tokens/validate", post( routes::tokens::validate_token ) )
+  .route( "/api/v1/api-tokens", get( routes::tokens::list_tokens ) )
+  // Agent management
+  .route( "/api/v1/agents", post( routes::agents::create_agent ) )
+  .route( "/api/v1/agents", get( routes::agents::list_agents ) )
+  // Analytics
+  .route( "/api/v1/analytics/spending/total", get( routes::analytics::get_spending_total ) )
+  // Health check
+  .route( "/api/health", get( routes::health::health_check ) );
 
 // Start server
-let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
 axum::serve(listener, app).await?;
 ```
 
 ## Testing
 
-**Test Coverage:** 353 tests (100% pass rate)
-- Unit tests: Token validation, usage calculations, limit enforcement
-- Integration tests: Full API contract validation across all endpoints
+**Test Coverage:** 379 tests (100% pass rate)
+- Unit tests: Token validation, usage calculations, limit enforcement, agent management
+- Integration tests: Full API contract validation across all endpoints (tokens, agents, analytics, auth, users)
 - Corner case tests: DoS protection, NULL byte injection, concurrency, malformed JSON
 - Security tests: SQL injection, XSS, command injection, path traversal
+- Protocol tests: Protocol 005 budget control (26 tests), Protocol 010 agents (39 tests), Protocol 012 analytics (30 tests), Protocol 014 tokens (111 tests)
 
 **Run tests:**
 ```bash
@@ -136,12 +206,22 @@ w3 .test l::3
 
 ## Status
 
-**Version:** 0.4 (2025-12-07)
-**Implementation:** ✅ COMPLETE (FR-7/8/9/10 + Phases 1-5 Security Fixes and Corner Case Coverage)
-**Test Coverage:** 353 tests (+152 from baseline 201, +76% increase)
-**Verification:** All 11 fixes complete (3 Phase 1 issues + 8 implementation bugs), 0 clippy warnings, 0 regressions
+**Version:** 0.5 (2025-12-12)
+**Implementation:** ✅ COMPLETE (Protocol 014 Tokens + Protocol 010 Agents + Protocol 012 Analytics + Phases 1-5 QA)
+**Test Coverage:** 379 tests (100% pass rate, 0 clippy warnings, 0 regressions)
+  - Protocol 014 (API Tokens): 111 tests including validate endpoint
+  - Protocol 010 (Agents): 39 tests (Phase 2 complete)
+  - Protocol 012 (Analytics): 30 tests (Phase 4 complete)
+  - Protocol 005 (Budget): 26 tests
+  - Security & corner cases: 173 tests
+**Verification:** All critical deliverables complete, Phase 1-4 at 100%, Phase 5 QA ongoing
 
-**Next Steps:** Post-pilot (API authentication, rate limiting, distributed deployment, telemetry ingestion)
+**Completed Phases:**
+- Phase 1: Protocol 014 API Tokens (10/11 deliverables, 91% - CLI stub remaining)
+- Phase 2: Protocol 010 Agents API Foundation (100% complete)
+- Phase 4: Protocol 012 Analytics API (100% complete)
+
+**Next Steps:** Complete Phase 3 enhancements (templates, batch ops, search/filtering), Phase 5 QA completion (performance testing, documentation)
 
 ## Docker Deployment
 
@@ -234,3 +314,26 @@ The Dockerfile uses multi-stage builds for security and efficiency:
 - [Docker Compose Architecture](../../docs/deployment/006_docker_compose_deployment.md) - Design details
 - [Getting Started Guide](../../docs/getting_started.md) § Deploy Control Panel - Quickstart
 - [Deployment Guide](../../docs/deployment_guide.md) - Production procedures
+
+## Directory Structure
+
+### Source Files
+
+| File | Responsibility |
+|------|----------------|
+| lib.rs | REST API and WebSocket server for Iron Runtime dashboard. |
+| error.rs | Custom error types and JSON error responses for API |
+| ic_token.rs | ic token claims implementation |
+| ip_token.rs | IP Token (Iron Provider Token) encryption |
+| jwt_auth.rs | JWT authentication middleware |
+| rbac.rs | RBAC (Role-Based Access Control) module |
+| token_auth.rs | API Token authentication middleware |
+| user_auth.rs | User authentication and password verification |
+| bin/ | REST API server binary for Iron Control API |
+| middleware/ | Middleware modules for Iron Control API |
+| routes/ | REST API route handlers |
+
+**Notes:**
+- Entries marked 'TBD' require manual documentation
+- Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+

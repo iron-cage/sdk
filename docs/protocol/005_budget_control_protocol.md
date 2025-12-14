@@ -1,4 +1,25 @@
-# Protocol 005: Budget Control Protocol
+# Protocol: Budget Control Protocol
+
+### Scope
+
+This protocol defines how Iron Runtime and Control Panel communicate to enforce budget limits without exposing provider API keys. It implements a two-token system (IC Token for authentication, IP Token for provider access) with budget borrowing via a tranche model, enabling secure budget-controlled LLM access.
+
+**In scope**:
+- Token handshake and budget initialization
+- Budget borrowing lifecycle (borrow → spend → refresh → return)
+- Usage reporting and cost tracking
+- IP Token encryption format (AES-256-GCM)
+- Security model and threat mitigation
+- Multi-layer enforcement strategy (database, token distinguishability, API)
+- Implementation variants (pilot per-request vs production batched reporting)
+- Failure handling and retry logic
+
+**Out of scope**:
+- Admin budget allocation UI (see Control Panel user guide)
+- Provider pricing rate calculations (see billing documentation)
+- LLM request routing and model selection (see Runtime architecture docs)
+- Agent creation and lifecycle (see Protocol 010: Agents API)
+- User authentication (see Protocol 007: Authentication API)
 
 **Status:** Specification
 **Version:** 1.0.0
@@ -9,17 +30,11 @@
 
 ### Purpose
 
-Define how runtime and Control Panel communicate to enforce budget limits without exposing provider tokens.
-
----
-
-## User Need
-
 Developers need budget-controlled LLM access without handling provider API keys directly. Admins need centralized budget control and real-time monitoring.
 
-## Core Idea
+This protocol implements a two-token system with budget borrowing (tranche model):
 
-**Two-token system with budget borrowing:**
+**Two-token architecture:**
 
 ```
 Admin (Control Panel)          Developer (Runtime)
@@ -28,22 +43,30 @@ Admin (Control Panel)          Developer (Runtime)
 | Stores IP Token  |           | (visible)        |
 +--------+---------+           +--------+---------+
          |                              |
-         | 1. Token Handshake           |
+         | 1. Handshake (borrow tranche)|
          |<-------- IC Token -----------+
          |                              |
-         +-------- IP Token + $10 ----->|
+         +---- IP Token + $10 tranche ->|
          |        (encrypted)           |
          |                              |
          | 2. LLM Requests              |
-         |<--- Usage: 500 tok, $0.01 ---+
+         |<--- Usage: $0.01, report --->|
+         |     (returns updated limit)  |
          |                              |
-         | 3. Budget Refresh (at $9)    |
+         | 3. Refresh (at $1 remaining) |
          |<-------- Need more ----------+
-         |                              |
          +--------- + $10 more --------->|
+         |                              |
+         | 4. Return (on shutdown)      |
+         |<--- Return $3 unused --------+
+         |     (credit back to budget)  |
 ```
 
-## Standards Compliance
+**Dashboard as Bank:** Agent borrows tranches, spends locally, returns unused on shutdown.
+
+**Key insight:** Developer NEVER sees provider credentials. Runtime acts as secure proxy.
+
+### Standards Compliance
 
 This protocol adheres to the following Iron Cage standards:
 
@@ -63,7 +86,7 @@ This protocol adheres to the following Iron Cage standards:
 - Machine-readable error codes: `BUDGET_EXCEEDED`, `INVALID_TOKEN`, `HANDSHAKE_FAILED`
 - Consistent JSON structure with `error.code` and `error.message` fields
 
-## When This Protocol Applies
+### When This Protocol Applies
 
 **Universal Application:** This protocol is used in ALL deployment scenarios. Control Panel is always present as standalone admin service managing developer budgets. There is no "self-managed" mode without Control Panel.
 
@@ -78,7 +101,14 @@ This protocol adheres to the following Iron Cage standards:
 - Production: Control Panel manages distributed agents
 - Future: Local emulation service may implement same protocol
 
-## IC Token 1:1 Relationship
+### The Two Tokens
+
+**Token Architecture:**
+
+| Token | Visible To | Stored | Purpose |
+|-------|-----------|--------|---------|
+| **IC Token** | Developer | Plaintext on disk | Budget ID, authentication with Control Panel, 1:1 with agent |
+| **IP Token** | Runtime only | Encrypted in memory | Actual LLM provider API key |
 
 **Critical Design:** One Agent = One IC Token (strict 1:1 relationship)
 
@@ -88,7 +118,7 @@ This protocol adheres to the following Iron Cage standards:
 - Agent has exactly one Agent Budget (1:1, restrictive)
 - Agent can have multiple IPs (developer selects which to use)
 
-## Budget Types
+**Budget Types:**
 
 **Restrictive Budget (ONLY ONE):**
 - **Agent Budget:** Blocks requests when exceeded. This is the ONLY budget that enforces limits.
@@ -100,14 +130,32 @@ This protocol adheres to the following Iron Cage standards:
 
 **Key Point:** Agents are the ONLY way to control budget. Project/IP/Master budgets are for monitoring only.
 
-## The Two Tokens
+### Version Compatibility
 
-| Token | Visible To | Stored | Purpose |
-|-------|-----------|--------|---------|
-| **IC Token** | Developer | Plaintext on disk | Budget ID, authentication with Control Panel, 1:1 with agent |
-| **IP Token** | Runtime only | Encrypted in memory | Actual LLM provider API key |
+**Current Version:** 1.0.0
 
-**Key insight:** Developer NEVER sees provider credentials. Runtime acts as secure proxy.
+**Backward Compatibility Policy:**
+- Minor version changes (1.0 → 1.1): Backward compatible, runtime continues working
+- Major version changes (1.x → 2.0): Breaking changes, runtime upgrade required
+- Protocol version negotiated during handshake (`runtime_version` field)
+
+**Runtime Version Requirements:**
+- Runtime must send `runtime_version` in `INIT_BUDGET_REQUEST`
+- Control Panel validates compatibility and returns error if unsupported
+- Error response: `{"error": "incompatible_version", "required": "1.x", "provided": "0.9.0"}`
+
+**Migration Path (Future Major Versions):**
+1. Control Panel announces deprecation timeline (minimum 90 days)
+2. Control Panel supports both versions during transition period
+3. Runtime detects version mismatch and displays upgrade instructions
+4. Developers update runtime to compatible version
+
+**Version Change Log:**
+- **1.0.0** (2025-12-10): Initial protocol specification
+  - Two-token system (IC Token + IP Token)
+  - Budget borrowing with tranche model
+  - AES-256-GCM encryption for IP Tokens
+  - Multi-layer enforcement strategy
 
 ### IC Token Format (JWT Structure)
 
@@ -146,7 +194,7 @@ This protocol adheres to the following Iron Cage standards:
 
 **Lifetime:** Until agent deleted or IC Token regenerated (long-lived, no auto-expiration)
 
-## Budget Borrowing Protocol
+### Budget Borrowing Protocol
 
 ### Step 1: Initialization (Token Handshake)
 
@@ -292,15 +340,32 @@ Content-Type: application/json
 | `provider` | string | YES | Provider used | For audit trail |
 | `timestamp` | number | YES | Unix timestamp | When request completed |
 
-**Response:** 200 OK (acknowledgment, no body)
+**Response Schema:**
+```json
+{
+  "success": true,
+  "budget_limit_usd": 100.00,
+  "budget_remaining_usd": 89.95,
+  "lease_spent_usd": 0.0457
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Report accepted |
+| `budget_limit_usd` | number | Current agent budget limit (may change via dashboard) |
+| `budget_remaining_usd` | number | Remaining in agent budget (total - all leases spent) |
+| `lease_spent_usd` | number | Total spent in current lease |
+
+**Runtime Behavior:**
+- Update local CostController with `budget_limit_usd` (syncs dashboard changes)
+- Track spending locally
 
 **Performance:**
 - Async send: 0ms perceived latency (doesn't block agent)
 - Actual network: ~5-20ms (happens in background)
-
-**Runtime Updates Local Budget:**
-- Spent: $0.0457
-- Remaining: $10.00 - $0.0457 = $9.9543
 
 ### Step 3: Budget Refresh
 
@@ -379,7 +444,71 @@ Content-Type: application/json
 - If approved: Add $10 to local budget, continue processing
 - If denied: Stop accepting new LLM calls, return Error::BudgetExhausted to agent
 
-## Budget Overshoot Prevention
+### Step 4: Budget Return (Tranche Return)
+
+**Trigger:** Runtime shutdown or agent stop
+
+**Message 6: BUDGET_RETURN_REQUEST**
+
+**Direction:** Runtime → Control Panel
+
+**HTTP Request:**
+```http
+POST /api/v1/budget/return
+Content-Type: application/json
+```
+
+**Request Schema:**
+```json
+{
+  "lease_id": "lease_001",
+  "final_spent_usd": 7.00,
+  "returning_usd": 3.00
+}
+```
+
+**Field Specifications:**
+
+| Field | Type | Required | Description | Purpose |
+|-------|------|----------|-------------|---------|
+| `lease_id` | string | YES | Current lease ID | Identify lease to close |
+| `final_spent_usd` | number | YES | Total spent in lease | Final reconciliation |
+| `returning_usd` | number | YES | Unused budget to return | Credit back to agent budget |
+
+**Message 7: BUDGET_RETURN_RESPONSE**
+
+**Direction:** Control Panel → Runtime
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "returned_usd": 3.00,
+  "agent_budget_remaining_usd": 93.00,
+  "lease_status": "closed"
+}
+```
+
+**Field Specifications:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Return processed successfully |
+| `returned_usd` | number | Amount credited back to agent budget |
+| `agent_budget_remaining_usd` | number | Agent's available budget after return |
+| `lease_status` | string | "closed" - lease is now terminated |
+
+**Control Panel Behavior:**
+1. Validate lease exists and is active
+2. Credit `returning_usd` to agent budget (available += returning)
+3. Update lease: `returned_amount = returning_usd`, `status = closed`, `closed_at = now()`
+4. Return confirmation
+
+**Runtime Behavior:**
+- Call on graceful shutdown
+- Best effort on crash (may lose unused budget)
+
+#### Budget Overshoot Prevention
 
 **Local check (fast):**
 ```
@@ -393,7 +522,7 @@ if local_budget_remaining < estimated_cost:
 - Refresh denied if allocation exceeded
 - Admin can increase allocation in real-time
 
-## Security Model
+### Security Model
 
 **IP Token protection:**
 - Encrypted with AES-256 in runtime memory
@@ -407,7 +536,7 @@ if local_budget_remaining < estimated_cost:
 - Memory dump attack: IP Token encrypted, key unavailable outside process
 - Disk forensics: No IP Token on disk
 
-## Protocol Exclusivity: Enforcement Strategy
+### Protocol Exclusivity: Enforcement Strategy
 
 **Critical Requirement:** Protocol 005 must be the ONLY way for agents to access LLM provider credentials. Any bypass path violates the budget control guarantee.
 
@@ -535,7 +664,7 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 **Pitfall:** Always verify exclusive access patterns with database constraints AND API-level checks. Database constraints alone are insufficient if the API allows unauthorized paths. Both layers must enforce the same invariant.
 
-## Implementation Variants
+### Implementation Variants
 
 ### Pilot Implementation (Per-Request Reporting)
 
@@ -582,7 +711,9 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 **See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#cost-vs-reliability) for decision rationale.
 
-## Failure Handling
+---
+
+### Failure Handling
 
 | Scenario | Behavior |
 |----------|----------|
@@ -591,6 +722,24 @@ cargo test --test protocol_005_enforcement_simple --all-features
 | IP Token decrypt fails | Fatal error, runtime shutdown |
 | Usage report fails | Retry 3x, then cache locally |
 
----
+### Cross-References
 
-*Related: [003_service_boundaries.md](../architecture/003_service_boundaries.md) | [002_layer_model.md](../architecture/002_layer_model.md)*
+**Dependencies**:
+- Format: Token exchange format (encryption, serialization)
+- Architecture: [002_layer_model.md](../architecture/002_layer_model.md) - Layer responsibilities
+- Architecture: [003_service_boundaries.md](../architecture/003_service_boundaries.md) - Service boundaries
+
+**Used By**:
+- Iron Runtime Client - Implements budget control protocol
+- Iron Control API - Serves budget control endpoints
+
+**Related**:
+- State Machine 001: [Budget Lease Lifecycle](../state_machine/001_budget_lease_lifecycle.md) - Client-side lease lifecycle states and transitions
+
+**Implementation**:
+- Source: `module/iron_control_api/src/routes/budget.rs` - Budget control endpoints
+- Source: `module/iron_token_manager/src/lease_manager.rs` - Lease lifecycle management
+- Tests: `module/iron_control_api/tests/budget_*.rs` - Budget control protocol tests
+
+**Specification**:
+- Requirement: `module/iron_control_api/spec.md` § Budget Control - Protocol requirements

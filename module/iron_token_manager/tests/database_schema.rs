@@ -60,7 +60,9 @@ use common::create_test_db;
 #[ tokio::test ]
 async fn test_schema_creates_all_tables()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Verify all 5 tables exist
   let table_count : i64 = sqlx::query_scalar(
@@ -69,7 +71,7 @@ async fn test_schema_creates_all_tables()
   )
   .fetch_one( &pool )
   .await
-  .expect( "Failed to count tables" );
+  .expect("LOUD FAILURE: Failed to count tables");
 
   assert_eq!( table_count, 5, "Expected 5 tables to be created" );
 }
@@ -77,7 +79,9 @@ async fn test_schema_creates_all_tables()
 #[ tokio::test ]
 async fn test_api_tokens_table_structure()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert test token
   let result = sqlx::query(
@@ -99,15 +103,17 @@ async fn test_api_tokens_table_structure()
   let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM api_tokens" )
     .fetch_one( &pool )
     .await
-    .expect( "Failed to count tokens" );
+    .expect("LOUD FAILURE: Failed to count tokens");
 
-  assert_eq!( count, 1 );
+  assert_eq!( count, 1, "Exactly one token should be inserted" );
 }
 
 #[ tokio::test ]
 async fn test_token_hash_uniqueness_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert first token
   sqlx::query(
@@ -118,7 +124,7 @@ async fn test_token_hash_uniqueness_constraint()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "First insert should succeed" );
+  .expect("LOUD FAILURE: First insert should succeed");
 
   // Attempt to insert duplicate hash (should fail)
   let result = sqlx::query(
@@ -136,7 +142,9 @@ async fn test_token_hash_uniqueness_constraint()
 #[ tokio::test ]
 async fn test_token_usage_foreign_key_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert token first
   sqlx::query(
@@ -148,7 +156,7 @@ async fn test_token_usage_foreign_key_constraint()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "Token insert should succeed" );
+  .expect("LOUD FAILURE: Token insert should succeed");
 
   // Insert usage record (should succeed)
   let result = sqlx::query(
@@ -184,7 +192,9 @@ async fn test_token_usage_foreign_key_constraint()
 #[ tokio::test ]
 async fn test_cascade_delete_removes_usage_records()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert token
   sqlx::query(
@@ -196,7 +206,7 @@ async fn test_cascade_delete_removes_usage_records()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "Token insert failed" );
+  .expect("LOUD FAILURE: Token insert failed");
 
   // Insert usage record
   sqlx::query(
@@ -210,33 +220,35 @@ async fn test_cascade_delete_removes_usage_records()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "Usage insert failed" );
+  .expect("LOUD FAILURE: Usage insert failed");
 
   // Verify usage record exists
   let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM token_usage WHERE token_id = 1" )
     .fetch_one( &pool )
     .await
-    .expect( "Count query failed" );
-  assert_eq!( count, 1 );
+    .expect("LOUD FAILURE: Count query failed");
+  assert_eq!( count, 1, "Exactly one usage record should exist for the token" );
 
   // Delete token (should cascade to usage)
   sqlx::query( "DELETE FROM api_tokens WHERE id = 1" )
     .execute( &pool )
     .await
-    .expect( "Token delete failed" );
+    .expect("LOUD FAILURE: Token delete failed");
 
   // Verify usage record was cascade-deleted
   let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM token_usage WHERE token_id = 1" )
     .fetch_one( &pool )
     .await
-    .expect( "Count query failed" );
+    .expect("LOUD FAILURE: Count query failed");
   assert_eq!( count, 0, "Usage record should be cascade-deleted" );
 }
 
 #[ tokio::test ]
 async fn test_usage_limits_unique_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert first limit
   sqlx::query(
@@ -250,7 +262,7 @@ async fn test_usage_limits_unique_constraint()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "First limit insert should succeed" );
+  .expect("LOUD FAILURE: First limit insert should succeed");
 
   // Attempt duplicate (same user_id + project_id)
   let result = sqlx::query(
@@ -271,7 +283,9 @@ async fn test_usage_limits_unique_constraint()
 #[ tokio::test ]
 async fn test_api_tokens_user_fk_constraint()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert a user first
   sqlx::query(
@@ -287,7 +301,7 @@ async fn test_api_tokens_user_fk_constraint()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "User insert should succeed" );
+  .expect("LOUD FAILURE: User insert should succeed");
 
   // Insert token with valid user_id (should succeed)
   let result = sqlx::query(
@@ -317,7 +331,9 @@ async fn test_api_tokens_user_fk_constraint()
 #[ tokio::test ]
 async fn test_api_tokens_cascade_delete_on_user_deletion()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Insert user
   sqlx::query(
@@ -333,7 +349,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "User insert failed" );
+  .expect("LOUD FAILURE: User insert failed");
 
   // Insert tokens for this user
   sqlx::query(
@@ -344,7 +360,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "Token insert 1 failed" );
+  .expect("LOUD FAILURE: Token insert 1 failed");
 
   sqlx::query(
     "INSERT INTO api_tokens (token_hash, user_id, created_at) VALUES ($1, $2, $3)"
@@ -354,36 +370,38 @@ async fn test_api_tokens_cascade_delete_on_user_deletion()
   .bind( 1_733_270_400_000_i64 )
   .execute( &pool )
   .await
-  .expect( "Token insert 2 failed" );
+  .expect("LOUD FAILURE: Token insert 2 failed");
 
   // Verify tokens exist
   let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM api_tokens WHERE user_id = $1" )
     .bind( "user_cascade" )
     .fetch_one( &pool )
     .await
-    .expect( "Count query failed" );
-  assert_eq!( count, 2 );
+    .expect("LOUD FAILURE: Count query failed");
+  assert_eq!( count, 2, "Both tokens should exist for the user" );
 
   // Delete user (should cascade to tokens)
   sqlx::query( "DELETE FROM users WHERE id = $1" )
     .bind( "user_cascade" )
     .execute( &pool )
     .await
-    .expect( "User delete failed" );
+    .expect("LOUD FAILURE: User delete failed");
 
   // Verify tokens were cascade-deleted
   let count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM api_tokens WHERE user_id = $1" )
     .bind( "user_cascade" )
     .fetch_one( &pool )
     .await
-    .expect( "Count query failed" );
+    .expect("LOUD FAILURE: Count query failed");
   assert_eq!( count, 0, "Tokens should be cascade-deleted when user is deleted" );
 }
 
 #[ tokio::test ]
 async fn test_all_indexes_created()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Count indexes (excluding sqlite internal indexes)
   let index_count : i64 = sqlx::query_scalar(
@@ -391,7 +409,7 @@ async fn test_all_indexes_created()
   )
   .fetch_one( &pool )
   .await
-  .expect( "Failed to count indexes" );
+  .expect("LOUD FAILURE: Failed to count indexes");
 
   // Expected: All migrations create 40 indexes total
   // Migration 001: 15 indexes (api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
@@ -406,6 +424,7 @@ async fn test_all_indexes_created()
   // Migration 012: 1 index (budget_modification_history)
   // Migration 013: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
   // Migration 014: 1 index (idx_agents_owner_id for agents.owner_id)
-  // Total: 15 + 2 + 4 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 1 = 39... but actual is 40 (recounted from DB)
-  assert_eq!( index_count, 40, "Expected 40 indexes to be created across all migrations" );
+  // Migration 018: 1 index (converted budget tables)
+  // Total: 15 + 2 + 4 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 1 + 1 = 41
+  assert_eq!( index_count, 41, "Expected 41 indexes to be created across all migrations" );
 }

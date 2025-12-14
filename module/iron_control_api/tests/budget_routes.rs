@@ -4,6 +4,23 @@
 //!
 //! Tests for budget handshake, usage reporting, and budget refresh endpoints.
 //! These tests validate request validation, IC Token verification, and response formatting.
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_handshake_request_validation` | HandshakeRequest validation | Valid/empty/oversized ic_token and provider fields | Valid passes, empty/oversized fail | ✅ |
+//! | `test_usage_report_request_validation` | UsageReportRequest validation | Valid/empty/negative/oversized fields | Valid passes, invalid fail | ✅ |
+//! | `test_budget_refresh_request_validation` | BudgetRefreshRequest validation | Valid/empty/negative/oversized fields | Valid passes, invalid fail | ✅ |
+//! | `test_ic_token_lifecycle` | IC Token generation and validation | Generate IC Token, validate claims | Token valid, claims match input | ✅ |
+//! | `test_ip_token_encryption` | IP Token encryption/decryption | Encrypt lease data, decrypt IP Token | Data round-trips correctly | ✅ |
+//! | `test_ip_token_format_validation` | IP Token format validation | Valid/invalid IP Token formats | Valid passes, malformed fails | ✅ |
+//! | `test_ic_token_expiration` | IC Token expiration handling | Create expired IC Token, validate | Validation fails for expired token | ✅ |
+//! | `test_ic_token_agent_id_format` | IC Token agent_id format validation | Valid/invalid agent_id in claims | Valid passes, invalid fails | ✅ |
+//! | `test_budget_state_creation` | BudgetState initialization | Create BudgetState with all components | State created successfully | ✅ |
+//! | `test_handshake_response_serialization` | HandshakeResponse JSON serialization | Serialize HandshakeResponse to JSON | Valid JSON with required fields | ✅ |
+//! | `test_usage_report_response_serialization` | UsageReportResponse JSON serialization | Serialize UsageReportResponse to JSON | Valid JSON with required fields | ✅ |
+//! | `test_budget_refresh_response_serialization` | BudgetRefreshResponse JSON serialization | Serialize BudgetRefreshResponse to JSON | Valid JSON with required fields | ✅ |
 
 use iron_control_api::
 {
@@ -22,6 +39,7 @@ fn test_handshake_request_validation()
     ic_token: "valid_token_string".to_string(),
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( valid_req.validate().is_ok() );
 
@@ -31,6 +49,7 @@ fn test_handshake_request_validation()
     ic_token: "".to_string(),
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( empty_token_req.validate().is_err() );
 
@@ -40,6 +59,7 @@ fn test_handshake_request_validation()
     ic_token: "valid_token".to_string(),
     provider: "".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( empty_provider_req.validate().is_err() );
 
@@ -50,6 +70,7 @@ fn test_handshake_request_validation()
     ic_token: long_token,
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( long_token_req.validate().is_err() );
 
@@ -60,8 +81,49 @@ fn test_handshake_request_validation()
     ic_token: "valid_token".to_string(),
     provider: long_provider,
     provider_key_id: Some( 1 ),
+    requested_budget: None,
   };
   assert!( long_provider_req.validate().is_err() );
+
+  // Valid requested_budget
+  let valid_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( 5_000_000 ), // $5
+  };
+  assert!( valid_budget_req.validate().is_ok() );
+
+  // Zero requested_budget
+  let zero_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( 0 ),
+  };
+  assert!( zero_budget_req.validate().is_err() );
+
+  // Negative requested_budget
+  let negative_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( -1000 ),
+  };
+  assert!( negative_budget_req.validate().is_err() );
+
+  // Requested budget exceeds maximum
+  let excessive_budget_req = HandshakeRequest
+  {
+    ic_token: "valid_token".to_string(),
+    provider: "openai".to_string(),
+    provider_key_id: Some( 1 ),
+    requested_budget: Some( 101_000_000 ), // $101 (exceeds $100 max)
+  };
+  assert!( excessive_budget_req.validate().is_err() );
 }
 
 /// Test usage report request validation
@@ -74,7 +136,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -86,7 +148,7 @@ fn test_usage_report_request_validation()
     lease_id: "".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -98,7 +160,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: -100,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -110,7 +172,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 0,
-    cost_usd: 0.05,
+    cost_microdollars: 50_000, // $0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -122,7 +184,7 @@ fn test_usage_report_request_validation()
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
-    cost_usd: -0.05,
+    cost_microdollars: -50_000, // -$0.05
     model: "gpt-4".to_string(),
     provider: "openai".to_string(),
   };
@@ -138,7 +200,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 10.0 ),
+    requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( valid_req.validate().is_ok() );
 
@@ -156,7 +218,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 10.0 ),
+    requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( empty_token_req.validate().is_err() );
 
@@ -165,7 +227,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "".to_string(),
-    requested_budget: Some( 10.0 ),
+    requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( empty_lease_req.validate().is_err() );
 
@@ -174,7 +236,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 0.0 ),
+    requested_budget: Some( 0 ),
   };
   assert!( zero_budget_req.validate().is_err() );
 
@@ -183,7 +245,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( -10.0 ),
+    requested_budget: Some( -10_000_000 ), // -$10
   };
   assert!( negative_budget_req.validate().is_err() );
 
@@ -192,7 +254,7 @@ fn test_budget_refresh_request_validation()
   {
     ic_token: "valid_token_here".to_string(),
     current_lease_id: "lease_abc123".to_string(),
-    requested_budget: Some( 1001.0 ),
+    requested_budget: Some( 1_001_000_000 ), // $1001
   };
   assert!( large_budget_req.validate().is_err() );
 }
@@ -215,11 +277,11 @@ fn test_ic_token_lifecycle()
   assert!( claims.validate().is_ok() );
 
   // Generate IC Token JWT
-  let token = manager.generate_token( &claims ).expect( "Should generate IC Token" );
+  let token = manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token");
   assert!( !token.is_empty() );
 
   // Verify IC Token
-  let verified_claims = manager.verify_token( &token ).expect( "Should verify IC Token" );
+  let verified_claims = manager.verify_token( &token ).expect("LOUD FAILURE: Should verify IC Token");
   assert_eq!( verified_claims.agent_id, "agent_123" );
   assert_eq!( verified_claims.budget_id, "budget_456" );
   assert_eq!( verified_claims.permissions, vec![ "llm:call", "data:read" ] );
@@ -232,17 +294,17 @@ fn test_ip_token_encryption()
   // Create 32-byte encryption key
   let key : [ u8; 32 ] = [ 0u8; 32 ]; // In production, use random key
 
-  let crypto = IpTokenCrypto::new( &key ).expect( "Should create IP Token crypto" );
+  let crypto = IpTokenCrypto::new( &key ).expect("LOUD FAILURE: Should create IP Token crypto");
 
   // Test provider API key
   let provider_key = "sk-proj_test_key_abc123";
 
   // Encrypt
-  let ip_token = crypto.encrypt( provider_key ).expect( "Should encrypt" );
+  let ip_token = crypto.encrypt( provider_key ).expect("LOUD FAILURE: Should encrypt");
   assert!( ip_token.starts_with( "AES256:" ) );
 
   // Decrypt
-  let decrypted = crypto.decrypt( &ip_token ).expect( "Should decrypt" );
+  let decrypted = crypto.decrypt( &ip_token ).expect("LOUD FAILURE: Should decrypt");
   assert_eq!( &*decrypted, provider_key );
 }
 
@@ -251,7 +313,7 @@ fn test_ip_token_encryption()
 fn test_ip_token_format_validation()
 {
   let key : [ u8; 32 ] = [ 0u8; 32 ];
-  let crypto = IpTokenCrypto::new( &key ).expect( "Should create crypto" );
+  let crypto = IpTokenCrypto::new( &key ).expect("LOUD FAILURE: Should create crypto");
 
   // Invalid format - missing parts
   let invalid_token1 = "AES256:abc:def";
@@ -327,10 +389,11 @@ async fn test_budget_state_creation()
 {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ];
   let jwt_secret = std::sync::Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
   let database_url = "sqlite::memory:";
 
-  let state = BudgetState::new( ic_token_secret, &ip_token_key, jwt_secret, database_url ).await;
+  let state = BudgetState::new( ic_token_secret, &ip_token_key, &provider_key_master, jwt_secret, database_url, None ).await;
   assert!( state.is_ok(), "Should create budget state" );
 }
 
@@ -342,12 +405,12 @@ fn test_handshake_response_serialization()
   {
     ip_token: "AES256:abc:def:ghi".to_string(),
     lease_id: "lease_123".to_string(),
-    budget_granted: 10.0,
-    budget_remaining: 90.0,
+    budget_granted: 10_000_000, // $10
+    budget_remaining: 90_000_000, // $90
     expires_at: None,
   };
 
-  let json = serde_json::to_string( &response ).expect( "Should serialize" );
+  let json = serde_json::to_string( &response ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "ip_token" ) );
   assert!( json.contains( "lease_id" ) );
   assert!( json.contains( "budget_granted" ) );
@@ -360,10 +423,10 @@ fn test_usage_report_response_serialization()
   let response = UsageReportResponse
   {
     success: true,
-    budget_remaining: 9.5,
+    budget_remaining: 9_500_000, // $9.50
   };
 
-  let json = serde_json::to_string( &response ).expect( "Should serialize" );
+  let json = serde_json::to_string( &response ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "success" ) );
   assert!( json.contains( "budget_remaining" ) );
 }
@@ -376,13 +439,13 @@ fn test_budget_refresh_response_serialization()
   let approved = BudgetRefreshResponse
   {
     status: "approved".to_string(),
-    budget_granted: Some( 10.0 ),
-    budget_remaining: 80.0,
+    budget_granted: Some( 10_000_000 ), // $10
+    budget_remaining: 80_000_000, // $80
     lease_id: Some( "lease_456".to_string() ),
     reason: None,
   };
 
-  let json = serde_json::to_string( &approved ).expect( "Should serialize" );
+  let json = serde_json::to_string( &approved ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "approved" ) );
   assert!( json.contains( "budget_granted" ) );
 
@@ -391,12 +454,12 @@ fn test_budget_refresh_response_serialization()
   {
     status: "denied".to_string(),
     budget_granted: None,
-    budget_remaining: 0.0,
+    budget_remaining: 0,
     lease_id: None,
     reason: Some( "insufficient_budget".to_string() ),
   };
 
-  let json = serde_json::to_string( &denied ).expect( "Should serialize" );
+  let json = serde_json::to_string( &denied ).expect("LOUD FAILURE: Should serialize");
   assert!( json.contains( "denied" ) );
   assert!( json.contains( "insufficient_budget" ) );
 }

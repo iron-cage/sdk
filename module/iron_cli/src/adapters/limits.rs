@@ -6,7 +6,7 @@ use super::AdapterError;
 use super::services::LimitsService;
 use super::auth::HasParams;
 use crate::handlers::limits_handlers;
-use crate::formatting::Formatter;
+use crate::formatting::TreeFmtFormatter;
 use std::collections::HashMap;
 
 fn extract_params<T>(command: &T) -> HashMap<String, String>
@@ -20,7 +20,7 @@ where
 pub async fn list_limits_adapter<T, S>(
   command: &T,
   limits_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -44,7 +44,7 @@ where
 pub async fn get_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -74,7 +74,7 @@ where
 pub async fn create_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -112,7 +112,7 @@ where
 pub async fn update_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -149,7 +149,7 @@ where
 pub async fn delete_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,

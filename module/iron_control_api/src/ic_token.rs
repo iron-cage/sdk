@@ -74,7 +74,7 @@ impl IcTokenClaims
   {
     let now = SystemTime::now()
       .duration_since( UNIX_EPOCH )
-      .expect( "Time went backwards" )
+      .expect( "LOUD FAILURE: Time went backwards" )
       .as_secs();
 
     Self {
@@ -110,7 +110,7 @@ impl IcTokenClaims
     {
       let now = SystemTime::now()
         .duration_since( UNIX_EPOCH )
-        .expect( "Time went backwards" )
+        .expect( "LOUD FAILURE: Time went backwards" )
         .as_secs();
 
       if now > exp
@@ -194,161 +194,3 @@ impl IcTokenManager
   }
 }
 
-#[ cfg( test ) ]
-mod tests
-{
-  use super::*;
-
-  #[ test ]
-  fn test_create_ic_token_claims()
-  {
-    let claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      None,
-    );
-
-    assert_eq!( claims.agent_id, "agent_abc123" );
-    assert_eq!( claims.budget_id, "budget_xyz789" );
-    assert_eq!( claims.issuer, "iron-control-panel" );
-    assert_eq!( claims.permissions, vec![ "llm:call" ] );
-    assert!( claims.expires_at.is_none() );
-    assert!( claims.issued_at > 0 );
-  }
-
-  #[ test ]
-  fn test_validate_ic_token_claims_success()
-  {
-    let claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      None,
-    );
-
-    assert!( claims.validate().is_ok() );
-  }
-
-  #[ test ]
-  fn test_validate_ic_token_claims_invalid_issuer()
-  {
-    let mut claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      None,
-    );
-
-    claims.issuer = "evil-hacker".to_string();
-    let result = claims.validate();
-    assert!( result.is_err() );
-    assert!( result.unwrap_err().contains( "Invalid issuer" ) );
-  }
-
-  #[ test ]
-  fn test_validate_ic_token_claims_invalid_agent_id_format()
-  {
-    let claims = IcTokenClaims::new(
-      "invalid_format".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      None,
-    );
-
-    let result = claims.validate();
-    assert!( result.is_err() );
-    assert!( result.unwrap_err().contains( "Invalid agent_id format" ) );
-  }
-
-  #[ test ]
-  fn test_validate_ic_token_claims_expired()
-  {
-    let past_timestamp = 1000000000; // Far in the past
-    let claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      Some( past_timestamp ),
-    );
-
-    let result = claims.validate();
-    assert!( result.is_err() );
-    assert!( result.unwrap_err().contains( "Token expired" ) );
-  }
-
-  #[ test ]
-  fn test_generate_and_verify_ic_token()
-  {
-    let manager = IcTokenManager::new( "test_secret_key_12345".to_string() );
-
-    let claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string(), "data:read".to_string() ],
-      None,
-    );
-
-    // Generate token
-    let token = manager.generate_token( &claims ).expect( "Should generate token" );
-    assert!( !token.is_empty() );
-
-    // Verify token
-    let verified_claims = manager.verify_token( &token ).expect( "Should verify token" );
-    assert_eq!( verified_claims.agent_id, "agent_abc123" );
-    assert_eq!( verified_claims.budget_id, "budget_xyz789" );
-    assert_eq!( verified_claims.permissions.len(), 2 );
-  }
-
-  #[ test ]
-  fn test_verify_invalid_token()
-  {
-    let manager = IcTokenManager::new( "test_secret_key_12345".to_string() );
-    let result = manager.verify_token( "invalid.token.here" );
-    assert!( result.is_err() );
-  }
-
-  #[ test ]
-  fn test_verify_token_wrong_secret()
-  {
-    let manager1 = IcTokenManager::new( "secret_1".to_string() );
-    let manager2 = IcTokenManager::new( "secret_2".to_string() );
-
-    let claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      None,
-    );
-
-    let token = manager1.generate_token( &claims ).expect( "Should generate" );
-    let result = manager2.verify_token( &token );
-
-    assert!( result.is_err() );
-  }
-
-  #[ test ]
-  fn test_verify_token_with_expiration()
-  {
-    let manager = IcTokenManager::new( "test_secret_key_12345".to_string() );
-
-    // Create token that expires in 1 hour
-    let future_timestamp = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .unwrap()
-      .as_secs()
-      + 3600;
-
-    let claims = IcTokenClaims::new(
-      "agent_abc123".to_string(),
-      "budget_xyz789".to_string(),
-      vec![ "llm:call".to_string() ],
-      Some( future_timestamp ),
-    );
-
-    let token = manager.generate_token( &claims ).expect( "Should generate" );
-    let verified_claims = manager.verify_token( &token ).expect( "Should verify" );
-
-    assert_eq!( verified_claims.agent_id, "agent_abc123" );
-  }
-}

@@ -1,7 +1,5 @@
 //! Login endpoint tests
 //!
-//! Test Matrix: Login validation
-//!
 //! Corner cases covered:
 //! - Valid credentials (happy path)
 //! - Invalid username (user not found)
@@ -11,8 +9,17 @@
 //! - Empty username
 //! - Empty password
 //! - SQL injection attempts
+//!
+//! ## Test Matrix
+//!
+//! | Test Case | Scenario | Input/Setup | Expected | Status |
+//! |-----------|----------|-------------|----------|--------|
+//! | `test_infrastructure_verification` | Verify test infrastructure | Create DB + user, verify password hashing | Password verification works | ✅ |
+//! | `test_jwt_token_infrastructure` | Verify JWT token generation | Create AuthState, generate access+refresh tokens, verify them | Tokens valid and verifiable | ✅ |
+//! | `test_fixtures_infrastructure` | Verify test fixtures | Use valid_login_request + invalid_login_request_missing_username fixtures | Fixtures validate correctly | ✅ |
 
-use crate::common::{ create_test_database, create_test_user, verify_password };
+use crate::common::{ create_test_user, verify_password };
+use crate::common::test_db;
 use crate::common::fixtures::{ valid_login_request, invalid_login_request_missing_username };
 use crate::common::test_state::create_test_auth_state;
 
@@ -23,10 +30,11 @@ use crate::common::test_state::create_test_auth_state;
 async fn test_infrastructure_verification()
 {
   // Create in-memory database
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool();
 
   // Create test user
-  let ( user_id, password_hash ) = create_test_user( &pool, "testuser" ).await;
+  let ( user_id, password_hash ) = create_test_user( pool, "testuser" ).await;
 
   // Verify user ID is positive
   assert!(
@@ -56,7 +64,7 @@ async fn test_infrastructure_verification()
     "SELECT id, username, password_hash FROM users WHERE id = ?"
   )
   .bind( &user_id )
-  .fetch_one( &pool )
+  .fetch_one( pool )
   .await
   .expect( "LOUD FAILURE: Should fetch created user from database" );
 

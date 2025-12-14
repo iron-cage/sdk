@@ -35,7 +35,10 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
   let path = uri.path();
 
   // Check if redirect has expired
-  let now = SystemTime::now().duration_since( UNIX_EPOCH ).unwrap().as_secs();
+  let now = SystemTime::now()
+    .duration_since( UNIX_EPOCH )
+    .expect( "INVARIANT: SystemTime is always after UNIX_EPOCH (system clock would need to be set before 1970-01-01)" )
+    .as_secs();
   let redirect_expired = now > DEPLOYMENT_DATE + EXPIRATION_SECONDS;
 
   if redirect_expired
@@ -46,7 +49,7 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
       return Response::builder()
         .status( StatusCode::NOT_FOUND )
         .body( Body::empty() )
-        .unwrap();
+        .expect( "INVARIANT: Response with valid StatusCode and empty Body never fails" );
     }
   }
   else
@@ -59,7 +62,7 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
         .status( StatusCode::PERMANENT_REDIRECT )
         .header( "Location", new_uri )
         .body( Body::empty() )
-        .unwrap();
+        .expect( "INVARIANT: Response with valid StatusCode, Location header, and empty Body never fails" );
     }
   }
 
@@ -68,13 +71,13 @@ pub async fn redirect_old_tokens_url( req: Request<Body>, next: Next ) -> Respon
 }
 
 /// Convert old token path to new path
-fn convert_old_path_to_new( path: &str ) -> Option<String>
+pub fn convert_old_path_to_new( path: &str ) -> Option<String>
 {
   path.strip_prefix( "/api/tokens" ).map( |suffix| format!( "/api/v1/api-tokens{suffix}" ) )
 }
 
 /// Build redirect URI preserving query parameters
-fn build_redirect_uri( original_uri: &Uri, new_path: &str ) -> String
+pub fn build_redirect_uri( original_uri: &Uri, new_path: &str ) -> String
 {
   if let Some( query ) = original_uri.query()
   {
@@ -83,31 +86,5 @@ fn build_redirect_uri( original_uri: &Uri, new_path: &str ) -> String
   else
   {
     new_path.to_string()
-  }
-}
-
-#[cfg(test)]
-mod tests
-{
-  use super::*;
-
-  #[test]
-  fn test_convert_old_path_to_new()
-  {
-    assert_eq!( convert_old_path_to_new( "/api/tokens" ), Some( "/api/v1/api-tokens".to_string() ) );
-    assert_eq!( convert_old_path_to_new( "/api/tokens/abc123" ), Some( "/api/v1/api-tokens/abc123".to_string() ) );
-    assert_eq!( convert_old_path_to_new( "/api/tokens/abc123/rotate" ), Some( "/api/v1/api-tokens/abc123/rotate".to_string() ) );
-    assert_eq!( convert_old_path_to_new( "/api/users" ), None );
-    assert_eq!( convert_old_path_to_new( "/api/v1/api-tokens" ), None );
-  }
-
-  #[test]
-  fn test_build_redirect_uri()
-  {
-    let uri: Uri = "/api/tokens".parse().unwrap();
-    assert_eq!( build_redirect_uri( &uri, "/api/v1/api-tokens" ), "/api/v1/api-tokens" );
-
-    let uri: Uri = "/api/tokens?page=2&per_page=10".parse().unwrap();
-    assert_eq!( build_redirect_uri( &uri, "/api/v1/api-tokens" ), "/api/v1/api-tokens?page=2&per_page=10" );
   }
 }

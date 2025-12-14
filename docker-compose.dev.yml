@@ -7,7 +7,7 @@ version: '3.8'
 services:
   backend:
     image: rust:1-slim-bookworm
-    container_name: iron_backend_dev
+    container_name: iron_cp_backend_dev
     working_dir: /app
     volumes:
       - ./:/app  # Source code (live reload)
@@ -30,7 +30,7 @@ services:
 
   frontend:
     image: node:20-alpine
-    container_name: iron_frontend_dev
+    container_name: iron_cp_frontend_dev
     working_dir: /app
     volumes:
       - ./module/iron_dashboard:/app  # Source code (live reload)

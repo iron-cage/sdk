@@ -6,7 +6,7 @@ use super::AdapterError;
 use super::services::HealthService;
 use super::auth::HasParams;
 use crate::handlers::health_handlers;
-use crate::formatting::Formatter;
+use crate::formatting::TreeFmtFormatter;
 use std::collections::HashMap;
 
 fn extract_params<T>(command: &T) -> HashMap<String, String>
@@ -20,7 +20,7 @@ where
 pub async fn health_adapter<T, S>(
   command: &T,
   health_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,
@@ -45,7 +45,7 @@ where
 pub async fn version_adapter<T, S>(
   command: &T,
   health_service: S,
-  formatter: &Formatter,
+  formatter: &TreeFmtFormatter,
 ) -> Result<String, AdapterError>
 where
   T: HasParams,

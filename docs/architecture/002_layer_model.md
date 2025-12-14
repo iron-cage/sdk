@@ -1,19 +1,29 @@
-# Layer Model
+# Architecture: Layer Model
 
-**Purpose:** How requests flow through processing layers in the gateway.
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
+### Scope
 
----
+This document defines the six-layer request processing model for Iron Runtime's gateway architecture. It specifies layer responsibilities, failure modes, processing order, and latency budgets for both pilot and production deployments.
 
-## User Need
+**In scope**:
+- Six processing layers (Input Safety, Cost, Reliability, Provider, Output Safety, Observability)
+- Request path processing (layers 1-4)
+- Response path processing (layers 4-6)
+- Layer failure modes and fallback behavior
+- Latency budget per layer (pilot vs production)
+- Design principles (fail-safe, non-blocking, independent, ordered)
 
-Understand which component handles safety, cost, reliability - and in what order.
+**Out of scope**:
+- Detailed layer implementation (see service-specific documentation)
+- Provider-specific routing logic (see Protocol 004: MCP Integration)
+- Budget allocation and IC/IP token system (see Protocol 005: Budget Control)
+- Safety layer detection algorithms (see Security 002: Isolation Layers)
+- Observability backend configuration (see deployment documentation)
 
-## Core Idea
+### Purpose
 
-**Six processing layers with bidirectional request-response flow:**
+**User Need:** Understand which component handles safety, cost, reliability - and in what order.
+
+**Solution:** Six processing layers with bidirectional request-response flow:
 
 ```
 REQUEST PATH (Input Processing):
@@ -35,7 +45,13 @@ RESPONSE PATH (Output Processing):
                   Redact PII            (async)
 ```
 
-## The Six Layers
+**Key Insight:** Each layer has a specific responsibility and failure mode. Safety layers (input/output) are fail-safe (block all if down, never bypass). Observability is async (0ms perceived latency). Processing order ensures defense in depth - safety MUST run before provider access.
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-13
+
+### The Six Layers
 
 | Layer | Phase | Responsibility | Failure Mode |
 |-------|-------|---------------|--------------|
@@ -49,14 +65,14 @@ RESPONSE PATH (Output Processing):
 **Request Path:** Layers 1 → 2 → 3 → 4 → LLM Provider
 **Response Path:** LLM Provider → 4 → 5 → 6 → Agent
 
-## Design Principles
+### Design Principles
 
 - **Fail-safe:** Safety layer down = block all (never bypass)
 - **Non-blocking:** Observability is async, adds 0ms latency
 - **Independent:** Each layer can be deployed/scaled separately
 - **Ordered:** Safety MUST run before provider (defense in depth)
 
-## Latency Budget
+### Latency Budget
 
 | Layer | Pilot Target | Production Target | Notes |
 |-------|--------------|-------------------|-------|
@@ -71,6 +87,29 @@ RESPONSE PATH (Output Processing):
 
 **See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) for authoritative latency reference and rationale.
 
----
+### Cross-References
 
-*Related: [004_data_flow.md](004_data_flow.md) | [005_service_integration.md](005_service_integration.md)*
+#### Related Principles Documents
+- [Principles: Design Philosophy](../principles/001_design_philosophy.md) - Fail-Safe Defaults principle reflected in fail-safe safety layers (block all if down), Observable Behavior via observability layer
+- [Principles: Quality Attributes](../principles/002_quality_attributes.md) - Reliability via circuit breaker/retry logic, Security via input/output safety layers, Performance via latency budgets
+- [Principles: Development Workflow](../principles/005_development_workflow.md) - Specification-first approach applied to this architecture document
+
+**Related Architecture Documents:**
+- [Architecture: Data Flow](004_data_flow.md) - End-to-end request journey through these processing layers
+- [Architecture: Service Integration](005_service_integration.md) - How gateway services communicate using this layer model
+- [Architecture: Service Boundaries](003_service_boundaries.md) - Control/Data/Runtime plane separation context for layers
+
+#### Used By
+- [Protocol: Budget Control Protocol](../protocol/005_budget_control_protocol.md) - References layer model for Cost layer responsibilities
+- [Security: Isolation Layers](../security/002_isolation_layers.md) - Implements Input/Output Safety layers
+- [Architecture: Data Flow](004_data_flow.md) - Traces request journey through these six layers
+- [Architecture: Service Integration](005_service_integration.md) - Uses layer model to explain service communication
+
+#### Dependencies
+- [Constraints: Trade-offs](../constraints/004_trade_offs.md#latency-budget-summary) - Authoritative latency budget reference and rationale
+- [Architecture: Service Boundaries](003_service_boundaries.md) - Plane separation architecture that layers operate within
+
+#### Implementation
+- Gateway service: Layer orchestration (module paths TBD)
+- Safety service: Input/Output safety layers (module paths TBD)
+- Cost service: Budget tracking layer (module paths TBD)

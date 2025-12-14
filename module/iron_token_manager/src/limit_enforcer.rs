@@ -20,14 +20,14 @@ pub struct UsageLimit
   pub max_tokens_per_day: Option< i64 >,
   /// Max requests per minute (NULL = unlimited)
   pub max_requests_per_minute: Option< i64 >,
-  /// Max cost in cents per month (NULL = unlimited)
-  pub max_cost_cents_per_month: Option< i64 >,
+  /// Max cost in microdollars per month (NULL = unlimited)
+  pub max_cost_microdollars_per_month: Option< i64 >,
   /// Current tokens used today
   pub current_tokens_today: i64,
   /// Current requests this minute
   pub current_requests_this_minute: i64,
-  /// Current cost in cents this month
-  pub current_cost_cents_this_month: i64,
+  /// Current cost in microdollars this month
+  pub current_cost_microdollars_this_month: i64,
   /// Last daily reset timestamp
   pub tokens_reset_at: Option< i64 >,
   /// Last minute reset timestamp
@@ -98,14 +98,10 @@ impl LimitEnforcer
       .max_connections( 5 )
       .connect( database_url )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
-    // Run migrations
-    let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
-    sqlx::raw_sql( migration_sql )
-      .execute( &pool )
-      .await
-      .map_err( |_| crate::error::TokenError )?;
+    // Run all migrations to ensure schema is up to date
+    crate::migrations::apply_all_migrations( &pool ).await?;
 
     Ok( Self { pool } )
   }
@@ -118,7 +114,7 @@ impl LimitEnforcer
   /// * `project_id` - Optional project ID
   /// * `max_tokens_per_day` - Max tokens per day (None = unlimited)
   /// * `max_requests_per_minute` - Max requests per minute (None = unlimited)
-  /// * `max_cost_cents_per_month` - Max cost in cents per month (None = unlimited)
+  /// * `max_cost_microdollars_per_month` - Max cost in cents per month (None = unlimited)
   ///
   /// # Errors
   ///
@@ -129,26 +125,26 @@ impl LimitEnforcer
     project_id: Option< &str >,
     max_tokens_per_day: Option< i64 >,
     max_requests_per_minute: Option< i64 >,
-    max_cost_cents_per_month: Option< i64 >,
+    max_cost_microdollars_per_month: Option< i64 >,
   ) -> Result< i64 >
   {
     let now_ms = current_time_ms();
 
     let result = sqlx::query(
       "INSERT INTO usage_limits \
-       (user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month, created_at, updated_at) \
+       (user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month, created_at, updated_at) \
        VALUES ($1, $2, $3, $4, $5, $6, $7)"
     )
     .bind( user_id )
     .bind( project_id )
     .bind( max_tokens_per_day )
     .bind( max_requests_per_minute )
-    .bind( max_cost_cents_per_month )
+    .bind( max_cost_microdollars_per_month )
     .bind( now_ms )
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( result.last_insert_rowid() )
   }
@@ -170,8 +166,8 @@ impl LimitEnforcer
   pub async fn get_limit( &self, user_id: &str, project_id: Option< &str > ) -> Result< UsageLimit >
   {
     let row = sqlx::query(
-      "SELECT id, user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month, \
-       current_tokens_today, current_requests_this_minute, current_cost_cents_this_month, \
+      "SELECT id, user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month, \
+       current_tokens_today, current_requests_this_minute, current_cost_microdollars_this_month, \
        tokens_reset_at, requests_reset_at, cost_reset_at, created_at, updated_at \
        FROM usage_limits WHERE user_id = $1 AND (project_id = $2 OR (project_id IS NULL AND $2 IS NULL))"
     )
@@ -179,8 +175,8 @@ impl LimitEnforcer
     .bind( project_id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?
-    .ok_or( crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?
+    .ok_or( crate::error::TokenError::Generic )?;
 
     Ok( UsageLimit {
       id: row.get( "id" ),
@@ -188,10 +184,10 @@ impl LimitEnforcer
       project_id: row.get( "project_id" ),
       max_tokens_per_day: row.get( "max_tokens_per_day" ),
       max_requests_per_minute: row.get( "max_requests_per_minute" ),
-      max_cost_cents_per_month: row.get( "max_cost_cents_per_month" ),
+      max_cost_microdollars_per_month: row.get( "max_cost_microdollars_per_month" ),
       current_tokens_today: row.get( "current_tokens_today" ),
       current_requests_this_minute: row.get( "current_requests_this_minute" ),
-      current_cost_cents_this_month: row.get( "current_cost_cents_this_month" ),
+      current_cost_microdollars_this_month: row.get( "current_cost_microdollars_this_month" ),
       tokens_reset_at: row.get( "tokens_reset_at" ),
       requests_reset_at: row.get( "requests_reset_at" ),
       cost_reset_at: row.get( "cost_reset_at" ),
@@ -255,7 +251,7 @@ impl LimitEnforcer
   ///
   /// * `user_id` - User ID
   /// * `project_id` - Optional project ID
-  /// * `cost_cents` - Cost in cents to check
+  /// * `cost_microdollars` - Cost in cents to check
   ///
   /// # Returns
   ///
@@ -264,14 +260,14 @@ impl LimitEnforcer
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn check_cost_allowed( &self, user_id: &str, project_id: Option< &str >, cost_cents: i64 ) -> Result< bool >
+  pub async fn check_cost_allowed( &self, user_id: &str, project_id: Option< &str >, cost_microdollars: i64 ) -> Result< bool >
   {
     let limit = self.get_limit( user_id, project_id ).await?;
 
     // If no limit set, allow unlimited
-    let Some( max_cost ) = limit.max_cost_cents_per_month else { return Ok( true ) };
+    let Some( max_cost ) = limit.max_cost_microdollars_per_month else { return Ok( true ) };
 
-    Ok( limit.current_cost_cents_this_month + cost_cents <= max_cost )
+    Ok( limit.current_cost_microdollars_this_month + cost_microdollars <= max_cost )
   }
 
   /// Increment token usage counter
@@ -299,7 +295,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -327,7 +323,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -338,26 +334,26 @@ impl LimitEnforcer
   ///
   /// * `user_id` - User ID
   /// * `project_id` - Optional project ID
-  /// * `cost_cents` - Cost in cents to add
+  /// * `cost_microdollars` - Cost in cents to add
   ///
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn increment_cost( &self, user_id: &str, project_id: Option< &str >, cost_cents: i64 ) -> Result< () >
+  pub async fn increment_cost( &self, user_id: &str, project_id: Option< &str >, cost_microdollars: i64 ) -> Result< () >
   {
     let now_ms = current_time_ms();
 
     sqlx::query(
-      "UPDATE usage_limits SET current_cost_cents_this_month = current_cost_cents_this_month + $1, updated_at = $2 \
+      "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + $1, updated_at = $2 \
        WHERE user_id = $3 AND (project_id = $4 OR (project_id IS NULL AND $4 IS NULL))"
     )
-    .bind( cost_cents )
+    .bind( cost_microdollars )
     .bind( now_ms )
     .bind( user_id )
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -385,7 +381,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -413,7 +409,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -433,7 +429,7 @@ impl LimitEnforcer
     let now_ms = current_time_ms();
 
     sqlx::query(
-      "UPDATE usage_limits SET current_cost_cents_this_month = 0, cost_reset_at = $1, updated_at = $1 \
+      "UPDATE usage_limits SET current_cost_microdollars_this_month = 0, cost_reset_at = $1, updated_at = $1 \
        WHERE user_id = $2 AND (project_id = $3 OR (project_id IS NULL AND $3 IS NULL))"
     )
     .bind( now_ms )
@@ -441,7 +437,7 @@ impl LimitEnforcer
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -454,7 +450,7 @@ impl LimitEnforcer
   /// * `project_id` - Optional project ID
   /// * `max_tokens_per_day` - Max tokens per day (None = unlimited)
   /// * `max_requests_per_minute` - Max requests per minute (None = unlimited)
-  /// * `max_cost_cents_per_month` - Max cost in cents per month (None = unlimited)
+  /// * `max_cost_microdollars_per_month` - Max cost in cents per month (None = unlimited)
   ///
   /// # Errors
   ///
@@ -466,24 +462,24 @@ impl LimitEnforcer
     project_id: Option< &str >,
     max_tokens_per_day: Option< i64 >,
     max_requests_per_minute: Option< i64 >,
-    max_cost_cents_per_month: Option< i64 >,
+    max_cost_microdollars_per_month: Option< i64 >,
   ) -> Result< () >
   {
     let now_ms = current_time_ms();
 
     sqlx::query(
-      "UPDATE usage_limits SET max_tokens_per_day = $1, max_requests_per_minute = $2, max_cost_cents_per_month = $3, updated_at = $4 \
+      "UPDATE usage_limits SET max_tokens_per_day = $1, max_requests_per_minute = $2, max_cost_microdollars_per_month = $3, updated_at = $4 \
        WHERE user_id = $5 AND (project_id = $6 OR (project_id IS NULL AND $6 IS NULL))"
     )
     .bind( max_tokens_per_day )
     .bind( max_requests_per_minute )
-    .bind( max_cost_cents_per_month )
+    .bind( max_cost_microdollars_per_month )
     .bind( now_ms )
     .bind( user_id )
     .bind( project_id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -504,16 +500,16 @@ impl LimitEnforcer
   pub async fn get_limit_by_id( &self, id: i64 ) -> Result< UsageLimit >
   {
     let row = sqlx::query(
-      "SELECT id, user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month, \
-       current_tokens_today, current_requests_this_minute, current_cost_cents_this_month, \
+      "SELECT id, user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month, \
+       current_tokens_today, current_requests_this_minute, current_cost_microdollars_this_month, \
        tokens_reset_at, requests_reset_at, cost_reset_at, created_at, updated_at \
        FROM usage_limits WHERE id = $1"
     )
     .bind( id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?
-    .ok_or( crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?
+    .ok_or( crate::error::TokenError::Generic )?;
 
     Ok( UsageLimit {
       id: row.get( "id" ),
@@ -521,10 +517,10 @@ impl LimitEnforcer
       project_id: row.get( "project_id" ),
       max_tokens_per_day: row.get( "max_tokens_per_day" ),
       max_requests_per_minute: row.get( "max_requests_per_minute" ),
-      max_cost_cents_per_month: row.get( "max_cost_cents_per_month" ),
+      max_cost_microdollars_per_month: row.get( "max_cost_microdollars_per_month" ),
       current_tokens_today: row.get( "current_tokens_today" ),
       current_requests_this_minute: row.get( "current_requests_this_minute" ),
-      current_cost_cents_this_month: row.get( "current_cost_cents_this_month" ),
+      current_cost_microdollars_this_month: row.get( "current_cost_microdollars_this_month" ),
       tokens_reset_at: row.get( "tokens_reset_at" ),
       requests_reset_at: row.get( "requests_reset_at" ),
       cost_reset_at: row.get( "cost_reset_at" ),
@@ -545,14 +541,14 @@ impl LimitEnforcer
   pub async fn list_all_limits( &self ) -> Result< Vec< UsageLimit > >
   {
     let rows = sqlx::query(
-      "SELECT id, user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month, \
-       current_tokens_today, current_requests_this_minute, current_cost_cents_this_month, \
+      "SELECT id, user_id, project_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month, \
+       current_tokens_today, current_requests_this_minute, current_cost_microdollars_this_month, \
        tokens_reset_at, requests_reset_at, cost_reset_at, created_at, updated_at \
        FROM usage_limits ORDER BY created_at DESC"
     )
     .fetch_all( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
       rows.iter().map( |row| UsageLimit {
@@ -561,10 +557,10 @@ impl LimitEnforcer
         project_id: row.get( "project_id" ),
         max_tokens_per_day: row.get( "max_tokens_per_day" ),
         max_requests_per_minute: row.get( "max_requests_per_minute" ),
-        max_cost_cents_per_month: row.get( "max_cost_cents_per_month" ),
+        max_cost_microdollars_per_month: row.get( "max_cost_microdollars_per_month" ),
         current_tokens_today: row.get( "current_tokens_today" ),
         current_requests_this_minute: row.get( "current_requests_this_minute" ),
-        current_cost_cents_this_month: row.get( "current_cost_cents_this_month" ),
+        current_cost_microdollars_this_month: row.get( "current_cost_microdollars_this_month" ),
         tokens_reset_at: row.get( "tokens_reset_at" ),
         requests_reset_at: row.get( "requests_reset_at" ),
         cost_reset_at: row.get( "cost_reset_at" ),
@@ -581,7 +577,7 @@ impl LimitEnforcer
   /// * `id` - Limit ID
   /// * `max_tokens_per_day` - Max tokens per day (None = unlimited)
   /// * `max_requests_per_minute` - Max requests per minute (None = unlimited)
-  /// * `max_cost_cents_per_month` - Max cost in cents per month (None = unlimited)
+  /// * `max_cost_microdollars_per_month` - Max cost in cents per month (None = unlimited)
   ///
   /// # Errors
   ///
@@ -591,23 +587,23 @@ impl LimitEnforcer
     id: i64,
     max_tokens_per_day: Option< i64 >,
     max_requests_per_minute: Option< i64 >,
-    max_cost_cents_per_month: Option< i64 >,
+    max_cost_microdollars_per_month: Option< i64 >,
   ) -> Result< () >
   {
     let now_ms = current_time_ms();
 
     sqlx::query(
-      "UPDATE usage_limits SET max_tokens_per_day = $1, max_requests_per_minute = $2, max_cost_cents_per_month = $3, updated_at = $4 \
+      "UPDATE usage_limits SET max_tokens_per_day = $1, max_requests_per_minute = $2, max_cost_microdollars_per_month = $3, updated_at = $4 \
        WHERE id = $5"
     )
     .bind( max_tokens_per_day )
     .bind( max_requests_per_minute )
-    .bind( max_cost_cents_per_month )
+    .bind( max_cost_microdollars_per_month )
     .bind( now_ms )
     .bind( id )
     .execute( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -627,7 +623,7 @@ impl LimitEnforcer
       .bind( id )
       .execute( &self.pool )
       .await
-      .map_err( |_| crate::error::TokenError )?;
+      .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( () )
   }
@@ -639,6 +635,6 @@ fn current_time_ms() -> i64
 {
   std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
-    .expect( "Time went backwards" )
+    .expect( "LOUD FAILURE: Time went backwards" )
     .as_millis() as i64
 }
