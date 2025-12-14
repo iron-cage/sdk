@@ -160,7 +160,7 @@ impl TestState
 
     // Store it (will be hashed internally)
     let _token_id = self.token_storage
-      .create_token( &plaintext_token, user_id, project_id, Some( "test token" ), None,  )
+      .create_token( &plaintext_token, user_id, project_id, Some( "test token" ), None,  None)
       .await
       .expect( "LOUD FAILURE: Failed to create token" );
 
@@ -503,6 +503,8 @@ async fn test_different_projects_have_separate_keys()
 
   let response_a = router_a.oneshot( request_a ).await.unwrap();
   let ( _, body_a ) = extract_response( response_a ).await;
+  println!( "✓ Response body extracted: {}", body_a );
+
   let key_response_a: KeyResponse = serde_json::from_str( &body_a ).unwrap();
 
   // Fetch key for project B
