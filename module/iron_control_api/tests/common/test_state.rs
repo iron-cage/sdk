@@ -168,17 +168,13 @@ impl TestAppState
   /// Create new test application state with in-memory database.
   pub async fn new() -> Self
   {
-    let auth = create_test_auth_state().await;
-    let tokens = create_test_token_state().await;
-
-    // Create database using iron_test_db
     let db = super::test_db::create_test_db().await;
     let database = db.pool().clone();
 
     // Keep TestDatabase alive (prevents pool from being invalidated)
     core::mem::forget( db );
 
-    let auth = AuthState::from_pool( database.clone(), TEST_JWT_SECRET.to_string() );
+    let auth = AuthState::from_pool( database.clone(), TEST_JWT_SECRET.to_string() ).await.unwrap();
     let tokens = TokenState::from_pool( database.clone() );
 
     // Seed test users for FK constraint compliance

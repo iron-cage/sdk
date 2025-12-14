@@ -18,7 +18,7 @@ pub mod fixtures;
 pub mod test_db;
 pub mod test_state;
 
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 use axum::{ response::Response, http::StatusCode, body::Body };
 use iron_control_api::jwt_auth::{ JwtSecret, AccessTokenClaims, RefreshTokenClaims };
 

@@ -786,8 +786,7 @@ async fn test_assign_providers_to_agent_as_admin_success() {
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, description, created_at, owner_id) VALUES (?, ?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+  let result = sqlx::query( "INSERT INTO agents (id, name, providers, description, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
     .bind( "Test Agent" )
     .bind( "[\"openai_1\"]" )
     .bind( "123" )
@@ -869,8 +868,7 @@ async fn test_assign_providers_to_agent_empty_list() {
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
     .bind( "[\"openai_1\"]" )
     .bind( now )
@@ -879,7 +877,7 @@ async fn test_assign_providers_to_agent_empty_list() {
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )

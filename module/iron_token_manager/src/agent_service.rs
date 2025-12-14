@@ -47,7 +47,7 @@ pub struct Agent
   /// Tags for categorization
   pub tags: Option< Vec< String > >,
   /// Owner user ID
-  pub owner_id: String,
+  pub user_id: String,
   /// Associated project ID
   pub project_id: Option< String >,
   /// IC Token for agent authentication
@@ -152,7 +152,7 @@ pub struct AgentDetails
   /// Tags for categorization
   pub tags: Option< Vec< String > >,
   /// Owner user ID
-  pub owner_id: String,
+  pub user_id: String,
   /// Associated project ID
   pub project_id: Option< String >,
   /// IC Token for agent authentication
@@ -192,7 +192,7 @@ pub enum AgentSortField
 pub struct ListAgentsFilters
 {
   /// Filter by owner (None for admin to see all)
-  pub owner_id: Option< String >,
+  pub user_id: Option< String >,
   /// Filter by name (partial match, case-insensitive)
   pub name: Option< String >,
   /// Filter by status
@@ -268,7 +268,7 @@ impl AgentService
   ///
   /// # Arguments
   ///
-  /// * `filters` - Filters including `owner_id`, `name`, `status`, pagination, and sorting
+  /// * `filters` - Filters including `user_id`, `name`, `status`, pagination, and sorting
   ///
   /// # Returns
   ///
@@ -283,10 +283,10 @@ impl AgentService
     let mut conditions = Vec::new();
     let mut bind_values: Vec< String > = Vec::new();
 
-    if let Some( ref owner_id ) = filters.owner_id
+    if let Some( ref user_id ) = filters.user_id
     {
-      conditions.push( "a.owner_id = ?" );
-      bind_values.push( owner_id.clone() );
+      conditions.push( "a.user_id = ?" );
+      bind_values.push( user_id.clone() );
     }
 
     if let Some( ref name ) = filters.name
@@ -350,7 +350,7 @@ impl AgentService
     let data_sql = format!(
       r#"
       SELECT
-        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
+        a.id, a.name, a.providers, a.description, a.tags, a.user_id, a.project_id, a.status, a.created_at, a.updated_at,
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
@@ -400,7 +400,7 @@ impl AgentService
     let row = sqlx::query(
       r#"
       SELECT
-        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
+        a.id, a.name, a.providers, a.description, a.tags, a.user_id, a.project_id, a.status, a.created_at, a.updated_at,
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
@@ -420,7 +420,7 @@ impl AgentService
   /// # Arguments
   ///
   /// * `params` - Agent creation parameters
-  /// * `owner_id` - ID of user who will own the agent
+  /// * `user_id` - ID of user who will own the agent
   ///
   /// # Returns
   ///
@@ -429,7 +429,7 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database insert fails
-  pub async fn create_agent( &self, params: CreateAgentParams, owner_id: &str ) -> Result< Agent >
+  pub async fn create_agent( &self, params: CreateAgentParams, user_id: &str ) -> Result< Agent >
   {
     let agent_id = format!( "agent_{}", uuid::Uuid::new_v4() );
     let providers_json = serde_json::to_string( &params.providers.clone().unwrap_or_default() )
@@ -455,7 +455,7 @@ impl AgentService
 
     sqlx::query(
       r#"
-      INSERT INTO agents (id, name, providers, description, tags, owner_id, project_id, status, created_at, updated_at)
+      INSERT INTO agents (id, name, providers, description, tags, user_id, project_id, status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       "#
     )
@@ -464,7 +464,7 @@ impl AgentService
     .bind( &providers_json )
     .bind( &params.description )
     .bind( &tags_json )
-    .bind( owner_id )
+    .bind( user_id )
     .bind( &params.project_id )
     .bind( &status )
     .bind( now )
@@ -586,7 +586,7 @@ impl AgentService
     let row = sqlx::query(
       r#"
       SELECT
-        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
+        a.id, a.name, a.providers, a.description, a.tags, a.user_id, a.project_id, a.status, a.created_at, a.updated_at,
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
@@ -627,7 +627,7 @@ impl AgentService
         providers: providers,
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.owner_id,
+        user_id: agent.user_id,
         project_id: agent.project_id,
         ic_token: agent.ic_token,
         status: agent.status,
@@ -807,7 +807,7 @@ impl AgentService
   /// Returns error if database query fails
   pub async fn get_agent_owner( &self, id: &str ) -> Result< Option< String > >
   {
-    let owner: Option< String > = sqlx::query_scalar( "SELECT owner_id FROM agents WHERE id = ?" )
+    let owner: Option< String > = sqlx::query_scalar( "SELECT user_id FROM agents WHERE id = ?" )
       .bind( id )
       .fetch_optional( &self.pool )
       .await
@@ -924,7 +924,7 @@ impl AgentService
       providers,
       description: row.get( "description" ),
       tags,
-      owner_id: row.get( "owner_id" ),
+      user_id: row.get( "user_id" ),
       project_id: row.get( "project_id" ),
       ic_token: None, // IC tokens are loaded separately if needed
       status: row.get( "status" ),

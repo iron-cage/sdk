@@ -49,18 +49,6 @@ impl AgentState {
     }
 }
 
-impl axum::extract::FromRef< AgentState > for AuthState
-{
-  fn from_ref( state: &AgentState ) -> Self
-  {
-    AuthState
-    {
-      jwt_secret: state.jwt_secret.clone(),
-      db_pool: state.db_pool.clone(),
-    }
-  }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Agent {
     pub id: String,
@@ -179,7 +167,7 @@ impl From<ServiceAgent> for AgentListItem {
             providers: agent.providers,
             description: agent.description,
             tags: agent.tags,
-            owner_id: agent.owner_id,
+            owner_id: agent.user_id,
             project_id: agent.project_id,
             status: agent.status,
             created_at: agent.created_at,
@@ -258,7 +246,7 @@ pub async fn list_agents(
     let per_page = query.per_page.min(100);
 
     let filters = ListAgentsFilters {
-        owner_id: if user.0.role == "admin" {
+        user_id: if user.0.role == "admin" {
             None // Admin sees all agents
         } else {
             Some(user.0.sub.clone()) // Regular users only see agents they own
@@ -320,7 +308,7 @@ pub async fn get_agent(
     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
 
     // Check if user has access (admin or owns the agent)
-    if user.0.role != "admin" && agent.owner_id != user.0.sub {
+    if user.0.role != "admin" && agent.user_id != user.0.sub {
         return Err((
             StatusCode::FORBIDDEN,
             "You don't have access to this agent".to_string(),
@@ -334,7 +322,7 @@ pub async fn get_agent(
         providers: agent.providers,
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.owner_id,
+        owner_id: agent.user_id,
         project_id: agent.project_id,
         status: agent.status,
         created_at: agent.created_at,
@@ -495,7 +483,7 @@ pub async fn create_agent(
         providers: agent.providers,
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.owner_id,
+        owner_id: agent.user_id,
         project_id: agent.project_id,
         status: agent.status,
         created_at: agent.created_at,
@@ -573,7 +561,7 @@ pub async fn get_agent_details(
         )),
     };
 
-    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+    if user.0.sub != agent.user_id && user.0.role != "admin" {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorResponse {
@@ -600,7 +588,7 @@ pub async fn get_agent_details(
         }).collect(),
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.owner_id,
+        owner_id: agent.user_id,
         project_id: agent.project_id,
         status: agent.status,
         created_at: agent.created_at.to_string(),
@@ -646,7 +634,7 @@ pub async fn update_agent(
     };
 
     // Permission check
-    if user.0.role != "admin" && user.0.sub != agent.owner_id {
+    if user.0.role != "admin" && user.0.sub != agent.user_id {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorResponse {
@@ -735,7 +723,7 @@ pub async fn update_agent(
         providers: updated_agent.providers,
         description: updated_agent.description,
         tags: updated_agent.tags,
-        owner_id: updated_agent.owner_id,
+        owner_id: updated_agent.user_id,
         project_id: updated_agent.project_id,
         status: updated_agent.status,
         created_at: updated_agent.created_at,
@@ -901,7 +889,7 @@ pub async fn get_agent_providers(
         )),
     };
 
-    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+    if user.0.sub != agent.user_id && user.0.role != "admin" {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorResponse {
@@ -988,7 +976,7 @@ pub async fn assign_providers_to_agent(
         )),
     };
 
-    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+    if user.0.sub != agent.user_id && user.0.role != "admin" {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorResponse {
@@ -1066,7 +1054,7 @@ pub async fn assign_providers_to_agent(
         providers: agent.providers,
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.owner_id,
+        owner_id: agent.user_id,
         project_id: agent.project_id,
         status: agent.status,
         created_at: agent.created_at,
@@ -1127,7 +1115,7 @@ pub async fn remove_provider_from_agent(
         )),
     };
 
-    if user.0.sub != agent.owner_id && user.0.role != "admin" {
+    if user.0.sub != agent.user_id && user.0.role != "admin" {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorResponse {
@@ -1220,7 +1208,7 @@ pub async fn remove_provider_from_agent(
 //         )),
 //     };
 
-//     if user.0.sub != agent.owner_id && user.0.role != "admin" {
+//     if user.0.sub != agent.user_id && user.0.role != "admin" {
 //         return Err((
 //             StatusCode::FORBIDDEN,
 //             Json(ErrorResponse {

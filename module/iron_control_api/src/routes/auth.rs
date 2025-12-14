@@ -123,11 +123,64 @@ impl AuthState {
   }
 
   /// Create new auth state from existing pool
-  pub fn from_pool(db_pool: Pool<Sqlite>, jwt_secret_key: String) -> Self {
-    Self {
+  pub async fn from_pool(db_pool: Pool<Sqlite>, jwt_secret_key: String) -> Result<Self, sqlx::Error> {
+    // Run migration 003 (users table) if not already applied
+    let migration_003_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_003_completed'",
+    )
+    .fetch_one(&db_pool)
+    .await?;
+
+    if migration_003_completed == 0 {
+      let migration_003 =
+        include_str!("../../../iron_token_manager/migrations/003_create_users_table.sql");
+      sqlx::raw_sql(migration_003).execute(&db_pool).await?;
+    }
+
+    // Migration 006: Create user audit log table
+    let migration_006_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_006_completed'",
+    )
+    .fetch_one(&db_pool)
+    .await?;
+
+    if migration_006_completed == 0 {
+      let migration_006 =
+        include_str!("../../../iron_token_manager/migrations/006_create_user_audit_log.sql");
+      sqlx::raw_sql(migration_006).execute(&db_pool).await?;
+    }
+
+    // Migration 007: Create token blacklist table
+    let migration_007_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_007_completed'",
+    )
+    .fetch_one(&db_pool)
+    .await?;
+
+    if migration_007_completed == 0 {
+      let migration_007 =
+        include_str!("../../../iron_token_manager/migrations/007_create_blacklist_table.sql");
+      sqlx::raw_sql(migration_007).execute(&db_pool).await?;
+    }
+
+    // Migration 019: Add account lockout fields
+    let migration_019_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_019_completed'",
+    )
+    .fetch_one(&db_pool)
+    .await?;
+
+    if migration_019_completed == 0 {
+      let migration_019 =
+        include_str!("../../../iron_token_manager/migrations/019_add_account_lockout_fields.sql");
+      sqlx::raw_sql(migration_019).execute(&db_pool).await?;
+    }
+
+    Ok(Self {
       jwt_secret: Arc::new(JwtSecret::new(jwt_secret_key)),
       db_pool,
-    }
+      rate_limiter: crate::rate_limiter::LoginRateLimiter::new(),
+    })
   }
 }
 

@@ -7,7 +7,7 @@
 
 -- Create agents table
 CREATE TABLE IF NOT EXISTS agents (
-  id TEXT PRIMARY KEY CHECK(id NOT NULL),
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   description TEXT,
   tags TEXT,
   status TEXT CHECK(status IN ('active', 'inactive', 'exhausted')),
