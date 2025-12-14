@@ -30,128 +30,25 @@ This document provides a comprehensive high-level view of the Iron Cage architec
 ---
 
 **Status:** Specification
-**Version:** 1.0.0
+**Version:** 2.0.0
 **Last Updated:** 2025-12-14
 **Priority:** MUST-HAVE
+**Visual Diagrams:** 6 Mermaid diagrams embedded (deployment boundaries, data flow, service communication)
+**Architecture Notes:** This is a concise high-level overview. Detailed specifications distributed to specialized documents (Actor Model, Service Integration, etc.)
 
 ---
 
 ## 1. ACTORS
 
-### 1.1 Human Actors
+Iron Cage has three actor types across 18 total actors:
 
-Human actors are people who interact with the Iron Cage platform through CLI and/or Dashboard interfaces.
+**Human Actors (6):** Platform administrators, developers, viewers, operations/security engineers, and product visitors. Admin manages Control Panel with full access, User (developer) runs agents with own-data access, Viewer has read-only access. All three primary roles use BOTH CLI and Dashboard interfaces equivalently.
 
-| Actor | Primary Role | Access Level | Primary Interface | Key Responsibilities |
-|-------|-------------|--------------|-------------------|---------------------|
-| **Admin** | Platform administrator | Full Control Panel access (all users, all data) | CLI + Dashboard | Create users, allocate budgets, manage IP Tokens (provider credentials), configure safety policies, review audit logs, revoke access |
-| **User** | AI agent developer | Standard Control Panel access (own data only) | CLI + Dashboard | Create and run agents locally, view own usage and spending, select models/providers (from allowed list), request budget increases |
-| **Viewer** | Read-only stakeholder | Read-only Control Panel access (own data only) | CLI + Dashboard | View own usage, view budgets and spending, monitor spending real-time (graphs/charts) |
-| **Operations Engineer** | System monitoring | Full monitoring access | Dashboard (Grafana/similar) | Monitor execution metrics, track system health, investigate performance issues, manage alerts |
-| **Security Engineer** | Compliance and isolation | Audit log access | Dashboard + Audit tools | Review audit logs, implement isolation policies, conduct security investigations, manage compliance |
-| **Product Visitor** | Pre-customer | Public marketing site | Web browser | View marketing content, learn about platform, sign up for trial |
+**Software Actors (7):** Python agents (LangChain/CrewAI), web browsers, CLI tools, LLM provider APIs, database, cache, and object storage. Agents authenticate via IC Token (JWT), users authenticate via User Token (JWT), Gateway translates IC Token → IP Token for provider communication.
 
-**Role Hierarchy:**
-```
-Admin (Full) > User (Standard) > Viewer (Read-Only)
-```
+**Service Actors (8):** Gateway (central orchestrator), Safety/Cost/Tool Proxy/Audit services in Data Plane, API Gateway/Dashboard/Scheduler in Control Plane. Failure modes: Safety and Tool Proxy fail-safe (block when down), Cost and Audit fail-open (degrade gracefully).
 
-**Critical Constraints:**
-- All three primary roles (Admin, User, Viewer) use **BOTH CLI and Dashboard** (equivalent interface, not role-specific)
-- Admin cannot modify own account (self-modification prevention)
-- Admin cannot delete last admin user (system integrity protection)
-- Users/Viewers can only regenerate own tokens (Admin can regenerate any tokens)
-
-**See:** [Architecture: Roles and Permissions](006_roles_and_permissions.md) for complete RBAC specification
-
----
-
-### 1.2 Software Actors
-
-Software actors are external systems and client applications that interact with Iron Cage.
-
-| Actor | Type | Purpose | Communication Protocol | Authentication |
-|-------|------|---------|------------------------|----------------|
-| **Python Agent** | User's AI application | Execute LLM-based workflows (LangChain, CrewAI, custom) | SDK intercepts LLM calls → HTTPS to Gateway | IC Token (JWT) |
-| **Web Browser** | Client application | Access Control Panel Dashboard | HTTPS REST API + WebSocket | User Token (JWT) |
-| **Terminal / CLI Tool** | Client application | Execute iron CLI commands | HTTPS REST API | User Token (JWT) |
-| **LLM Provider API** | External service | Process LLM inference requests (OpenAI, Anthropic, etc.) | HTTPS (via Gateway) | IP Token (provider-specific) |
-| **Database** | Infrastructure | Persist platform state (users, agents, budgets, audit logs) | PostgreSQL protocol (pilot: SQLite) | Database credentials |
-| **Cache** | Infrastructure | Store hot data (budget tracking, permissions) | Redis protocol (pilot: in-memory) | Redis credentials |
-| **Object Storage** | Infrastructure | Store audit logs, large payloads | S3 protocol | S3 credentials |
-
-**Critical Flows:**
-
-**Python Agent → Gateway:**
-```
-Developer code: openai.chat.completions.create(...)
-         ↓
-SDK intercepts call
-         ↓
-SDK adds IC Token header: Authorization: Bearer ic_abc123...
-         ↓
-SDK sends to Gateway: POST http://localhost:8084/v1/chat/completions
-         ↓
-Gateway validates IC Token, checks budget, forwards to provider
-```
-
-**Browser/CLI → Control Panel:**
-```
-User: iron users create --username alice --role user
-         ↓
-CLI sends: POST /api/v1/users
-           Authorization: Bearer user_xyz789...
-           {"username": "alice", "role": "user", ...}
-         ↓
-Control Panel validates User Token, checks Admin permission, creates user
-```
-
-**See:** [Architecture: Data Flow](004_data_flow.md) for complete request journey
-
----
-
-### 1.3 Service Actors
-
-Service actors are internal Iron Cage microservices that process requests and enforce policies.
-
-| Service | Port | Plane | Primary Responsibility | Dependencies | Failure Mode |
-|---------|------|-------|------------------------|--------------|--------------|
-| **Gateway** | 8084 | Data Plane | Central orchestrator coordinating all services, routing requests | All services below | N/A (single point, must be highly available) |
-| **Safety Service** | 8080 | Data Plane | Input/output validation (prompt injection detection, PII scanning, secret redaction) | Database (validation patterns) | **Fail-safe** (block all if down) |
-| **Cost Service** | 8081 | Data Plane | Budget tracking and enforcement (check budgets, track spending, report usage) | Database (budgets), Cache (hot data) | **Fail-open** (allow with degraded tracking) |
-| **Tool Proxy** | 8082 | Data Plane | Tool authorization and validation (validate tool params, authorize execution) | Cache (permissions) | **Fail-safe** (block tool execution) |
-| **Audit Service** | 8083 | Data Plane | Compliance logging (log all requests/responses, track audit trail) | Database (logs), Object Storage (payloads) | **Fail-open** (buffer in queue) |
-| **API Gateway** | 443 | Control Plane | Control Panel REST API (user management, agent management, token operations) | Database (platform state) | **Fail-safe** (deny access) |
-| **Dashboard** | 443 | Control Plane | Web UI for Control Panel (Vue SPA, policy management, monitoring) | API Gateway | Degrades gracefully (UI unavailable) |
-| **Scheduler** | N/A | Control Plane | Background jobs (token expiration, budget rollover, cleanup) | Database | Degrades gracefully (delayed operations) |
-
-**Service Planes:**
-
-```
-CONTROL PLANE (Admin Management)
-+-----------------------------------------------------------+
-|  API Gateway (443) ← handles User Token authentication    |
-|  Dashboard (443) ← Vue SPA for admin/user/viewer          |
-|  Scheduler ← background jobs                              |
-+-----------------------------------------------------------+
-                        manages ↓
-DATA PLANE (Request Processing)
-+-----------------------------------------------------------+
-|  Gateway (8084) ← orchestrates all below                  |
-|    ├─→ Safety (8080) ← input/output validation           |
-|    ├─→ Cost (8081) ← budget enforcement                   |
-|    ├─→ Tool Proxy (8082) ← tool authorization            |
-|    └─→ Audit (8083) ← compliance logging                 |
-+-----------------------------------------------------------+
-                        serves ↓
-AGENT RUNTIME (Local Execution)
-+-----------------------------------------------------------+
-|  Python Agent (developer machine) ← uses IC Token        |
-|  SDK (intercepts LLM calls) ← sends to Gateway           |
-+-----------------------------------------------------------+
-```
-
-**See:** [Architecture: Service Boundaries](003_service_boundaries.md) for complete plane separation model
+**See:** [Deployment: Actor Model](../deployment/002_actor_model.md) for complete actor taxonomy with roles, responsibilities, access levels, and communication protocols
 
 ---
 
@@ -245,51 +142,9 @@ Developer Agent → PyO3 FFI → Rust Gateway (embedded) → LLM Provider
 
 **Deployment:** Cloud infrastructure (Kubernetes pods) or on-premise servers. Scales independently by load.
 
-**Gateway Service (Central Orchestrator):**
+**Gateway Orchestration Pattern:** Gateway acts as central hub coordinating Safety (input/output validation), Cost (budget enforcement), Tool Proxy (tool authorization), and Audit (compliance logging). Synchronous calls block request (Safety, Cost), asynchronous calls non-blocking (Audit). Failure modes: Safety/Tool Proxy fail-safe (block when down - security critical), Cost/Audit fail-open (degrade gracefully - availability priority).
 
-```
-Agent Request → Gateway (8084)
-                   ├─→ Safety (8080) - validate input [SYNC, blocking]
-                   ├─→ Cost (8081) - check budget [SYNC, blocking]
-                   ├─→ Translate IC Token → IP Token
-                   ├─→ LLM Provider - forward request
-                   ├─→ Safety (8080) - validate output [SYNC, blocking]
-                   └─→ Audit (8083) - log event [ASYNC, non-blocking]
-```
-
-**Service Responsibilities:**
-
-**Safety Service (8080):**
-- **Input Validation:** Scan prompt for injection attacks, detect PII, enforce content policies
-- **Output Validation:** Scan LLM response for secrets (API keys, passwords), redact PII, enforce output policies
-- **Pattern Storage:** Database stores regex patterns, ML model configs, policy rules
-- **Latency:** Pilot 10ms (regex), Production 50ms (ML models)
-- **Failure Mode:** Fail-safe (block all requests if Safety down - security critical)
-
-**Cost Service (8081):**
-- **Budget Check:** Verify agent budget before request (restrictive enforcement)
-- **Usage Tracking:** Record token usage, calculate cost, update spending
-- **Real-time Reporting:** Send usage reports to Control Panel (async batched in production)
-- **Cache Layer:** Hot budget data in Redis for fast lookups
-- **Latency:** <5ms (cache hit), 100ms (cache miss)
-- **Failure Mode:** Fail-open (allow requests with degraded tracking if Cost down - availability priority)
-
-**Tool Proxy Service (8082):**
-- **Tool Authorization:** Validate tool calls against whitelist, check permissions
-- **Parameter Validation:** Ensure tool parameters match schema, sanitize inputs
-- **Execution Coordination:** Forward tool calls to appropriate executors
-- **Latency:** 50ms (typical)
-- **Failure Mode:** Fail-safe (block tool execution if Tool Proxy down)
-
-**Audit Service (8083):**
-- **Request Logging:** Log all requests with prompt hash, model, input tokens
-- **Response Logging:** Log all responses with response hash, output tokens, latency
-- **Event Tracking:** Track safety events (PII detected, secrets redacted), cost events (budget exceeded)
-- **Immutable Audit Trail:** Write to append-only database + object storage
-- **Latency:** 0ms perceived (async, non-blocking)
-- **Failure Mode:** Fail-open (buffer logs in queue if Audit down, replay when recovered)
-
-**See:** [Architecture: Service Integration](005_service_integration.md) for complete service communication patterns
+**See:** [Architecture: Service Integration](005_service_integration.md) for complete service responsibilities, orchestration patterns, Gateway coordination flow, and service communication sequences
 
 ---
 
@@ -577,7 +432,68 @@ Step 10: Return to Agent
 
 **Security Guarantee:** Both input AND output validated. Agent never receives unvalidated LLM responses.
 
+**Visual Diagram (Mermaid):**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as Developer Code
+    participant SDK as Agent SDK
+    participant GW as Gateway :8084<br/>(Orchestrator)
+    participant SF as Safety :8080<br/>(Validation)
+    participant CS as Cost :8081<br/>(Budget)
+    participant Vault as IP Token Vault<br/>(Encrypted)
+    participant Prov as LLM Provider<br/>(OpenAI/Anthropic)
+    participant AD as Audit :8083<br/>(Logging)
+
+    Note over Dev,Prov: REQUEST PATH (Steps 0-7)
+
+    Dev->>SDK: openai.chat.completions.create(...)
+    SDK->>SDK: Read IC Token from ENV<br/>IRON_IC_TOKEN=ic_abc123...
+
+    SDK->>+GW: HTTPS POST /v1/chat/completions<br/>Authorization: Bearer ic_abc123...<br/>(0.1ms - IC Token validation)
+    Note right of GW: Step 0: IC Token Validation<br/>Verify JWT signature<br/>Check not revoked
+
+    GW->>+SF: POST /validate/input<br/>{"prompt": "...", "agent_id": "..."}<br/>(50ms - Input Firewall)
+    Note right of SF: Step 2: Input Validation<br/>Prompt injection detection<br/>PII scanning
+    SF-->>-GW: {"safe": true, "pii_detected": false}
+
+    GW->>+CS: POST /budgets/check<br/>{"agent_id": "agent_abc123", "estimated_cost": 0.05}<br/>(5ms - Budget Check)
+    Note right of CS: Step 3: Budget Enforcement<br/>Query: SELECT budget, spent<br/>IF spent + cost > budget: BLOCK
+    CS-->>-GW: {"allowed": true, "remaining": 95.00}
+
+    GW->>+Vault: GET /ip-tokens/{provider_id}<br/>(0.5ms - Token Translation)
+    Note right of Vault: Step 6a: Token Translation<br/>Replace IC Token with IP Token<br/>Developer never sees IP Token
+    Vault-->>-GW: {"ip_token": "sk-proj-..."}
+
+    GW->>+Prov: HTTPS POST /v1/chat/completions<br/>Authorization: Bearer sk-proj-...<br/>(3000ms - LLM Processing)
+    Note right of Prov: Step 7: LLM Gateway<br/>Provider processes request<br/>(dominates latency)
+    Prov-->>-GW: {"choices": [...], "usage": {"total_tokens": 1523}}
+
+    Note over GW,AD: RESPONSE PATH (Steps 7a-9)
+
+    par Cost Reporting (Async)
+        GW--)CS: POST /budgets/report<br/>{"agent_id": "...", "tokens": 1523, "cost": 0.0457}<br/>(0ms perceived - async)
+        Note right of CS: Step 7a: Cost Reporting<br/>UPDATE agent_budgets<br/>SET spent = spent + 0.0457
+    end
+
+    GW->>+SF: POST /validate/output<br/>{"response": "...", "agent_id": "..."}<br/>(50ms - Output Firewall)
+    Note right of SF: Step 8: Output Validation<br/>Secret scanning (API keys)<br/>PII redaction
+    SF-->>-GW: {"safe": true, "redacted": false}
+
+    par Audit Logging (Async)
+        GW--)AD: POST /audit/log<br/>{"request": {...}, "response": {...}, "latency": 3106}<br/>(0ms perceived - async)
+        Note right of AD: Step 9: Observability<br/>Log to database + S3<br/>Complete audit trail
+    end
+
+    GW-->>-SDK: 200 OK<br/>{"choices": [...], "usage": {...}}
+    SDK-->>Dev: LLM Response
+
+    Note over Dev,Prov: TOTAL LATENCY: ~3.1 seconds<br/>Control Panel overhead: 0.6ms (0.02%)<br/>Provider dominates: 3000ms (97%)
+```
+
 **See:** [Architecture: Data Flow](004_data_flow.md) for complete 11-step specification
+**See:** [Architecture: Service Integration](005_service_integration.md) for Gateway orchestration patterns, service communication sequences, and failure mode handling
 
 ---
 
@@ -1248,67 +1164,150 @@ DEVELOPER MACHINE                  CLOUD INFRASTRUCTURE           LLM PROVIDER
 - ✅ Admin never sees developer's private data (budget/usage stats only)
 - ⚠️ LLM Provider sees prompts and responses (per provider terms)
 
+**Visual Diagram: Data Flow Across Boundaries (Mermaid):**
+
+```mermaid
+graph LR
+    subgraph DM["Developer Machine<br/>(Local Execution)"]
+        Agent["Python Agent<br/>+ iron_sdk"]
+        Code["Agent Code<br/>(100% local)"]
+        Context["Local Context<br/>(RAG docs, history)"]
+
+        Agent -.owns.-> Code
+        Agent -.owns.-> Context
+    end
+
+    subgraph CI["Cloud Infrastructure<br/>(Admin-Managed)"]
+        Gateway["Gateway :8084"]
+        Safety["Safety :8080"]
+        Cost["Cost :8081"]
+        Audit["Audit :8083"]
+        DB[(Database<br/>PostgreSQL)]
+        Vault[("IP Token Vault<br/>(encrypted)")]
+
+        Gateway --> Safety
+        Gateway --> Cost
+        Gateway --> Audit
+        Cost --> DB
+        Audit --> DB
+        Gateway -.reads.-> Vault
+    end
+
+    subgraph LP["LLM Provider<br/>(Third-Party)"]
+        OpenAI["OpenAI API"]
+        Anthropic["Anthropic API"]
+    end
+
+    Agent -->|"HTTPS<br/>IC Token (JWT)<br/>Prompts"| Gateway
+    Gateway -->|"HTTPS<br/>IP Token<br/>Prompts"| OpenAI
+    Gateway -->|"HTTPS<br/>IP Token<br/>Prompts"| Anthropic
+    OpenAI -->|"Responses"| Gateway
+    Anthropic -->|"Responses"| Gateway
+    Gateway -->|"Responses"| Agent
+
+    Gateway -.->|"Metadata only<br/>(tokens, cost, agent_id)"| DB
+
+    style DM fill:#e1f5e1
+    style CI fill:#e1e5f5
+    style LP fill:#f5e1e1
+    style Code fill:#90EE90
+    style Context fill:#90EE90
+    style Vault fill:#FFD700
+```
+
+**Boundary Crossing Details:**
+
+| Boundary | What Crosses | What NEVER Crosses | Authentication |
+|----------|--------------|-------------------|----------------|
+| Developer → Cloud | IC Token (JWT), Prompts | Agent code, Local context, RAG docs | IC Token validates agent_id |
+| Cloud → Provider | IP Token, Prompts | IC Token, User data | IP Token (hidden from developer) |
+| Provider → Cloud | Responses, Token usage | N/A | IP Token signature |
+| Cloud → Developer | Responses | IP Token, Other users' data | IC Token validates ownership |
+
+**Visual Diagram: Three-Plane Architecture (Mermaid):**
+
+```mermaid
+graph TB
+    subgraph CP["CONTROL PLANE<br/>(Admin Management - Always Deployed)"]
+        direction LR
+        API["API Gateway :443<br/>(REST API)"]
+        Dash["Dashboard :443<br/>(Vue SPA)"]
+        Sched["Scheduler<br/>(Background jobs)"]
+        CPDB[(Database<br/>PostgreSQL)]
+
+        API --> CPDB
+        Dash --> API
+        Sched --> CPDB
+    end
+
+    subgraph DP["DATA PLANE<br/>(Request Processing - Load Scaled)"]
+        direction LR
+        GW["Gateway :8084<br/>(Orchestrator)"]
+        SF["Safety :8080<br/>(Input/Output validation)"]
+        CS["Cost :8081<br/>(Budget tracking)"]
+        TP["Tool Proxy :8082<br/>(Tool authorization)"]
+        AD["Audit :8083<br/>(Compliance logging)"]
+
+        GW --> SF
+        GW --> CS
+        GW --> TP
+        GW --> AD
+    end
+
+    subgraph AR["AGENT RUNTIME<br/>(Local Execution - Developer Machine)"]
+        direction LR
+        PAgent["Python Agent<br/>(LangChain/CrewAI)"]
+        SDK["iron_sdk<br/>(LLM call interceptor)"]
+
+        PAgent --> SDK
+    end
+
+    Admin["Admin<br/>(CLI + Dashboard)"]
+    User["User/Developer<br/>(CLI + Dashboard)"]
+    Viewer["Viewer<br/>(CLI + Dashboard)"]
+
+    Admin -->|"User Token<br/>Full access"| API
+    User -->|"User Token<br/>Own data only"| API
+    Viewer -->|"User Token<br/>Read-only"| API
+
+    CP -->|"Manages:<br/>Policies, Budgets,<br/>IP Tokens"| DP
+    DP -->|"Serves:<br/>Validation, Enforcement,<br/>Audit"| AR
+    AR -->|"Requests:<br/>IC Token,<br/>LLM calls"| GW
+
+    GW -.->|"Cost reports<br/>(async)"| CS
+    CS -.->|"Budget updates"| CPDB
+
+    style CP fill:#FFE4B5
+    style DP fill:#B5D4FF
+    style AR fill:#D4FFB5
+```
+
+**Plane Communication Patterns:**
+
+| Direction | Data Flow | Protocol | Frequency |
+|-----------|-----------|----------|-----------|
+| Control → Data | Policies (safety rules, rate limits), Budgets (allocations, limits), IP Tokens (provider credentials) | REST API (internal) | Weekly (policy changes) |
+| Data → Runtime | Validation results (pass/block), Budget enforcement (allow/deny), Tool authorization (permit/reject) | HTTPS + JWT | Per request (~450 req/min) |
+| Runtime → Data | LLM calls (with IC Token), Tool execution requests, Agent metadata | HTTPS + JWT | Per request (~450 req/min) |
+| Data → Control | Cost reports (usage, spending), Audit logs (compliance trail), Alert events (budget exceeded) | Async queue | Continuous (batched) |
+
+**Scaling Characteristics:**
+
+| Plane | Scales By | Change Frequency | State Management | Replicas |
+|-------|-----------|------------------|------------------|----------|
+| **Control Plane** | Replicas (admin load) | Weekly (policy updates) | Database (PostgreSQL) | 2-3 (HA) |
+| **Data Plane** | Load (request volume) | Rarely (service updates) | Cache + Database | 5-20 (HPA) |
+| **Agent Runtime** | HPA (K8s autoscale) | Per-request (agent execution) | Stateless (local context only) | 1-1000s (elastic) |
+
 ---
 
 ### 4.2 Network Communication
 
-**Communication Protocols:**
+**Communication Protocols:** Agent SDK → Gateway (HTTPS TLS 1.3 with IC Token on :8084), Gateway → Services (HTTP internal mesh on :8080-8083), Gateway → Provider (HTTPS TLS 1.3 with IP Token), Browser/CLI → Control Panel (HTTPS TLS 1.3 with User Token on :443).
 
-```
-ACTOR A                 PROTOCOL          ACTOR B
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Port Exposure:** Gateway :8084 and API Gateway :443 exposed externally, all other services (Safety :8080, Cost :8081, Tool Proxy :8082, Audit :8083, Database :5432, Redis :6379) internal-only with firewall DENY rules.
 
-Developer Machine → Agent Runtime
-  Python code          → Function calls → iron_sdk
-
-Agent SDK → Gateway
-  HTTPS                → TLS 1.3         → Gateway (8084)
-  Authorization: Bearer ic_abc123...
-
-Gateway → Safety/Cost/Tool/Audit
-  HTTP (internal)      → Service mesh    → Services (8080-8083)
-  (future: gRPC for performance)
-
-Gateway → LLM Provider
-  HTTPS                → TLS 1.3         → Provider API
-  Authorization: Bearer {IP_TOKEN}
-
-Browser → Control Panel
-  HTTPS                → TLS 1.3         → API Gateway (443)
-  Authorization: Bearer user_xyz789...
-
-CLI → Control Panel
-  HTTPS                → TLS 1.3         → API Gateway (443)
-  Authorization: Bearer user_xyz789...
-
-Dashboard → Control Panel (real-time updates)
-  WebSocket            → WSS (TLS 1.3)   → API Gateway (443)
-  (future: Server-Sent Events)
-```
-
-**Port Assignments:**
-
-| Service | Port | Protocol | Exposed Externally? |
-|---------|------|----------|---------------------|
-| Gateway | 8084 | HTTPS | Yes (to agents) |
-| Safety | 8080 | HTTP | No (internal only) |
-| Cost | 8081 | HTTP | No (internal only) |
-| Tool Proxy | 8082 | HTTP | No (internal only) |
-| Audit | 8083 | HTTP | No (internal only) |
-| API Gateway | 443 | HTTPS | Yes (to users) |
-| Dashboard | 443 | HTTPS | Yes (to browsers) |
-| PostgreSQL | 5432 | PostgreSQL | No (internal only) |
-| Redis | 6379 | Redis | No (internal only) |
-
-**Firewall Rules (Production):**
-
-```
-ALLOW: 0.0.0.0/0 → Gateway (8084) [HTTPS] # Agent SDK calls
-ALLOW: 0.0.0.0/0 → API Gateway (443) [HTTPS] # CLI + Dashboard
-DENY:  0.0.0.0/0 → Safety/Cost/Tool/Audit (8080-8083) # Internal only
-DENY:  0.0.0.0/0 → PostgreSQL (5432) # Internal only
-DENY:  0.0.0.0/0 → Redis (6379) # Internal only
-```
+**See:** [Architecture: Service Integration](005_service_integration.md) for complete network communication matrix, protocol details, port assignments, and firewall rules
 
 ---
 

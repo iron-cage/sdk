@@ -51,10 +51,11 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  Router, http::{ Method, header }, routing::{ delete, get, post, put }, middleware
+  Router, http::{ Method, header }, routing::{ delete, get, post, put }
 };
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
+use workspace_tools::workspace;
 
 /// Deployment mode classification for production safety warnings
 ///
@@ -117,6 +118,61 @@ fn detect_deployment_mode() -> DeploymentMode
   {
     DeploymentMode::Pilot
   }
+}
+
+/// Get database URL with workspace-relative path resolution
+///
+/// Resolves database path using workspace_tools for context-independent paths:
+/// - **Pilot mode**: {workspace_root}/iron.db
+/// - **Development mode**: {workspace_root}/data/dev_control.db
+/// - **Production mode**: {workspace_root}/data/iron_production.db
+///
+/// Respects DATABASE_URL environment variable if set (highest priority).
+/// All paths are workspace-relative and work regardless of execution directory.
+///
+/// Returns SQLite URL with ?mode=rwc parameter for database creation.
+fn get_database_url() -> Result< String, Box< dyn std::error::Error > >
+{
+  // Check for explicit DATABASE_URL override (highest priority)
+  if let Ok( url ) = env::var( "DATABASE_URL" )
+  {
+    return Ok( url );
+  }
+
+  // Detect workspace root
+  let ws = workspace()
+    .map_err( | e | format!( "Failed to detect workspace: {}", e ) )?;
+
+  // Get deployment mode
+  let mode = detect_deployment_mode();
+
+  // Determine database path based on mode
+  let db_path = match mode
+  {
+    DeploymentMode::Pilot =>
+    {
+      // Pilot: {workspace}/iron.db (canonical path)
+      ws.root().join( "iron.db" )
+    }
+    DeploymentMode::Development =>
+    {
+      // Development: {workspace}/data/dev_control.db
+      let data_dir = ws.data_dir();
+      std::fs::create_dir_all( &data_dir )?;
+      data_dir.join( "dev_control.db" )
+    }
+    DeploymentMode::Production | DeploymentMode::ProductionUnconfirmed =>
+    {
+      // Production: {workspace}/data/iron_production.db
+      // Note: Production should use PostgreSQL in real deployment
+      let data_dir = ws.data_dir();
+      std::fs::create_dir_all( &data_dir )?;
+      data_dir.join( "iron_production.db" )
+    }
+  };
+
+  // Construct SQLite URL with mode=rwc for database creation
+  Ok( format!( "sqlite://{}?mode=rwc", db_path.display() ) )
 }
 
 /// Combined application state containing all service states
@@ -283,10 +339,10 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     Err( _ ) => tracing::debug!( "No .env file loaded (not required)" ),
   }
 
-  // Database URL (SQLite for pilot, canonical path iron.db)
+  // Database URL (workspace-relative paths via workspace_tools)
   // Load this BEFORE deployment mode actions (needed for database wiping)
-  let database_url = std::env::var( "DATABASE_URL" )
-    .unwrap_or_else( |_| "sqlite://./iron.db?mode=rwc".to_string() );
+  let database_url = get_database_url()?;
+  tracing::info!( "Database: {}", database_url );
 
   // Extract database file path from SQLite URL for development mode wiping
   let extract_sqlite_path = | url: &str | -> Option< String >
@@ -567,6 +623,26 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     analytics: analytics_state,
   };
 
+  // Fix(ironcage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
+  // Root cause: Hardcoded origins prevented multi-domain production deployment
+  // Pitfall: Never hardcode deployment-specific config (origins, ports, URLs)
+  let allowed_origins_str = std::env::var( "ALLOWED_ORIGINS" )
+    .expect( "ALLOWED_ORIGINS environment variable required (comma-separated URLs)" );
+
+  let allowed_origins: Vec< axum::http::HeaderValue > = allowed_origins_str
+    .split( ',' )
+    .map( |origin| {
+      origin.trim().parse::<axum::http::HeaderValue>()
+        .unwrap_or_else( |_| panic!( "Invalid origin in ALLOWED_ORIGINS: {}", origin ) )
+    } )
+    .collect();
+
+  tracing::info!( "✅ Configured CORS for {} origins", allowed_origins.len() );
+  for origin in &allowed_origins
+  {
+    tracing::info!( "   - {}", origin.to_str().unwrap() );
+  }
+
   // Build router with all endpoints
   let app = Router::new()
     // Health check (FR-2: Health endpoint at /api/health)
@@ -661,29 +737,29 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Apply combined state to all routes
     .with_state( app_state )
 
-    // URL redirect middleware for backward compatibility (Protocol 014)
-    // Redirects old /api/tokens paths to new /api/v1/api-tokens paths
-    // Expires 3 months after deployment (2025-03-12)
-    .layer( middleware::from_fn( iron_control_api::middleware::url_redirect::redirect_old_tokens_url ) )
-
-    // CORS middleware (FR-4: Restrict to frontend origin for pilot)
-    // Pilot configuration: localhost:5173, 5174, 5175 (Vite dev server on any available port)
-    // Allow methods: GET, POST, PUT, DELETE (all REST operations)
+    // CORS middleware (configured from ALLOWED_ORIGINS environment variable)
+    // Allow methods: GET, POST, PUT, DELETE, PATCH (all REST operations)
     // Allow headers: Content-Type (JSON requests), Authorization (Bearer tokens)
     .layer(
       CorsLayer::new()
-        .allow_origin( [
-          "http://localhost:5173".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
-          "http://localhost:5174".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
-          "http://localhost:5175".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
-        ] )
+        .allow_origin( allowed_origins )
         .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH ] )
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
     );
 
+  // Fix(ironcage-migration): Replace hardcoded port with SERVER_PORT env var
+  // Root cause: Hardcoded port prevented multi-environment deployment
+  // Pitfall: Never hardcode deployment-specific config (ports, hosts, URLs)
+  let server_port_str = std::env::var( "SERVER_PORT" )
+    .expect( "SERVER_PORT environment variable required (port number 1-65535)" );
+
+  let server_port: u16 = server_port_str.parse::< u16 >()
+    .unwrap_or_else( |_| panic!( "Invalid SERVER_PORT: {} (must be 1-65535)", server_port_str ) );
+
   // Server address (0.0.0.0 for Docker container networking)
-  let addr = SocketAddr::from( ( [0, 0, 0, 0], 3001 ) );
-  
+  let addr = SocketAddr::from( ( [0, 0, 0, 0], server_port ) );
+
+  tracing::info!( "✅ API server configured on port {}", server_port );
   tracing::info!( "API server listening on http://{}", addr );
   tracing::info!( "Endpoints:" );
   tracing::info!( "  GET  /api/health" );

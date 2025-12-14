@@ -33,6 +33,7 @@ pub use migrations::{ MigrationRegistry, Migration, MigrationRecord };
 pub use wipe::{ discover_table_dependencies, wipe_all_tables, topological_sort_reverse };
 
 use sqlx::SqlitePool;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Test database handle with automatic cleanup
@@ -41,6 +42,7 @@ pub struct TestDatabase
   pool: SqlitePool,
   _temp: Option< TempDir >,
   storage_mode: StorageMode,
+  path: Option< PathBuf >,
 }
 
 impl TestDatabase
@@ -61,6 +63,17 @@ impl TestDatabase
   pub fn storage_mode( &self ) -> &StorageMode
   {
     &self.storage_mode
+  }
+
+  /// Get database file path (None for in-memory databases)
+  ///
+  /// For CI environments, this returns the workspace-relative path where
+  /// the test database is stored for post-failure inspection.
+  /// For local environments with TempFile, returns the temporary path.
+  /// For InMemory/SharedInMemory, returns None.
+  pub fn path( &self ) -> Option< &PathBuf >
+  {
+    self.path.as_ref()
   }
 }
 

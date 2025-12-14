@@ -17,6 +17,7 @@ pub mod error_format;
 pub mod fixtures;
 pub mod sql_injection_helpers;
 pub mod test_db;
+pub mod source_analysis;
 pub mod test_state;
 
 use sqlx::SqlitePool;

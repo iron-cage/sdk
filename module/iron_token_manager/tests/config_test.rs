@@ -6,7 +6,12 @@ use iron_token_manager::*;
 fn test_default_dev_config()
 {
   let config = Config::default_dev();
-  assert_eq!( config.database.url, "sqlite:///./iron.db?mode=rwc", "Default dev config should use local file-based SQLite database" );
+  // Database URL should be workspace-relative (absolute path) or local fallback
+  assert!(
+    config.database.url.contains( "iron.db" ) && config.database.url.contains( "?mode=rwc" ),
+    "Default dev config should use iron.db with mode=rwc, got: {}",
+    config.database.url
+  );
   assert_eq!( config.database.max_connections, 5, "Default dev config should limit connections to 5 for SQLite" );
   assert!( config.database.auto_migrate, "Default dev config should have auto_migrate enabled for convenience" );
   assert!( config.database.foreign_keys, "Default dev config should have foreign_keys enabled for data integrity" );

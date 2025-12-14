@@ -33,6 +33,7 @@
 
 use serde::{ Deserialize, Serialize };
 use std::path::Path;
+use workspace_tools::workspace;
 
 /// Complete configuration for token manager
 #[ derive( Debug, Clone, Serialize, Deserialize ) ]
@@ -181,13 +182,15 @@ impl Config
 
   /// Load configuration from specific environment
   ///
+  /// Loads config from workspace-relative path: `{workspace}/config/iron_token_manager.{env}.toml`
+  ///
   /// # Arguments
   ///
   /// * `env` - Environment name ("development", "test", "production")
   ///
   /// # Errors
   ///
-  /// Returns error if config file not found or invalid format.
+  /// Returns error if workspace not detected or config file not found.
   ///
   /// # Examples
   ///
@@ -196,8 +199,15 @@ impl Config
   /// ```
   pub fn from_env( env: &str ) -> crate::error::Result< Self >
   {
-    let config_file = format!( "config.{env}.toml" );
-    Self::from_file( &config_file )
+    // Detect workspace and use workspace-relative config path
+    let ws = workspace()
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+    let config_path = ws.root()
+      .join( "config" )
+      .join( format!( "iron_token_manager.{env}.toml" ) );
+
+    Self::from_file( config_path.to_str().unwrap_or( "config.dev.toml" ) )
   }
 
   /// Load configuration from specific file
@@ -277,15 +287,26 @@ impl Config
 
   /// Create a default development configuration
   ///
+  /// Uses workspace-relative database path if workspace detected,
+  /// otherwise falls back to current directory.
+  ///
   /// Useful for testing and examples.
   #[ must_use ]
   pub fn default_dev() -> Self
   {
+    // Try to use workspace-relative path, fallback to current directory
+    let db_url = workspace()
+      .ok()
+      .map_or_else(
+        || "sqlite://./iron.db?mode=rwc".to_string(),
+        | ws | format!( "sqlite://{}?mode=rwc", ws.root().join( "iron.db" ).display() )
+      );
+
     Self
     {
       database: DatabaseConfig
       {
-        url: "sqlite:///./iron.db?mode=rwc".to_string(),
+        url: db_url,
         max_connections: 5,
         auto_migrate: true,
         foreign_keys: true,

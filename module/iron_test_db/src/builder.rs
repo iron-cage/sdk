@@ -3,6 +3,7 @@
 use crate::{ TestDatabase, error::{ Result, TestDbError } };
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 use tempfile::TempDir;
+use workspace_tools::workspace;
 
 /// Storage mode for test database
 #[ derive( Debug, Clone ) ]
@@ -72,24 +73,57 @@ impl TestDatabaseBuilder
   /// Build the test database
   pub async fn build( self ) -> Result< TestDatabase >
   {
-    let ( pool, temp_dir ) = match &self.storage_mode
+    let ( pool, temp_dir, path ) = match &self.storage_mode
     {
       StorageMode::InMemory => {
         let pool = self.create_pool( "sqlite::memory:" ).await?;
-        ( pool, None )
+        ( pool, None, None )
       },
       StorageMode::TempFile => {
-        let temp_dir = TempDir::new()
-          .map_err( TestDbError::Io )?;
-        let db_path = temp_dir.path().join( "test.db" );
-        let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
-        let pool = self.create_pool( &db_url ).await?;
-        ( pool, Some( temp_dir ) )
+        // CI environment: Use workspace storage for debugging
+        // Local environment: Use TempDir for automatic cleanup
+        let is_ci = std::env::var( "CI" ).is_ok();
+
+        if is_ci
+        {
+          // CI: Store in workspace for post-failure inspection
+          let ws = workspace()
+            .map_err( | e | TestDbError::Io( std::io::Error::other(
+              format!( "Failed to detect workspace: {}", e )
+            ) ) )?;
+
+          let test_db_dir = ws.root().join( "target" ).join( "test_databases" );
+          std::fs::create_dir_all( &test_db_dir )
+            .map_err( TestDbError::Io )?;
+
+          // Use timestamp for unique test database names
+          let timestamp = std::time::SystemTime::now()
+            .duration_since( std::time::UNIX_EPOCH )
+            .unwrap()
+            .as_millis();
+          let db_path = test_db_dir.join( format!( "test_{}.db", timestamp ) );
+          let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
+
+          eprintln!( "Test database at: {}", db_path.display() );
+
+          let pool = self.create_pool( &db_url ).await?;
+          ( pool, None, Some( db_path ) )
+        }
+        else
+        {
+          // Local: Use TempDir for automatic cleanup
+          let temp_dir = TempDir::new()
+            .map_err( TestDbError::Io )?;
+          let db_path = temp_dir.path().join( "test.db" );
+          let db_url = format!( "sqlite://{}?mode=rwc", db_path.display() );
+          let pool = self.create_pool( &db_url ).await?;
+          ( pool, Some( temp_dir ), Some( db_path ) )
+        }
       },
       StorageMode::SharedInMemory { name } => {
         let db_url = format!( "sqlite:file:{}?mode=memory&cache=shared", name );
         let pool = self.create_pool( &db_url ).await?;
-        ( pool, None )
+        ( pool, None, None )
       },
     };
 
@@ -102,6 +136,7 @@ impl TestDatabaseBuilder
       pool,
       _temp: temp_dir,
       storage_mode: self.storage_mode.clone(),
+      path,
     } )
   }
 

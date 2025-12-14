@@ -48,6 +48,9 @@ iron_runtime_state = { workspace = true, features = ["enabled", "sqlite"], optio
 iron_token_manager = { workspace = true, optional = true }
 iron_secrets = { workspace = true, optional = true }
 
+# Workspace management
+workspace_tools = { workspace = true }
+
 # Web framework
 axum = { workspace = true, features = ["ws"], optional = true }
 axum-extra = { workspace = true, optional = true, features = ["typed-header"] }
@@ -109,6 +112,9 @@ hyper = { workspace = true }
 http-body-util = { workspace = true }
 sha2 = { workspace = true }
 serial_test = "3.2.0"
+tempfile = "3.8"
+reqwest = { workspace = true }
+walkdir = "2.4"
 
 [[bin]]
 name = "iron_control_api_server"
