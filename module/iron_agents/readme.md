@@ -1,4 +1,6 @@
-# This folder contains other agent modules, collected to make it easier to maintain structure in the modules.
+# Iron Agents
+
+This folder contains other agent modules, collected to make it easier to maintain structure in the modules.
 
 ### Structure
 ```text
