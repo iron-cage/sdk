@@ -435,12 +435,11 @@ pub async fn handshake(
   // Budget spending already recorded by check_and_reserve_budget() - no separate call needed
 
   // Deduct lease amount from usage_limits (the "bank")
-  // Convert microdollars to cents: microdollars / 10_000
-  let granted_cents = budget_to_grant / 10_000;
+  // Both are now in microdollars - no conversion needed
   if let Err( err ) = sqlx::query(
-    "UPDATE usage_limits SET current_cost_cents_this_month = current_cost_cents_this_month + ? WHERE user_id = ?"
+    "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + ? WHERE user_id = ?"
   )
-  .bind( granted_cents )
+  .bind( budget_to_grant )
   .bind( &owner_id )
   .execute( &state.db_pool )
   .await

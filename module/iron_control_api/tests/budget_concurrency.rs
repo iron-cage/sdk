@@ -476,6 +476,7 @@ async fn test_handshake_with_existing_active_lease()
 /// SQLite's database-level locking might HIDE this race in simple tests.
 /// Need to test with high concurrency (20+ threads) or add artificial delays
 /// to expose race window. Consider testing with PostgreSQL for finer-grained locking.
+// test_kind: bug_reproducer(issue-budget-006)
 #[ tokio::test ]
 async fn test_toctou_race_insufficient_budget()
 {

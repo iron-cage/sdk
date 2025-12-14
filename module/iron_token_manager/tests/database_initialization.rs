@@ -166,7 +166,7 @@ async fn test_production_schema_matches_test_schema()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  assert_eq!( index_count, 40, "Should have 40 indexes across all migrations (migration 013 added idx_api_tokens_agent_id)" );
+  assert_eq!( index_count, 41, "Should have 41 indexes across all migrations (migration 018 adds 1 more)" );
 }
 
 #[ tokio::test ]

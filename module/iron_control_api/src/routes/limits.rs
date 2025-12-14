@@ -48,7 +48,7 @@ pub struct CreateLimitRequest
   pub project_id: Option< String >,
   pub max_tokens_per_day: Option< i64 >,
   pub max_requests_per_minute: Option< i64 >,
-  pub max_cost_per_month_cents: Option< i64 >,
+  pub max_cost_per_month_microdollars: Option< i64 >,
 }
 
 impl CreateLimitRequest
@@ -101,7 +101,7 @@ impl CreateLimitRequest
   {
     Self::validate_limit_value( self.max_tokens_per_day, "max_tokens_per_day" )?;
     Self::validate_limit_value( self.max_requests_per_minute, "max_requests_per_minute" )?;
-    Self::validate_limit_value( self.max_cost_per_month_cents, "max_cost_per_month_cents" )?;
+    Self::validate_limit_value( self.max_cost_per_month_microdollars, "max_cost_per_month_microdollars" )?;
     Ok( () )
   }
 
@@ -114,9 +114,9 @@ impl CreateLimitRequest
   {
     if self.max_tokens_per_day.is_none()
       && self.max_requests_per_minute.is_none()
-      && self.max_cost_per_month_cents.is_none()
+      && self.max_cost_per_month_microdollars.is_none()
     {
-      return Err( "at least one limit must be specified (max_tokens_per_day, max_requests_per_minute, or max_cost_per_month_cents)".to_string() );
+      return Err( "at least one limit must be specified (max_tokens_per_day, max_requests_per_minute, or max_cost_per_month_microdollars)".to_string() );
     }
     Ok( () )
   }
@@ -157,7 +157,7 @@ pub struct UpdateLimitRequest
 {
   pub max_tokens_per_day: Option< i64 >,
   pub max_requests_per_minute: Option< i64 >,
-  pub max_cost_per_month_cents: Option< i64 >,
+  pub max_cost_per_month_microdollars: Option< i64 >,
 }
 
 impl UpdateLimitRequest
@@ -211,7 +211,7 @@ impl UpdateLimitRequest
   {
     Self::validate_limit_value( self.max_tokens_per_day, "max_tokens_per_day" )?;
     Self::validate_limit_value( self.max_requests_per_minute, "max_requests_per_minute" )?;
-    Self::validate_limit_value( self.max_cost_per_month_cents, "max_cost_per_month_cents" )?;
+    Self::validate_limit_value( self.max_cost_per_month_microdollars, "max_cost_per_month_microdollars" )?;
     Ok( () )
   }
 
@@ -224,7 +224,7 @@ impl UpdateLimitRequest
   {
     if self.max_tokens_per_day.is_none()
       && self.max_requests_per_minute.is_none()
-      && self.max_cost_per_month_cents.is_none()
+      && self.max_cost_per_month_microdollars.is_none()
     {
       return Err( "at least one field must be provided for update".to_string() );
     }
@@ -262,7 +262,7 @@ pub struct LimitResponse
   pub project_id: Option< String >,
   pub max_tokens_per_day: Option< i64 >,
   pub max_requests_per_minute: Option< i64 >,
-  pub max_cost_per_month_cents: Option< i64 >,
+  pub max_cost_per_month_microdollars: Option< i64 >,
   pub created_at: i64,
 }
 
@@ -308,7 +308,7 @@ pub async fn create_limit(
     request.project_id.as_deref(),
     request.max_tokens_per_day,
     request.max_requests_per_minute,
-    request.max_cost_per_month_cents,
+    request.max_cost_per_month_microdollars,
   ).await
   {
     Ok( id ) => id,
@@ -339,7 +339,7 @@ pub async fn create_limit(
     project_id: limit.project_id,
     max_tokens_per_day: limit.max_tokens_per_day,
     max_requests_per_minute: limit.max_requests_per_minute,
-    max_cost_per_month_cents: limit.max_cost_cents_per_month,
+    max_cost_per_month_microdollars: limit.max_cost_microdollars_per_month,
     created_at: limit.created_at,
   };
 
@@ -380,7 +380,7 @@ pub async fn list_limits( State( state ): State< LimitsState > ) -> impl IntoRes
       project_id: limit.project_id,
       max_tokens_per_day: limit.max_tokens_per_day,
       max_requests_per_minute: limit.max_requests_per_minute,
-      max_cost_per_month_cents: limit.max_cost_cents_per_month,
+      max_cost_per_month_microdollars: limit.max_cost_microdollars_per_month,
       created_at: limit.created_at,
     }
   } ).collect();
@@ -426,7 +426,7 @@ pub async fn get_limit(
     project_id: limit.project_id,
     max_tokens_per_day: limit.max_tokens_per_day,
     max_requests_per_minute: limit.max_requests_per_minute,
-    max_cost_per_month_cents: limit.max_cost_cents_per_month,
+    max_cost_per_month_microdollars: limit.max_cost_microdollars_per_month,
     created_at: limit.created_at,
   };
 
@@ -477,7 +477,7 @@ pub async fn update_limit(
     limit_id,
     request.max_tokens_per_day,
     request.max_requests_per_minute,
-    request.max_cost_per_month_cents,
+    request.max_cost_per_month_microdollars,
   ).await
   {
     tracing::error!( "Failed to update limit {}: {:?}", limit_id, e );
@@ -505,7 +505,7 @@ pub async fn update_limit(
     project_id: limit.project_id,
     max_tokens_per_day: limit.max_tokens_per_day,
     max_requests_per_minute: limit.max_requests_per_minute,
-    max_cost_per_month_cents: limit.max_cost_cents_per_month,
+    max_cost_per_month_microdollars: limit.max_cost_microdollars_per_month,
     created_at: limit.created_at,
   };
 

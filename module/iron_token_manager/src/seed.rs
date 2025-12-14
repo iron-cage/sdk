@@ -489,8 +489,8 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
-      max_cost_cents_per_month, current_tokens_today, current_requests_this_minute, \
-      current_cost_cents_this_month, created_at, updated_at) \
+      max_cost_microdollars_per_month, current_tokens_today, current_requests_this_minute, \
+      current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
   .bind( "admin" )
@@ -511,18 +511,18 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
-      max_cost_cents_per_month, current_tokens_today, current_requests_this_minute, \
-      current_cost_cents_this_month, created_at, updated_at) \
+      max_cost_microdollars_per_month, current_tokens_today, current_requests_this_minute, \
+      current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
   .bind( "developer" )
   .bind::< Option< &str > >( None )
   .bind( 1_000_000 )  // 1M tokens/day
   .bind( 60 )  // 60 requests/minute
-  .bind( 5000 )  // $50/month
+  .bind( 50_000_000_i64 )  // $50/month in microdollars
   .bind( 250_000 )  // Current: 250k tokens used today
   .bind( 15 )  // Current: 15 requests this minute
-  .bind( 1250 )  // Current: $12.50 this month
+  .bind( 12_500_000_i64 )  // Current: $12.50 this month in microdollars
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )
@@ -533,8 +533,8 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
-      max_cost_cents_per_month, current_tokens_today, current_requests_this_minute, \
-      current_cost_cents_this_month, created_at, updated_at) \
+      max_cost_microdollars_per_month, current_tokens_today, current_requests_this_minute, \
+      current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
   .bind( "viewer" )

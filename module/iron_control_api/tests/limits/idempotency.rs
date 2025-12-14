@@ -53,7 +53,7 @@ async fn create_limit( router: &Router ) -> i64
     "project_id": null,
     "max_tokens_per_day": 1000,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
