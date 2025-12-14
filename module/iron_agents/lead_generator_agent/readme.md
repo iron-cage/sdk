@@ -14,44 +14,51 @@ The agent follows a two-step process:
 
 -   **Python:** Version 3.10 or higher (3.12+ recommended).
 -   **Package Manager:** `uv`.
--   **API Keys:**
-    -   OpenAI API Key (GPT-4o model access).
-    -   Apollo.io API Key (Master Key recommended).
+-   **API Tokens:**
+    -   OpenAI API Token (GPT-4o model access).
+    -   Apollo.io API Token (Master Token recommended).
 
 ### Installation
 
 This project is configured to use `uv` for dependency management.
 
-  **Initialize the project (if starting fresh):**
+  **Sync the project:**
     ```bash
-    uv init
+    uv sync
     ```
 
 ### Configuration
 
-Create a file named `.env` in the root directory of the project. Add your API keys to this file.
 
-**File: .env**
-```env
-OPENAI_API_KEY=sk-your_openai_key_here
-APOLLO_API_KEY=your_apollo_api_key_here
+
+Create a file named `-secrets.sh` in the secret folder with tokens. You can use secrets.template to copypaste variables.
+
+**File: -secrets.sh**
+```
+OPENAI_API_KEY=sk-your_openai_token_here
+APOLLO_API_KEY=your_apollo_api_token_here
 ```
 
 ### Project Structure
 
 ```text
 .
-├── .env                         # Environment variables (API Keys)
-├── .venv/                       # Virtual environment managed by uv
-├── pyproject.toml               # Project dependencies definition
-├── uv.lock                      # Dependency lock file
+├── .venv/                               # Virtual environment managed by uv
+├── pyproject.toml                       # Project dependencies definition
+├── uv.lock                              # Dependency lock file
+├── secret
+│   ├── -secrets.sh                      # File with API tokens  
+│   ├── -secrets.template.sh             # Template for creating a file -secrets.sh 
+│   └── readme.md                        # Secrets documentation
 ├── src
-    ├── apollo_tools.py          # Tool definitions for Apollo API interaction
-    └── lead_generator_agent.py  # Main entry point and agent logic
+│   ├── apollo_tools.py                  # Tool definitions for Apollo API interaction
+│   └── lead_generator_agent.py          # Main entry point and agent logic
 ├── test
-    ├── test_agent.py            # Tests for agent
-    └── test_apollo_tools.py     # Tests for apollo tools
-└── README.md                    # Project documentation
+│   ├── test_agent.py                    # Tests for agent
+│   └── test_apollo_tools.py             # Tests for apollo tools
+├── license                              # License
+├── spec.md                              # Specification of project
+└── readme.md                            # Project documentation
 ```
 
 The module consists of two main Python files:
@@ -63,7 +70,7 @@ This file contains the core logic for interacting with the Apollo.io API. It def
     *   **Purpose:** Searches for people based on job title, industry keywords, and location.
     *   **Parameters:** `job_title` (str), `industry` (str, optional), `location` (str, optional), `quantity` (int).
     *   **Output:** A list of simplified lead objects containing the Apollo `id`.
-    *   **Implementation Note:** API keys are passed via the `X-Api-Key` header to comply with Apollo's security standards.
+    *   **Implementation Note:** API tokens are passed via the `X-Api-Key` header to comply with Apollo's security standards.
 
 *   **`get_lead_details`**:
     *   **Purpose:** Retrieves the full profile of a specific lead using their Apollo ID.
@@ -74,17 +81,41 @@ This file contains the core logic for interacting with the Apollo.io API. It def
 #### 2. `lead_generator_agent.py`
 This is the entry point of the application. It initializes the OpenAI model and the LangChain AgentExecutor.
 
-*   **Model:** Uses `gpt-4o` with `temperature=0` for deterministic and precise output.
+*   **Model:** Uses `gpt-5-nano` with `temperature=0` and `max-retries=2` for deterministic and precise output.
 *   **System Prompt:** Strictly enforces a JSON-only output format. It instructs the agent to perform the search first and then iterate through every found ID to fetch details.
 *   **Output Handling:** The script captures the agent's output, strips any Markdown formatting, validates the JSON, and prints the result to the console.
 
+### Agent prompt
+
+```You are an API proxy. Your only goal is to return raw data in JSON format.
+
+ALGORITHM:
+1. Use `search_leads` to get IDs.
+2. For EACH found ID, call `get_lead_details`.
+3. Collect all results from `get_lead_details` as a JSON.
+
+OUTPUT FORMAT (CRITICAL):
+- Return all and ONLY a valid JSON Array (list of objects).
+- Do not write any text, do not say hello, do not explain anything.
+- Do not use Markdown (no ```json).
+- Do not truncate data.
+- Do not revrite or modify the data.
+
+Example output:
+[
+  {{ "id": "123", "name": "John" }},
+  {{ "id": "456", "name": "Criss" }}
+]
+```
+
 ### Usage
 
-To run the agent, execute the following command in your terminal:
-
-```bash
-uv run lead_generator_agent.py
-```
+### How to run an agent:
+1. Sync all by `uv sync`
+2. Create a file -secrets.sh and paste related tokets
+3. Move to folder `src` and type `uv run lead_generator_agent.py` in a console
+4. Type a prompt in a console, for example: `Find 3 Jewelry Founders in Germany`
+5. Wait for answer
 
 #### Interactive Mode
 Once running, the script will prompt you for a query.
@@ -102,43 +133,3 @@ Once running, the script will prompt you for a query.
 3.  It receives a list of IDs (e.g., `["id_1", "id_2", "id_3"]`).
 4.  It sequentially calls `get_lead_details` for each ID.
 5.  It aggregates the results into a single JSON array.
-
-#### Output Format
-The output will be a raw JSON array printed to the console:
-
-```json
-[
-  {
-    "id": "64b...",
-    "first_name": "Name",
-    "last_name": "Surname",
-    "organization": {
-      "name": "Company Name",
-      "website_url": "http://example.com"
-    },
-    "email": "name@example.com",
-    "linkedin_url": "http://linkedin.com/in/profile",
-    "employment_history": [...]
-  }
-]
-```
-
-### Troubleshooting
-
-#### Common Errors
-
-1.  **ImportError: cannot import name 'create_tool_calling_agent'**
-    *   **Cause:** Outdated version of `langchain`.
-    *   **Solution:** Update dependencies using `uv add langchain --upgrade`.
-
-2.  **Apollo API Error 422: INVALID_API_KEY_LOCATION**
-    *   **Cause:** The API key was sent in the request body instead of the headers.
-    *   **Solution:** Ensure you are using the provided version of `apollo_tools.py` which passes the key in the `X-Api-Key` header.
-
-3.  **Match Error 400: Please add a valid 'webhook_url'**
-    *   **Cause:** Attempting to reveal phone numbers without a configured webhook.
-    *   **Solution:** Ensure `reveal_phone_number` is set to `"false"` in `apollo_tools.py`.
-
-4.  **Agent returns text instead of JSON**
-    *   **Cause:** The LLM ignored the system prompt instructions.
-    *   **Solution:** The current script includes logic to strip Markdown tags (` ```json `). If persistence occurs, ensure `temperature` is set to `0` in `lead_generator_agent.py`.

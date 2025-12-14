@@ -420,6 +420,14 @@ mod implementation
       }
     }
 
+    /// Python module definition
+    #[pymodule]
+    fn iron_runtime(m: &Bound<'_, PyModule>) -> PyResult<()>
+    {
+      m.add_class::<Runtime>()?;
+      m.add_class::<crate::llm_router::LlmRouter>()?;
+      Ok(())
+    }
   }
 }
 
