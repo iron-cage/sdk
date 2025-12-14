@@ -81,6 +81,8 @@ services:
       DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
       JWT_SECRET: ${JWT_SECRET}
       IRON_SECRETS_MASTER_KEY: ${IRON_SECRETS_MASTER_KEY}
+      IP_TOKEN_KEY: ${IP_TOKEN_KEY}
+      IC_TOKEN_SECRET: ${IC_TOKEN_SECRET}
       IRON_DEPLOYMENT_MODE: production
       RUST_LOG: info
     volumes:
