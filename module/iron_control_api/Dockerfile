@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace manifests
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Copy all modules (workspace requires all members)
 COPY module/ ./module/
@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y \
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/iron_control_api_server /app/
 
+COPY module/ ./module/
+
 # Create non-root user and data directory for SQLite
 RUN useradd -m -u 1000 iron && \
   mkdir -p /app/data && \
@@ -42,11 +44,7 @@ RUN useradd -m -u 1000 iron && \
 USER iron
 
 # Expose API port
-EXPOSE 3000
-
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+EXPOSE 3001
 
 # Run the server
 CMD ["/app/iron_control_api_server"]

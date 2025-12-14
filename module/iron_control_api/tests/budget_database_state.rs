@@ -29,6 +29,8 @@
 //! | `test_report_usage_exceeding_lease_budget` | Usage exceeds lease budget limit | Lease with 10.0 USD, POST /api/budget/report with cost_usd=15.0 | 403 Forbidden (budget exceeded) | ✅ |
 //! | `test_refresh_with_insufficient_agent_budget` | Refresh with insufficient agent budget | Agent budget=5.0 USD, POST /api/budget/refresh requesting 10.0 USD | 403 Forbidden (insufficient budget) | ✅ |
 
+mod common;
+
 use axum::
 {
   body::Body,
@@ -61,10 +63,17 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
 {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ];
 
   let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
   let ip_token_crypto = Arc::new(
     iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
+  );
+  let provider_key_crypto = Arc::new(
+    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
+  );
+  let crypto_service = Arc::new(
+    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
   );
   let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
   let agent_budget_manager = Arc::new(
@@ -82,8 +91,10 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     lease_manager,
     agent_budget_manager,
     provider_key_storage,
+    provider_key_crypto,
     db_pool: pool,
     jwt_secret,
+    crypto_service: Some( crypto_service ),
   }
 }
 
@@ -154,14 +165,22 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
 
   // Insert into ai_provider_keys (actual table name from migration 004)
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
+  // Create real encrypted provider key for testing
+  let test_provider_key = format!( "sk-test_key_for_agent_{}", agent_id );
+  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key (must match create_test_budget_state)
+  let crypto_service = iron_secrets::crypto::CryptoService::new( &provider_key_master )
+    .expect( "LOUD FAILURE: Should create crypto service" );
+  let encrypted = crypto_service.encrypt( &test_provider_key )
+    .expect( "LOUD FAILURE: Should encrypt provider key" );
+
   sqlx::query(
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
   .bind( agent_id * 1000 )  // Unique provider key ID per test (e.g., agent 114 → key 114000)
   .bind( "openai" )
-  .bind( "encrypted_test_key_base64" )
-  .bind( "test_nonce_base64" )
+  .bind( encrypted.ciphertext_base64() )
+  .bind( encrypted.nonce_base64() )
   .bind( 1 )
   .bind( now_ms )
   .bind( "test_user" )
@@ -171,12 +190,12 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
 
   // Insert usage_limits for test_user (required for budget validation)
   sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_cents_per_month, current_cost_cents_this_month, created_at, updated_at)
+    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)"
   )
   .bind( "test_user" )
-  .bind( 1000000i64 )  // $10,000 USD limit (in cents)
-  .bind( 0i64 )        // No spending yet
+  .bind( 10_000_000_000_i64 )  // $10,000 USD limit (in microdollars)
+  .bind( 0i64 )                 // No spending yet
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )
@@ -894,6 +913,14 @@ async fn test_refresh_with_insufficient_agent_budget()
     "requested_budget": 10_000_000  // $10
   } );
 
+  // Create valid JWT token for authorization (GAP-003: refresh endpoint requires JWT)
+  let access_token = common::create_test_access_token(
+    "test_user",
+    "test@example.com",
+    "admin",
+    "test_jwt_secret"
+  );
+
   let app = Router::new()
     .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
     .with_state( state );
@@ -902,6 +929,7 @@ async fn test_refresh_with_insufficient_agent_budget()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", access_token ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -921,23 +949,32 @@ async fn test_refresh_with_insufficient_agent_budget()
   let response_json: serde_json::Value = serde_json::from_str( &body_str )
     .expect("LOUD FAILURE: Response should be valid JSON");
 
-  // Assert: Status is "denied"
+  // Fix(issue-budget-008): Refresh now reserves budget via check_and_reserve_budget
+  //
+  // Root cause: Test expected denial when budget < requested, but check_and_reserve_budget
+  // supports partial grants. Agent has $5, requests $10, receives $5 granted.
+  //
+  // Pitfall: When fixing budget accounting bugs, check ALL tests that validate budget
+  // enforcement behavior. Partial grant support changes "insufficient budget" semantics
+  // from "deny" to "approve with available amount".
+
+  // Assert: Status is "approved" (partial grant)
   assert_eq!(
     response_json[ "status" ].as_str().unwrap(),
-    "denied",
-    "Refresh with insufficient budget should return status='denied'"
+    "approved",
+    "Refresh with partial budget should return status='approved' (partial grant)"
   );
 
-  // Assert: Reason is "insufficient_budget"
+  // Assert: budget_granted is $5 (partial grant, not full $10)
   assert_eq!(
-    response_json[ "reason" ].as_str().unwrap(),
-    "insufficient_budget",
-    "Denial reason should be 'insufficient_budget'"
+    response_json[ "budget_granted" ].as_i64().unwrap(),
+    5_000_000,
+    "Partial grant should provide available budget ($5, not requested $10)"
   );
 
-  // Assert: budget_granted is None
+  // Assert: Reason is None (approved, not denied)
   assert!(
-    response_json[ "budget_granted" ].is_null(),
-    "No budget should be granted when denied"
+    response_json[ "reason" ].is_null(),
+    "Approved refresh should have no denial reason"
   );
 }

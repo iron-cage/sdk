@@ -8,15 +8,17 @@
 //! - Response extractors
 //! - Database test infrastructure and isolation tests
 //! - Budget test infrastructure (Protocol 005)
+//! - Authentication test infrastructure (Protocol 007)
 
+pub mod auth;
 pub mod budget;
 pub mod corner_cases;
-pub mod database;
 pub mod error_format;
 pub mod fixtures;
+pub mod test_db;
 pub mod test_state;
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
+use sqlx::SqlitePool;
 use axum::{ response::Response, http::StatusCode, body::Body };
 use iron_control_api::jwt_auth::{ JwtSecret, AccessTokenClaims, RefreshTokenClaims };
 
@@ -246,23 +248,11 @@ mod tests
   use super::*;
 
   #[ tokio::test ]
-  async fn test_create_test_database()
-  {
-    let pool = create_test_database().await;
-
-    // Verify schema was applied
-    let result = sqlx::query( "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'" )
-      .fetch_one( &pool )
-      .await;
-
-    assert!( result.is_ok(), "Users table should exist" );
-  }
-
-  #[ tokio::test ]
   async fn test_create_test_user()
   {
-    let pool = create_test_database().await;
-    let ( user_id, password_hash ) = create_test_user( &pool, "testuser" ).await;
+    let db = test_db::create_test_db().await;
+    let pool = db.pool();
+    let ( user_id, password_hash ) = create_test_user( pool, "testuser" ).await;
 
     assert!( !user_id.is_empty(), "User ID should not be empty" );
     assert!( !password_hash.is_empty() );
@@ -270,7 +260,7 @@ mod tests
     // Verify user was inserted
     let count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users WHERE id = ?" )
       .bind( user_id )
-      .fetch_one( &pool )
+      .fetch_one( pool )
       .await
       .expect("LOUD FAILURE: Should query users");
 

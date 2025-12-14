@@ -163,11 +163,15 @@ async fn test_ic_token_authorization_enforcement()
   // Attempt to refresh agent 1's lease using agent 2's IC Token (authorization violation)
   let ic_token_agent_2 = create_ic_token( agent_2, &state.ic_token_manager );
 
+  // Create JWT token for authenticated request (GAP-003)
+  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+
   let app2 = create_budget_router( state ).await;
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", access_token ) )
     .body( Body::from(
       json!({
         "ic_token": ic_token_agent_2,
@@ -690,11 +694,15 @@ async fn test_sql_injection_in_reason_field()
   // Attempt SQL injection via reason field
   let malicious_reason = "Need more'; DROP TABLE agents; --";
 
+  // Create JWT token for authenticated request (GAP-003)
+  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+
   let app2 = create_budget_router( state ).await;
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", access_token ) )
     .body( Body::from(
       json!({
         "ic_token": ic_token,
@@ -820,12 +828,16 @@ async fn test_refresh_on_revoked_lease()
     .await
     .unwrap();
 
+  // Create JWT token for authenticated request (GAP-003)
+  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+
   // Attempt to refresh on revoked lease
   let app2 = create_budget_router( state ).await;
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
+    .header( "authorization", format!( "Bearer {}", access_token ) )
     .body( Body::from(
       json!({
         "ic_token": ic_token,
@@ -999,4 +1011,191 @@ async fn test_handshake_after_revocation()
     first_lease_id, second_lease_id,
     "New lease should have different ID than revoked lease"
   );
+}
+
+/// E5: SQL injection in lease_id parameter
+///
+/// # Corner Case
+/// Malicious lease_id attempting SQL injection
+///
+/// # Expected Behavior
+/// - Request rejected (404 Not Found) OR SQL injection prevented (200 OK with no damage)
+/// - Database tables remain intact
+/// - No data corruption or deletion
+///
+/// # Risk
+/// HIGH - SQL injection could compromise entire database
+#[ tokio::test ]
+async fn test_sql_injection_in_lease_id()
+{
+  let pool = setup_test_db().await;
+  let agent_id = 220;
+
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+
+  // Create valid lease first
+  let app = create_budget_router( state.clone() ).await;
+  let handshake_response = app
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/handshake" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "ic_token": ic_token,
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( handshake_response.status(), StatusCode::OK );
+
+  // Attempt SQL injection via lease_id
+  let malicious_lease_id = "lease_123'; DROP TABLE budget_leases; --";
+
+  let app2 = create_budget_router( state ).await;
+  let report_response = app2
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "lease_id": malicious_lease_id,
+          "request_id": "req_sql_injection_test",
+          "tokens": 1000,
+          "cost_microdollars": 5_000_000,
+          "model": "gpt-4",
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  // Should reject (404 Not Found) or prevent SQL injection (400 Bad Request)
+  assert!(
+    report_response.status() == StatusCode::NOT_FOUND
+      || report_response.status() == StatusCode::BAD_REQUEST,
+    "LOUD FAILURE: Malicious lease_id should be rejected, got status: {}",
+    report_response.status()
+  );
+
+  // Verify budget_leases table still exists (injection prevented)
+  let lease_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM budget_leases" )
+    .fetch_one( &pool )
+    .await
+    .expect("LOUD FAILURE: budget_leases table should still exist");
+
+  assert!(
+    lease_count >= 1,
+    "LOUD FAILURE: budget_leases table should be intact (SQL injection prevented)"
+  );
+}
+
+/// E6: XSS in model parameter
+///
+/// # Corner Case
+/// Malicious model parameter containing XSS payload
+///
+/// # Expected Behavior
+/// - Request accepted with sanitization OR rejected with validation error
+/// - No JavaScript execution risk in stored data
+/// - Stored value is safe for retrieval
+///
+/// # Risk
+/// MEDIUM - XSS could compromise clients retrieving stored data
+#[ tokio::test ]
+async fn test_xss_in_model_parameter()
+{
+  let pool = setup_test_db().await;
+  let agent_id = 221;
+
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+
+  // Create lease
+  let app = create_budget_router( state.clone() ).await;
+  let handshake_response = app
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/handshake" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "ic_token": ic_token,
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( handshake_response.status(), StatusCode::OK );
+
+  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
+
+  // Attempt XSS via model parameter
+  let malicious_model = "<script>alert('XSS')</script>";
+
+  let app2 = create_budget_router( state ).await;
+  let report_response = app2
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "lease_id": lease_id,
+          "request_id": "req_xss_test",
+          "tokens": 1000,
+          "cost_microdollars": 5_000_000,
+          "model": malicious_model,
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  // Should accept (200) or reject with validation error (400/422), NOT execute XSS
+  assert!(
+    report_response.status() == StatusCode::OK
+      || report_response.status() == StatusCode::BAD_REQUEST
+      || report_response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "LOUD FAILURE: XSS should be prevented or sanitized, got status: {}",
+    report_response.status()
+  );
+
+  // If accepted, verify data is stored (backend APIs typically don't execute JS, but should sanitize)
+  // The key security concern is that the data is stored safely without causing issues
+  // when retrieved by other systems
+  if report_response.status() == StatusCode::OK
+  {
+    // Verify the usage was recorded
+    let usage_count: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM llm_usage_events WHERE lease_id = ? AND model = ?"
+    )
+    .bind( &lease_id )
+    .bind( malicious_model )
+    .fetch_one( &pool )
+    .await
+    .unwrap_or( 0 );
+
+    // Either sanitized (count = 0) or stored as-is (count = 1)
+    // Both are acceptable as long as retrieval is safe
+    assert!(
+      usage_count <= 1,
+      "LOUD FAILURE: XSS payload should be handled safely"
+    );
+  }
 }

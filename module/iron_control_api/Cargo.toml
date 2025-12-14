@@ -98,7 +98,12 @@ base64 = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["v4"], optional = true }
 hex = { version = "0.4", optional = true }
 
+[build-dependencies]
+vergen = { version = "8.0", features = ["build", "git", "gitcl"] }
+
 [dev-dependencies]
+iron_token_manager = { path = "../iron_token_manager" }
+iron_test_db = { path = "../iron_test_db", features = ["enabled"] }
 tokio = { workspace = true, features = ["full"] }
 hyper = { workspace = true }
 http-body-util = { workspace = true }

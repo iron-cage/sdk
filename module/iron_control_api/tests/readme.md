@@ -81,6 +81,8 @@ tests/
 | `budget_security.rs` | Test Protocol 005 security-critical scenarios | Security attacks → Attack prevention | NOT concurrency (budget_concurrency.rs), NOT database state (budget_database_state.rs), NOT input validation (budget_corner_cases.rs), NOT types (budget_routes.rs) |
 | `auth_endpoints.rs` | Test authentication endpoint JWT token lifecycle | JWT scenarios → Token validation | NOT auth flows (auth/), NOT user management (users.rs), NOT RBAC (rbac.rs), NOT integration (integration_tests.rs) |
 | `users.rs` | Test user management CRUD endpoints | User management scenarios → CRUD validation | NOT auth (auth/, auth_endpoints.rs), NOT tokens (tokens/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
+| `auth_rate_limiting.rs` | Test Protocol 007 login rate limiting for brute force prevention | Login rate limit scenarios → Attack prevention validation | NOT token rate limiting (tokens/rate_limiting.rs), NOT auth flows (auth/), NOT JWT lifecycle (auth_endpoints.rs), NOT user management (users.rs) |
+| `agent_provider_key_tests.rs` | Test provider API key retrieval endpoint | Key fetch scenarios → Retrieval validation | Feature 014 provider key tests | NOT budget (budget_*), NOT auth (auth/), NOT tokens (tokens/) |
 
 ## Test Coverage Summary
 

@@ -121,13 +121,23 @@ pub struct BudgetRefreshResponse
 ///
 /// - 200 OK with approval/denial status
 /// - 400 Bad Request if validation fails
+/// - 401 Unauthorized if JWT authentication fails
 /// - 404 Not Found if lease doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn refresh_budget(
   State( state ): State< BudgetState >,
+  authenticated_user: crate::jwt_auth::AuthenticatedUser,
   Json( request ): Json< BudgetRefreshRequest >,
 ) -> impl IntoResponse
 {
+  // Extract approver identity from JWT for audit trail (GAP-003)
+  let approver_id = &authenticated_user.0.sub;
+  tracing::info!(
+    "Budget refresh requested by approver: {} (role: {})",
+    approver_id,
+    authenticated_user.0.role
+  );
+
   // Validate request
   if let Err( validation_error ) = request.validate()
   {
@@ -276,22 +286,51 @@ pub async fn refresh_budget(
   // Get requested budget amount (with default)
   let requested_budget = request.get_requested_budget();
 
-  // Check if agent has sufficient remaining budget
-  if agent_budget.budget_remaining < requested_budget
-  {
-    // Deny request
-    return ( StatusCode::OK, Json( BudgetRefreshResponse
-    {
-      status: "denied".to_string(),
-      budget_granted: None,
-      budget_remaining: agent_budget.budget_remaining,
-      lease_id: None,
-      reason: Some( "insufficient_budget".to_string() ),
-    } ) )
-      .into_response();
-  }
+  // Fix(issue-budget-008): Reserve budget atomically before creating new lease
+  //
+  // Root cause: Original implementation created new lease via `create_lease()` without
+  // reserving budget from agent. `create_lease()` only creates the database record but
+  // does NOT call `check_and_reserve_budget()` to update agent's total_spent and
+  // budget_remaining. This violated the budget invariant and allowed unlimited lease
+  // creation without budget enforcement.
+  //
+  // Pitfall: Never call `lease_manager.create_lease()` directly for user-facing endpoints.
+  // Always reserve budget first via `agent_budget_manager.check_and_reserve_budget()`.
+  // The lease record and agent budget must be updated atomically. Pattern: handshake
+  // endpoint does this correctly (handshake.rs:256-258), refresh endpoint must match.
 
-  // Approve request - create new lease
+  // Atomically check and reserve budget for new lease
+  let budget_granted = match state
+    .agent_budget_manager
+    .check_and_reserve_budget( lease.agent_id, requested_budget )
+    .await
+  {
+    Ok( granted ) if granted > 0 => granted,
+    Ok( _ ) =>
+    {
+      // Insufficient budget - deny request
+      return ( StatusCode::OK, Json( BudgetRefreshResponse
+      {
+        status: "denied".to_string(),
+        budget_granted: None,
+        budget_remaining: agent_budget.budget_remaining,
+        lease_id: None,
+        reason: Some( "insufficient_budget".to_string() ),
+      } ) )
+        .into_response();
+    }
+    Err( err ) =>
+    {
+      tracing::error!( "Database error checking and reserving budget: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Budget service unavailable" }) ),
+      )
+        .into_response();
+    }
+  };
+
+  // Create new lease with granted budget
   let new_lease_id = format!( "lease_{}", Uuid::new_v4() );
 
   if let Err( err ) = state
@@ -300,7 +339,7 @@ pub async fn refresh_budget(
       &new_lease_id,
       lease.agent_id,
       lease.budget_id,
-      requested_budget,
+      budget_granted,
       None,
     )
     .await
@@ -320,18 +359,39 @@ pub async fn refresh_budget(
     // Continue anyway - new lease was created
   }
 
-  // Update agent budget (deduct granted amount from remaining)
-  // Note: The budget was already deducted during handshake, so we dont double-deduct here
-  // Instead, we just return the current status
-
-  // Calculate new remaining budget after this grant
-  let new_remaining = agent_budget.budget_remaining.saturating_sub( requested_budget );
+  // Get updated budget status after reservation
+  let updated_budget = match state
+    .agent_budget_manager
+    .get_budget_status( lease.agent_id )
+    .await
+  {
+    Ok( Some( budget ) ) => budget,
+    Ok( None ) =>
+    {
+      // Agent budget disappeared - should never happen
+      tracing::error!( "Agent budget disappeared after refresh" );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Budget service unavailable" }) ),
+      )
+        .into_response();
+    }
+    Err( err ) =>
+    {
+      tracing::error!( "Database error fetching updated budget: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Budget service unavailable" }) ),
+      )
+        .into_response();
+    }
+  };
 
   ( StatusCode::OK, Json( BudgetRefreshResponse
   {
     status: "approved".to_string(),
-    budget_granted: Some( requested_budget ),
-    budget_remaining: new_remaining,
+    budget_granted: Some( budget_granted ),
+    budget_remaining: updated_budget.budget_remaining,
     lease_id: Some( new_lease_id ),
     reason: None,
   } ) )

@@ -10,7 +10,7 @@
 
 ---
 
-## TL;DR
+### TL;DR
 
 **Timestamps:** ISO 8601 with Z (`2025-12-10T10:30:45Z`)
 **Currency:** Decimal with 2 places (`100.50`)
@@ -20,7 +20,7 @@
 
 ---
 
-## Timestamp Format
+### Timestamp Format
 
 ### Standard Format
 
@@ -165,7 +165,7 @@ timestamp1 < timestamp2  // true (9th < 10th)
 
 ---
 
-## Currency Format
+### Currency Format
 
 ### Standard Format
 
@@ -179,15 +179,29 @@ timestamp1 < timestamp2  // true (9th < 10th)
 }
 ```
 
-**Decimal precision:** Always 2 decimal places (cents precision)
+**Display format:** 2 decimal places for USD display
 
 ```json
-✅ "budget": 100.00  // OK (even if zero cents)
-✅ "budget": 100.50  // OK
-❌ "budget": 100     // ❌ Missing decimal places
-❌ "budget": 100.5   // ❌ Only 1 decimal place
-❌ "budget": 100.505 // ❌ Too many decimal places
+✅ "budget_usd": 100.00  // OK (display format)
+✅ "budget_usd": 100.50  // OK
 ```
+
+### Internal Storage: Microdollars
+
+**All budget values stored as integers in microdollars** (1 USD = 1,000,000 microdollars).
+This avoids floating-point precision errors for sub-cent amounts.
+
+```json
+{
+  "budget_granted": 10000000,      // $10.00 in microdollars
+  "cost_microdollars": 2500000,    // $2.50 in microdollars
+  "budget_remaining": 7500000      // $7.50 in microdollars
+}
+```
+
+**Conversion:**
+- Display: `microdollars / 1_000_000.0` → USD (e.g., 2500000 → $2.50)
+- Storage: `usd * 1_000_000` → microdollars (e.g., $2.50 → 2500000)
 
 ### Currency Code
 
@@ -299,7 +313,7 @@ console.log(new Intl.NumberFormat('en-US', {
 
 ---
 
-## Boolean Format
+### Boolean Format
 
 ### Standard Format
 
@@ -374,7 +388,7 @@ console.log(new Intl.NumberFormat('en-US', {
 
 ---
 
-## Null Handling
+### Null Handling
 
 ### Optional Fields
 
@@ -440,7 +454,7 @@ PUT /api/v1/agents/{id}
 
 ---
 
-## Array Handling
+### Array Handling
 
 ### Empty Arrays
 
@@ -522,7 +536,7 @@ PUT /api/v1/agents/{id}
 
 ---
 
-## Complete Example
+### Complete Example
 
 ### Agent Resource
 
@@ -577,7 +591,7 @@ PUT /api/v1/agents/{id}
 
 ---
 
-## Validation Rules
+### Validation Rules
 
 ### Timestamp Validation
 
@@ -633,7 +647,7 @@ struct Agent {
 
 ---
 
-## Migration and Compatibility
+### Migration and Compatibility
 
 ### Timestamp Migration
 
@@ -681,7 +695,7 @@ fn parse_timestamp_flexible(value: &serde_json::Value) -> Result<DateTime<Utc>, 
 
 ---
 
-## References
+### References
 
 ### Related Documentation
 

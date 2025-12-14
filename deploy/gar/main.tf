@@ -1,0 +1,21 @@
+# Provider for resource creation
+provider "google" {
+  project     = var.PROJECT_ID
+  region      = var.REGION
+  credentials = file(var.GOOGLE_SE_CREDS_PATH)
+}
+
+terraform {
+  backend "gcs" {}
+}
+
+# Artifact Registry block
+resource "google_artifact_registry_repository" "container-images-repo" {
+  # Location for the repository
+  location      = var.REGION
+  project       = var.PROJECT_ID
+  repository_id = var.REPO_NAME
+  description   = "Docker image registry for the deployments"
+  # Format of the repository. We are using Docker.
+  format = "DOCKER"
+}

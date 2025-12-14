@@ -44,6 +44,7 @@
 //! | `test_reset_password_short_rejected` | Reset password too short | POST with password <8 chars | 400 Bad Request | ✅ |
 
 use crate::common::extract_json_response;
+use crate::common::test_db;
 use iron_control_api::routes::users::
 {
   UserManagementState, CreateUserResponse, ListUsersResponse, UserResponse,
@@ -55,6 +56,7 @@ use axum::
   Router,
   routing::{ get, post, put, delete },
   http::{ Request, StatusCode },
+  extract::ConnectInfo,
 };
 use axum::body::Body;
 use tower::ServiceExt;
@@ -62,6 +64,7 @@ use serde_json::json;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 
 use std::sync::Arc;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::extract::FromRef;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::jwt_auth::JwtSecret;
@@ -85,73 +88,18 @@ impl FromRef<TestAppState> for UserManagementState {
 }
 
 /// Create test database with users table and migrations
-async fn create_test_database() -> SqlitePool
-{
-  // Use shared in-memory database so all connections see the same data
-  // Without ?cache=shared, each connection gets its own private database!
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( "sqlite::memory:?cache=shared" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create in-memory database" );
-
-  // Enable foreign key constraints (required for SQLite)
-  sqlx::raw_sql( "PRAGMA foreign_keys = ON;" )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to enable foreign keys" );
-
-  // Apply migrations (003, 005, 006)
-  let migration_003 = include_str!( "../../../iron_token_manager/migrations/003_create_users_table.sql" );
-  let migration_005 = include_str!( "../../../iron_token_manager/migrations/005_enhance_users_table.sql" );
-  let migration_006 = include_str!( "../../../iron_token_manager/migrations/006_create_user_audit_log.sql" );
-
-  sqlx::raw_sql( migration_003 )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to apply migration 003" );
-
-  sqlx::raw_sql( migration_005 )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to apply migration 005" );
-
-  sqlx::raw_sql( migration_006 )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to apply migration 006" );
-
-  // Create admin user with ID=999 for testing (used as performed_by in audit logs)
-  let admin_password_hash = bcrypt::hash( "admin_password", 4 )
-    .expect( "LOUD FAILURE: Failed to hash admin password" );
-
-  let now = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect("LOUD FAILURE: Time went backwards")
-    .as_millis() as i64;
-
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (999, 'test_admin', ?, 'admin@test.com', 'admin', 1, ?)"
-  )
-  .bind( &admin_password_hash )
-  .bind( now )
-  .execute( &pool )
-  .await
-  .expect( "LOUD FAILURE: Failed to create test admin user" );
-
-  pool
-}
 
 /// Create test router with user management routes
 async fn create_test_router() -> Router
 {
-  let db_pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool();
   let permission_checker = Arc::new( PermissionChecker::new() );
 
   let auth_state = AuthState {
     db_pool: db_pool.clone(),
     jwt_secret: Arc::new(JwtSecret::new("test_secret".to_string())),
+    rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
   };
 
   let user_state = UserManagementState::new( db_pool, permission_checker );
@@ -160,6 +108,8 @@ async fn create_test_router() -> Router
     auth: auth_state,
     users: user_state,
   };
+
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
   Router::new()
     .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
@@ -171,6 +121,7 @@ async fn create_test_router() -> Router
     .route( "/api/users/:id/role", put( iron_control_api::routes::users::change_user_role ) )
     .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
     .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
+    .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state( state )
 }
 

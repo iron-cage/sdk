@@ -7,60 +7,19 @@
 //! | `test_direct_handler_call` | Direct UserService integration test | Create user via UserService, suspend via same instance, verify audit log | User suspended (is_active=false), audit log entry created | ✅ |
 
 use iron_control_api::routes::users::{ UserManagementState, CreateUserRequest, SuspendUserRequest };
+use crate::common::test_db;
 use iron_control_api::rbac::PermissionChecker;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 use std::sync::Arc;
 use tracing::{debug, info};
 
 /// Create test database
-async fn create_test_database() -> SqlitePool
-{
-  // Use shared in-memory database so all connections see the same data
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( "sqlite::memory:?cache=shared" )
-    .await
-    .expect("LOUD FAILURE: Failed to create database");
-
-  // Enable foreign key constraints (required for SQLite)
-  sqlx::raw_sql( "PRAGMA foreign_keys = ON;" )
-    .execute( &pool )
-    .await
-    .expect("LOUD FAILURE: Failed to enable foreign keys");
-
-  // Apply migrations
-  let migration_003 = include_str!( "../../../iron_token_manager/migrations/003_create_users_table.sql" );
-  let migration_005 = include_str!( "../../../iron_token_manager/migrations/005_enhance_users_table.sql" );
-  let migration_006 = include_str!( "../../../iron_token_manager/migrations/006_create_user_audit_log.sql" );
-
-  sqlx::raw_sql( migration_003 ).execute( &pool ).await.expect("LOUD FAILURE: Migration 003 failed");
-  sqlx::raw_sql( migration_005 ).execute( &pool ).await.expect("LOUD FAILURE: Migration 005 failed");
-  sqlx::raw_sql( migration_006 ).execute( &pool ).await.expect("LOUD FAILURE: Migration 006 failed");
-
-  // Create admin user
-  let admin_hash = bcrypt::hash( "admin_password", 4 ).expect("LOUD FAILURE: Hash failed");
-  let now = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect("LOUD FAILURE: Time error")
-    .as_millis() as i64;
-
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (999, 'test_admin', ?, 'admin@test.com', 'admin', 1, ?)"
-  )
-  .bind( &admin_hash )
-  .bind( now )
-  .execute( &pool )
-  .await
-  .expect("LOUD FAILURE: Admin creation failed");
-
-  pool
-}
 
 #[ tokio::test ]
 async fn test_direct_handler_call()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool();
   let user_service = iron_token_manager::user_service::UserService::new( pool.clone() );
 
   // Create user through UserService

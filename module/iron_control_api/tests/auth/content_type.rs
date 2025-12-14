@@ -19,8 +19,9 @@
 //! - API contract enforcement for auth operations
 
 use crate::common::test_state::create_test_auth_state;
-use axum::{ Router, routing::post, http::{ Request, StatusCode } };
+use axum::{ Router, routing::post, http::{ Request, StatusCode }, extract::ConnectInfo };
 use axum::body::Body;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower::ServiceExt;
 use iron_control_api::routes::auth;
 
@@ -38,15 +39,19 @@ async fn create_test_router() -> Router
 async fn test_login_wrong_content_type()
 {
   let router = create_test_router().await;
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
   // WHY: Login credentials must be sent with proper Content-Type
   // Security-critical: prevent parser confusion on credentials
-  let request = Request::builder()
+  let mut request = Request::builder()
     .method( "POST" )
     .uri( "/api/auth/login" )
     .header( "content-type", "text/plain" )
     .body( Body::from( r#"{"username":"test","password":"pass"}"# ) )
     .unwrap();
+
+  // Insert ConnectInfo into request extensions for the handler
+  request.extensions_mut().insert(ConnectInfo(test_addr));
 
   let response = router.oneshot( request ).await.unwrap();
 

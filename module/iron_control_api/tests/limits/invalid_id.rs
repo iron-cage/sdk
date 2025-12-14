@@ -103,7 +103,7 @@ async fn test_update_limit_with_non_numeric_id_returns_json_error()
     .method( "PUT" )
     .uri( "/api/limits/xyz" )
     .header( "content-type", "application/json" )
-    .body( Body::from( r#"{"user_id":"user_1","max_cost_per_month_cents":1000}"# ) )
+    .body( Body::from( r#"{"user_id":"user_1","max_cost_per_month_microdollars":1000}"# ) )
     .unwrap();
 
   let response = app.clone().oneshot( request ).await.unwrap();

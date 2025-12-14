@@ -237,15 +237,16 @@ pub async fn create_provider_key(
   // Create masked key for response
   let masked_key = mask_api_key( &request.api_key );
 
-  let keys = state.storage.get_keys_by_provider(provider).await;
-  if keys.is_err()
+  let keys = match state.storage.get_keys_by_provider(provider).await
   {
-    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-      "error": "Failed to get provider keys"
-    }) ) ).into_response();
-  }
-
-  let keys = keys.unwrap();
+    Ok( keys ) => keys,
+    Err( _ ) =>
+    {
+      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+        "error": "Failed to get provider keys"
+      }) ) ).into_response();
+    }
+  };
   let key_id = if !keys.is_empty()
   {
     match state.storage.update_key(
