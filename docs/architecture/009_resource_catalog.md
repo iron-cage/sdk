@@ -472,6 +472,72 @@ This document provides an exhaustive catalog of all REST API resources exposed b
 
 **Total:** 23 resources with complete specifications across all priority levels.
 
+### Implementation & CLI Parity Status
+
+**Last Updated:** 2025-12-14
+
+**REST API Implementation Status:**
+
+| Domain | Endpoints Implemented | Total Specified | Implementation % |
+|--------|----------------------|-----------------|------------------|
+| **Health/Version** | 2/2 | 2 | 100% ✅ |
+| **Authentication** | 4/4 | 4 | 100% ✅ |
+| **Users** | 8/8 | 8 | 100% ✅ |
+| **API Tokens** | 7/7 | 7 | 100% ✅ |
+| **Usage** | 3/3 | 3 | 100% ✅ |
+| **Limits** | 5/5 | 5 | 100% ✅ |
+| **Providers** | 7/7 | 7 | 100% ✅ |
+| **Keys** | 1/1 | 1 | 100% ✅ |
+| **Agents** | 6/6 | 6 | 100% ✅ |
+| **Budget** | 11/11 | 11 | 100% ✅ |
+| **Analytics** | 10/10 | 10 | 100% ✅ |
+| **TOTAL** | **64/64** | **64** | **100% ✅** |
+
+**CLI-API Parity Status:**
+
+| REST Endpoint(s) | CLI Command Group | CLI Commands | Status |
+|------------------|-------------------|--------------|--------|
+| `GET /api/health` | - | - | ❌ No CLI (public endpoint) |
+| `GET /api/v1/version` | - | - | ❌ No CLI (public endpoint) |
+| `POST /api/v1/auth/login` | `.auth` | `login` | ✅ Mapped |
+| `POST /api/v1/auth/refresh` | `.auth` | `refresh` | ✅ Mapped |
+| `POST /api/v1/auth/logout` | `.auth` | `logout` | ✅ Mapped |
+| `POST /api/v1/auth/validate` | `.auth` | `validate` | ✅ Mapped |
+| `/api/v1/users/*` (8 endpoints) | `.user` | `list, create, get, update, delete, set_role, reset_password, get_permissions` | ✅ Mapped (8 commands) |
+| `/api/v1/api-tokens/*` (7 endpoints) | `.api_token` | `list, create, get, revoke` | ⚠️ Partial (4/7 mapped) |
+| `/api/v1/usage/*` (3 endpoints) | - | - | ❌ No CLI |
+| `/api/v1/limits/*` (5 endpoints) | `.budget_limit` | `get, set` | ⚠️ Partial (2/5 mapped) |
+| `/api/v1/providers/*` (7 endpoints) | `.provider` | `list, create, get, update, delete, assign_agents, list_agents, remove_agent` | ✅ Mapped (8 commands) |
+| `GET /api/v1/keys` | - | - | ❌ No CLI (agent-only) |
+| `/api/v1/agents/*` (6 endpoints) | `.agent` | `list, create, get, update, delete, assign_providers, list_providers, remove_provider` | ✅ Mapped (8 commands) |
+| `/api/v1/budget/handshake` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/report` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/refresh` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/return` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/requests/*` (5 endpoints) | `.budget_request` | `list, create, get, approve, reject, cancel` | ✅ Mapped (6 commands) |
+| `/api/v1/analytics/*` (10 endpoints) | `.analytics` | `usage, spending, metrics, usage_by_agent, usage_by_provider, spending_by_period, export_usage, export_spending` | ✅ Mapped (8 commands) |
+
+**CLI Parity Summary:**
+- **✅ Full Parity (47 commands):** Agents, Providers, Analytics, Users, Budget Requests, Auth
+- **⚠️ Partial Parity:** API Tokens (4/7), Limits (2/5)
+- **❌ No CLI (Expected):** Health, Version (public), Keys (agent-only), Budget protocol endpoints (agent-facing), Usage endpoints (basic tracking)
+- **Total CLI Commands:** 47 (covers 47/64 REST endpoints = 73% coverage)
+
+**Gaps Analysis:**
+1. **API Tokens:** Missing PUT (update), POST (validate), POST/:id/rotate commands
+2. **Limits:** Missing POST (create), GET/:id (get), PUT/:id (update), DELETE/:id (delete) - only has get/set for agent budgets
+3. **Usage:** `/api/usage/*` endpoints not exposed in CLI (use `/api/v1/analytics/*` instead via `.analytics` commands)
+4. **Health/Version:** Public monitoring endpoints intentionally not exposed in CLI
+5. **Keys:** `/api/v1/keys` is user token endpoint, agent-only access, not needed in CLI
+6. **Budget Protocol:** Agent-facing endpoints not exposed in CLI (used by iron_runtime directly)
+
+**Recent Changes (2025-12-14):**
+- ✅ Implemented `/api/v1/version` endpoint (build-time metadata with `vergen`)
+- ✅ Removed `version` field from `/api/health` response (rollback impossible via type system)
+- ✅ Documented `/api/keys` endpoint (Protocol 018: Keys API)
+- ✅ Removed `/api/traces` debugging endpoint (inappropriate for production)
+- ✅ Documented `/api/usage` vs `/api/v1/analytics` distinction (Protocol 012, different data sources and purposes)
+
 ### ❌ Missing Resources (Intentionally Not Exposed)
 
 **Entities Without Direct API:**

@@ -3,6 +3,7 @@
 //! Budget change request approval workflow
 
 use super::state::BudgetState;
+use crate::error::ValidationError;
 use axum::
 {
   extract::State,
@@ -62,30 +63,42 @@ impl CreateBudgetRequestRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate agent_id is positive
     if self.agent_id <= 0
     {
-      return Err( "agent_id must be positive".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "agent_id".to_string(),
+        reason: "must be positive".to_string(),
+      } );
     }
 
     // Validate requester_id is not empty
     if self.requester_id.trim().is_empty()
     {
-      return Err( "requester_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "requester_id".to_string() ) );
     }
 
     // Validate requested_budget_usd is finite (not NaN or Infinity)
     if !self.requested_budget_usd.is_finite()
     {
-      return Err( "requested_budget_usd must be a valid number".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "requested_budget_usd".to_string(),
+        reason: "must be a valid number".to_string(),
+      } );
     }
 
     // Validate requested_budget_usd is positive
     if self.requested_budget_usd <= 0.0
     {
-      return Err( "requested_budget_usd must be positive".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "requested_budget_usd".to_string(),
+        reason: "must be positive".to_string(),
+      } );
     }
 
     // Fix(issue-TBD): Validate requested_budget_usd does not exceed safe maximum
@@ -100,28 +113,31 @@ impl CreateBudgetRequestRequest
     // Don't assume is_finite() is sufficient - finite doesn't mean reasonable.
     if self.requested_budget_usd > Self::MAX_BUDGET_USD
     {
-      return Err( format!(
-        "requested_budget_usd exceeds maximum allowed budget of {} USD",
-        Self::MAX_BUDGET_USD
-      ) );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "requested_budget_usd".to_string(),
+        reason: format!( "exceeds maximum allowed budget of {} USD", Self::MAX_BUDGET_USD ),
+      } );
     }
 
     // Validate justification length
     let justification_len = self.justification.trim().len();
     if justification_len < Self::MIN_JUSTIFICATION_LENGTH
     {
-      return Err( format!(
-        "justification too short (min {} characters)",
-        Self::MIN_JUSTIFICATION_LENGTH
-      ) );
+      return Err( ValidationError::TooShort
+      {
+        field: "justification".to_string(),
+        min_length: Self::MIN_JUSTIFICATION_LENGTH,
+      } );
     }
 
     if justification_len > Self::MAX_JUSTIFICATION_LENGTH
     {
-      return Err( format!(
-        "justification too long (max {} characters)",
-        Self::MAX_JUSTIFICATION_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "justification".to_string(),
+        max_length: Self::MAX_JUSTIFICATION_LENGTH,
+      } );
     }
 
     Ok( () )
@@ -165,7 +181,7 @@ pub async fn create_budget_request(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 

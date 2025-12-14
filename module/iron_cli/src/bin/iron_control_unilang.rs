@@ -416,14 +416,17 @@ fn route_to_handler(
     ".auth.login" =>
     {
       runtime.block_on( iron_cli::adapters::auth_adapters::login_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".auth.logout" =>
     {
       runtime.block_on( iron_cli::adapters::auth_adapters::logout_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".auth.refresh" =>
     {
       runtime.block_on( iron_cli::adapters::auth_adapters::refresh_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Default: Command not implemented

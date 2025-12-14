@@ -1,37 +1,54 @@
-# Protocol 010: Agents API
+# Protocol: Agents API
 
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
-**Priority:** MUST-HAVE
+### Scope
+
+This protocol defines the HTTP API for managing agents in the Iron Control Panel. Agents are autonomous entities that consume LLM provider services within budget constraints.
+
+**In scope**:
+- Agent lifecycle operations (create, list, get, update)
+- Agent-provider assignments (add, list, remove providers)
+- Agent-budget relationship (view budget status, spending)
+- IC Token generation and metadata access
+- Owner-based access control with admin override
+- Pagination, filtering, and sorting of agent lists
+- CLI integration commands
+- Audit logging for mutation operations
+
+**Out of scope**:
+- Agent deletion (Future Enhancement - see lines 1304-1316)
+- Agent activation/deactivation (Future Enhancement - see lines 1319-1326)
+- Multi-project support (Future Enhancement - see lines 1329-1335)
+- Budget modification (see Protocol 013: Budget Limits API)
+- IC Token rotation (see Protocol 006: Token Management API)
+- Provider management (see Protocol 011: Providers API)
+- Usage analytics (see Protocol 012: Analytics API)
+
+### Purpose
+
+**User Need**: Developers need to create and manage autonomous agents that consume LLM services within budget constraints. Admins need centralized control over agent budgets, provider access, and usage tracking. Both need secure, token-based authentication without exposing provider API keys.
+
+**Solution**: This API provides RESTful endpoints for complete agent lifecycle management. Each agent receives a unique IC Token for authentication, an allocated budget, and assignments to one or more LLM providers. The 1:1 agent-budget relationship (RESTRICTIVE) ensures clear ownership and budget isolation. Owner-based access control with admin override enables both developer autonomy and administrative oversight.
+
+**Key Insight**: The agent is the central execution unit in Iron Cage. By binding exactly one IC Token and exactly one budget to each agent, we create a clear ownership model where developers manage their agents independently while admins maintain budget control. The many-to-many agent-provider relationship provides flexibility in provider selection without compromising budget isolation.
 
 ---
 
-## Overview
+**Status**: Specification
+**Version**: 1.0.0
+**Last Updated**: 2025-12-14
+**Priority**: MUST-HAVE
 
-The Agents API provides HTTP endpoints for managing agents in the Iron Control Panel. Agents are autonomous entities that consume AI provider services within budget constraints. Each agent has a unique IC Token for authentication, an assigned budget, and access to one or more providers.
-
-**Key characteristics:**
-- **1:1 Agent-IC Token relationship:** Each agent has exactly one IC Token
-- **1:1 Agent-Budget relationship:** Each agent has exactly one Agent Budget (RESTRICTIVE)
-- **Many-to-Many Agent-Provider relationship:** Agents can use multiple providers, providers can serve multiple agents
-- **Owner-based access control:** Agents are owned by users, with admin override capabilities
-
----
-
-## Standards Compliance
+### Standards Compliance
 
 This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `agent_id`: `agent_<uuid>` (e.g., `agent_550e8400-e29b-41d4-a716-446655440000`)
-- `provider_id`: `provider_<uuid>`
-- `token_id`: `token_<uuid>`
-- `user_id`: `user_<uuid>`
-- `project_id`: `project_<uuid>`
-
-> **Note:** Examples in this document use simplified IDs (e.g., `agent_abc123`, `ip_openai_001`) for readability. Production systems use full UUIDs as specified in ID Format Standards.
+- Agents API uses short alphanumeric IDs for agent, IC Token, and IP Token identifiers to optimize performance, readability, and database indexing
+- `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
+- `ic_token_id`: `ic_<alphanumeric>` with regex `^ic_[a-z0-9]{6,32}$` (e.g., `ic_def456ghi789`)
+- `provider_id`: `ip_<name>_<numeric>` for IP Token identifiers (e.g., `ip_openai_001`, `ip_anthropic_001`)
+- `user_id`: `user_<uuid>` for cross-system compatibility
+- `project_id`: `project_<uuid>` for cross-system compatibility
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
@@ -50,11 +67,10 @@ This protocol adheres to the following Iron Cage standards:
 - Sorting: Optional `?sort=-created_at` (newest first, default)
 - URL structure: `/api/v1/agents`, `/api/v1/agents/{id}`
 
----
 
-## Endpoints
+### Endpoints
 
-### Create Agent
+#### Create Agent
 
 **Endpoint:** `POST /api/v1/agents`
 
@@ -175,9 +191,8 @@ HTTP 404 Not Found
 
 **Audit Log:** Yes (mutation operation)
 
----
 
-### List Agents
+#### List Agents
 
 **Endpoint:** `GET /api/v1/agents`
 
@@ -294,9 +309,8 @@ HTTP 400 Bad Request
 
 **Audit Log:** No (read operation)
 
----
 
-### Get Agent Details
+#### Get Agent Details
 
 **Endpoint:** `GET /api/v1/agents/{id}`
 
@@ -393,9 +407,8 @@ HTTP 403 Forbidden
 
 **Audit Log:** No (read operation)
 
----
 
-### Update Agent
+#### Update Agent
 
 **Endpoint:** `PUT /api/v1/agents/{id}`
 
@@ -499,9 +512,8 @@ HTTP 404 Not Found
 
 **Audit Log:** Yes (mutation operation)
 
----
 
-### Assign Providers to Agent
+#### Assign Providers to Agent
 
 **Endpoint:** `PUT /api/v1/agents/{id}/providers`
 
@@ -667,9 +679,8 @@ Response: 200 OK
 - Operation: AGENT_PROVIDERS_UPDATED
 - Logged fields: agent_id, old_providers, new_providers, user_id, timestamp
 
----
 
-### Get Agent Providers
+#### Get Agent Providers
 
 **Endpoint:** `GET /api/v1/agents/{id}/providers`
 
@@ -760,9 +771,8 @@ Response: 200 OK
 - **Owner:** Can view providers for OWN agents only
 - **Other Users:** 403 Forbidden
 
----
 
-### Remove Provider from Agent
+#### Remove Provider from Agent
 
 **Endpoint:** `DELETE /api/v1/agents/{agent_id}/providers/{provider_id}`
 
@@ -878,9 +888,8 @@ Response: 200 OK
 - Operation: AGENT_PROVIDER_REMOVED
 - Logged fields: agent_id, provider_id, user_id, timestamp
 
----
 
-### Get Agent Status
+#### Get Agent Status
 
 **Endpoint:** `GET /api/v1/agents/{id}/status`
 
@@ -970,11 +979,10 @@ HTTP 403 Forbidden
 
 **Audit Log:** No (read operation, high frequency)
 
----
 
-## Data Models
+### Data Models
 
-### Agent Object
+#### Agent Object
 
 ```json
 {
@@ -1000,7 +1008,7 @@ HTTP 403 Forbidden
 }
 ```
 
-### Agent Status Object
+#### Agent Status Object
 
 ```json
 {
@@ -1022,11 +1030,10 @@ HTTP 403 Forbidden
 }
 ```
 
----
 
-## Relationships
+### Relationships
 
-### Agent ↔ IC Token (1:1)
+#### Agent ↔ IC Token (1:1)
 
 - Each agent has exactly one IC Token
 - IC Token is automatically created with agent
@@ -1034,7 +1041,7 @@ HTTP 403 Forbidden
 - IC Token can be rotated via `POST /api/v1/tokens/{ic_token_id}/rotate`
 - Deleting agent (future) invalidates IC Token
 
-### Agent ↔ Agent Budget (1:1)
+#### Agent ↔ Agent Budget (1:1)
 
 - Each agent has exactly one Agent Budget (RESTRICTIVE type)
 - Budget set at agent creation
@@ -1042,7 +1049,7 @@ HTTP 403 Forbidden
 - Developers request budget changes via request/approval workflow (see [Protocol 017](017_budget_requests_api.md))
 - Budget enforcement blocks requests when exhausted
 
-### Agent ↔ Providers (Many-to-Many)
+#### Agent ↔ Providers (Many-to-Many)
 
 - Agent can have zero or more providers
 - No maximum limit on number of providers
@@ -1052,30 +1059,29 @@ HTTP 403 Forbidden
 - Provider assignment managed via `PUT /api/v1/agents/{id}/providers` (see Protocol 010) or `DELETE /api/v1/providers/{id}` (cascade deletion, see Protocol 011)
 - Provider usage tracked for analytics
 
-### Agent ↔ User (Many-to-One)
+#### Agent ↔ User (Many-to-One)
 
 - Each agent has exactly one owner (user)
 - Owner inferred from auth token on creation
 - Owner can view and modify own agents
 - Admin can view and modify all agents
 
-### Agent ↔ Project (Many-to-One)
+#### Agent ↔ Project (Many-to-One)
 
 - Each agent belongs to exactly one project
 - Pilot uses Master Project only (project_id defaults to "proj_master")
 - Post-Pilot supports multi-project assignment
 
----
 
-## Security
+### Security
 
-### Authentication
+#### Authentication
 
 All endpoints require authentication via:
 - **User Token:** Bearer token from `POST /api/v1/auth/login`
 - **API Token:** Bearer token from `POST /api/v1/api-tokens`
 
-### Authorization Matrix
+#### Authorization Matrix
 
 | Operation | Owner | Admin | Other User |
 |-----------|-------|-------|------------|
@@ -1085,7 +1091,7 @@ All endpoints require authentication via:
 | Update agent | ✅ (own) | ✅ (all) | ❌ |
 | Get agent status | ✅ (own) | ✅ (all) | ❌ |
 
-### Sensitive Data Handling
+#### Sensitive Data Handling
 
 **IC Token Value:**
 - Returned ONLY on agent creation (`POST /api/v1/agents`)
@@ -1099,11 +1105,10 @@ All endpoints require authentication via:
 - Not visible to other users (even in same project)
 - Returned in all agent endpoints (list, details, status)
 
----
 
-## Error Handling
+### Error Handling
 
-### Standard Error Format
+#### Standard Error Format
 
 All errors use consistent format:
 
@@ -1117,7 +1122,7 @@ All errors use consistent format:
 }
 ```
 
-### Error Codes
+#### Error Codes
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
@@ -1131,7 +1136,7 @@ All errors use consistent format:
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
-### Validation Error Details
+#### Validation Error Details
 
 Multiple validation errors returned together:
 
@@ -1149,11 +1154,10 @@ HTTP 400 Bad Request
 }
 ```
 
----
 
-## Rate Limiting
+### Rate Limiting
 
-### Limits (per user)
+#### Limits (per user)
 
 | Endpoint | Limit | Window |
 |----------|-------|--------|
@@ -1163,7 +1167,7 @@ HTTP 400 Bad Request
 | `PUT /api/v1/agents/{id}` | 30 | 1 minute |
 | `GET /api/v1/agents/{id}/status` | 20 | 1 minute |
 
-### Rate Limit Response
+#### Rate Limit Response
 
 ```
 HTTP 429 Too Many Requests
@@ -1180,11 +1184,10 @@ Retry-After: 60
 }
 ```
 
----
 
-## Audit Logging
+### Audit Logging
 
-### Logged Operations
+#### Logged Operations
 
 | Endpoint | Method | Logged |
 |----------|--------|--------|
@@ -1194,7 +1197,7 @@ Retry-After: 60
 | `PUT /api/v1/agents/{id}` | PUT | ✅ Yes |
 | `GET /api/v1/agents/{id}/status` | GET | ❌ No |
 
-### Audit Log Entry
+#### Audit Log Entry
 
 ```json
 {
@@ -1220,11 +1223,10 @@ Retry-After: 60
 
 **Access:** Admin via `GET /api/v1/audit-logs`
 
----
 
-## CLI Integration
+### CLI Integration
 
-### iron agents create
+#### iron agents create
 
 ```bash
 iron agents create \
@@ -1240,7 +1242,7 @@ iron agents create \
 # ⚠️  Save this token now. You won't be able to see it again.
 ```
 
-### iron agents list
+#### iron agents list
 
 ```bash
 iron agents list
@@ -1254,7 +1256,7 @@ iron agents list --sort -budget
 # agent_def456  Test Agent           $10.00   $10.00  $0.00      exhausted
 ```
 
-### iron agents get
+#### iron agents get
 
 ```bash
 iron agents get agent_abc123
@@ -1272,7 +1274,7 @@ iron agents get agent_abc123
 # Created:     2025-12-10 10:30:45
 ```
 
-### iron agents update
+#### iron agents update
 
 ```bash
 iron agents update agent_abc123 \
@@ -1284,7 +1286,7 @@ iron agents update agent_abc123 \
 # Agent updated: agent_abc123
 ```
 
-### iron agents status
+#### iron agents status
 
 ```bash
 iron agents status agent_abc123
@@ -1297,11 +1299,10 @@ iron agents status agent_abc123
 # Last Request: 2025-12-10 15:22:10 (8 minutes ago)
 ```
 
----
 
-## Future Enhancements (Post-Pilot)
+### Future Enhancements (Post-Pilot)
 
-### Agent Deletion
+#### Agent Deletion
 
 **Endpoint:** `DELETE /api/v1/agents/{id}`
 
@@ -1314,9 +1315,8 @@ iron agents status agent_abc123
 
 **Reasoning:** Preserve audit trail, prevent accidental data loss
 
----
 
-### Agent Activation/Deactivation
+#### Agent Activation/Deactivation
 
 **Endpoints:**
 - `POST /api/v1/agents/{id}/activate`
@@ -1324,28 +1324,40 @@ iron agents status agent_abc123
 
 **Use case:** Temporarily disable agent without deletion
 
----
 
-### Multi-Project Support
+#### Multi-Project Support
 
 **Changes:**
 - `project_id` becomes user-selectable (not defaulted to Master Project)
 - Add `?project_id=proj_abc` filter to `GET /api/v1/agents`
 - Project-level budget limits
 
----
 
-## References
+### Cross-References
 
-**Related Protocols:**
-- [005: Budget Control Protocol](005_budget_control_protocol.md) - Agent Budget enforcement
-- [006: Token Management API](006_token_management_api.md) - IC Token rotation
-- [011: Providers API](011_providers_api.md) - Provider management
-- [012: Analytics API](012_analytics_api.md) - Agent spending analytics
-- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification
+#### Related Principles Documents
 
-**Related Documents:**
-- [007: Entity Model](../architecture/007_entity_model.md) - Agent entity definition
-- [002: REST API Protocol](002_rest_api_protocol.md) - General REST API standards
+None.
 
----
+#### Related Architecture Documents
+
+- [007: Entity Model](../architecture/007_entity_model.md) - Agent entity definition and relationships
+
+#### Used By
+
+- Protocol 012: Analytics API - Agent spending analytics
+- Protocol 017: Budget Requests API - Agent budget change requests
+
+#### Dependencies
+
+- Protocol 002: REST API Protocol - General REST API standards and conventions
+- Protocol 005: Budget Control Protocol - Agent budget enforcement and IC Token usage
+- Protocol 006: Token Management API - IC Token rotation and regeneration
+- Protocol 011: Providers API - Provider management and IP Token assignments
+- Protocol 013: Budget Limits API - Admin budget modification endpoints
+
+#### Implementation
+
+- `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_control_api/src/routes/agents.rs` - Agents API endpoint handlers
+- `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_types/src/agent.rs` - Agent data structures
+

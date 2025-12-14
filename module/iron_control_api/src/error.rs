@@ -204,3 +204,71 @@ where
     }
   }
 }
+
+/// Validation error types for request validation
+///
+/// Replaces `Result<(), String>` with typed error handling per code_design.rulebook.md
+#[ derive( Debug ) ]
+pub enum ValidationError
+{
+  /// Missing required field
+  MissingField( String ),
+  /// Invalid field value
+  InvalidValue
+  {
+    field: String,
+    reason: String,
+  },
+  /// Field value too long
+  TooLong
+  {
+    field: String,
+    max_length: usize,
+  },
+  /// Field value too short
+  TooShort
+  {
+    field: String,
+    min_length: usize,
+  },
+  /// Invalid format
+  InvalidFormat
+  {
+    field: String,
+    expected: String,
+  },
+  /// Contains invalid character
+  InvalidCharacter
+  {
+    field: String,
+    character: String,
+  },
+  /// Custom validation error
+  Custom( String ),
+}
+
+impl std::fmt::Display for ValidationError
+{
+  fn fmt( &self, f: &mut std::fmt::Formatter<'_> ) -> std::fmt::Result
+  {
+    match self
+    {
+      Self::MissingField( field ) =>
+        write!( f, "{} cannot be empty", field ),
+      Self::InvalidValue { field, reason } =>
+        write!( f, "Invalid {}: {}", field, reason ),
+      Self::TooLong { field, max_length } =>
+        write!( f, "{} too long (max {} characters)", field, max_length ),
+      Self::TooShort { field, min_length } =>
+        write!( f, "{} too short (min {} characters)", field, min_length ),
+      Self::InvalidFormat { field, expected } =>
+        write!( f, "Invalid {}: must be {}", field, expected ),
+      Self::InvalidCharacter { field, character } =>
+        write!( f, "{} contains invalid {} character)", field, character ),
+      Self::Custom( msg ) =>
+        write!( f, "{}", msg ),
+    }
+  }
+}
+
+impl std::error::Error for ValidationError {}

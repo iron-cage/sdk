@@ -18,6 +18,7 @@ use iron_secrets::crypto::{ CryptoService, mask_api_key };
 use iron_token_manager::provider_key_storage::{ ProviderKeyStorage, ProviderType };
 use serde::{ Deserialize, Serialize };
 use std::sync::Arc;
+use crate::error::ValidationError;
 
 /// Provider management state
 #[ derive( Clone ) ]
@@ -89,30 +90,42 @@ impl CreateProviderKeyRequest
   const MAX_DESCRIPTION_LENGTH: usize = 500;
 
   /// Validate request
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate provider type
     if self.provider != "openai" && self.provider != "anthropic"
     {
-      return Err( "Invalid provider: must be 'openai' or 'anthropic'".to_string() );
+      return Err( ValidationError::InvalidFormat
+      {
+        field: "provider".to_string(),
+        expected: "'openai' or 'anthropic'".to_string(),
+      } );
     }
 
     // Validate API key not empty
     if self.api_key.trim().is_empty()
     {
-      return Err( "api_key cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "api_key".to_string() ) );
     }
 
     // Validate API key length
     if self.api_key.len() > Self::MAX_API_KEY_LENGTH
     {
-      return Err( format!( "api_key too long (max {} characters)", Self::MAX_API_KEY_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "api_key".to_string(),
+        max_length: Self::MAX_API_KEY_LENGTH,
+      } );
     }
 
     // Validate no NULL bytes
     if self.api_key.contains( '\0' )
     {
-      return Err( "api_key contains invalid NULL byte".to_string() );
+      return Err( ValidationError::InvalidCharacter
+      {
+        field: "api_key".to_string(),
+        character: "NULL".to_string(),
+      } );
     }
 
     // Validate base_url if provided
@@ -120,11 +133,19 @@ impl CreateProviderKeyRequest
     {
       if base_url.len() > Self::MAX_BASE_URL_LENGTH
       {
-        return Err( format!( "base_url too long (max {} characters)", Self::MAX_BASE_URL_LENGTH ) );
+        return Err( ValidationError::TooLong
+        {
+          field: "base_url".to_string(),
+          max_length: Self::MAX_BASE_URL_LENGTH,
+        } );
       }
       if base_url.contains( '\0' )
       {
-        return Err( "base_url contains invalid NULL byte".to_string() );
+        return Err( ValidationError::InvalidCharacter
+        {
+          field: "base_url".to_string(),
+          character: "NULL".to_string(),
+        } );
       }
     }
 
@@ -133,11 +154,19 @@ impl CreateProviderKeyRequest
     {
       if description.len() > Self::MAX_DESCRIPTION_LENGTH
       {
-        return Err( format!( "description too long (max {} characters)", Self::MAX_DESCRIPTION_LENGTH ) );
+        return Err( ValidationError::TooLong
+        {
+          field: "description".to_string(),
+          max_length: Self::MAX_DESCRIPTION_LENGTH,
+        } );
       }
       if description.contains( '\0' )
       {
-        return Err( "description contains invalid NULL byte".to_string() );
+        return Err( ValidationError::InvalidCharacter
+        {
+          field: "description".to_string(),
+          character: "NULL".to_string(),
+        } );
       }
     }
 
@@ -205,7 +234,7 @@ pub async fn create_provider_key(
   if let Err( validation_error ) = request.validate()
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 

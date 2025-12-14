@@ -2,12 +2,12 @@
 
 Tests for iron_secrets encryption and key management.
 
-## Organization
+## Responsibility Table
 
-| File | Responsibility |
-|------|----------------|
-| crypto_test.rs | Cryptographic operations and key derivation tests |
-| smoke_test.rs | Basic functionality and integration smoke tests |
+| File | Responsibility | Input→Output | Out of Scope |
+|------|----------------|--------------|--------------|
+| `crypto_test.rs` | Test cryptographic operations and key derivation | Crypto scenarios → Security validation | NOT integration (smoke_test.rs) |
+| `smoke_test.rs` | Test basic functionality and integration smoke tests | End-to-end flows → Integration validation | NOT crypto details (crypto_test.rs) |
 
 ## Test Categories
 

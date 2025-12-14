@@ -123,7 +123,7 @@ async fn test_all_none_rejected()
     "LOUD FAILURE: Request with all None limits must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "at least one" ) || err_msg.contains( "required" ),
     "LOUD FAILURE: Error message must indicate at least one limit is required. Got: {}",
@@ -150,7 +150,7 @@ async fn test_zero_tokens_per_day_rejected()
     "LOUD FAILURE: Zero max_tokens_per_day must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "positive" ) || err_msg.contains( "greater than" ) || err_msg.contains( "must be" ),
     "LOUD FAILURE: Error message must indicate value must be positive. Got: {}",
@@ -277,7 +277,7 @@ async fn test_overflow_tokens_per_day_rejected()
     "LOUD FAILURE: i64::MAX max_tokens_per_day must be rejected (overflow risk)"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "too large" ) || err_msg.contains( "maximum" ) || err_msg.contains( "overflow" ),
     "LOUD FAILURE: Error must mention value is too large. Got: {}",

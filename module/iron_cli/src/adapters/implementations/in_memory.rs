@@ -658,7 +658,6 @@ impl HealthService for InMemoryAdapter
 
     Ok( HealthStatus {
       status: "ok".to_string(),
-      version: env!( "CARGO_PKG_VERSION" ).to_string(),
       uptime_seconds: 0,
     })
   }

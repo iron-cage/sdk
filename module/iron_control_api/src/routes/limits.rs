@@ -14,7 +14,7 @@ use axum::{
   http::StatusCode,
   response::{ IntoResponse, Json },
 };
-use crate::error::JsonPath;
+use crate::error::{ JsonPath, ValidationError };
 use iron_token_manager::limit_enforcer::LimitEnforcer;
 use serde::{ Deserialize, Serialize };
 use std::sync::Arc;
@@ -67,23 +67,26 @@ impl CreateLimitRequest
   ///
   /// - Ok(()) if value is None or valid (positive and within safe range)
   /// - Err(String) with descriptive error message if validation fails
-  fn validate_limit_value( value: Option< i64 >, field_name: &str ) -> Result< (), String >
+  fn validate_limit_value( value: Option< i64 >, field_name: &str ) -> Result< (), ValidationError >
   {
     if let Some( val ) = value
     {
       if val <= 0
       {
-        return Err( format!( "{} must be a positive number", field_name ) );
+        return Err( ValidationError::InvalidValue
+        {
+          field: field_name.to_string(),
+          reason: "must be a positive number".to_string(),
+        } );
       }
 
       if val > Self::MAX_SAFE_LIMIT
       {
-        return Err( format!(
-          "{} {} too large. Maximum: {}",
-          field_name,
-          val,
-          Self::MAX_SAFE_LIMIT
-        ) );
+        return Err( ValidationError::InvalidValue
+        {
+          field: field_name.to_string(),
+          reason: format!( "{} too large. Maximum: {}", val, Self::MAX_SAFE_LIMIT ),
+        } );
       }
     }
 
@@ -97,7 +100,7 @@ impl CreateLimitRequest
   /// # Errors
   ///
   /// Returns error if any provided field is ≤ 0 or exceeds MAX_SAFE_LIMIT
-  pub fn validate_values( &self ) -> Result< (), String >
+  pub fn validate_values( &self ) -> Result< (), ValidationError >
   {
     Self::validate_limit_value( self.max_tokens_per_day, "max_tokens_per_day" )?;
     Self::validate_limit_value( self.max_requests_per_minute, "max_requests_per_minute" )?;
@@ -110,13 +113,13 @@ impl CreateLimitRequest
   /// # Errors
   ///
   /// Returns error if all fields are None (no limits specified, semantic error)
-  pub fn validate_presence( &self ) -> Result< (), String >
+  pub fn validate_presence( &self ) -> Result< (), ValidationError >
   {
     if self.max_tokens_per_day.is_none()
       && self.max_requests_per_minute.is_none()
       && self.max_cost_per_month_microdollars.is_none()
     {
-      return Err( "at least one limit must be specified (max_tokens_per_day, max_requests_per_minute, or max_cost_per_month_microdollars)".to_string() );
+      return Err( ValidationError::Custom( "at least one limit must be specified (max_tokens_per_day, max_requests_per_minute, or max_cost_per_month_microdollars)".to_string() ) );
     }
     Ok( () )
   }
@@ -140,7 +143,7 @@ impl CreateLimitRequest
   /// - All limits are None (missing required data)
   /// - Any limit is ≤ 0
   /// - Any limit exceeds MAX_SAFE_LIMIT
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     self.validate_values()?;
     self.validate_presence()?;
@@ -176,23 +179,26 @@ impl UpdateLimitRequest
   ///
   /// - Ok(()) if value is None or valid (positive and within safe range)
   /// - Err(String) with descriptive error message if validation fails
-  fn validate_limit_value( value: Option< i64 >, field_name: &str ) -> Result< (), String >
+  fn validate_limit_value( value: Option< i64 >, field_name: &str ) -> Result< (), ValidationError >
   {
     if let Some( val ) = value
     {
       if val <= 0
       {
-        return Err( format!( "{} must be a positive number", field_name ) );
+        return Err( ValidationError::InvalidValue
+        {
+          field: field_name.to_string(),
+          reason: "must be a positive number".to_string(),
+        } );
       }
 
       if val > Self::MAX_SAFE_LIMIT
       {
-        return Err( format!(
-          "{} {} too large. Maximum: {}",
-          field_name,
-          val,
-          Self::MAX_SAFE_LIMIT
-        ) );
+        return Err( ValidationError::InvalidValue
+        {
+          field: field_name.to_string(),
+          reason: format!( "{} too large. Maximum: {}", val, Self::MAX_SAFE_LIMIT ),
+        } );
       }
     }
 
@@ -207,7 +213,7 @@ impl UpdateLimitRequest
   /// # Errors
   ///
   /// Returns error if any provided field is ≤ 0 or exceeds MAX_SAFE_LIMIT
-  pub fn validate_values( &self ) -> Result< (), String >
+  pub fn validate_values( &self ) -> Result< (), ValidationError >
   {
     Self::validate_limit_value( self.max_tokens_per_day, "max_tokens_per_day" )?;
     Self::validate_limit_value( self.max_requests_per_minute, "max_requests_per_minute" )?;
@@ -220,13 +226,13 @@ impl UpdateLimitRequest
   /// # Errors
   ///
   /// Returns error if all fields are None (no fields to update, semantic error)
-  pub fn validate_presence( &self ) -> Result< (), String >
+  pub fn validate_presence( &self ) -> Result< (), ValidationError >
   {
     if self.max_tokens_per_day.is_none()
       && self.max_requests_per_minute.is_none()
       && self.max_cost_per_month_microdollars.is_none()
     {
-      return Err( "at least one field must be provided for update".to_string() );
+      return Err( ValidationError::Custom( "at least one field must be provided for update".to_string() ) );
     }
     Ok( () )
   }
@@ -245,7 +251,7 @@ impl UpdateLimitRequest
   /// - All fields are None (no fields to update)
   /// - Any provided field is ≤ 0
   /// - Any provided field exceeds MAX_SAFE_LIMIT
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     self.validate_values()?;
     self.validate_presence()?;
@@ -290,7 +296,7 @@ pub async fn create_limit(
   if let Err( validation_error ) = request.validate_values()
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -298,7 +304,7 @@ pub async fn create_limit(
   if let Err( validation_error ) = request.validate_presence()
   {
     return ( StatusCode::UNPROCESSABLE_ENTITY, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -460,7 +466,7 @@ pub async fn update_limit(
   if let Err( validation_error ) = request.validate_values()
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -468,7 +474,7 @@ pub async fn update_limit(
   if let Err( validation_error ) = request.validate_presence()
   {
     return ( StatusCode::UNPROCESSABLE_ENTITY, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 

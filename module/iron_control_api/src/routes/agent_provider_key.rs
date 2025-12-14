@@ -5,6 +5,7 @@
 //! POST /api/v1/agents/provider-key
 
 use crate::routes::budget::BudgetState;
+use crate::error::ValidationError;
 use axum::
 {
   extract::State,
@@ -27,19 +28,20 @@ impl GetProviderKeyRequest
   const MAX_IC_TOKEN_LENGTH: usize = 2000;
 
   /// Validate request parameters
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.ic_token.trim().is_empty()
     {
-      return Err( "ic_token cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "ic_token".to_string() ) );
     }
 
     if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
     {
-      return Err( format!(
-        "ic_token too long (max {} characters)",
-        Self::MAX_IC_TOKEN_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "ic_token".to_string(),
+        max_length: Self::MAX_IC_TOKEN_LENGTH,
+      } );
     }
 
     Ok( () )
@@ -94,7 +96,7 @@ pub async fn get_provider_key(
     return (
       StatusCode::BAD_REQUEST,
       Json( serde_json::json!({
-        "error": validation_error,
+        "error": validation_error.to_string(),
         "code": "INVALID_TOKEN"
       }) ),
     ).into_response();

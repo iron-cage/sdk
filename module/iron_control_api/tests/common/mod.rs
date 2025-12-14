@@ -15,6 +15,7 @@ pub mod budget;
 pub mod corner_cases;
 pub mod error_format;
 pub mod fixtures;
+pub mod sql_injection_helpers;
 pub mod test_db;
 pub mod test_state;
 

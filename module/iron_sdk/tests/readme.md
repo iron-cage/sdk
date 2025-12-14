@@ -2,13 +2,17 @@
 
 Tests for iron_sdk Python SDK.
 
-## Organization
+## Status
 
-| File | Responsibility |
-|------|----------------|
-| test_context.py | Context management and agent lifecycle tests |
-| test_decorators.py | Decorator functionality and API wrapping tests |
-| test_integrations.py | End-to-end integration tests with Control Panel |
+Currently contains placeholder test infrastructure. Test implementation pending.
+
+## Responsibility Table
+
+| File | Responsibility | Notes |
+|------|----------------|-------|
+| `test_context.py` | Test context management and agent lifecycle | Implementation pending |
+| `test_decorators.py` | Test decorator functionality and API wrapping | Implementation pending |
+| `test_integrations.py` | Test end-to-end integration with Control Panel | Implementation pending |
 
 ## Test Categories
 

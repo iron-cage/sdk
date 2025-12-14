@@ -151,11 +151,13 @@ pub trait TracesService: Send + Sync
 }
 
 /// Health check data
+///
+/// Note: Version information moved to dedicated /api/version endpoint.
+/// Use HealthService::get_version() for version data.
 #[ derive( Debug, Clone, serde::Serialize, serde::Deserialize ) ]
 pub struct HealthStatus
 {
   pub status: String,
-  pub version: String,
   pub uptime_seconds: u64,
 }
 

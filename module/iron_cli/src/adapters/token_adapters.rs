@@ -12,14 +12,15 @@ use serde_json::json;
 use crate::handlers::token_handlers;
 use super::token::{ TokenApiClient, TokenApiConfig };
 use super::keyring;
+use super::{ AdapterError, ServiceError };
 
 /// Format JSON response according to format parameter
-fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, String>
+fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, AdapterError>
 {
   match format
   {
-    "yaml" => serde_yaml::to_string( data ).map_err( |e| e.to_string() ),
-    _ => serde_json::to_string_pretty( data ).map_err( |e| e.to_string() ),
+    "yaml" => serde_yaml::to_string( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
+    _ => serde_json::to_string_pretty( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
   }
 }
 
@@ -42,11 +43,10 @@ fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, S
 /// ```
 pub async fn generate_token_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  token_handlers::generate_token_handler( params )
-    .map_err( |e| e.to_string() )?;
+  token_handlers::generate_token_handler( params )?;
 
   // 2. Check dry_run
   let dry_run = params
@@ -71,7 +71,7 @@ pub async fn generate_token_adapter(
 
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 4. Create HTTP client
   let config = TokenApiConfig::load();
@@ -92,7 +92,7 @@ pub async fn generate_token_adapter(
   let response = client
     .post( "/api/v1/tokens", body, Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to generate token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to generate token: {}", e ) ) ) )?;
 
   // 7. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -118,15 +118,14 @@ pub async fn generate_token_adapter(
 /// ```
 pub async fn list_tokens_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  token_handlers::list_tokens_handler( params )
-    .map_err( |e| e.to_string() )?;
+  token_handlers::list_tokens_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -149,7 +148,7 @@ pub async fn list_tokens_adapter(
   let response = client
     .get( "/api/v1/tokens", Some( query_params ), Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to list tokens: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to list tokens: {}", e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -173,15 +172,14 @@ pub async fn list_tokens_adapter(
 /// ```
 pub async fn get_token_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  token_handlers::get_token_handler( params )
-    .map_err( |e| e.to_string() )?;
+  token_handlers::get_token_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -195,7 +193,7 @@ pub async fn get_token_adapter(
   let response = client
     .get( &path, None, Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to get token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to get token: {}", e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -220,11 +218,10 @@ pub async fn get_token_adapter(
 /// ```
 pub async fn rotate_token_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  token_handlers::rotate_token_handler( params )
-    .map_err( |e| e.to_string() )?;
+  token_handlers::rotate_token_handler( params )?;
 
   // 2. Check dry_run
   let dry_run = params
@@ -248,7 +245,7 @@ pub async fn rotate_token_adapter(
 
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 4. Create HTTP client
   let config = TokenApiConfig::load();
@@ -262,7 +259,7 @@ pub async fn rotate_token_adapter(
   let response = client
     .post( &path, json!({}), Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to rotate token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to rotate token: {}", e ) ) ) )?;
 
   // 7. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -287,11 +284,10 @@ pub async fn rotate_token_adapter(
 /// ```
 pub async fn revoke_token_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  token_handlers::revoke_token_handler( params )
-    .map_err( |e| e.to_string() )?;
+  token_handlers::revoke_token_handler( params )?;
 
   // 2. Check dry_run
   let dry_run = params
@@ -315,7 +311,7 @@ pub async fn revoke_token_adapter(
 
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 4. Create HTTP client
   let config = TokenApiConfig::load();
@@ -329,7 +325,7 @@ pub async fn revoke_token_adapter(
   let response = client
     .delete( &path, Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to revoke token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to revoke token: {}", e ) ) ) )?;
 
   // 7. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );

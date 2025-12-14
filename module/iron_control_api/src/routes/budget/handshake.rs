@@ -3,6 +3,7 @@
 //! IC Token → IP Token exchange with budget lease creation
 
 use super::state::BudgetState;
+use crate::error::ValidationError;
 use axum::
 {
   extract::State,
@@ -42,36 +43,38 @@ impl HandshakeRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate ic_token is not empty
     if self.ic_token.trim().is_empty()
     {
-      return Err( "ic_token cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "ic_token".to_string() ) );
     }
 
     // Validate ic_token length (DoS prevention)
     if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
     {
-      return Err( format!(
-        "ic_token too long (max {} characters)",
-        Self::MAX_IC_TOKEN_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "ic_token".to_string(),
+        max_length: Self::MAX_IC_TOKEN_LENGTH,
+      } );
     }
 
     // Validate provider is not empty
     if self.provider.trim().is_empty()
     {
-      return Err( "provider cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "provider".to_string() ) );
     }
 
     // Validate provider length
     if self.provider.len() > Self::MAX_PROVIDER_LENGTH
     {
-      return Err( format!(
-        "provider too long (max {} characters)",
-        Self::MAX_PROVIDER_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "provider".to_string(),
+        max_length: Self::MAX_PROVIDER_LENGTH,
+      } );
     }
 
     // Validate requested_budget if provided
@@ -79,16 +82,24 @@ impl HandshakeRequest
     {
       if budget <= 0
       {
-        return Err( "requested_budget must be positive".to_string() );
+        return Err( ValidationError::InvalidValue
+        {
+          field: "requested_budget".to_string(),
+          reason: "must be positive".to_string(),
+        } );
       }
 
       if budget > Self::MAX_HANDSHAKE_BUDGET
       {
-        return Err( format!(
-          "requested_budget exceeds maximum ({} microdollars / ${:.2} USD)",
-          Self::MAX_HANDSHAKE_BUDGET,
-          Self::MAX_HANDSHAKE_BUDGET as f64 / 1_000_000.0
-        ) );
+        return Err( ValidationError::InvalidValue
+        {
+          field: "requested_budget".to_string(),
+          reason: format!(
+            "exceeds maximum ({} microdollars / ${:.2} USD)",
+            Self::MAX_HANDSHAKE_BUDGET,
+            Self::MAX_HANDSHAKE_BUDGET as f64 / 1_000_000.0
+          ),
+        } );
       }
     }
 
@@ -133,7 +144,7 @@ pub async fn handshake(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 

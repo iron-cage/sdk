@@ -39,21 +39,23 @@ Iron Cage Documentation
     ├── Core Protocols (Pilot-Critical)
     │   ├── 002: REST API Protocol           → HTTP REST API overview
     │   ├── 003: WebSocket Protocol          → Real-time message format
-    │   ├── 004: MCP Integration Protocol    → Model Context Protocol
     │   ├── 005: Budget Control Protocol     → Two-token system, budget borrowing
     │   ├── 006: Token Management API        → IC Token CRUD
     │   ├── 007: Authentication API          → User login/logout/refresh
     │   └── 008: User Management API         → Admin user account management
     │
-    └── Extended API Protocols (MUST-HAVE)
-        ├── 010: Agents API                  → Agent CRUD operations
-        ├── 011: Providers API               → Provider CRUD operations
-        ├── 012: Analytics API               → Usage and spending metrics
-        ├── 013: Budget Limits API           → Budget modification (admin)
-        ├── 014: API Tokens API              → API token management
-        ├── 015: Projects API                → Project access (read-only Pilot)
-        ├── 016: Settings API                → Settings management (POST-PILOT)
-        └── 017: Budget Requests API         → Budget request/approval workflow
+    ├── Extended API Protocols (MUST-HAVE)
+    │   ├── 010: Agents API                  → Agent CRUD operations
+    │   ├── 011: Providers API               → Provider CRUD operations
+    │   ├── 012: Analytics API               → Usage and spending metrics
+    │   ├── 013: Budget Limits API           → Budget modification (admin)
+    │   ├── 014: API Tokens API              → API token management
+    │   ├── 015: Projects API                → Project access (read-only Pilot)
+    │   └── 017: Budget Requests API         → Budget request/approval workflow
+    │
+    └── POST-PILOT Protocols
+        ├── 004: MCP Integration Protocol    → Model Context Protocol (POST-PILOT)
+        └── 016: Settings API                → Settings management (POST-PILOT)
 ```
 
 ---
@@ -176,8 +178,10 @@ All protocols are located in `/docs/protocol/` and define specific API contracts
 
 ---
 
-#### Protocol 004: MCP Integration Protocol
+#### Protocol 004: MCP Integration Protocol (POST-PILOT)
 **File:** `docs/protocol/004_mcp_integration_protocol.md`
+
+**Status:** POST-PILOT (Deferred Implementation)
 
 **Purpose:** Model Context Protocol tool integration
 

@@ -150,7 +150,6 @@ struct AppState
   tokens: iron_control_api::routes::tokens::TokenState,
   usage: iron_control_api::routes::usage::UsageState,
   limits: iron_control_api::routes::limits::LimitsState,
-  traces: iron_control_api::routes::traces::TracesState,
   providers: iron_control_api::routes::providers::ProvidersState,
   keys: iron_control_api::routes::keys::KeysState,
   users: iron_control_api::routes::users::UserManagementState,
@@ -199,15 +198,6 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::limits::Li
   fn from_ref( state: &AppState ) -> Self
   {
     state.limits.clone()
-  }
-}
-
-/// Enable traces routes to access TracesState from combined AppState
-impl axum::extract::FromRef< AppState > for iron_control_api::routes::traces::TracesState
-{
-  fn from_ref( state: &AppState ) -> Self
-  {
-    state.traces.clone()
   }
 }
 
@@ -478,10 +468,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .await
     .expect( "LOUD FAILURE: Failed to initialize limits state" );
 
-  let traces_state = iron_control_api::routes::traces::TracesState::new( &database_url )
-    .await
-    .expect( "LOUD FAILURE: Failed to initialize traces state" );
-
   let providers_state = iron_control_api::routes::providers::ProvidersState::new( &database_url )
     .await
     .expect( "LOUD FAILURE: Failed to initialize providers storage" );
@@ -573,7 +559,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     tokens: token_state,
     usage: usage_state,
     limits: limits_state,
-    traces: traces_state,
     providers: providers_state,
     keys: keys_state,
     users: user_management_state,
@@ -626,10 +611,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/limits/:id", get( iron_control_api::routes::limits::get_limit ) )
     .route( "/api/v1/limits/:id", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
     .route( "/api/v1/limits/:id", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
-
-    // Traces endpoints
-    .route( "/api/v1/traces", get( iron_control_api::routes::traces::list_traces ) )
-    .route( "/api/v1/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
 
     // Provider key management endpoints
     .route( "/api/v1/providers", post( iron_control_api::routes::providers::create_provider_key ) )
@@ -724,8 +705,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  GET  /api/limits/:id" );
   tracing::info!( "  PUT  /api/limits/:id" );
   tracing::info!( "  DELETE /api/limits/:id" );
-  tracing::info!( "  GET  /api/traces" );
-  tracing::info!( "  GET  /api/traces/:id" );
   tracing::info!( "  POST /api/providers" );
   tracing::info!( "  GET  /api/providers" );
   tracing::info!( "  GET  /api/providers/:id" );

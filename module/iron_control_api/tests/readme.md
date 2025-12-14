@@ -2,7 +2,7 @@
 
 ## Organization
 
-This directory contains ALL tests for iron_control_api crate following domain-based organization with comprehensive endpoint coverage for Protocol 014 (API Tokens), Protocol 010 (Agents), Protocol 012 (Analytics), and legacy FR-8/9/10 (Usage/Limits/Traces).
+This directory contains ALL tests for iron_control_api crate following domain-based organization with comprehensive endpoint coverage for Protocol 014 (API Tokens), Protocol 010 (Agents), Protocol 012 (Analytics), and legacy FR-8/9 (Usage/Limits).
 
 ### Directory Structure
 
@@ -43,13 +43,8 @@ tests/
 │   ├── endpoints.rs        # Limits CRUD endpoint tests (10 tests)
 │   └── validation.rs       # Request validation tests (17 tests)
 ├── limits.rs               # Limits test suite entry point
-├── traces/                 # FR-10: Request Traces API
-│   ├── list.rs             # Trace list endpoint tests (7 tests)
-│   ├── get_by_id.rs        # Trace by ID endpoint tests (8 tests)
-│   └── mod.rs              # Traces test module
-├── traces.rs               # Traces test suite entry point
 ├── manual/
-│   └── readme.md           # Manual testing procedures (416 lines, covers FR-7/8/9/10)
+│   └── readme.md           # Manual testing procedures (416 lines, covers FR-7/8/9)
 ├── api_test.rs             # API integration tests
 ├── integration_tests.rs    # Full integration test suite
 └── rbac.rs                 # RBAC middleware tests
@@ -59,18 +54,17 @@ tests/
 
 | Entity | Responsibility | Input→Output | Out of Scope |
 |--------|----------------|--------------|--------------|
-| `tokens/` | Test Protocol 014 API token endpoints including validate | Token scenarios → Test results | NOT auth flows (auth/), NOT agents (agents/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/), NOT traces (traces/) |
+| `tokens/` | Test Protocol 014 API token endpoints including validate | Token scenarios → Test results | NOT auth flows (auth/), NOT agents (agents/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
 | `agents/` | Test Protocol 010 agent CRUD endpoints and budgets | Agent scenarios → Test results | NOT tokens (tokens/), NOT auth (auth/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
 | `analytics/` | Test Protocol 012 analytics endpoints (spending, usage, budget status) | Analytics scenarios → Test results | NOT agents (agents/), NOT tokens (tokens/), NOT usage (usage/), NOT auth (auth/) |
 | `usage/` | Test usage analytics endpoints and aggregation | Usage scenarios → Analytics validation | NOT token CRUD (tokens/), NOT auth (auth/), NOT limits (limits/), NOT manual procedures (manual/) |
-| `limits/` | Test budget limits CRUD and validation | Limits scenarios → Constraint validation | NOT tokens (tokens/), NOT usage analytics (usage/), NOT traces (traces/), NOT integration flows (integration_tests.rs) |
-| `traces/` | Test request traces listing and retrieval | Trace scenarios → Trace validation | NOT tokens (tokens/), NOT usage (usage/), NOT limits (limits/), NOT auth (auth/) |
+| `limits/` | Test budget limits CRUD and validation | Limits scenarios → Constraint validation | NOT tokens (tokens/), NOT usage analytics (usage/), NOT integration flows (integration_tests.rs) |
 | `auth/` | Test authentication and authorization flows | Auth scenarios → Security validation | NOT token operations (tokens/), NOT business logic (tokens/, usage/, limits/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
-| `common/` | Provide shared test infrastructure and helpers | Test needs → Reusable utilities | NOT domain tests (tokens/, usage/, limits/, traces/), NOT integration tests (integration_tests.rs), NOT manual tests (manual/) |
-| `manual/` | Document manual testing procedures | Test procedures → Manual validation steps | NOT automated tests (tokens/, usage/, limits/, traces/), NOT test infrastructure (common/), NOT integration (integration_tests.rs) |
-| `integration_tests.rs` | Test full API integration across endpoints | Integration scenarios → End-to-end validation | NOT domain-specific details (tokens/, usage/, limits/, traces/), NOT auth internals (auth/), NOT manual procedures (manual/) |
-| `rbac.rs` | Test role-based access control middleware | RBAC scenarios → Authorization validation | NOT auth flows (auth/), NOT endpoint logic (tokens/, usage/, limits/, traces/), NOT integration (integration_tests.rs) |
-| `api_test.rs` | Test API-level contracts and behaviors | API scenarios → Contract validation | NOT domain specifics (tokens/, usage/, limits/, traces/), NOT auth (auth/), NOT RBAC (rbac.rs) |
+| `common/` | Provide shared test infrastructure and helpers | Test needs → Reusable utilities | NOT domain tests (tokens/, usage/, limits/), NOT integration tests (integration_tests.rs), NOT manual tests (manual/) |
+| `manual/` | Document manual testing procedures | Test procedures → Manual validation steps | NOT automated tests (tokens/, usage/, limits/), NOT test infrastructure (common/), NOT integration (integration_tests.rs) |
+| `integration_tests.rs` | Test full API integration across endpoints | Integration scenarios → End-to-end validation | NOT domain-specific details (tokens/, usage/, limits/), NOT auth internals (auth/), NOT manual procedures (manual/) |
+| `rbac.rs` | Test role-based access control middleware | RBAC scenarios → Authorization validation | NOT auth flows (auth/), NOT endpoint logic (tokens/, usage/, limits/), NOT integration (integration_tests.rs) |
+| `api_test.rs` | Test API-level contracts and behaviors | API scenarios → Contract validation | NOT domain specifics (tokens/, usage/, limits/), NOT auth (auth/), NOT RBAC (rbac.rs) |
 | `budget_routes.rs` | Test Protocol 005 budget control types and crypto | Budget control unit tests → Type validation | NOT HTTP integration (integration_tests.rs), NOT enforcement (protocol_005_enforcement_simple.rs), NOT migration metrics (protocol_005_migration_metrics.rs) |
 | `protocol_005_enforcement_simple.rs` | Test Protocol 005 multi-layer enforcement | Enforcement checks → Security validation | NOT budget flow (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT metrics (protocol_005_migration_metrics.rs) |
 | `protocol_005_migration_metrics.rs` | Test Protocol 005 migration completeness metrics | Migration metrics → Quantitative validation | NOT enforcement (protocol_005_enforcement_simple.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT types (budget_routes.rs) |
@@ -114,13 +108,13 @@ tests/
   - ✅ All passing - Documented NON-idempotent token creation (security)
   - ✅ Fixed: Standardized DELETE idempotency semantics across endpoints (1 inconsistency resolved)
 - **Error Format Consistency:** 2 shared tests validating JSON error responses across all domains
-  - ✅ All passing - Consistent {"error": "..."} format, no stack traces leaked
+  - ✅ All passing - Consistent {"error": "..."} format, no stack trace data leaked
 - **Empty Body Handling:** 4 tests across tokens/limits (empty JSON, missing body)
   - ✅ All passing - Proper validation (400/422 based on semantics)
 - **Phase 2 Complete:** 306 tests → **Phase 3-4 Complete:** 330 tests (+24 tests, +8%)
 
 **Phase 5 Additional Coverage** (2025-12-07):
-- **Additional test coverage:** Integration tests, auth flows, RBAC scenarios, traces endpoints
+- **Additional test coverage:** Integration tests, auth flows, RBAC scenarios
 - **Phase 3-4 Complete:** 330 tests → **Phase 5 Complete:** 353 tests (+23 tests, +7%)
 - **Status:** All tests passing, comprehensive corner case coverage achieved
 
@@ -186,10 +180,6 @@ tests/
   - **NEW Phase 2**: Malformed JSON (4), HTTP methods (4)
   - **NEW Phase 3-4**: Content-Type (2), Idempotency (2), Empty body (2)
 
-- **FR-10 (Request Traces):** 34 tests
-  - GET /api/traces (list), GET /api/traces/:id (get by ID)
-  - 404 handling, ordering, structure validation, field presence, empty database handling
-
 ### By Test Type
 
 - **Security Tests:** 33 tests
@@ -250,7 +240,6 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo nextest run --test tokens
 cargo nextest run --test usage
 cargo nextest run --test limits
-cargo nextest run --test traces
 
 # With output
 cargo nextest run --test tokens --nocapture
@@ -261,7 +250,7 @@ cargo nextest run --test tokens test_create_token_valid_request
 
 ## Test Organization Principles
 
-1. **Domain-Based** - Organized by functional requirement (FR-7/8/9/10), not by methodology
+1. **Domain-Based** - Organized by functional requirement (FR-7/8/9), not by methodology
 2. **No Mocking** - Real implementations only, in-memory database for isolation
 3. **Loud Failures** - All assertions use descriptive failure messages for debugging
 4. **Test Matrices** - Each file documents test matrix with all scenarios covered
@@ -292,8 +281,8 @@ Example from `tests/usage/aggregate.rs`:
 ## Manual Testing
 
 For tests requiring server startup, auth setup, or external dependencies:
-- See `tests/manual/readme.md` (416 lines, comprehensive FR-7/8/9/10 coverage)
-- Covers: Token security, auth flows, usage analytics, limits CRUD, traces, CORS, error recovery
+- See `tests/manual/readme.md` (416 lines, comprehensive FR-7/8/9 coverage)
+- Covers: Token security, auth flows, usage analytics, limits CRUD, CORS, error recovery
 - Documented procedures with expected results and pass/fail tracking
 
 ## Known Test Gaps
@@ -312,7 +301,7 @@ For tests requiring server startup, auth setup, or external dependencies:
 
 ### When Adding New Endpoints
 
-1. Create test file in appropriate domain directory (auth/, tokens/, usage/, limits/, traces/)
+1. Create test file in appropriate domain directory (auth/, tokens/, usage/, limits/)
 2. Add test matrix documentation to file header
 3. Write tests BEFORE implementation (true TDD)
 4. Update this readme with test count and coverage details
@@ -334,7 +323,7 @@ Last verified: 2025-12-07 (Phases 1-5 Complete)
 - ✅ 0 clippy warnings
 - ✅ All Phase 1-5 tests passing (Security, Corner Cases, API Contract, Edge Cases, Additional Coverage)
 - ✅ All doc tests passing
-- ✅ All FR-7/8/9/10 endpoints have integration test coverage
+- ✅ All FR-7/8/9 endpoints have integration test coverage
 - ✅ Phases 1-5 security fixes and corner case coverage complete:
   - ✅ DoS protection (issue-001): 500-char limits enforced
   - ✅ NULL byte injection prevention (issue-002): Explicit rejection
@@ -348,7 +337,7 @@ Last verified: 2025-12-07 (Phases 1-5 Complete)
   - ✅ Idempotency tests (4 tests): DELETE semantics
   - ✅ Error format tests (2 tests): Response consistency
   - ✅ Empty body tests (4 tests): Edge case handling
-  - ✅ Additional coverage (+23 tests): Integration, auth, RBAC, traces
+  - ✅ Additional coverage (+23 tests): Integration, auth, RBAC
 - ✅ All bugs fixed (8 implementation bugs):
   - ✅ State validation: Revoked tokens properly rejected (3 bugs fixed)
   - ✅ Atomic operations: Concurrent operations properly isolated (3 bugs fixed)

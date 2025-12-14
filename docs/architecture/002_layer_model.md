@@ -14,7 +14,7 @@ This document defines the six-layer request processing model for Iron Runtime's 
 
 **Out of scope**:
 - Detailed layer implementation (see service-specific documentation)
-- Provider-specific routing logic (see Protocol 004: MCP Integration)
+- Provider-specific routing logic (see Protocol 004: MCP Integration - POST-PILOT)
 - Budget allocation and IC/IP token system (see Protocol 005: Budget Control)
 - Safety layer detection algorithms (see Security 002: Isolation Layers)
 - Observability backend configuration (see deployment documentation)

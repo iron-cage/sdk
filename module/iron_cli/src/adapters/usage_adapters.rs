@@ -11,14 +11,15 @@ use serde_json::json;
 use crate::handlers::usage_handlers;
 use super::token::{ TokenApiClient, TokenApiConfig };
 use super::keyring;
+use super::{ AdapterError, ServiceError };
 
 /// Format JSON response according to format parameter
-fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, String>
+fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, AdapterError>
 {
   match format
   {
-    "yaml" => serde_yaml::to_string( data ).map_err( |e| e.to_string() ),
-    _ => serde_json::to_string_pretty( data ).map_err( |e| e.to_string() ),
+    "yaml" => serde_yaml::to_string( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
+    _ => serde_json::to_string_pretty( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
   }
 }
 
@@ -40,15 +41,14 @@ fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, S
 /// ```
 pub async fn show_usage_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  usage_handlers::show_usage_handler( params )
-    .map_err( |e| e.to_string() )?;
+  usage_handlers::show_usage_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -71,7 +71,7 @@ pub async fn show_usage_adapter(
   let response = client
     .get( "/api/v1/usage", Some( query_params ), Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to get usage: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to get usage: {}", e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -98,15 +98,14 @@ pub async fn show_usage_adapter(
 /// ```
 pub async fn export_usage_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  usage_handlers::export_usage_handler( params )
-    .map_err( |e| e.to_string() )?;
+  usage_handlers::export_usage_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -134,15 +133,15 @@ pub async fn export_usage_adapter(
   let response = client
     .get( "/api/v1/usage/export", Some( query_params ), Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to export usage: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to export usage: {}", e ) ) ) )?;
 
   // 6. Write to file
   let output_file = params.get( "output_file" ).unwrap(); // Already validated
   let export_data = serde_json::to_string_pretty( &response )
-    .map_err( |e| format!( "Failed to serialize data: {}", e ) )?;
+    .map_err( |e| AdapterError::FormattingError( format!( "Failed to serialize data: {}", e ) ) )?;
 
   std::fs::write( output_file, export_data )
-    .map_err( |e| format!( "Failed to write file: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to write file: {}", e ) ) ) )?;
 
   // 7. Format success message
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -173,15 +172,14 @@ pub async fn export_usage_adapter(
 /// ```
 pub async fn get_usage_by_project_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  usage_handlers::usage_by_project_handler( params )
-    .map_err( |e| e.to_string() )?;
+  usage_handlers::usage_by_project_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -189,14 +187,14 @@ pub async fn get_usage_by_project_adapter(
 
   // 4. Build path
   let project_id = params.get( "project_id" )
-    .ok_or_else( || "project_id parameter is required".to_string() )?;
+    .ok_or_else( || AdapterError::ExtractionError( "project_id parameter is required".to_string() ) )?;
   let path = format!( "/api/v1/usage/by-project/{}", project_id );
 
   // 5. Make HTTP call
   let response = client
     .get( &path, None, Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to get usage for project {}: {}", project_id, e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to get usage for project {}: {}", project_id, e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -221,15 +219,14 @@ pub async fn get_usage_by_project_adapter(
 /// ```
 pub async fn get_usage_by_provider_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  usage_handlers::usage_by_provider_handler( params )
-    .map_err( |e| e.to_string() )?;
+  usage_handlers::usage_by_provider_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -237,14 +234,14 @@ pub async fn get_usage_by_provider_adapter(
 
   // 4. Build path
   let provider = params.get( "provider" )
-    .ok_or_else( || "provider parameter is required".to_string() )?;
+    .ok_or_else( || AdapterError::ExtractionError( "provider parameter is required".to_string() ) )?;
   let path = format!( "/api/v1/usage/by-provider/{}", provider );
 
   // 5. Make HTTP call
   let response = client
     .get( &path, None, Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to get usage for provider {}: {}", provider, e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to get usage for provider {}: {}", provider, e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );

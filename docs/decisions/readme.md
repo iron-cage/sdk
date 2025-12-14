@@ -13,6 +13,7 @@
 | ADR-005 | **adr_005_cli_architecture.md** | Document decision on CLI wrapper pattern (iron_cli_py wraps iron_cli binary, native vs delegated commands) |
 | ADR-006 | **adr_006_package_consolidation.md** | Document decision to consolidate deployment packages (6→5 packages, iron_examples merged into iron_sdk) |
 | ADR-007 | **adr_007_testing_philosophy.md** | Document decision to reject mocking (no mocking principle, test-per-module, real implementations, iron_testing removed) |
+| ADR-008 | **adr_008_traces_endpoint_removal.md** | Document decision to remove traces debugging endpoint (security risk, not production feature, cleanup for Pilot) |
 
 ---
 
@@ -25,6 +26,7 @@
 | ADR-005 | [CLI Architecture](adr_005_cli_architecture.md) | Accepted | 2025-12 |
 | ADR-006 | [Package Consolidation](adr_006_package_consolidation.md) | Accepted | 2025-12 |
 | ADR-007 | [Testing Philosophy](adr_007_testing_philosophy.md) | Accepted | 2025-12 |
+| ADR-008 | [Traces Endpoint Removal](adr_008_traces_endpoint_removal.md) | Accepted | 2025-12-14 |
 
 ## ADR Format
 

@@ -9,14 +9,15 @@
 use std::collections::HashMap;
 use crate::handlers::health_handlers;
 use super::token::{ TokenApiClient, TokenApiConfig };
+use super::{ AdapterError, ServiceError };
 
 /// Format JSON response according to format parameter
-fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, String>
+fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, AdapterError>
 {
   match format
   {
-    "yaml" => serde_yaml::to_string( data ).map_err( |e| e.to_string() ),
-    _ => serde_json::to_string_pretty( data ).map_err( |e| e.to_string() ),
+    "yaml" => serde_yaml::to_string( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
+    _ => serde_json::to_string_pretty( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
   }
 }
 
@@ -35,11 +36,10 @@ fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, S
 /// ```
 pub async fn health_check_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  health_handlers::health_handler( params )
-    .map_err( |e| e.to_string() )?;
+  health_handlers::health_handler( params )?;
 
   // 2. Create HTTP client (no auth needed for health)
   let config = TokenApiConfig::load();
@@ -49,7 +49,7 @@ pub async fn health_check_adapter(
   let response = client
     .get( "/api/v1/health", None, None )
     .await
-    .map_err( |e| format!( "Health check failed: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Health check failed: {}", e ) ) ) )?;
 
   // 4. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -72,11 +72,10 @@ pub async fn health_check_adapter(
 /// ```
 pub async fn version_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  health_handlers::version_handler( params )
-    .map_err( |e| e.to_string() )?;
+  health_handlers::version_handler( params )?;
 
   // 2. Get CLI version (always available)
   let cli_version = env!( "CARGO_PKG_VERSION" );

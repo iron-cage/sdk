@@ -21,18 +21,11 @@ This protocol defines how Iron Runtime and Control Panel communicate to enforce 
 - Agent creation and lifecycle (see Protocol 010: Agents API)
 - User authentication (see Protocol 007: Authentication API)
 
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
-**Priority:** MUST-HAVE
-
----
-
 ### Purpose
 
-Developers need budget-controlled LLM access without handling provider API keys directly. Admins need centralized budget control and real-time monitoring.
+**User Need**: Developers need budget-controlled LLM access without handling provider API keys directly. Admins need centralized budget control and real-time monitoring to prevent overspending and ensure secure credential management.
 
-This protocol implements a two-token system with budget borrowing (tranche model):
+**Solution**: This protocol implements a two-token system (IC Token for authentication, IP Token for provider access) with budget borrowing via a tranche model. The agent borrows budget tranches from Control Panel, spends them locally during LLM requests, and returns unused credit on shutdown. This "Dashboard as Bank" model ensures budget enforcement without exposing provider credentials to developers.
 
 **Two-token architecture:**
 
@@ -62,23 +55,28 @@ Admin (Control Panel)          Developer (Runtime)
          |     (credit back to budget)  |
 ```
 
-**Dashboard as Bank:** Agent borrows tranches, spends locally, returns unused on shutdown.
+**Key Insight**: Developer NEVER sees provider credentials. The Runtime acts as a secure proxy that receives encrypted IP Tokens, uses them to access LLM providers on behalf of the developer, and reports usage back to Control Panel for budget tracking. This credential isolation is the core security guarantee of Iron Cage.
 
-**Key insight:** Developer NEVER sees provider credentials. Runtime acts as secure proxy.
+---
+
+**Status**: Specification
+**Version**: 1.0.0
+**Last Updated**: 2025-12-14
+**Priority**: MUST-HAVE
 
 ### Standards Compliance
 
 This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `agent_id`: `agent_<uuid>` (e.g., `agent_550e8400-e29b-41d4-a716-446655440000`)
-- `budget_id`: `budget_<uuid>` (e.g., `budget_7c9e6679-7425-40de-944b-e07fc1f90ae7`)
-- `lease_id`: `lease_<uuid>` (e.g., `lease_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d`)
+- Budget protocol uses short alphanumeric IDs for performance and readability
+- `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
+- `budget_id`: `budget_<alphanumeric>` with regex `^budget_[a-z0-9]{6,32}$` (e.g., `budget_xyz789`)
+- `lease_id`: `lease_<numeric>` for sequential lease tracking (e.g., `lease_001`, `lease_002`)
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `10.00`, `9.15`)
-- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-14T10:30:45.123Z`)
 - Unix timestamps: Seconds since epoch for `issued_at`, `expires_at` claims
 
 **Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
@@ -151,7 +149,7 @@ This protocol adheres to the following Iron Cage standards:
 4. Developers update runtime to compatible version
 
 **Version Change Log:**
-- **1.0.0** (2025-12-10): Initial protocol specification
+- **1.0.0** (2025-12-14): Initial protocol specification
   - Two-token system (IC Token + IP Token)
   - Budget borrowing with tranche model
   - AES-256-GCM encryption for IP Tokens
@@ -196,7 +194,7 @@ This protocol adheres to the following Iron Cage standards:
 
 ### Budget Borrowing Protocol
 
-### Step 1: Initialization (Token Handshake)
+#### Step 1: Initialization (Token Handshake)
 
 **Message 1: INIT_BUDGET_REQUEST**
 
@@ -295,7 +293,7 @@ plaintext.zeroize();
 - Lease ID: "lease_001"
 - Ready to process LLM calls
 
-### Step 2: Request Execution
+#### Step 2: Request Execution
 
 **Token Translation (< 1ms):**
 ```
@@ -367,7 +365,7 @@ Content-Type: application/json
 - Async send: 0ms perceived latency (doesn't block agent)
 - Actual network: ~5-20ms (happens in background)
 
-### Step 3: Budget Refresh
+#### Step 3: Budget Refresh
 
 **Trigger:** `remaining_budget < $1.00` threshold
 
@@ -444,7 +442,7 @@ Content-Type: application/json
 - If approved: Add $10 to local budget, continue processing
 - If denied: Stop accepting new LLM calls, return Error::BudgetExhausted to agent
 
-### Step 4: Budget Return (Tranche Return)
+#### Step 4: Budget Return (Tranche Return)
 
 **Trigger:** Runtime shutdown or agent stop
 
@@ -666,7 +664,7 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 ### Implementation Variants
 
-### Pilot Implementation (Per-Request Reporting)
+#### Pilot Implementation (Per-Request Reporting)
 
 **Characteristics:**
 - Cost reporting after every LLM call
@@ -688,7 +686,7 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 **Trade-off:** Simple implementation (no buffering logic) vs higher overhead
 
-### Production Implementation (Batched Reporting)
+#### Production Implementation (Batched Reporting)
 
 **Characteristics:**
 - Cost reporting batched every 10 requests

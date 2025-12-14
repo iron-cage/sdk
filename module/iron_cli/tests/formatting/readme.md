@@ -8,7 +8,8 @@ Test CLI output formatting across all format types.
 
 | File | Responsibility |
 |------|----------------|
-| `formatter_test.rs` | Test 4 output formats (table, expanded, json, yaml) |
+| `formatter_test.rs` | Test legacy formatter implementation |
+| `tree_formatter_test.rs` | Test tree_fmt-based formatter implementation |
 
 ## Notes
 

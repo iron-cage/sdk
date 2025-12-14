@@ -15,6 +15,13 @@
 | `sql_injection_comprehensive.rs` | Comprehensive SQL injection tests (30+ attack vectors) |
 | `user_name_field.rs` | Username field validation tests |
 | `validation.rs` | Auth request validation (LoginRequest, RefreshRequest, LogoutRequest) |
+| `test_attack_taxonomy.rs` | Verify SQL injection attack vector taxonomy |
+| `test_endpoint_catalog.rs` | Verify endpoint catalog completeness and accuracy |
+| `test_parameter_matrix.rs` | Verify parameter-to-payload mapping matrix |
+| `test_skeleton_generator.rs` | Verify test skeleton generator creates correct structure |
+| `test_sql_injection_helpers.rs` | Verify SQL injection helper functions work correctly |
+| `test_sql_injection_standards.rs` | Verify SQL injection testing standards completeness |
+| `-generate_test_skeletons.sh` | Generate 244 test skeleton files for Phase 2 implementation |
 
 ## Directory Purpose
 

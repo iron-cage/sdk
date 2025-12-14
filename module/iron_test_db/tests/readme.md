@@ -2,12 +2,12 @@
 
 Tests for iron_test_db test database infrastructure.
 
-## Organization
+## Responsibility Table
 
-| File | Responsibility |
-|------|----------------|
-| infrastructure_tests.rs | Database creation, migration, and cleanup tests |
-| wipe_test.rs | Table dependency discovery and data wiping tests |
+| File | Responsibility | Input→Output | Out of Scope |
+|------|----------------|--------------|--------------|
+| `infrastructure_tests.rs` | Test database creation, migration, and cleanup | DB lifecycle → Infrastructure validation | NOT wipe algorithm (wipe_test.rs) |
+| `wipe_test.rs` | Test table dependency discovery and data wiping | Dependency graphs → Topological sort validation | NOT DB lifecycle (infrastructure_tests.rs) |
 
 ## Test Categories
 

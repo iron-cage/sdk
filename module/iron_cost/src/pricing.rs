@@ -19,6 +19,7 @@ use crate::converter::{
     micros_to_usd, usd_per_token_to_micros_per_mtok, micros_per_mtok_to_usd_per_token,
     TOKENS_PER_MILLION,
 };
+use crate::error::CostError;
 
 const PRICING_JSON: &str = include_str!("../asset/pricing.json");
 const MAX_OUTPUT_TOKENS: u64 = 128000;
@@ -159,7 +160,7 @@ impl Model {
 
 impl PricingManager {
     /// Creates a new PricingManager with embedded LiteLLM pricing data.
-    pub fn new() -> Result<PricingManager, String> {
+    pub fn new() -> Result<PricingManager, CostError> {
         let manager = PricingManager {
             pricing: ArcSwap::from_pointee(HashMap::new()),
         };
@@ -171,9 +172,9 @@ impl PricingManager {
     ///
     /// Filters out invalid entries (sample_spec, models without pricing).
     /// Can be used to reload pricing from external source.
-    pub fn load_from_file(&self, json_str: &str) -> Result<(), String> {
+    pub fn load_from_file(&self, json_str: &str) -> Result<(), CostError> {
         let raw_map: HashMap<String, Value> = serde_json::from_str(json_str)
-            .map_err(|e| format!("Failed to parse json: {}", e))?;
+            .map_err(|e| CostError::JsonParseError(e.to_string()))?;
 
         let mut new_map = HashMap::new();
 

@@ -3,6 +3,7 @@
 //! Cost tracking and unused budget return
 
 use super::state::BudgetState;
+use crate::error::ValidationError;
 use axum::
 {
   extract::State,
@@ -46,74 +47,86 @@ impl UsageReportRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate lease_id
     if self.lease_id.trim().is_empty()
     {
-      return Err( "lease_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "lease_id".to_string() ) );
     }
 
     if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
     {
-      return Err( format!(
-        "lease_id too long (max {} characters)",
-        Self::MAX_LEASE_ID_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "lease_id".to_string(),
+        max_length: Self::MAX_LEASE_ID_LENGTH,
+      } );
     }
 
     // Validate request_id
     if self.request_id.trim().is_empty()
     {
-      return Err( "request_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "request_id".to_string() ) );
     }
 
     if self.request_id.len() > Self::MAX_REQUEST_ID_LENGTH
     {
-      return Err( format!(
-        "request_id too long (max {} characters)",
-        Self::MAX_REQUEST_ID_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "request_id".to_string(),
+        max_length: Self::MAX_REQUEST_ID_LENGTH,
+      } );
     }
 
     // Validate tokens is positive
     if self.tokens <= 0
     {
-      return Err( "tokens must be positive".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "tokens".to_string(),
+        reason: "must be positive".to_string(),
+      } );
     }
 
     // Validate cost_microdollars is non-negative
     if self.cost_microdollars < 0
     {
-      return Err( "cost_microdollars cannot be negative".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "cost_microdollars".to_string(),
+        reason: "cannot be negative".to_string(),
+      } );
     }
 
     // Validate model
     if self.model.trim().is_empty()
     {
-      return Err( "model cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "model".to_string() ) );
     }
 
     if self.model.len() > Self::MAX_MODEL_LENGTH
     {
-      return Err( format!(
-        "model too long (max {} characters)",
-        Self::MAX_MODEL_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "model".to_string(),
+        max_length: Self::MAX_MODEL_LENGTH,
+      } );
     }
 
     // Validate provider
     if self.provider.trim().is_empty()
     {
-      return Err( "provider cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "provider".to_string() ) );
     }
 
     if self.provider.len() > Self::MAX_PROVIDER_LENGTH
     {
-      return Err( format!(
-        "provider too long (max {} characters)",
-        Self::MAX_PROVIDER_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "provider".to_string(),
+        max_length: Self::MAX_PROVIDER_LENGTH,
+      } );
     }
 
     Ok( () )
@@ -153,7 +166,7 @@ pub async fn report_usage(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 
@@ -318,21 +331,29 @@ impl BudgetReturnRequest
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Validate budget return request parameters
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.lease_id.trim().is_empty()
     {
-      return Err( "lease_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "lease_id".to_string() ) );
     }
 
     if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
     {
-      return Err( format!( "lease_id too long (max {} characters)", Self::MAX_LEASE_ID_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "lease_id".to_string(),
+        max_length: Self::MAX_LEASE_ID_LENGTH,
+      } );
     }
 
     if self.spent_microdollars < 0
     {
-      return Err( "spent_microdollars cannot be negative".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "spent_microdollars".to_string(),
+        reason: "cannot be negative".to_string(),
+      } );
     }
 
     Ok( () )
@@ -375,7 +396,7 @@ pub async fn return_budget(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 

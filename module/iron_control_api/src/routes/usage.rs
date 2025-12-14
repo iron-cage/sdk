@@ -25,6 +25,7 @@ use axum::{
 use iron_token_manager::usage_tracker::UsageTracker;
 use serde::{ Serialize, Deserialize };
 use std::sync::Arc;
+use crate::error::ValidationError;
 
 /// Maximum project_id length for DoS prevention
 const MAX_PROJECT_ID_LENGTH: usize = 1000;
@@ -39,21 +40,22 @@ const MAX_PROVIDER_LENGTH: usize = 100;
 /// Returns error if:
 /// - project_id is whitespace-only
 /// - project_id exceeds 1000 characters
-fn validate_project_id( project_id: &str ) -> Result< (), String >
+fn validate_project_id( project_id: &str ) -> Result< (), ValidationError >
 {
   // Validate not whitespace-only
   if project_id.trim().is_empty()
   {
-    return Err( "project_id cannot be empty or whitespace-only".to_string() );
+    return Err( ValidationError::MissingField( "project_id".to_string() ) );
   }
 
   // Validate length (DoS prevention)
   if project_id.len() > MAX_PROJECT_ID_LENGTH
   {
-    return Err( format!(
-      "project_id too long (max {} characters)",
-      MAX_PROJECT_ID_LENGTH
-    ) );
+    return Err( ValidationError::TooLong
+    {
+      field: "project_id".to_string(),
+      max_length: MAX_PROJECT_ID_LENGTH,
+    } );
   }
 
   Ok( () )
@@ -66,21 +68,22 @@ fn validate_project_id( project_id: &str ) -> Result< (), String >
 /// Returns error if:
 /// - provider is whitespace-only
 /// - provider exceeds 100 characters
-fn validate_provider( provider: &str ) -> Result< (), String >
+fn validate_provider( provider: &str ) -> Result< (), ValidationError >
 {
   // Validate not whitespace-only
   if provider.trim().is_empty()
   {
-    return Err( "provider cannot be empty or whitespace-only".to_string() );
+    return Err( ValidationError::MissingField( "provider".to_string() ) );
   }
 
   // Validate length (DoS prevention)
   if provider.len() > MAX_PROVIDER_LENGTH
   {
-    return Err( format!(
-      "provider too long (max {} characters)",
-      MAX_PROVIDER_LENGTH
-    ) );
+    return Err( ValidationError::TooLong
+    {
+      field: "provider".to_string(),
+      max_length: MAX_PROVIDER_LENGTH,
+    } );
   }
 
   Ok( () )
@@ -207,7 +210,7 @@ pub async fn get_usage_by_project(
   if let Err( validation_error ) = validate_project_id( &project_id )
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -277,7 +280,7 @@ pub async fn get_usage_by_provider(
   if let Err( validation_error ) = validate_provider( &provider )
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 

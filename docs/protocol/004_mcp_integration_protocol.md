@@ -33,8 +33,8 @@ Iron Cage integration with Model Context Protocol (MCP) for standardized tool di
 
 **Status**: Specification
 **Version**: 1.0.0
-**Last Updated**: 2025-12-13
-**Priority**: NICE-TO-HAVE
+**Last Updated**: 2025-12-14
+**Priority**: POST-PILOT
 
 
 ### Standards Compliance

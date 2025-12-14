@@ -28,6 +28,7 @@ use iron_token_manager::user_service::
   CreateUserParams, ListUsersFilters, User, UserService,
 };
 use crate::jwt_auth::AuthenticatedUser;
+use crate::error::ValidationError;
 use std::str::FromStr;
 
 /// State for user management endpoints
@@ -81,47 +82,71 @@ impl CreateUserRequest
   const MAX_EMAIL_LENGTH: usize = 255;
   const MIN_PASSWORD_LENGTH: usize = 8;
 
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Username validation
     if self.username.is_empty()
     {
-      return Err( "username cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "username".to_string() ) );
     }
     if self.username.len() > Self::MAX_USERNAME_LENGTH
     {
-      return Err( format!( "username exceeds maximum length of {}", Self::MAX_USERNAME_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "username".to_string(),
+        max_length: Self::MAX_USERNAME_LENGTH,
+      } );
     }
 
     // Password validation
     if self.password.len() < Self::MIN_PASSWORD_LENGTH
     {
-      return Err( format!( "password must be at least {} characters", Self::MIN_PASSWORD_LENGTH ) );
+      return Err( ValidationError::TooShort
+      {
+        field: "password".to_string(),
+        min_length: Self::MIN_PASSWORD_LENGTH,
+      } );
     }
     if self.password.len() > Self::MAX_PASSWORD_LENGTH
     {
-      return Err( format!( "password exceeds maximum length of {}", Self::MAX_PASSWORD_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "password".to_string(),
+        max_length: Self::MAX_PASSWORD_LENGTH,
+      } );
     }
 
     // Email validation
     if self.email.is_empty()
     {
-      return Err( "email cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "email".to_string() ) );
     }
     if self.email.len() > Self::MAX_EMAIL_LENGTH
     {
-      return Err( format!( "email exceeds maximum length of {}", Self::MAX_EMAIL_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "email".to_string(),
+        max_length: Self::MAX_EMAIL_LENGTH,
+      } );
     }
     if !self.email.contains( '@' )
     {
-      return Err( "email must contain @ symbol".to_string() );
+      return Err( ValidationError::InvalidFormat
+      {
+        field: "email".to_string(),
+        expected: "must contain @ symbol".to_string(),
+      } );
     }
 
     // Role validation
     let valid_roles = [ "viewer", "user", "admin" ];
     if !valid_roles.contains( &self.role.as_str() )
     {
-      return Err( format!( "role must be one of: {}", valid_roles.join( ", " ) ) );
+      return Err( ValidationError::InvalidFormat
+      {
+        field: "role".to_string(),
+        expected: format!( "one of: {}", valid_roles.join( ", " ) ),
+      } );
     }
 
     Ok( () )
@@ -220,13 +245,17 @@ impl SuspendUserRequest
 {
   const MAX_REASON_LENGTH: usize = 1000;
 
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if let Some( ref reason ) = self.reason
     {
       if reason.len() > Self::MAX_REASON_LENGTH
       {
-        return Err( format!( "reason exceeds maximum length of {}", Self::MAX_REASON_LENGTH ) );
+        return Err( ValidationError::TooLong
+        {
+          field: "reason".to_string(),
+          max_length: Self::MAX_REASON_LENGTH,
+        } );
       }
     }
     Ok( () )
@@ -242,12 +271,16 @@ pub struct ChangeRoleRequest
 
 impl ChangeRoleRequest
 {
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     let valid_roles = [ "viewer", "user", "admin" ];
     if !valid_roles.contains( &self.role.as_str() )
     {
-      return Err( format!( "role must be one of: {}", valid_roles.join( ", " ) ) );
+      return Err( ValidationError::InvalidFormat
+      {
+        field: "role".to_string(),
+        expected: format!( "one of: {}", valid_roles.join( ", " ) ),
+      } );
     }
     Ok( () )
   }
@@ -266,15 +299,23 @@ impl ResetPasswordRequest
   const MAX_PASSWORD_LENGTH: usize = 1000;
   const MIN_PASSWORD_LENGTH: usize = 8;
 
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.new_password.len() < Self::MIN_PASSWORD_LENGTH
     {
-      return Err( format!( "password must be at least {} characters", Self::MIN_PASSWORD_LENGTH ) );
+      return Err( ValidationError::TooShort
+      {
+        field: "password".to_string(),
+        min_length: Self::MIN_PASSWORD_LENGTH,
+      } );
     }
     if self.new_password.len() > Self::MAX_PASSWORD_LENGTH
     {
-      return Err( format!( "password exceeds maximum length of {}", Self::MAX_PASSWORD_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "password".to_string(),
+        max_length: Self::MAX_PASSWORD_LENGTH,
+      } );
     }
     Ok( () )
   }
@@ -299,7 +340,7 @@ pub async fn create_user(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
     ({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -463,7 +504,7 @@ pub async fn suspend_user(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
     ({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -605,7 +646,7 @@ pub async fn change_user_role(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
     ({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
@@ -659,7 +700,7 @@ pub async fn reset_password(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!
     ({
-      "error": validation_error
+      "error": validation_error.to_string()
     }) ) ).into_response();
   }
 
