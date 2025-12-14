@@ -72,6 +72,9 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
   let provider_key_crypto = Arc::new(
     iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
   );
+  let crypto_service = Arc::new(
+    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
+  );
   let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
   let agent_budget_manager = Arc::new(
     iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
@@ -91,6 +94,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     provider_key_crypto,
     db_pool: pool,
     jwt_secret,
+    crypto_service: Some( crypto_service ),
   }
 }
 
@@ -186,12 +190,12 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
 
   // Insert usage_limits for test_user (required for budget validation)
   sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_cents_per_month, current_cost_cents_this_month, created_at, updated_at)
+    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)"
   )
   .bind( "test_user" )
-  .bind( 1000000i64 )  // $10,000 USD limit (in cents)
-  .bind( 0i64 )        // No spending yet
+  .bind( 10_000_000_000_i64 )  // $10,000 USD limit (in microdollars)
+  .bind( 0i64 )                 // No spending yet
   .bind( now_ms )
   .bind( now_ms )
   .execute( pool )

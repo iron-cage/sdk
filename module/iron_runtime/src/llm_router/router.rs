@@ -333,24 +333,24 @@ impl LlmRouter {
 
     // Determine budget: use explicit budget, or fetch from server handshake, or default to 0
     // Also capture lease_id from handshake for budget return on shutdown
-    let (effective_budget, lease_id) = if let Some(b) = budget {
-      (b, None)
+    // Note: Python API accepts dollars (f64), server returns microdollars (i64)
+    let (effective_budget_micros, lease_id): (i64, Option<String>) = if let Some(b) = budget {
+      // Convert dollars from Python API to microdollars
+      ((b * 1_000_000.0) as i64, None)
     } else if !server_url.is_empty() {
-      // Fetch budget from server handshake (Protocol 005)
+      // Fetch budget from server handshake (Protocol 005) - already in microdollars
       match runtime.block_on(async {
         fetch_budget_from_handshake(&server_url, &api_key).await
       }) {
         Some(result) => (result.budget, Some(result.lease_id)),
-        None => (0.0, None),
+        None => (0, None),
       }
     } else {
-      (0.0, None)
+      (0, None)
     };
 
     // Create cost controller with effective budget (always created, defaults to 0)
-    // Convert USD to microdollars (1 USD = 1,000,000 microdollars)
-    let budget_micros = (effective_budget * 1_000_000.0) as i64;
-    let cost_controller = Some(Arc::new(CostController::new(budget_micros)));
+    let cost_controller = Some(Arc::new(CostController::new(effective_budget_micros)));
 
     // Create analytics event store (feature-gated)
     #[cfg(feature = "analytics")]
@@ -425,11 +425,11 @@ impl LlmRouter {
       // Return unused budget to server before shutting down (Protocol 005)
       if let Some(lease_id) = self.lease_id.take() {
         if !self.server_url.is_empty() {
-          // Get spent amount from cost_controller (convert microdollars to USD)
-          let spent_usd = self.cost_controller
+          // Get spent amount from cost_controller (already in microdollars)
+          let spent_microdollars = self.cost_controller
             .as_ref()
-            .map(|cc| cc.total_spent() as f64 / 1_000_000.0)
-            .unwrap_or(0.0);
+            .map(|cc| cc.total_spent())
+            .unwrap_or(0);
 
           let url = format!("{}/api/v1/budget/return", self.server_url);
           let client = reqwest::blocking::Client::builder()
@@ -441,13 +441,14 @@ impl LlmRouter {
               match client
                 .post(&url)
                 .header("Content-Type", "application/json")
-                .json(&serde_json::json!({"lease_id": lease_id, "spent_usd": spent_usd}))
+                .json(&serde_json::json!({"lease_id": lease_id, "spent_microdollars": spent_microdollars}))
                 .send()
               {
                 Ok(resp) if resp.status().is_success() => {
                   if let Ok(body) = resp.json::<serde_json::Value>() {
-                    if let Some(returned) = body.get("returned").and_then(|v| v.as_f64()) {
-                      tracing::info!("Budget returned to server: ${:.6} (spent: ${:.6})", returned, spent_usd);
+                    if let Some(returned) = body.get("returned").and_then(|v| v.as_i64()) {
+                      tracing::info!("Budget returned to server: ${:.6} (spent: ${:.6})",
+                        returned as f64 / 1_000_000.0, spent_microdollars as f64 / 1_000_000.0);
                     }
                   }
                 }
@@ -490,7 +491,7 @@ fn find_free_port() -> std::io::Result<u16> {
 
 /// Result from server handshake containing budget and lease info
 struct HandshakeResult {
-  budget: f64,
+  budget: i64,  // microdollars
   lease_id: String,
 }
 
@@ -523,13 +524,14 @@ async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option
 
   #[derive(serde::Deserialize)]
   struct HandshakeResponse {
-    budget_granted: f64,
+    budget_granted: i64,  // microdollars
     lease_id: String,
   }
 
   match response.json::<HandshakeResponse>().await {
     Ok(data) => {
-      tracing::info!("Budget from server handshake: ${:.4}, lease_id: {}", data.budget_granted, data.lease_id);
+      tracing::info!("Budget from server handshake: ${:.6} ({}μ$), lease_id: {}",
+        data.budget_granted as f64 / 1_000_000.0, data.budget_granted, data.lease_id);
       Some(HandshakeResult {
         budget: data.budget_granted,
         lease_id: data.lease_id,
