@@ -160,7 +160,7 @@ impl TestState
 
     // Store it (will be hashed internally)
     let _token_id = self.token_storage
-      .create_token( &plaintext_token, user_id, project_id, Some( "test token" ), None,  None)
+      .create_token( &plaintext_token, user_id, project_id, Some( "test token" ), None, None );
       .await
       .expect( "LOUD FAILURE: Failed to create token" );
 
@@ -492,8 +492,6 @@ async fn test_different_projects_have_separate_keys()
   state.assign_key_to_project( project_a, key_id_a ).await;
   state.assign_key_to_project( project_b, key_id_b ).await;
 
-  println!( "→ Building GET /api/keys request with Authorization header" );
-
   // Fetch key for project A
   let router_a = state.router();
   let request_a = Request::builder()
@@ -503,15 +501,8 @@ async fn test_different_projects_have_separate_keys()
     .body( Body::empty() )
     .unwrap();
 
-  println!( "→ Sending request to router" );
-
   let response_a = router_a.oneshot( request_a ).await.unwrap();
-
-  println!( "→ Extracting response body" );
-
   let ( _, body_a ) = extract_response( response_a ).await;
-  println!( "✓ Response body extracted: {}", body_a );
-
   let key_response_a: KeyResponse = serde_json::from_str( &body_a ).unwrap();
 
   // Fetch key for project B
