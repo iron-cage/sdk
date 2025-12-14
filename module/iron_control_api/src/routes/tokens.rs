@@ -105,7 +105,7 @@ pub struct CreateTokenRequest
 
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
-  pub agent_id: Option< String >,
+  pub agent_id: Option< i64 >,
 
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
@@ -306,7 +306,7 @@ pub struct CreateTokenResponse
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
-  pub agent_id: Option< String >,
+  pub agent_id: Option< i64 >,
   pub provider: Option< String >,
   pub created_at: i64,
   pub rotated_at: Option< i64 >,
@@ -323,7 +323,7 @@ pub struct TokenListItem
   pub user_id: String,
   pub project_id: Option< String >,
   pub description: Option< String >,
-  pub agent_id: Option< String >,
+  pub agent_id: Option< i64 >,
   pub provider: Option< String >,
   pub created_at: i64,
   pub last_used_at: Option< i64 >,
@@ -449,7 +449,7 @@ pub async fn create_token(
       user_id,
       request.project_id.as_deref(),
       token_name,
-      request.agent_id.as_deref(),
+      request.agent_id,
       request.provider.as_deref(),
     )
     .await
@@ -573,7 +573,7 @@ pub struct ListTokensQuery
   pub per_page: u32,
   pub project_id: Option< String >,
   pub status: Option< String >,
-  pub agent_id: Option< String >,
+  pub agent_id: Option< i64 >,
 }
 
 /// Pagination metadata
@@ -618,33 +618,7 @@ pub async fn list_tokens(
   let user_id = &claims.sub;
 
   // Parse agent_id if provided
-  let agent_id_filter = match query.agent_id
-  {
-    Some( ref s ) => match s.parse::< i64 >()
-    {
-      Ok( id ) => Some( id ),
-      Err( _ ) =>
-      {
-        // If agent_id is not a valid integer, we can either return 400 or ignore it.
-        // Given the user example uses "agent_xyz", which is not i64, but the DB expects i64,
-        // we have a conflict. Assuming the DB is correct (i64), we should probably return 400.
-        // However, to be robust, if it's not an integer, it won't match any i64 ID anyway.
-        // But passing None would mean "no filter", which is wrong (it should filter by that ID).
-        // So returning 400 is safer.
-        return (
-          StatusCode::BAD_REQUEST,
-          Json( ApiErrorResponse {
-            error: ApiErrorDetail {
-              code: "VALIDATION_ERROR".to_string(),
-              message: "Invalid agent_id format (must be integer)".to_string(),
-              fields: None,
-            }
-          } ),
-        ).into_response();
-      }
-    },
-    None => None,
-  };
+  let agent_id_filter = query.agent_id;
 
   // Clamp per_page
   let per_page = query.per_page.clamp( 1, 200 );
@@ -1018,7 +992,7 @@ pub async fn rotate_token(
       &existing_metadata.user_id,
       existing_metadata.project_id.as_deref(),
       existing_metadata.name.as_deref(),
-      Some(&existing_metadata.agent_id.unwrap()),
+      Some(existing_metadata.agent_id.unwrap()),
       existing_metadata.provider.as_deref(),
     )
     .await

@@ -29,15 +29,15 @@ pub struct ICToken
 pub struct Agent
 {
   /// Agent ID (format: agent_<uuid>)
-  pub id: String,
+  pub id: i64,
   /// Agent name
   pub name: String,
-  /// Budget allocation in USD (from `agent_budgets` table)
-  pub budget: f64,
-  /// Amount spent in USD (from `agent_budgets` table)
-  pub spent: f64,
-  /// Remaining budget in USD (budget - spent)
-  pub remaining: f64,
+  /// Budget allocation in microdollars (from `agent_budgets` table)
+  pub budget: i64,
+  /// Amount spent in microdollars (from `agent_budgets` table)
+  pub spent: i64,
+  /// Remaining budget in microdollars (budget - spent)
+  pub remaining: i64,
   /// Percentage of budget used (0.0 - 100.0)
   pub percent_used: f64,
   /// Allowed providers for this agent
@@ -47,7 +47,7 @@ pub struct Agent
   /// Tags for categorization
   pub tags: Option< Vec< String > >,
   /// Owner user ID
-  pub user_id: String,
+  pub owner_id: String,
   /// Associated project ID
   pub project_id: Option< String >,
   /// IC Token for agent authentication
@@ -67,7 +67,7 @@ pub struct CreateAgentParams
   /// Agent name
   pub name: String,
   /// Budget allocation in USD
-  pub budget: f64,
+  pub budget: i64,
   /// Allowed providers
   pub providers: Option< Vec< String > >,
   /// Description
@@ -134,15 +134,15 @@ pub struct ProviderListItem
 pub struct AgentDetails
 {
 /// Agent ID (format: agent_<uuid>)
-  pub id: String,
+  pub id: i64,
   /// Agent name
   pub name: String,
   /// Budget allocation in USD (from `agent_budgets` table)
-  pub budget: f64,
+  pub budget: i64,
   /// Amount spent in USD (from `agent_budgets` table)
-  pub spent: f64,
+  pub spent: i64,
   /// Remaining budget in USD (budget - spent)
-  pub remaining: f64,
+  pub remaining: i64,
   /// Percentage of budget used (0.0 - 100.0)
   pub percent_used: f64,
   /// Allowed providers for this agent
@@ -285,7 +285,7 @@ impl AgentService
 
     if let Some( ref user_id ) = filters.user_id
     {
-      conditions.push( "a.user_id = ?" );
+      conditions.push( "a.owner_id = ?" );
       bind_values.push( user_id.clone() );
     }
 
@@ -350,7 +350,7 @@ impl AgentService
     let data_sql = format!(
       r#"
       SELECT
-        a.id, a.name, a.providers, a.description, a.tags, a.user_id, a.project_id, a.status, a.created_at, a.updated_at,
+        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
@@ -395,12 +395,12 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if agent not found or database query fails
-  pub async fn get_agent( &self, id: &str ) -> Result< Option< Agent > >
+  pub async fn get_agent( &self, id: i64 ) -> Result< Option< Agent > >
   {
     let row = sqlx::query(
       r#"
       SELECT
-        a.id, a.name, a.providers, a.description, a.tags, a.user_id, a.project_id, a.status, a.created_at, a.updated_at,
+        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
@@ -410,7 +410,8 @@ impl AgentService
     .bind( id )
     .fetch_optional( &self.pool )
     .await
-    .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError::Generic } )?;
+    .unwrap();
+    // .map_err( |e| { error!( "Error getting agent: {}", e ); crate::error::TokenError::Generic } )?;
 
     Ok( row.map( |row| Self::row_to_agent( &row ) ) )
   }
@@ -431,7 +432,6 @@ impl AgentService
   /// Returns error if database insert fails
   pub async fn create_agent( &self, params: CreateAgentParams, user_id: &str ) -> Result< Agent >
   {
-    let agent_id = format!( "agent_{}", uuid::Uuid::new_v4() );
     let providers_json = serde_json::to_string( &params.providers.clone().unwrap_or_default() )
       .map_err( |e| { error!( "Error serializing providers: {}", e ); crate::error::TokenError::Generic } )?;
     let tags_json = serde_json::to_string( &params.tags.clone().unwrap_or_default() )
@@ -453,13 +453,12 @@ impl AgentService
       }
     }
 
-    sqlx::query(
+    let result = sqlx::query(
       r#"
-      INSERT INTO agents (id, name, providers, description, tags, user_id, project_id, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO agents (name, providers, description, tags, owner_id, project_id, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       "#
     )
-    .bind( &agent_id )
     .bind( &params.name )
     .bind( &providers_json )
     .bind( &params.description )
@@ -472,6 +471,10 @@ impl AgentService
     .execute( &self.pool )
     .await
     .map_err( |e| { error!( "Error creating agent: {}", e ); crate::error::TokenError::Generic } )?;
+
+    let agent_id = result.last_insert_rowid();
+
+    print!("[TRACE] create_agent: Agent created - agent_id={}", agent_id);
 
     sqlx::query(
       r#"
@@ -490,7 +493,9 @@ impl AgentService
       crate::error::TokenError::Generic 
     })?;
 
-    self.get_agent( &agent_id )
+    print!("[TRACE] create_agent: Budget lease created - agent_id={}", agent_id);
+
+    self.get_agent( agent_id )
       .await?
       .ok_or_else( || {
         error!( "Failed to fetch created agent: {}", agent_id );
@@ -512,10 +517,10 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn update_agent( &self, id: &str, params: UpdateAgentParams ) -> Result< Option< Agent > >
+  pub async fn update_agent( &self, id: i64, params: UpdateAgentParams ) -> Result< Option< Agent > >
   {
     // Check if agent exists
-    let existing: Option< String > = sqlx::query_scalar( "SELECT id FROM agents WHERE id = ?" )
+    let existing: Option< i64 > = sqlx::query_scalar( "SELECT id FROM agents WHERE id = ?" )
       .bind( id )
       .fetch_optional( &self.pool )
       .await
@@ -581,12 +586,12 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_agent_details( &self, id: &str ) -> Result< Option< AgentDetails > >
+  pub async fn get_agent_details( &self, id: i64 ) -> Result< Option< AgentDetails > >
   {
     let row = sqlx::query(
       r#"
       SELECT
-        a.id, a.name, a.providers, a.description, a.tags, a.user_id, a.project_id, a.status, a.created_at, a.updated_at,
+        a.id, a.name, a.providers, a.description, a.tags, a.owner_id, a.project_id, a.status, a.created_at, a.updated_at,
         b.total_allocated as budget, b.total_spent as spent, b.budget_remaining as remaining
       FROM agents a
       LEFT JOIN agent_budgets b ON a.id = b.agent_id
@@ -627,7 +632,7 @@ impl AgentService
         providers: providers,
         description: agent.description,
         tags: agent.tags,
-        user_id: agent.user_id,
+        user_id: agent.owner_id,
         project_id: agent.project_id,
         ic_token: agent.ic_token,
         status: agent.status,
@@ -651,8 +656,9 @@ impl AgentService
     let is_enabled: bool = row.get("is_enabled");
     let status = if is_enabled { "active".to_string() } else { "inactive".to_string() };
 
+    let id: i64 = row.get("id");
     ProviderListItem {
-      id: row.get("id"),
+      id: id.to_string(),
       name: row.get("provider"),
       endpoint: row.get("base_url"),
       models,
@@ -675,7 +681,7 @@ impl AgentService
   ///
   /// Returns error if database query fails
 
-  pub async fn assign_providers_to_agent(&self, id: &str, providers: Vec<String>) -> Result <Option<Agent>> {
+  pub async fn assign_providers_to_agent(&self, id: i64, providers: Vec<String>) -> Result <Option<Agent>> {
     // Validate providers exist    
     for provider in &providers {
       let provider = sqlx::query("SELECT id FROM ai_provider_keys WHERE id = ?")
@@ -724,7 +730,7 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn remove_provider_from_agent(&self, id: &str, provider_id: &str) -> Result<Vec<ProviderListItemBrief>> {
+  pub async fn remove_provider_from_agent(&self, id: i64, provider_id: &str) -> Result<Vec<ProviderListItemBrief>> {
     let providers = sqlx::query("SELECT providers FROM agents WHERE id = ?")
       .bind(id)
       .fetch_optional(&self.pool)
@@ -781,7 +787,7 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn delete_agent( &self, id: &str ) -> Result< bool >
+  pub async fn delete_agent( &self, id: i64 ) -> Result< bool >
   {
     let result = sqlx::query( "DELETE FROM agents WHERE id = ?" )
       .bind( id )
@@ -805,7 +811,7 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_agent_owner( &self, id: &str ) -> Result< Option< String > >
+  pub async fn get_agent_owner( &self, id: i64 ) -> Result< Option< String > >
   {
     let owner: Option< String > = sqlx::query_scalar( "SELECT user_id FROM agents WHERE id = ?" )
       .bind( id )
@@ -830,7 +836,7 @@ impl AgentService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_agent_tokens( &self, agent_id: &str, user_filter: Option< &str > ) -> Result< Vec< AgentTokenItem > >
+  pub async fn get_agent_tokens( &self, agent_id: i64, user_filter: Option< &str > ) -> Result< Vec< AgentTokenItem > >
   {
     let rows = if let Some( user_id ) = user_filter
     {
@@ -904,10 +910,10 @@ impl AgentService
       .as_ref()
       .and_then( |json| serde_json::from_str( json ).ok() );
 
-    let budget: f64 = row.get( "budget" );
-    let spent: f64 = row.get( "spent" );
-    let remaining: f64 = row.get( "remaining" );
-    let percent_used = if budget > 0.0 { (spent / budget) * 100.0 } else { 0.0 };
+    let budget: i64 = row.get( "budget" );
+    let spent: i64 = row.get( "spent" );
+    let remaining: i64 = row.get( "remaining" );
+    let percent_used = if budget > 0 { (spent / budget) as f64 * 100.0 } else { 0.0 };
 
     let ts = row.get( "created_at" );
     let dt = &DateTime::from_timestamp(ts, 0).unwrap_or_default();
@@ -924,7 +930,7 @@ impl AgentService
       providers,
       description: row.get( "description" ),
       tags,
-      user_id: row.get( "user_id" ),
+      owner_id: row.get( "owner_id" ),
       project_id: row.get( "project_id" ),
       ic_token: None, // IC tokens are loaded separately if needed
       status: row.get( "status" ),

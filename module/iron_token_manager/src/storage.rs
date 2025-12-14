@@ -20,7 +20,7 @@ pub struct TokenMetadata
   /// Optional human-friendly name
   pub name: Option< String >,
   /// Optional agent ID
-  pub agent_id: Option< String >,
+  pub agent_id: Option< i64 >,
   /// Optional provider
   pub provider: Option< String >,
   /// Whether token is active
@@ -219,7 +219,7 @@ impl TokenStorage
     user_id: &str,
     project_id: Option< &str >,
     name: Option< &str >,
-    agent_id: Option< &str >,
+    agent_id: Option< i64 >,
     provider: Option< &str >,
   ) -> Result< CreatedToken >
   {

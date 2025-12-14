@@ -51,9 +51,9 @@ impl AgentState {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Agent {
-    pub id: String,
+    pub id: i64,
     pub name: String,
-    pub budget: f64,
+    pub budget: i64,
     pub providers: Vec<String>,
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
@@ -86,7 +86,7 @@ impl From<ServiceICToken> for ICToken {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateAgentRequest {
     pub name: String,
-    pub budget: f64,
+    pub budget: i64,
     pub providers: Option<Vec<String>>,
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
@@ -135,11 +135,11 @@ pub struct Pagination {
 /// Agent list item with computed fields
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AgentListItem {
-    pub id: String,
+    pub id: i64,
     pub name: String,
-    pub budget: f64,
-    pub spent: f64,
-    pub remaining: f64,
+    pub budget: i64,
+    pub spent: i64,
+    pub remaining: i64,
     pub providers: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -156,8 +156,8 @@ pub struct AgentListItem {
 impl From<ServiceAgent> for AgentListItem {
     fn from(agent: ServiceAgent) -> Self {
         // TODO: spent will be computed from usage data later
-        let spent = 0.0;
-        let remaining = (agent.budget - spent).max(0.0);
+        let spent = 0;
+        let remaining = (agent.budget - spent).max(0);
         Self {
             id: agent.id,
             name: agent.name,
@@ -167,7 +167,7 @@ impl From<ServiceAgent> for AgentListItem {
             providers: agent.providers,
             description: agent.description,
             tags: agent.tags,
-            owner_id: agent.user_id,
+            owner_id: agent.owner_id,
             project_id: agent.project_id,
             status: agent.status,
             created_at: agent.created_at,
@@ -294,12 +294,12 @@ pub async fn list_agents(
 /// Get a single agent
 pub async fn get_agent(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
     let service = &state.agent_service;
 
-    let agent = service.get_agent(&id).await.map_err(|e| {
+    let agent = service.get_agent(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Database error: {}", e),
@@ -308,7 +308,7 @@ pub async fn get_agent(
     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
 
     // Check if user has access (admin or owns the agent)
-    if user.0.role != "admin" && agent.user_id != user.0.sub {
+    if user.0.role != "admin" && agent.owner_id != user.0.sub {
         return Err((
             StatusCode::FORBIDDEN,
             "You don't have access to this agent".to_string(),
@@ -322,7 +322,7 @@ pub async fn get_agent(
         providers: agent.providers,
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.user_id,
+        owner_id: agent.owner_id,
         project_id: agent.project_id,
         status: agent.status,
         created_at: agent.created_at,
@@ -353,7 +353,7 @@ pub async fn create_agent(
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, Json<ErrorResponse>)> {
     // Validation
     let mut validation_errors = std::collections::HashMap::new();
-    if req.budget < 0.01 {
+    if req.budget < 10000 {
         validation_errors.insert("budget".to_string(), "Must be >= 0.01".to_string());
     }
     if req.name.trim().is_empty() {
@@ -373,8 +373,6 @@ pub async fn create_agent(
         ));
     }
 
-    println!("role {}", user.0.role);
-
     // Permission check
     if user.0.role != "admin" && user.0.sub != req.owner_id {
         return Err((
@@ -392,7 +390,7 @@ pub async fn create_agent(
     // Provider existence check
     if let Some(providers) = &req.providers {
         for provider_id in providers {
-            let exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+            let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
                 .bind(provider_id)
                 .fetch_optional(state.token_storage.pool())
                 .await
@@ -422,13 +420,15 @@ pub async fn create_agent(
                 ));
             }
         }
+    } else {
     }
-    
+
     let service = &state.agent_service;
     let generator = TokenGenerator::new();
     let token_service = &state.token_storage;
 
     let plaintext_token = generator.generate();
+
     let providers_string = serde_json::to_string(&req.providers).map_err(|e| {
         (
             StatusCode::BAD_REQUEST,
@@ -441,17 +441,14 @@ pub async fn create_agent(
             }),
         )
     })?;
-        
-
     let params = CreateAgentParams {
-        name: req.name,
+        name: req.name.clone(),
         budget: req.budget,
-        providers: req.providers,
-        description: req.description,
-        tags: req.tags,
+        providers: req.providers.clone(),
+        description: req.description.clone(),
+        tags: req.tags.clone(),
         project_id: None, // leave empty for now as project is not supported yet
     };
-
     let agent = service.create_agent(params, &req.owner_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -464,9 +461,8 @@ pub async fn create_agent(
             }),
         )
     })?;
-
-    let token = token_service.create_token(&plaintext_token, &req.owner_id, None, None, Some(&agent.id), Some(&providers_string)).await.map_err(|e| {
-           (StatusCode::INTERNAL_SERVER_ERROR,
+    let token = token_service.create_token(&plaintext_token, &req.owner_id, None, None, Some(agent.id), Some(&providers_string)).await.map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 error: ErrorDetail {
                     code: "INTERNAL_ERROR".to_string(),
@@ -476,26 +472,30 @@ pub async fn create_agent(
             }))
         })?;
 
-    Ok((StatusCode::CREATED, Json(Agent {
-        id: agent.id,
-        name: agent.name,
+    let ic_token = ICToken {
+        id: token.id.to_string(),
+        token: token.token.clone(),
+        created_at: chrono::DateTime::from_timestamp(token.created_at / 1000, ((token.created_at % 1000) * 1_000_000) as u32)
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_default()
+    };
+
+    let response = Agent {
+        id: agent.id.clone(),
+        name: agent.name.clone(),
         budget: agent.budget,
-        providers: agent.providers,
-        description: agent.description,
-        tags: agent.tags,
-        owner_id: agent.user_id,
-        project_id: agent.project_id,
-        status: agent.status,
-        created_at: agent.created_at,
-        updated_at: agent.updated_at,
-        ic_token: Some(ICToken { 
-            id: token.id.to_string(), 
-            token: token.token, 
-            created_at: chrono::DateTime::from_timestamp(token.created_at / 1000, ((token.created_at % 1000) * 1_000_000) as u32)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_default()
-        }),
-    })))
+        providers: agent.providers.clone(),
+        description: agent.description.clone(),
+        tags: agent.tags.clone(),
+        owner_id: agent.owner_id.clone(),
+        project_id: agent.project_id.clone(),
+        status: agent.status.clone(),
+        created_at: agent.created_at.clone(),
+        updated_at: agent.updated_at.clone(),
+        ic_token: Some(ic_token),
+    };
+
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -507,11 +507,11 @@ pub struct ProviderListItem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AgentDetails {
-    pub id: String,
+    pub id: i64,
     pub name: String,
-    pub budget: f64,
-    pub spent: f64,
-    pub remaining: f64,
+    pub budget: i64,
+    pub spent: i64,
+    pub remaining: i64,
     pub percent_used: f64,
     pub providers: Vec<ProviderListItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -529,12 +529,12 @@ pub struct AgentDetails {
 /// Get agent details
 pub async fn get_agent_details(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<Json<AgentDetails>, (StatusCode, Json<ErrorResponse>)> {
     let service = &state.agent_service;
 
-    let agent = service.get_agent_details(&id).await.map_err(|e| {
+    let agent = service.get_agent_details(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -599,14 +599,14 @@ pub async fn get_agent_details(
 /// Update an agent (admin only)
 pub async fn update_agent(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
     Json(req): Json<UpdateAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
     let service = &state.agent_service;
 
     // Fetch agent first to check existence and permissions
-    let agent = service.get_agent(&id).await.map_err(|e| {
+    let agent = service.get_agent(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -634,7 +634,7 @@ pub async fn update_agent(
     };
 
     // Permission check
-    if user.0.role != "admin" && user.0.sub != agent.user_id {
+    if user.0.role != "admin" && user.0.sub != agent.owner_id {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorResponse {
@@ -693,7 +693,7 @@ pub async fn update_agent(
         tags: req.tags,
     };
 
-    let updated_agent = service.update_agent(&id, params).await.map_err(|e| {
+    let updated_agent = service.update_agent(id, params).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -723,7 +723,7 @@ pub async fn update_agent(
         providers: updated_agent.providers,
         description: updated_agent.description,
         tags: updated_agent.tags,
-        owner_id: updated_agent.user_id,
+        owner_id: updated_agent.owner_id,
         project_id: updated_agent.project_id,
         status: updated_agent.status,
         created_at: updated_agent.created_at,
@@ -735,7 +735,7 @@ pub async fn update_agent(
 /// Delete an agent (admin only)
 pub async fn delete_agent(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<(StatusCode, String), (StatusCode, String)> {
     // Only admins can delete agents
@@ -748,7 +748,7 @@ pub async fn delete_agent(
 
     let service = &state.agent_service;
 
-    let deleted = service.delete_agent(&id).await.map_err(|e| {
+    let deleted = service.delete_agent(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Database error: {}", e),
@@ -791,13 +791,13 @@ impl From<ServiceAgentTokenItem> for AgentTokenItem {
 /// Get all tokens for an agent (filtered by user role)
 pub async fn get_agent_tokens(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<AgentTokenItem>>, (StatusCode, String)> {
     let service = &state.agent_service;
 
     // Check if agent exists and get owner_id for authorization
-    let owner_id = service.get_agent_owner(&id).await.map_err(|e| {
+    let owner_id = service.get_agent_owner(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Database error: {}", e),
@@ -820,7 +820,7 @@ pub async fn get_agent_tokens(
         Some(user.0.sub.as_str()) // Regular users only see their own tokens
     };
 
-    let tokens = service.get_agent_tokens(&id, user_filter).await.map_err(|e| {
+    let tokens = service.get_agent_tokens(id, user_filter).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Database error: {}", e),
@@ -849,7 +849,7 @@ pub struct AgentProviderItemExtended {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetAgentProvidersResponse {
-    pub agent_id: String,
+    pub agent_id: i64,
     pub providers: Vec<AgentProviderItemExtended>,
     pub count: usize,
 }
@@ -857,12 +857,12 @@ pub struct GetAgentProvidersResponse {
 /// Get agent providers
 pub async fn get_agent_providers(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<Json<GetAgentProvidersResponse>, (StatusCode, Json<ErrorResponse>)> {
     let service = &state.agent_service;
 
-    let agent = service.get_agent_details(&id).await.map_err(|e| {
+    let agent = service.get_agent_details(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -911,7 +911,7 @@ pub async fn get_agent_providers(
     }).collect();
 
     Ok(Json(GetAgentProvidersResponse {
-        agent_id: agent.id,
+        agent_id: id,
         count: providers.len(),
         providers,
     }))
@@ -926,7 +926,7 @@ pub struct AssignProvidersToAgentRequest {
 /// Assign providers to an agent
 pub async fn assign_providers_to_agent(
     State(state): State<AgentState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     user: AuthenticatedUser,
     Json(req): Json<AssignProvidersToAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
@@ -948,7 +948,7 @@ pub async fn assign_providers_to_agent(
         ));
     }
     
-    let agent = service.get_agent_details(&id).await.map_err(|e| {
+    let agent = service.get_agent_details(id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -991,7 +991,7 @@ pub async fn assign_providers_to_agent(
 
     // Check providers existence
     for provider_id in &req.providers {
-        let exists: Option<String> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
             .bind(provider_id)
             .fetch_optional(&state.db_pool)
             .await
@@ -1024,7 +1024,7 @@ pub async fn assign_providers_to_agent(
         }
     }
 
-    let agent = service.assign_providers_to_agent(&id, req.providers).await.map_err(|e| {
+    let agent = service.assign_providers_to_agent(id, req.providers).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -1037,7 +1037,7 @@ pub async fn assign_providers_to_agent(
         )
     })?
     .ok_or((
-        StatusCode::BAD_REQUEST,
+        StatusCode::NOT_FOUND,
         Json(ErrorResponse {
             error: ErrorDetail {
                 code: "INVALID_PROVIDER_ID".to_string(),
@@ -1054,7 +1054,7 @@ pub async fn assign_providers_to_agent(
         providers: agent.providers,
         description: agent.description,
         tags: agent.tags,
-        owner_id: agent.user_id,
+        owner_id: agent.owner_id,
         project_id: agent.project_id,
         status: agent.status,
         created_at: agent.created_at,
@@ -1071,7 +1071,7 @@ pub struct RemainedProviderItem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RemoveProviderFromAgentResponse {
-    pub agent_id: String,
+    pub agent_id: i64,
     pub provider_id: String,
     pub removed: bool,
     pub remaining_providers: Vec< RemainedProviderItem >,
@@ -1083,12 +1083,12 @@ pub struct RemoveProviderFromAgentResponse {
 /// Remove provider from an agent
 pub async fn remove_provider_from_agent(
     State(state): State<AgentState>,
-    Path((agent_id, provider_id)): Path<(String, String)>,
+    Path((agent_id, provider_id)): Path<(i64, String)>,
     user: AuthenticatedUser,
 ) -> Result<Json<RemoveProviderFromAgentResponse>, (StatusCode, Json<ErrorResponse>)> {
     let service = state.agent_service;
 
-    let agent = service.get_agent_details(&agent_id).await.map_err(|e| {
+    let agent = service.get_agent_details(agent_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -1143,7 +1143,7 @@ pub async fn remove_provider_from_agent(
         ));
     }
 
-    let providers_list: Vec<RemainedProviderItem> = service.remove_provider_from_agent(&agent_id, &provider_id).await.map_err(|e| {
+    let providers_list: Vec<RemainedProviderItem> = service.remove_provider_from_agent(agent_id, &provider_id).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -1176,12 +1176,12 @@ pub async fn remove_provider_from_agent(
 // /// Get agent status
 // pub async fn get_agent_status(
 //     State(pool): State<SqlitePool>,
-//     Path(id): Path<String>,
+//     Path(id): Path<i64>,
 //     user: AuthenticatedUser,
 // ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
 //     let service = AgentService::new(pool);
 
-//     let agent = service.get_agent_details(&id).await.map_err(|e| {
+//     let agent = service.get_agent_details(id).await.map_err(|e| {
 //         (
 //             StatusCode::INTERNAL_SERVER_ERROR,
 //             Json(ErrorResponse {

@@ -32,7 +32,7 @@ async fn test_get_agent_details_not_found_error() {
     let response = app.oneshot(
         Request::builder()
             .method(Method::GET)
-            .uri("/api/agents/agent_invalid/details")
+            .uri("/api/agents/123/details")
             .header("authorization", format!("Bearer {}", admin_token))
             .body(Body::empty())
             .unwrap()
@@ -42,7 +42,7 @@ async fn test_get_agent_details_not_found_error() {
     let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let error_response: ErrorResponse = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(error_response.error.code, "AGENT_NOT_FOUND");
-    assert_eq!(error_response.error.message.unwrap(), "Agent 'agent_invalid' does not exist");
+    assert_eq!(error_response.error.message.unwrap(), "Agent '123' does not exist");
 }
 
 #[tokio::test]
@@ -51,8 +51,7 @@ async fn test_get_agent_details_forbidden_error() {
 
     // Create agent owned by admin
     let now = chrono::Utc::now().timestamp_millis();
-    sqlx::query("INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)")
-        .bind("agent_admin")
+    let result = sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
         .bind("Admin Agent")
         .bind("[]")
         .bind(now)
@@ -61,11 +60,13 @@ async fn test_get_agent_details_forbidden_error() {
         .await
         .unwrap();
 
+    let agent_id = result.last_insert_rowid();
+
     // Regular user tries to access admin's agent
     let response = app.oneshot(
         Request::builder()
             .method(Method::GET)
-            .uri("/api/agents/agent_admin/details")
+            .uri(format!("/api/agents/{}/details", agent_id))
             .header("authorization", format!("Bearer {}", user_token))
             .body(Body::empty())
             .unwrap()

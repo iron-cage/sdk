@@ -59,6 +59,40 @@ use tower::ServiceExt;
 use serde_json::json;
 use sqlx::SqlitePool;
 
+/// Create a test user with a unique ID
+async fn create_unique_test_user( pool: &SqlitePool, email: &str ) -> String
+{
+  let password_hash = bcrypt::hash( "test_password", 4 )
+    .expect( "LOUD FAILURE: Failed to hash test password" );
+
+  let now = std::time::SystemTime::now()
+    .duration_since( std::time::UNIX_EPOCH )
+    .expect("LOUD FAILURE: Time went backwards")
+    .as_secs() as i64;
+
+  // Generate unique user ID using UUID-like approach
+  let user_id = format!( "user_{}", uuid::Uuid::new_v4().to_string().replace( "-", "" )[..12].to_string() );
+
+  sqlx::query(
+    "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( &user_id )
+  .bind( format!( "user_{}", uuid::Uuid::new_v4() ) )
+  .bind( email )
+  .bind( &password_hash )
+  .bind( "user" )
+  .bind( 1 )
+  .bind( now )
+  .execute( pool )
+  .await
+  .unwrap_or_else( |_| panic!(
+    "LOUD FAILURE: Failed to create test user '{}'",
+    email
+  ) );
+
+  user_id
+}
+
 /// Helper to create test router with agents endpoints
 async fn create_agents_router() -> ( Router, SqlitePool, String, String, String, String )
 {
@@ -88,6 +122,24 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
   ( router, app_state.database.clone(), admin_token, user_token, admin_id, user_id )
 }
 
+/// Helper to create a provider key and return its auto-generated ID
+async fn create_provider_key( pool: &SqlitePool, provider_name: &str, now: i64 ) -> String
+{
+  let provider_user_id = create_unique_test_user( pool, &format!("provider_{}@test.com", uuid::Uuid::new_v4()) ).await;
+
+  let provider_result = sqlx::query( "INSERT INTO ai_provider_keys (provider, base_url, created_at, encrypted_api_key, encryption_nonce, user_id) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( provider_name )
+    .bind( "https://api.example.com/v1" )
+    .bind( now )
+    .bind( "encrypted_api_key" )
+    .bind( "encryption_nonce" )
+    .bind( &provider_user_id )
+    .execute( pool )
+    .await.unwrap();
+
+  provider_result.last_insert_rowid().to_string()
+}
+
 // ============================================================================
 // Agent Creation Tests
 // ============================================================================
@@ -98,25 +150,17 @@ async fn test_create_agent_as_admin_success()
   let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
   let now = chrono::Utc::now().timestamp_millis();
 
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
   let request_body = CreateAgentRequest {
     name: "Test Agent".to_string(),
-    budget: 100.0,
-    providers: Some(vec!["openai_1".to_string()]),
+    budget: 100000000,
+    providers: Some(vec![provider_id]),
     description: None,
     tags: None,
     project_id: None,
     owner_id: _admin_id,
   };
-
-  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
-    .execute( &pool )
-    .await.unwrap();
 
   let response = app
     .oneshot(
@@ -148,25 +192,17 @@ async fn test_create_agent_as_user_allowed()
   let ( app, pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
   let now = chrono::Utc::now().timestamp_millis();
 
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
   let request_body = CreateAgentRequest {
     name: "Test Agent".to_string(),
-    budget: 100.0,
-    providers: Some(vec!["openai_1".to_string()]),
+    budget: 100000000,
+    providers: Some(vec![provider_id]),
     description: None,
     tags: None,
     project_id: None,
     owner_id: _user_id,
   };
-
-  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
-      .bind( "openai_1" )
-      .bind( "openai" )
-      .bind( "https://api.openai.com/v1" )
-      .bind( now )
-      .bind( "encrypted_api_key" )
-      .bind( "encryption_nonce" )
-      .execute( &pool )
-      .await.unwrap();
 
   let response = app
     .oneshot(
@@ -191,7 +227,7 @@ async fn test_create_agent_without_auth_unauthorized()
 
   let request_body = CreateAgentRequest {
     name: "Test Agent".to_string(),
-    budget: 100.0,
+    budget: 100000000,
     providers: Some(vec!["openai".to_string(), "anthropic".to_string()]),
     description: None,
     tags: None,
@@ -218,14 +254,16 @@ async fn test_create_agent_without_auth_unauthorized()
 // Agent Listing Tests
 // ============================================================================
 
-async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &str > ) 
+async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &str > )
 {
   let now = chrono::Utc::now().timestamp_millis();
 
+  let provider_id = create_provider_key( pool, "openai", now ).await;
+
   let agent1 = CreateAgentParams {
     name: "Agent 4".to_string(),
-    budget: 400.0,
-    providers: Some(vec!["openai_1".to_string()]),
+    budget: 400000000,
+    providers: Some(vec![provider_id.clone()]),
     description: None,
     tags: None,
     project_id: None,
@@ -233,8 +271,8 @@ async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &
 
   let agent2 = CreateAgentParams {
     name: "Agent 4".to_string(),
-    budget: 400.0,
-    providers: Some(vec!["openai_1".to_string()]),
+    budget: 400000000,
+    providers: Some(vec![provider_id.clone()]),
     description: None,
     tags: None,
     project_id: None,
@@ -242,28 +280,28 @@ async fn seed_test_agents( pool: &SqlitePool, admin_id: &str, user_id: Option< &
 
   let agent3 = CreateAgentParams {
     name: "Agent 5".to_string(),
-    budget: 400.0,
-    providers: Some(vec!["openai_1".to_string()]),
+    budget: 400000000,
+    providers: Some(vec![provider_id.clone()]),
     description: None,
     tags: None,
     project_id: None,
   };
 
-  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
-    .execute( pool )
-    .await.unwrap();
+  let agent4 = CreateAgentParams {
+    name: "Agent 6".to_string(),
+    budget: 400000000,
+    providers: Some(vec![provider_id]),
+    description: None,
+    tags: None,
+    project_id: None,
+  };
 
   let service: AgentService = AgentService::new(pool.clone());
 
   service.create_agent(agent1, &admin_id).await.unwrap();
   service.create_agent(agent2, &admin_id).await.unwrap();
   service.create_agent(agent3, &user_id.unwrap_or(&admin_id)).await.unwrap();
+  service.create_agent(agent4, &admin_id).await.unwrap();
 }
 
 #[ tokio::test ]
@@ -292,7 +330,7 @@ async fn test_list_agents_as_admin_sees_all()
     .await
     .unwrap();
   let agents: PaginatedAgentsResponse = serde_json::from_slice( &body_bytes ).unwrap();
-  assert_eq!( agents.data.len(), 4, "Admin should see all agents" );
+  assert_eq!( agents.data.len(), 5, "Admin should see all agents (including migration-seeded agent_1)" );
 }
 
 #[ tokio::test ]
@@ -334,17 +372,16 @@ async fn test_list_agents_as_user_sees_only_accessible()
 #[ tokio::test ]
 async fn test_update_agent_as_admin_success()
 {
-  let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "update_admin_test@test.com" ).await;
   let now = chrono::Utc::now().timestamp_millis();
 
   // Create agent
-  let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_dsonifni" )
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
     .bind( "[\"openai\"]" )
     .bind( now )
-    .bind( &admin_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
@@ -357,7 +394,7 @@ async fn test_update_agent_as_admin_success()
   )
   .bind( "hash1" )
   .bind( "user_123" )
-  .bind( agent_id )
+  .bind( &agent_id )
   .bind( "openai" )
   .bind( now )
   .execute( &pool )
@@ -369,14 +406,14 @@ async fn test_update_agent_as_admin_success()
   )
   .bind( "hash2" )
   .bind( "user_123" )
-  .bind( agent_id )
+  .bind( &agent_id )
   .bind( "anthropic" )
   .bind( now )
   .execute( &pool )
   .await
   .unwrap();
 
-  let agent_id = result.last_insert_rowid();
+  let _agent_id = result.last_insert_rowid();
 
   let request_body = json!({
     "name": "New Name",
@@ -388,7 +425,7 @@ async fn test_update_agent_as_admin_success()
     .oneshot(
       Request::builder()
         .method( Method::PUT )
-        .uri( format!( "/api/agents/{}", "agent_dsonifni" ) )
+        .uri( format!( "/api/agents/{}", agent_id ) )
         .header( "content-type", "application/json" )
         .header( "authorization", format!( "Bearer {}", admin_token ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
@@ -412,16 +449,16 @@ async fn test_update_agent_as_admin_success()
 #[ tokio::test ]
 async fn test_update_agent_as_user_forbidden()
 {
-  let ( app, pool, _admin_token, user_token, admin_id, _user_id ) = create_agents_router().await;
+  let ( app, pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "update_user_test@test.com" ).await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_dsonifnidsfas" )
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
     .bind( "[\"openai\"]" )
     .bind( now )
-    .bind( &admin_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
@@ -434,7 +471,7 @@ async fn test_update_agent_as_user_forbidden()
   )
   .bind( "hash1" )
   .bind( "user_123" )
-  .bind( agent_id )
+  .bind( &agent_id )
   .bind( "openai" )
   .bind( now )
   .execute( &pool )
@@ -446,7 +483,7 @@ async fn test_update_agent_as_user_forbidden()
   )
   .bind( "hash2" )
   .bind( "user_123" )
-  .bind( agent_id )
+  .bind( &agent_id )
   .bind( "anthropic" )
   .bind( now )
   .execute( &pool )
@@ -461,7 +498,7 @@ async fn test_update_agent_as_user_forbidden()
     .oneshot(
       Request::builder()
         .method( Method::PUT )
-        .uri( format!( "/api/agents/{}", "agent_dsonifnidsfas" ) )
+        .uri( format!( "/api/agents/{}", agent_id ) )
         .header( "content-type", "application/json" )
         .header( "authorization", format!( "Bearer {}", user_token ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
@@ -480,41 +517,32 @@ async fn test_update_agent_as_user_forbidden()
 #[ tokio::test ]
 async fn test_get_agent_details_as_admin_success()
 {
-  let ( app, pool, admin_token, _user_token, _admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "details_admin_test@test.com" ).await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
-    .bind( &user_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
@@ -539,7 +567,7 @@ async fn test_get_agent_details_as_admin_success()
   let details: AgentDetails = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( details.name, "Test Agent" );
-  assert_eq!( details.budget, 100.0 );
+  assert_eq!( details.budget, 100000000 );
 }
 
 #[ tokio::test ]
@@ -547,39 +575,29 @@ async fn test_get_agent_details_as_owner_success()
 {
   let ( app, pool, _admin_token, user_token, _admin_id, user_id ) = create_agents_router().await;
 
-  // Create agent owned by user
+  // Create agent owned by the user from the token
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
     .bind( &user_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
@@ -604,47 +622,38 @@ async fn test_get_agent_details_as_owner_success()
   let details: AgentDetails = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( details.name, "Test Agent" );
-  assert_eq!( details.budget, 100.0 );
+  assert_eq!( details.budget, 100000000 );
 }
 
 #[ tokio::test ]
 async fn test_get_agent_details_as_other_user_forbidden()
 {
-  let ( app, pool, _admin_token, user_token, admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "details_forbidden_test@test.com" ).await;
 
-  // Create agent owned by admin
+  // Create agent owned by owner
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
-    .bind( &admin_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
@@ -693,40 +702,29 @@ async fn test_get_agent_providers_success()
 {
   let ( app, pool, _admin_token, user_token, _admin_id, user_id ) = create_agents_router().await;
 
-  // Create agent owned by user
+  // Create agent owned by the user from the token
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
     .bind( &user_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "[\"gpt-3.5-turbo\"]" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
@@ -752,9 +750,8 @@ async fn test_get_agent_providers_success()
   let response: GetAgentProvidersResponse = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( response.providers.len(), 1 );
-  assert_eq!( response.providers[ 0 ].id, "openai_1" );
   assert_eq!( response.providers[ 0 ].name, "openai" );
-  assert_eq!( response.providers[ 0 ].endpoint, "https://api.openai.com/v1" );
+  assert_eq!( response.providers[ 0 ].endpoint, "https://api.example.com/v1" );
 }
 
 # [ tokio::test ]
@@ -782,61 +779,40 @@ async fn test_get_agent_providers_not_found() {
 
 #[ tokio::test ]
 async fn test_assign_providers_to_agent_as_admin_success() {
-  let ( app, pool, admin_token, _user_token, admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "assign_admin_test@test.com" ).await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, description, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
+
+  let provider_id_1 = create_provider_key( &pool, "openai", now ).await;
+  let provider_id_2 = create_provider_key( &pool, "anthropic", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, description, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id_1) )
     .bind( "123" )
     .bind( now )
-    .bind( &user_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "[\"gpt-3.5-turbo\"]" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "anthropic_1" )
-    .bind( "[\"claude-3.5-sonnet\"]" )
-    .bind( "anthropic" )
-    .bind( "https://api.anthropic.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
 
   let request_body = json!({
-    "providers": ["openai_1", "anthropic_1"],
+    "providers": [provider_id_1, provider_id_2],
   });
 
   let response = app
@@ -864,15 +840,19 @@ async fn test_assign_providers_to_agent_as_admin_success() {
 
 #[ tokio::test ]
 async fn test_assign_providers_to_agent_empty_list() {
-  let ( app, pool, admin_token, _user_token, admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "assign_empty_test@test.com" ).await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
   let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
-    .bind( &user_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
@@ -881,37 +861,11 @@ async fn test_assign_providers_to_agent_empty_list() {
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "[\"gpt-3.5-turbo\"]" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "anthropic_1" )
-    .bind( "[\"claude-3.5-sonnet\"]" )
-    .bind( "anthropic" )
-    .bind( "https://api.anthropic.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
@@ -961,48 +915,38 @@ pub struct ErrorDetail {
 
 #[ tokio::test ]
 async fn test_assign_providers_to_agent_invalid_provider() {
-  let ( app, pool, admin_token, _user_token, admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "assign_invalid_test@test.com" ).await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
-    .bind( &user_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "[\"gpt-3.5-turbo\"]" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
 
   let request_body = json!({
-    "providers": ["openai_1", "invalid_provider"],
+    "providers": [provider_id, "999999"],
   });
 
   let response = app
@@ -1026,42 +970,32 @@ async fn test_assign_providers_to_agent_invalid_provider() {
 /// ============================================================================
 #[ tokio::test ]
 async fn test_remove_provider_from_agent() {
-  let ( app, pool, admin_token, _user_token, admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "remove_provider_test@test.com" ).await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( "agent_123" )
+
+  let provider_id = create_provider_key( &pool, "openai", now ).await;
+
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
     .bind( "Test Agent" )
-    .bind( "[\"openai_1\"]" )
+    .bind( format!("[\"{}\"]", provider_id) )
     .bind( now )
-    .bind( &user_id )
+    .bind( &owner_id )
     .execute( &pool )
     .await
     .unwrap();
 
-  let agent_id = "agent_123";
+  let agent_id = result.last_insert_rowid().to_string();
 
   // Create budget
   sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?)" )
-    .bind( agent_id )
-    .bind( 100.0 )
-    .bind( 100.0 )
+    .bind( &agent_id )
+    .bind( 100000000 )
+    .bind( 100000000 )
     .bind( now )
     .bind( now )
-    .execute( &pool )
-    .await
-    .unwrap();
-
-  // Create provider key
-  sqlx::query( "INSERT INTO ai_provider_keys (id, models, provider, base_url, created_at, encrypted_api_key, encryption_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)" )
-    .bind( "openai_1" )
-    .bind( "[\"gpt-3.5-turbo\"]" )
-    .bind( "openai" )
-    .bind( "https://api.openai.com/v1" )
-    .bind( now )
-    .bind( "encrypted_api_key" )
-    .bind( "encryption_nonce" )
     .execute( &pool )
     .await
     .unwrap();
@@ -1070,7 +1004,7 @@ async fn test_remove_provider_from_agent() {
     .oneshot(
       Request::builder()
         .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}/providers/openai_1", agent_id ) )
+        .uri( format!( "/api/agents/{}/providers/{}", agent_id, provider_id ) )
         .header( "authorization", format!( "Bearer {}", admin_token ) )
         .body( Body::empty() )
         .unwrap(),

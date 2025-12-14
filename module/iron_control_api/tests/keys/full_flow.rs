@@ -160,7 +160,7 @@ impl TestState
 
     // Store it (will be hashed internally)
     let _token_id = self.token_storage
-      .create_token( &plaintext_token, user_id, project_id, Some( "test token" ), None, None )
+      .create_token( &plaintext_token, user_id, project_id, Some( "test token" ), None,  )
       .await
       .expect( "LOUD FAILURE: Failed to create token" );
 
@@ -342,19 +342,32 @@ async fn test_no_key_assigned_returns_404()
 #[ tokio::test ]
 async fn test_disabled_key_returns_403()
 {
+  println!( "\n=== TEST START: test_disabled_key_returns_403 ===" );
+
   let state = TestState::new().await;
+  println!( "✓ TestState initialized" );
 
   // Create token with project_id
   let project_id = "project-with-disabled-key";
+  println!( "→ Creating token for user='test_user', project_id='{}'", project_id );
   let token = state.create_token( "test_user", Some( project_id ) ).await;
+  println!( "✓ Token created: {}", &token[..20.min(token.len())] );
 
   // Create and assign key
+  println!( "→ Creating provider key with TEST_API_KEY" );
   let key_id = state.create_provider_key( TEST_API_KEY ).await;
+  println!( "✓ Provider key created with ID: {}", key_id );
+
+  println!( "→ Assigning key {} to project '{}'", key_id, project_id );
   state.assign_key_to_project( project_id, key_id ).await;
+  println!( "✓ Key assigned to project" );
 
   // Disable the key
+  println!( "→ Disabling key with ID: {}", key_id );
   state.disable_key( key_id ).await;
+  println!( "✓ Key disabled successfully" );
 
+  println!( "→ Building GET /api/keys request with Authorization header" );
   let router = state.router();
   let request = Request::builder()
     .method( "GET" )
@@ -362,21 +375,34 @@ async fn test_disabled_key_returns_403()
     .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
     .body( Body::empty() )
     .unwrap();
+  println!( "✓ Request built successfully" );
 
+  println!( "→ Sending request to router" );
   let response = router.oneshot( request ).await.unwrap();
+  let status = response.status();
+  println!( "✓ Response received with status: {}", status );
 
+  println!( "→ Verifying status code is 403 FORBIDDEN" );
   assert_eq!(
-    response.status(),
+    status,
     StatusCode::FORBIDDEN,
-    "LOUD FAILURE: Disabled key must return 403 Forbidden"
+    "LOUD FAILURE: Disabled key must return 403 Forbidden, got: {}", status
   );
+  println!( "✓ Status code assertion passed" );
 
+  println!( "→ Extracting response body" );
   let ( _status, body ) = extract_response( response ).await;
+  println!( "✓ Response body extracted: {}", body );
+
+  println!( "→ Verifying error message contains 'disabled'" );
   assert!(
     body.contains( "disabled" ),
     "LOUD FAILURE: Error message should indicate key is disabled, got: {}",
     body
   );
+  println!( "✓ Error message assertion passed" );
+
+  println!( "=== TEST PASSED: test_disabled_key_returns_403 ===\n" );
 }
 
 /// Test rate limiting returns 429 after exceeding limit.

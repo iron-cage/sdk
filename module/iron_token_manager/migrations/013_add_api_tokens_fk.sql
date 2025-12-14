@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS api_tokens_new
   project_id TEXT CHECK (project_id IS NULL OR (LENGTH(project_id) > 0 AND LENGTH(project_id) <= 500)),
 
   -- Agent association (added in migration 008)
-  agent_id TEXT NOT NULL,
+  agent_id TEXT,
   provider TEXT,
 
   -- Token metadata

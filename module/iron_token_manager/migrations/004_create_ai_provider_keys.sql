@@ -10,7 +10,7 @@
 CREATE TABLE IF NOT EXISTS ai_provider_keys
 (
   -- Primary key
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
 
   -- Provider type (openai, anthropic)
   provider TEXT NOT NULL CHECK ( provider IN ( 'openai', 'anthropic' ) ),

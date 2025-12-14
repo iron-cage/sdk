@@ -32,7 +32,7 @@ async fn test_create_agent_validation_error() {
 
     let request_body = json!({
         "name": "",
-        "budget": 0.0,
+        "budget": 0,
         "owner_id": admin_id
     });
 
@@ -64,7 +64,7 @@ async fn test_create_agent_forbidden() {
     // Regular user trying to create agent for admin
     let request_body = json!({
         "name": "Test Agent",
-        "budget": 100.0,
+        "budget": 10000000,
         "owner_id": admin_id 
     });
 
@@ -93,7 +93,7 @@ async fn test_create_agent_provider_not_found() {
 
     let request_body = json!({
         "name": "Test Agent",
-        "budget": 100.0,
+        "budget": 10000000,
         "owner_id": admin_id,
         "providers": ["ip_invalid_001"]
     });
