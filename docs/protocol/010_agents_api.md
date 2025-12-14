@@ -53,6 +53,15 @@ This protocol adheres to the following Iron Cage standards:
   - Usage: User identifier for authorization checks and ownership tracking
 - `project_id`: `project_<uuid>` for cross-system compatibility
 
+- IC Token value: JWT token (e.g., `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`)
+  - Format: JSON Web Token (JWT) with HS256 signature
+  - Pattern: `^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$`
+  - Source: Protocol 006 (Token Management API)
+  - Usage: Authentication credential for agent-to-control-panel communication
+  - Length: 200-400 bytes (typical)
+  - Security: Shown once at creation/rotation, never retrievable again
+  - Ref: Protocol 005 (Budget Control Protocol) for usage in handshake
+
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
 - Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
@@ -61,8 +70,8 @@ This protocol adheres to the following Iron Cage standards:
 
 **Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
 - Consistent error response structure across all endpoints
-- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `DUPLICATE_NAME`, `BUDGET_EXCEEDED`
-- HTTP status codes: 200, 201, 400, 401, 403, 404, 409
+- Machine-readable error codes: `VALIDATION_ERROR`, `NO_FIELDS_PROVIDED`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `FORBIDDEN`, `AGENT_NOT_FOUND`, `PROVIDER_NOT_FOUND`, `INVALID_PROVIDER_ID`, `PROVIDER_NOT_ASSIGNED`, `RATE_LIMIT_EXCEEDED`, `INTERNAL_ERROR`
+- HTTP status codes: 200, 201, 400, 401, 403, 404, 429, 500
 
 **API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
 - Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
@@ -122,12 +131,12 @@ Content-Type: application/json
   "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
-    "token": "ic_xyz789abc123def456...",
-    "created_at": "2025-12-10T10:30:45Z"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF9hYmMxMjMiLCJpY190b2tlbl9pZCI6ImljX2RlZjQ1NmdoaTc4OSIsImlhdCI6MTczMzczNDI0NSwiZXhwIjoxNzM2MzI2MjQ1fQ.vW8xY0zA2bC4dE6fG8hI0jK2lM4nO6pQ8rS0tU2vW4yX",
+    "created_at": "2025-12-10T10:30:45.000Z"
   },
   "status": "active",
-  "created_at": "2025-12-10T10:30:45Z",
-  "updated_at": "2025-12-10T10:30:45Z"
+  "created_at": "2025-12-10T10:30:45.000Z",
+  "updated_at": "2025-12-10T10:30:45.000Z"
 }
 ```
 
@@ -238,8 +247,8 @@ Content-Type: application/json
       "owner_id": "user_xyz789",
       "project_id": "proj_master",
       "status": "active",
-      "created_at": "2025-12-10T10:30:45Z",
-      "updated_at": "2025-12-10T10:30:45Z"
+      "created_at": "2025-12-10T10:30:45.000Z",
+      "updated_at": "2025-12-10T10:30:45.000Z"
     },
     {
       "id": "agent_def456",
@@ -251,8 +260,8 @@ Content-Type: application/json
       "owner_id": "user_xyz789",
       "project_id": "proj_master",
       "status": "exhausted",
-      "created_at": "2025-12-09T14:20:30Z",
-      "updated_at": "2025-12-09T18:45:12Z"
+      "created_at": "2025-12-09T14:20:30.000Z",
+      "updated_at": "2025-12-09T18:45:12.000Z"
     }
   ],
   "pagination": {
@@ -357,12 +366,12 @@ Content-Type: application/json
   "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
-    "created_at": "2025-12-10T10:30:45Z",
-    "last_used": "2025-12-10T14:22:10Z"
+    "created_at": "2025-12-10T10:30:45.000Z",
+    "last_used": "2025-12-10T14:22:10.000Z"
   },
   "status": "active",
-  "created_at": "2025-12-10T10:30:45Z",
-  "updated_at": "2025-12-10T10:30:45Z"
+  "created_at": "2025-12-10T10:30:45.000Z",
+  "updated_at": "2025-12-10T10:30:45.000Z"
 }
 ```
 
@@ -459,8 +468,8 @@ Content-Type: application/json
   "owner_id": "user_xyz789",
   "project_id": "proj_master",
   "status": "active",
-  "created_at": "2025-12-10T10:30:45Z",
-  "updated_at": "2025-12-10T15:22:10Z"
+  "created_at": "2025-12-10T10:30:45.000Z",
+  "updated_at": "2025-12-10T15:22:10.000Z"
 }
 ```
 
@@ -560,7 +569,7 @@ HTTP 404 Not Found
       "models": ["claude-3-opus", "claude-3-sonnet"]
     }
   ],
-  "updated_at": "2025-12-11T10:30:00Z"
+  "updated_at": "2025-12-11T10:30:00.000Z"
 }
 ```
 
@@ -651,7 +660,7 @@ Response: 200 OK
 {
   "agent_id": "agent_abc123",
   "providers": [],
-  "updated_at": "2025-12-11T10:35:00Z"
+  "updated_at": "2025-12-11T10:35:00.000Z"
 }
 ```
 
@@ -669,7 +678,7 @@ Response: 200 OK
     {"id": "ip_openai_001", "name": "openai", "endpoint": "https://api.openai.com/v1", "models": ["gpt-4", "gpt-3.5-turbo"]},
     {"id": "ip_anthropic_001", "name": "anthropic", "endpoint": "https://api.anthropic.com/v1", "models": ["claude-3-opus", "claude-3-sonnet"]}
   ],
-  "updated_at": "2025-12-11T10:35:00Z"
+  "updated_at": "2025-12-11T10:35:00.000Z"
 }
 ```
 
@@ -925,8 +934,8 @@ Content-Type: application/json
     "today": 89,
     "last_hour": 12
   },
-  "last_request_at": "2025-12-10T15:22:10Z",
-  "checked_at": "2025-12-10T15:30:00Z"
+  "last_request_at": "2025-12-10T15:22:10.000Z",
+  "checked_at": "2025-12-10T15:30:00.000Z"
 }
 ```
 
@@ -1002,12 +1011,12 @@ HTTP 403 Forbidden
   "project_id": "proj_master",
   "ic_token": {
     "id": "ic_def456ghi789",
-    "created_at": "2025-12-10T10:30:45Z",
-    "last_used": "2025-12-10T14:22:10Z"
+    "created_at": "2025-12-10T10:30:45.000Z",
+    "last_used": "2025-12-10T14:22:10.000Z"
   },
   "status": "active",
-  "created_at": "2025-12-10T10:30:45Z",
-  "updated_at": "2025-12-10T10:30:45Z"
+  "created_at": "2025-12-10T10:30:45.000Z",
+  "updated_at": "2025-12-10T10:30:45.000Z"
 }
 ```
 
@@ -1028,8 +1037,8 @@ HTTP 403 Forbidden
     "today": 89,
     "last_hour": 12
   },
-  "last_request_at": "2025-12-10T15:22:10Z",
-  "checked_at": "2025-12-10T15:30:00Z"
+  "last_request_at": "2025-12-10T15:22:10.000Z",
+  "checked_at": "2025-12-10T15:30:00.000Z"
 }
 ```
 
@@ -1131,6 +1140,8 @@ All errors use consistent format:
 |------|-------------|-------------|
 | `VALIDATION_ERROR` | 400 | One or more fields failed validation |
 | `NO_FIELDS_PROVIDED` | 400 | Update request with no fields |
+| `INVALID_PROVIDER_ID` | 400 | One or more provider IDs are invalid or not found |
+| `PROVIDER_NOT_ASSIGNED` | 400 | Provider is not assigned to the agent |
 | `UNAUTHORIZED` | 401 | Missing or invalid authentication |
 | `TOKEN_EXPIRED` | 401 | Authentication token expired |
 | `FORBIDDEN` | 403 | Insufficient permissions |
@@ -1204,7 +1215,7 @@ Retry-After: 60
 
 ```json
 {
-  "timestamp": "2025-12-10T10:30:45Z",
+  "timestamp": "2025-12-10T10:30:45.000Z",
   "user_id": "user_xyz789",
   "endpoint": "POST /api/v1/agents",
   "method": "POST",

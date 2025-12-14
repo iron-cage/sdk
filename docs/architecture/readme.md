@@ -2,12 +2,15 @@
 
 **Purpose:** Conceptual overview of Iron Cage system architecture - how components are organized and why.
 
+**START HERE:** [000_high_level_overview.md](000_high_level_overview.md) - Comprehensive view of all actors, components, and collaboration patterns.
+
 ---
 
 ## Directory Responsibilities
 
 | ID | Entity | Responsibility |
 |----|--------|----------------|
+| 000 | **000_high_level_overview.md** | Define ALL actors (human/software/service), ALL major components (Control Panel/Agent Runtime/Data Plane/External Systems/Infrastructure), and ALL collaboration patterns (authentication/request processing/budget control/monitoring/user management/agent lifecycle/failure handling) with precise protocols and system boundaries - THE definitive high-level architecture reference |
 | 001 | **001_execution_models.md** | Define WHERE agents execute (local primary 95%, server future 5%) and ALWAYS-present Control Panel architecture managing budgets via IC Token/IP Token protocol across two runtime modes (Router, Library) |
 | 002 | **002_layer_model.md** | Document six request processing layers (Safety, Cost, Reliability, Provider, Output Safety, Observability) with failure modes |
 | 003 | **003_service_boundaries.md** | Define three plane separation (Control Plane for admin, Data Plane for processing, Agent Runtime for execution) with communication patterns, role access (Admin/Super User/Developer via CLI+Dashboard), and scaling characteristics (replicas, load, HPA) |
@@ -24,6 +27,7 @@
 
 | ID | Name | Purpose |
 |----|------|---------|
+| 000 | [High-Level Overview](000_high_level_overview.md) | **START HERE** - All actors, components, collaboration patterns |
 | 001 | [Execution Models](001_execution_models.md) | Where agents run (local vs server) |
 | 002 | [Layer Model](002_layer_model.md) | Request processing pipeline |
 | 003 | [Service Boundaries](003_service_boundaries.md) | Control Plane / Data Plane / Runtime separation |
@@ -37,24 +41,25 @@
 ## Relationships
 
 ```
-                    +---------------------+
-                    |  Execution Models   |
-                    |  (where agents run) |
-                    +----------+----------+
+                   +-------------------------+
+                   | High-Level Overview     |
+                   | (START HERE)            |
+                   | All actors, components, |
+                   | collaboration patterns  |
+                   +-----------+-------------+
                                |
               +----------------+----------------+
-              v                v                v
-     +----------------+ +------------+ +----------------+
-     |  Layer Model   | | Data Flow  | |   Service      |
-     |  (processing)  | | (journey)  | |  Boundaries    |
-     +----------------+ +------------+ +----------------+
-              |                               |
-              +---------------+---------------+
-                              v
-                    +---------------------+
-                    |  Service Integration |
-                    |  (communication)     |
-                    +---------------------+
+              v                                 v
+    +---------------------+          +---------------------+
+    |  Execution Models   |          | Roles & Permissions |
+    |  (where agents run) |          | (who can do what)   |
+    +----------+----------+          +---------------------+
+               |
++------+-------+-------+-------+
+|      |       |       |       |
+v      v       v       v       v
+Layer  Data   Service Entity  Runtime
+Model  Flow   Bound.  Model   Modes
 ```
 
 *For capability concepts, see [capabilities/](../capabilities/readme.md)*
