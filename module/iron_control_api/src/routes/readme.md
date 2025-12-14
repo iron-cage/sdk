@@ -21,3 +21,4 @@ REST API route handlers for all iron_control_api HTTP endpoints.
 | `traces.rs` | Handles call tracing query endpoints |
 | `usage.rs` | Handles usage analytics endpoints |
 | `users.rs` | Handles user account management endpoints |
+| `version.rs` | API version and build metadata endpoint |

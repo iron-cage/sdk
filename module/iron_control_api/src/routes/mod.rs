@@ -15,3 +15,4 @@ pub mod keys;
 pub mod users;
 pub mod budget;
 pub mod auth;
+pub mod version;

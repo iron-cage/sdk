@@ -55,7 +55,10 @@ pub async fn setup_auth_test_db() -> SqlitePool
       suspended_by INTEGER,
       deleted_at INTEGER,
       deleted_by INTEGER,
-      force_password_change INTEGER NOT NULL DEFAULT 0
+      force_password_change INTEGER NOT NULL DEFAULT 0,
+      failed_login_count INTEGER NOT NULL DEFAULT 0,
+      last_failed_login INTEGER,
+      locked_until INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -214,11 +217,39 @@ pub async fn seed_test_user_with_name(
 ///
 /// # Test SocketAddr
 ///
-/// Uses 127.0.0.1:54321 as the test client address for all requests.
+/// - Default: Uses 127.0.0.1:54321 as the test client address
+/// - Custom IP: If x-test-client-ip header is present, uses that IP address
+///   (This allows testing IP-based rate limiting with different IPs)
+///
+/// **Note:** x-test-client-ip is ONLY for testing. Production uses real TCP ConnectInfo.
 async fn inject_connect_info( mut request: Request, next: Next ) -> Response
 {
+  // Check for custom test IP header
+  let ip = if let Some( test_ip ) = request.headers().get( "x-test-client-ip" )
+  {
+    if let Ok( ip_str ) = test_ip.to_str()
+    {
+      if let Ok( parsed_ip ) = ip_str.parse::<IpAddr>()
+      {
+        parsed_ip
+      }
+      else
+      {
+        IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) )
+      }
+    }
+    else
+    {
+      IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) )
+    }
+  }
+  else
+  {
+    IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) )
+  };
+
   // Create fake test socket address
-  let addr = SocketAddr::new( IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) ), 54321 );
+  let addr = SocketAddr::new( ip, 54321 );
 
   // Insert ConnectInfo extension
   request.extensions_mut().insert( ConnectInfo( addr ) );
@@ -258,5 +289,93 @@ pub async fn create_auth_router( pool: SqlitePool ) -> Router
     .route( "/api/v1/auth/refresh", post( refresh ) )
     .route( "/api/v1/auth/validate", post( validate ) )
     .with_state( auth_state )
+    .layer( middleware::from_fn( inject_connect_info ) )
+}
+
+/// Combined test state (mimics AppState pattern from main server)
+///
+/// Allows AuthenticatedUser extractor to access AuthState even when
+/// routes use UserManagementState (via FromRef trait).
+#[derive(Clone)]
+struct TestAppState
+{
+  auth: AuthState,
+  users: iron_control_api::routes::users::UserManagementState,
+}
+
+/// Enable AuthenticatedUser extractor to access AuthState from TestAppState
+impl axum::extract::FromRef< TestAppState > for AuthState
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    state.auth.clone()
+  }
+}
+
+/// Enable user routes to access UserManagementState from TestAppState
+impl axum::extract::FromRef< TestAppState > for iron_control_api::routes::users::UserManagementState
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    state.users.clone()
+  }
+}
+
+/// Create Axum router with auth + users endpoints for testing
+///
+/// # Arguments
+///
+/// * `pool` - Database connection pool
+///
+/// # Returns
+///
+/// Axum router with:
+/// - POST /api/v1/auth/login
+/// - POST /api/v1/auth/logout
+/// - POST /api/v1/auth/refresh
+/// - POST /api/v1/auth/validate
+/// - POST /api/v1/users (create user - requires admin)
+#[allow(dead_code)]
+pub async fn create_full_router( pool: SqlitePool ) -> Router
+{
+  use iron_control_api::routes::users::{ create_user, UserManagementState };
+  use iron_control_api::rbac::PermissionChecker;
+
+  // Create auth state
+  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new(
+    "test_jwt_secret_for_authentication_tests_only".to_string()
+  ) );
+
+  let auth_state = AuthState
+  {
+    jwt_secret: jwt_secret.clone(),
+    db_pool: pool.clone(),
+    rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
+  };
+
+  // Create user management state
+  let permission_checker = Arc::new( PermissionChecker::new() );
+
+  let user_state = UserManagementState
+  {
+    db_pool: pool.clone(),
+    permission_checker,
+  };
+
+  // Create combined state (allows AuthenticatedUser extractor to work on user routes)
+  let app_state = TestAppState
+  {
+    auth: auth_state,
+    users: user_state,
+  };
+
+  // Create router with combined state
+  Router::new()
+    .route( "/api/v1/auth/login", post( login ) )
+    .route( "/api/v1/auth/logout", post( logout ) )
+    .route( "/api/v1/auth/refresh", post( refresh ) )
+    .route( "/api/v1/auth/validate", post( validate ) )
+    .route( "/api/v1/users", post( create_user ) )
+    .with_state( app_state )
     .layer( middleware::from_fn( inject_connect_info ) )
 }

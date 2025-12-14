@@ -114,7 +114,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
   let user_token = user_data[ "user_token" ].as_str().unwrap();
 
   // Phase 2: Attempt admin-only operations as regular user
-  let admin_operations = vec![
+  let admin_operations = [
     ( "POST", "/api/v1/admin/users", json!({ "username": "newuser", "role": "admin" }) ),
     ( "PUT", "/api/v1/admin/users/user_123/role", json!({ "role": "admin" }) ),
     ( "DELETE", "/api/v1/admin/users/user_123", json!({}) ),
@@ -289,7 +289,7 @@ async fn test_horizontal_privilege_escalation_user_to_user()
   let agent_id = create_data[ "agent_id" ].as_i64().unwrap();
 
   // User B attempts to access user A's agent (horizontal escalation)
-  let access_attempts = vec![
+  let access_attempts = [
     ( "GET", format!( "/api/v1/agents/{}", agent_id ), json!({}) ),
     ( "PUT", format!( "/api/v1/agents/{}", agent_id ), json!({ "name": "Hijacked Agent" }) ),
     ( "DELETE", format!( "/api/v1/agents/{}", agent_id ), json!({}) ),
@@ -318,7 +318,7 @@ async fn test_horizontal_privilege_escalation_user_to_user()
   // Verify user A can still access their own agent
   let user_a_access = Request::builder()
     .method( "GET" )
-    .uri( &format!( "/api/v1/agents/{}", agent_id ) )
+    .uri( format!( "/api/v1/agents/{}", agent_id ) )
     .header( "content-type", "application/json" )
     .header( "authorization", format!( "Bearer {}", token_a ) )
     .body( Body::empty() )
@@ -417,7 +417,7 @@ async fn test_idor_vulnerabilities()
   {
     let request = Request::builder()
       .method( "GET" )
-      .uri( &format!( "/api/v1/users/{}", target_user_id ) )
+      .uri( format!( "/api/v1/users/{}", target_user_id ) )
       .header( "content-type", "application/json" )
       .header( "authorization", format!( "Bearer {}", user_5_token ) )
       .body( Body::empty() )
@@ -513,7 +513,7 @@ async fn test_role_modification_prevention()
   let user_token = login_data[ "user_token" ].as_str().unwrap();
 
   // Phase 1: Attempt to modify own role via profile update
-  let role_modification_attempts = vec![
+  let role_modification_attempts = [
     ( "PUT", "/api/v1/users/me", json!({ "role": "admin" }) ),
     ( "PUT", "/api/v1/profile", json!({ "role": "admin" }) ),
     ( "PATCH", "/api/v1/users/me", json!({ "role": "admin" }) ),

@@ -582,6 +582,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Health check (FR-2: Health endpoint at /api/health)
     .route( "/api/health", get( iron_control_api::routes::health::health_check ) )
 
+    // Version endpoint (API version discovery)
+    .route( "/api/v1/version", get( iron_control_api::routes::version::get_version ) )
+
     // Authentication endpoints
     .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
     .route( "/api/v1/auth/refresh", post( iron_control_api::routes::auth::refresh ) )

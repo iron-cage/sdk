@@ -102,6 +102,19 @@ impl AuthState {
       sqlx::raw_sql(migration_007).execute(&db_pool).await?;
     }
 
+    // Migration 019: Add account lockout fields
+    let migration_019_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_019_completed'",
+    )
+    .fetch_one(&db_pool)
+    .await?;
+
+    if migration_019_completed == 0 {
+      let migration_019 =
+        include_str!("../../../iron_token_manager/migrations/019_add_account_lockout_fields.sql");
+      sqlx::raw_sql(migration_019).execute(&db_pool).await?;
+    }
+
     Ok(Self {
       jwt_secret: Arc::new(JwtSecret::new(jwt_secret_key)),
       db_pool,
@@ -350,6 +363,45 @@ pub async fn login(
       .into_response();
   }
 
+  // Check account lockout before attempting authentication
+  // Protocol 007: "Account lockout after 10 failed attempts"
+  let lockout_check: Option<( i64, Option< i64 > )> = sqlx::query_as(
+    "SELECT failed_login_count, locked_until FROM users WHERE email = ?"
+  )
+    .bind( &request.email )
+    .fetch_optional( &state.db_pool )
+    .await
+    .unwrap_or( None );
+
+  if let Some(( failed_count, Some( locked_until_ts ) )) = lockout_check
+  {
+    let now = chrono::Utc::now().timestamp_millis();
+    if locked_until_ts > now
+    {
+      let retry_after_secs = ( locked_until_ts - now ) / 1000;
+      tracing::warn!(
+        email = %request.email,
+        failed_login_count = failed_count,
+        locked_until = locked_until_ts,
+        "Login attempt blocked - account locked"
+      );
+      return (
+        StatusCode::FORBIDDEN,
+        Json( ErrorResponse {
+          error: ErrorDetail {
+            code: "AUTH_ACCOUNT_LOCKED".to_string(),
+            message: format!( "Account locked due to too many failed login attempts. Try again in {} seconds.", retry_after_secs ),
+            details: Some( serde_json::json!({
+              "retry_after": retry_after_secs,
+              "locked_until": locked_until_ts
+            })),
+          },
+        }),
+      )
+        .into_response();
+    }
+  }
+
   // Authenticate user against database
   // Note: Using username field for email (database schema uses username)
   let user = match user_auth::authenticate_user(&state.db_pool, &request.email, &request.password)
@@ -357,7 +409,48 @@ pub async fn login(
   {
     Ok(Some(user)) => user,
     Ok(None) => {
-      // Invalid credentials - return 401
+      // Invalid credentials - increment failed login counter
+      // Protocol 007: Account lockout after 10 failed attempts (15-30 min duration)
+      let now = chrono::Utc::now().timestamp_millis();
+
+      let failed_count: Option<i64> = sqlx::query_scalar(
+        "UPDATE users SET
+         failed_login_count = failed_login_count + 1,
+         last_failed_login = ?
+         WHERE email = ?
+         RETURNING failed_login_count"
+      )
+        .bind( now )
+        .bind( &request.email )
+        .fetch_optional( &state.db_pool )
+        .await
+        .unwrap_or( None );
+
+      // Lock account if threshold reached (10 failed attempts)
+      if let Some( count ) = failed_count
+      {
+        if count >= 10
+        {
+          // Lock for 30 minutes (1800000 milliseconds)
+          let locked_until = now + 1800000;
+          sqlx::query(
+            "UPDATE users SET locked_until = ? WHERE email = ?"
+          )
+            .bind( locked_until )
+            .bind( &request.email )
+            .execute( &state.db_pool )
+            .await
+            .ok();
+
+          tracing::warn!(
+            email = %request.email,
+            failed_login_count = count,
+            locked_until = locked_until,
+            "Account locked after 10 failed login attempts"
+          );
+        }
+      }
+
       // GAP-004: Log failed login attempt for security monitoring
       tracing::warn!(
         email = %request.email,
@@ -420,9 +513,22 @@ pub async fn login(
   let user_id = &user.id;
   let user_role = &user.role;
 
+  // Reset failed login counter on successful authentication
+  sqlx::query(
+    "UPDATE users SET
+     failed_login_count = 0,
+     last_failed_login = NULL,
+     locked_until = NULL
+     WHERE id = ?"
+  )
+    .bind( user_id )
+    .execute( &state.db_pool )
+    .await
+    .ok();
+
   // Generate User Token (30 days expiration)
-  // Generate unique token ID for blacklist tracking
-  let access_token_id = format!("access_{}_{}", user_id, chrono::Utc::now().timestamp());
+  // Generate unique token ID for blacklist tracking (UUID for session fixation prevention)
+  let access_token_id = format!("access_{}_{}", user_id, uuid::Uuid::new_v4());
   let user_token = match state.jwt_secret.generate_access_token(user_id, &user.email, user_role, &access_token_id) {
     Ok(token) => token,
     Err(err) => {
@@ -707,8 +813,8 @@ pub async fn refresh(
     }
   };
 
-  // Generate new User Token (30 days)
-  let new_token_id = format!("refresh_{}_{}", user.id, chrono::Utc::now().timestamp());
+  // Generate new User Token (30 days) with unique JTI (session fixation prevention)
+  let new_token_id = format!("refresh_{}_{}", user.id, uuid::Uuid::new_v4());
   let new_user_token = match state.jwt_secret.generate_access_token(&user.id, &user.email, &user.role, &new_token_id) {
     Ok( token ) => token,
     Err( e ) => {
