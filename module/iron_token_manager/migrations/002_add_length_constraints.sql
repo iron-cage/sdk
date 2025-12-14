@@ -39,6 +39,10 @@ CREATE TABLE api_tokens_new
   scopes TEXT,
   is_active BOOLEAN NOT NULL DEFAULT 1,
 
+  -- Agent and provider association
+  agent_id INTEGER,  -- nullable reference to agents table
+  provider TEXT,  -- optional provider name
+
   -- Timestamps
   created_at INTEGER NOT NULL,
   last_used_at INTEGER,
@@ -49,8 +53,8 @@ CREATE TABLE api_tokens_new
 );
 
 -- Step 2: Copy data from old table (if it exists and has data)
-INSERT INTO api_tokens_new (id, token_hash, user_id, project_id, name, scopes, is_active, created_at, last_used_at, expires_at)
-SELECT id, token_hash, user_id, project_id, name, scopes, is_active, created_at, last_used_at, expires_at
+INSERT INTO api_tokens_new (id, token_hash, user_id, project_id, name, scopes, is_active, agent_id, provider, created_at, last_used_at, expires_at)
+SELECT id, token_hash, user_id, project_id, name, scopes, is_active, agent_id, provider, created_at, last_used_at, expires_at
 FROM api_tokens
 WHERE EXISTS (SELECT 1 FROM api_tokens LIMIT 1);
 

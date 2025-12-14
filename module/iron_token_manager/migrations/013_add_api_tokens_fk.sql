@@ -22,12 +22,16 @@ INSERT INTO _migration_013_completed (applied_at)
 SELECT strftime('%s', 'now') * 1000
 WHERE NOT EXISTS (SELECT 1 FROM _migration_013_completed);
 
+-- Temporarily disable foreign key checks during table rebuild
+PRAGMA foreign_keys = OFF;
+
 -- Rebuild api_tokens table with FK constraint
 -- Step 1: Create new table with FK
-CREATE TABLE IF NOT EXISTS api_tokens_new
+DROP TABLE IF EXISTS api_tokens_new;
+CREATE TABLE api_tokens_new
 (
   -- Primary key
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
 
   -- Token hash (SHA-256, never store plaintext)
   token_hash TEXT NOT NULL UNIQUE,
@@ -38,7 +42,7 @@ CREATE TABLE IF NOT EXISTS api_tokens_new
   project_id TEXT CHECK (project_id IS NULL OR (LENGTH(project_id) > 0 AND LENGTH(project_id) <= 500)),
 
   -- Agent association (added in migration 008)
-  agent_id TEXT,
+  agent_id INTEGER,  -- nullable reference to agents table
   provider TEXT,
 
   -- Token metadata
@@ -50,20 +54,19 @@ CREATE TABLE IF NOT EXISTS api_tokens_new
   created_at INTEGER NOT NULL,  -- milliseconds since epoch
   last_used_at INTEGER,  -- nullable
   expires_at INTEGER,  -- nullable (NULL = never expires)
-
-  -- Foreign key constraint to users table with CASCADE DELETE
-  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  revoked_at INTEGER,  -- nullable, set when token is revoked
 
   -- Unique constraint on token_hash
   CONSTRAINT token_hash_unique UNIQUE(token_hash)
 );
 
 -- Step 2: Copy data from old table to new table
--- INSERT INTO api_tokens_new
---   (id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at)
--- SELECT
---   id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at
--- FROM api_tokens;
+-- Note: revoked_at column will be NULL for all existing tokens since it's added in migration 015
+INSERT INTO api_tokens_new
+  (id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at, revoked_at)
+SELECT
+  id, token_hash, user_id, project_id, agent_id, provider, name, scopes, is_active, created_at, last_used_at, expires_at, NULL
+FROM api_tokens;
 
 -- Step 3: Drop old table
 DROP TABLE api_tokens;
@@ -76,3 +79,6 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_project_id ON api_tokens(project_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_is_active ON api_tokens(is_active);
 -- CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
+
+-- Re-enable foreign key checks
+PRAGMA foreign_keys = ON;
