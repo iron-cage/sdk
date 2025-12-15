@@ -1,5 +1,8 @@
 //! Database seeding utilities for development and testing
 //!
+//! - **Default**: No auto-seeding (database remains empty)
+//! - **Demo Mode** (`ENABLE_DEMO_SEED=true`): Seeds `admin@ironcage.ai` with `IronDemo2025!`
+//!
 //! Provides functions to populate database with realistic sample data for manual testing.
 //! Supports two modes controlled by `ENABLE_DEMO_SEED` environment variable:
 //!
@@ -779,4 +782,3 @@ async fn seed_token_usage( pool: &SqlitePool ) -> Result< () >
 
   Ok( () )
 }
-

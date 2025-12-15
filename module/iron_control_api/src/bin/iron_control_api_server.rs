@@ -592,11 +592,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     iron_token_manager::seed::seed_all( &agents_pool )
       .await
       .expect( "LOUD FAILURE: Failed to seed database" );
-    tracing::info!( "✓ Database seeded (admin@ironcage.ai / IronDemo2025!)" );
-  }
-  else if user_count == 0
-  {
-    tracing::info!( "Empty database - no auto-seeding (set ENABLE_DEMO_SEED=true to seed demo accounts)" );
+    tracing::info!( "✓ Database seeded with demo accounts (see docs/demo_credentials.md)" );
   }
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
@@ -829,4 +825,3 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
   Ok( () )
 }
-

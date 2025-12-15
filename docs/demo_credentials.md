@@ -14,17 +14,11 @@
 | `tester@ironcage.ai` | user | Unlimited usage |
 | `guest@ironcage.ai` | user | Minimal permissions |
 
-## Local Development
+## Demo Seeding for Local Development
 
-**URL:** http://localhost:5173
-
-**Password (all users):** `testpass`
-
-| Email | Role |
-|-------|------|
-| `admin@admin.com` | admin |
-| `developer@example.com` | user |
-| `tester@example.com` | user |
+- Default: Local databases start empty (no users are seeded automatically).
+- Optional: Set `ENABLE_DEMO_SEED=true` to seed `admin@ironcage.ai` with password `IronDemo2025!`.
+- If you previously relied on auto-seeded test users, enable the flag or create accounts manually.
 
 ---
 
