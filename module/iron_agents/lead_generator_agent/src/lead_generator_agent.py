@@ -137,7 +137,7 @@ def setup_llm():
         print("\n> Initializing Direct OpenAI Connection...")
         return ChatOpenAI(
             model="gpt-5-nano", 
-            temperature=0
+            temperature=1
         )
 
 # --- Main Execution Function ---
