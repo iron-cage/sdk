@@ -17,7 +17,7 @@ except ImportError:
     except ImportError:
         IRON_CAGE_AVAILABLE = False
 
-# --- ROUTER CONFIGURATION (As in your example) ---
+# --- ROUTER CONFIGURATION ---
 def get_router_config(mode_selection):
     """
     Returns router configuration based on environment variables and user selection.
