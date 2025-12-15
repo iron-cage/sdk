@@ -1,5 +1,20 @@
 # Architecture: Service Boundaries
 
+## ⚠️ CRITICAL: Default Deployment Location
+
+**By default (95% of deployments), Data Plane and Agent Runtime run LOCALLY on the developer machine, NOT in the cloud.**
+
+- **Local Execution (Default, 95%):** Agent Runtime + Data Plane services (Gateway, Safety, Cost, Audit, Tool Proxy) run as localhost processes on developer machine alongside the agent code
+- **Server Execution (Future, 5%):** Agent Runtime + Data Plane services run in cloud (Kubernetes) for hosted agent execution
+
+**Control Plane (Control Panel) is the ONLY component that runs in the cloud by default** - it provides management, token generation, and analytics but is NOT in the request path.
+
+**This document describes the logical plane separation architecture. The deployment location (local vs cloud) does not change the plane responsibilities or communication patterns.**
+
+**Key Privacy Guarantee:** When running locally (default), no data leaves the developer machine - all checks happen before sending prompts to LLM providers.
+
+---
+
 ### Scope
 
 This document defines the three-plane separation model (Control Plane, Data Plane, Agent Runtime) and their communication patterns.
