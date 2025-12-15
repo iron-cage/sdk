@@ -74,11 +74,15 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
     .expect("LOUD FAILURE: Time went backwards")
     .as_secs() as i64;
 
+  // Use a unique username based on email to avoid UNIQUE constraint violations
+  let username = email.split('@').next().unwrap_or("test_user");
+  let user_id = format!("user_{}", username);
+
   sqlx::query(
     "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind("user_123")
-  .bind( "test_user" )
+  .bind(&user_id)
+  .bind( username )
   .bind( email )
   .bind( &password_hash )
   .bind( "user" )
@@ -86,12 +90,12 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
   .bind( now )
   .execute( pool )
   .await
-  .unwrap_or_else( |_| panic!(
-    "LOUD FAILURE: Failed to create test user '{}'",
-    email
+  .unwrap_or_else( |e| panic!(
+    "LOUD FAILURE: Failed to create test user '{}': {}",
+    email, e
   ) );
 
-  ( "user_123".to_string(), password_hash )
+  ( user_id, password_hash )
 }
 
 /// Generate valid JWT access token for test user.

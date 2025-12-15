@@ -24,7 +24,6 @@ use axum::{
 use iron_token_manager::{agent_budget::AgentBudgetManager, storage::TokenStorage};
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite, SqlitePool};
-use tokio::sync::Mutex;
 use crate::{ic_token::{IcTokenClaims, IcTokenManager}, jwt_auth::JwtSecret, routes::auth::AuthState};
 
 use crate::jwt_auth::AuthenticatedUser;
@@ -66,10 +65,11 @@ pub struct Agent {
     providers_json: Option<String>,
     pub created_at: i64,
     pub owner_id: String,
+    #[sqlx(skip)]
     pub ic_token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CreateAgentRequest {
     pub name: String,
     pub providers: Vec<String>,
@@ -117,8 +117,7 @@ pub async fn list_agents(
                 name,
                 providers as providers_json,
                 created_at,
-                owner_id,
-                ic_token
+                owner_id
             FROM agents
             ORDER BY created_at DESC
             "#
@@ -140,8 +139,7 @@ pub async fn list_agents(
                 name,
                 providers as providers_json,
                 created_at,
-                owner_id,
-                ic_token
+                owner_id
             FROM agents
             WHERE owner_id = ?
             ORDER BY created_at DESC
@@ -150,12 +148,13 @@ pub async fn list_agents(
         .bind(&user.0.sub)
         .fetch_all(&pool)
         .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
-            )
-        })?
+        .unwrap()
+        // .map_err(|e| {
+        //     (
+        //         StatusCode::INTERNAL_SERVER_ERROR,
+        //         format!("Database error: {}", e),
+        //     )
+        // })?
     };
 
     // Parse providers JSON
@@ -181,8 +180,7 @@ pub async fn get_agent(
             name,
             providers as providers_json,
             created_at,
-            owner_id,
-            ic_token
+            owner_id
         FROM agents
         WHERE id = ?
         "#
@@ -221,9 +219,8 @@ pub async fn create_agent(
     Json(req): Json<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
     // Only admins can create agents
-    let AgentState { pool, token_storage, agent_budget_manager: _, ic_token_manager, jwt_secret: _ } = state;
-    let CreateAgentRequest { name, providers } = req;
-    
+    let CreateAgentRequest { name, providers } = req.clone();
+
     if user.0.role != "admin" {
         return Err((
             StatusCode::FORBIDDEN,
@@ -250,7 +247,7 @@ pub async fn create_agent(
     .bind(&providers_json)
     .bind(created_at)
     .bind(&owner_id)
-    .execute(&pool)
+    .execute(&state.pool)
     .await
     .map_err(|e| {
         (
@@ -260,11 +257,10 @@ pub async fn create_agent(
     })?;
 
     let agent_id = result.last_insert_rowid();
-
     let claims = IcTokenClaims::new(agent_id.to_string(), agent_id.to_string(), vec![], None);
-    let plaintext_token = ic_token_manager.generate_token(&claims).unwrap();
+    let plaintext_token = state.ic_token_manager.generate_token(&claims).unwrap();
 
-    token_storage.create_token(&plaintext_token, &owner_id, None, Some(&name), Some(agent_id), None).await.map_err(|e| {
+    state.token_storage.create_token(&plaintext_token, &owner_id, None, Some(&name), Some(agent_id), None).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to create token: {}", e),
@@ -358,8 +354,7 @@ pub async fn update_agent(
             name,
             providers as providers_json,
             created_at,
-            owner_id,
-            ic_token
+            owner_id
         FROM agents
         WHERE id = ?
         "#
@@ -384,7 +379,7 @@ pub async fn update_agent(
 
 /// Delete an agent (admin only)
 pub async fn delete_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     Path(id): Path<i64>,
     user: AuthenticatedUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -396,9 +391,12 @@ pub async fn delete_agent(
         ));
     }
 
-    let result = sqlx::query("DELETE FROM agents WHERE id = ?")
+    let pool = &state.pool;
+
+    // Check if agent exists before deletion
+    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM agents WHERE id = ?")
         .bind(id)
-        .execute(&pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| {
             (
@@ -407,9 +405,20 @@ pub async fn delete_agent(
             )
         })?;
 
-    if result.rows_affected() == 0 {
+    if exists.is_none() {
         return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
     }
+
+    sqlx::query("DELETE FROM agents WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -20,6 +20,8 @@
 //! duplicated test database infrastructure. See module/iron_test_db/tests/
 //! migration_verification.rs for full migration rationale.
 
+use std::result;
+use sqlx::Row;
 use iron_test_db::{ TestDatabase, TestDatabaseBuilder };
 
 /// Authentication schema for iron_control_api tests
@@ -125,4 +127,48 @@ pub async fn create_test_db() -> TestDatabase
     .expect( "LOUD FAILURE: Failed to apply authentication schema" );
 
   db
+}
+
+/// Create an isolated in-memory test database.
+///
+/// This is the preferred function for test functions that need database isolation.
+/// Each call creates a completely isolated in-memory database with fresh schema.
+///
+/// This function:
+/// 1. Creates a fresh in-memory SQLite database
+/// 2. Configures connection pool (size: 5)
+/// 3. Applies all migrations from iron_token_manager
+/// 4. Applies authentication schema (users, token_blacklist, user_audit_log tables)
+///
+/// # Isolation Guarantee
+///
+/// Each call to this function creates a new, isolated database instance.
+/// Databases are completely independent and dropped when the returned TestDatabase
+/// is dropped, ensuring zero data leakage between tests.
+///
+/// # Panics
+///
+/// Panics with LOUD FAILURE message if:
+/// - Database creation fails
+/// - Migration application fails
+/// - Authentication schema application fails
+///
+/// # Examples
+///
+/// ```no_run
+/// # use iron_control_api_tests::common::test_db::create_test_db_isolated;
+/// # async fn example() {
+/// let db = create_test_db_isolated().await;
+/// let pool = db.pool();
+///
+/// // Use pool for queries - completely isolated from other tests
+/// sqlx::query("SELECT * FROM users")
+///   .fetch_all(pool)
+///   .await
+///   .expect("Query failed");
+/// # }
+/// ```
+pub async fn create_test_db_isolated() -> TestDatabase
+{
+  create_test_db().await
 }

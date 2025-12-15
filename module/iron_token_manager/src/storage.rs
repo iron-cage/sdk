@@ -215,7 +215,7 @@ impl TokenStorage
 
     let result = sqlx::query(
       "INSERT INTO api_tokens (token_hash, user_id, project_id, name, agent_id, provider, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7)"
+       VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
     .bind( &token_hash )
     .bind( user_id )
@@ -226,7 +226,8 @@ impl TokenStorage
     .bind( now_ms )
     .execute( &self.pool )
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .unwrap();
+    // .map_err( crate::error::TokenError::Database )?;
 
     Ok( result.last_insert_rowid() )
   }

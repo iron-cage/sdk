@@ -292,7 +292,8 @@ impl UserService
     .bind( user_id )
     .fetch_one( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .unwrap();
+    // .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( User {
       id: row.get( "id" ),

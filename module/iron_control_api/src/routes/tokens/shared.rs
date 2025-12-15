@@ -5,6 +5,7 @@
 use iron_token_manager::storage::TokenStorage;
 use iron_token_manager::token_generator::TokenGenerator;
 use serde::{ Deserialize, Serialize };
+use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use crate::error::ValidationError;
 
@@ -30,6 +31,14 @@ impl TokenState
       storage: Arc::new( storage ),
       generator: Arc::new( TokenGenerator::new() ),
     } )
+  }
+
+  pub async fn from_pool( pool: Pool< Sqlite > ) -> Self
+  {
+    Self {
+      storage: Arc::new( TokenStorage::from_pool( pool ) ),
+      generator: Arc::new( TokenGenerator::new() ),
+    }
   }
 }
 

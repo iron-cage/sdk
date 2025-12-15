@@ -52,7 +52,8 @@ use axum::{
 use iron_control_api::routes::agents::AgentState;
 use tower::ServiceExt;
 use serde_json::json;
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool, pool};
+
 
 /// Test schema for agents integration tests
 const AGENTS_SCHEMA: &str = r#"
@@ -61,8 +62,7 @@ CREATE TABLE IF NOT EXISTS agents (
   name TEXT NOT NULL,
   providers TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  owner_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-  ic_token TEXT NOT NULL DEFAULT ''
+  owner_id TEXT REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS api_tokens (
@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   agent_id INTEGER,
   provider TEXT,
   name TEXT,
+  project_id TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL,
   last_used_at INTEGER,
@@ -87,15 +88,24 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
   // Create TestAppState with auth support
   let app_state = TestAppState::new().await;
 
+  // Use the app state's database pool (shared across auth, tokens, and agents)
+  let agent_pool = app_state.database.clone();
+
+  // Enable foreign key constraints for this connection
+  sqlx::raw_sql( "PRAGMA foreign_keys = ON;" )
+    .execute( &agent_pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to enable foreign keys" );
+
   // Add agents schema to database
   sqlx::raw_sql( AGENTS_SCHEMA )
-    .execute( &app_state.database )
+    .execute( &agent_pool )
     .await
     .expect( "LOUD FAILURE: Failed to apply agents schema" );
 
-  // Create admin and regular user
-  let ( admin_id, _ ) = create_test_admin( &app_state.database ).await;
-  let ( user_id, _ ) = create_test_user( &app_state.database, "regular_user@mail.com" ).await;
+  // Create admin and regular user in the correct pool
+  let ( admin_id, _ ) = create_test_admin( &agent_pool ).await;
+  let ( user_id, _ ) = create_test_user( &agent_pool, "regular_user@mail.com" ).await;
 
   // Generate tokens using TEST_JWT_SECRET
   let admin_token = create_test_access_token( &admin_id, "admin@admin.com", "admin", "test_jwt_secret_key_for_testing_12345" );
@@ -108,9 +118,9 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
     .route( "/api/agents/:id", put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/agents/:id", delete_route( iron_control_api::routes::agents::delete_agent ) )
     .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
-    .with_state( app_state.clone() );
+    .with_state( app_state );
 
-  ( router, app_state.database.clone(), admin_token, user_token, admin_id, user_id )
+  ( router, agent_pool, admin_token, user_token, admin_id, user_id )
 }
 
 // ============================================================================
@@ -347,11 +357,16 @@ async fn test_get_agent_as_admin_success()
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::OK );
-
+  let status = response.status();
   let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
     .await
     .unwrap();
+
+  if status != StatusCode::OK {
+    let body_str = String::from_utf8( body_bytes.to_vec() ).unwrap();
+    panic!( "Expected 200 OK, got {}. Body: {}", status, body_str );
+  }
+
   let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( agent[ "name" ].as_str().unwrap(), "Test Agent" );
@@ -508,6 +523,12 @@ async fn test_delete_agent_as_admin_success()
 {
   let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
 
+  let result = sqlx::query("SELECT * FROM agents").fetch_all(&pool).await.unwrap();
+
+  let rows: Vec<i64> = result.into_iter().map(|r| r.get::<i64, &str>("id")).collect();
+
+  println!("rows: {:?}", rows);
+
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
   let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
@@ -518,8 +539,15 @@ async fn test_delete_agent_as_admin_success()
     .execute( &pool )
     .await
     .unwrap();
-
+  
   let agent_id = result.last_insert_rowid();
+  println!( "agent_id: {}", agent_id );
+
+  let result = sqlx::query("SELECT * FROM agents").fetch_all(&pool).await.unwrap();
+
+  let rows: Vec<i64> = result.into_iter().map(|r| r.get::<i64, &str>("id")).collect();
+
+  println!("rows: {:?}", rows);
 
   let response = app
     .oneshot(

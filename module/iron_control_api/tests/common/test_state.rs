@@ -182,18 +182,28 @@ pub struct TestAppState
 
 impl TestAppState
 {
-  /// Create new test application state with in-memory database.
+  /// Create new test application state with isolated in-memory database.
+  ///
+  /// Each call creates a completely isolated in-memory database with its own
+  /// connection pool, ensuring test isolation. Databases are dropped when
+  /// TestAppState is dropped.
   pub async fn new() -> Self
   {
-    let auth = create_test_auth_state().await;
-    let tokens = create_test_token_state().await;
-
-    // Create database using iron_test_db
-    let db = super::test_db::create_test_db().await;
+    // Create an isolated in-memory database
+    // Using sqlite::memory: creates a fresh, isolated database for each test
+    let db = super::test_db::create_test_db_isolated().await;
     let database = db.pool().clone();
 
-    // Keep TestDatabase alive (prevents pool from being invalidated)
-    core::mem::forget( db );
+    // Create auth state with fresh database
+    let auth = AuthState::new( TEST_JWT_SECRET.to_string(), "sqlite::memory:" )
+      .await
+      .expect( "LOUD FAILURE: Failed to create isolated test AuthState" );
+
+    // Create token state with fresh database and seed users
+    let tokens = TokenState::from_pool(database.clone())
+      .await;
+    // Seed test users for FK constraint compliance
+    seed_test_users_for_tokens( tokens.storage.pool() ).await;
 
     Self { auth, tokens, database }
   }
@@ -264,7 +274,7 @@ impl FromRef< TestAppState > for AgentState
     {
       pool: state.database.clone(),
       agent_budget_manager: Arc::new(  AgentBudgetManager::from_pool( state.database.clone() ) ),
-      token_storage: Arc::new( (*state.tokens.storage).clone() ),
+      token_storage: state.tokens.storage.clone(),
       ic_token_manager: Arc::new(  IcTokenManager::new( TEST_JWT_SECRET.to_string() ) ),
       jwt_secret: Arc::new( JwtSecret::new( TEST_JWT_SECRET.to_string() ) ),
     }
