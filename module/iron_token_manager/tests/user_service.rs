@@ -2,10 +2,12 @@
 //!
 //! Tests for user management service covering user lifecycle, RBAC, audit logging,
 //! and password security. Uses REAL `BCrypt` hashing and `SQLite` database.
+//! and password security. Uses REAL `BCrypt` hashing and `SQLite` database.
 //!
 //! ## Test Matrix
 //!
 //! ### User Creation
+//! - `test_create_user_success`: Valid user creation → User created with `BCrypt` hash
 //! - `test_create_user_success`: Valid user creation → User created with `BCrypt` hash
 //! - `test_create_user_empty_username`: Empty username → Error "username required"
 //! - `test_create_user_empty_password`: Empty password → Error "password required"
@@ -14,6 +16,7 @@
 //! - `test_create_user_duplicate_username`: Duplicate username → Error "username exists"
 //! - `test_create_user_sql_injection_username`: SQL injection in username → Rejected safely
 //! - `test_create_user_unicode_username`: Unicode username → Created successfully
+//! - `test_create_user_bcrypt_cost_12`: Password hash → `BCrypt` cost=12
 //! - `test_create_user_bcrypt_cost_12`: Password hash → `BCrypt` cost=12
 //! - `test_create_user_password_never_plaintext`: Password storage → Hash stored, not plaintext
 //!
@@ -33,6 +36,7 @@
 //! ### User Deletion (Soft Delete)
 //! - `test_delete_user_soft_delete`: Delete user → User soft deleted (not removed)
 //! - `test_deleted_user_not_in_list`: Deleted user → Not in `list_users` results
+//! - `test_deleted_user_not_in_list`: Deleted user → Not in `list_users` results
 //! - `test_deleted_user_data_preserved`: Deleted user → Data preserved in DB
 //! - `test_delete_already_deleted`: Delete deleted user → No error (idempotent)
 //!
@@ -43,6 +47,7 @@
 //! - `test_audit_log_immutable`: Audit entries → Cannot be modified
 //!
 //! ### Password Security
+//! - `test_password_bcrypt_cost_12`: Password hashes → `BCrypt` cost exactly 12
 //! - `test_password_bcrypt_cost_12`: Password hashes → `BCrypt` cost exactly 12
 //! - `test_password_verification`: Correct password → Verifies successfully
 //! - `test_password_verification_wrong`: Wrong password → Verification fails
@@ -69,8 +74,10 @@
 //! - ✅ State transitions (active ↔ suspended ↔ deleted)
 //! - ✅ Idempotent operations (double suspend, double delete)
 //! - ✅ Security (`BCrypt` cost=12, no plaintext passwords)
+//! - ✅ Security (`BCrypt` cost=12, no plaintext passwords)
 //! - ✅ Audit immutability (logs can't be modified)
 
+use iron_token_manager::user_service::{ UserService, CreateUserParams, ListUsersFilters };
 use iron_token_manager::user_service::{ UserService, CreateUserParams, ListUsersFilters };
 
 mod common;
@@ -131,8 +138,65 @@ async fn test_diagnostic_database_schema()
   }
 }
 
+/// Diagnostic test to check database schema
+///
+/// Verifies that required tables exist before testing user creation.
+#[ tokio::test ]
+async fn test_diagnostic_database_schema()
+{
+  let db = common::create_test_db().await;
+
+  // Check if users table exists
+  let users_table_exists: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'"
+  )
+  .fetch_one( db.pool() )
+  .await
+  .expect( "LOUD FAILURE: Failed to query sqlite_master for users table" );
+
+  assert_eq!(
+    users_table_exists, 1,
+    "LOUD FAILURE: users table should exist after migrations. Found: {users_table_exists}"
+  );
+
+  // Check if user_audit_log table exists
+  let audit_table_exists: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='user_audit_log'"
+  )
+  .fetch_one( db.pool() )
+  .await
+  .expect( "LOUD FAILURE: Failed to query sqlite_master for user_audit_log table" );
+
+  assert_eq!(
+    audit_table_exists, 1,
+    "LOUD FAILURE: user_audit_log table should exist after migrations. Found: {audit_table_exists}"
+  );
+
+  // Try direct SQL insertion to test schema compatibility
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  let insert_result = sqlx::query(
+    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+     VALUES ($1, $2, $3, $4, $5, 1, $6)"
+  )
+  .bind( "user_test_001" )
+  .bind( "test_user" )
+  .bind( "$2b$12$abcdefghijklmnopqrstuvwxyz1234567890" )  // Fake BCrypt hash
+  .bind( "test@example.com" )
+  .bind( "user" )
+  .bind( now_ms )
+  .execute( db.pool() )
+  .await;
+
+  match insert_result
+  {
+    Ok( _ ) => println!( "✅ Direct SQL insert succeeded" ),
+    Err( e ) => panic!( "LOUD FAILURE: Direct SQL insert failed: {e:?}" ),
+  }
+}
+
 /// Test successful user creation with valid parameters
 ///
+/// Verifies that user creation works for valid inputs and stores `BCrypt` password hash.
 /// Verifies that user creation works for valid inputs and stores `BCrypt` password hash.
 #[ tokio::test ]
 async fn test_create_user_success()
@@ -148,6 +212,16 @@ async fn test_create_user_success()
     role: "user".to_string(),
   };
 
+  // Use user_001 as admin (pre-seeded by common::create_test_db)
+  let result = service.create_user( params, "user_001" ).await;
+
+  // Print detailed error if creation fails
+  if let Err( ref e ) = result
+  {
+    eprintln!( "❌ User creation failed with error: {e:?}" );
+  }
+
+  let user = result.expect( "LOUD FAILURE: Failed to create valid user with correct parameters" );
   // Use user_001 as admin (pre-seeded by common::create_test_db)
   let result = service.create_user( params, "user_001" ).await;
 
@@ -174,16 +248,20 @@ async fn test_create_user_success()
 async fn test_create_user_empty_username()
 {
   let db = common::create_test_db().await;
+  let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
   let params = CreateUserParams
   {
+    username: String::new(),
     username: String::new(),
     password: "SecurePass123!".to_string(),
     email: "john@example.com".to_string(),
     role: "user".to_string(),
   };
 
+  // Use user_001 as admin (pre-seeded by common::create_test_db)
+  let result = service.create_user( params, "user_001" ).await;
   // Use user_001 as admin (pre-seeded by common::create_test_db)
   let result = service.create_user( params, "user_001" ).await;
 
@@ -206,16 +284,20 @@ async fn test_create_user_empty_username()
 async fn test_create_user_empty_password()
 {
   let db = common::create_test_db().await;
+  let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
   let params = CreateUserParams
   {
     username: "john_doe".to_string(),
     password: String::new(),
+    password: String::new(),
     email: "john@example.com".to_string(),
     role: "user".to_string(),
   };
 
+  // Use user_001 as admin (pre-seeded by common::create_test_db)
+  let result = service.create_user( params, "user_001" ).await;
   // Use user_001 as admin (pre-seeded by common::create_test_db)
   let result = service.create_user( params, "user_001" ).await;
 
@@ -238,6 +320,7 @@ async fn test_create_user_empty_password()
 async fn test_create_user_empty_email()
 {
   let db = common::create_test_db().await;
+  let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
   let params = CreateUserParams
@@ -245,9 +328,12 @@ async fn test_create_user_empty_email()
     username: "john_doe".to_string(),
     password: "SecurePass123!".to_string(),
     email: String::new(),
+    email: String::new(),
     role: "user".to_string(),
   };
 
+  // Use user_001 as admin (pre-seeded by common::create_test_db)
+  let result = service.create_user( params, "user_001" ).await;
   // Use user_001 as admin (pre-seeded by common::create_test_db)
   let result = service.create_user( params, "user_001" ).await;
 
@@ -270,6 +356,7 @@ async fn test_create_user_empty_email()
 async fn test_create_user_invalid_role()
 {
   let db = common::create_test_db().await;
+  let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
   let params = CreateUserParams
@@ -280,6 +367,8 @@ async fn test_create_user_invalid_role()
     role: "hacker".to_string(), // Invalid role
   };
 
+  // Use user_001 as admin (pre-seeded by common::create_test_db)
+  let result = service.create_user( params, "user_001" ).await;
   // Use user_001 as admin (pre-seeded by common::create_test_db)
   let result = service.create_user( params, "user_001" ).await;
 
@@ -296,7 +385,41 @@ async fn test_create_user_invalid_role()
 }
 
 /// Test that `BCrypt` password hash has cost factor of exactly 12
+/// Test that `BCrypt` password hash has cost factor of exactly 12
 ///
+/// Bug reproducer for issue-001: `BCrypt` cost was 10 instead of required 12
+///
+/// ## Root Cause
+///
+/// Used `bcrypt::DEFAULT_COST` (value: 10) instead of explicit cost=12 per security
+/// specification. The `BCrypt` library defaults to cost 10 for backward compatibility,
+/// but our security requirements mandate cost 12 for adequate protection against
+/// brute-force attacks.
+///
+/// ## Why Not Caught
+///
+/// No test coverage existed for `user_service` module (643 lines, 0 tests). The module
+/// had RBAC, audit logging, password hashing, but zero verification. Manual testing
+/// revealed the security gap during systematic corner case review.
+///
+/// ## Fix Applied
+///
+/// Changed from `bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )` to explicit
+/// `const BCRYPT_COST: u32 = 12; bcrypt::hash( &params.password, BCRYPT_COST )`.
+/// The constant makes the cost requirement explicit and prevents accidental changes.
+///
+/// ## Prevention
+///
+/// 1. NEVER use `DEFAULT_COST` for password hashing - always specify explicit cost
+/// 2. Add security tests FIRST before implementing security-critical features
+/// 3. Manual testing with exhaustive corner case list reveals gaps in test coverage
+///
+/// ## Pitfall
+///
+/// Library defaults prioritize backward compatibility over security. When implementing
+/// security features (password hashing, encryption, key derivation), ALWAYS specify
+/// security parameters explicitly. Never rely on library defaults - they may be weak
+/// for current security standards. `DEFAULT_COST=10` is 4x weaker than cost=12.
 /// Bug reproducer for issue-001: `BCrypt` cost was 10 instead of required 12
 ///
 /// ## Root Cause
@@ -334,6 +457,7 @@ async fn test_create_user_invalid_role()
 async fn test_password_bcrypt_cost_12()
 {
   let db = common::create_test_db().await;
+  let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
   let params = CreateUserParams
@@ -344,6 +468,7 @@ async fn test_password_bcrypt_cost_12()
     role: "user".to_string(),
   };
 
+  let user = service.create_user( params, "user_001" ).await
   let user = service.create_user( params, "user_001" ).await
     .expect( "Failed to create user" );
 
@@ -373,6 +498,7 @@ async fn test_password_bcrypt_cost_12()
 async fn test_sql_injection_username()
 {
   let db = common::create_test_db().await;
+  let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
   let params = CreateUserParams
@@ -384,6 +510,8 @@ async fn test_sql_injection_username()
   };
 
   // Should either reject SQL injection OR escape it safely
+  // Use user_001 as admin (pre-seeded by common::create_test_db)
+  let result = service.create_user( params, "user_001" ).await;
   // Use user_001 as admin (pre-seeded by common::create_test_db)
   let result = service.create_user( params, "user_001" ).await;
 
@@ -409,11 +537,13 @@ async fn test_sql_injection_username()
 }
 
 /// Test that deleted user doesn't appear in `list_users`
+/// Test that deleted user doesn't appear in `list_users`
 ///
 /// Verifies soft delete properly filters deleted users from listing.
 #[ tokio::test ]
 async fn test_deleted_user_not_in_list()
 {
+  let db = common::create_test_db().await;
   let db = common::create_test_db().await;
   let service = UserService::new( db.pool().clone() );
 
@@ -427,9 +557,11 @@ async fn test_deleted_user_not_in_list()
   };
 
   let user = service.create_user( params, "user_001" ).await
+  let user = service.create_user( params, "user_001" ).await
     .expect( "Failed to create user" );
 
   // Delete user
+  service.delete_user( &user.id, "user_001" ).await
   service.delete_user( &user.id, "user_001" ).await
     .expect( "Failed to delete user" );
 
@@ -442,6 +574,8 @@ async fn test_deleted_user_not_in_list()
     "LOUD FAILURE: Deleted user should not appear in list_users. Found user: {users:?}"
   );
 
+  // Test database pre-seeds user_001 through user_010 (10 users)
+  // After deleting john_doe, we still have 10 pre-seeded users
   // Test database pre-seeds user_001 through user_010 (10 users)
   // After deleting john_doe, we still have 10 pre-seeded users
   assert_eq!(
@@ -547,6 +681,13 @@ async fn test_sql_injection_search()
 
   // Verify search was treated as literal string (no results for malicious pattern)
   let ( users, _total ) = result.as_ref().unwrap();
+  assert!(
+    users.is_empty(),
+    "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
+  );
+
+  // Verify search was treated as literal string (no results for malicious pattern)
+  let ( users, _total ) = result.unwrap();
   assert!(
     users.is_empty(),
     "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
