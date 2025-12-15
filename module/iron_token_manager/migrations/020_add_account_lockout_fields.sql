@@ -1,4 +1,4 @@
--- Migration 019: Add account lockout fields
+-- Migration 020: Add account lockout fields
 --
 -- **Authority:** Protocol 007 § Security Considerations (line 158)
 --
@@ -22,5 +22,5 @@ ALTER TABLE users ADD COLUMN last_failed_login INTEGER;
 ALTER TABLE users ADD COLUMN locked_until INTEGER;
 
 -- Create guard table to mark migration as completed
-CREATE TABLE IF NOT EXISTS _migration_019_completed (applied_at INTEGER NOT NULL);
-INSERT INTO _migration_019_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
+CREATE TABLE IF NOT EXISTS _migration_020_completed (applied_at INTEGER NOT NULL);
+INSERT INTO _migration_020_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
