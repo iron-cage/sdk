@@ -33,8 +33,8 @@ IRON_SECRETS_MASTER_KEY="To generate use: openssl rand -base64 32"
 
 # OPENAI API key for accessing GPT, DALL·E, etc.
 OPENAI_API_KEY="<Get it from: https://platform.openai.com/account/api-keys>"
-# Apollo Studio API key for GraphQL schema publishing and analytics
-APOLLO_API_KEY="<Get it from: https://studio.apollographql.com → Settings → API Keys>"
+# Apollo API key for lead data scraping
+APOLLO_API_KEY="<Get it from: https://developer.apollo.io/keys>"
 
 ## -------------------------------------------------------------------------------------------------------------
 ##  Optional Parameters
