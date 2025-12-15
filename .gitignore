@@ -114,7 +114,7 @@ backups/
 # secret
 /secret/*
 !/secret/readme.md
-!/secret/secrets.template.sh
+!/secret/secret.template.sh
 !/secret/iron.example.sh
 !/secret/api_keys.example.sh
 # workspace-secrets.sh contains actual secrets - NEVER commit

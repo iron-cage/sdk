@@ -23,15 +23,15 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # Copy built files from builder
+ARG SERVER_PORT=3001
+ENV SERVER_PORT=${SERVER_PORT}
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY module/iron_dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy template
+COPY module/iron_dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:80 || exit 1
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Config generation
+CMD envsubst '$SERVER_PORT' \
+    < /etc/nginx/templates/default.conf.template \
+    > /etc/nginx/conf.d/default.conf \
+ && nginx -g 'daemon off;'

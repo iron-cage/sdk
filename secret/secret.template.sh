@@ -20,16 +20,33 @@ SECRET_HETZNER_CLOUD_TOKEN="<Get it from: https://console.hetzner.cloud → Secu
 # Default project name (Should not consists "-" or spaces) / `iron_site`
 PROJECT_NAME="iron_cage_sdk"
 
-# test | production
-ENVIRONMENT="test"
+# =============================================================================
+# Iron Runtime Server Secrets
 
-# SQLite connection string for pilot mode
+# SQLite connection string
 DATABASE_URL="sqlite://./iron.db?mode=rwc"
 # JWT secret key for signing access and refresh tokens
 JWT_SECRET="<To generate use: openssl rand -hex 32>"
+# IC Token secret for agent authentication (Protocol 005)
+IC_TOKEN_SECRET="<To generate use: openssl rand -hex 32>"
+# Secret key used to sign and validate IP-based access tokens
+IP_TOKEN_KEY="<To generate use: openssl rand -hex 32>"
 # Master key for AES-256-GCM encryption of AI provider API keys
-IRON_SECRETS_MASTER_KEY="To generate use: openssl rand -base64 32"
+IRON_SECRETS_MASTER_KEY="<To generate use: openssl rand -base64 32>"
+# Allowed origins for CORS (comma-separated URLs)
+ALLOWED_ORIGINS="http://localhost:5173,http://localhost:3001"
+# TCP port on which the backend HTTP API listens for incoming requests
+SERVER_PORT="3001"
+# Explicit deployment mode
+# Values:
+#   pilot       - local development (default)
+#   development - explicit dev mode, enables DB wipe on startup
+#   production  - confirmed production deployment
+IRON_DEPLOYMENT_MODE="pilot"
+ENABLE_DEMO_SEED="true"
 
+# =============================================================================
+# AI keys
 
 # OPENAI API key for accessing GPT, DALL·E, etc.
 OPENAI_API_KEY="<Get it from: https://platform.openai.com/account/api-keys>"

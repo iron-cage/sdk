@@ -51,7 +51,13 @@ for var in \
   TAG \
   JWT_SECRET \
   IRON_SECRETS_MASTER_KEY \
-  DATABASE_URL
+  DATABASE_URL \
+  IP_TOKEN_KEY \
+  IC_TOKEN_SECRET \
+  ALLOWED_ORIGINS \
+  SERVER_PORT \
+  IRON_DEPLOYMENT_MODE \
+  ENABLE_DEMO_SEED
 do
   # Expansion with : "${!var:?...}" exits with an error message if the variable is unset.
   : "${!var:?$var is not set in the environment}"
@@ -83,14 +89,19 @@ services:
       IRON_SECRETS_MASTER_KEY: ${IRON_SECRETS_MASTER_KEY}
       IP_TOKEN_KEY: ${IP_TOKEN_KEY}
       IC_TOKEN_SECRET: ${IC_TOKEN_SECRET}
-      IRON_DEPLOYMENT_MODE: production
+      SERVER_PORT: ${SERVER_PORT}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      IRON_DEPLOYMENT_MODE: ${IRON_DEPLOYMENT_MODE}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED}
       RUST_LOG: info
+    ports:
+    - "${SERVER_PORT}:${SERVER_PORT}"
     volumes:
       - sqlite_data:/app/data
     networks:
       - iron_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -124,5 +135,6 @@ volumes:
 EOF
 
 docker compose up -d
+ufw allow ${SERVER_PORT}/tcp
 
 __msg_success "Deployment successful! App is available at: http://localhost:80"
