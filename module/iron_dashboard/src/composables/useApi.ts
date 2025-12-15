@@ -399,14 +399,14 @@ export function useApi() {
     return fetchApi<Agent>(`/api/v1/agents/${id}`)
   }
 
-  async function createAgent(data: { name: string; providers: string[] }): Promise<Agent> {
+  async function createAgent(data: { name: string; providers: string[]; provider_key_id?: number | null }): Promise<Agent> {
     return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async function updateAgent(data: { id: number; name?: string; providers?: string[] }): Promise<Agent> {
+  async function updateAgent(data: { id: number; name?: string; providers?: string[]; provider_key_id?: number | null }): Promise<Agent> {
     const { id, ...updateData } = data
     return fetchApi<Agent>(`/api/v1/agents/${id}`, {
       method: 'PUT',
@@ -660,6 +660,7 @@ export interface Agent {
   name: string
   providers: string[]
   created_at: number
+  provider_key_id?: number | null
   has_ic_token?: boolean
   ic_token_created_at?: number
 }
