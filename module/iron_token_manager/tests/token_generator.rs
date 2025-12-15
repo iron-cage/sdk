@@ -553,6 +553,7 @@ fn test_token_randomness_chi_squared()
 /// 1. Adding 100 warm-up iterations to stabilize CPU cache/scheduling
 /// 2. Increasing measurement iterations from 1000 to 5000 for stable averages
 /// 3. Widening threshold from 0.5-1.5 to 0.3-3.0 (still detects 10x+ violations)
+///
 /// This maintains security validation while tolerating CI environment variance.
 #[ test ]
 fn test_verify_token_constant_time()
