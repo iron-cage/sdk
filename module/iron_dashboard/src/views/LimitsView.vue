@@ -30,6 +30,11 @@ const maxRequestsPerMinute = ref<number | undefined>(undefined)
 const maxCostPerMonthCents = ref<number | undefined>(undefined)
 const createError = ref('')
 const editError = ref('')
+const showBudgetModal = ref(false)
+const budgetAgentId = ref<number | null>(null)
+const budgetAgentName = ref('')
+const budgetUsd = ref<number | null>(null)
+const budgetError = ref('')
 
 // Fetch limits
 const { data: limits, isLoading, error, refetch } = useQuery({
@@ -44,7 +49,7 @@ const { data: agents } = useQuery({
 })
 
 // Fetch agent budget status
-const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetError, refetch: refetchBudget } = useQuery({
+const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError, refetch: refetchBudget } = useQuery({
   queryKey: ['budget-status'],
   queryFn: () => api.getBudgetStatus(),
 })
@@ -191,6 +196,40 @@ function openCreateLimitForAgent(agentId: number) {
   createError.value = ''
   showCreateModal.value = true
 }
+
+function openBudgetModal(row: BudgetStatus) {
+  budgetAgentId.value = row.agent_id
+  budgetAgentName.value = row.agent_name
+  budgetUsd.value = Number((row.budget / 1_000_000).toFixed(2))
+  budgetError.value = ''
+  showBudgetModal.value = true
+}
+
+const updateBudgetMutation = useMutation({
+  mutationFn: (data: { agentId: number; total_allocated_microdollars: number }) =>
+    api.updateAgentBudget(data.agentId, data.total_allocated_microdollars),
+  onSuccess: () => {
+    showBudgetModal.value = false
+    queryClient.invalidateQueries({ queryKey: ['budget-status'] })
+  },
+  onError: (err) => {
+    budgetError.value = err instanceof Error ? err.message : 'Failed to update budget'
+  },
+})
+
+function handleUpdateBudget() {
+  if (!budgetAgentId.value) return
+  if (!budgetUsd.value || budgetUsd.value <= 0) {
+    budgetError.value = 'Budget must be greater than zero'
+    return
+  }
+
+  const micros = Math.round(budgetUsd.value * 1_000_000)
+  updateBudgetMutation.mutate({
+    agentId: budgetAgentId.value,
+    total_allocated_microdollars: micros,
+  })
+}
 </script>
 
 <template>
@@ -312,8 +351,8 @@ function openCreateLimitForAgent(agentId: number) {
       <div v-if="isBudgetLoading" class="p-6 text-gray-600">
         Loading agent budgets...
       </div>
-      <div v-else-if="budgetError" class="p-6 text-red-600">
-        Error loading budgets: {{ budgetError.message }}
+      <div v-else-if="budgetQueryError" class="p-6 text-red-600">
+        Error loading budgets: {{ budgetQueryError.message }}
       </div>
       <div v-else-if="budgetStatus?.data?.length">
         <table class="min-w-full divide-y divide-gray-200">
@@ -357,8 +396,8 @@ function openCreateLimitForAgent(agentId: number) {
                 {{ row.percent_used.toFixed(1) }}%
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <Button size="sm" variant="secondary" @click="openCreateLimitForAgent(row.agent_id)">
-                  Update Limit
+                <Button size="sm" variant="secondary" @click="openBudgetModal(row)">
+                  Update Budget
                 </Button>
               </td>
             </tr>
@@ -521,6 +560,48 @@ function openCreateLimitForAgent(agentId: number) {
             :disabled="updateMutation.isPending.value"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Limit' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Update Agent Budget Modal -->
+    <Dialog v-model:open="showBudgetModal">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Agent Budget</DialogTitle>
+          <DialogDescription>
+            Set the total allocated budget for {{ budgetAgentName }} (in USD). Remaining will be recalculated automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Alert v-if="budgetError" variant="destructive">
+          <AlertDescription>{{ budgetError }}</AlertDescription>
+        </Alert>
+
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="budget-amount">Total Budget (USD)</Label>
+            <Input
+              id="budget-amount"
+              v-model.number="budgetUsd"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="e.g., 50.00"
+            />
+            <p class="text-xs text-gray-500">
+              This sets the total budget. Remaining will be total minus spent.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showBudgetModal = false">
+            Cancel
+          </Button>
+          <Button @click="handleUpdateBudget">
+            Update Budget
           </Button>
         </DialogFooter>
       </DialogContent>

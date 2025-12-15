@@ -414,6 +414,13 @@ export function useApi() {
     })
   }
 
+  async function updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse> {
+    return fetchApi<AgentBudgetResponse>(`/api/v1/agents/${agentId}/budget`, {
+      method: 'PUT',
+      body: JSON.stringify({ total_allocated_microdollars }),
+    })
+  }
+
   async function deleteAgent(id: number): Promise<void> {
     await fetchApi<void>(`/api/v1/agents/${id}`, {
       method: 'DELETE',
@@ -624,6 +631,7 @@ export function useApi() {
     getAgent,
     createAgent,
     updateAgent,
+    updateAgentBudget,
     deleteAgent,
     getAgentTokens,
     createAgentToken,
@@ -678,6 +686,12 @@ export interface Agent {
   ic_token_created_at?: number
 }
 
+export interface AgentBudgetResponse {
+  agent_id: number
+  total_allocated: number
+  total_spent: number
+  budget_remaining: number
+}
 // IC Token types
 export interface IcTokenResponse {
   agent_id: number
@@ -714,6 +728,7 @@ export type {
   ApproveBudgetRequestResponse,
   RejectBudgetRequestRequest,
   RejectBudgetRequestResponse,
+  AgentBudgetResponse,
   BudgetStatus,
   BudgetStatusResponse,
 }

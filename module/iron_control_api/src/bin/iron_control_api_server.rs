@@ -732,6 +732,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
+    .route( "/api/v1/agents/:id/budget", axum::routing::put( iron_control_api::routes::agents::update_agent_budget ) )
     .route( "/api/v1/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
 
     // IC Token management endpoints (agent authentication with budget runtime)
@@ -855,4 +856,3 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
   Ok( () )
 }
-
