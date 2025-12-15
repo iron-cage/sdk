@@ -546,7 +546,7 @@ async fn test_sql_injection_search()
   );
 
   // Verify search was treated as literal string (no results for malicious pattern)
-  let ( users, _total ) = result.unwrap();
+  let ( users, _total ) = result.as_ref().unwrap();
   assert!(
     users.is_empty(),
     "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
