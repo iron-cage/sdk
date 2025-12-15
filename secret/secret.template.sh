@@ -32,7 +32,7 @@ IC_TOKEN_SECRET="<To generate use: openssl rand -hex 32>"
 # Secret key used to sign and validate IP-based access tokens
 IP_TOKEN_KEY="<To generate use: openssl rand -hex 32>"
 # Master key for AES-256-GCM encryption of AI provider API keys
-IRON_SECRETS_MASTER_KEY="To generate use: openssl rand -base64 32"
+IRON_SECRETS_MASTER_KEY="<To generate use: openssl rand -base64 32>"
 # Allowed origins for CORS (comma-separated URLs)
 ALLOWED_ORIGINS="http://localhost:5173,http://localhost:3001"
 # TCP port on which the backend HTTP API listens for incoming requests
