@@ -38,7 +38,9 @@ def get_router_config(mode_selection):
     """
     if mode_selection == "2":
         if os.environ.get("IC_TOKEN"):
-            server_url = os.environ.get("IC_SERVER", "http://localhost:3001")
+            server_url = (os.environ.get("IC_SERVER") or "http://localhost:3001").strip()
+            if server_url and not server_url.startswith(("http://", "https://")):
+                server_url = f"http://{server_url}"
             return {
                 "api_key": os.environ["IC_TOKEN"],
                 "server_url": server_url,
