@@ -56,6 +56,10 @@ CREATE TABLE api_tokens_new
   expires_at INTEGER,  -- nullable (NULL = never expires)
   revoked_at INTEGER,  -- nullable, set when token is revoked
 
+  -- Foreign key constraint with cascade delete
+  -- When a user is deleted, all their tokens are automatically deleted
+  CONSTRAINT api_tokens_user_id_fk FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+
   -- Unique constraint on token_hash
   CONSTRAINT token_hash_unique UNIQUE(token_hash)
 );
