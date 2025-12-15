@@ -148,13 +148,12 @@ pub async fn list_agents(
         .bind(&user.0.sub)
         .fetch_all(&pool)
         .await
-        .unwrap()
-        // .map_err(|e| {
-        //     (
-        //         StatusCode::INTERNAL_SERVER_ERROR,
-        //         format!("Database error: {}", e),
-        //     )
-        // })?
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?
     };
 
     // Parse providers JSON
@@ -258,7 +257,12 @@ pub async fn create_agent(
 
     let agent_id = result.last_insert_rowid();
     let claims = IcTokenClaims::new(agent_id.to_string(), agent_id.to_string(), vec![], None);
-    let plaintext_token = state.ic_token_manager.generate_token(&claims).unwrap();
+    let plaintext_token = state.ic_token_manager.generate_token(&claims).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create token: {}", e),
+        )
+    })?;
 
     state.token_storage.create_token(&plaintext_token, &owner_id, None, Some(&name), Some(agent_id), None).await.map_err(|e| {
         (

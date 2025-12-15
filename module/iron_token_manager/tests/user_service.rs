@@ -445,7 +445,110 @@ async fn test_deleted_user_not_in_list()
   // Test database pre-seeds user_001 through user_010 (10 users)
   // After deleting john_doe, we still have 10 pre-seeded users
   assert_eq!(
-    total, 0,
-    "LOUD FAILURE: Total count should not include deleted users. Got: {total}"
+    total, 10,
+    "LOUD FAILURE: Total count should be 10 (pre-seeded users). Got: {total}"
+  );
+}
+
+/// Test SQL injection attempt in search parameter
+///
+/// Bug reproducer for issue-002: SQL injection vulnerability in `list_users` search/role filters
+///
+/// ## Root Cause
+///
+/// The `list_users` function used string concatenation with `write!()` macro to build SQL
+/// queries: `write!( &mut query, " AND role = '{role}'" )` and similar for search filters.
+/// This allowed user-supplied values to be injected directly into SQL statements without
+/// sanitization, creating classic SQL injection vulnerability.
+///
+/// ## Why Not Caught
+///
+/// No test coverage for `list_users` function. The `user_service` module (643 lines) had zero
+/// tests, so SQL injection vulnerabilities went undetected. Manual testing with SQL injection
+/// payloads in corner case list revealed the security gap.
+///
+/// ## Fix Applied
+///
+/// Refactored `list_users` to use `SQLx` parameterized queries with `bind()`:
+/// 1. Build query with placeholders: `role = $1`, `username LIKE $2`
+/// 2. Bind user-supplied values separately: `query.bind( role ).bind( &search_pattern )`
+/// 3. `SQLx` handles escaping automatically, preventing SQL injection
+///
+/// Changed from:
+/// ```rust
+/// write!( &mut query, " AND role = '{role}'" ) // UNSAFE
+/// ```
+///
+/// To:
+/// ```rust
+/// query_conditions.push( format!( "role = ${param_index}" ) );
+/// count_q = count_q.bind( role ); // SAFE - parameterized
+/// ```
+///
+/// ## Prevention
+///
+/// 1. NEVER use string concatenation or `format!()` to build SQL with user input
+/// 2. ALWAYS use parameterized queries (`bind()`) for all user-supplied values
+/// 3. Add SQL injection tests BEFORE implementing features that accept user input
+/// 4. Review ALL string-based query building during security audits
+///
+/// ## Pitfall
+///
+/// String interpolation in SQL (`format!()`, `write!()`, string concat) is ALWAYS unsafe for
+/// user input. Even "safe-looking" values like role enums can be injection vectors if not
+/// properly validated. `SQLx` parameterized queries are the ONLY safe way to include user
+/// input in SQL. The performance difference is negligible compared to the security risk.
+#[ tokio::test ]
+async fn test_sql_injection_search()
+{
+  let db = common::create_test_db().await;
+  let service = UserService::new( db.pool().clone() );
+
+  // Create a normal user for reference
+  let params = CreateUserParams
+  {
+    username: "normal_user".to_string(),
+    password: "SecurePass123!".to_string(),
+    email: "normal@example.com".to_string(),
+    role: "user".to_string(),
+  };
+
+  service.create_user( params, "user_001" ).await
+    .expect( "Failed to create normal user" );
+
+  // Attempt SQL injection via search parameter
+  let filters = ListUsersFilters
+  {
+    search: Some( "'; DROP TABLE users;--".to_string() ),
+    role: None,
+    is_active: None,
+    limit: None,
+    offset: None,
+  };
+
+  // Should NOT error - parameterized queries prevent SQL injection
+  let result = service.list_users( filters ).await;
+
+  assert!(
+    result.is_ok(),
+    "LOUD FAILURE: SQL injection in search should be prevented by parameterized queries. Got error: {result:?}"
+  );
+
+  // Verify users table still exists and contains data
+  let users_exist: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
+    .fetch_one( db.pool() )
+    .await
+    .expect( "LOUD FAILURE: users table should still exist after SQL injection attempt" );
+
+  assert!(
+    users_exist > 0,
+    "LOUD FAILURE: SQL injection should not drop users table. User count: {users_exist}"
+  );
+
+  // Verify search was treated as literal string (no results for malicious pattern)
+  let ( users, _total ) = result.unwrap();
+  assert!(
+    users.is_empty(),
+    "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
   );
 }
