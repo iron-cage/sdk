@@ -520,6 +520,17 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
   }
 
+  async function getBudgetStatus(
+    page?: number,
+    per_page?: number
+  ): Promise<BudgetStatusResponse> {
+    const params = new URLSearchParams()
+    if (page) params.append('page', String(page))
+    if (per_page) params.append('per_page', String(per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
+  }
+
   // ============================================================================
   // Budget Request Workflow API
   // ============================================================================
@@ -627,6 +638,7 @@ export function useApi() {
     getAnalyticsSpendingByProvider,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
+    getBudgetStatus,
     // Budget Request Workflow
     createBudgetRequest,
     getBudgetRequest,
@@ -660,6 +672,7 @@ export interface Agent {
   name: string
   providers: string[]
   created_at: number
+  owner_id?: string
   provider_key_id?: number | null
   has_ic_token?: boolean
   ic_token_created_at?: number
@@ -701,6 +714,8 @@ export type {
   ApproveBudgetRequestResponse,
   RejectBudgetRequestRequest,
   RejectBudgetRequestResponse,
+  BudgetStatus,
+  BudgetStatusResponse,
 }
 
 // ============================================================================
@@ -748,6 +763,33 @@ export interface SpendingByProviderResponse {
   summary: { total_spend: number; total_requests: number; providers_count: number }
   period: string
   calculated_at: string
+}
+
+// Budget status (agent budgets)
+export interface BudgetStatusResponse {
+  data: BudgetStatus[]
+  summary: {
+    total_agents: number
+    active: number
+    exhausted: number
+    critical: number
+    high: number
+    medium: number
+    low: number
+  }
+  pagination: Pagination
+  calculated_at: string
+}
+
+export interface BudgetStatus {
+  agent_id: number
+  agent_name: string
+  budget: number
+  spent: number
+  remaining: number
+  percent_used: number
+  status: string
+  risk_level: string
 }
 
 export interface RequestUsageResponse {

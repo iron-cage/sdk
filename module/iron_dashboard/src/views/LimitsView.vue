@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type LimitRecord } from '../composables/useApi'
+import { useApi, type LimitRecord, type Agent, type BudgetStatus } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const editingLimit = ref<LimitRecord | null>(null)
 const projectId = ref('')
+const overrideUserId = ref<string | null>(null)
 const maxTokensPerDay = ref<number | undefined>(undefined)
 const maxRequestsPerMinute = ref<number | undefined>(undefined)
 const maxCostPerMonthCents = ref<number | undefined>(undefined)
@@ -34,6 +35,18 @@ const editError = ref('')
 const { data: limits, isLoading, error, refetch } = useQuery({
   queryKey: ['limits'],
   queryFn: () => api.getLimits(),
+})
+
+// Fetch agents (for owner lookup)
+const { data: agents } = useQuery({
+  queryKey: ['agents-for-limits'],
+  queryFn: () => api.getAgents(),
+})
+
+// Fetch agent budget status
+const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetError, refetch: refetchBudget } = useQuery({
+  queryKey: ['budget-status'],
+  queryFn: () => api.getBudgetStatus(),
 })
 
 // Create limit mutation
@@ -74,6 +87,7 @@ const deleteMutation = useMutation({
 
 function resetForm() {
   projectId.value = ''
+  overrideUserId.value = null
   maxTokensPerDay.value = undefined
   maxRequestsPerMinute.value = undefined
   maxCostPerMonthCents.value = undefined
@@ -94,6 +108,8 @@ function microdollarsToCents( microdollars: number | undefined ): number | undef
 function handleCreateLimit() {
   createError.value = ''
 
+  const userId = overrideUserId.value || authStore.username || 'default'
+
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
     createError.value = 'At least one limit must be specified'
@@ -101,7 +117,7 @@ function handleCreateLimit() {
   }
 
   createMutation.mutate({
-    user_id: authStore.username || 'default',
+    user_id: userId,
     project_id: projectId.value || undefined,
     // Convert empty string/falsy to undefined (backend expects i64 or null, not "")
     max_tokens_per_day: maxTokensPerDay.value || undefined,
@@ -125,6 +141,8 @@ function handleUpdateLimit() {
   if( !editingLimit.value ) return
   editError.value = ''
 
+  const userId = overrideUserId.value || authStore.username || 'default'
+
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
     editError.value = 'At least one limit must be specified'
@@ -138,6 +156,7 @@ function handleUpdateLimit() {
     max_requests_per_minute: maxRequestsPerMinute.value || undefined,
     // Convert cents (UI) to microdollars (backend)
     max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
+    user_id: userId,
   })
 }
 
@@ -153,6 +172,24 @@ function formatDate( timestamp: number ): string {
 
 function formatCost( cents: number ): string {
   return `$${( cents / 100 ).toFixed( 2 )}`
+}
+
+function findOwnerByAgentId(agentId: number): string | null {
+  const match = agents?.value?.find((a: Agent) => a.id === agentId)
+  return match?.owner_id || null
+}
+
+function openCreateLimitForAgent(agentId: number) {
+  const owner = findOwnerByAgentId(agentId)
+  if (owner) {
+    overrideUserId.value = owner
+  }
+  projectId.value = ''
+  maxTokensPerDay.value = undefined
+  maxRequestsPerMinute.value = undefined
+  maxCostPerMonthCents.value = undefined
+  createError.value = ''
+  showCreateModal.value = true
 }
 </script>
 
@@ -256,6 +293,81 @@ function formatCost( cents: number ): string {
       <Button @click="showCreateModal = true">
         Create First Limit
       </Button>
+    </div>
+
+    <!-- Agent Budgets -->
+    <div class="mt-10 bg-white rounded-lg shadow overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Agent Budgets</h2>
+          <p class="text-sm text-gray-500">Allocated, spent, and remaining budget per agent.</p>
+        </div>
+        <div class="space-x-2">
+          <Button variant="outline" size="sm" @click="refetchBudget">
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div v-if="isBudgetLoading" class="p-6 text-gray-600">
+        Loading agent budgets...
+      </div>
+      <div v-else-if="budgetError" class="p-6 text-red-600">
+        Error loading budgets: {{ budgetError.message }}
+      </div>
+      <div v-else-if="budgetStatus?.data?.length">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Agent
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Allocated
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Spent
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Remaining
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Used
+              </th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {{ row.agent_name }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                ${{ (row.budget / 1_000_000).toFixed(2) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                ${{ (row.spent / 1_000_000).toFixed(2) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                ${{ (row.remaining / 1_000_000).toFixed(2) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                {{ row.percent_used.toFixed(1) }}%
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <Button size="sm" variant="secondary" @click="openCreateLimitForAgent(row.agent_id)">
+                  Update Limit
+                </Button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="p-6 text-gray-600">
+        No agent budget data available.
+      </div>
     </div>
 
     <!-- Create limit modal -->

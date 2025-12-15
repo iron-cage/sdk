@@ -246,10 +246,72 @@ pub async fn handshake(
     }
   };
 
+  // Ensure agent budget row exists (seed from owner's usage limit if needed)
+  if state.agent_budget_manager.get_budget_status( agent_id ).await.ok().flatten().is_none()
+  {
+    // Fetch owner's usage limit to seed a budget cap if available
+    let limit_row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
+      "SELECT max_cost_per_month_microdollars, current_cost_microdollars_this_month
+       FROM usage_limits
+       WHERE user_id = ?
+       LIMIT 1"
+    )
+    .bind( &owner_id )
+    .fetch_optional( &state.db_pool )
+    .await
+    .map_err( |_| () )
+    .ok()
+    .flatten();
+
+    let (limit_max, current_cost) = limit_row
+      .map( |(max, cost)| (max.unwrap_or(0), cost.unwrap_or(0)) )
+      .unwrap_or( (0, 0) );
+
+    let available_from_limit = if limit_max > current_cost { limit_max - current_cost } else { 0 };
+    let seed_budget = if available_from_limit > 0 { available_from_limit } else { HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET };
+
+    if seed_budget <= 0
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "Budget limit exceeded" }) ),
+      )
+        .into_response();
+    }
+
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let _ = sqlx::query(
+      "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+       VALUES (?, ?, 0, ?, ?, ?)"
+    )
+    .bind( agent_id )
+    .bind( seed_budget )
+    .bind( seed_budget )
+    .bind( now_ms )
+    .bind( now_ms )
+    .execute( &state.db_pool )
+    .await;
+  }
+
+  // Get provider API key
+  let provider_type = match request.provider.as_str()
+  {
+    "openai" => ProviderType::OpenAI,
+    "anthropic" => ProviderType::Anthropic,
+    _ =>
+    {
+      return (
+        StatusCode::BAD_REQUEST,
+        Json( serde_json::json!({ "error": format!( "Unsupported provider: {}", request.provider ) }) ),
+      )
+        .into_response();
+    }
+  };
+
   // Fix(issue-budget-006): Atomically check and reserve budget to prevent TOCTOU race
   //
   // Root cause: get_budget_status() and record_spending() were separate operations,
-  // creating race window where concurrent requests could both pass budget check before either
+  // creating race window where concurrent requests could both pass the check before either
   // recorded spending, causing negative budget (invariant violation).
   //
   // Pitfall: Time-of-check to time-of-use (TOCTOU) races occur when check and update are
@@ -299,21 +361,6 @@ pub async fn handshake(
     }
   };
 
-  // Get provider API key
-  let provider_type = match request.provider.as_str()
-  {
-    "openai" => ProviderType::OpenAI,
-    "anthropic" => ProviderType::Anthropic,
-    _ =>
-    {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json( serde_json::json!({ "error": format!( "Unsupported provider: {}", request.provider ) }) ),
-      )
-        .into_response();
-    }
-  };
-
   // Get provider key ID (use provided or fetch first available for provider)
   let key_id = match request.provider_key_id
   {
@@ -349,6 +396,14 @@ pub async fn handshake(
   let _key_record = match state.provider_key_storage.get_key( key_id ).await
   {
     Ok( record ) => record,
+    Err( crate::error::TokenError::Database( sqlx::Error::RowNotFound ) ) =>
+    {
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Provider key not found" }) ),
+      )
+        .into_response();
+    }
     Err( err ) =>
     {
       tracing::error!( "Database error fetching provider key: {}", err );
