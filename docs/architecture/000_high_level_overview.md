@@ -50,30 +50,36 @@ This simplified diagram shows Iron Cage's three-boundary architecture at the hig
         DEVELOPER                  YOUR CLOUD                OPENAI/ANTHROPIC
         (Private)                  (Controlled)              (3rd Party)
 
-    ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-    │              │  Setup   │ Control Panel│          │              │
-    │  AI Agent    │─Token(1)─>│ (Management) │          │              │
-    │+ iron_sdk    │          └──────────────┘          │              │
-    │              │                  ║                 │              │
-    │  Your Code   │          ┌──────────────┐          │  LLM API     │
-    │  Your Data   │  Prompt  │   Gateway    │  Prompt  │              │
-    │  RAG Docs    │─IC Token─>│  (Runtime)   │─IP Token─>│  Process    │
-    │              │   (2)    │              │   (3)    │  Request     │
-    │  Responses   │<─────────│  + Safety    │<─────────│              │
-    │              │          │  + Cost      │          │              │
-    └──────────────┘          │  + Audit     │          └──────────────┘
-                              └──────────────┘
-                                     ║
-                              (async logging)
+    ┌──────────────┐           ┌──────────────┐          ┌──────────────┐
+    │  AI Agent    │  Setup    │ Control Panel│          │              │
+    │              │─Token(1)─>│ (Management) │          │              │
+    │+ iron_sdk    │           │              │          │              │
+    │  Runtime     │           │ • User mgmt  │          │  LLM API     │
+    │ ┌──────────┐ │           │ • Tokens     │          │              │
+    │ │ Safety   │ │           │ • Analytics  │          │              │
+    │ │ Cost     │ │           │              │          │              │
+    │ │ Audit    │ │           │ NOT in       │          │              │
+    │ └──────────┘ │           │ request path │          │              │
+    │              │           └──────────────┘          │              │
+    │  Gateway     │                                     │              │
+    │ (Validator)  │  Prompt + IP Token                  │              │
+    │ (Translator) │──────────────────────────────(2)───>│  Process     │
+    │              │                                     │  Request     │
+    │  Your Code   │                                     │              │
+    │  Your Data   │<────────────────────────────────────│              │
+    │  RAG Docs    │            Response                 │  Response    │
+    │              │                                     │              │
+    └──────────────┘                                     └──────────────┘
 
-    ✓ Runs Locally            ✓ Your Control           ⚠️ Third Party
-    ✓ Code NEVER Sent         ✓ Budget Limits          ⚠️ Prompts Sent
-    ✓ Data NEVER Sent         ✓ Safety Rules           ⚠️ Provider ToS
+    ✓ 100% Local              ✓ Setup Only             ⚠️ Third Party
+    ✓ Gateway Local           ✓ Management             ⚠️ Prompts Sent
+    ✓ Code NEVER Sent         ✓ Token Generation       ⚠️ Provider ToS
+    ✓ Data NEVER Sent         ✓ Analytics
 ```
 
 **Key Points:**
-- **Left (Developer Machine):** Agent + iron_sdk run 100% locally. Your code, data, and RAG documents NEVER leave your machine. Only prompts are sent out.
-- **Middle (Your Cloud):** Control Panel manages users/agents/tokens (setup only, step 1). Gateway validates requests and translates IC Token → IP Token (runtime only, steps 2-3).
+- **Left (Developer Machine):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally. Nothing leaves your machine except prompts after local validation.
+- **Middle (Your Cloud):** Control Panel ONLY for setup and management. NOT in request path. Handles user management, token generation, and analytics.
 - **Right (Third Party):** LLM provider receives only prompts with IP Token. Never sees your code, data, or IC Token.
 
 **Business Value:**
