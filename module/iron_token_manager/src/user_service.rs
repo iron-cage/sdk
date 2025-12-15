@@ -3,7 +3,6 @@
 //! Provides admin-only operations for user lifecycle management: create, suspend,
 //! activate, delete, role changes, and password resets. All operations are audited.
 
-use core::fmt::Write as _;
 use sqlx::{ SqlitePool, Row };
 use crate::error::Result;
 use tracing::error;
@@ -146,8 +145,53 @@ impl UserService
   /// - Database insert fails
   pub async fn create_user( &self, params: CreateUserParams, admin_id: &str ) -> Result< User >
   {
-    // Hash password with BCrypt
-    let password_hash = bcrypt::hash( &params.password, bcrypt::DEFAULT_COST )
+    // Validate inputs
+    if params.username.trim().is_empty()
+    {
+      return Err( crate::error::TokenError::Validation {
+        field: "username".to_string(),
+        reason: "username is required and cannot be empty".to_string(),
+      } );
+    }
+
+    if params.password.trim().is_empty()
+    {
+      return Err( crate::error::TokenError::Validation {
+        field: "password".to_string(),
+        reason: "password is required and cannot be empty".to_string(),
+      } );
+    }
+
+    if params.email.trim().is_empty()
+    {
+      return Err( crate::error::TokenError::Validation {
+        field: "email".to_string(),
+        reason: "email is required and cannot be empty".to_string(),
+      } );
+    }
+
+    // Validate role (only admin, user, viewer allowed)
+    let valid_roles = [ "admin", "user", "viewer" ];
+    if !valid_roles.contains( &params.role.as_str() )
+    {
+      return Err( crate::error::TokenError::Validation {
+        field: "role".to_string(),
+        reason: format!( "invalid role '{}'. Must be admin, user, or viewer", params.role ),
+      } );
+    }
+
+    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10)
+    //
+    // Root cause: Used bcrypt::DEFAULT_COST which is 10 for backward compatibility,
+    // but our security requirements mandate cost=12 for adequate protection against
+    // brute-force attacks. DEFAULT_COST=10 is 4x weaker than cost=12.
+    //
+    // Pitfall: Library defaults prioritize backward compatibility over security.
+    // When implementing security-critical features (password hashing, encryption,
+    // key derivation), ALWAYS specify security parameters explicitly. Never rely
+    // on library defaults - they may be weak for current security standards.
+    const BCRYPT_COST: u32 = 12;
+    let password_hash = bcrypt::hash( &params.password, BCRYPT_COST )
       .map_err( |e| { error!( "Error hashing password: {}", e ); crate::error::TokenError::Generic } )?;
 
     let now_ms = current_time_ms();
@@ -209,43 +253,111 @@ impl UserService
     let limit = filters.limit.unwrap_or( 50 ).min( 100 );
     let offset = filters.offset.unwrap_or( 0 );
 
-    // Build query with filters
-    let mut query = String::from(
+    // Fix(issue-002): Use parameterized queries to prevent SQL injection
+    //
+    // Root cause: Original implementation used string concatenation with write!() macro:
+    // `write!( &mut query, " AND role = '{role}'" )` which allowed SQL injection through
+    // user-supplied role and search values.
+    //
+    // Pitfall: String interpolation in SQL (format!(), write!(), concat) is ALWAYS unsafe
+    // for user input. Even "safe-looking" values like role enums can be injection vectors.
+    // SQLx parameterized queries with bind() are the ONLY safe way to include user input
+    // in SQL. Use placeholders ($1, $2) and bind values separately.
+    let mut query_conditions = Vec::new();
+    let mut count_conditions = Vec::new();
+
+    // Base condition - exclude deleted users
+    query_conditions.push( "deleted_at IS NULL".to_string() );
+    count_conditions.push( "deleted_at IS NULL".to_string() );
+
+    let mut param_index = 1;
+
+    // Role filter (if provided)
+    if filters.role.is_some()
+    {
+      query_conditions.push( format!( "role = ${param_index}" ) );
+      count_conditions.push( format!( "role = ${param_index}" ) );
+      param_index += 1;
+    }
+
+    // Active status filter (if provided)
+    if filters.is_active.is_some()
+    {
+      query_conditions.push( format!( "is_active = ${param_index}" ) );
+      count_conditions.push( format!( "is_active = ${param_index}" ) );
+      param_index += 1;
+    }
+
+    // Search filter (if provided)
+    if filters.search.is_some()
+    {
+      query_conditions.push( format!( "(username LIKE ${param_index} OR email LIKE ${})", param_index + 1 ) );
+      count_conditions.push( format!( "(username LIKE ${param_index} OR email LIKE ${})", param_index + 1 ) );
+      param_index += 2;
+    }
+
+    let query = format!(
       "SELECT id, username, email, password_hash, role, is_active, created_at, \
        last_login, suspended_at, suspended_by, deleted_at, deleted_by, force_password_change \
-       FROM users WHERE 1=1"
+       FROM users WHERE {} ORDER BY created_at DESC LIMIT ${param_index} OFFSET ${}",
+      query_conditions.join( " AND " ),
+      param_index + 1
     );
-    let mut count_query = String::from( "SELECT COUNT(*) FROM users WHERE 1=1" );
+
+    let count_query = format!(
+      "SELECT COUNT(*) FROM users WHERE {}",
+      count_conditions.join( " AND " )
+    );
+
+    // Prepare search pattern outside if block to extend its lifetime
+    let search_pattern = filters.search.as_ref().map( | s | format!( "%{s}%" ) );
+
+    // Build count query with parameters
+    let mut count_q = sqlx::query_scalar::< _, i64 >( &count_query );
 
     if let Some( ref role ) = filters.role
     {
-      let _ = write!( &mut query, " AND role = '{role}'" );
-      let _ = write!( &mut count_query, " AND role = '{role}'" );
+      count_q = count_q.bind( role );
     }
 
     if let Some( is_active ) = filters.is_active
     {
-      let active_val = i32::from( is_active );
-      let _ = write!( &mut query, " AND is_active = {active_val}" );
-      let _ = write!( &mut count_query, " AND is_active = {active_val}" );
+      count_q = count_q.bind( i32::from( is_active ) );
     }
 
-    if let Some( ref search ) = filters.search
+    if let Some( ref pattern ) = search_pattern
     {
-      let _ = write!( &mut query, " AND (username LIKE '%{search}%' OR email LIKE '%{search}%')" );
-      let _ = write!( &mut count_query, " AND (username LIKE '%{search}%' OR email LIKE '%{search}%')" );
+      count_q = count_q.bind( pattern ).bind( pattern );
     }
-
-    let _ = write!( &mut query, " ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}" );
 
     // Get total count
-    let total : i64 = sqlx::query_scalar( &count_query )
+    let total = count_q
       .fetch_one( &self.pool )
       .await
       .map_err( |_| crate::error::TokenError::Generic )?;
 
+    // Build data query with parameters
+    let mut data_q = sqlx::query( &query );
+
+    if let Some( ref role ) = filters.role
+    {
+      data_q = data_q.bind( role );
+    }
+
+    if let Some( is_active ) = filters.is_active
+    {
+      data_q = data_q.bind( i32::from( is_active ) );
+    }
+
+    if let Some( ref pattern ) = search_pattern
+    {
+      data_q = data_q.bind( pattern ).bind( pattern );
+    }
+
+    data_q = data_q.bind( limit ).bind( offset );
+
     // Get users
-    let rows = sqlx::raw_sql( &query )
+    let rows = data_q
       .fetch_all( &self.pool )
       .await
       .map_err( |_| crate::error::TokenError::Generic )?;
@@ -292,8 +404,7 @@ impl UserService
     .bind( user_id )
     .fetch_one( &self.pool )
     .await
-    .unwrap();
-    // .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok( User {
       id: row.get( "id" ),
