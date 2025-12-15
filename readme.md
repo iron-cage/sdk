@@ -4,50 +4,19 @@ Control Panel and Agent Runtime for Iron Cage AI agent management.
 
 ## Overview
 
-**iron_runtime** is one of two repositories in the Iron Cage project:
-- **iron_runtime** (this repo) - Control Panel, Agent Runtime, runtime services
-- **iron_cage** - Sandboxing only (OS-level isolation via Landlock, seccomp, rlimits)
-
-This repository contains the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
+Iron Runtime provides the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
 
 ## Architecture at a Glance
 
-This simplified diagram shows Iron Cage's three-boundary architecture at the highest level, designed for board presentations and non-technical stakeholders.
+This diagram shows Iron Cage's three-boundary architecture at the highest level, designed for architecture reviews and technical stakeholders.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                   IRON CAGE ARCHITECTURE                            │
-└─────────────────────────────────────────────────────────────────────┘
+![Iron Cage Architecture - Three-Boundary Model](asset/architecture1_paddings.webp)
 
-        DEVELOPER                  YOUR CLOUD                OPENAI/ANTHROPIC
-        (Private)                  (Controlled)              (3rd Party)
-
-    ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-    │  AI Agent    │  Setup   │ Control Panel│          │              │
-    │              │─Token(1)─>│ (Management) │          │              │
-    │+ iron_sdk    │          │              │          │              │
-    │  Runtime     │          │ • User mgmt  │          │  LLM API     │
-    │ ┌──────────┐ │          │ • Tokens     │          │              │
-    │ │ Safety   │ │          │ • Analytics  │          │              │
-    │ │ Cost     │ │          │              │          │              │
-    │ │ Audit    │ │          │ NOT in       │          │              │
-    │ └──────────┘ │          │ request path │          │              │
-    │              │          └──────────────┘          │              │
-    │  Gateway     │                                    │              │
-    │ (Validator)  │  Prompt + IP Token                 │              │
-    │ (Translator) │─────────────────────────────(2)───>│  Process     │
-    │              │                                    │  Request     │
-    │  Your Code   │                                    │              │
-    │  Your Data   │<───────────────────────────────────│              │
-    │  RAG Docs    │            Response                │  Response    │
-    │              │                                    │              │
-    └──────────────┘                                    └──────────────┘
-
-    ✓ 100% Local              ✓ Setup Only             ⚠️ Third Party
-    ✓ Gateway Local           ✓ Management             ⚠️ Prompts Sent
-    ✓ Code NEVER Sent         ✓ Token Generation       ⚠️ Provider ToS
-    ✓ Data NEVER Sent         ✓ Analytics
-```
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally
+- **Middle (Your Cloud - Management Plane):** Control Panel for setup and management - **NOT IN DATA PATH**
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+- **Critical:** Request/response arrows go **AROUND** Control Panel (bypass architecture)
 
 **Key Points:**
 - **Left (Developer Machine):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally. Nothing leaves your machine except prompts after local validation.
@@ -60,10 +29,6 @@ This simplified diagram shows Iron Cage's three-boundary architecture at the hig
 3. **Security:** Input/output validation protects against prompt injection, PII leaks, and credential exposure
 4. **Compliance:** Complete audit trail for regulatory requirements and accountability
 5. **Flexibility:** Use any LLM provider (OpenAI, Anthropic, custom) without vendor lock-in
-
-## Repository Architecture
-
-See [`docs/repository_architecture.md`](docs/repository_architecture.md) for complete documentation of the two-repository split.
 
 ## Workspace Organization
 
@@ -213,7 +178,7 @@ See [`contributing.md`](contributing.md) for contributor workflow.
 ## Status
 
 **Version:** 0.1.0
-**Status:** Migration in progress from iron_cage monorepo
+**Status:** Active development
 
 ## License
 
