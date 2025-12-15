@@ -41,7 +41,8 @@ pub struct Agent {
 pub struct CreateAgentRequest {
     pub name: String,
     pub providers: Vec<String>,
-    pub provider_key_id: Option<i64>,
+    pub provider_key_id: i64,
+    pub initial_budget_microdollars: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -176,32 +177,45 @@ pub async fn create_agent(
         ));
     }
 
-    let providers_json = serde_json::to_string(&req.providers).map_err(|e| {
+    if req.initial_budget_microdollars <= 0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "initial_budget_microdollars must be positive".to_string(),
+        ));
+    }
+
+    // Validate provider key exists and fetch provider name
+    let provider_row = sqlx::query(
+        r#"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1"#
+    )
+    .bind(req.provider_key_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?;
+
+    let provider_name: String = match provider_row {
+        Some(row) => row.get::<String, _>("provider"),
+        None => {
+            return Err((StatusCode::NOT_FOUND, "Provider key not found or disabled".to_string()));
+        }
+    };
+
+    // Normalize providers to match provider key
+    let provider_list = vec![provider_name];
+    let providers_json = serde_json::to_string(&provider_list).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("JSON error: {}", e),
         )
     })?;
+
     let created_at = chrono::Utc::now().timestamp_millis();
     let owner_id = user.0.sub.clone();
-
-    // Validate provider_key_id if provided
-    if let Some(key_id) = req.provider_key_id {
-        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
-            .bind(key_id)
-            .fetch_optional(&pool)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {}", e),
-                )
-            })?;
-
-        if exists.is_none() {
-            return Err((StatusCode::NOT_FOUND, "Provider key not found".to_string()));
-        }
-    }
 
     let result = sqlx::query(
         r#"
@@ -223,14 +237,38 @@ pub async fn create_agent(
         )
     })?;
 
+    let agent_id = result.last_insert_rowid();
+
+    // Create required initial agent budget
+    sqlx::query(
+        r#"
+        INSERT INTO agent_budgets
+          (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+        VALUES (?, ?, 0, ?, ?, ?)
+        "#
+    )
+    .bind(agent_id)
+    .bind(req.initial_budget_microdollars)
+    .bind(req.initial_budget_microdollars)
+    .bind(created_at)
+    .bind(created_at)
+    .execute(&pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create agent budget: {}", e),
+        )
+    })?;
+
     let agent = Agent {
-        id: result.last_insert_rowid(),
+        id: agent_id,
         name: req.name,
-        providers: req.providers,
+        providers: provider_list,
         providers_json: Some(providers_json),
         created_at,
         owner_id,
-        provider_key_id: req.provider_key_id,
+        provider_key_id: Some(req.provider_key_id),
     };
 
     Ok((StatusCode::CREATED, Json(agent)))
@@ -305,26 +343,11 @@ pub async fn update_agent(
     // Update provider_key_id if provided (Some(Some(id)) sets; Some(None) clears)
     if let Some(provider_key_id_opt) = req.provider_key_id {
         if let Some(key_id) = provider_key_id_opt {
-            let exists: Option<i64> =
-                sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
-                    .bind(key_id)
-                    .fetch_optional(&pool)
-                    .await
-                    .map_err(|e| {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Database error: {}", e),
-                        )
-                    })?;
-            if exists.is_none() {
-                return Err((StatusCode::NOT_FOUND, "Provider key not found".to_string()));
-            }
-        }
-
-        sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
-            .bind(provider_key_id_opt)
-            .bind(id)
-            .execute(&pool)
+            let provider_row = sqlx::query(
+                r#"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1"#
+            )
+            .bind(key_id)
+            .fetch_optional(&pool)
             .await
             .map_err(|e| {
                 (
@@ -332,6 +355,55 @@ pub async fn update_agent(
                     format!("Database error: {}", e),
                 )
             })?;
+            let provider_name: String = match provider_row {
+                Some(row) => row.get::<String, _>("provider"),
+                None => {
+                    return Err((StatusCode::NOT_FOUND, "Provider key not found or disabled".to_string()));
+                }
+            };
+
+            // Align providers list with provider key
+            let providers_json = serde_json::to_string(&vec![provider_name]).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("JSON error: {}", e),
+                )
+            })?;
+
+            sqlx::query("UPDATE agents SET provider_key_id = ?, providers = ? WHERE id = ?")
+                .bind(Some(key_id))
+                .bind(&providers_json)
+                .bind(id)
+                .execute(&pool)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Database error: {}", e),
+                    )
+                })?;
+        } else {
+            // Clearing provider key also clears providers list
+            let providers_json = serde_json::to_string(&Vec::<String>::new()).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("JSON error: {}", e),
+                )
+            })?;
+
+            sqlx::query("UPDATE agents SET provider_key_id = NULL, providers = ? WHERE id = ?")
+                .bind(&providers_json)
+                .bind(id)
+                .execute(&pool)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Database error: {}", e),
+                    )
+                })?;
+        }
+
     }
 
     // Fetch updated agent
