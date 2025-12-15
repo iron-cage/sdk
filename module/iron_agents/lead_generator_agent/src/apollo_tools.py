@@ -3,10 +3,6 @@ import json
 from langchain.agents import tool
 from config import APOLLO_API_KEY
 
-# Immediate validation
-if not APOLLO_API_KEY:
-    raise ValueError("CRITICAL: APOLLO_API_KEY is missing. Check your 'secret/-secrets.sh' file.")
-
 # --- Tool for Searching Leads ---
 @tool
 def search_leads(job_title: str, industry: str | None = None, location: str | None = None, quantity: int = 3):
