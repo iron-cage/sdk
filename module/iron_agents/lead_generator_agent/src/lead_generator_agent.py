@@ -27,7 +27,7 @@ def get_router_config(mode_selection):
         # Check if token exists
         if os.environ.get("IC_TOKEN"):
             # If both token and server URL exist - use server mode
-            server_url = os.environ.get("IC_SERVER", "http://localhost:8080")
+            server_url = os.environ.get("IC_SERVER", "http://localhost:3001")
             return {
                 "api_key": os.environ["IC_TOKEN"],
                 "server_url": server_url,
@@ -75,7 +75,7 @@ def setup_llm():
             if not os.environ.get("OPENAI_API_KEY"):
                 print("❌ Error: OPENAI_API_KEY missing.")
                 sys.exit(1)
-            return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+            return ChatOpenAI(model="gpt-5-nano", temperature=1)
 
         # === OPTION WITH ROUTER (Iron Cage) ===
         print(f"\n> Initializing Iron Cage Router...")
@@ -89,8 +89,8 @@ def setup_llm():
             print(f"> Budget Limit: ${router.budget}")
 
         return ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
+            model="gpt-5-nano",
+            temperature=1,
             base_url=router.base_url,
             api_key=router.api_key
         )
