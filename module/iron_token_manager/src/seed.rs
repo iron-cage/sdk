@@ -1,7 +1,10 @@
 //! Database seeding utilities for development and testing
 //!
 //! Provides functions to populate database with realistic sample data for manual testing.
-//! Designed for use in development and test environments only.
+//! Supports two modes controlled by `ENABLE_DEMO_SEED` environment variable:
+//!
+//! - **Local Development** (default): Seeds `admin@admin.com` with password `testpass`
+//! - **Production Demo** (`ENABLE_DEMO_SEED=true`): Seeds `admin@ironcage.ai` with `IronDemo2025!`
 //!
 //! # Usage
 //!
@@ -14,13 +17,24 @@
 //!
 //! # Safety
 //!
-//! - NEVER use in production
 //! - Seeds only to empty tables (fails if data exists)
-//! - Uses predictable test data (not secure)
+//! - Uses predictable test data (not secure for real production)
 //! - Provider keys use placeholder encryption
 
 use sqlx::SqlitePool;
 use crate::error::Result;
+
+/// Check if demo seed mode is enabled via environment variable
+///
+/// Returns true if `ENABLE_DEMO_SEED=true` is set, false otherwise.
+/// When enabled, seeds database with demo accounts for production demos.
+/// When disabled (default), database remains empty - no auto-seeding.
+pub fn is_demo_seed_enabled() -> bool
+{
+  std::env::var( "ENABLE_DEMO_SEED" )
+    .map( |v| v.to_lowercase() == "true" || v == "1" )
+    .unwrap_or( false )
+}
 
 /// Wipe all data from database tables
 ///
@@ -147,16 +161,40 @@ pub async fn seed_all( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Seed users table with sample accounts
+/// User seed data structure
+struct SeedUser
+{
+  id: &'static str,
+  username: &'static str,
+  email: &'static str,
+  role: &'static str,
+  is_active: bool,
+  days_ago: i64,
+}
+
+/// Get demo seed users for production demo deployments
 ///
-/// Creates 5 users with various edge cases:
-/// - `admin` (role: admin, active)
-/// - `developer` (role: user, active)
-/// - `viewer` (role: user, inactive)
-/// - `tester` (role: user, active, no usage limits)
-/// - `guest` (role: user, active, no tokens)
+/// Password: `IronDemo2025!`
+fn demo_users() -> Vec< SeedUser >
+{
+  vec![
+    SeedUser { id: "user_admin", username: "admin", email: "admin@ironcage.ai", role: "admin", is_active: true, days_ago: 0 },
+    SeedUser { id: "user_demo", username: "demo", email: "demo@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
+    SeedUser { id: "user_viewer", username: "viewer", email: "viewer@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
+    SeedUser { id: "user_tester", username: "tester", email: "tester@ironcage.ai", role: "user", is_active: true, days_ago: 7 },
+    SeedUser { id: "user_guest", username: "guest", email: "guest@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
+  ]
+}
+
+/// Seed users table with demo accounts
 ///
-/// Passwords are bcrypt hashed "password123" (DO NOT use in production!)
+/// Creates 5 demo users (only when `ENABLE_DEMO_SEED=true`):
+/// - `admin@ironcage.ai` (admin, active)
+/// - `demo@ironcage.ai` (user, active)
+/// - `viewer@ironcage.ai` (user, active)
+/// - `tester@ironcage.ai` (user, active)
+/// - `guest@ironcage.ai` (user, active)
+/// - Password: `IronDemo2025!`
 ///
 /// # Errors
 ///
@@ -164,90 +202,31 @@ pub async fn seed_all( pool: &SqlitePool ) -> Result< () >
 pub async fn seed_users( pool: &SqlitePool ) -> Result< () >
 {
   let now_ms = crate::storage::current_time_ms();
-  let day_ms = 24 * 60 * 60 * 1000;
+  let day_ms: i64 = 24 * 60 * 60 * 1000;
 
-  // Bcrypt hash of "testpass" (cost = 12)
-  let password_hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
+  // Bcrypt hash of "IronDemo2025!" (cost = 12)
+  // Generated with: cargo run --package iron_token_manager --example gen_password_hash
+  let password_hash = "$2b$12$AJbkR5cbO1NDN8vXQ2FSr.02E7lvpf6X7fp7yfBkppqHWtHF8vh86";
 
-  // Admin user
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, $7)"
-  )
-  .bind( "user_admin" )
-  .bind( "admin" )
-  .bind( password_hash )
-  .bind( "admin@admin.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .map_err( |_| crate::error::TokenError::Generic )?;
+  for user in demo_users()
+  {
+    let created_at = now_ms - ( user.days_ago * day_ms );
 
-  // Developer user
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, $7)"
-  )
-  .bind( "user_developer" )
-  .bind( "developer" )
-  .bind( password_hash )
-  .bind( "developer@example.com" )
-  .bind( "user" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .map_err( |_| crate::error::TokenError::Generic )?;
-
-  // Inactive viewer user
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, $7)"
-  )
-  .bind( "user_viewer" )
-  .bind( "viewer" )
-  .bind( password_hash )
-  .bind( "viewer@example.com" )
-  .bind( "user" )
-  .bind( 0 )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .map_err( |_| crate::error::TokenError::Generic )?;
-
-  // Tester user (no usage limits - unlimited testing)
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, $7)"
-  )
-  .bind( "user_tester" )
-  .bind( "tester" )
-  .bind( password_hash )
-  .bind( "tester@example.com" )
-  .bind( "user" )
-  .bind( 1 )
-  .bind( now_ms - ( 7 * day_ms ) )  // Created a week ago
-  .execute( pool )
-  .await
-  .map_err( |_| crate::error::TokenError::Generic )?;
-
-  // Guest user (no tokens - just registered)
-  sqlx::query(
-    "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, $7)"
-  )
-  .bind( "user_guest" )
-  .bind( "guest" )
-  .bind( password_hash )
-  .bind( "guest@example.com" )
-  .bind( "user" )
-  .bind( 1 )
-  .bind( now_ms - ( 60 * 60 * 1000 ) )  // Created 1 hour ago
-  .execute( pool )
-  .await
-  .map_err( |_| crate::error::TokenError::Generic )?;
+    sqlx::query(
+      "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7)"
+    )
+    .bind( user.id )
+    .bind( user.username )
+    .bind( password_hash )
+    .bind( user.email )
+    .bind( user.role )
+    .bind( if user.is_active { 1 } else { 0 } )
+    .bind( created_at )
+    .execute( pool )
+    .await
+    .map_err( |_| crate::error::TokenError::Generic )?;
+  }
 
   Ok( () )
 }
@@ -352,7 +331,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_2 )
-  .bind( "user_developer" )
+  .bind( "user_demo" )
   .bind::< Option< &str > >( None )
   .bind( "Developer Token" )
   .bind( 1 )
@@ -370,7 +349,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_3 )
-  .bind( "user_developer" )
+  .bind( "user_demo" )
   .bind( "project_alpha" )
   .bind( "Project Alpha Token" )
   .bind( 1 )
@@ -406,7 +385,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_5 )
-  .bind( "user_developer" )
+  .bind( "user_demo" )
   .bind::< Option< &str > >( None )
   .bind( "Expired Token" )
   .bind( 1 )
@@ -424,7 +403,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
      VALUES ($1, $2, $3, $4, $5, $6, $7)"
   )
   .bind( token_hash_6 )
-  .bind( "user_developer" )
+  .bind( "user_demo" )
   .bind( "project_beta" )
   .bind( "Expiring Soon Token" )
   .bind( 1 )
@@ -493,7 +472,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
       current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
-  .bind( "admin" )
+  .bind( "user_admin" )
   .bind::< Option< &str > >( None )
   .bind::< Option< i64 > >( None )  // Unlimited tokens
   .bind::< Option< i64 > >( None )  // Unlimited requests
@@ -507,7 +486,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .await
   .map_err( |_| crate::error::TokenError::Generic )?;
 
-  // Limit 2: Developer standard tier
+  // Limit 2: Demo standard tier
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
@@ -515,7 +494,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
       current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
-  .bind( "developer" )
+  .bind( "user_demo" )
   .bind::< Option< &str > >( None )
   .bind( 1_000_000 )  // 1M tokens/day
   .bind( 60 )  // 60 requests/minute
@@ -529,7 +508,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
   .await
   .map_err( |_| crate::error::TokenError::Generic )?;
 
-  // Limit 3: Free tier
+  // Limit 3: Viewer free tier
   sqlx::query(
     "INSERT INTO usage_limits \
      (user_id, project_id, max_tokens_per_day, max_requests_per_minute, \
@@ -537,7 +516,7 @@ async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
       current_cost_microdollars_this_month, created_at, updated_at) \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
   )
-  .bind( "viewer" )
+  .bind( "user_viewer" )
   .bind::< Option< &str > >( None )
   .bind( 100_000 )  // 100k tokens/day
   .bind( 10 )  // 10 requests/minute
