@@ -1,0 +1,312 @@
+# Environment Variable Registry
+#
+# This file documents ALL environment variables used by Iron Cage modules.
+# It serves as the single source of truth for configuration requirements.
+#
+# Format:
+# [variables.{deployment_mode}.{VAR_NAME}]
+# description = "What the variable does"
+# required = true/false
+# validation = "validation rules"
+# forbidden_values = ["values that must not be used"]
+# forbidden_patterns = ["regex patterns that must not match"]
+# used_by = ["list", "of", "modules"]
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+[variables.all.DATABASE_URL]
+description = "SQLite connection string for database persistence"
+required = false
+default = "sqlite://./iron.db?mode=rwc"
+validation = "Must include ?mode=rwc for SQLite to create database file"
+used_by = ["iron_control_api", "iron_token_manager", "iron_runtime"]
+notes = """
+  Pilot/Development: sqlite://./iron.db?mode=rwc (default)
+  CI/Testing: sqlite://target/test_databases/{test_name}.db?mode=rwc
+  Production: postgres://user:pass@host/database (recommended)
+"""
+
+# =============================================================================
+# AUTHENTICATION SECRETS
+# =============================================================================
+
+[variables.production.JWT_SECRET]
+description = "Secret key for signing JWT access and refresh tokens"
+required = true
+validation = "hex:64"  # 64 hex characters = 32 bytes
+forbidden_values = ["dev-secret-change-in-production"]
+forbidden_patterns = ["^dev-", "test", "example"]
+generation = "openssl rand -hex 32"
+used_by = ["iron_control_api"]
+
+[variables.pilot.JWT_SECRET]
+description = "Secret key for signing JWT access and refresh tokens"
+required = false
+default = "dev-secret-change-in-production"
+used_by = ["iron_control_api"]
+
+[variables.development.JWT_SECRET]
+description = "Secret key for signing JWT access and refresh tokens"
+required = false
+default = "dev-secret-change-in-production"
+used_by = ["iron_control_api"]
+
+# =============================================================================
+# BUDGET CONTROL PROTOCOL (Protocol 005)
+# =============================================================================
+
+[variables.production.IC_TOKEN_SECRET]
+description = "Secret key for IC Token generation and validation (Budget Control Protocol)"
+required = true
+validation = "hex:64"  # 64 hex characters = 32 bytes
+forbidden_values = ["dev-ic-token-secret-change-in-production"]
+forbidden_patterns = ["^dev-", "test", "example"]
+generation = "openssl rand -hex 32"
+used_by = ["iron_control_api", "iron_runtime"]
+
+[variables.pilot.IC_TOKEN_SECRET]
+description = "Secret key for IC Token generation and validation"
+required = false
+default = "dev-ic-token-secret-change-in-production"
+used_by = ["iron_control_api", "iron_runtime"]
+
+[variables.development.IC_TOKEN_SECRET]
+description = "Secret key for IC Token generation and validation"
+required = false
+default = "dev-ic-token-secret-change-in-production"
+used_by = ["iron_control_api", "iron_runtime"]
+
+[variables.production.IP_TOKEN_KEY]
+description = "32-byte AES-256-GCM key for IP Token encryption (Budget Control Protocol)"
+required = true
+validation = "hex:64"  # 64 hex characters = 32 bytes
+forbidden_patterns = ["^0+$"]  # Not all zeros
+generation = "openssl rand -hex 32"
+used_by = ["iron_control_api", "iron_runtime"]
+
+[variables.pilot.IP_TOKEN_KEY]
+description = "32-byte AES-256-GCM key for IP Token encryption"
+required = false
+default = "0000000000000000000000000000000000000000000000000000000000000000"
+used_by = ["iron_control_api", "iron_runtime"]
+
+[variables.development.IP_TOKEN_KEY]
+description = "32-byte AES-256-GCM key for IP Token encryption"
+required = false
+default = "0000000000000000000000000000000000000000000000000000000000000000"
+used_by = ["iron_control_api", "iron_runtime"]
+
+# =============================================================================
+# PROVIDER KEY ENCRYPTION
+# =============================================================================
+
+[variables.all.IRON_SECRETS_MASTER_KEY]
+description = "Master key for AES-256-GCM encryption of AI provider API keys"
+required = true
+validation = "base64:44"  # 44 base64 characters = 32 bytes
+forbidden_values = ["To generate use: openssl rand -base64 32"]
+generation = "openssl rand -base64 32"
+used_by = ["iron_control_api", "iron_secrets"]
+notes = """
+  CRITICAL: Loss of this key = permanent loss of all encrypted API keys
+  - Never commit to git
+  - Backup in separate secure location
+  - For production: consider AWS KMS or similar
+"""
+
+# =============================================================================
+# AI PROVIDER API KEYS
+# =============================================================================
+
+[variables.all.OPENAI_API_KEY]
+description = "OpenAI API key for GPT, DALL·E, etc."
+required = false
+validation = "Starts with 'sk-' and 48+ characters"
+used_by = ["iron_runtime", "iron_cli"]
+notes = "Get from: https://platform.openai.com/api-keys"
+
+[variables.all.ANTHROPIC_API_KEY]
+description = "Anthropic API key for Claude models"
+required = false
+validation = "Starts with 'sk-ant-' and 100+ characters"
+used_by = ["iron_runtime", "iron_cli"]
+notes = "Get from: https://console.anthropic.com/settings/keys"
+
+# =============================================================================
+# DEPLOYMENT MODE CONTROL
+# =============================================================================
+
+[variables.all.IRON_DEPLOYMENT_MODE]
+description = "Explicit deployment mode for runtime behavior control"
+required = false
+validation = "One of: pilot, development, production"
+allowed_values = ["pilot", "development", "production"]
+used_by = ["iron_control_api"]
+notes = """
+  pilot: Localhost development (default if not set)
+  development: Explicit dev mode, enables DB wipe on startup
+  production: Confirmed production deployment, strict validation
+
+  If not set, deployment mode is inferred from environment signals:
+  - KUBERNETES_SERVICE_HOST (Kubernetes)
+  - AWS_EXECUTION_ENV (AWS Lambda/ECS)
+  - DYNO (Heroku)
+  - debug_assertions (release build)
+"""
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+
+[variables.production.ALLOWED_ORIGINS]
+description = "Comma-separated list of allowed CORS origins for API server"
+required = true
+validation = "Comma-separated URLs (https://domain.com,https://app.domain.com)"
+forbidden_values = ["http://localhost:3000", "http://localhost:5173"]
+forbidden_patterns = ["localhost", "127\\.0\\.0\\.1"]
+used_by = ["iron_control_api"]
+notes = """
+  Production: Must be HTTPS origins only
+  Example: https://ironcage.ai,https://app.ironcage.ai
+
+  Security: Never include localhost or development origins in production
+"""
+
+[variables.pilot.ALLOWED_ORIGINS]
+description = "Comma-separated list of allowed CORS origins for API server"
+required = false
+default = "http://localhost:3000,http://localhost:5173"
+used_by = ["iron_control_api"]
+
+[variables.development.ALLOWED_ORIGINS]
+description = "Comma-separated list of allowed CORS origins for API server"
+required = false
+default = "http://localhost:3000,http://localhost:5173"
+used_by = ["iron_control_api"]
+
+[variables.production.SERVER_PORT]
+description = "TCP port number for API server to bind (1-65535)"
+required = true
+validation = "Integer 1-65535"
+forbidden_values = ["80", "443"]
+forbidden_patterns = ["^0$"]
+used_by = ["iron_control_api"]
+notes = """
+  Production: Use non-privileged port (1024-65535)
+  Common choices: 3000, 3001, 8000, 8080
+
+  Ports 80/443 require root privileges - use reverse proxy instead
+"""
+
+[variables.pilot.SERVER_PORT]
+description = "TCP port number for API server to bind"
+required = false
+default = "3001"
+used_by = ["iron_control_api"]
+
+[variables.development.SERVER_PORT]
+description = "TCP port number for API server to bind"
+required = false
+default = "3001"
+used_by = ["iron_control_api"]
+
+# =============================================================================
+# PLATFORM DETECTION (Auto-detected, not set by user)
+# =============================================================================
+
+[variables.auto.KUBERNETES_SERVICE_HOST]
+description = "Auto-set by Kubernetes, used for production environment detection"
+required = false
+used_by = ["iron_control_api"]
+notes = "Do not set manually - Kubernetes sets this automatically"
+
+[variables.auto.AWS_EXECUTION_ENV]
+description = "Auto-set by AWS Lambda/ECS, used for production environment detection"
+required = false
+used_by = ["iron_control_api"]
+notes = "Do not set manually - AWS sets this automatically"
+
+[variables.auto.DYNO]
+description = "Auto-set by Heroku, used for production environment detection"
+required = false
+used_by = ["iron_control_api"]
+notes = "Do not set manually - Heroku sets this automatically"
+
+[variables.auto.CI]
+description = "Auto-set by CI environments (GitHub Actions, GitLab CI, etc.)"
+required = false
+used_by = ["iron_test_db"]
+notes = "Used to determine test database storage location (workspace for CI, tempfile for local)"
+
+# =============================================================================
+# FRONTEND CONFIGURATION
+# =============================================================================
+
+[variables.all.VITE_API_URL]
+description = "Backend API URL for frontend development server"
+required = false
+default = "http://localhost:3000"
+used_by = ["iron_dashboard"]
+notes = "Used by Vite dev server for API proxying"
+
+# =============================================================================
+# LEGACY/DEPLOYMENT VARIABLES (from secrets.template.sh)
+# =============================================================================
+
+[variables.legacy.SECRET_STATE_ARCHIVE_KEY]
+description = "Google Cloud state archive encryption key"
+required = false
+generation = "openssl rand -hex 32"
+used_by = []
+notes = "Legacy deployment variable, not used by current modules"
+
+[variables.legacy.GOOGLE_SE_CREDS_PATH]
+description = "Path to Google Cloud service account credentials"
+required = false
+default = "secret/service_account.json"
+used_by = []
+notes = "Legacy deployment variable"
+
+[variables.legacy.SECRET_RSA_PRIVATE_KEY_PATH]
+description = "Path to SSH private key for deployment"
+required = false
+used_by = []
+notes = "Legacy deployment variable"
+
+[variables.legacy.SECRET_RSA_PUBLIC_KEY_PATH]
+description = "Path to SSH public key for deployment"
+required = false
+used_by = []
+notes = "Legacy deployment variable"
+
+[variables.legacy.CSP]
+description = "Cloud service provider (hetzner, etc.)"
+required = false
+used_by = []
+notes = "Legacy deployment variable"
+
+[variables.legacy.SECRET_HETZNER_CLOUD_TOKEN]
+description = "Hetzner Cloud API token"
+required = false
+used_by = []
+notes = "Legacy deployment variable"
+
+[variables.legacy.PROJECT_NAME]
+description = "Project name for deployment"
+required = false
+used_by = []
+notes = "Legacy deployment variable"
+
+[variables.legacy.ENVIRONMENT]
+description = "Deployment environment (test/production)"
+required = false
+used_by = []
+notes = "Legacy deployment variable - replaced by IRON_DEPLOYMENT_MODE"
+
+[variables.legacy.APOLLO_API_KEY]
+description = "Apollo Studio API key for GraphQL"
+required = false
+used_by = []
+notes = "Legacy variable, not currently used"

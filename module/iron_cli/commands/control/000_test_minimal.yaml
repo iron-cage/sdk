@@ -1,0 +1,24 @@
+- name: .test.minimal
+  namespace: ''
+  description: Minimal test command
+  hint: Tests if Pipeline integration works
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: message
+    kind: String
+    description: Test message
+    hint: Message to display
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .test.minimal
+  aliases: []
+  tags: []

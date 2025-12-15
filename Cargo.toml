@@ -1,0 +1,363 @@
+[workspace]
+resolver = "2"
+members = [
+  # Foundation layer
+  "module/iron_types",
+  "module/iron_cost",
+  "module/iron_telemetry",
+  "module/iron_runtime_analytics",
+
+  # Infrastructure layer
+  "module/iron_runtime_state",
+
+  # Test infrastructure
+  "module/iron_test_db",
+
+  # Configuration
+  "module/iron_config",
+
+  # Feature layer
+  "module/iron_safety",
+  "module/iron_reliability",
+  "module/iron_secrets",
+  "module/iron_token_manager",
+
+  # Integration layer
+  "module/iron_control_api",
+  "module/iron_runtime",
+
+  # Application layer
+  "module/iron_cli",
+
+  # Database schemas (spec-only)
+  "module/iron_control_schema",
+
+  # NOTE: Non-Rust modules (not in Cargo workspace):
+  # Python: iron_cli_py, iron_sdk, iron_testing
+  # Frontend: iron_dashboard (Vue.js)
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["iron_cage contributors"]
+license = "MIT"
+
+[workspace.metadata]
+branches = ["master"]
+master_branch = "master"
+workspace_name = "iron_runtime"
+repo_url = "https://github.com/.../iron_runtime"
+description = "Control Panel and Agent Runtime for Iron Cage AI agent management"
+
+# Strict lints per rulebook requirements
+[workspace.lints.rust]
+# Warn on unsafe code (not deny - we need FFI for landlock/seccomp)
+unsafe_code = "warn"
+# Warn if public items lack documentation
+missing_docs = "warn"
+# Denies non-idiomatic code for Rust 2018 edition
+rust_2018_idioms = { level = "warn", priority = -1 }
+# Denies using features that may break in future Rust versions
+future_incompatible = { level = "warn", priority = -1 }
+# Warns for public types not implementing Debug
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# Denies pedantic lints, enforcing strict coding styles and conventions
+pedantic = { level = "warn", priority = -1 }
+# Denies undocumented unsafe blocks
+undocumented_unsafe_blocks = "deny"
+# Denies to prefer `core` over `std` when available, for `no_std` compatibility
+std_instead_of_core = "warn"
+# Denies including files in documentation unconditionally
+doc_include_without_cfg = "warn"
+
+# Exceptions - following willbe patterns
+# Allows functions that are only called once
+single_call_fn = "allow"
+# Allows forcing a function to always be inlined
+inline_always = "allow"
+# Allows item names that repeat the module name
+module_name_repetitions = "allow"
+# Allows using fully qualified paths instead of `use` statements
+absolute_paths = "allow"
+# Allows wildcard imports
+wildcard_imports = "allow"
+# Allow to prefer `alloc` over `std` when available, for `no_std` compatibility
+std_instead_of_alloc = "allow"
+# Allow put definitions of struct at any point in functions
+items_after_statements = "allow"
+# Allow precision loss, for example during conversion from i64 to f64
+cast_precision_loss = "allow"
+# Allows `pub use` statements
+pub_use = "allow"
+# Allows the `?` operator
+question_mark_used = "allow"
+# Allows implicit returns
+implicit_return = "allow"
+# Allow ordering of fields in intuitive way
+arbitrary_source_item_ordering = "allow"
+# Allow mod.rs files
+mod_module_files = "allow"
+# Allow missing docs for private items
+missing_docs_in_private_items = "allow"
+# Don't require inline in public items (too restrictive for this use case)
+missing_inline_in_public_items = "allow"
+
+## Error Handling - MUST use error_tools per rulebook
+
+[workspace.dependencies.error_tools]
+version = "0.35"
+
+## Serialization
+
+[workspace.dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+## Web Framework Dependencies
+
+[workspace.dependencies.axum]
+version = "0.7"
+
+[workspace.dependencies.axum-extra]
+version = "0.9"
+features = ["typed-header"]
+
+[workspace.dependencies.tower]
+version = "0.5"
+
+[workspace.dependencies.tower-http]
+version = "0.6"
+features = ["cors", "trace"]
+
+## Async Runtime
+
+[workspace.dependencies.tokio]
+version = "1.48"
+features = ["full"]
+
+[workspace.dependencies.async-trait]
+version = "0.1"
+
+## Concurrency & State
+
+[workspace.dependencies.dashmap]
+version = "5.5"
+
+## Persistence
+
+[workspace.dependencies.sqlx]
+version = "0.8"
+features = ["sqlite", "runtime-tokio-rustls"]
+
+[workspace.dependencies.redis]
+version = "1.0"
+features = ["tokio-comp", "connection-manager"]
+
+## Additional Error Handling
+
+[workspace.dependencies.thiserror]
+version = "1.0"
+
+[workspace.dependencies.anyhow]
+version = "1.0"
+
+## Additional Serialization
+
+[workspace.dependencies.serde_json]
+version = "1.0"
+
+[workspace.dependencies.serde_yaml]
+version = "0.9"
+
+[workspace.dependencies.toml]
+version = "0.8"
+
+## Logging & Tracing
+
+[workspace.dependencies.tracing]
+version = "=0.1.41"
+
+[workspace.dependencies.tracing-subscriber]
+version = "=0.3.20"
+
+## Utilities
+
+[workspace.dependencies.regex]
+version = "1.12"
+
+[workspace.dependencies.uuid]
+version = "1.18"
+features = ["v4", "serde"]
+
+[workspace.dependencies.chrono]
+version = "0.4"
+features = ["serde"]
+
+[workspace.dependencies.clap]
+version = "4.0"
+features = ["derive"]
+
+[workspace.dependencies.rand]
+version = "0.8"
+
+## Workspace Management
+
+[workspace.dependencies.workspace_tools]
+version = "0.11"
+features = ["serde", "secrets", "secure", "testing"]
+
+## Cryptography (for token management and secrets)
+
+[workspace.dependencies.sha2]
+version = "0.10"
+
+[workspace.dependencies.aes-gcm]
+version = "0.10"
+
+[workspace.dependencies.argon2]
+version = "0.5"
+
+[workspace.dependencies.zeroize]
+version = "1"
+
+## Authentication & Rate Limiting
+
+[workspace.dependencies.jsonwebtoken]
+version = "9.0"
+
+[workspace.dependencies.governor]
+version = "0.7"
+
+[workspace.dependencies.nonzero_ext]
+version = "0.3"
+
+[workspace.dependencies.base64]
+version = "0.22"
+
+[workspace.dependencies.headers]
+version = "0.4"
+
+## Modularity
+
+[workspace.dependencies.mod_interface]
+version = "0.54"
+
+## PyO3 for Python Bindings
+## Fix(pyo3-buffer-overflow): Updated to 0.24.1+ for RUSTSEC-2025-0020
+## - Vulnerability: Buffer overflow in PyString::from_object (missing nul-termination check)
+## - Fix: pyo3 0.24.x adds validation in CStr::from_ptr
+## - Test coverage: module/iron_runtime/tests/pyo3_string_safety_test.rs
+
+[workspace.dependencies.pyo3]
+version = "0.24.1"
+features = ["extension-module"]
+
+## LLM API Clients (from api_llm workspace)
+
+[workspace.dependencies.api_openai]
+version = "0.3.0"
+# path = "../../../api_llm/dev/api/openai"  # Removed - use crates.io version
+default-features = false
+features = [ "enabled" ]
+
+[workspace.dependencies.api_claude]
+version = "0.4.0"
+# path = "../../../api_llm/dev/api/claude"  # Removed - use crates.io version
+default-features = false
+features = [ "enabled" ]
+
+[workspace.dependencies.api_gemini]
+version = "0.5.0"
+# path = "../../../api_llm/dev/api/gemini"  # Removed - use crates.io version
+default-features = false
+features = [ "enabled" ]
+
+## Foundation Modules (local workspace crates)
+
+[workspace.dependencies.iron_types]
+path = "module/iron_types"
+
+[workspace.dependencies.iron_cost]
+path = "module/iron_cost"
+
+[workspace.dependencies.iron_telemetry]
+path = "module/iron_telemetry"
+
+## Workspace Crates (internal modules)
+
+[workspace.dependencies.iron_runtime_state]
+path = "module/iron_runtime_state"
+
+[workspace.dependencies.iron_test_db]
+path = "module/iron_test_db"
+
+[workspace.dependencies.iron_config]
+path = "module/iron_config"
+
+[workspace.dependencies.iron_safety]
+path = "module/iron_safety"
+
+[workspace.dependencies.iron_reliability]
+path = "module/iron_reliability"
+
+[workspace.dependencies.iron_control_api]
+path = "module/iron_control_api"
+
+[workspace.dependencies.iron_runtime]
+path = "module/iron_runtime"
+
+[workspace.dependencies.iron_secrets]
+path = "module/iron_secrets"
+
+[workspace.dependencies.iron_token_manager]
+path = "module/iron_token_manager"
+
+[workspace.dependencies.iron_cli]
+path = "module/iron_cli"
+
+[workspace.dependencies.iron_control_schema]
+path = "module/iron_control_schema"
+
+[workspace.dependencies.iron_runtime_analytics]
+path = "module/iron_runtime_analytics"
+
+## HTTP Client
+
+[workspace.dependencies.reqwest]
+version = "0.12"
+features = ["json"]
+
+## Environment Loading
+
+[workspace.dependencies.dotenvy]
+version = "0.15"
+
+## Password Hashing
+
+[workspace.dependencies.bcrypt]
+version = "0.16"
+
+## Dev Dependencies
+
+[workspace.dependencies.tempfile]
+version = "3.0"
+
+[workspace.dependencies.hyper]
+version = "1.5"
+features = ["full"]
+
+[workspace.dependencies.http-body-util]
+version = "0.1"
+
+[workspace.dependencies.arc-swap]
+version = "1.7.1"
+
+[workspace.dependencies.crossbeam]
+version = "0.8.4"
+
+[workspace.dependencies.wiremock]
+version = "0.6.5"

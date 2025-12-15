@@ -1,0 +1,83 @@
+[package]
+name = "iron_runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Agent runtime with LLM request routing and translation"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["runtime", "llm", "routing", "agent-runtime"]
+categories = ["asynchronous"]
+
+[features]
+default = ["full"]
+enabled = [
+  "dep:iron_types",
+  "dep:iron_runtime_state",
+  "dep:iron_telemetry",
+  "dep:iron_safety",
+  "dep:iron_cost",
+  "dep:iron_reliability",
+  "dep:tokio",
+  "dep:pyo3",
+  # pyo3-asyncio temporarily disabled due to version conflict
+  # "dep:pyo3-asyncio",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:uuid",
+  "dep:anyhow",
+  # LlmRouter dependencies
+  "dep:axum",
+  "dep:reqwest",
+  "dep:tracing",
+]
+analytics = ["dep:iron_runtime_analytics"]
+full = ["enabled", "analytics"]
+
+[dependencies]
+# Iron Cage crates
+iron_types = { workspace = true, features = ["full"], optional = true }
+iron_runtime_state = { workspace = true, features = ["enabled", "sqlite"], optional = true }
+iron_telemetry = { workspace = true, features = ["full"], optional = true }
+iron_safety = { workspace = true, features = ["full"], optional = true }
+iron_cost = { workspace = true, features = ["full"], optional = true }
+iron_reliability = { workspace = true, features = ["full"], optional = true }
+iron_runtime_analytics = { workspace = true, features = ["full"], optional = true }
+
+# Python FFI
+pyo3 = { workspace = true, features = ["extension-module", "auto-initialize"], optional = true }
+# pyo3-asyncio temporarily disabled due to version conflict with pyo3 0.22
+# pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"], optional = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"], optional = true }
+
+# Serialization
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+
+# Error handling
+anyhow = { workspace = true, optional = true }
+
+
+# Utilities
+uuid = { workspace = true, features = ["v4"], optional = true }
+
+# HTTP server (LlmRouter)
+axum = { workspace = true, optional = true }
+
+# HTTP client (LlmRouter)
+reqwest = { workspace = true, features = ["json", "blocking"], optional = true }
+
+# Logging
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+# Enable test utilities for ID types in tests
+iron_types = { workspace = true, features = ["test-helpers"] }
+
+[lib]
+name = "iron_runtime"
+crate-type = ["rlib", "cdylib"]

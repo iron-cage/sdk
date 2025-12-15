@@ -1,0 +1,52 @@
+- name: .health
+  namespace: ''
+  description: Check API server health
+  hint: No authentication required
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .health
+  - .health format::json
+  aliases: []
+  tags: []
+- name: .version
+  namespace: ''
+  description: Display CLI version
+  hint: Shows version from Cargo.toml
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .version
+  - .version format::json
+  aliases: []
+  tags: []

@@ -1,0 +1,408 @@
+- name: .user.list
+  namespace: ''
+  description: List all users
+  hint: Shows registered users
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .user.list
+  aliases: []
+  tags: []
+- name: .user.create
+  namespace: ''
+  description: Create new user
+  hint: Register new user account
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: username
+    kind: String
+    description: Username for login
+    hint: Unique username (3-50 chars)
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: email
+    kind: String
+    description: User email address
+    hint: Valid email for contact
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: password
+    kind: String
+    description: Initial password
+    hint: Secure password
+    attributes:
+      optional: false
+      multiple: false
+      interactive: true
+      sensitive: true
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: role
+    kind: String
+    description: User role
+    hint: admin or user
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .user.create username::example_name email::user@example.com password::value
+  aliases: []
+  tags: []
+- name: .user.get
+  namespace: ''
+  description: Get details for specific user
+  hint: Shows user configuration and permissions
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: User ID
+    hint: UUID of user to retrieve
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .user.get id::abc123
+  aliases: []
+  tags: []
+- name: .user.update
+  namespace: ''
+  description: Update user information
+  hint: Modify email or other details
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: User ID
+    hint: UUID of user to update
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: email
+    kind: String
+    description: New email address
+    hint: Optional new email
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .user.update id::abc123
+  aliases: []
+  tags: []
+- name: .user.delete
+  namespace: ''
+  description: Delete user account
+  hint: Permanently removes user
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: User ID
+    hint: UUID of user to delete
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .user.delete id::abc123
+  aliases: []
+  tags: []
+- name: .user.set_role
+  namespace: ''
+  description: Change user role
+  hint: Update user permissions
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: User ID
+    hint: UUID of user
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: role
+    kind: String
+    description: New role
+    hint: admin or user
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .user.set_role id::abc123 role::value
+  aliases: []
+  tags: []
+- name: .user.reset_password
+  namespace: ''
+  description: Reset user password
+  hint: Generate new password for user
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: User ID
+    hint: UUID of user
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: new_password
+    kind: String
+    description: New password
+    hint: Secure password
+    attributes:
+      optional: false
+      multiple: false
+      interactive: true
+      sensitive: true
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .user.reset_password id::abc123 new_password::value
+  aliases: []
+  tags: []
+- name: .user.get_permissions
+  namespace: ''
+  description: Get user permissions
+  hint: Shows what user can access
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: User ID
+    hint: UUID of user
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .user.get_permissions id::abc123
+  aliases: []
+  tags: []

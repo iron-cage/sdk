@@ -1,0 +1,130 @@
+- name: .traces.list
+  namespace: ''
+  description: List recent API call traces
+  hint: Shows trace details (ID, token, provider, model, tokens, cost)
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: limit
+    description: Max number of traces to return
+    kind: Integer
+    hint: Maximum trace count
+    attributes:
+      optional: true
+      default: 20
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .traces.list
+  - .traces.list limit::50
+  - .traces.list format::json
+  aliases: []
+  tags: []
+- name: .traces.get
+  namespace: ''
+  description: Get specific trace details by ID
+  hint: Shows all fields including total tokens calculation
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: trace_id
+    description: Trace ID to retrieve
+    kind: Integer
+    hint: Numeric trace identifier
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Output format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .traces.get trace_id::999
+  - .traces.get trace_id::123 format::json
+  aliases: []
+  tags: []
+- name: .traces.export
+  namespace: ''
+  description: Export trace data to file or stdout
+  hint: Exports up to 1000 traces in JSON or CSV format
+  status: stable
+  version: 1.0.0
+  idempotent: true
+  arguments:
+  - name: export_format
+    description: Export format
+    kind: String
+    hint: Data format for export
+    attributes:
+      optional: true
+      default: json
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: output
+    description: Output file path
+    kind: String
+    hint: Write to file (stdout if not provided)
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    description: Display format
+    kind: String
+    hint: Controls how results are displayed
+    attributes:
+      optional: true
+      default: table
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  examples:
+  - .traces.export
+  - .traces.export export_format::json output::traces.json
+  - .traces.export export_format::csv output::traces.csv
+  aliases: []
+  tags: []

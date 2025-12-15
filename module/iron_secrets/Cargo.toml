@@ -1,0 +1,49 @@
+[package]
+name = "iron_secrets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Secrets management and encryption for Iron Cage"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["secrets", "encryption", "key-management", "security"]
+categories = ["cryptography"]
+
+[dependencies]
+# Workspace crates
+iron_types = { workspace = true }
+iron_runtime_state = { workspace = true }
+
+# Error handling (per rulebook)
+error_tools = { workspace = true }
+
+# Crypto
+aes-gcm = { workspace = true }
+argon2 = { workspace = true }
+rand = { workspace = true }
+zeroize = { workspace = true }
+base64 = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Modularity
+mod_interface = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = "0.5"
+
+[lints]
+workspace = true

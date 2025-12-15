@@ -1,0 +1,22 @@
+[package]
+name = "iron_reliability"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Resilience patterns for distributed systems"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["resilience", "circuit-breaker", "retry", "reliability"]
+categories = ["asynchronous"]
+
+[features]
+default = ["enabled"]
+enabled = ["dep:iron_types", "dep:tokio", "dep:serde", "dep:tracing"]
+full = ["enabled"]
+
+[dependencies]
+iron_types = { workspace = true, features = ["full"], optional = true }
+tokio = { workspace = true, features = ["full"], optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+tracing = { workspace = true, optional = true }

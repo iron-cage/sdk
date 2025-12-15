@@ -1,0 +1,432 @@
+- name: .provider.list
+  namespace: ''
+  description: List all providers with optional filtering
+  hint: Shows providers in table format by default
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: v
+    kind: Integer
+    description: Verbosity level (0-5)
+    hint: 0=silent, 1=count, 2=table, 3=detailed, 4=verbose, 5=debug
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .provider.list
+  aliases: []
+  tags: []
+- name: .provider.create
+  namespace: ''
+  description: Create new provider with API configuration
+  hint: Registers new LLM API provider
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: name
+    kind: String
+    description: Provider name
+    hint: Unique identifier for provider
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: api_key
+    kind: String
+    description: API key for provider
+    hint: Authentication key
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: true
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: endpoint
+    kind: String
+    description: API endpoint URL
+    hint: Base URL for API calls
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .provider.create name::example_name api_key::value
+  aliases: []
+  tags: []
+- name: .provider.get
+  namespace: ''
+  description: Get details for specific provider
+  hint: Shows complete provider configuration
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Provider ID
+    hint: UUID of provider to retrieve
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .provider.get id::abc123
+  aliases: []
+  tags: []
+- name: .provider.update
+  namespace: ''
+  description: Update provider configuration
+  hint: Modify name, API key, or endpoint
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Provider ID
+    hint: UUID of provider to update
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: name
+    kind: String
+    description: New provider name
+    hint: Optional new name
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: api_key
+    kind: String
+    description: New API key
+    hint: Optional new key
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: true
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: endpoint
+    kind: String
+    description: New API endpoint
+    hint: Optional new URL
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .provider.update id::abc123
+  aliases: []
+  tags: []
+- name: .provider.delete
+  namespace: ''
+  description: Delete provider by ID
+  hint: Permanently removes provider
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Provider ID
+    hint: UUID of provider to delete
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .provider.delete id::abc123
+  aliases: []
+  tags: []
+- name: .provider.assign_agents
+  namespace: ''
+  description: Assign agents to provider
+  hint: Links one or more agents to provider
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Provider ID
+    hint: UUID of provider
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: agent_ids
+    kind: String
+    description: Comma-separated agent IDs
+    hint: UUIDs of agents to assign
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .provider.assign_agents id::abc123 agent_ids::abc123
+  aliases: []
+  tags: []
+- name: .provider.list_agents
+  namespace: ''
+  description: List agents assigned to provider
+  hint: Shows all linked agents
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Provider ID
+    hint: UUID of provider
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .provider.list_agents id::abc123
+  aliases: []
+  tags: []
+- name: .provider.remove_agent
+  namespace: ''
+  description: Remove agent from provider
+  hint: Unlinks specific agent
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Provider ID
+    hint: UUID of provider
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: agent_id
+    kind: String
+    description: Agent ID to remove
+    hint: UUID of agent to unlink
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: dry
+    kind: Integer
+    description: Dry run mode (0 or 1)
+    hint: 1 = preview only, 0 = execute
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .provider.remove_agent id::abc123 agent_id::abc123
+  aliases: []
+  tags: []

@@ -1,0 +1,84 @@
+[package]
+name = "iron_token_manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "API token lifecycle management and usage tracking"
+repository = "https://github.com/.../iron_runtime"
+readme = "readme.md"
+keywords = ["tokens", "api-keys", "usage-tracking", "limits"]
+categories = ["authentication"]
+
+[features]
+default = ["enabled"]
+enabled = []
+full = ["enabled"]
+
+[dependencies]
+# Workspace crates
+iron_types = { workspace = true }
+iron_runtime_state = { workspace = true }
+iron_telemetry = { workspace = true }
+iron_cost = { workspace = true }
+iron_config = { workspace = true }
+workspace_tools = { workspace = true }
+
+# LLM API clients (DO NOT duplicate - use workspace crates)
+# Phase 2 Week 4 (Days 16-20): BLOCKED - api_openai has dead code warning (post_binary)
+# BLOCKER: api_openai fails compilation with -D warnings (dead_code in client_ext_http_stream.rs:162)
+# Wrapper implementation complete but cannot test until upstream warning fixed
+# api_openai = { workspace = true, optional = true }
+# api_claude = { workspace = true }
+# api_gemini = { workspace = true }
+
+# Error handling (per rulebook)
+error_tools = { workspace = true }
+
+# Crypto for token generation
+rand.workspace = true
+sha2 = "0.10"
+hex = "0.4"
+base64 = { workspace = true }
+bcrypt = "0.15"
+subtle = "2.6"
+
+# Database
+sqlx = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Time & UUID
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+# Rate limiting
+governor = "0.7"
+nonzero_ext = "0.3"
+
+# Concurrency
+dashmap = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Modularity
+mod_interface = { workspace = true }
+
+[dev-dependencies]
+iron_test_db = { workspace = true }
+tempfile = { workspace = true }
+tokio-test = "0.4"
+regex.workspace = true
+# Enable test utilities for ID types in tests
+iron_types = { workspace = true, features = ["test-helpers"] }
+
+[lints]
+workspace = true

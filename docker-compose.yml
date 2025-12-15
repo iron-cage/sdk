@@ -1,0 +1,56 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: module/iron_control_api/Dockerfile
+    container_name: iron_cp_backend
+    environment:
+      DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
+      JWT_SECRET: ${JWT_SECRET}
+      IC_TOKEN_SECRET: ${IC_TOKEN_SECRET}
+      IP_TOKEN_KEY: ${IP_TOKEN_KEY}
+      IRON_SECRETS_MASTER_KEY: ${IRON_SECRETS_MASTER_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      SERVER_PORT: ${SERVER_PORT:-3001}
+      IRON_DEPLOYMENT_MODE: production
+      RUST_LOG: info
+    volumes:
+      - sqlite_data:/app/data
+    networks:
+      - iron_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${SERVER_PORT:-3001}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: module/iron_dashboard/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: iron_cp_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - iron_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  iron_network:
+    driver: bridge
+
+volumes:
+  sqlite_data:
+    driver: local

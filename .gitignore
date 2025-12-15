@@ -1,0 +1,120 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Python
+__pycache__/
+uv.lock
+.python-version
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# Python virtual env lib dirs (not src/lib/)
+/lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.whl
+
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Legacy Python tooling (use uv + pyproject.toml instead)
+.python-version
+requirements.txt
+requirements-dev.txt
+requirements-test.txt
+setup.py
+setup.cfg
+
+# uv lock files (gitignored - regenerate with `uv lock`)
+uv.lock
+
+# Maturin builds
+target/wheels/
+
+# Node.js (for iron_dashboard)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.cache/
+.vite/
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Database backups (NEVER commit)
+backups/
+*_backup*.db
+*.db.backup
+*.bak
+*.orig
+
+# Secrets directory: hyphenated files contain sensitive credentials
+# Files like secret/-iron.sh, secret/-api_keys.sh are gitignored via -* pattern
+# secret/readme.md (documentation) is tracked - no hyphen prefix
+-*
+
+# Build artifacts
+*.o
+*.a
+*.dylib
+*.dll
+*.exe
+
+# SQLite
+*.sqlite
+*.sqlite3
+
+# Ignore Terraform state files
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.backup
+
+# secret
+/secret/*
+!/secret/readme.md
+!/secret/secrets.template.sh
+!/secret/iron.example.sh
+!/secret/api_keys.example.sh
+# workspace-secrets.sh contains actual secrets - NEVER commit
