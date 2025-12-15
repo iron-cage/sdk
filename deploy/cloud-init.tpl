@@ -27,11 +27,13 @@ write_files:
       TAG=${tag}
       JWT_SECRET=${jwt_secret}
       IRON_SECRETS_MASTER_KEY=${iron_secrets_master_key}
+      IRON_DEPLOYMENT_MODE=${iron_deployment_mode}
       DATABASE_URL=${database_url}
       IP_TOKEN_KEY=${ip_token_key}
       IC_TOKEN_SECRET=${ic_token_key}
       ALLOWED_ORIGINS=${allowed_origins}
       SERVER_PORT=${server_port}
+      ENABLE_DEMO_SEED=${enable_demo_seed}
 
   - path: /root/init.sh
     permissions: '0700'

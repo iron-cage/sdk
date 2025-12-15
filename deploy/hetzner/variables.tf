@@ -73,6 +73,16 @@ variable "SERVER_PORT" {
   description = "TCP port on which the backend HTTP API listens for incoming requests"
 }
 
+# Explicit deployment mode
+variable "IRON_DEPLOYMENT_MODE" {
+  description = "Explicit deployment mode"
+}
+
+# Enable demo seed mode
+variable "ENABLE_DEMO_SEED" {
+  description = "Enable demo seed mode"
+}
+
 # Google Cloud Platform credentials
 data "local_sensitive_file" "service_account_creds" {
   filename = var.GOOGLE_SE_CREDS_PATH

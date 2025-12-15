@@ -2,7 +2,7 @@ name: Deploy CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "feat/deploy" ]
 
   workflow_dispatch:
 
@@ -25,7 +25,13 @@ jobs:
           echo "TF_VAR_PROJECT_ID=${{ secrets.TF_VAR_PROJECT_ID }}"
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+          echo "IC_TOKEN_SECRET=${{ secrets.IC_TOKEN_SECRET }}"
+          echo "IP_TOKEN_KEY=${{ secrets.IP_TOKEN_KEY }}"
           echo "IRON_SECRETS_MASTER_KEY=${{ secrets.IRON_SECRETS_MASTER_KEY }}"
+          echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}"
+          echo "SERVER_PORT=${{ secrets.SERVER_PORT }}"
+          echo "IRON_DEPLOYMENT_MODE=${{ secrets.IRON_DEPLOYMENT_MODE }}"
+          echo "ENABLE_DEMO_SEED=${{ secrets.ENABLE_DEMO_SEED }}"
         } > secret/-secret.sh
 
     - name: Create key files

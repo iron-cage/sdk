@@ -21,6 +21,12 @@ JWT_SECRET=dummy-jwt
 IRON_SECRETS_MASTER_KEY=secret_jwt_master_key
 DATABASE_URL=postgres://u:p@db/test_db
 TAG=example.com/app
+IRON_DEPLOYMENT_MODE=test
+IP_TOKEN_KEY=ip_token_key
+IC_TOKEN_SECRET=ic_token_key
+ALLOWED_ORIGINS=http://localhost:3001,http://localhost:5173
+SERVER_PORT=3001
+ENABLE_DEMO_SEED=true
 EOF
 
   cp "$FULL_ENV" "$TEST_DIR/etc-environment"
@@ -98,4 +104,46 @@ teardown() {
   run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
   [ "$status" -ne 0 ]
   [[ "$output" == *"DATABASE_URL is not set in the environment"* ]]
+}
+
+@test "missing IP_TOKEN_KEY" {
+  env_without "IP_TOKEN_KEY"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"IP_TOKEN_KEY is not set in the environment"* ]]
+}
+
+@test "missing IC_TOKEN_SECRET" {
+  env_without "IC_TOKEN_SECRET"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"IC_TOKEN_SECRET is not set in the environment"* ]]
+}
+
+@test "missing ALLOWED_ORIGINS" {
+  env_without "ALLOWED_ORIGINS"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ALLOWED_ORIGINS is not set in the environment"* ]]
+}
+
+@test "missing SERVER_PORT" {
+  env_without "SERVER_PORT"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"SERVER_PORT is not set in the environment"* ]]
+}
+
+@test "missing IRON_DEPLOYMENT_MODE" {
+  env_without "IRON_DEPLOYMENT_MODE"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"IRON_DEPLOYMENT_MODE is not set in the environment"* ]]
+}
+
+@test "missing ENABLE_DEMO_SEED" {
+  env_without "ENABLE_DEMO_SEED"
+  run env TAG="example.com/app" bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ENABLE_DEMO_SEED is not set in the environment"* ]]
 }

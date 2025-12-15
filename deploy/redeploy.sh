@@ -55,7 +55,9 @@ for var in \
   IP_TOKEN_KEY \
   IC_TOKEN_SECRET \
   ALLOWED_ORIGINS \
-  SERVER_PORT
+  SERVER_PORT \
+  IRON_DEPLOYMENT_MODE \
+  ENABLE_DEMO_SEED
 do
   # Expansion with : "${!var:?...}" exits with an error message if the variable is unset.
   : "${!var:?$var is not set in the environment}"
@@ -89,7 +91,8 @@ services:
       IC_TOKEN_SECRET: ${IC_TOKEN_SECRET}
       SERVER_PORT: ${SERVER_PORT}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
-      IRON_DEPLOYMENT_MODE: production
+      IRON_DEPLOYMENT_MODE: ${IRON_DEPLOYMENT_MODE}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED}
       RUST_LOG: info
     volumes:
       - sqlite_data:/app/data

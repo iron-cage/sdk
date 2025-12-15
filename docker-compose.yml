@@ -12,7 +12,8 @@ services:
       IRON_SECRETS_MASTER_KEY: ${IRON_SECRETS_MASTER_KEY}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       SERVER_PORT: ${SERVER_PORT:-3001}
-      IRON_DEPLOYMENT_MODE: production
+      IRON_DEPLOYMENT_MODE: ${IRON_DEPLOYMENT_MODE}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED}
       RUST_LOG: info
     volumes:
       - sqlite_data:/app/data
