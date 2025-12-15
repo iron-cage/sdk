@@ -36,6 +36,9 @@ OPENAI_API_KEY="<Get it from: https://platform.openai.com/account/api-keys>"
 # Apollo Studio API key for GraphQL schema publishing and analytics
 APOLLO_API_KEY="<Get it from: https://studio.apollographql.com → Settings → API Keys>"
 
+IP_TOKEN_KEY="<To generate use: openssl rand -hex 32>"
+IC_TOKEN_SECRET="<To generate use: openssl rand -hex 32>"
+
 ## -------------------------------------------------------------------------------------------------------------
 ##  Optional Parameters
 
