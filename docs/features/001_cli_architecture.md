@@ -195,7 +195,7 @@ iron_cli_py locates the iron_cli binary using this search order:
 
 - **iron_cli Specification:** [module/iron_cli/spec.md](../../module/iron_cli/spec.md)
 - **iron_cli_py Specification:** [module/iron_cli_py/spec.md](../../module/iron_cli_py/spec.md)
-- **Architecture Decision:** [ADR-002](../../pilot/decisions/002-cli-architecture.md)
+- **Architecture Decision:** [ADR-002](../../../iron_cage/dev/pilot/decisions/002-cli-architecture.md)
 - **iron_sdk Overview:** [module/iron_sdk/readme.md](../../module/iron_sdk/readme.md)
 
 ---

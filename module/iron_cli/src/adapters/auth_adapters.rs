@@ -18,14 +18,15 @@ use serde_json::{ json, Value };
 use crate::handlers::auth_handlers;
 use super::token::{ TokenApiClient, TokenApiConfig };
 use super::keyring;
+use super::{ AdapterError, ServiceError };
 
 /// Format JSON response according to format parameter
-fn format_response( data: &Value, format: &str ) -> Result<String, String>
+fn format_response( data: &Value, format: &str ) -> Result<String, AdapterError>
 {
   match format
   {
-    "yaml" => serde_yaml::to_string( data ).map_err( |e| e.to_string() ),
-    _ => serde_json::to_string_pretty( data ).map_err( |e| e.to_string() ),
+    "yaml" => serde_yaml::to_string( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
+    _ => serde_json::to_string_pretty( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
   }
 }
 
@@ -53,11 +54,10 @@ fn format_response( data: &Value, format: &str ) -> Result<String, String>
 /// ```
 pub async fn login_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  auth_handlers::login_handler( params )
-    .map_err( |e| e.to_string() )?;
+  auth_handlers::login_handler( params )?;
 
   // 2. Extract parameters
   let username = params.get( "username" ).unwrap(); // Already validated
@@ -77,25 +77,25 @@ pub async fn login_adapter(
   let response = client
     .post( "/api/v1/auth/login", body, None )
     .await
-    .map_err( |e| format!( "Login failed: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Login failed: {}", e ) ) ) )?;
 
   // 6. Extract tokens from response
   let access_token = response
     .get( "access_token" )
     .and_then( |v| v.as_str() )
-    .ok_or_else( || "Missing access_token in response".to_string() )?;
+    .ok_or_else( || AdapterError::ExtractionError( "Missing access_token in response".to_string() ) )?;
 
   let refresh_token = response
     .get( "refresh_token" )
     .and_then( |v| v.as_str() )
-    .ok_or_else( || "Missing refresh_token in response".to_string() )?;
+    .ok_or_else( || AdapterError::ExtractionError( "Missing refresh_token in response".to_string() ) )?;
 
   // 7. Store tokens in keyring
   keyring::set_access_token( access_token )
-    .map_err( |e| format!( "Failed to store access token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to store access token: {}", e ) ) ) )?;
 
   keyring::set_refresh_token( refresh_token )
-    .map_err( |e| format!( "Failed to store refresh token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to store refresh token: {}", e ) ) ) )?;
 
   // 8. Format success output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -130,15 +130,14 @@ pub async fn login_adapter(
 /// ```
 pub async fn logout_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  auth_handlers::logout_handler( params )
-    .map_err( |e| e.to_string() )?;
+  auth_handlers::logout_handler( params )?;
 
   // 2. Clear tokens from keyring
   keyring::clear_tokens()
-    .map_err( |e| format!( "Failed to clear tokens: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to clear tokens: {}", e ) ) ) )?;
 
   // 3. Format success output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -174,15 +173,14 @@ pub async fn logout_adapter(
 /// ```
 pub async fn refresh_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  auth_handlers::refresh_handler( params )
-    .map_err( |e| e.to_string() )?;
+  auth_handlers::refresh_handler( params )?;
 
   // 2. Get refresh token from keyring
   let refresh_token = keyring::get_refresh_token()
-    .map_err( |e| format!( "Failed to get refresh token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to get refresh token: {}", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -197,17 +195,17 @@ pub async fn refresh_adapter(
   let response = client
     .post( "/api/v1/auth/refresh", body, None )
     .await
-    .map_err( |e| format!( "Token refresh failed: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Token refresh failed: {}", e ) ) ) )?;
 
   // 6. Extract new access token from response
   let new_access_token = response
     .get( "access_token" )
     .and_then( |v| v.as_str() )
-    .ok_or_else( || "Missing access_token in response".to_string() )?;
+    .ok_or_else( || AdapterError::ExtractionError( "Missing access_token in response".to_string() ) )?;
 
   // 7. Store new access token in keyring
   keyring::set_access_token( new_access_token )
-    .map_err( |e| format!( "Failed to store new access token: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to store new access token: {}", e ) ) ) )?;
 
   // 8. Format success output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );

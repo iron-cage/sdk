@@ -76,7 +76,7 @@ cat <<EOF > compose.yml
 services:
   backend:
     image: ${TAG}_back
-    container_name: iron_backend
+    container_name: iron_cp_backend
     environment:
       DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
       JWT_SECRET: ${JWT_SECRET}
@@ -99,7 +99,7 @@ services:
 
   frontend:
     image: ${TAG}_front
-    container_name: iron_frontend
+    container_name: iron_cp_frontend
     ports:
       - "80:80"
     depends_on:

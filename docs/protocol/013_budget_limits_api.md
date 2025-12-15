@@ -1,34 +1,52 @@
-# Protocol 013: Budget Limits API
+# Protocol: Budget Limits API
 
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
-**Priority:** MUST-HAVE
+### Scope
+
+This protocol defines the HTTP API for modifying agent budgets after creation and viewing budget modification history.
+
+**In scope**:
+- Budget modification endpoint (PUT /api/v1/limits/agents/{agent_id}/budget) for admin-only direct budget changes (increase or decrease)
+- Force flag requirement for budget decreases preventing accidental agent shutdowns (force: true confirmation with impact analysis)
+- Budget history endpoint (GET /api/v1/limits/agents/{agent_id}/budget/history) returning modification records sorted newest first
+- Authorization model (admin can modify any agent budget, agent owner can view own history, non-admin cannot modify directly)
+- Emergency use case for long-running agents approaching budget limits (admin bypasses request workflow for immediate top-up)
+- Audit logging for all budget modifications (previous/new budget, reason, modified_by, timestamp, 90-day retention)
+- Safety validation (budget decreases rejected without force flag, budget unchanged validation, new budget >= 0.01)
+- Developer request workflow alternative (see Protocol 017: Budget Change Requests API for planned budget increases)
+
+**Out of scope**:
+- Initial budget setting at agent creation (see Protocol 010: Agents API for POST /api/v1/agents endpoint)
+- Budget enforcement and consumption tracking (see Protocol 005: Budget Control Protocol)
+- Budget status monitoring and analytics queries (see Protocol 012: Analytics API)
+- Automatic budget alerts or threshold notifications (Future Enhancement)
+- Budget presets or quick increase templates (Future Enhancement)
+- Budget decrease without force flag (safety policy, requires explicit confirmation)
+- Non-admin budget modifications (developers use Protocol 017: Budget Change Requests API instead)
+- Budget modification for deleted agents (404 error, no resurrection of deleted agents)
+
+### Purpose
+
+**User Need**: Admins need the ability to modify agent budgets after creation to handle emergency scenarios where long-running agents approach budget limits mid-task. Without budget modification capability, agents would fail critical tasks (95% budget used, 4-hour customer task running) forcing developers to abandon work and create new agents. Developers need transparency into budget modification history for compliance audits and operational review. Both need safety guardrails preventing accidental budget decreases that could immediately exhaust agents mid-task.
+
+**Solution**: This API provides admin-only budget modification (PUT /api/v1/limits/agents/{agent_id}/budget) with full mutability (increase or decrease) protected by force flag requirement for decreases. Budget increases are immediate (emergency top-up bypassing request workflow) while decreases require explicit force: true confirmation with impact analysis showing current_spent and new_remaining. Budget history endpoint (GET /api/v1/limits/agents/{agent_id}/budget/history) returns all modifications with reasons, modified_by, timestamps, and summary statistics (initial budget, total increases, modification count). All modifications are audit logged (90-day retention) with previous/new budget, reason, and user identity. Developers use Protocol 017: Budget Change Requests API for planned increases (request/approval workflow) while admins bypass for emergencies.
+
+**Key Insight**: Budget modification requires asymmetric safety policy. Budget increases are safe (more resources, no interruption risk) and should be frictionless for emergency scenarios. Budget decreases are dangerous (could immediately exhaust agent mid-task) and must require explicit confirmation with impact preview. The force flag design achieves this: first decrease attempt rejected with detailed impact analysis (current budget, requested budget, decrease amount, current spent, new remaining if applied), then admin retries with force: true after reviewing impact. This prevents accidental shutdowns while preserving admin control. The admin-only modification policy (developers use request workflow) provides centralized budget governance while emergency bypass enables immediate response to critical situations.
 
 ---
 
-## Overview
+**Status**: Specification
+**Version**: 1.0.0
+**Last Updated**: 2025-12-14
+**Priority**: MUST-HAVE
 
-The Budget Limits API provides endpoints for modifying agent budgets after creation. The primary use case is emergency budget increases for long-running agents approaching their limits. Budget modifications support full mutability with force flag protection for decreases to prevent accidental agent shutdowns.
-
-**Key characteristics:**
-- **Full mutability:** Budgets can be increased or decreased
-- **Force flag for decreases:** Budget decreases require explicit confirmation to prevent accidental shutdowns
-- **Emergency use case:** Preventing task failure when agent approaches budget limit
-- **Admin-only authorization:** Only admins can directly modify budgets (developers use request workflow)
-- **Audit logging:** All budget modifications are logged for compliance
-- **Developer path:** See [Protocol 017: Budget Change Requests API](017_budget_requests_api.md) for request/approval workflow
-
----
-
-## Standards Compliance
+### Standards Compliance
 
 This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `agent_id`: `agent_<uuid>`
-- `user_id`: `user_<uuid>`
+- Budget Limits API uses short alphanumeric IDs for agent and user identifiers to optimize performance, readability, and operational clarity
+- `agent_id`: `agent_<alphanumeric>` with regex `^agent_[a-z0-9]{6,32}$` (e.g., `agent_abc123`)
+- `user_id`: `user_<alphanumeric>` with regex `^user_[a-z0-9_]{3,32}$` (e.g., `user_admin_001`, `user_xyz789`)
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
@@ -44,11 +62,10 @@ This protocol adheres to the following Iron Cage standards:
 - URL structure: `/api/v1/agents/{id}/budget`
 - Standard HTTP methods: PATCH for budget modifications
 
----
 
-## Endpoints
+### Endpoints
 
-### Modify Agent Budget
+#### Modify Agent Budget
 
 **Endpoint:** `PUT /api/v1/limits/agents/{agent_id}/budget`
 
@@ -188,9 +205,8 @@ HTTP 404 Not Found
 
 **Audit Log:** Yes (mutation operation, includes previous/new budget and reason)
 
----
 
-### Get Budget Modification History
+#### Get Budget Modification History
 
 **Endpoint:** `GET /api/v1/limits/agents/{agent_id}/budget/history`
 
@@ -332,11 +348,10 @@ HTTP 404 Not Found
 
 **Audit Log:** No (read operation)
 
----
 
-## Data Models
+### Data Models
 
-### Budget Modification Object
+#### Budget Modification Object
 
 ```json
 {
@@ -353,7 +368,7 @@ HTTP 404 Not Found
 }
 ```
 
-### Budget History Object
+#### Budget History Object
 
 ```json
 {
@@ -386,11 +401,10 @@ HTTP 404 Not Found
 }
 ```
 
----
 
-## Security
+### Security
 
-### Authorization Matrix
+#### Authorization Matrix
 
 | Operation | Agent Owner | Admin | Other User |
 |-----------|-------------|-------|------------|
@@ -403,7 +417,7 @@ HTTP 404 Not Found
 - **Admin oversight:** Admins have system-wide visibility and control
 - **Safety:** Budget modifications require admin authorization (prevents unauthorized spending)
 
-### Force Flag Policy
+#### Force Flag Policy
 
 **Why require force flag for decreases?**
 1. **Prevent accidental shutdowns:** Decreasing budget could immediately exhaust agent mid-task
@@ -431,11 +445,10 @@ Content-Type: application/json
 }
 ```
 
----
 
-## Error Handling
+### Error Handling
 
-### Error Codes
+#### Error Codes
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
@@ -449,29 +462,27 @@ Content-Type: application/json
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
----
 
-## Rate Limiting
+### Rate Limiting
 
-### Limits (per user)
+#### Limits (per user)
 
 | Endpoint | Limit | Window | Reasoning |
 |----------|-------|--------|-----------|
 | `PUT /api/v1/limits/agents/{id}/budget` | 10 | 1 minute | Budget increases rare, prevent abuse |
 | `GET /api/v1/limits/agents/{id}/budget/history` | 60 | 1 minute | Standard read rate |
 
----
 
-## Audit Logging
+### Audit Logging
 
-### Logged Operations
+#### Logged Operations
 
 | Endpoint | Method | Logged | Special Fields |
 |----------|--------|--------|----------------|
 | `PUT /api/v1/limits/agents/{id}/budget` | PUT | ✅ Yes | previous_budget, new_budget, reason |
 | `GET /api/v1/limits/agents/{id}/budget/history` | GET | ❌ No | N/A |
 
-### Audit Log Entry
+#### Audit Log Entry
 
 ```json
 {
@@ -496,11 +507,10 @@ Content-Type: application/json
 
 **Retention:** 90 days (compliance standard)
 
----
 
-## CLI Integration
+### CLI Integration
 
-### iron limits agent_budget increase
+#### iron limits agent_budget increase
 
 ```bash
 iron limits agent_budget increase agent_abc123 150.00
@@ -516,7 +526,7 @@ iron limits agent_budget increase agent_abc123 150.00 \
 # Modified at: 2025-12-10 15:30:45
 ```
 
-### iron limits agent_budget history
+#### iron limits agent_budget history
 
 ```bash
 iron limits agent_budget history agent_abc123
@@ -536,7 +546,7 @@ iron limits agent_budget history agent_abc123
 #   Modifications: 2
 ```
 
-### iron limits agent_budget get
+#### iron limits agent_budget get
 
 ```bash
 iron limits agent_budget get agent_abc123
@@ -553,11 +563,10 @@ iron limits agent_budget get agent_abc123
 # Modifications: 2
 ```
 
----
 
-## Use Case Examples
+### Use Case Examples
 
-### Example 1: Emergency Budget Increase
+#### Example 1: Emergency Budget Increase
 
 **Scenario:** Production agent at 95% budget, running critical 4-hour customer task
 
@@ -591,9 +600,8 @@ iron agents status agent_abc123
 # ✅ Budget healthy
 ```
 
----
 
-### Example 2: Budget Decrease Attempt (Rejected)
+#### Example 2: Budget Decrease Attempt (Rejected)
 
 **Scenario:** Admin accidentally tries to decrease budget
 
@@ -618,9 +626,8 @@ iron limits agent_budget increase agent_abc123 150.00
 # ✅ Budget increased: $100.00 → $150.00
 ```
 
----
 
-### Example 3: Budget Audit Trail
+#### Example 3: Budget Audit Trail
 
 **Scenario:** Compliance audit requires budget modification history
 
@@ -641,11 +648,10 @@ iron limits agent_budget history agent_abc123
 # - Initial budget vs current budget
 ```
 
----
 
-## Future Enhancements (Post-Pilot)
+### Future Enhancements (Post-Pilot)
 
-### Budget Decrease Support
+#### Budget Decrease Support
 
 **Endpoint:** `PUT /api/v1/limits/agents/{agent_id}/budget/decrease`
 
@@ -657,9 +663,8 @@ iron limits agent_budget history agent_abc123
 
 **Use case:** Fix misconfiguration without creating new agent
 
----
 
-### Budget Alerts
+#### Budget Alerts
 
 **Endpoint:** `POST /api/v1/limits/agents/{agent_id}/budget/alerts`
 
@@ -668,9 +673,8 @@ iron limits agent_budget history agent_abc123
 - Email/webhook notifications
 - Auto-suggest budget increase amount
 
----
 
-### Budget Presets
+#### Budget Presets
 
 **Endpoint:** `GET /api/v1/limits/budget-presets`
 
@@ -678,18 +682,30 @@ iron limits agent_budget history agent_abc123
 - Pre-defined budget levels (small: $10, medium: $50, large: $100, etc.)
 - Quick budget increases without entering amounts
 
----
 
-## References
+### Cross-References
 
-**Related Protocols:**
-- [010: Agents API](010_agents_api.md) - Agent management (initial budget set here)
-- [005: Budget Control Protocol](005_budget_control_protocol.md) - Budget enforcement
-- [012: Analytics API](012_analytics_api.md) - Budget status monitoring
-- [002: REST API Protocol](002_rest_api_protocol.md) - General standards
+#### Related Principles Documents
 
-**Related Documents:**
-- [007: Entity Model](../architecture/007_entity_model.md) - Agent Budget entity
-<!-- TODO: Add Budget Architecture doc for budget types -->
+None.
 
----
+#### Related Architecture Documents
+
+- Architecture 007: Entity Model - Agent Budget entity definition
+
+#### Used By
+
+None currently. Budget modification capability consumed by admin dashboard UI (not yet documented).
+
+#### Dependencies
+
+- Protocol 002: REST API Protocol - General REST API standards and conventions
+- Protocol 005: Budget Control Protocol - Budget enforcement and consumption tracking referenced in budget modification context
+- Protocol 010: Agents API - Agent entity for budget association, initial budget setting at agent creation
+- Protocol 012: Analytics API - Budget status monitoring and alerting referenced in emergency use case
+- Protocol 017: Budget Change Requests API - Developer request/approval workflow alternative to admin direct modification
+
+#### Implementation
+
+- `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_control_api/src/routes/limits.rs` - Budget modification endpoint handlers
+

@@ -768,8 +768,7 @@ impl TracesService for HttpAdapter
 struct HealthStatusResponse
 {
   status: String,
-  version: String,
-  uptime_seconds: u64,
+  timestamp: i64,
 }
 
 impl From<HealthStatusResponse> for HealthStatus
@@ -778,8 +777,7 @@ impl From<HealthStatusResponse> for HealthStatus
   {
     HealthStatus {
       status: resp.status,
-      version: resp.version,
-      uptime_seconds: resp.uptime_seconds,
+      uptime_seconds: resp.timestamp as u64,
     }
   }
 }
@@ -802,7 +800,7 @@ impl HealthService for HttpAdapter
   async fn get_version( &self ) -> Result<String, ServiceError>
   {
     #[ derive( Deserialize ) ]
-    struct VersionResponse { version: String }
+    struct VersionResponse { current_version: String }
 
     let response = self
       .request( Method::GET, "/api/version" )
@@ -811,7 +809,7 @@ impl HealthService for HttpAdapter
       .map_err( |e| ServiceError::NetworkError( format!( "Version request failed: {}", e ) ) )?;
 
     let version_resp: VersionResponse = Self::handle_response( response ).await?;
-    Ok( version_resp.version )
+    Ok( version_resp.current_version )
   }
 }
 

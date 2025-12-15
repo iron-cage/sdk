@@ -3,6 +3,7 @@
 //! Request additional budget allocation
 
 use super::state::BudgetState;
+use crate::error::ValidationError;
 use axum::
 {
   extract::State,
@@ -40,34 +41,36 @@ impl BudgetRefreshRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate ic_token
     if self.ic_token.trim().is_empty()
     {
-      return Err( "ic_token cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "ic_token".to_string() ) );
     }
 
     if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
     {
-      return Err( format!(
-        "ic_token too long (max {} characters)",
-        Self::MAX_IC_TOKEN_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "ic_token".to_string(),
+        max_length: Self::MAX_IC_TOKEN_LENGTH,
+      } );
     }
 
     // Validate current_lease_id
     if self.current_lease_id.trim().is_empty()
     {
-      return Err( "current_lease_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "current_lease_id".to_string() ) );
     }
 
     if self.current_lease_id.len() > Self::MAX_LEASE_ID_LENGTH
     {
-      return Err( format!(
-        "current_lease_id too long (max {} characters)",
-        Self::MAX_LEASE_ID_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "current_lease_id".to_string(),
+        max_length: Self::MAX_LEASE_ID_LENGTH,
+      } );
     }
 
     // Validate requested_budget if provided
@@ -75,15 +78,20 @@ impl BudgetRefreshRequest
     {
       if budget <= 0
       {
-        return Err( "requested_budget must be positive".to_string() );
+        return Err( ValidationError::InvalidValue
+        {
+          field: "requested_budget".to_string(),
+          reason: "must be positive".to_string(),
+        } );
       }
 
       if budget > Self::MAX_BUDGET_REQUEST
       {
-        return Err( format!(
-          "requested_budget too large (max {} microdollars)",
-          Self::MAX_BUDGET_REQUEST
-        ) );
+        return Err( ValidationError::InvalidValue
+        {
+          field: "requested_budget".to_string(),
+          reason: format!( "too large (max {} microdollars)", Self::MAX_BUDGET_REQUEST ),
+        } );
       }
     }
 
@@ -143,7 +151,7 @@ pub async fn refresh_budget(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 

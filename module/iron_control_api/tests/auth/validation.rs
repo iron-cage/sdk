@@ -61,7 +61,7 @@ async fn test_empty_email_rejected()
     "LOUD FAILURE: Empty email must be rejected"
   );
   assert!(
-    result.unwrap_err().contains( "email" ),
+    result.unwrap_err().to_string().contains( "email" ),
     "LOUD FAILURE: Error message must mention 'email'"
   );
 }
@@ -82,7 +82,7 @@ async fn test_empty_password_rejected()
     "LOUD FAILURE: Empty password must be rejected"
   );
   assert!(
-    result.unwrap_err().contains( "password" ),
+    result.unwrap_err().to_string().contains( "password" ),
     "LOUD FAILURE: Error message must mention 'password'"
   );
 }
@@ -172,7 +172,7 @@ async fn test_email_too_long_rejected()
     "LOUD FAILURE: email exceeding 255 characters must be rejected"
   );
 
-  let error_msg = result.unwrap_err();
+  let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "email" ) && error_msg.contains( "255" ),
     "LOUD FAILURE: Error must specify email length limit, got: {}", error_msg
@@ -196,7 +196,7 @@ async fn test_password_too_long_rejected()
     "LOUD FAILURE: Password exceeding 1000 characters must be rejected"
   );
 
-  let error_msg = result.unwrap_err();
+  let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "password" ) && error_msg.contains( "1000" ),
     "LOUD FAILURE: Error must specify password length limit, got: {}", error_msg

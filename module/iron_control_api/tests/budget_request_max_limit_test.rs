@@ -124,7 +124,7 @@ fn test_budget_request_just_over_limit()
     "Budget request at $10,000.01 should fail validation"
   );
 
-  let error_msg = result.unwrap_err();
+  let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "exceeds maximum" ) || error_msg.contains( "10000" ),
     "Error message should mention exceeds/maximum/10000, got: {}",
@@ -156,7 +156,7 @@ fn test_budget_request_significantly_over_limit()
     "Budget request at $50,000 should fail validation"
   );
 
-  let error_msg = result.unwrap_err();
+  let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "exceeds maximum" ) && error_msg.contains( "10000" ),
     "Error should mention 'exceeds maximum' and '10000', got: {}",
@@ -211,7 +211,7 @@ fn test_error_message_format()
 
   assert!( result.is_err(), "Should fail validation" );
 
-  let error_msg = result.unwrap_err();
+  let error_msg = result.unwrap_err().to_string();
 
   // Error should be specific and actionable
   assert!(
@@ -280,7 +280,7 @@ fn test_validation_fails_on_budget_limit_first()
 
   assert!( result.is_err(), "Should fail validation" );
 
-  let error_msg = result.unwrap_err();
+  let error_msg = result.unwrap_err().to_string();
 
   // Should fail on budget limit before reaching justification length check
   // (validation order matters for error reporting)

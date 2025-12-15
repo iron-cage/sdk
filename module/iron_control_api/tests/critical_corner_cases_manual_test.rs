@@ -37,27 +37,10 @@
 //! - Prevention
 //! - Pitfall
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
+#[ path = "common/mod.rs" ]
+mod common;
 
-/// Create isolated test database
-async fn create_test_database() -> SqlitePool
-{
-  // Use shared in-memory database
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( "sqlite::memory:?cache=shared" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create test database" );
-
-  // Enable foreign keys
-  sqlx::raw_sql( "PRAGMA foreign_keys = ON;" )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to enable foreign keys" );
-
-  pool
-}
-
+use common::test_db;
 // ============================================================================
 // CATEGORY 1: Analytics Aggregation Edge Cases
 // ============================================================================
@@ -71,7 +54,8 @@ async fn create_test_database() -> SqlitePool
 #[tokio::test]
 async fn test_analytics_sum_near_max_i64()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   // Create analytics table
   sqlx::query(
@@ -141,7 +125,8 @@ async fn test_analytics_sum_near_max_i64()
 #[tokio::test]
 async fn test_analytics_negative_cost_rejected()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS analytics_events (
@@ -186,7 +171,8 @@ async fn test_analytics_negative_cost_rejected()
 #[tokio::test]
 async fn test_analytics_sum_empty_dataset()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS analytics_events (
@@ -235,7 +221,8 @@ async fn test_analytics_sum_empty_dataset()
 #[tokio::test]
 async fn test_analytics_sum_single_record()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS analytics_events (
@@ -296,7 +283,8 @@ async fn test_analytics_sum_single_record()
 #[tokio::test]
 async fn test_analytics_fractional_cents_handling()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS analytics_events (
@@ -372,7 +360,8 @@ async fn test_budget_concurrent_spending_no_overspend()
   // This test is CRITICAL for financial accuracy
   // If it fails, users could exceed their budgets
 
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS budgets (
@@ -497,7 +486,8 @@ async fn test_budget_concurrent_spending_no_overspend()
 #[tokio::test]
 async fn test_delete_agent_with_usage_data()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   // Create tables with FK constraint
   sqlx::query(
@@ -523,25 +513,27 @@ async fn test_delete_agent_with_usage_data()
   .expect( "LOUD FAILURE: Failed to create analytics table" );
 
   // Create agent and usage data
-  sqlx::query( "INSERT INTO agents (id, name) VALUES (1, 'test-agent')" )
+  let now = chrono::Utc::now().timestamp_millis();
+  sqlx::query( "INSERT INTO agents (id, name, providers, created_at) VALUES (100, 'test-agent', '[]', ?)" )
+    .bind( now )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to create agent" );
 
-  sqlx::query( "INSERT INTO analytics_events (agent_id, cost_cents) VALUES (1, 100)" )
+  sqlx::query( "INSERT INTO analytics_events (agent_id, cost_cents) VALUES (100, 100)" )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to create usage data" );
 
   // Delete agent
-  sqlx::query( "DELETE FROM agents WHERE id = 1" )
+  sqlx::query( "DELETE FROM agents WHERE id = 100" )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to delete agent" );
 
   // Check if usage data was cascaded or orphaned
   let remaining_events: (i64,) = sqlx::query_as(
-    "SELECT COUNT(*) FROM analytics_events WHERE agent_id = 1"
+    "SELECT COUNT(*) FROM analytics_events WHERE agent_id = 100"
   )
   .fetch_one( &pool )
   .await
@@ -572,7 +564,8 @@ async fn test_dos_protection_oversized_user_id()
   // This test verifies API-level validation BEFORE database
   // Actual API implementation should reject this at Axum handler level
 
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS api_tokens (
@@ -607,7 +600,8 @@ async fn test_dos_protection_oversized_user_id()
 #[tokio::test]
 async fn test_null_byte_injection_rejected()
 {
-  let pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS api_tokens (

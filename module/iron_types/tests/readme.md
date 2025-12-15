@@ -1,12 +1,13 @@
 # tests/
 
-Contains all automated tests for iron_cage_types.
+Contains all automated tests for iron_types.
 
-## Organization
+## Responsibility Table
 
-Tests organized by functional area (configuration, error handling, serialization).
-
-Flat structure maintained (< 20 test files expected).
+| File | Responsibility | Input→Output | Out of Scope |
+|------|----------------|--------------|--------------|
+| `ids_test.rs` | Test ID types and validation | ID operations → Type validation | NOT readme examples (readme_example_test.rs) |
+| `readme_example_test.rs` | Test readme code examples for correctness | Example code → Execution validation | NOT ID internals (ids_test.rs) |
 
 ## Running Tests
 

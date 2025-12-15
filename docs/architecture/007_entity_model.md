@@ -1,25 +1,36 @@
-# Entity Model
+# Architecture: Entity Model
 
-**Purpose:** Core entities and their relationships in Iron Cage platform.
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
+### Scope
 
-> **Note:** "IP" in this document means **Inference Provider** (e.g., OpenAI, Anthropic), NOT IP address.
+This document defines the core entities and their relationships in the Iron Cage platform.
 
----
+**In Scope:**
+- Seven core entities (User, Master Project, Project, Agent, IP/Inference Provider, IC Token, Budget Change Request)
+- Entity relationships and cardinality (1:1, 1:N, N:M)
+- Entity attributes and unique identifiers
+- Deletion cascades and reassignment policies (IP cascades, User reassignment)
+- Budget types (Restrictive: Agent Budget; Informative: Project, IP, Master budgets)
+- Token lifecycle management (IC Token, User Token, IP Token)
+- Special entities (Master Project admin-only, Orphaned Agents Project)
+- Entity state machines (Budget Change Request: pending → approved/rejected/cancelled)
 
-## User Need
+**Out of Scope:**
+- Database schema implementation (covered in Database Design)
+- API endpoint specifications (covered in Protocol documents 008, 017, 005)
+- Entity validation rules (covered in API Reference)
+- UI representation of entities (covered in Frontend Architecture)
+- Entity access control (covered in Architecture: Roles and Permissions)
+- Entity lifecycle hooks and business logic (covered in Service Implementation)
 
-Understand the main entities (Agent, Project, Inference Provider) and how they relate.
+### Purpose
 
-## Core Idea
+**User Need**: Platform developers, architects, and administrators need to understand the main entities (Agent, Project, Inference Provider, User, Tokens, Budgets) and how they relate to design data models, implement APIs, and manage platform resources.
 
-**Seven core entities with clear relationships:**
+**Solution**: Define seven core entities with clear relationships:
 
 ```
 User (person)
-  ├─ has role (Admin, Super User, Developer)
+  ├─ has role (Admin, User, Viewer)
   ├─ belongs to Project(s)
   ├─ owns multiple Agents
   └─ has multiple User Tokens
@@ -45,7 +56,17 @@ User (person)
                                           └─ has IP Token(s)
 ```
 
-## Entity 1: Agent
+> **Note:** "IP" in this document means **Inference Provider** (e.g., OpenAI, Anthropic), NOT IP address.
+
+**Key Insight**: Budget control is centralized through agents - the Agent Budget is the ONLY restrictive budget that blocks requests when exceeded. All other budgets (Project, IP, Master) are informative for monitoring only. This design keeps control simple and predictable. Critical relationships include 1:1 Agent-IC Token (can't share), deletion cascades (IP deletion removes from all agents), and agent reassignment (deleted user's agents move to Orphaned Agents Project owned by admin).
+
+---
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-13
+
+### Entity 1: Agent
 
 **Definition:** AI agent executing on developer's machine
 
@@ -60,7 +81,7 @@ User (person)
 - owner (developer)
 - status (running, stopped, etc.)
 
-## Entity 2: Project
+### Entity 2: Project
 
 **Definition:** Collection of agents, Inference Provider assignments, and related entities
 
@@ -75,7 +96,7 @@ User (person)
 - name (human-readable)
 - owner (admin or team)
 
-## Entity 3: Master Project
+### Entity 3: Master Project
 
 **Definition:** Special project containing ALL resources (admin-only)
 
@@ -87,7 +108,7 @@ User (person)
 
 **Pilot Requirement:** Master project MUST be implemented in Pilot for admin oversight
 
-## Entity 4: IP (Inference Provider)
+### Entity 4: IP (Inference Provider)
 
 **Definition:** LLM inference provider (OpenAI, Anthropic, etc.)
 
@@ -107,12 +128,12 @@ User (person)
 - provider_name (openai, anthropic, etc.)
 - endpoint_url
 
-## Entity 5: User
+### Entity 5: User
 
 **Definition:** Person using Iron Cage platform (admin, developer, super user)
 
 **Relationships:**
-- Has role (Admin, Super User, or Developer)
+- Has role (Admin, User, or Viewer)
 - Owns/creates multiple Agents (1:N)
 - Belongs to Project(s) (N:M)
 - Has multiple User Tokens (1:N)
@@ -121,7 +142,7 @@ User (person)
 **Attributes:**
 - user_id (unique identifier)
 - email (login)
-- role (Admin, Super User, Developer)
+- role (Admin, User, Viewer)
 
 **Token Permissions:**
 - Can regenerate own IC Tokens (for owned agents)
@@ -151,7 +172,7 @@ User (person)
 
 **See:** [Protocol 008](../protocol/008_user_management_api.md) (User Management API)
 
-## Entity 6: IC Token
+### Entity 6: IC Token
 
 **Definition:** Iron Cage Token for agent authentication
 
@@ -163,7 +184,7 @@ User (person)
 
 **Lifecycle:** Created with agent, lives until agent deleted or regenerated (long-lived, no auto-expiration)
 
-## Entity 7: Budget Change Request
+### Entity 7: Budget Change Request
 
 **Definition:** Request from developer to admin for modifying agent budget
 
@@ -193,7 +214,7 @@ User (person)
 
 **See:** [Protocol 017](../protocol/017_budget_requests_api.md)
 
-## Budget Types
+### Budget Types
 
 **Restrictive Budget (ONE TYPE ONLY):**
 - **Agent Budget:** Blocks requests when exceeded
@@ -207,12 +228,12 @@ User (person)
 
 **Key Point:** ONLY agent budget blocks requests. All others are for monitoring.
 
-## Token Lifecycle Management
+### Token Lifecycle Management
 
 **IC Token (Agent Authentication):**
 - Created: When agent is created by admin
 - Lifetime: Until agent deleted (long-lived, no auto-expiration)
-- Regeneration: Developer can regenerate own (replaces existing), Admin can regenerate any
+- Regeneration: User can regenerate own (replaces existing), Admin can regenerate any
 - 1:1 with agent: Cannot be shared or transferred
 - Invalidation: When agent deleted or IC Token regenerated
 
@@ -228,7 +249,7 @@ User (person)
 - Regeneration: Admin only (in Control Panel vault)
 - Users never see: Stored encrypted in Control Panel
 
-## Budget Control Principle
+### Budget Control Principle
 
 **Critical Design Decision:** Agents are the ONLY way to control budget.
 
@@ -254,4 +275,51 @@ This design keeps control simple and predictable.
 
 ---
 
-*Related: [006_roles_and_permissions.md](006_roles_and_permissions.md) | [../protocol/005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md)*
+### Cross-References
+
+#### Related Principles Documents
+- Design Philosophy - Entity modeling principles, relationship design patterns
+- Quality Attributes - Data consistency (entity integrity), Scalability (entity relationships), Security (token lifecycle)
+
+#### Related Architecture Documents
+- [Architecture: Execution Models](001_execution_models.md) - Entity contexts across execution modes (local agent uses IC Token, Control Panel uses User Token)
+- [Architecture: Data Flow](004_data_flow.md) - Entity data flow through system (Step 1: Agent authentication with IC Token, Step 2: Budget check against Agent Budget)
+- [Architecture: Service Integration](005_service_integration.md) - Entity references at service boundaries (Gateway validates IC Token, Budget Service checks Agent Budget, Provider Service uses IP Token)
+- [Architecture: Roles and Permissions](006_roles_and_permissions.md) - User entity role definitions (Admin, User, Viewer), token regeneration permissions by role, user management operations affecting User entity
+- [Architecture: Resource Catalog](009_resource_catalog.md) - Resource type definitions mapped to entities (agents, projects, users, providers as resources)
+
+#### Used By
+- Database Schema Design - Implements entity models as database tables (users, agents, projects, inference_providers, ic_tokens, user_tokens, ip_tokens, budget_change_requests)
+- API Gateway - Validates entity relationships on incoming requests (IC Token belongs to Agent, Agent belongs to Project, User has role permissions)
+- Budget Service - Enforces budget controls on Agent entity (checks Agent Budget, updates spending, blocks when exceeded)
+- Token Management Service - Manages token lifecycle for IC Token, User Token, IP Token entities
+- User Management Service - Implements User entity operations (create, suspend, activate, delete with agent reassignment to Orphaned Agents Project)
+- Agent Service - Manages Agent entity lifecycle (create with IC Token, assign to Project, configure Agent Budget, select IPs)
+- Project Service - Manages Project and Master Project entities (contains Agents, IPs, Users)
+
+#### Dependencies
+- User Management Protocol - Defines User entity CRUD operations, role assignment, account lifecycle states
+- Budget Control Protocol - Defines Budget entity types (Agent restrictive, Project/IP/Master informative), budget enforcement logic
+- Token Management Protocol - Defines token entity lifecycles (IC Token long-lived no expiration, User Token 30 days, IP Token in vault)
+- Database Design - Entity persistence layer (tables, relationships, constraints, ON DELETE CASCADE for IP, soft delete for User)
+
+#### Implementation
+- Database: `users` table (user_id, role enum [admin, user, viewer], is_active, deleted_at)
+- Database: `agents` table (agent_id, owner_id FK users, project_id FK projects, status)
+- Database: `projects` table (project_id, name, owner, special flag for Master Project and Orphaned Agents Project)
+- Database: `inference_providers` table (ip_id, provider_name, endpoint_url, ON DELETE CASCADE to agent_providers)
+- Database: `ic_tokens` table (token_id, agent_id FK agents 1:1, created_at, never expires)
+- Database: `user_tokens` table (token_id, user_id FK users, created_at, expires_at default 30 days)
+- Database: `ip_tokens` table (token_id, ip_id FK inference_providers, encrypted_value)
+- Database: `agent_budgets` table (budget_id, agent_id FK agents 1:1, amount, restrictive flag true)
+- Database: `project_budgets` table (budget_id, project_id FK projects 1:1, informative flag true)
+- Database: `ip_budgets` table (budget_id, ip_id FK inference_providers 1:1, informative flag true)
+- Database: `budget_change_requests` table (request_id, agent_id FK agents, requester_id FK users, current_budget, requested_budget, justification, status enum [pending, approved, rejected, cancelled], reviewed_by FK users, review_notes)
+- API: `POST /api/v1/agents` - Create Agent with IC Token and Agent Budget
+- API: `DELETE /api/v1/providers/{id}` - Delete IP with ON DELETE CASCADE to all agent assignments
+- API: `DELETE /api/v1/users/{id}` - Soft delete User with agent reassignment to Orphaned Agents Project
+- API: `POST /api/v1/budget-requests` - Create Budget Change Request (see Protocol 017)
+- API: `PUT /api/v1/agents/{id}/providers` - Assign IPs to Agent (N:M relationship)
+- See: [Protocol 008](../protocol/008_user_management_api.md) - User Management API
+- See: [Protocol 017](../protocol/017_budget_requests_api.md) - Budget Requests API
+- See: [Protocol 005](../protocol/005_budget_control_protocol.md) - Budget Control Protocol

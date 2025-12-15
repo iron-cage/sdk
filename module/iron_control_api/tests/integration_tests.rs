@@ -21,7 +21,8 @@
 
 mod common;
 
-use common::{ create_test_database, create_test_user };
+use common::{ create_test_user };
+use crate::common::test_db;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::health;
 use iron_control_api::jwt_auth::JwtSecret;
@@ -30,32 +31,38 @@ use axum::{
   routing::{ get, post },
   http::{ StatusCode, Request },
   body::Body,
+  extract::ConnectInfo,
 };
 use tower::ServiceExt;
 use serde_json::json;
 use std::sync::Arc;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /// Helper to create test auth router
 async fn create_auth_router() -> Router
 {
   // Create database with schema
-  let db_pool = create_test_database().await;
+  let db = test_db::create_test_db().await;
+  let db_pool = db.pool();
 
   // Create test user with known credentials
-  create_test_user( &db_pool, "test_user@mail.com" ).await;
+  create_test_user( db_pool, "test_user@mail.com" ).await;
 
   // Construct AuthState directly with prepared database
   let auth_state = AuthState
   {
     jwt_secret: Arc::new( JwtSecret::new( "test_secret_key_12345".to_string() ) ),
-    db_pool,
+    db_pool: db_pool.clone(),
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
   };
+
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
   Router::new()
     .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
     .route( "/api/auth/refresh", post( iron_control_api::routes::auth::refresh ) )
     .route( "/api/auth/logout", post( iron_control_api::routes::auth::logout ) )
+    .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state( auth_state )
 }
 

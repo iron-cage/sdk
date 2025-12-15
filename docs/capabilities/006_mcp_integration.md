@@ -2,6 +2,8 @@
 
 **Concept:** Zero-configuration tool access enabling AI agents to use filesystem, databases, and external services via Model Context Protocol.
 
+**Status:** 📋 POST-PILOT (Deferred Implementation)
+
 ---
 
 ## User Need
@@ -33,3 +35,17 @@ The insight: MCP provides the **protocol** - Iron Cage adds the **governance** (
 
 - [Safe Execution](003_safe_execution.md) - Sandboxes tool execution
 - [AI Safety Guardrails](004_ai_safety_guardrails.md) - Validates tool parameters
+
+## Implementation Status
+
+**Priority:** POST-PILOT (Deferred)
+
+**Specification:** See [Protocol 004: MCP Integration Protocol](../protocol/004_mcp_integration_protocol.md) for complete technical specification.
+
+**Rationale:** MCP integration provides ecosystem tool compatibility but is not required for pilot launch. Core agent functionality (LLM access with budget control via Protocol 005) meets pilot requirements. Tool integration can be added post-pilot based on user feedback and specific tool requirements.
+
+**Dependencies:**
+- Protocol 004 (MCP Integration Protocol) specification complete
+- Tool registry service design
+- Policy enforcement layer integration with RBAC
+- Security validation for tool parameters and results

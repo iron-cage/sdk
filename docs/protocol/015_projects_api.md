@@ -1,96 +1,119 @@
-# Protocol 015: Projects API
+# Protocol: Projects API
 
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
-**Priority:** NICE-TO-HAVE
+Provides read-only access to project information in the Iron Control Panel.
+
+### Scope
+
+#### In Scope
+
+- Read-only project access (list, get details)
+- Single "Master Project" implementation for Pilot phase
+- Project attributes (name, description, counts, budgets, settings)
+- User membership in Master Project (all users automatically included)
+- Project-level resource counts (users, agents, providers)
+- Project-level budget aggregation
+
+#### Out of Scope
+
+- Project creation, update, deletion (POST-PILOT feature)
+- Multi-project support (POST-PILOT feature)
+- Project membership management (POST-PILOT feature)
+- Project-specific roles and permissions (POST-PILOT feature)
+- Project-level resource isolation (POST-PILOT feature)
+- Project-scoped API tokens (POST-PILOT feature)
+- Cross-project resource sharing (POST-PILOT feature)
+
+### Purpose
+
+**User Need:** Users need visibility into their project context including resource counts, budget allocation, and project settings. Applications need to retrieve project information to display context, validate resource ownership, and enforce project-level constraints. Analytics systems need project metadata for aggregation and reporting.
+
+**Solution:** Protocol 015 provides GET endpoints for listing projects and retrieving project details. In the Pilot phase, a single "Master Project" exists with all users automatically included, simplifying implementation while providing necessary project context. The read-only API ensures data consistency during Pilot while the architecture supports future multi-project expansion.
+
+**Key Insight:** The single-project Pilot design balances simplicity with future scalability. By implementing the Projects API early (even for one project), client code can be written project-aware from day one, avoiding costly refactoring when multi-project support is added POST-PILOT. The Master Project ID (`proj_master_001`) serves as a known constant for configuration and testing during Pilot phase.
 
 ---
 
-## Overview
+**Status:** Certain (Required for project context awareness)
+**Version:** 1.1.0
+**Last Updated:** 2025-12-14
+**Priority:** MUST-HAVE
 
-The Projects API provides read-only access to project information in the Iron Control Panel. In the Pilot phase, a single "Master Project" exists, and all users belong to this project. Full project CRUD operations (create, update, delete, multi-project support) are planned for POST-PILOT implementation.
+### Standards Compliance
 
-## Key Concepts
+This protocol defines the following ID formats:
 
-### Project Structure
-- **Single Project (Pilot)**: All users and resources belong to the "Master Project"
-- **Project Attributes**: ID, name, description, creation date, user count, agent count
-- **Resource Ownership**: All agents, providers, and tokens belong to the project
-- **User Membership**: All users have access to the Master Project
+- `project_id`: `proj_<alphanumeric>` (e.g., `proj_master_001`)
+  - Pattern: `^proj_[a-z0-9_]{3,32}$`
+  - Usage: Database entity identifier for projects
+  - Master Project ID: `proj_master_001` (constant in Pilot phase)
 
-### Authorization Model
-- **List Projects**: Any authenticated user (User, Owner, Admin)
-- **Get Project Details**: Any authenticated user (User, Owner, Admin)
-- **Future CRUD**: POST-PILOT implementation will add role-based restrictions
+- `user_id`: `user_<alphanumeric>` (e.g., `user_xyz789`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: Project member references
 
-### Future Expansion (POST-PILOT)
+**Data Format Standards:**
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45Z`)
+- Counts: Integer (e.g., `12` users, `8` agents)
+- Currency: Decimal numbers with 2 decimal places (e.g., `100.50`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+
+**Error Format Standards:**
+- Consistent error response structure with `error.code` and `error.message`
+- HTTP status codes: 200, 400, 401, 404
+
+### Pilot Phase Design
+
+**Single Project Model:**
+- All users and resources belong to the "Master Project" (`proj_master_001`)
+- No project creation, update, or deletion operations
+- All authenticated users have read access to Master Project
+- Simplifies authorization (no multi-project access control needed)
+
+**Future Expansion (POST-PILOT):**
 - Multiple projects per organization
 - Project-level resource isolation
 - Project-specific roles and permissions
-- Project creation and management
+- Project creation and management endpoints
 - Project-level budget allocation
+- User membership management
 
-## Base URL
+### Endpoints
 
-```
-https://api.iron-control.example.com/api/v1
-```
+#### List Projects
 
-## Authentication
+**Endpoint:** `GET /api/v1/projects`
 
-All endpoints require authentication via:
-- **User Token**: Short-lived session token from login (`Authorization: Bearer <user-token>`)
-- **API Token**: Persistent authentication token (`Authorization: Bearer <api-token>`)
+**Description:** Retrieves all projects accessible to the authenticated user. In Pilot, returns the single "Master Project".
 
-## Standards Compliance
+##### Authentication
 
-This protocol adheres to the following Iron Cage standards:
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
 
-**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `project_id`: `project_<uuid>` (e.g., `project_550e8400-e29b-41d4-a716-446655440000`)
-- `user_id`: `user_<uuid>`
+##### Request
 
-**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
-- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
-- Counts: Integer (e.g., `42` users, `15` agents)
-
-**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
-- Consistent error response structure across all endpoints
-- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`
-- HTTP status codes: 200, 400, 401, 404
-
-**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
-- Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
-- URL structure: `/api/v1/projects`, `/api/v1/projects/{id}`
-
-## Endpoints
-
-### 1. List Projects
-
-Retrieves all projects accessible to the authenticated user. In Pilot, returns the single "Master Project".
-
-**Endpoint**: `GET /api/v1/projects`
-
-**Request**:
 ```http
 GET /api/v1/projects?page=1&per_page=50
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Query Parameters**:
+##### Query Parameters
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `page` | integer | No | Page number (default: 1) |
 | `per_page` | integer | No | Items per page (default: 50, max: 100) |
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "data": [
     {
-      "id": "proj_master-001",
+      "id": "proj_master_001",
       "name": "Master Project",
       "description": "Default project for Iron Control Panel Pilot",
       "user_count": 12,
@@ -107,24 +130,38 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-**Response Fields**:
+##### Response Fields
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Project ID (format: `proj-*`) |
+| `id` | string | Project ID (format: `proj_<alphanumeric>`) |
 | `name` | string | Project name |
 | `description` | string | Project description |
 | `user_count` | integer | Number of users in project |
 | `agent_count` | integer | Number of agents in project |
 | `created_at` | string | ISO 8601 timestamp with Z |
 
-**Authorization**:
-- Any authenticated user can list projects
-- Users only see projects they have access to (Master Project in Pilot)
+##### Empty Results
 
-**Error Responses**:
-
-- **401 Unauthorized**: Missing or invalid authentication token
 ```json
+HTTP 200 OK
+{
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "per_page": 50,
+    "total_items": 0,
+    "total_pages": 0
+  }
+}
+```
+
+**Note:** In Pilot, this will never return empty results (Master Project always exists). POST-PILOT, new users without project membership may see empty results.
+
+##### Error Responses
+
+```json
+HTTP 401 Unauthorized
 {
   "error": {
     "code": "UNAUTHORIZED",
@@ -133,8 +170,8 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-- **401 Unauthorized**: Expired authentication token
 ```json
+HTTP 401 Unauthorized
 {
   "error": {
     "code": "TOKEN_EXPIRED",
@@ -143,29 +180,47 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
----
+##### Authorization
 
-### 2. Get Project Details
+- **Any authenticated user:** Can list projects
+- **Pilot:** All users see Master Project
+- **POST-PILOT:** Users only see projects they have access to
 
-Retrieves detailed information about a specific project.
+##### Audit Log
 
-**Endpoint**: `GET /api/v1/projects/{id}`
+No (read operation)
 
-**Request**:
+#### Get Project Details
+
+**Endpoint:** `GET /api/v1/projects/{id}`
+
+**Description:** Retrieves detailed information about a specific project.
+
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 GET /api/v1/projects/proj_master_001
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Path Parameters**:
+##### Path Parameters
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | Project ID (format: `proj-*`) |
+| `id` | string | Yes | Project ID (format: `proj_<alphanumeric>`) |
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
-  "id": "proj_master-001",
+  "id": "proj_master_001",
   "name": "Master Project",
   "description": "Default project for Iron Control Panel Pilot",
   "user_count": 12,
@@ -182,7 +237,8 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-**Response Fields**:
+##### Response Fields
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Project ID |
@@ -195,15 +251,14 @@ Authorization: Bearer <user-token or api-token>
 | `total_spent` | number | Total spending across all agents |
 | `created_at` | string | ISO 8601 timestamp with Z |
 | `settings` | object | Project-level settings |
+| `settings.default_agent_budget` | number | Default budget for new agents |
+| `settings.max_agents_per_user` | integer | Maximum agents per user |
+| `settings.allowed_providers` | array | List of allowed AI providers |
 
-**Authorization**:
-- Any authenticated user can view project details
-- Users can only view projects they belong to
+##### Error Responses
 
-**Error Responses**:
-
-- **401 Unauthorized**: Missing or invalid authentication token
 ```json
+HTTP 401 Unauthorized
 {
   "error": {
     "code": "UNAUTHORIZED",
@@ -212,8 +267,8 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-- **404 Not Found**: Project does not exist or user has no access
 ```json
+HTTP 404 Not Found
 {
   "error": {
     "code": "PROJECT_NOT_FOUND",
@@ -222,74 +277,87 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
----
+**Note:** In Pilot, 404 only occurs if user requests wrong project ID. In POST-PILOT, 404 also returned if user lacks access to requested project.
 
-## Common Patterns
+##### Authorization
 
-### Pagination
-All list endpoints use offset pagination:
-- Default: `page=1`, `per_page=50`
-- Maximum: `per_page=100`
-- Empty results return HTTP 200 with empty array
+- **Any authenticated user:** Can view project details
+- **Pilot:** All users can view Master Project
+- **POST-PILOT:** Users can only view projects they belong to
 
-### Error Format
-All errors follow the simple custom format:
+##### Audit Log
+
+No (read operation)
+
+### Data Models
+
+#### Project Object (Summary)
+
 ```json
 {
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message",
-    "field": "field_name"  // Optional: for validation errors
+  "id": "proj_master_001",
+  "name": "Master Project",
+  "description": "Default project for Iron Control Panel Pilot",
+  "user_count": 12,
+  "agent_count": 8,
+  "created_at": "2025-01-15T08:00:00Z"
+}
+```
+
+#### Project Object (Details)
+
+```json
+{
+  "id": "proj_master_001",
+  "name": "Master Project",
+  "description": "Default project for Iron Control Panel Pilot",
+  "user_count": 12,
+  "agent_count": 8,
+  "provider_count": 3,
+  "total_budget": 1500.00,
+  "total_spent": 892.45,
+  "created_at": "2025-01-15T08:00:00Z",
+  "settings": {
+    "default_agent_budget": 100.00,
+    "max_agents_per_user": 10,
+    "allowed_providers": ["openai", "anthropic", "google"]
   }
 }
 ```
 
-### Timestamps
-All timestamps use ISO 8601 format with Z suffix:
-- Format: `YYYY-MM-DDTHH:MM:SSZ`
-- Example: `2025-12-10T10:30:45Z`
+### Pilot Phase Implementation
 
-### Currency
-All monetary values use decimal numbers with 2 decimal places:
-- Format: `number` (JSON number type)
-- Example: `100.50`
+#### Master Project Configuration
 
-## POST-PILOT Expansion
+**Constant Values:**
+- Project ID: `proj_master_001` (hardcoded)
+- Project Name: "Master Project"
+- Description: "Default project for Iron Control Panel Pilot"
 
-The following features are planned for POST-PILOT implementation:
-
-### Project Management Endpoints (Future)
-- `POST /api/v1/projects` - Create new project (Admin only)
-- `PUT /api/v1/projects/{id}` - Update project (Owner/Admin)
-- `DELETE /api/v1/projects/{id}` - Delete project (Admin only)
-
-### User Management Endpoints (Future)
-- `POST /api/v1/projects/{id}/users` - Add user to project
-- `DELETE /api/v1/projects/{id}/users/{user_id}` - Remove user from project
-- `PUT /api/v1/projects/{id}/users/{user_id}/role` - Update user role in project
-
-### Resource Management (Future)
-- Project-level resource isolation
-- Cross-project resource sharing
-- Project-level budget allocation
-- Project-specific provider configurations
-
-### Multi-Project Support (Future)
-- Users can belong to multiple projects
-- Context switching between projects
-- Project-scoped API tokens
-- Project-level analytics and reporting
-
-## Implementation Notes
-
-### Pilot Phase Constraints
-- Single project (Master Project) hardcoded in system
+**User Membership:**
 - All users automatically belong to Master Project
-- No project creation or deletion
-- No multi-project switching
-- Project ID is constant: `proj_master_001`
+- No membership management needed in Pilot
+- POST-PILOT: Implement project_members table
 
-### Database Schema (Reference)
+**Resource Association:**
+- All agents belong to Master Project
+- All API tokens belong to Master Project
+- All provider configurations belong to Master Project
+
+#### Performance Optimizations
+
+**Caching:**
+- List endpoint response cached (5-minute TTL)
+- Single project = minimal cache invalidation complexity
+- POST-PILOT: Invalidate cache on project modifications
+
+**Computed Fields:**
+- `user_count`: Real-time count from users table
+- `agent_count`: Real-time count from agents table
+- `provider_count`: Real-time count from providers table
+- POST-PILOT: Denormalize counters for multi-project performance
+
+**Database Schema (Reference):**
 ```sql
 -- Pilot: Single row in projects table
 CREATE TABLE projects (
@@ -306,30 +374,101 @@ CREATE TABLE project_members (
   user_id VARCHAR(50) NOT NULL,
   role VARCHAR(50) NOT NULL,         -- 'admin', 'owner', 'user'
   joined_at TIMESTAMP NOT NULL,
-  PRIMARY KEY (project_id, user_id)
+  PRIMARY KEY (project_id, user_id),
+  FOREIGN KEY (project_id) REFERENCES projects(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 ```
 
-### Performance Considerations
-- List endpoint cached (5-minute TTL in Pilot since single project)
-- User count and agent count computed on-demand
-- POST-PILOT: Implement denormalized counters for multi-project performance
+### Security
 
-### Security Considerations
-- Users can only access projects they belong to
-- Project existence checks prevent enumeration attacks
-- POST-PILOT: Implement fine-grained project-level permissions
+#### Access Control (Pilot)
 
-## Related APIs
-- **001 Authentication API**: User login and token management
-- **010 Agents API**: Agent creation and management within projects
-- **011 Providers API**: Provider configuration within projects
-- **016 Settings API**: Project-level settings management (POST-PILOT)
+**Authorization Model:**
+- Any authenticated user can list projects
+- Any authenticated user can view Master Project details
+- No write operations = no write authorization needed
 
-## Changelog
+**Project Existence Checks:**
+- Return 404 for non-existent project IDs (prevents enumeration)
+- POST-PILOT: Return 404 for projects user doesn't have access to (prevents information leakage)
 
-### Version 1.0 (2025-12-10)
-- Initial specification for Pilot phase
-- Read-only endpoints (List, Get)
-- Single Master Project support
-- Documented POST-PILOT expansion plans
+#### Access Control (POST-PILOT)
+
+**Planned Authorization:**
+- Users can only view projects they belong to
+- Project admins can manage project settings
+- Organization admins can create/delete projects
+- Fine-grained project-level permissions (read, write, admin)
+
+### Future Enhancements (POST-PILOT)
+
+#### Project Management Endpoints
+
+- `POST /api/v1/projects` - Create new project (Admin only)
+- `PUT /api/v1/projects/{id}` - Update project (Owner/Admin)
+- `DELETE /api/v1/projects/{id}` - Delete project (Admin only)
+- `GET /api/v1/projects/{id}/members` - List project members
+- `POST /api/v1/projects/{id}/members` - Add user to project
+- `DELETE /api/v1/projects/{id}/members/{user_id}` - Remove user
+- `PUT /api/v1/projects/{id}/members/{user_id}/role` - Update user role
+
+#### Multi-Project Features
+
+**User Experience:**
+- Project switcher in dashboard
+- Context switching between projects
+- Project-scoped API tokens
+- Project-level analytics and reporting
+
+**Resource Management:**
+- Project-level resource isolation
+- Cross-project resource sharing (with permissions)
+- Project-level budget allocation
+- Project-specific provider configurations
+
+**Architecture Changes:**
+- Project context in all API requests
+- Project-scoped authentication tokens
+- Project-level audit logs
+- Project-specific rate limits
+
+### Cross-References
+
+#### Related Principles Documents
+
+None
+
+#### Related Architecture Documents
+
+None
+
+#### Used By
+
+- Dashboard applications (project context display)
+- CLI tools (project switching, resource scoping)
+- Analytics systems (project-level aggregation)
+- Admin tools (project management, user assignment)
+
+#### Dependencies
+
+- Protocol 007: Authentication API (User authentication, token management)
+- Protocol 010: Agents API (Agent creation within projects)
+- Protocol 011: Providers API (Provider configuration within projects)
+- Protocol 016: Settings API (Project-level settings management, POST-PILOT)
+- Protocol 002: REST API Protocol (General REST standards, pagination)
+
+#### Implementation
+
+**Status:** Specified (Not yet implemented)
+
+**Planned Files:**
+- `module/iron_control_api/src/routes/projects.rs` - Endpoint implementation
+- `module/iron_control_api/src/services/project_service.rs` - Project business logic
+- `module/iron_control_api/tests/projects/endpoints.rs` - Integration tests
+- `module/iron_control_api/tests/projects/pilot.rs` - Pilot phase specific tests
+
+**Database Migration:**
+- Create projects table with Master Project row
+- Seed Master Project data (`proj_master_001`)
+- POST-PILOT: Create project_members table and foreign keys

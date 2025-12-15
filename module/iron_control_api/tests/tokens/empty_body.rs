@@ -6,19 +6,19 @@
 //!
 //! | Test Case | Endpoint | Body | Expected Result | Status |
 //! |-----------|----------|------|----------------|--------|
-//! | `test_create_token_with_empty_json_object` | POST /api/v1/api-tokens | {} | 201 Created | ✅ |
+//! | `test_create_token_with_empty_json_object` | POST /api/v1/api-tokens | {} | 400 Bad Request | ✅ |
 //! | `test_create_token_with_no_body` | POST /api/v1/api-tokens | (empty) | 400 Bad Request | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
-//! **Protocol 014 Changes:**
-//! - ✅ Empty JSON object `{}` → 201 Created (user_id from JWT, all fields optional)
+//! **Protocol 014 Validation:**
+//! - ✅ Empty JSON object `{}` → 400 Bad Request (at least one field required)
 //! - ✅ Completely empty body → 400 (cannot parse as JSON)
 //!
 //! **Why These Tests Matter:**
-//! 1. **Protocol 014**: user_id extracted from JWT, not required in request
-//! 2. **API Contract**: All request fields are optional (name, project_id, description)
-//! 3. **Client UX**: Minimal request `{}` with JWT auth is valid
+//! 1. **Protocol 014**: Requires at least one field (name, description, project_id, etc.)
+//! 2. **API Contract**: Empty requests provide no useful information and should be rejected
+//! 3. **Security**: Prevent meaningless token creation attempts
 
 use crate::common::test_state::TestAppState;
 use axum::{ Router, routing::post, http::{ Request, StatusCode } };
@@ -52,7 +52,7 @@ async fn test_create_token_with_empty_json_object()
 {
   let ( router, app_state ) = create_test_router().await;
 
-  // WHY: Protocol 014 - Empty JSON object is valid (user_id from JWT, all fields optional)
+  // WHY: Protocol 014 - Empty JSON object is invalid (at least one field required)
   let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
   let request = Request::builder()
     .method( "POST" )
@@ -66,15 +66,8 @@ async fn test_create_token_with_empty_json_object()
 
   assert_eq!(
     response.status(),
-    StatusCode::CREATED,
-    "LOUD FAILURE: Empty JSON object with JWT auth must return 201 Created (Protocol 014)"
-  );
-
-  // WHY: Verify response is JSON with token
-  let content_type = response.headers().get( "content-type" );
-  assert!(
-    content_type.is_some() && content_type.unwrap().to_str().unwrap().contains( "application/json" ),
-    "LOUD FAILURE: Success response must be JSON"
+    StatusCode::BAD_REQUEST,
+    "LOUD FAILURE: Empty JSON object must return 400 Bad Request (no fields provided)"
   );
 }
 

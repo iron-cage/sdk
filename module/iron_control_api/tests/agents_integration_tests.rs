@@ -249,7 +249,14 @@ async fn test_list_agents_as_admin_sees_all()
     .unwrap();
   let agents: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
 
-  assert_eq!( agents.len(), 2, "Admin should see all agents" );
+  assert!( agents.len() >= 2, "Admin should see at least the 2 created agents (plus any seeded agents)" );
+
+  // Verify the created agents are present
+  let agent_names: Vec< &str > = agents.iter()
+    .filter_map( |a| a[ "name" ].as_str() )
+    .collect();
+  assert!( agent_names.contains( &"Agent 1" ), "Should contain Agent 1" );
+  assert!( agent_names.contains( &"Agent 2" ), "Should contain Agent 2" );
 }
 
 #[ tokio::test ]
@@ -260,7 +267,7 @@ async fn test_list_agents_as_user_sees_only_accessible()
   // Create agents - one owned by admin, one owned by user
   let now = chrono::Utc::now().timestamp_millis();
   sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( 1 )
+    .bind( 100 )
     .bind( "Admin Agent" )
     .bind( "[\"openai\"]" )
     .bind( now )
@@ -270,7 +277,7 @@ async fn test_list_agents_as_user_sees_only_accessible()
     .unwrap();
 
   sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( 2 )
+    .bind( 101 )
     .bind( "User Agent" )
     .bind( "[\"anthropic\"]" )
     .bind( now )
@@ -579,7 +586,7 @@ async fn test_get_agent_tokens_success()
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
   let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( 1 )
+    .bind( 100 )
     .bind( "Test Agent" )
     .bind( "[\"openai\"]" )
     .bind( now )

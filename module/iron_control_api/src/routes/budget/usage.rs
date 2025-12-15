@@ -3,6 +3,7 @@
 //! Cost tracking and unused budget return
 
 use super::state::BudgetState;
+use crate::error::ValidationError;
 use axum::
 {
   extract::State,
@@ -46,74 +47,86 @@ impl UsageReportRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate lease_id
     if self.lease_id.trim().is_empty()
     {
-      return Err( "lease_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "lease_id".to_string() ) );
     }
 
     if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
     {
-      return Err( format!(
-        "lease_id too long (max {} characters)",
-        Self::MAX_LEASE_ID_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "lease_id".to_string(),
+        max_length: Self::MAX_LEASE_ID_LENGTH,
+      } );
     }
 
     // Validate request_id
     if self.request_id.trim().is_empty()
     {
-      return Err( "request_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "request_id".to_string() ) );
     }
 
     if self.request_id.len() > Self::MAX_REQUEST_ID_LENGTH
     {
-      return Err( format!(
-        "request_id too long (max {} characters)",
-        Self::MAX_REQUEST_ID_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "request_id".to_string(),
+        max_length: Self::MAX_REQUEST_ID_LENGTH,
+      } );
     }
 
     // Validate tokens is positive
     if self.tokens <= 0
     {
-      return Err( "tokens must be positive".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "tokens".to_string(),
+        reason: "must be positive".to_string(),
+      } );
     }
 
     // Validate cost_microdollars is non-negative
     if self.cost_microdollars < 0
     {
-      return Err( "cost_microdollars cannot be negative".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "cost_microdollars".to_string(),
+        reason: "cannot be negative".to_string(),
+      } );
     }
 
     // Validate model
     if self.model.trim().is_empty()
     {
-      return Err( "model cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "model".to_string() ) );
     }
 
     if self.model.len() > Self::MAX_MODEL_LENGTH
     {
-      return Err( format!(
-        "model too long (max {} characters)",
-        Self::MAX_MODEL_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "model".to_string(),
+        max_length: Self::MAX_MODEL_LENGTH,
+      } );
     }
 
     // Validate provider
     if self.provider.trim().is_empty()
     {
-      return Err( "provider cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "provider".to_string() ) );
     }
 
     if self.provider.len() > Self::MAX_PROVIDER_LENGTH
     {
-      return Err( format!(
-        "provider too long (max {} characters)",
-        Self::MAX_PROVIDER_LENGTH
-      ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "provider".to_string(),
+        max_length: Self::MAX_PROVIDER_LENGTH,
+      } );
     }
 
     Ok( () )
@@ -153,7 +166,7 @@ pub async fn report_usage(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 
@@ -206,12 +219,21 @@ pub async fn report_usage(
     }
   }
 
-  // Check if lease has been revoked
+  // Check if lease has been revoked or expired
   if lease.lease_status == "revoked"
   {
     return (
       StatusCode::FORBIDDEN,
       Json( serde_json::json!({ "error": "Lease has been revoked" }) ),
+    )
+      .into_response();
+  }
+
+  if lease.lease_status == "expired"
+  {
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({ "error": "Lease expired" }) ),
     )
       .into_response();
   }
@@ -309,21 +331,29 @@ impl BudgetReturnRequest
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Validate budget return request parameters
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.lease_id.trim().is_empty()
     {
-      return Err( "lease_id cannot be empty".to_string() );
+      return Err( ValidationError::MissingField( "lease_id".to_string() ) );
     }
 
     if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
     {
-      return Err( format!( "lease_id too long (max {} characters)", Self::MAX_LEASE_ID_LENGTH ) );
+      return Err( ValidationError::TooLong
+      {
+        field: "lease_id".to_string(),
+        max_length: Self::MAX_LEASE_ID_LENGTH,
+      } );
     }
 
     if self.spent_microdollars < 0
     {
-      return Err( "spent_microdollars cannot be negative".to_string() );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "spent_microdollars".to_string(),
+        reason: "cannot be negative".to_string(),
+      } );
     }
 
     Ok( () )
@@ -366,7 +396,7 @@ pub async fn return_budget(
   {
     return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
     {
-      "error": validation_error
+      "error": validation_error.to_string()
     } ) ) ).into_response();
   }
 
@@ -417,6 +447,37 @@ pub async fn return_budget(
   // Calculate returned: granted - spent (capped at 0)
   let returned = ( lease.budget_granted - request.spent_microdollars ).max( 0 );
 
+  // Fix(issue-budget-007): Restore returned budget to agent_budgets
+  //
+  // Root cause: return_budget only credited usage_limits but not agent_budgets.
+  // The handshake reserved budget from agent_budgets via check_and_reserve_budget(),
+  // but return_budget never restored the unused portion back.
+  //
+  // Pitfall: When implementing a reserve/return pattern, ensure BOTH reserve AND return
+  // update the same state. Missing return logic causes permanent "budget leak".
+  //
+  // Restore the returned budget to agent_budgets
+  if returned > 0
+  {
+    if let Err( err ) = state
+      .agent_budget_manager
+      .restore_reserved_budget( lease.agent_id, returned )
+      .await
+    {
+      tracing::error!( "Database error restoring agent budget: {}", err );
+      // Continue - lease is closed, log the error but don't fail the return
+    }
+    else
+    {
+      tracing::info!(
+        lease_id = %request.lease_id,
+        agent_id = lease.agent_id,
+        returned_microdollars = %returned,
+        "Budget restored to agent_budgets"
+      );
+    }
+  }
+
   // Credit the returned amount back to usage_limits
   if returned > 0
   {
@@ -440,12 +501,11 @@ pub async fn return_budget(
     if let Some( owner_id ) = owner_id
     {
       // Credit the returned amount back to usage_limits
-      // Convert microdollars to cents: microdollars / 10_000
-      let returned_cents = returned / 10_000;
+      // Both are now in microdollars - no conversion needed
       if let Err( err ) = sqlx::query(
-        "UPDATE usage_limits SET current_cost_cents_this_month = current_cost_cents_this_month - ? WHERE user_id = ?"
+        "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month - ? WHERE user_id = ?"
       )
-      .bind( returned_cents )
+      .bind( returned )
       .bind( &owner_id )
       .execute( &state.db_pool )
       .await
@@ -460,7 +520,6 @@ pub async fn return_budget(
           agent_id = lease.agent_id,
           owner_id = %owner_id,
           returned_microdollars = %returned,
-          returned_cents = %returned_cents,
           "Budget returned and credited to usage_limits"
         );
       }

@@ -54,6 +54,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **[protocol/](protocol/readme.md)** | 8 (002-008) | Communication protocols (REST API, WebSocket, MCP, budget control, token management, authentication, user management) |
 | **[features/](features/readme.md)** | 6 (001-006) | Feature documentation (CLI architecture, token management, user management) |
 | **[decisions/](decisions/readme.md)** | 6 (adr_002-007) | Architecture Decision Records (ADR format) |
+| **[enforcement/](enforcement/readme.md)** | 3 | Enforcement infrastructure documentation (mechanisms, contracts, impossibility proofs) |
 
 ### Reference Documents
 
@@ -165,7 +166,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 
 All documentation directories with 3+ files maintain Responsibility Tables per organizational_principles.rulebook.md § Responsibility Table Format § Mandatory Locations.
 
-**Compliance Status:** 22/22 directories (100%)
+**Compliance Status:** 23/23 directories (100%)
 
 **Documentation Directories:**
 
@@ -183,6 +184,7 @@ All documentation directories with 3+ files maintain Responsibility Tables per o
 | docs/decisions/ | 7 | ✅ Compliant | ✅ Unique |
 | docs/capabilities/ | 8 | ✅ Compliant | ✅ Unique |
 | docs/deployment/ | 5 | ✅ Compliant | ✅ Unique |
+| docs/enforcement/ | 4 | ✅ Compliant | ✅ Unique |
 
 **Test Directory Compliance:**
 

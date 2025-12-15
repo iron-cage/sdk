@@ -51,10 +51,11 @@
 //! ensure default value includes the parameter (as implemented here).
 
 use axum::{
-  Router, http::{ Method, header }, routing::{ delete, get, post, put }, middleware
+  Router, http::{ Method, header }, routing::{ delete, get, post, put }
 };
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
+use workspace_tools::workspace;
 
 /// Deployment mode classification for production safety warnings
 ///
@@ -119,6 +120,61 @@ fn detect_deployment_mode() -> DeploymentMode
   }
 }
 
+/// Get database URL with workspace-relative path resolution
+///
+/// Resolves database path using workspace_tools for context-independent paths:
+/// - **Pilot mode**: {workspace_root}/iron.db
+/// - **Development mode**: {workspace_root}/data/dev_control.db
+/// - **Production mode**: {workspace_root}/data/iron_production.db
+///
+/// Respects DATABASE_URL environment variable if set (highest priority).
+/// All paths are workspace-relative and work regardless of execution directory.
+///
+/// Returns SQLite URL with ?mode=rwc parameter for database creation.
+fn get_database_url() -> Result< String, Box< dyn std::error::Error > >
+{
+  // Check for explicit DATABASE_URL override (highest priority)
+  if let Ok( url ) = env::var( "DATABASE_URL" )
+  {
+    return Ok( url );
+  }
+
+  // Detect workspace root
+  let ws = workspace()
+    .map_err( | e | format!( "Failed to detect workspace: {}", e ) )?;
+
+  // Get deployment mode
+  let mode = detect_deployment_mode();
+
+  // Determine database path based on mode
+  let db_path = match mode
+  {
+    DeploymentMode::Pilot =>
+    {
+      // Pilot: {workspace}/iron.db (canonical path)
+      ws.root().join( "iron.db" )
+    }
+    DeploymentMode::Development =>
+    {
+      // Development: {workspace}/data/dev_control.db
+      let data_dir = ws.data_dir();
+      std::fs::create_dir_all( &data_dir )?;
+      data_dir.join( "dev_control.db" )
+    }
+    DeploymentMode::Production | DeploymentMode::ProductionUnconfirmed =>
+    {
+      // Production: {workspace}/data/iron_production.db
+      // Note: Production should use PostgreSQL in real deployment
+      let data_dir = ws.data_dir();
+      std::fs::create_dir_all( &data_dir )?;
+      data_dir.join( "iron_production.db" )
+    }
+  };
+
+  // Construct SQLite URL with mode=rwc for database creation
+  Ok( format!( "sqlite://{}?mode=rwc", db_path.display() ) )
+}
+
 /// Combined application state containing all service states
 ///
 /// This pattern allows routes to access only the state they need through Axum's
@@ -150,7 +206,6 @@ struct AppState
   tokens: iron_control_api::routes::tokens::TokenState,
   usage: iron_control_api::routes::usage::UsageState,
   limits: iron_control_api::routes::limits::LimitsState,
-  traces: iron_control_api::routes::traces::TracesState,
   providers: iron_control_api::routes::providers::ProvidersState,
   keys: iron_control_api::routes::keys::KeysState,
   users: iron_control_api::routes::users::UserManagementState,
@@ -199,15 +254,6 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::limits::Li
   fn from_ref( state: &AppState ) -> Self
   {
     state.limits.clone()
-  }
-}
-
-/// Enable traces routes to access TracesState from combined AppState
-impl axum::extract::FromRef< AppState > for iron_control_api::routes::traces::TracesState
-{
-  fn from_ref( state: &AppState ) -> Self
-  {
-    state.traces.clone()
   }
 }
 
@@ -293,10 +339,10 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     Err( _ ) => tracing::debug!( "No .env file loaded (not required)" ),
   }
 
-  // Database URL (SQLite for pilot, canonical path iron.db)
+  // Database URL (workspace-relative paths via workspace_tools)
   // Load this BEFORE deployment mode actions (needed for database wiping)
-  let database_url = std::env::var( "DATABASE_URL" )
-    .unwrap_or_else( |_| "sqlite://./iron.db?mode=rwc".to_string() );
+  let database_url = get_database_url()?;
+  tracing::info!( "Database: {}", database_url );
 
   // Extract database file path from SQLite URL for development mode wiping
   let extract_sqlite_path = | url: &str | -> Option< String >
@@ -478,10 +524,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .await
     .expect( "LOUD FAILURE: Failed to initialize limits state" );
 
-  let traces_state = iron_control_api::routes::traces::TracesState::new( &database_url )
-    .await
-    .expect( "LOUD FAILURE: Failed to initialize traces state" );
-
   let providers_state = iron_control_api::routes::providers::ProvidersState::new( &database_url )
     .await
     .expect( "LOUD FAILURE: Failed to initialize providers storage" );
@@ -507,6 +549,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     10,
     std::time::Duration::from_secs( 60 ),
   );
+
+  // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
+  let crypto_service_for_budget = crypto_service.clone();
 
   let keys_state = iron_control_api::routes::keys::KeysState
   {
@@ -551,12 +596,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   }
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
+  // crypto_service_for_budget enables Feature 014: Agent Provider Key retrieval
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
     ic_token_secret,
     &ip_token_key,
     &provider_key_master_bytes,
     auth_state.jwt_secret.clone(),
     &database_url,
+    Some( crypto_service_for_budget ),
   )
   .await
   .expect( "LOUD FAILURE: Failed to initialize budget state" );
@@ -568,7 +615,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     tokens: token_state,
     usage: usage_state,
     limits: limits_state,
-    traces: traces_state,
     providers: providers_state,
     keys: keys_state,
     users: user_management_state,
@@ -577,10 +623,33 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     analytics: analytics_state,
   };
 
+  // Fix(ironcage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
+  // Root cause: Hardcoded origins prevented multi-domain production deployment
+  // Pitfall: Never hardcode deployment-specific config (origins, ports, URLs)
+  let allowed_origins_str = std::env::var( "ALLOWED_ORIGINS" )
+    .expect( "ALLOWED_ORIGINS environment variable required (comma-separated URLs)" );
+
+  let allowed_origins: Vec< axum::http::HeaderValue > = allowed_origins_str
+    .split( ',' )
+    .map( |origin| {
+      origin.trim().parse::<axum::http::HeaderValue>()
+        .unwrap_or_else( |_| panic!( "Invalid origin in ALLOWED_ORIGINS: {}", origin ) )
+    } )
+    .collect();
+
+  tracing::info!( "✅ Configured CORS for {} origins", allowed_origins.len() );
+  for origin in &allowed_origins
+  {
+    tracing::info!( "   - {}", origin.to_str().unwrap() );
+  }
+
   // Build router with all endpoints
   let app = Router::new()
     // Health check (FR-2: Health endpoint at /api/health)
     .route( "/api/health", get( iron_control_api::routes::health::health_check ) )
+
+    // Version endpoint (API version discovery)
+    .route( "/api/v1/version", get( iron_control_api::routes::version::get_version ) )
 
     // Authentication endpoints
     .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
@@ -619,10 +688,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/limits/:id", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
     .route( "/api/v1/limits/:id", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
 
-    // Traces endpoints
-    .route( "/api/v1/traces", get( iron_control_api::routes::traces::list_traces ) )
-    .route( "/api/v1/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
-
     // Provider key management endpoints
     .route( "/api/v1/providers", post( iron_control_api::routes::providers::create_provider_key ) )
     .route( "/api/v1/providers", get( iron_control_api::routes::providers::list_provider_keys ) )
@@ -638,6 +703,8 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Agent management endpoints
     .route( "/api/v1/agents", get( iron_control_api::routes::agents::list_agents ) )
     .route( "/api/v1/agents", post( iron_control_api::routes::agents::create_agent ) )
+    // Agent Provider Key endpoint (Feature 014) - must be before :id routes
+    .route( "/api/v1/agents/provider-key", post( iron_control_api::routes::agent_provider_key::get_provider_key ) )
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
@@ -670,29 +737,29 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Apply combined state to all routes
     .with_state( app_state )
 
-    // URL redirect middleware for backward compatibility (Protocol 014)
-    // Redirects old /api/tokens paths to new /api/v1/api-tokens paths
-    // Expires 3 months after deployment (2025-03-12)
-    .layer( middleware::from_fn( iron_control_api::middleware::url_redirect::redirect_old_tokens_url ) )
-
-    // CORS middleware (FR-4: Restrict to frontend origin for pilot)
-    // Pilot configuration: localhost:5173, 5174, 5175 (Vite dev server on any available port)
-    // Allow methods: GET, POST, PUT, DELETE (all REST operations)
+    // CORS middleware (configured from ALLOWED_ORIGINS environment variable)
+    // Allow methods: GET, POST, PUT, DELETE, PATCH (all REST operations)
     // Allow headers: Content-Type (JSON requests), Authorization (Bearer tokens)
     .layer(
       CorsLayer::new()
-        .allow_origin( [
-          "http://localhost:5173".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
-          "http://localhost:5174".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
-          "http://localhost:5175".parse::<axum::http::HeaderValue>().expect( "INVARIANT: static localhost URL is valid HeaderValue" ),
-        ] )
+        .allow_origin( allowed_origins )
         .allow_methods( [ Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH ] )
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
     );
 
+  // Fix(ironcage-migration): Replace hardcoded port with SERVER_PORT env var
+  // Root cause: Hardcoded port prevented multi-environment deployment
+  // Pitfall: Never hardcode deployment-specific config (ports, hosts, URLs)
+  let server_port_str = std::env::var( "SERVER_PORT" )
+    .expect( "SERVER_PORT environment variable required (port number 1-65535)" );
+
+  let server_port: u16 = server_port_str.parse::< u16 >()
+    .unwrap_or_else( |_| panic!( "Invalid SERVER_PORT: {} (must be 1-65535)", server_port_str ) );
+
   // Server address (0.0.0.0 for Docker container networking)
-  let addr = SocketAddr::from( ( [0, 0, 0, 0], 3001 ) );
-  
+  let addr = SocketAddr::from( ( [0, 0, 0, 0], server_port ) );
+
+  tracing::info!( "✅ API server configured on port {}", server_port );
   tracing::info!( "API server listening on http://{}", addr );
   tracing::info!( "Endpoints:" );
   tracing::info!( "  GET  /api/health" );
@@ -714,8 +781,6 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  GET  /api/limits/:id" );
   tracing::info!( "  PUT  /api/limits/:id" );
   tracing::info!( "  DELETE /api/limits/:id" );
-  tracing::info!( "  GET  /api/traces" );
-  tracing::info!( "  GET  /api/traces/:id" );
   tracing::info!( "  POST /api/providers" );
   tracing::info!( "  GET  /api/providers" );
   tracing::info!( "  GET  /api/providers/:id" );
@@ -742,9 +807,21 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  GET  /api/v1/analytics/usage/tokens/by-agent" );
   tracing::info!( "  GET  /api/v1/analytics/usage/models" );
 
-  // Start server
+  // Fix(login-connect-info): Enable ConnectInfo extraction for per-IP rate limiting
+  // Root cause: Login handler uses ConnectInfo<SocketAddr> for per-IP rate limiting
+  //             (Fix issue-GAP-006), but axum::serve() doesnt provide ConnectInfo by
+  //             default. Must explicitly opt-in via into_make_service_with_connect_info.
+  // Pitfall: Never use axum::serve(listener, app) when handlers need ConnectInfo.
+  //          Always use app.into_make_service_with_connect_info::<SocketAddr>() to
+  //          make client addresses available. Without this, requests fail with 500
+  //          "Missing request extension: ConnectInfo<SocketAddr>".
+  //
+  // Start server with ConnectInfo support
   let listener = tokio::net::TcpListener::bind( addr ).await?;
-  axum::serve( listener, app ).await?;
+  axum::serve(
+    listener,
+    app.into_make_service_with_connect_info::<SocketAddr>()
+  ).await?;
 
   Ok( () )
 }

@@ -89,7 +89,7 @@ pub async fn run_proxy(
       .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
 
   let pricing_manager = Arc::new(
-    PricingManager::new().map_err(LlmRouterError::ServerStart)?
+    PricingManager::new().map_err(|e| LlmRouterError::ServerStart(e.to_string()))?
   );
 
   let state = ProxyState {
@@ -200,6 +200,16 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
         ),
         "iron_cage_insufficient_budget",
         "insufficient_budget",
+      )))
+    }
+    Err(e) => {
+      // Unexpected error (e.g., JsonParseError should never occur here)
+      tracing::error!("Unexpected cost error: {}", e);
+      Err(Box::new(create_openai_error_response(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        &format!("Internal error: {}", e),
+        "internal_error",
+        "internal_error",
       )))
     }
   }

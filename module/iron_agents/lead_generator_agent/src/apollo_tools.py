@@ -1,16 +1,11 @@
-import os
 import requests
 import json
 from langchain.agents import tool
-from dotenv import load_dotenv
+from config import APOLLO_API_KEY
 
-# --- Load Configuration ---
-# Loads environment variables from a .env file.
-load_dotenv()
-APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
-
+# Immediate validation
 if not APOLLO_API_KEY:
-    raise ValueError("CRITICAL ERROR: APOLLO_API_KEY is missing in environment variables (.env).")
+    raise ValueError("CRITICAL: APOLLO_API_KEY is missing. Check your 'secret/-secrets.sh' file.")
 
 # --- Tool for Searching Leads ---
 @tool

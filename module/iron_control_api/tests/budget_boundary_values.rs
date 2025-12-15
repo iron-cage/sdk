@@ -10,10 +10,12 @@
 //!
 //! | Test Case | Scenario | Input | Expected Response |
 //! |-----------|----------|-------|-------------------|
-//! | `test_cost_i64_max` | Maximum i64 value | cost_microdollars = i64::MAX | Handled safely (accept or reject) |
+//! | `test_cost_i64_max` | Maximum i64 value for cost | cost_microdollars = i64::MAX | Handled safely (accept or reject) |
 //! | `test_cost_zero` | Zero cost (cached response) | cost_microdollars = 0 | 200 OK (valid for cached responses) |
 //! | `test_budget_exactly_at_limit` | Budget allocation at exact limit | Request budget = remaining budget | 200 OK (exact match allowed) |
 //! | `test_multiple_leases_equal_total_budget` | Multiple leases exhausting budget | Create leases until budget exhausted | All succeed until budget depleted |
+//! | `test_tokens_i64_max` | Maximum i64 value for tokens | tokens = i64::MAX | Handled safely (accept or reject) |
+//! | `test_lease_expiration_exact_timestamp` | Lease expires at exact current time | expires_at = now_ms | Behavior documented (200 or 403) |
 
 mod common;
 
@@ -370,4 +372,188 @@ async fn test_multiple_leases_equal_total_budget()
     response_json["error"].as_str().unwrap(), "Budget limit exceeded",
     "LOUD FAILURE: 6th lease should be denied due to insufficient budget"
   );
+}
+
+/// B3: Maximum i64 value for tokens field
+///
+/// # Corner Case
+/// POST /api/budget/report with tokens = i64::MAX
+///
+/// # Expected Behavior
+/// - Request handled safely (either accepted or rejected with validation error)
+/// - No integer overflow or panic
+/// - Token count stored correctly or rejected
+///
+/// # Risk
+/// MEDIUM - Large token counts shouldn't cause overflow but should be validated
+#[ tokio::test ]
+async fn test_tokens_i64_max()
+{
+  let pool = setup_test_db().await;
+  let agent_id = 404i64;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let router_handshake = create_budget_router( state.clone() ).await;
+
+  // Create lease
+  let handshake_response = router_handshake
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/handshake" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "ic_token": ic_token,
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( handshake_response.status(), StatusCode::OK );
+
+  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+
+  // Attempt to report with i64::MAX tokens
+  let router_report = create_budget_router( state ).await;
+  let response = router_report
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "lease_id": lease_id,
+          "request_id": "req_tokens_max_test",
+          "tokens": i64::MAX,
+          "cost_microdollars": 5_000_000,
+          "model": "gpt-4",
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  // Should either accept (200) or reject with validation error (400)
+  // Must NOT panic or cause integer overflow
+  assert!(
+    response.status() == StatusCode::OK
+      || response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "LOUD FAILURE: i64::MAX tokens should be handled safely, got status: {}",
+    response.status()
+  );
+
+  // If accepted, verify lease budget was updated (no overflow)
+  if response.status() == StatusCode::OK
+  {
+    let lease_budget: i64 = sqlx::query_scalar(
+      "SELECT budget_spent FROM budget_leases WHERE id = ?"
+    )
+    .bind( lease_id )
+    .fetch_one( &pool )
+    .await
+    .expect("LOUD FAILURE: Should query lease budget");
+
+    assert!(
+      lease_budget >= 0,
+      "LOUD FAILURE: Lease budget should be non-negative after i64::MAX tokens report"
+    );
+  }
+}
+
+/// B6: Lease expiration edge case - expires exactly at current timestamp
+///
+/// # Corner Case
+/// Lease expires_at equals current_timestamp (millisecond precision)
+///
+/// # Expected Behavior
+/// Implementation-defined:
+/// - Option A: expires_at < now (strict) → expired
+/// - Option B: expires_at <= now (inclusive) → expired
+/// - Option C: expires_at == now (edge case) → still valid
+///
+/// Test documents actual behavior for consistency
+///
+/// # Risk
+/// MEDIUM - Edge case could cause inconsistent behavior across requests
+#[ tokio::test ]
+async fn test_lease_expiration_exact_timestamp()
+{
+  let pool = setup_test_db().await;
+  let agent_id = 405i64;
+  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let router_handshake = create_budget_router( state.clone() ).await;
+
+  // Create lease
+  let handshake_response = router_handshake
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/handshake" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "ic_token": ic_token,
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let lease_id = handshake_json["lease_id"].as_str().unwrap();
+
+  // Set lease expiration to current timestamp (edge case)
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  sqlx::query( "UPDATE budget_leases SET expires_at = ? WHERE id = ?" )
+    .bind( now_ms )
+    .bind( lease_id )
+    .execute( &pool )
+    .await
+    .expect( "LOUD FAILURE: Should update lease expiration to current timestamp" );
+
+  // Attempt to report usage at exact expiration time
+  let router_report = create_budget_router( state ).await;
+  let response = router_report
+    .oneshot(
+      Request::builder()
+        .method( "POST" )
+        .uri( "/api/budget/report" )
+        .header( "content-type", "application/json" )
+        .body( Body::from( json!({
+          "lease_id": lease_id,
+          "request_id": "req_edge_timestamp_test",
+          "tokens": 1000,
+          "cost_microdollars": 5_000_000,
+          "model": "gpt-4",
+          "provider": "openai"
+        }).to_string() ) )
+        .unwrap()
+    )
+    .await
+    .unwrap();
+
+  // Document behavior: Either 200 (still valid) or 403 (expired at exact match)
+  // Both are acceptable - test documents which behavior is implemented
+  assert!(
+    response.status() == StatusCode::OK
+      || response.status() == StatusCode::FORBIDDEN,
+    "LOUD FAILURE: Lease at exact expiration timestamp should be handled consistently (got {})",
+    response.status()
+  );
+
+  // Note: If 200, implementation treats expires_at == now as valid (strict <)
+  //       If 403, implementation treats expires_at == now as expired (<=)
+  // Either behavior is acceptable as long as consistent
 }

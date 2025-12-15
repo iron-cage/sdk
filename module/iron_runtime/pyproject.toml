@@ -1,7 +1,7 @@
 [project]
-name = "iron-cage"
+name = "iron-runtime"
 version = "0.1.0"
-description = "Iron Cage - LLM proxy with safety controls"
+description = "Iron Runtime - LLM proxy with safety controls"
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
 classifiers = [
@@ -38,7 +38,7 @@ build-backend = "maturin"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"
-module-name = "iron_cage"
+module-name = "iron_runtime"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,317 @@
+# Canonical Path Definitions
+#
+# This file defines all workspace-relative paths used by Iron Cage modules.
+# It serves as the single source of truth for file locations.
+#
+# Paths are relative to workspace root (/home/user1/pro/lib/wip_iron/iron_runtime/dev)
+# Use workspace_tools crate to resolve these paths at runtime:
+#   let ws = workspace()?;
+#   let db_path = ws.root().join(paths.databases.control_pilot);
+#
+# Format:
+# [category.subcategory]
+# path = "relative/path/from/workspace/root"
+# description = "What this path is for"
+# used_by = ["module1", "module2"]
+
+# =============================================================================
+# DATABASES
+# =============================================================================
+
+[databases]
+description = "SQLite database file locations"
+
+[databases.pilot]
+control = "iron.db"
+description = "Control API database for pilot mode"
+used_by = ["iron_control_api"]
+notes = """
+  Binary default: ./iron.db (current directory)
+  Canonical: {workspace_root}/iron.db
+  Production: Use PostgreSQL instead
+"""
+
+[databases.development]
+control = "dev_control.db"
+description = "Control API database for development mode"
+used_by = ["iron_control_api"]
+notes = """
+  Makefile override for development
+  Wiped on startup when IRON_DEPLOYMENT_MODE=development
+"""
+
+[databases.ci]
+directory = "target/test_databases"
+description = "Test database directory for CI environments"
+used_by = ["iron_test_db"]
+notes = """
+  CI stores test databases in workspace for debugging
+  Pattern: target/test_databases/{test_name}.db
+  Auto-detected via CI environment variable
+"""
+
+[databases.local]
+strategy = "tempfile"
+description = "Local development uses temporary databases"
+used_by = ["iron_test_db"]
+notes = """
+  Local development uses TempDir for auto-cleanup
+  No persistent test databases locally
+"""
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+[config]
+description = "Configuration file locations"
+
+[config.workspace]
+directory = "config"
+description = "Workspace-level configuration files"
+files = [
+  "config/environment.toml",
+  "config/secrets.toml",
+  "config/paths.toml",
+  "config/testing.toml",
+  "config/deployment.toml",
+]
+used_by = ["all"]
+
+[config.user]
+directory = "~/.config/iron-cage"
+description = "User-level configuration (global defaults)"
+used_by = ["iron_cli"]
+notes = """
+  User configuration hierarchy:
+  1. ~/.config/iron-cage/config.toml (global)
+  2. ./.iron.local.toml (project-local)
+  3. Environment variables (highest priority)
+"""
+
+[config.project]
+file = ".iron.local.toml"
+description = "Project-local configuration overrides"
+used_by = ["iron_cli", "iron_control_api"]
+notes = """
+  Git-ignored project-specific overrides
+  Useful for per-project database paths, API URLs, etc.
+"""
+
+# =============================================================================
+# SECRETS
+# =============================================================================
+
+[secrets]
+description = "Secret file locations"
+
+[secrets.workspace]
+file = "secret/workspace-secrets.sh"
+description = "Consolidated workspace secrets (single source of truth)"
+used_by = ["all"]
+notes = """
+  Replaces:
+  - secret/-iron.sh
+  - secret/-api_keys.sh
+  - dev/.env
+  - dev/module/iron_dashboard/.env
+"""
+
+[secrets.examples]
+directory = "secret"
+files = [
+  "secret/iron.example.sh",
+  "secret/api_keys.example.sh",
+  "secret/secrets.template.sh",
+]
+description = "Example secret files (documentation only)"
+used_by = []
+notes = "Maintained for onboarding and documentation"
+
+# =============================================================================
+# DATA DIRECTORIES
+# =============================================================================
+
+[data]
+description = "Runtime data and state"
+
+[data.workspace]
+directory = "data"
+description = "Workspace-level data directory"
+used_by = ["all"]
+notes = """
+  Stores:
+  - SQLite databases (pilot/development)
+  - State archives
+  - Runtime caches
+"""
+
+[data.logs]
+directory = "logs"
+description = "Application log files"
+used_by = ["iron_control_api", "iron_runtime"]
+notes = """
+  Structured logs for debugging and audit trails
+  Rotated daily, retained for 7 days (configurable)
+"""
+
+[data.workspace_metadata]
+directory = ".workspace"
+description = "Workspace metadata (workspace_tools internal)"
+used_by = ["workspace_tools"]
+notes = """
+  Stores workspace detection cache
+  Managed by workspace_tools crate
+"""
+
+# =============================================================================
+# BUILD ARTIFACTS
+# =============================================================================
+
+[build]
+description = "Build output and artifacts"
+
+[build.target]
+directory = "target"
+description = "Cargo build output"
+used_by = ["cargo"]
+notes = """
+  Standard Cargo target directory
+  Contains debug/release binaries, test artifacts
+"""
+
+[build.binaries]
+pilot = "target/debug"
+production = "target/release"
+description = "Binary output locations"
+used_by = ["iron_control_api", "iron_cli"]
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+
+[docs]
+description = "Documentation locations"
+
+[docs.workspace]
+directory = "docs"
+description = "Project documentation"
+subdirs = [
+  "docs/architecture",
+  "docs/protocol",
+  "docs/features",
+  "docs/deployment",
+  "docs/verification",
+]
+used_by = []
+
+[docs.module]
+pattern = "module/{crate_name}/docs"
+description = "Per-module documentation"
+used_by = []
+
+# =============================================================================
+# FRONTEND
+# =============================================================================
+
+[frontend]
+description = "Frontend application paths"
+
+[frontend.dashboard]
+directory = "module/iron_dashboard"
+build_output = "module/iron_dashboard/dist"
+dev_server = "http://localhost:5173"
+description = "Vue.js dashboard frontend"
+used_by = ["iron_dashboard"]
+
+# =============================================================================
+# MIGRATION NOTES
+# =============================================================================
+
+[migration]
+description = "Path migration from hardcoded to workspace-relative"
+
+[migration.phase1]
+status = "Week 2 - Path Management"
+changes = [
+  "Update iron_control_api binary to use workspace paths",
+  "Expose test database paths in iron_test_db",
+  "Create canonical path helpers in each crate",
+]
+
+[migration.from_hardcoded]
+description = "Hardcoded paths to migrate"
+
+[[migration.from_hardcoded.paths]]
+old = "./iron.db"
+new = "{workspace_root}/iron.db"
+affected = ["iron_control_api"]
+
+[[migration.from_hardcoded.paths]]
+old = "dev_control.db"
+new = "{workspace_root}/data/dev_control.db"
+affected = ["Makefile", "iron_control_api"]
+
+[[migration.from_hardcoded.paths]]
+old = "/tmp/rustXXXXXX/test.db"
+new = "{workspace_root}/target/test_databases/{test_name}.db (CI only)"
+affected = ["iron_test_db"]
+
+# =============================================================================
+# USAGE EXAMPLES
+# =============================================================================
+
+# Example 1: Database path resolution
+# ```rust
+# use workspace_tools::workspace;
+#
+# let ws = workspace()?;
+# let mode = std::env::var("IRON_DEPLOYMENT_MODE")?;
+#
+# let db_path = match mode.as_str() {
+#   "pilot" => ws.root().join("iron.db"),
+#   "development" => ws.root().join("data/dev_control.db"),
+#   "production" => {
+#     // Production should use PostgreSQL
+#     return Err("Use PostgreSQL for production".into());
+#   }
+#   _ => return Err(format!("Unknown mode: {}", mode).into()),
+# };
+# ```
+
+# Example 2: Test database path exposure
+# ```rust
+# pub struct TestDatabase {
+#   pool: SqlitePool,
+#   path: PathBuf,  // Now public for CI debugging
+#   _temp_dir: Option<TempDir>,
+# }
+#
+# pub async fn create_test_db() -> TestDatabase {
+#   let ws = workspace()?;
+#   let is_ci = std::env::var("CI").is_ok();
+#
+#   let (path, temp_dir) = if is_ci {
+#     // CI: Store in workspace for debugging
+#     let db_dir = ws.root().join("target/test_databases");
+#     std::fs::create_dir_all(&db_dir)?;
+#     (db_dir.join(format!("{}.db", test_name())), None)
+#   } else {
+#     // Local: Use tempfile
+#     let temp = TempDir::new()?;
+#     (temp.path().join("test.db"), Some(temp))
+#   };
+#
+#   TestDatabase { pool, path, _temp_dir: temp_dir }
+# }
+# ```
+
+# Example 3: Configuration loading
+# ```rust
+# let ws = workspace()?;
+# let config = ws.load_config_layered(&[
+#   "config/iron_cli.toml",           // Workspace default
+#   "~/.config/iron-cage/config.toml", // User global
+#   ".iron.local.toml",                 // Project local
+# ])?;
+# ```

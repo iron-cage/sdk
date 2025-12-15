@@ -1,12 +1,14 @@
 # tests/
 
-Contains all automated tests for iron_cage_cost.
+Contains all automated tests for iron_cost.
 
-## Organization
+## Responsibility Table
 
-Tests organized by functional area (budget tracking, enforcement, metrics).
-
-Flat structure maintained (< 20 test files expected).
+| File | Responsibility | Input→Output | Out of Scope |
+|------|----------------|--------------|--------------|
+| `budget_test.rs` | Test CostController budget tracking and enforcement | Budget operations → Validation | NOT pricing (pricing_test.rs), NOT conversions (converter_test.rs) |
+| `converter_test.rs` | Test USD/micros conversion functions | Conversion inputs → Precision validation | NOT budget logic (budget_test.rs), NOT pricing (pricing_test.rs) |
+| `pricing_test.rs` | Test PricingManager model pricing lookup | Model names → Cost calculations | NOT budget (budget_test.rs), NOT conversions (converter_test.rs) |
 
 ## Running Tests
 

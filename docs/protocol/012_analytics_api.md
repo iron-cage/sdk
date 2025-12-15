@@ -1,34 +1,67 @@
-# Protocol 012: Analytics API
+# Protocol: Analytics API
 
-**Status:** Specification
-**Version:** 1.7.0
-**Last Updated:** 2025-12-12
+### Scope
+
+This protocol defines the HTTP API for analytics event ingestion and query endpoints providing insights into agent spending, provider usage, budget status, and request patterns.
+
+#### In Scope
+
+- Event ingestion endpoint (POST /api/v1/analytics/events) for LlmRouter reporting with IC token authentication
+- 8 query endpoints answering critical questions (total spend, spend by agent, budget status, spend by provider, request count, token usage, model usage, average cost)
+- Period-based filtering (today, yesterday, last-7-days, last-30-days, all-time) across all query endpoints
+- Authorization model (users see own data, admins see all data) with role-based access control
+- Event deduplication using per-agent event_id (UNIQUE(agent_id, event_id)) preventing duplicate analytics
+- Async event processing (202 Accepted) with non-blocking ingestion for minimal latency impact
+- Cost tracking in microdollars (1 USD = 1,000,000 microdollars) for precision
+- Pagination (offset-based, default 50 items/page, max 100) and filtering (agent_id, provider_id)
+
+#### Out of Scope
+
+- Event storage implementation details (see Database Schema reference in Event Ingestion section)
+- Real-time streaming analytics (current implementation query-based)
+- Custom aggregation periods beyond 5 standard periods (Future Enhancement)
+- Event ingestion from sources other than LlmRouter (Future Enhancement)
+- Historical data export/archival (Future Enhancement)
+- Budget enforcement logic (see Protocol 005: Budget Control Protocol)
+- Agent management (see Protocol 010: Agents API)
+- Provider management (see Protocol 011: Providers API)
+
+### Purpose
+
+**User Need**: Developers need real-time visibility into agent LLM spending, token usage, and budget status to optimize costs and prevent budget exhaustion. Admins need aggregated analytics across all agents to understand provider cost breakdown, identify high-spend agents, and forecast capacity needs. Both need historical trend analysis (today, yesterday, last-7-days, last-30-days, all-time) and risk alerts when agents approach budget limits.
+
+**Solution**: This API provides event-based analytics with dual functionality: async event ingestion (POST /api/v1/analytics/events) for LlmRouter to report completed/failed LLM requests without blocking request latency, and 8 query endpoints delivering answers to critical questions about spending, usage, and budget status. Events use per-agent deduplication (UNIQUE(agent_id, event_id)) enabling idempotent retries while cost tracking uses microdollars (1 USD = 1,000,000) for precision. Period-based queries (today through all-time) with pagination and filtering (agent_id, provider_id) enable both real-time monitoring and historical analysis. Authorization separates user data (own agents only) from admin data (all agents) while rate limiting (20 req/min queries, 1000 events/min) protects database performance.
+
+**Key Insight**: Analytics requires event ingestion decoupled from query performance. By accepting events asynchronously (202 Accepted) and processing them in background, we eliminate analytics overhead from critical LLM request path. Per-agent event_id deduplication (not global) enables safe retries without duplicate charges while maintaining event namespace separation. The 8 query endpoints directly answer the questions developers ask ("How much have I spent?", "Which agents are near budget limits?", "What's the most expensive model?") rather than exposing raw events, optimizing for human decision-making over system flexibility.
 
 ---
 
-## Overview
+**Status**: Specification
+**Version**: 1.7.0
+**Last Updated**: 2025-12-14
+**Priority**: MUST-HAVE
 
-The Analytics API provides insights into agent spending, provider usage, budget status, and request patterns. Supports both event ingestion from LlmRouter and query endpoints for dashboard display.
-
-**Key characteristics:**
-- **Event ingestion:** LlmRouter reports events via POST (async, non-blocking)
-- **8 critical use cases:** Answers essential questions about spending, usage, and budget status
-- **Real-time + daily aggregations:** Supports today, yesterday, last-7-days, last-30-days, all-time
-- **Pagination:** Consistent offset pagination across all endpoints
-- **Filtering:** By agent_id and provider_id
-- **Authorization:** Users see own data, admins see all data
-- **Multi-agent:** Single database stores events from all agents, filtered by `agent_id`
-
----
-
-## Standards Compliance
+### Standards Compliance
 
 This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `agent_id`: `agent_<uuid>`
-- `provider_id`: `provider_<uuid>`
+- Analytics API uses short alphanumeric IDs for provider (IP Token) and agent identifiers to optimize performance, readability, and operational clarity
+
+- `provider_id`: `ip_<name>_<numeric>` (e.g., `ip_openai_001`, `ip_anthropic_001`)
+  - Pattern: `^ip_[a-z0-9-]+_[0-9]{3}$`
+  - Source: Protocol 011 (Providers API)
+  - Usage: IP Token identifier for provider association and cost attribution
+
+- `agent_id`: `agent_<alphanumeric>` (e.g., `agent_abc123`)
+  - Pattern: `^agent_[a-z0-9]{6,32}$`
+  - Source: Protocol 010 (Agents API)
+  - Usage: Agent identifier for analytics event association and spending attribution
+
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: User identifier for authorization checks and data filtering
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `100.00`)
@@ -46,9 +79,8 @@ This protocol adheres to the following Iron Cage standards:
 - Filtering: Query parameters for `agent_id`, `provider_id`, `period`
 - URL structure: `/api/v1/analytics/*`
 
----
 
-## Use Cases
+### Use Cases
 
 The Analytics API answers 8 critical questions:
 
@@ -61,13 +93,12 @@ The Analytics API answers 8 critical questions:
 7. **Model Usage:** "Which models are being used most?"
 8. **Average Cost:** "What's the average cost per request?"
 
----
 
-## Event Ingestion
+### Event Ingestion
 
 LlmRouter reports analytics events after each LLM request. Events are sent asynchronously (non-blocking) to avoid impacting request latency.
 
-### POST /api/v1/analytics/events
+#### POST /api/v1/analytics/events
 
 **Description:** Report LLM request events from LlmRouter to server.
 
@@ -93,7 +124,7 @@ Content-Type: application/json
   "input_tokens": 150,
   "output_tokens": 50,
   "cost_micros": 1250,
-  "provider_id": "ip_openai-001"
+  "provider_id": "ip_openai_001"
 }
 ```
 
@@ -221,7 +252,7 @@ $1.00 USD = 1,000,000 microdollars
   "event_type": "llm_request_failed",
   "model": "gpt-4o-mini",
   "provider": "openai",
-  "provider_id": "ip_openai-001",
+  "provider_id": "ip_openai_001",
   "error_code": "rate_limit_exceeded",
   "error_message": "Rate limit exceeded. Please retry after 60 seconds."
 }
@@ -239,11 +270,10 @@ $1.00 USD = 1,000,000 microdollars
 |-------|-------|--------|
 | Events per token | 1000 | 1 minute |
 
----
 
-## Query Endpoints
+### Query Endpoints
 
-### 1. Total Spending
+#### 1. Total Spending
 
 **Endpoint:** `GET /api/v1/analytics/spending/total`
 
@@ -254,7 +284,7 @@ $1.00 USD = 1,000,000 microdollars
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/total?period=today&agent_id=agent-abc123
+GET /api/v1/analytics/spending/total?period=today&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -263,7 +293,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range: `today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time` |
-| `agent_id` | integer | - | Filter by specific agent (optional) |
+| `agent_id` | string | - | Filter by specific agent (optional) |
 | `provider_id` | string | - | Filter by specific provider (optional) |
 
 **Success Response:**
@@ -298,9 +328,8 @@ Content-Type: application/json
 - **User:** See own agents' spending
 - **Admin:** See all agents' spending
 
----
 
-### 2. Spending by Agent
+#### 2. Spending by Agent
 
 **Endpoint:** `GET /api/v1/analytics/spending/by-agent`
 
@@ -320,7 +349,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent (returns single result) |
+| `agent_id` | string | - | Filter by specific agent (returns single result) |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -371,7 +400,7 @@ Content-Type: application/json
 | Field | Type | Description |
 |-------|------|-------------|
 | `data[]` | array | Agent spending records (sorted by spending desc) |
-| `data[].agent_id` | integer | Agent identifier |
+| `data[].agent_id` | string | Agent identifier |
 | `data[].agent_name` | string | Agent name |
 | `data[].spending` | number | Amount spent (USD) |
 | `data[].budget` | number | Total budget (USD) |
@@ -387,9 +416,8 @@ Content-Type: application/json
 - **User:** See own agents only
 - **Admin:** See all agents
 
----
 
-### 3. Budget Status
+#### 3. Budget Status
 
 **Endpoint:** `GET /api/v1/analytics/budget/status`
 
@@ -409,7 +437,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | integer | - | Filter agents above threshold (e.g., 80 = show agents with >80% budget used) |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `status` | string | - | Filter by status: `active`, `exhausted`, `inactive` |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -490,9 +518,8 @@ Content-Type: application/json
 - **User:** See own agents only
 - **Admin:** See all agents
 
----
 
-### 4. Spending by Provider
+#### 4. Spending by Provider
 
 **Endpoint:** `GET /api/v1/analytics/spending/by-provider`
 
@@ -512,7 +539,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider (returns single result) |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -526,7 +553,7 @@ Content-Type: application/json
 {
   "data": [
     {
-      "provider_id": "ip_openai-001",
+      "provider_id": "ip_openai_001",
       "provider_name": "openai",
       "spending": 789.45,
       "request_count": 12456,
@@ -534,7 +561,7 @@ Content-Type: application/json
       "agent_count": 8
     },
     {
-      "provider_id": "ip_anthropic-001",
+      "provider_id": "ip_anthropic_001",
       "provider_name": "anthropic",
       "spending": 456.22,
       "request_count": 9123,
@@ -575,9 +602,8 @@ Content-Type: application/json
 - **User:** See own usage only
 - **Admin:** See all usage
 
----
 
-### 5. Request Usage
+#### 5. Request Usage
 
 **Endpoint:** `GET /api/v1/analytics/usage/requests`
 
@@ -588,7 +614,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/usage/requests?period=today&agent_id=agent-abc123
+GET /api/v1/analytics/usage/requests?period=today&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -597,7 +623,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `today` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -635,9 +661,8 @@ Content-Type: application/json
 - **User:** See own data only
 - **Admin:** See all data
 
----
 
-### 6. Token Usage by Agent
+#### 6. Token Usage by Agent
 
 **Endpoint:** `GET /api/v1/analytics/usage/tokens/by-agent`
 
@@ -657,7 +682,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -722,9 +747,8 @@ Content-Type: application/json
 - **User:** See own agents only
 - **Admin:** See all agents
 
----
 
-### 7. Model Usage
+#### 7. Model Usage
 
 **Endpoint:** `GET /api/v1/analytics/usage/models`
 
@@ -744,7 +768,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
@@ -759,7 +783,7 @@ Content-Type: application/json
   "data": [
     {
       "model": "gpt-4",
-      "provider_id": "ip_openai-001",
+      "provider_id": "ip_openai_001",
       "provider_name": "openai",
       "request_count": 8945,
       "spending": 567.89,
@@ -770,7 +794,7 @@ Content-Type: application/json
     },
     {
       "model": "claude-3-opus",
-      "provider_id": "ip_anthropic-001",
+      "provider_id": "ip_anthropic_001",
       "provider_name": "anthropic",
       "request_count": 5234,
       "spending": 345.67,
@@ -817,9 +841,8 @@ Content-Type: application/json
 - **User:** See own usage only
 - **Admin:** See all usage
 
----
 
-### 8. Average Cost Per Request
+#### 8. Average Cost Per Request
 
 **Endpoint:** `GET /api/v1/analytics/spending/avg-per-request`
 
@@ -830,7 +853,7 @@ Content-Type: application/json
 **Request:**
 
 ```
-GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent-abc123
+GET /api/v1/analytics/spending/avg-per-request?period=last-30-days&agent_id=agent_abc123
 Authorization: Bearer <user-token or api-token>
 ```
 
@@ -839,7 +862,7 @@ Authorization: Bearer <user-token or api-token>
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `period` | string | `all-time` | Time range |
-| `agent_id` | integer | - | Filter by specific agent |
+| `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
 
 **Success Response:**
@@ -881,11 +904,10 @@ Content-Type: application/json
 - **User:** See own data only
 - **Admin:** See all data
 
----
 
-## Common Parameters
+### Common Parameters
 
-### Period Values
+#### Period Values
 
 | Value | Description | Time Range |
 |-------|-------------|------------|
@@ -895,7 +917,7 @@ Content-Type: application/json
 | `last-30-days` | Last 30 days | Last 30 complete days + today |
 | `all-time` | Since agent creation | From first request to now |
 
-### Pagination
+#### Pagination
 
 All list endpoints support pagination:
 
@@ -918,20 +940,19 @@ All list endpoints support pagination:
 }
 ```
 
-### Filtering
+#### Filtering
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `agent_id` | integer | Filter by specific agent |
+| `agent_id` | string | Filter by specific agent |
 | `provider_id` | string | Filter by specific provider |
 
 **Note:** Filters are optional. Omitting filters returns data for all accessible agents/providers (based on user authorization).
 
----
 
-## Error Handling
+### Error Handling
 
-### Error Codes
+#### Error Codes
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
@@ -946,7 +967,7 @@ All list endpoints support pagination:
 | `QUERY_TIMEOUT` | 504 | Query took too long (>30 seconds) |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
-### Empty Results
+#### Empty Results
 
 Analytics endpoints return 200 with empty data (not 404):
 
@@ -963,11 +984,10 @@ HTTP 200 OK
 }
 ```
 
----
 
-## Rate Limiting
+### Rate Limiting
 
-### Limits (per user)
+#### Limits (per user)
 
 | Endpoint | Limit | Window |
 |----------|-------|--------|
@@ -975,18 +995,17 @@ HTTP 200 OK
 
 **Reasoning:** Analytics queries can be expensive. 20 req/min = polling every 3 seconds, sufficient for dashboards.
 
----
 
-## Performance
+### Performance
 
-### Query Optimization
+#### Query Optimization
 
 - **Real-time data:** Calculated from live database (no caching)
 - **Daily aggregations:** Pre-calculated nightly, fast queries
 - **Indexes:** Optimized for agent_id, provider_id, timestamp filters
 - **Query timeout:** 30 seconds (returns 504 if exceeded)
 
-### Response Times
+#### Response Times
 
 | Endpoint | Target | Max |
 |----------|--------|-----|
@@ -1001,17 +1020,16 @@ HTTP 200 OK
 
 **Note:** Times for user queries (10-50 agents). Admin queries (1000+ agents) may be slower.
 
----
 
-## CLI Integration
+### CLI Integration
 
-### iron analytics spending
+#### iron analytics spending
 
 ```bash
 # Total spend
 iron analytics spending total
 iron analytics spending total --period today
-iron analytics spending total --agent agent-abc123
+iron analytics spending total --agent agent_abc123
 
 # By agent
 iron analytics spending by-agent
@@ -1021,20 +1039,20 @@ iron analytics spending by-agent --provider ip_openai_001
 # By provider
 iron analytics spending by-provider
 iron analytics spending by-provider --period last-30-days
-iron analytics spending by-provider --agent agent-abc123
+iron analytics spending by-provider --agent agent_abc123
 
 # Average cost
 iron analytics spending avg-per-request
 iron analytics spending avg-per-request --period today
 ```
 
-### iron analytics usage
+#### iron analytics usage
 
 ```bash
 # Requests
 iron analytics usage requests
 iron analytics usage requests --period today
-iron analytics usage requests --agent agent-abc123
+iron analytics usage requests --agent agent_abc123
 
 # Tokens
 iron analytics usage tokens by-agent
@@ -1046,7 +1064,7 @@ iron analytics usage models --period last-30-days
 iron analytics usage models --provider ip_openai_001
 ```
 
-### iron analytics budget
+#### iron analytics budget
 
 ```bash
 # Budget status
@@ -1056,25 +1074,102 @@ iron analytics budget status --status active
 
 # Output:
 # AGENT                 BUDGET    SPENT     REMAINING  USED    RISK
-# agent-abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
-# agent-def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
-# agent-ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
+# agent_abc123 (Prod 1) $1000.00  $956.78   $43.22     95.68%  CRITICAL
+# agent_def456 (Test)   $500.00   $434.56   $65.44     86.91%  HIGH
+# agent_ghi789 (Dev)    $100.00   $100.00   $0.00      100.00% EXHAUSTED
 #
 # Summary: 3 agents (2 active, 1 exhausted, 1 critical, 1 high)
 ```
 
----
 
-## References
+### Usage vs Analytics Endpoints
 
-**Related Protocols:**
-- [010: Agents API](010_agents_api.md) - Agent management
-- [011: Providers API](011_providers_api.md) - Provider management
-- [005: Budget Control Protocol](005_budget_control_protocol.md) - Budget enforcement
-- [002: REST API Protocol](002_rest_api_protocol.md) - General standards
+The Iron Cage API provides two distinct endpoint families for tracking usage and analytics. They serve different purposes and use different data sources.
 
----
+#### /api/usage/* - Project-Level Usage Tracking
 
-**Protocol 012 Version:** 1.5.0
-**Status:** Specification
-**Last Updated:** 2025-12-11
+**Purpose:** Simple token usage tracking at project/provider level
+
+**Data Source:** `UsageTracker` from `iron_token_manager` crate
+
+**Endpoints:**
+- `GET /api/usage/aggregate` - Aggregate usage across all projects
+- `GET /api/usage/by-project/:project_id` - Usage for specific project
+- `GET /api/usage/by-provider/:provider` - Usage for specific provider
+
+**Returns:**
+- `total_tokens` - Token count
+- `total_requests` - Request count
+- `total_cost_cents` - Cost in cents
+- `providers[]` - Provider breakdown
+
+**Authentication:** None visible (basic usage tracking)
+
+**Use Case:** Basic project-level usage reporting and cost tracking for API token usage
+
+#### /api/v1/analytics/* - Comprehensive Analytics Platform
+
+**Purpose:** Full-featured analytics with spending, budgets, agent breakdowns, and event ingestion
+
+**Data Source:** `analytics_events` table (event-based analytics)
+
+**Endpoints:**
+- `POST /api/v1/analytics/events` - Event ingestion (IC token auth)
+- `GET /api/v1/analytics/spending/*` - Spending analytics (5 endpoints)
+- `GET /api/v1/analytics/budget/status` - Budget monitoring
+- `GET /api/v1/analytics/usage/requests` - Request statistics
+- `GET /api/v1/analytics/usage/tokens/by-agent` - Token usage by agent
+- `GET /api/v1/analytics/usage/models` - Model usage
+
+**Returns:**
+- Cost in USD (converted from microdollars)
+- Period filters (`today`, `yesterday`, `last-7-days`, `last-30-days`, `all-time`)
+- Pagination support
+- Budget status and risk levels
+- Agent-level breakdowns
+
+**Authentication:** JWT authentication (user tokens) for queries, IC tokens for event ingestion
+
+**Use Case:** Dashboard analytics, budget monitoring, spending analysis, comprehensive reporting
+
+#### Key Differences
+
+| Aspect | `/api/usage/*` | `/api/v1/analytics/*` |
+|--------|----------------|----------------------|
+| **Granularity** | Project-level | Agent-level |
+| **Data Source** | UsageTracker | analytics_events table |
+| **Authentication** | None | JWT / IC tokens |
+| **Features** | Basic stats | Period filters, pagination, budgets |
+| **Cost Units** | Cents | USD (from microdollars) |
+| **Purpose** | Simple reporting | Comprehensive analytics |
+
+**When to Use:**
+- Use `/api/usage/*` for simple project-level usage tracking
+- Use `/api/v1/analytics/*` for dashboard analytics, budget monitoring, and detailed reporting
+
+
+### Cross-References
+
+#### Related Principles Documents
+
+None.
+
+#### Related Architecture Documents
+
+None.
+
+#### Used By
+
+None currently. Analytics data consumed by dashboard UI (not yet documented).
+
+#### Dependencies
+
+- Protocol 002: REST API Protocol - General REST API standards and conventions
+- Protocol 005: Budget Control Protocol - Budget limits and enforcement referenced in budget status queries
+- Protocol 010: Agents API - Agent entity for analytics event association and filtering
+- Protocol 011: Providers API - Provider entity for analytics event attribution and cost breakdown
+
+#### Implementation
+
+- `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_control_api/src/routes/analytics/` - Analytics API endpoint handlers
+- `/home/user1/pro/lib/wip_iron/iron_runtime/dev/module/iron_runtime_analytics/` - Analytics event processing and storage

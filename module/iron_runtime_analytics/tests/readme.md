@@ -10,14 +10,17 @@ The implementation follows a simple pilot strategy:
 2. **Non-Blocking:** Drop new events when full (never block main thread)
 3. **Observability:** `dropped_count` counter tracks lost events
 
-## Organization
+## Responsibility Table
 
-Tests organized by functional area:
-
-- `event_store_test.rs` - EventStore basic operations (create, record, buffer, drops)
-- `stats_test.rs` - Atomic stats and computed statistics
-- `concurrency_test.rs` - Lock-free concurrent access safety
-- `protocol_012_test.rs` - Protocol 012 Analytics API compatibility
+| File | Responsibility | Input→Output | Out of Scope |
+|------|----------------|--------------|--------------|
+| `event_store_test.rs` | Test EventStore basic operations | Store creation/recording → Operation validation | NOT concurrency (concurrency_test.rs), NOT stats (stats_test.rs), NOT sync (sync_test.rs) |
+| `stats_test.rs` | Test atomic statistics and computed stats | Event recording → Stats calculation validation | NOT event storage (event_store_test.rs), NOT concurrency (concurrency_test.rs), NOT protocol schema (protocol_012_test.rs) |
+| `concurrency_test.rs` | Test lock-free concurrent access safety | Multi-threaded operations → Thread safety validation | NOT storage operations (event_store_test.rs), NOT stats logic (stats_test.rs), NOT sync (sync_test.rs) |
+| `protocol_012_test.rs` | Test Protocol 012 Analytics API compatibility | Event schema → Protocol compliance validation | NOT stats calculation (stats_test.rs), NOT storage (event_store_test.rs), NOT sync (sync_test.rs) |
+| `recording_test.rs` | Test high-level recording API | Recording calls → Event creation validation | NOT low-level storage (event_store_test.rs), NOT stats (stats_test.rs), NOT sync (sync_test.rs) |
+| `helpers_test.rs` | Test helper functions and Provider enum | Provider strings → Provider enum validation | NOT event storage (event_store_test.rs), NOT stats (stats_test.rs), NOT recording (recording_test.rs) |
+| `sync_test.rs` | Test analytics sync to Control API | Sync operations → HTTP sync validation | NOT event storage (event_store_test.rs), NOT stats (stats_test.rs), NOT concurrency (concurrency_test.rs) |
 
 ## Running Tests
 

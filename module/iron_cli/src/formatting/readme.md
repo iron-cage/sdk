@@ -4,9 +4,9 @@
 
 | File | Responsibility |
 |------|----------------|
-| formatter.rs | Implements output formatting for all formats |
 | mod.rs | Exports formatting module public API |
 | output_format.rs | Defines output format types |
+| tree_formatter.rs | Implements tree_fmt-based output formatting |
 
 ## Validation
 

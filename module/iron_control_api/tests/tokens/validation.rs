@@ -88,7 +88,7 @@ async fn test_empty_user_id_rejected()
     "LOUD FAILURE: Empty user_id must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "user_id" ) && ( err_msg.contains( "empty" ) || err_msg.contains( "required" ) ),
     "LOUD FAILURE: Error message must indicate user_id is empty/required. Got: {}",
@@ -116,7 +116,7 @@ async fn test_empty_project_id_rejected()
     "LOUD FAILURE: Empty project_id must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "project_id" ) && err_msg.contains( "empty" ),
     "LOUD FAILURE: Error message must indicate project_id cannot be empty. Got: {}",
@@ -145,7 +145,7 @@ async fn test_description_too_long_rejected()
     "LOUD FAILURE: Description exceeding 500 chars must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "description" ) && ( err_msg.contains( "long" ) || err_msg.contains( "500" ) ),
     "LOUD FAILURE: Error message must indicate description too long. Got: {}",
@@ -218,7 +218,7 @@ async fn test_whitespace_user_id_rejected()
     "LOUD FAILURE: Whitespace-only user_id must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "user_id" ) && ( err_msg.contains( "empty" ) || err_msg.contains( "whitespace" ) ),
     "LOUD FAILURE: Error message must indicate user_id is empty/whitespace. Got: {}",
@@ -246,7 +246,7 @@ async fn test_whitespace_project_id_rejected()
     "LOUD FAILURE: Whitespace-only project_id must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "project_id" ) && ( err_msg.contains( "empty" ) || err_msg.contains( "whitespace" ) ),
     "LOUD FAILURE: Error message must indicate project_id is empty/whitespace. Got: {}",

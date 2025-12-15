@@ -11,14 +11,15 @@ use serde_json::json;
 use crate::handlers::traces_handlers;
 use super::token::{ TokenApiClient, TokenApiConfig };
 use super::keyring;
+use super::{ AdapterError, ServiceError };
 
 /// Format JSON response according to format parameter
-fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, String>
+fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, AdapterError>
 {
   match format
   {
-    "yaml" => serde_yaml::to_string( data ).map_err( |e| e.to_string() ),
-    _ => serde_json::to_string_pretty( data ).map_err( |e| e.to_string() ),
+    "yaml" => serde_yaml::to_string( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
+    _ => serde_json::to_string_pretty( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
   }
 }
 
@@ -42,15 +43,14 @@ fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, S
 /// ```
 pub async fn list_traces_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  traces_handlers::list_traces_handler( params )
-    .map_err( |e| e.to_string() )?;
+  traces_handlers::list_traces_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -83,7 +83,7 @@ pub async fn list_traces_adapter(
   let response = client
     .get( "/api/v1/traces", Some( query_params ), Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to list traces: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to list traces: {}", e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -107,15 +107,14 @@ pub async fn list_traces_adapter(
 /// ```
 pub async fn get_trace_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  traces_handlers::get_trace_handler( params )
-    .map_err( |e| e.to_string() )?;
+  traces_handlers::get_trace_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -129,7 +128,7 @@ pub async fn get_trace_adapter(
   let response = client
     .get( &path, None, Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to get trace: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to get trace: {}", e ) ) ) )?;
 
   // 6. Format output
   let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -156,15 +155,14 @@ pub async fn get_trace_adapter(
 /// ```
 pub async fn export_traces_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, String>
+) -> Result<String, AdapterError>
 {
   // 1. Validate with handler
-  traces_handlers::export_traces_handler( params )
-    .map_err( |e| e.to_string() )?;
+  traces_handlers::export_traces_handler( params )?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token()
-    .map_err( |e| format!( "Not authenticated: {}. Please run .auth.login first.", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Not authenticated: {}. Please run .auth.login first.", e ) ) ) )?;
 
   // 3. Create HTTP client
   let config = TokenApiConfig::load();
@@ -177,7 +175,7 @@ pub async fn export_traces_adapter(
   let response = client
     .get( "/api/v1/traces", Some( query_params ), Some( &access_token ) )
     .await
-    .map_err( |e| format!( "Failed to fetch traces: {}", e ) )?;
+    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Failed to fetch traces: {}", e ) ) ) )?;
 
   // 5. Handle export format
   let export_format = params.get( "export_format" ).map( |s| s.as_str() ).unwrap_or( "json" );
@@ -185,21 +183,21 @@ pub async fn export_traces_adapter(
   let export_data = match export_format
   {
     "json" => serde_json::to_string_pretty( &response )
-      .map_err( |e| format!( "Failed to serialize JSON: {}", e ) )?,
+      .map_err( |e| AdapterError::FormattingError( format!( "Failed to serialize JSON: {}", e ) ) )?,
     "csv" =>
     {
       // For CSV, convert JSON array to CSV format
       // This is a simplified implementation - full CSV support would need proper CSV library
-      return Err( "CSV export not yet implemented".to_string() );
+      return Err( AdapterError::ServiceError( ServiceError::ValidationError( "CSV export not yet implemented".to_string() ) ) );
     }
-    _ => return Err( format!( "Unsupported export format: {}", export_format ) ),
+    _ => return Err( AdapterError::ServiceError( ServiceError::ValidationError( format!( "Unsupported export format: {}", export_format ) ) ) ),
   };
 
   // 6. Write to file or stdout
   if let Some( output_file ) = params.get( "output" )
   {
     std::fs::write( output_file, &export_data )
-      .map_err( |e| format!( "Failed to write file: {}", e ) )?;
+      .map_err( |e| AdapterError::ServiceError( ServiceError::StorageError( format!( "Failed to write file: {}", e ) ) ) )?;
 
     // Return success message
     let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );

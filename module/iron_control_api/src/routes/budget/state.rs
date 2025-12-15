@@ -27,6 +27,8 @@ pub struct BudgetState
   pub provider_key_crypto: Arc< CryptoService >,
   pub db_pool: SqlitePool,
   pub jwt_secret: Arc< JwtSecret >,
+  /// Crypto service for decrypting provider keys (Feature 014)
+  pub crypto_service: Option< Arc< CryptoService > >,
 }
 
 /// Enable AuthState extraction from BudgetState
@@ -54,6 +56,7 @@ impl BudgetState
   /// * `provider_key_master` - 32-byte master key for provider key encryption/decryption
   /// * `jwt_secret` - Secret key for JWT access token signing/verification
   /// * `database_url` - Database connection string
+  /// * `crypto_service` - Optional crypto service for provider key decryption
   ///
   /// # Errors
   ///
@@ -64,6 +67,7 @@ impl BudgetState
     provider_key_master: &[ u8 ],
     jwt_secret: Arc< JwtSecret >,
     database_url: &str,
+    crypto_service: Option< Arc< CryptoService > >,
   ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let db_pool = SqlitePool::connect( database_url ).await?;
@@ -84,6 +88,7 @@ impl BudgetState
       provider_key_crypto,
       db_pool,
       jwt_secret,
+      crypto_service,
     } )
   }
 }

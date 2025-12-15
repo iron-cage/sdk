@@ -53,7 +53,8 @@ use common::create_test_tracker;
 #[ tokio::test ]
 async fn test_record_usage()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -86,7 +87,8 @@ async fn test_record_usage()
 #[ tokio::test ]
 async fn test_record_usage_with_cost()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -113,7 +115,8 @@ async fn test_record_usage_with_cost()
 #[ tokio::test ]
 async fn test_multiple_usage_records()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -149,7 +152,8 @@ async fn test_multiple_usage_records()
 #[ tokio::test ]
 async fn test_get_usage_by_provider()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -182,7 +186,8 @@ async fn test_get_usage_by_provider()
 #[ tokio::test ]
 async fn test_aggregate_token_usage()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -218,7 +223,8 @@ async fn test_aggregate_token_usage()
 #[ allow( clippy::cast_possible_truncation ) ]
 async fn test_get_usage_in_time_range()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -253,7 +259,8 @@ async fn test_get_usage_in_time_range()
 #[ tokio::test ]
 async fn test_cascade_delete_usage_on_token_delete()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -290,7 +297,8 @@ async fn test_cascade_delete_usage_on_token_delete()
 #[ tokio::test ]
 async fn test_usage_records_have_timestamps()
 {
-  let ( tracker, storage, _temp ) = create_test_tracker().await;
+  let ( tracker, storage, db ) = create_test_tracker().await;
+  core::mem::forget( db );
   let generator = TokenGenerator::new();
   let token = generator.generate();
 

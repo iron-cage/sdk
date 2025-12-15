@@ -13,83 +13,16 @@
 pub mod auth;
 pub mod budget;
 pub mod corner_cases;
-pub mod database;
 pub mod error_format;
 pub mod fixtures;
+pub mod sql_injection_helpers;
+pub mod test_db;
+pub mod source_analysis;
 pub mod test_state;
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
+use sqlx::SqlitePool;
 use axum::{ response::Response, http::StatusCode, body::Body };
 use iron_control_api::jwt_auth::{ JwtSecret, AccessTokenClaims, RefreshTokenClaims };
-
-/// Test database schema for authentication
-const TEST_SCHEMA: &str = r#"
--- Users table for authentication tests
-CREATE TABLE IF NOT EXISTS users
-(
-  id TEXT PRIMARY KEY,
-  username TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user',
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL,
-  email TEXT,
-  last_login INTEGER,
-  suspended_at INTEGER,
-  suspended_by INTEGER,
-  deleted_at INTEGER,
-  deleted_by INTEGER,
-  force_password_change INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-
--- Refresh token blacklist for logout tests
-CREATE TABLE IF NOT EXISTS token_blacklist
-(
-  jti TEXT PRIMARY KEY CHECK (LENGTH(jti) > 0 AND LENGTH(jti) <= 255),
-  user_id TEXT NOT NULL,
-  blacklisted_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
-
--- User audit log for user management tests
-CREATE TABLE IF NOT EXISTS user_audit_log
-(
-  id TEXT PRIMARY KEY,
-  operation TEXT NOT NULL,
-  target_user_id TEXT NOT NULL,
-  performed_by TEXT NOT NULL,
-  timestamp INTEGER NOT NULL,
-  previous_state TEXT,
-  new_state TEXT,
-  reason TEXT,
-  FOREIGN KEY(target_user_id) REFERENCES users(id),
-  FOREIGN KEY(performed_by) REFERENCES users(id)
-);
-"#;
-
-/// Create in-memory SQLite database with test schema applied.
-///
-/// Uses real database (not mocked) to catch integration issues.
-pub async fn create_test_database() -> SqlitePool
-{
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( "sqlite::memory:?cache=shared" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create in-memory database" );
-
-  // Apply test schema
-  sqlx::raw_sql( TEST_SCHEMA )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to apply test schema" );
-
-  pool
-}
 
 /// Create admin user with credentials
 #[allow(dead_code)]
@@ -298,23 +231,11 @@ mod tests
   use super::*;
 
   #[ tokio::test ]
-  async fn test_create_test_database()
-  {
-    let pool = create_test_database().await;
-
-    // Verify schema was applied
-    let result = sqlx::query( "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'" )
-      .fetch_one( &pool )
-      .await;
-
-    assert!( result.is_ok(), "Users table should exist" );
-  }
-
-  #[ tokio::test ]
   async fn test_create_test_user()
   {
-    let pool = create_test_database().await;
-    let ( user_id, password_hash ) = create_test_user( &pool, "testuser" ).await;
+    let db = test_db::create_test_db().await;
+    let pool = db.pool();
+    let ( user_id, password_hash ) = create_test_user( pool, "testuser" ).await;
 
     assert!( !user_id.is_empty(), "User ID should not be empty" );
     assert!( !password_hash.is_empty() );
@@ -322,7 +243,7 @@ mod tests
     // Verify user was inserted
     let count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users WHERE id = ?" )
       .bind( user_id )
-      .fetch_one( &pool )
+      .fetch_one( pool )
       .await
       .expect("LOUD FAILURE: Should query users");
 

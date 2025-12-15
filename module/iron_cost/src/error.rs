@@ -14,6 +14,8 @@ pub enum CostError {
         available_microdollars: i64,
         requested_microdollars: i64,
     },
+    /// JSON parsing error in pricing data
+    JsonParseError(String),
 }
 
 impl std::fmt::Display for CostError {
@@ -35,6 +37,9 @@ impl std::fmt::Display for CostError {
                     *available_microdollars as f64 / 1_000_000.0,
                     *requested_microdollars as f64 / 1_000_000.0
                 )
+            }
+            Self::JsonParseError(msg) => {
+                write!(f, "Failed to parse pricing JSON: {}", msg)
             }
         }
     }

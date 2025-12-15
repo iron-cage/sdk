@@ -1,12 +1,13 @@
 # tests/
 
-Contains all automated tests for iron_cage_reliability.
+Contains all automated tests for iron_reliability.
 
-## Organization
+## Responsibility Table
 
-Tests organized by functional area (circuit breakers, retry logic, health monitoring).
-
-Flat structure maintained (< 20 test files expected).
+| File | Responsibility | Input→Output | Out of Scope |
+|------|----------------|--------------|--------------|
+| `circuit_breaker_test.rs` | Test circuit breaker state transitions and failure thresholds | Failure scenarios → Circuit state validation | NOT retry logic (future), NOT health monitoring (future) |
+| `readme_example_test.rs` | Test readme code examples for correctness | Example code → Execution validation | NOT circuit breaker internals (circuit_breaker_test.rs) |
 
 ## Running Tests
 

@@ -215,100 +215,122 @@ fn route_to_handler(
     ".auth.login" =>
     {
       runtime.block_on( iron_cli::adapters::auth_adapters::login_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".auth.refresh" =>
     {
       runtime.block_on( iron_cli::adapters::auth_adapters::refresh_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".auth.logout" =>
     {
       runtime.block_on( iron_cli::adapters::auth_adapters::logout_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Token commands
     ".tokens.generate" =>
     {
       runtime.block_on( iron_cli::adapters::token_adapters::generate_token_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".tokens.list" =>
     {
       runtime.block_on( iron_cli::adapters::token_adapters::list_tokens_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".tokens.get" =>
     {
       runtime.block_on( iron_cli::adapters::token_adapters::get_token_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".tokens.rotate" =>
     {
       runtime.block_on( iron_cli::adapters::token_adapters::rotate_token_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".tokens.revoke" =>
     {
       runtime.block_on( iron_cli::adapters::token_adapters::revoke_token_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Usage commands
     ".usage.show" =>
     {
       runtime.block_on( iron_cli::adapters::usage_adapters::show_usage_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".usage.by_project" =>
     {
       runtime.block_on( iron_cli::adapters::usage_adapters::get_usage_by_project_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".usage.by_provider" =>
     {
       runtime.block_on( iron_cli::adapters::usage_adapters::get_usage_by_provider_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".usage.export" =>
     {
       runtime.block_on( iron_cli::adapters::usage_adapters::export_usage_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Limits commands
     ".limits.list" =>
     {
       runtime.block_on( iron_cli::adapters::limits_adapters::show_limits_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".limits.get" =>
     {
       runtime.block_on( iron_cli::adapters::limits_adapters::get_limit_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".limits.create" =>
     {
       runtime.block_on( iron_cli::adapters::limits_adapters::create_limit_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".limits.update" =>
     {
       runtime.block_on( iron_cli::adapters::limits_adapters::update_limit_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".limits.delete" =>
     {
       runtime.block_on( iron_cli::adapters::limits_adapters::delete_limit_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Traces commands
     ".traces.list" =>
     {
       runtime.block_on( iron_cli::adapters::traces_adapters::list_traces_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".traces.get" =>
     {
       runtime.block_on( iron_cli::adapters::traces_adapters::get_trace_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".traces.export" =>
     {
       runtime.block_on( iron_cli::adapters::traces_adapters::export_traces_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Health commands (using actual YAML command names)
     ".health" =>
     {
       runtime.block_on( iron_cli::adapters::health_adapters::health_check_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
     ".version" =>
     {
       runtime.block_on( iron_cli::adapters::health_adapters::version_adapter( params ) )
+        .map_err( |e| e.to_string() )
     }
 
     // Default: Command not implemented

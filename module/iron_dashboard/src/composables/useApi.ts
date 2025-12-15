@@ -125,6 +125,52 @@ interface AssignProviderRequest {
   provider_key_id: number
 }
 
+// Budget Request Workflow types
+interface BudgetRequest {
+  id: string
+  agent_id: number
+  requester_id: string
+  current_budget_usd: number
+  requested_budget_usd: number
+  justification: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  created_at: number
+  updated_at: number
+}
+
+interface CreateBudgetRequestRequest {
+  agent_id: number
+  requester_id: string
+  requested_budget_usd: number
+  justification: string
+}
+
+interface CreateBudgetRequestResponse {
+  request_id: string
+  status: string
+  created_at: number
+}
+
+interface ListBudgetRequestsResponse {
+  requests: BudgetRequest[]
+}
+
+interface ApproveBudgetRequestResponse {
+  request_id: string
+  status: string
+  approved_at: number
+}
+
+interface RejectBudgetRequestRequest {
+  rejection_reason: string
+}
+
+interface RejectBudgetRequestResponse {
+  request_id: string
+  status: string
+  rejected_at: number
+}
+
 export function useApi() {
   const authStore = useAuthStore()
 
@@ -470,6 +516,65 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
   }
 
+  // ============================================================================
+  // Budget Request Workflow API
+  // ============================================================================
+
+  async function createBudgetRequest(
+    data: CreateBudgetRequestRequest
+  ): Promise<CreateBudgetRequestResponse> {
+    return fetchApi<CreateBudgetRequestResponse>('/api/v1/budget/requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function getBudgetRequest(requestId: string): Promise<BudgetRequest> {
+    return fetchApi<BudgetRequest>(`/api/v1/budget/requests/${requestId}`)
+  }
+
+  async function listBudgetRequests(filters?: {
+    status?: string
+    requester_id?: string
+    start_date?: number
+    end_date?: number
+  }): Promise<ListBudgetRequestsResponse> {
+    const params = new URLSearchParams()
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.requester_id) params.append('requester_id', filters.requester_id)
+    if (filters?.start_date) params.append('start_date', String(filters.start_date))
+    if (filters?.end_date) params.append('end_date', String(filters.end_date))
+    const query = params.toString()
+    return fetchApi<ListBudgetRequestsResponse>(
+      `/api/v1/budget/requests${query ? `?${query}` : ''}`
+    )
+  }
+
+  async function approveBudgetRequest(
+    requestId: string
+  ): Promise<ApproveBudgetRequestResponse> {
+    return fetchApi<ApproveBudgetRequestResponse>(
+      `/api/v1/budget/requests/${requestId}/approve`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({}),
+      }
+    )
+  }
+
+  async function rejectBudgetRequest(
+    requestId: string,
+    data: RejectBudgetRequestRequest
+  ): Promise<RejectBudgetRequestResponse> {
+    return fetchApi<RejectBudgetRequestResponse>(
+      `/api/v1/budget/requests/${requestId}/reject`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    )
+  }
+
   return {
     getTokens,
     getToken,
@@ -515,6 +620,12 @@ export function useApi() {
     getAnalyticsSpendingByProvider,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
+    // Budget Request Workflow
+    createBudgetRequest,
+    getBudgetRequest,
+    listBudgetRequests,
+    approveBudgetRequest,
+    rejectBudgetRequest,
   }
 }
 
@@ -559,6 +670,13 @@ export type {
   CreateProviderKeyRequest,
   UpdateProviderKeyRequest,
   AssignProviderRequest,
+  BudgetRequest,
+  CreateBudgetRequestRequest,
+  CreateBudgetRequestResponse,
+  ListBudgetRequestsResponse,
+  ApproveBudgetRequestResponse,
+  RejectBudgetRequestRequest,
+  RejectBudgetRequestResponse,
 }
 
 // ============================================================================

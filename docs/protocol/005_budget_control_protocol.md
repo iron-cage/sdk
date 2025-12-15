@@ -1,25 +1,33 @@
-# Protocol 005: Budget Control Protocol
+# Protocol: Budget Control Protocol
 
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
-**Priority:** MUST-HAVE
+### Scope
 
----
+This protocol defines how Iron Runtime and Control Panel communicate to enforce budget limits without exposing provider API keys. It implements a two-token system (IC Token for authentication, IP Token for provider access) with budget borrowing via a tranche model, enabling secure budget-controlled LLM access.
+
+#### In Scope
+- Token handshake and budget initialization
+- Budget borrowing lifecycle (borrow → spend → refresh → return)
+- Usage reporting and cost tracking
+- IP Token encryption format (AES-256-GCM)
+- Security model and threat mitigation
+- Multi-layer enforcement strategy (database, token distinguishability, API)
+- Implementation variants (pilot per-request vs production batched reporting)
+- Failure handling and retry logic
+
+#### Out of Scope
+- Admin budget allocation UI (see Control Panel user guide)
+- Provider pricing rate calculations (see billing documentation)
+- LLM request routing and model selection (see Runtime architecture docs)
+- Agent creation and lifecycle (see Protocol 010: Agents API)
+- User authentication (see Protocol 007: Authentication API)
 
 ### Purpose
 
-Define how runtime and Control Panel communicate to enforce budget limits without exposing provider tokens.
+**User Need**: Developers need budget-controlled LLM access without handling provider API keys directly. Admins need centralized budget control and real-time monitoring to prevent overspending and ensure secure credential management.
 
----
+**Solution**: This protocol implements a two-token system (IC Token for authentication, IP Token for provider access) with budget borrowing via a tranche model. The agent borrows budget tranches from Control Panel, spends them locally during LLM requests, and returns unused credit on shutdown. This "Dashboard as Bank" model ensures budget enforcement without exposing provider credentials to developers.
 
-## User Need
-
-Developers need budget-controlled LLM access without handling provider API keys directly. Admins need centralized budget control and real-time monitoring.
-
-## Core Idea
-
-**Two-token system with budget borrowing (tranche model):**
+**Two-token architecture:**
 
 ```
 Admin (Control Panel)          Developer (Runtime)
@@ -47,21 +55,37 @@ Admin (Control Panel)          Developer (Runtime)
          |     (credit back to budget)  |
 ```
 
-**Dashboard as Bank:** Agent borrows tranches, spends locally, returns unused on shutdown.
+**Key Insight**: Developer NEVER sees provider credentials. The Runtime acts as a secure proxy that receives encrypted IP Tokens, uses them to access LLM providers on behalf of the developer, and reports usage back to Control Panel for budget tracking. This credential isolation is the core security guarantee of Iron Cage.
 
-## Standards Compliance
+---
+
+**Status**: Specification
+**Version**: 1.0.0
+**Last Updated**: 2025-12-14
+**Priority**: MUST-HAVE
+
+### Standards Compliance
 
 This protocol adheres to the following Iron Cage standards:
 
 **ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `agent_id`: `agent_<uuid>` (e.g., `agent_550e8400-e29b-41d4-a716-446655440000`)
-- `budget_id`: `budget_<uuid>` (e.g., `budget_7c9e6679-7425-40de-944b-e07fc1f90ae7`)
-- `lease_id`: `lease_<uuid>` (e.g., `lease_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d`)
+- Budget protocol uses short alphanumeric IDs for performance and readability
+- `agent_id`: `agent_<alphanumeric>` (e.g., `agent_abc123`)
+  - Pattern: `^agent_[a-z0-9]{6,32}$`
+  - Source: Protocol 010 (Agents API)
+  - Usage: Agent identifier for budget allocation and lease tracking
+- `budget_id`: `budget_<alphanumeric>` (e.g., `budget_xyz789`)
+  - Pattern: `^budget_[a-z0-9]{6,32}$`
+  - Source: Protocol 005 (Budget Control Protocol) - defined here
+  - Usage: Budget allocation identifier for agent budget tracking
+- `lease_id`: `lease_<numeric>` (e.g., `lease_001`, `lease_002`)
+  - Pattern: `^lease_[0-9]{3,6}$`
+  - Source: Protocol 005 (Budget Control Protocol) - defined here
+  - Usage: Sequential lease identifier for budget tranche tracking
 
 **Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
 - Currency amounts: Decimal with exactly 2 decimal places (e.g., `10.00`, `9.15`)
-- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-14T10:30:45.123Z`)
 - Unix timestamps: Seconds since epoch for `issued_at`, `expires_at` claims
 
 **Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
@@ -69,7 +93,7 @@ This protocol adheres to the following Iron Cage standards:
 - Machine-readable error codes: `BUDGET_EXCEEDED`, `INVALID_TOKEN`, `HANDSHAKE_FAILED`
 - Consistent JSON structure with `error.code` and `error.message` fields
 
-## When This Protocol Applies
+### When This Protocol Applies
 
 **Universal Application:** This protocol is used in ALL deployment scenarios. Control Panel is always present as standalone admin service managing developer budgets. There is no "self-managed" mode without Control Panel.
 
@@ -84,7 +108,14 @@ This protocol adheres to the following Iron Cage standards:
 - Production: Control Panel manages distributed agents
 - Future: Local emulation service may implement same protocol
 
-## IC Token 1:1 Relationship
+### The Two Tokens
+
+**Token Architecture:**
+
+| Token | Visible To | Stored | Purpose |
+|-------|-----------|--------|---------|
+| **IC Token** | Developer | Plaintext on disk | Budget ID, authentication with Control Panel, 1:1 with agent |
+| **IP Token** | Runtime only | Encrypted in memory | Actual LLM provider API key |
 
 **Critical Design:** One Agent = One IC Token (strict 1:1 relationship)
 
@@ -94,7 +125,7 @@ This protocol adheres to the following Iron Cage standards:
 - Agent has exactly one Agent Budget (1:1, restrictive)
 - Agent can have multiple IPs (developer selects which to use)
 
-## Budget Types
+**Budget Types:**
 
 **Restrictive Budget (ONLY ONE):**
 - **Agent Budget:** Blocks requests when exceeded. This is the ONLY budget that enforces limits.
@@ -106,14 +137,32 @@ This protocol adheres to the following Iron Cage standards:
 
 **Key Point:** Agents are the ONLY way to control budget. Project/IP/Master budgets are for monitoring only.
 
-## The Two Tokens
+### Version Compatibility
 
-| Token | Visible To | Stored | Purpose |
-|-------|-----------|--------|---------|
-| **IC Token** | Developer | Plaintext on disk | Budget ID, authentication with Control Panel, 1:1 with agent |
-| **IP Token** | Runtime only | Encrypted in memory | Actual LLM provider API key |
+**Current Version:** 1.0.0
 
-**Key insight:** Developer NEVER sees provider credentials. Runtime acts as secure proxy.
+**Backward Compatibility Policy:**
+- Minor version changes (1.0 → 1.1): Backward compatible, runtime continues working
+- Major version changes (1.x → 2.0): Breaking changes, runtime upgrade required
+- Protocol version negotiated during handshake (`runtime_version` field)
+
+**Runtime Version Requirements:**
+- Runtime must send `runtime_version` in `INIT_BUDGET_REQUEST`
+- Control Panel validates compatibility and returns error if unsupported
+- Error response: `{"error": "incompatible_version", "required": "1.x", "provided": "0.9.0"}`
+
+**Migration Path (Future Major Versions):**
+1. Control Panel announces deprecation timeline (minimum 90 days)
+2. Control Panel supports both versions during transition period
+3. Runtime detects version mismatch and displays upgrade instructions
+4. Developers update runtime to compatible version
+
+**Version Change Log:**
+- **1.0.0** (2025-12-14): Initial protocol specification
+  - Two-token system (IC Token + IP Token)
+  - Budget borrowing with tranche model
+  - AES-256-GCM encryption for IP Tokens
+  - Multi-layer enforcement strategy
 
 ### IC Token Format (JWT Structure)
 
@@ -138,7 +187,7 @@ This protocol adheres to the following Iron Cage standards:
 | Claim | Type | Format | Example | Purpose |
 |-------|------|--------|---------|---------|
 | `agent_id` | string | `^agent_[a-z0-9]{6,32}$` | "agent_abc123" | Unique agent identifier |
-| `budget_id` | string | `^budget-[a-z0-9]{6,32}$` | "budget_xyz789" | Links to budget allocation |
+| `budget_id` | string | `^budget_[a-z0-9]{6,32}$` | "budget_xyz789" | Links to budget allocation |
 | `issued_at` | number | Unix timestamp (seconds) | 1702123456 | Token creation time |
 | `expires_at` | number or null | Unix timestamp or null | null | Optional expiration (null = long-lived, no auto-expiration) |
 | `issuer` | string | Literal "iron-control-panel" | "iron-control-panel" | Token source validation |
@@ -152,9 +201,9 @@ This protocol adheres to the following Iron Cage standards:
 
 **Lifetime:** Until agent deleted or IC Token regenerated (long-lived, no auto-expiration)
 
-## Budget Borrowing Protocol
+### Budget Borrowing Protocol
 
-### Step 1: Initialization (Token Handshake)
+#### Step 1: Initialization (Token Handshake)
 
 **Message 1: INIT_BUDGET_REQUEST**
 
@@ -253,7 +302,7 @@ plaintext.zeroize();
 - Lease ID: "lease_001"
 - Ready to process LLM calls
 
-### Step 2: Request Execution
+#### Step 2: Request Execution
 
 **Token Translation (< 1ms):**
 ```
@@ -325,7 +374,7 @@ Content-Type: application/json
 - Async send: 0ms perceived latency (doesn't block agent)
 - Actual network: ~5-20ms (happens in background)
 
-### Step 3: Budget Refresh
+#### Step 3: Budget Refresh
 
 **Trigger:** `remaining_budget < $1.00` threshold
 
@@ -402,7 +451,7 @@ Content-Type: application/json
 - If approved: Add $10 to local budget, continue processing
 - If denied: Stop accepting new LLM calls, return Error::BudgetExhausted to agent
 
-### Step 4: Budget Return (Tranche Return)
+#### Step 4: Budget Return (Tranche Return)
 
 **Trigger:** Runtime shutdown or agent stop
 
@@ -466,7 +515,7 @@ Content-Type: application/json
 - Call on graceful shutdown
 - Best effort on crash (may lose unused budget)
 
-## Budget Overshoot Prevention
+#### Budget Overshoot Prevention
 
 **Local check (fast):**
 ```
@@ -480,7 +529,7 @@ if local_budget_remaining < estimated_cost:
 - Refresh denied if allocation exceeded
 - Admin can increase allocation in real-time
 
-## Security Model
+### Security Model
 
 **IP Token protection:**
 - Encrypted with AES-256 in runtime memory
@@ -494,7 +543,7 @@ if local_budget_remaining < estimated_cost:
 - Memory dump attack: IP Token encrypted, key unavailable outside process
 - Disk forensics: No IP Token on disk
 
-## Protocol Exclusivity: Enforcement Strategy
+### Protocol Exclusivity: Enforcement Strategy
 
 **Critical Requirement:** Protocol 005 must be the ONLY way for agents to access LLM provider credentials. Any bypass path violates the budget control guarantee.
 
@@ -622,9 +671,9 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 **Pitfall:** Always verify exclusive access patterns with database constraints AND API-level checks. Database constraints alone are insufficient if the API allows unauthorized paths. Both layers must enforce the same invariant.
 
-## Implementation Variants
+### Implementation Variants
 
-### Pilot Implementation (Per-Request Reporting)
+#### Pilot Implementation (Per-Request Reporting)
 
 **Characteristics:**
 - Cost reporting after every LLM call
@@ -646,7 +695,7 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 **Trade-off:** Simple implementation (no buffering logic) vs higher overhead
 
-### Production Implementation (Batched Reporting)
+#### Production Implementation (Batched Reporting)
 
 **Characteristics:**
 - Cost reporting batched every 10 requests
@@ -669,7 +718,9 @@ cargo test --test protocol_005_enforcement_simple --all-features
 
 **See:** [constraints/004: Trade-offs](../constraints/004_trade_offs.md#cost-vs-reliability) for decision rationale.
 
-## Failure Handling
+---
+
+### Failure Handling
 
 | Scenario | Behavior |
 |----------|----------|
@@ -677,8 +728,6 @@ cargo test --test protocol_005_enforcement_simple --all-features
 | Budget refresh fails | Block new requests, return error |
 | IP Token decrypt fails | Fatal error, runtime shutdown |
 | Usage report fails | Retry 3x, then cache locally |
-
----
 
 ### Cross-References
 

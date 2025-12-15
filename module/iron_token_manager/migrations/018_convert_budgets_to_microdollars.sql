@@ -15,6 +15,7 @@
 --
 -- - budget_leases: budget_granted, budget_spent, returned_amount
 -- - agent_budgets: total_allocated, total_spent, budget_remaining
+-- - usage_limits: max_cost_cents_per_month, current_cost_cents_this_month (renamed to microdollars)
 
 -- Check if migration already applied
 CREATE TABLE IF NOT EXISTS _migration_018_completed (applied_at INTEGER NOT NULL);
@@ -104,3 +105,64 @@ FROM agent_budgets;
 -- Drop old table and rename new table
 DROP TABLE agent_budgets;
 ALTER TABLE agent_budgets_new RENAME TO agent_budgets;
+
+-- ============================================================================
+-- PART 3: Convert usage_limits table from cents to microdollars
+-- ============================================================================
+-- 1 cent = 10,000 microdollars (1 cent = $0.01 = 10,000 microdollars)
+
+-- Create temporary table with new schema
+CREATE TABLE IF NOT EXISTS usage_limits_new
+(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  project_id TEXT,
+
+  -- Limit types (renamed from cents to microdollars)
+  max_tokens_per_day INTEGER,
+  max_requests_per_minute INTEGER,
+  max_cost_microdollars_per_month INTEGER,  -- Changed from cents to microdollars
+
+  -- Current usage counters
+  current_tokens_today INTEGER NOT NULL DEFAULT 0,
+  current_requests_this_minute INTEGER NOT NULL DEFAULT 0,
+  current_cost_microdollars_this_month INTEGER NOT NULL DEFAULT 0,  -- Changed from cents to microdollars
+
+  -- Reset timestamps
+  tokens_reset_at INTEGER,
+  requests_reset_at INTEGER,
+  cost_reset_at INTEGER,
+
+  -- Timestamps
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+
+  CONSTRAINT user_project_unique UNIQUE( user_id, project_id )
+);
+
+-- Copy data from old table to new table (convert cents to microdollars: * 10000)
+INSERT INTO usage_limits_new
+(
+  id, user_id, project_id,
+  max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month,
+  current_tokens_today, current_requests_this_minute, current_cost_microdollars_this_month,
+  tokens_reset_at, requests_reset_at, cost_reset_at,
+  created_at, updated_at
+)
+SELECT
+  id, user_id, project_id,
+  max_tokens_per_day, max_requests_per_minute,
+  CASE WHEN max_cost_cents_per_month IS NULL THEN NULL ELSE max_cost_cents_per_month * 10000 END,
+  current_tokens_today, current_requests_this_minute,
+  current_cost_cents_this_month * 10000,
+  tokens_reset_at, requests_reset_at, cost_reset_at,
+  created_at, updated_at
+FROM usage_limits;
+
+-- Drop old table and rename new table
+DROP TABLE usage_limits;
+ALTER TABLE usage_limits_new RENAME TO usage_limits;
+
+-- Recreate indexes
+CREATE INDEX IF NOT EXISTS idx_usage_limits_user_id ON usage_limits( user_id );
+CREATE INDEX IF NOT EXISTS idx_usage_limits_project_id ON usage_limits( project_id );

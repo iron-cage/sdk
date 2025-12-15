@@ -28,19 +28,22 @@
 
 use crate::common::test_state::create_test_auth_state;
 use iron_control_api::routes::auth;
-use axum::{ Router, routing::post, http::{ Request, StatusCode } };
+use axum::{ Router, routing::post, http::{ Request, StatusCode }, extract::ConnectInfo };
 use axum::body::Body;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower::ServiceExt;
 
 /// Create test router with auth routes.
 async fn create_test_router() -> Router
 {
   let auth_state = create_test_auth_state().await;
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
   Router::new()
     .route( "/api/auth/login", post( auth::login ) )
     .route( "/api/auth/refresh", post( auth::refresh ) )
     .route( "/api/auth/logout", post( auth::logout ) )
+    .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state( auth_state )
 }
 

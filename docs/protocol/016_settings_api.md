@@ -1,40 +1,103 @@
-# Protocol 016: Settings API
+# Protocol: Settings API
 
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
-**Priority:** POST-PILOT
+### Scope
+
+#### In Scope
+
+- User-level settings (personal preferences)
+- Project-level settings (project defaults and configurations)
+- System-level settings (global defaults)
+- Settings hierarchy and inheritance (system → project → user)
+- Partial update support (PATCH-like behavior with PUT)
+- Settings categories (Display, Notifications, Operational, Security)
+- Authorization by role (Admin for system, Owner/Admin for project, any user for own settings)
+- Settings validation and type checking
+- Audit logging for all settings changes
+
+#### Out of Scope
+
+- Settings versioning and history (POST-PILOT feature)
+- Settings templates or presets (POST-PILOT feature)
+- Bulk settings import/export (POST-PILOT feature)
+- Settings diff/comparison tools (POST-PILOT feature)
+- Settings rollback functionality (POST-PILOT feature)
+- Cross-project settings replication (POST-PILOT feature)
+- Notification delivery (covered by separate notification service)
+- Actual enforcement of settings values (enforced by respective APIs)
+
+### Purpose
+
+**User Need:** Users need ability to customize their experience through personal preferences (UI theme, notifications, defaults), while project owners need project-level configuration (budget defaults, provider settings, team policies), and administrators need system-wide control over operational parameters, security policies, and resource limits. These settings must cascade hierarchically (system → project → user) to provide sensible defaults while allowing local overrides.
+
+**Solution:** Protocol 016 provides three-tier settings hierarchy with 7 endpoints: users manage personal preferences (GET/PUT/DELETE /api/v1/settings/user), project owners configure project settings (GET/PUT /api/v1/settings/project/{id}), and administrators control system defaults (GET/PUT /api/v1/settings/system). All update endpoints support partial updates (only specified fields modified), settings cascade through inheritance chain with tracking of source level (system/project/user), and comprehensive validation ensures setting values meet type and range constraints.
+
+**Key Insight:** The hierarchical settings model separates concerns across three distinct needs: system administrators define organizational policy (security, limits, defaults), project owners configure team-specific behavior (budgets, providers, notifications), and users personalize their interface (theme, layout, alerts). This separation enables both top-down governance (admin enforces password policy) and bottom-up customization (user chooses dark theme) within the same framework. The inheritance tracking ("this setting came from project level") provides transparency and helps users understand why settings have certain values.
 
 ---
 
-## Overview
+**Status:** POST-PILOT (Specification)
+**Version:** 1.0.0
+**Last Updated:** 2025-12-14
+**Priority:** POST-PILOT
 
-The Settings API provides endpoints for managing system-wide, project-level, and user-level configuration settings in the Iron Control Panel. This API is planned for POST-PILOT implementation and enables customization of default behaviors, notification preferences, display options, and operational parameters.
+### Standards Compliance
 
-**Note**: This specification describes the complete Settings API for future implementation. In the Pilot phase, settings are hardcoded and not exposed via API.
+This protocol defines the following ID formats:
 
-## Key Concepts
+- `user_id`: `user_<alphanumeric>` (e.g., `user_abc123`, `user_admin001`)
+  - Pattern: `^user_[a-z0-9_]{3,32}$`
+  - Source: Protocol 007 (Authentication API)
+  - Usage: User identifier for user settings and audit logs
+
+- `project_id`: `proj_<alphanumeric>` (e.g., `proj_master_001`)
+  - Pattern: `^proj_[a-z0-9_]{3,32}$`
+  - Source: Protocol 015 (Projects API)
+  - Usage: Project identifier for project settings scope
+  - Master Project ID: `proj_master_001` (constant in Pilot phase)
+
+**Data Format Standards:**
+- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45Z`)
+- Booleans: JSON boolean `true`/`false` (not strings)
+- Numeric ranges: Validated against documented min/max values
+- Currency: Decimal numbers with 2 decimal places (e.g., `100.00`)
+- Settings values: Type varies by setting (string, number, boolean, object, array)
+
+**Error Format Standards:**
+- Consistent error response structure with `error.code` and `error.message`
+- Optional `error.field` for validation errors (dot-notation path)
+- HTTP status codes: 200, 400, 401, 403, 404
+
+**API Design Standards:**
+- URL structure: `/api/v1/settings/{scope}` where scope is user|project|system
+- Partial updates: Only specified fields modified (PATCH-like with PUT)
+- Inheritance tracking: Response includes source level for each setting
 
 ### Settings Hierarchy
+
 Settings are organized in three scopes with inheritance:
 
-1. **System Settings** (Global)
-   - Administrator-only configuration
-   - Default values for all projects
-   - Examples: Max agents per project, allowed provider types, rate limits
+#### System Settings (Global)
 
-2. **Project Settings** (Project-scoped)
-   - Owner/Admin can configure
-   - Override system defaults for specific project
-   - Examples: Default agent budget, max agents per user, notification preferences
+- Administrator-only configuration
+- Default values for all projects
+- Examples: Max agents per project, allowed provider types, rate limits, security policies
 
-3. **User Settings** (User-scoped)
-   - User-specific preferences
-   - Override project defaults for individual user
-   - Examples: UI theme, email notifications, dashboard layout
+#### Project Settings (Project-scoped)
 
-### Settings Inheritance
+- Owner/Admin can configure
+- Override system defaults for specific project
+- Examples: Default agent budget, max agents per user, notification preferences, provider configurations
+
+#### User Settings (User-scoped)
+
+- User-specific preferences
+- Override project defaults for individual user
+- Examples: UI theme, email notifications, dashboard layout, timezone
+
+#### Settings Inheritance Chain
+
 Settings cascade from system → project → user:
+
 ```
 System Default: max_agents_per_user = 20
   ↓
@@ -43,88 +106,33 @@ Project Override: max_agents_per_user = 10
 User Setting: (inherits project value = 10)
 ```
 
-### Settings Categories
+Each GET response includes `inheritance` object tracking source level for each setting.
 
-**Operational Settings**:
-- Default agent budget
-- Max agents per user
-- Auto-pause thresholds
-- Budget alert levels
+### Endpoints
 
-**Notification Settings**:
-- Email notifications (budget alerts, agent status)
-- Webhook URLs for events
-- Notification frequency (immediate, daily digest, weekly)
-
-**Display Settings**:
-- UI theme (light, dark, auto)
-- Dashboard layout preferences
-- Default date ranges for analytics
-- Currency display format
-
-**Security Settings**:
-- Session timeout duration
-- API token expiration policy
-- IP whitelist for API access
-- Two-factor authentication requirements
-
-## Base URL
-
-```
-https://api.iron-control.example.com/api/v1
-```
-
-## Authentication
-
-All endpoints require authentication via:
-- **User Token**: Short-lived session token from login
-- **API Token**: Persistent authentication token
-
-Authorization varies by settings scope:
-- **System Settings**: Admin only
-- **Project Settings**: Owner or Admin
-- **User Settings**: Any authenticated user (own settings only)
-
-## Standards Compliance
-
-This protocol adheres to the following Iron Cage standards:
-
-**ID Format Standards** ([id_format_standards.md](../standards/id_format_standards.md))
-- All entity IDs use `prefix_uuid` format with underscore separator
-- `setting_id`: `setting_<uuid>` (e.g., `setting_550e8400-e29b-41d4-a716-446655440000`)
-- `project_id`: `project_<uuid>`
-- `user_id`: `user_<uuid>`
-
-**Data Format Standards** ([data_format_standards.md](../standards/data_format_standards.md))
-- Timestamps: ISO 8601 with Z suffix (e.g., `2025-12-10T10:30:45.123Z`)
-- Booleans: JSON boolean `true`/`false` (not strings)
-- Settings values: Type varies by setting (string, number, boolean, object)
-
-**Error Format Standards** ([error_format_standards.md](../standards/error_format_standards.md))
-- Consistent error response structure across all endpoints
-- Machine-readable error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `INVALID_SETTING_VALUE`
-- HTTP status codes: 200, 201, 400, 401, 403, 404
-
-**API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
-- URL structure: `/api/v1/settings/user`, `/api/v1/settings/project`, `/api/v1/settings/system`
-- Standard HTTP methods: GET for retrieval, PUT/PATCH for updates
-
-## Endpoints
-
-### 1. Get User Settings
+#### Get User Settings
 
 Retrieves current user's personal settings with inherited values from project and system levels.
 
-**Endpoint**: `GET /api/v1/settings/user`
+**Endpoint:** `GET /api/v1/settings/user`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 GET /api/v1/settings/user
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "user_id": "user_abc123",
   "settings": {
@@ -154,25 +162,34 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-**Response Fields**:
+##### Response Fields
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `user_id` | string | User ID |
 | `settings` | object | Current settings (merged from system/project/user) |
 | `inheritance` | object | Source of each setting value (system/project/user) |
 
-**Authorization**:
+##### Authorization
+
 - Any authenticated user (can only view own settings)
 
----
+##### Audit Log
 
-### 2. Update User Settings
+No (read operation)
+
+#### Update User Settings
 
 Updates current user's personal settings. Only specified fields are updated (partial update).
 
-**Endpoint**: `PUT /api/v1/settings/user`
+**Endpoint:** `PUT /api/v1/settings/user`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 PUT /api/v1/settings/user
 Authorization: Bearer <user-token or api-token>
@@ -189,15 +206,20 @@ Content-Type: application/json
 }
 ```
 
-**Request Fields**:
+##### Request Fields
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `display` | object | No | Display preferences |
 | `notifications` | object | No | Notification preferences |
 | `operational` | object | No | Operational preferences |
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "user_id": "user_abc123",
   "settings": {
@@ -222,13 +244,14 @@ Content-Type: application/json
 }
 ```
 
-**Authorization**:
+##### Authorization
+
 - Any authenticated user (can only update own settings)
 
-**Error Responses**:
+##### Error Responses
 
-- **400 Bad Request**: Invalid setting value
 ```json
+HTTP 400 Bad Request
 {
   "error": {
     "code": "INVALID_SETTING_VALUE",
@@ -238,22 +261,33 @@ Content-Type: application/json
 }
 ```
 
----
+##### Audit Log
 
-### 3. Reset User Settings
+Yes - User ID, timestamp, setting scope (user), previous values, new values
+
+#### Reset User Settings
 
 Resets user settings to project/system defaults.
 
-**Endpoint**: `DELETE /api/v1/settings/user`
+**Endpoint:** `DELETE /api/v1/settings/user`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 DELETE /api/v1/settings/user
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "message": "User settings reset to defaults",
   "settings": {
@@ -277,30 +311,43 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-**Authorization**:
+##### Authorization
+
 - Any authenticated user (can only reset own settings)
 
----
+##### Audit Log
 
-### 4. Get Project Settings
+Yes - User ID, timestamp, setting scope (user), action (reset to defaults)
+
+#### Get Project Settings
 
 Retrieves project-level settings. Requires Owner or Admin role.
 
-**Endpoint**: `GET /api/v1/settings/project/{project_id}`
+**Endpoint:** `GET /api/v1/settings/project/{project_id}`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 GET /api/v1/settings/project/proj_master_001
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Path Parameters**:
+##### Path Parameters
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `project_id` | string | Yes | Project ID (format: `proj-*`) |
+| `project_id` | string | Yes | Project ID (format: `proj_<alphanumeric>`) |
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "project_id": "proj_master_001",
   "settings": {
@@ -333,20 +380,22 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-**Response Fields**:
+##### Response Fields
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `project_id` | string | Project ID |
 | `settings` | object | Current project settings (merged with system defaults) |
 | `inheritance` | object | Source of each setting (system/project) |
 
-**Authorization**:
+##### Authorization
+
 - Owner or Admin role in the project
 
-**Error Responses**:
+##### Error Responses
 
-- **403 Forbidden**: Insufficient permissions
 ```json
+HTTP 403 Forbidden
 {
   "error": {
     "code": "INSUFFICIENT_PERMISSIONS",
@@ -355,8 +404,8 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-- **404 Not Found**: Project not found
 ```json
+HTTP 404 Not Found
 {
   "error": {
     "code": "PROJECT_NOT_FOUND",
@@ -365,15 +414,22 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
----
+##### Audit Log
 
-### 5. Update Project Settings
+No (read operation)
+
+#### Update Project Settings
 
 Updates project-level settings. Requires Owner or Admin role.
 
-**Endpoint**: `PUT /api/v1/settings/project/{project_id}`
+**Endpoint:** `PUT /api/v1/settings/project/{project_id}`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 PUT /api/v1/settings/project/proj_master_001
 Authorization: Bearer <user-token or api-token>
@@ -390,12 +446,14 @@ Content-Type: application/json
 }
 ```
 
-**Path Parameters**:
+##### Path Parameters
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `project_id` | string | Yes | Project ID (format: `proj-*`) |
+| `project_id` | string | Yes | Project ID (format: `proj_<alphanumeric>`) |
 
-**Request Fields**:
+##### Request Fields
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `operational` | object | No | Operational settings |
@@ -403,8 +461,12 @@ Content-Type: application/json
 | `notifications` | object | No | Notification settings |
 | `security` | object | No | Security settings (Admin only) |
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "project_id": "proj_master_001",
   "settings": {
@@ -433,14 +495,15 @@ Content-Type: application/json
 }
 ```
 
-**Authorization**:
+##### Authorization
+
 - Owner or Admin role in the project
 - Security settings require Admin role
 
-**Error Responses**:
+##### Error Responses
 
-- **400 Bad Request**: Invalid setting value
 ```json
+HTTP 400 Bad Request
 {
   "error": {
     "code": "INVALID_SETTING_VALUE",
@@ -450,8 +513,8 @@ Content-Type: application/json
 }
 ```
 
-- **403 Forbidden**: Insufficient permissions
 ```json
+HTTP 403 Forbidden
 {
   "error": {
     "code": "INSUFFICIENT_PERMISSIONS",
@@ -460,22 +523,33 @@ Content-Type: application/json
 }
 ```
 
----
+##### Audit Log
 
-### 6. Get System Settings
+Yes - User ID, timestamp, project ID, setting scope (project), previous values, new values
+
+#### Get System Settings
 
 Retrieves system-wide default settings. Requires Admin role.
 
-**Endpoint**: `GET /api/v1/settings/system`
+**Endpoint:** `GET /api/v1/settings/system`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 GET /api/v1/settings/system
 Authorization: Bearer <user-token or api-token>
 ```
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "settings": {
     "operational": {
@@ -505,13 +579,14 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
-**Authorization**:
+##### Authorization
+
 - Admin role only
 
-**Error Responses**:
+##### Error Responses
 
-- **403 Forbidden**: Insufficient permissions
 ```json
+HTTP 403 Forbidden
 {
   "error": {
     "code": "INSUFFICIENT_PERMISSIONS",
@@ -520,15 +595,22 @@ Authorization: Bearer <user-token or api-token>
 }
 ```
 
----
+##### Audit Log
 
-### 7. Update System Settings
+No (read operation)
+
+#### Update System Settings
 
 Updates system-wide default settings. Requires Admin role.
 
-**Endpoint**: `PUT /api/v1/settings/system`
+**Endpoint:** `PUT /api/v1/settings/system`
 
-**Request**:
+##### Authentication
+
+Requires authentication via `Authorization: Bearer <user-token or api-token>` header.
+
+##### Request
+
 ```http
 PUT /api/v1/settings/system
 Authorization: Bearer <user-token or api-token>
@@ -545,7 +627,8 @@ Content-Type: application/json
 }
 ```
 
-**Request Fields**:
+##### Request Fields
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `operational` | object | No | Operational defaults |
@@ -553,8 +636,12 @@ Content-Type: application/json
 | `security` | object | No | Security policies |
 | `audit` | object | No | Audit logging configuration |
 
-**Response** (HTTP 200 OK):
+##### Success Response
+
 ```json
+HTTP 200 OK
+Content-Type: application/json
+
 {
   "settings": {
     "operational": {
@@ -582,17 +669,18 @@ Content-Type: application/json
     }
   },
   "updated_at": "2025-12-10T10:30:45Z",
-  "updated_by": "admin-user_001"
+  "updated_by": "user_admin001"
 }
 ```
 
-**Authorization**:
+##### Authorization
+
 - Admin role only
 
-**Error Responses**:
+##### Error Responses
 
-- **400 Bad Request**: Invalid setting value
 ```json
+HTTP 400 Bad Request
 {
   "error": {
     "code": "INVALID_SETTING_VALUE",
@@ -602,8 +690,8 @@ Content-Type: application/json
 }
 ```
 
-- **403 Forbidden**: Insufficient permissions
 ```json
+HTTP 403 Forbidden
 {
   "error": {
     "code": "INSUFFICIENT_PERMISSIONS",
@@ -612,11 +700,14 @@ Content-Type: application/json
 }
 ```
 
----
+##### Audit Log
 
-## Settings Schema
+Yes - User ID, timestamp, setting scope (system), previous values, new values
 
-### Display Settings
+### Settings Schema
+
+#### Display Settings
+
 ```json
 {
   "theme": "light|dark|auto",
@@ -627,7 +718,8 @@ Content-Type: application/json
 }
 ```
 
-### Notification Settings
+#### Notification Settings
+
 ```json
 {
   "email_enabled": true,
@@ -639,7 +731,8 @@ Content-Type: application/json
 }
 ```
 
-### Operational Settings
+#### Operational Settings
+
 ```json
 {
   "default_agent_budget": 100.00,
@@ -650,7 +743,8 @@ Content-Type: application/json
 }
 ```
 
-### Security Settings
+#### Security Settings
+
 ```json
 {
   "session_timeout_minutes": 480,
@@ -663,10 +757,12 @@ Content-Type: application/json
 }
 ```
 
-## Common Patterns
+### Common Patterns
 
-### Partial Updates
+#### Partial Updates
+
 All update endpoints support partial updates - only specified fields are modified:
+
 ```json
 // Only updates theme, other display settings unchanged
 {
@@ -676,40 +772,31 @@ All update endpoints support partial updates - only specified fields are modifie
 }
 ```
 
-### Settings Inheritance
+#### Settings Inheritance
+
 Settings cascade from system → project → user:
+
 1. System settings provide global defaults
 2. Project settings override system defaults for that project
 3. User settings override project defaults for that user
 
-### Validation Rules
+The `inheritance` field in GET responses tracks the source level for each setting.
+
+#### Validation Rules
+
 - Budget values must be ≥ 0.01
 - Thresholds must be 0-100 (percentage)
 - Max agents per project ≥ max agents per user
 - Alert levels must be ascending order
 - URLs must be valid HTTPS endpoints
+- IP ranges must use valid CIDR notation
 
-### Error Format
-All errors follow the simple custom format:
-```json
-{
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message",
-    "field": "setting.path"  // Optional: for validation errors
-  }
-}
-```
+### Implementation Notes
 
-### Timestamps
-All timestamps use ISO 8601 format with Z suffix:
-- Format: `YYYY-MM-DDTHH:MM:SSZ`
-- Example: `2025-12-10T10:30:45Z`
+#### Pilot Phase
 
-## Implementation Notes
-
-### Pilot Phase
 In Pilot, settings are hardcoded and not exposed via API:
+
 - Default agent budget: $100.00
 - Max agents per user: 10
 - Auto-pause threshold: 95%
@@ -717,7 +804,8 @@ In Pilot, settings are hardcoded and not exposed via API:
 - Session timeout: 8 hours
 - Theme: Auto (system preference)
 
-### Database Schema (Reference)
+#### Database Schema (Reference)
+
 ```sql
 -- System-level settings (single row)
 CREATE TABLE system_settings (
@@ -746,7 +834,8 @@ CREATE TABLE user_settings (
 );
 ```
 
-### Settings Resolution Algorithm
+#### Settings Resolution Algorithm
+
 ```python
 def resolve_settings(user_id, project_id):
   system_settings = get_system_settings()
@@ -773,55 +862,80 @@ def resolve_settings(user_id, project_id):
   return resolved, inheritance
 ```
 
-### Caching Strategy
+#### Caching Strategy
+
 - System settings: Cache globally (1 hour TTL)
 - Project settings: Cache per project (15 minutes TTL)
 - User settings: Cache per user (5 minutes TTL)
 - Invalidate cache on update
 
-### Audit Logging
-All settings changes are logged:
-- User ID who made the change
-- Timestamp of change
-- Setting scope (system/project/user)
-- Previous value and new value
-- Change reason (optional)
+### Security Considerations
 
-## Security Considerations
+#### Authorization Matrix
 
-### Authorization Matrix
 | Endpoint | User | Owner | Admin |
 |----------|------|-------|-------|
 | GET /settings/user | Own only | Own only | Own only |
 | PUT /settings/user | Own only | Own only | Own only |
+| DELETE /settings/user | Own only | Own only | Own only |
 | GET /settings/project/{id} | ❌ | ✅ | ✅ |
 | PUT /settings/project/{id} | ❌ | ✅ (non-security) | ✅ |
 | GET /settings/system | ❌ | ❌ | ✅ |
 | PUT /settings/system | ❌ | ❌ | ✅ |
 
-### Sensitive Settings
+#### Sensitive Settings
+
 Security settings have additional restrictions:
+
 - Only Admin can modify system security settings
 - Only Admin can modify project security settings
 - Owner can view but not modify security settings
 - Two-factor authentication cannot be disabled if required by policy
 
-### Validation
+#### Validation
+
 - All numeric ranges validated (min/max)
 - URL endpoints validated and tested on update
 - Email addresses validated with regex
 - IP ranges validated with CIDR notation check
 
-## Related APIs
-- **001 Authentication API**: Session management settings
-- **015 Projects API**: Project-level settings scope
-- **010 Agents API**: Operational settings affect agent creation
+### Cross-References
 
-## Changelog
+#### Related Principles Documents
 
-### Version 1.0 (2025-12-10)
-- Initial specification for POST-PILOT implementation
-- Three-tier settings hierarchy (system/project/user)
-- Full CRUD operations for all scopes
-- Settings inheritance and resolution
-- Comprehensive validation rules
+None
+
+#### Related Architecture Documents
+
+None
+
+#### Used By
+
+- Dashboard applications (display user preferences, project configurations)
+- CLI tools (respect user settings for output formatting)
+- Admin tools (system settings management interface)
+
+#### Dependencies
+
+- Protocol 002: REST API Protocol (General REST standards, partial update patterns)
+- Protocol 007: Authentication API (User authentication, role-based authorization)
+- Protocol 008: User Management API (User roles for authorization checks)
+- Protocol 010: Agents API (Operational settings affect agent creation)
+- Protocol 015: Projects API (Project-level settings scope)
+
+#### Implementation
+
+**Status:** POST-PILOT (Not yet implemented)
+
+**Planned Files:**
+- `module/iron_control_api/src/routes/settings.rs` - Endpoint implementation
+- `module/iron_control_api/src/services/settings_service.rs` - Settings resolution and inheritance logic
+- `module/iron_control_api/tests/settings/endpoints.rs` - Integration tests
+- `module/iron_control_api/tests/settings/inheritance.rs` - Inheritance chain tests
+- `module/iron_control_api/tests/settings/authorization.rs` - Authorization tests
+- `module/iron_control_api/tests/settings/validation.rs` - Validation tests
+
+**Database Migration:**
+- Create system_settings, project_settings, user_settings tables
+- Seed system_settings with defaults
+- Migrate hardcoded Pilot values to database

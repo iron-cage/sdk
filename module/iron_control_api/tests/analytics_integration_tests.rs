@@ -17,12 +17,10 @@
 //! | `test_get_usage_by_provider_valid` | Usage by valid provider name | GET /api/usage/by-provider/:provider with admin token, valid provider | 200 OK, provider-specific usage data | ✅ |
 //! | `test_get_usage_by_provider_empty` | Usage with empty provider name | GET /api/usage/by-provider/ (empty provider) with admin token | 400 Bad Request (path validation) | ✅ |
 //! | `test_get_usage_by_provider_too_long` | Usage with oversized provider name (DoS) | GET /api/usage/by-provider/:provider with 100K+ char name | 400 Bad Request (DoS prevention) | ✅ |
-//! | `test_list_traces_empty` | List traces with no data | GET /api/traces with admin token, empty database | 200 OK, empty array | ✅ |
-//! | `test_get_trace_not_found` | Get nonexistent trace | GET /api/traces/nonexistent_id with admin token | 404 Not Found | ✅ |
 
 mod common;
 
-use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::{ TestAppState, TestTracesAppState } };
+use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::TestAppState };
 use axum::{
   Router,
   routing::get,
@@ -80,21 +78,16 @@ async fn create_analytics_router() -> ( Router, SqlitePool, String, String )
   let admin_token = create_test_access_token( &admin_id, "admin@admin.com", "admin", "test_jwt_secret_key_for_testing_12345" );
   let user_token = create_test_access_token( &user_id, "regular_user@mail.com", "user", "test_jwt_secret_key_for_testing_12345" );
 
-  // Create usage and traces state
+  // Create usage state
   let usage_state = iron_control_api::routes::usage::UsageState::new( "sqlite::memory:" )
     .await
     .expect("LOUD FAILURE: Failed to create UsageState");
-
-  let traces_app_state = TestTracesAppState::new().await;
 
   let router = Router::new()
     .route( "/api/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
     .route( "/api/usage/by-project/:project_id", get( iron_control_api::routes::usage::get_usage_by_project ) )
     .route( "/api/usage/by-provider/:provider", get( iron_control_api::routes::usage::get_usage_by_provider ) )
-    .with_state( usage_state.clone() )
-    .route( "/api/traces", get( iron_control_api::routes::traces::list_traces ) )
-    .route( "/api/traces/:id", get( iron_control_api::routes::traces::get_trace ) )
-    .with_state( traces_app_state );
+    .with_state( usage_state.clone() );
 
   ( router, app_state.database.clone(), admin_token, user_token )
 }
@@ -259,59 +252,4 @@ async fn test_get_usage_by_provider_too_long()
     .unwrap();
 
   assert_eq!( response.status(), StatusCode::BAD_REQUEST, "provider exceeding 100 chars should be rejected for DoS prevention" );
-}
-
-// ============================================================================
-// Traces List Tests
-// ============================================================================
-
-#[ tokio::test ]
-async fn test_list_traces_empty()
-{
-  let ( app, _pool, _admin_token, user_token ) = create_analytics_router().await;
-
-  let response = app
-    .oneshot(
-      Request::builder()
-        .method( Method::GET )
-        .uri( "/api/traces" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::empty() )
-        .unwrap(),
-    )
-    .await
-    .unwrap();
-
-  assert_eq!( response.status(), StatusCode::OK );
-
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
-    .await
-    .unwrap();
-  let traces: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
-
-  assert_eq!( traces.len(), 0, "Should return empty list when no traces exist" );
-}
-
-// ============================================================================
-// Traces Get Tests
-// ============================================================================
-
-#[ tokio::test ]
-async fn test_get_trace_not_found()
-{
-  let ( app, _pool, _admin_token, user_token ) = create_analytics_router().await;
-
-  let response = app
-    .oneshot(
-      Request::builder()
-        .method( Method::GET )
-        .uri( "/api/traces/999999" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::empty() )
-        .unwrap(),
-    )
-    .await
-    .unwrap();
-
-  assert_eq!( response.status(), StatusCode::NOT_FOUND );
 }

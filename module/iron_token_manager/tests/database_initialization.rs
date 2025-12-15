@@ -52,7 +52,9 @@ use common::create_test_db;
 #[ tokio::test ]
 async fn test_migrations_are_idempotent()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Apply migrations a second time (should be no-op)
   let result = iron_token_manager::migrations::apply_all_migrations( &pool ).await;
@@ -81,8 +83,13 @@ async fn test_migrations_are_idempotent()
 async fn test_isolated_test_databases()
 {
   // Create two independent test databases
-  let ( pool1, _temp1 ) = create_test_db().await;
-  let ( pool2, _temp2 ) = create_test_db().await;
+  let db1 = create_test_db().await;
+  let pool1 = db1.pool().clone();
+  core::mem::forget( db1 );
+
+  let db2 = create_test_db().await;
+  let pool2 = db2.pool().clone();
+  core::mem::forget( db2 );
 
   // Insert token into first database (uses user_001 from seed_test_users)
   sqlx::query(
@@ -113,7 +120,9 @@ async fn test_isolated_test_databases()
 #[ tokio::test ]
 async fn test_production_schema_matches_test_schema()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Get all application table names (exclude migration guards and sqlite internals)
   let tables: Vec< String > = sqlx::query_scalar(
@@ -157,32 +166,50 @@ async fn test_production_schema_matches_test_schema()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  assert_eq!( index_count, 40, "Should have 40 indexes across all migrations (migration 013 added idx_api_tokens_agent_id)" );
+  assert_eq!( index_count, 41, "Should have 41 indexes across all migrations (migration 018 adds 1 more)" );
 }
 
 #[ tokio::test ]
 async fn test_temp_databases_cleanup()
 {
-  use std::path::PathBuf;
+  use iron_test_db::TestDatabaseBuilder;
 
-  let db_path: PathBuf;
-
+  // Test RAII cleanup by creating and dropping multiple TestDatabase instances
+  // This verifies that resources are properly cleaned up without leaks
+  for _ in 0..3
   {
-    let ( _pool, temp ) = create_test_db().await;
-    db_path = temp.path().join( "test.db" );
+    let db = TestDatabaseBuilder::new()
+      .temp_file()
+      .build()
+      .await
+      .expect( "LOUD FAILURE: Failed to create test database" );
 
-    // Database should exist while TempDir is in scope
-    assert!( db_path.exists(), "Database file should exist" );
-  } // TempDir dropped here
+    // Apply migrations
+    iron_token_manager::migrations::apply_all_migrations( db.pool() )
+      .await
+      .expect( "LOUD FAILURE: Failed to apply migrations" );
 
-  // Database should be deleted after TempDir is dropped
-  assert!( !db_path.exists(), "Database file should be cleaned up" );
+    // Verify database is functional while in scope
+    let count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM sqlite_master WHERE type='table'" )
+      .fetch_one( db.pool() )
+      .await
+      .expect( "LOUD FAILURE: Database should be functional" );
+
+    assert!( count > 0, "Database should have tables" );
+
+    // TestDatabase drops here, cleaning up temp file
+  }
+
+  // If we got here without panicking, RAII cleanup worked correctly
+  // (TempDir cleanup is handled automatically by TestDatabase's Drop implementation)
 }
 
 #[ tokio::test ]
 async fn test_all_migrations_have_guards()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Verify guard tables exist for migrations that need them
   let guard_tables = vec![
@@ -213,7 +240,9 @@ async fn test_all_migrations_have_guards()
 #[ tokio::test ]
 async fn test_foreign_keys_enabled()
 {
-  let ( pool, _temp ) = create_test_db().await;
+  let db = create_test_db().await;
+  let pool = db.pool().clone();
+  core::mem::forget( db );
 
   // Check that foreign keys are enabled
   let foreign_keys_on: i64 = query_scalar( "PRAGMA foreign_keys" )

@@ -1,11 +1,4 @@
-# Protocol 002: REST API Protocol
-
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-11
-**Priority:** MUST-HAVE
-
----
+# Protocol: REST API Protocol
 
 ### Scope
 
@@ -29,37 +22,41 @@ HTTP REST API endpoint schemas for all Control Panel operations organized by res
 - Implementation details (see `module/iron_control_api/spec.md`)
 - Individual resource-specific protocols (see [006_token_management_api.md](006_token_management_api.md), [007_authentication_api.md](007_authentication_api.md))
 
----
-
 ### Purpose
 
-Define cross-cutting REST API standards that apply universally across all resource-specific protocols and serve as the master index for all REST API documentation.
+**User Need**: Backend developers, SDK developers, CLI developers, and API consumers need a single authoritative reference defining cross-cutting REST API standards (audit logging, CLI-API parity with 69 commands, rate limiting, example data, system resources health/version) that apply universally across all 23 resource-specific endpoints, plus a master index mapping each resource type (Entity CRUD, Operation RPC-style, Analytics derived, Configuration admin-only, System public) to its detailed protocol specification (006-017) to understand HTTP conventions, authentication patterns (IC Token agent auth, User Token dashboard access, no auth public), common patterns (pagination/filtering/sorting), and error handling without duplicating resource-specific endpoint details already documented in individual protocol files.
+
+**Solution**: Master index document defining five categories of cross-cutting standards:
 
 **Cross-Cutting Standards Defined in This Document:**
 
-1. **Audit Logging Standard** - What operations are logged, standard fields, retention policy (mutation operations only)
-2. **CLI-API Parity Standard** - Ensuring 100% coverage of user-facing endpoints in CLI (69 commands total: 47 control + 22 token management)
-3. **System Resources** - Health check and API version endpoints (operational/discovery endpoints)
-4. **Rate Limiting Standard** - Cross-endpoint rate limit policies by category
-5. **Example Data Standards** - Consistent example values across all documentation
+1. **Audit Logging Standard** - Mutation operations logging (POST/PUT/DELETE), standard fields (timestamp, user_id, action, resource_type, resource_id, changes), 90-day retention
+2. **CLI-API Parity Standard** - 100% coverage ensuring all 69 user-facing endpoints have CLI commands (47 control plane + 22 token management commands mapping to API endpoints)
+3. **System Resources** - Health check (`GET /api/health` public 200/503) and API version (`GET /api/version` public returns version/commit/timestamp) operational endpoints
+4. **Rate Limiting Standard** - Cross-endpoint policies by category (auth: 10/min, mutations: 100/hour, reads: 1000/hour, analytics: 500/hour, admin: unlimited)
+5. **Example Data Standards** - Consistent canonical example values across all documentation (agent_a1b2c3d4, token_t9x8y7z6, user_u5v6w7x8, project_p1q2r3s4, provider_prov_openai)
 
 **Cross-Cutting Standards Defined in Separate Files:**
-
-- **Pagination, Sorting, Filtering:** See [API Design Standards](../standards/api_design_standards.md)
-- **Error Response Format:** See [Error Format Standards](../standards/error_format_standards.md)
-- **ID Format:** See [ID Format Standards](../standards/id_format_standards.md)
-- **Data Format (Timestamps, Currency, etc.):** See [Data Format Standards](../standards/data_format_standards.md)
+- Pagination, Sorting, Filtering ([API Design Standards](../standards/api_design_standards.md))
+- Error Response Format ([Error Format Standards](../standards/error_format_standards.md))
+- ID Format ([ID Format Standards](../standards/id_format_standards.md))
+- Data Format - Timestamps, Currency ([Data Format Standards](../standards/data_format_standards.md))
 
 **Resource-Specific API Endpoints:**
+- See Protocol files 006-017 for individual resource specifications
+- See [Complete Protocol Reference](#complete-protocol-reference) table for full endpoint catalog
+- Resource types: Entity (6), Operation (4), Analytics (8), Configuration (3), System (2) = 23 total
 
-See Protocol files 006-017 for individual resource endpoint specifications:
-- Agents (010), Providers (011), Analytics (012)
-- API Tokens (014), Projects (015), Users (008)
-- Budget Requests (017), Settings (016 - POST-PILOT)
+**Master Index Table**: [Complete Protocol Reference](#complete-protocol-reference) maps each resource to its protocol file (006-017) with certainty classification (Certain/MUST-HAVE/NICE-TO-HAVE/POST-PILOT).
 
-**Note:** This document consolidates standards that span multiple resources and don't fit in individual resource protocols. Standards comprehensive enough to warrant separate normative files are maintained independently and referenced here.
+**Key Insight**: REST API Protocol serves dual purpose as both cross-cutting standards authority (defining 5 universal patterns: audit logging for mutations, CLI-API parity for all 69 user commands, system resources for ops monitoring, rate limiting by endpoint category, example data for consistency) and master index navigator (cataloging 23 resources across 5 types referencing detailed specifications in Protocol 006-017) ensuring developers find comprehensive standards here (pagination/errors/IDs via referenced Standards documents, authentication architecture via 3 patterns IC Token/User Token/None) while individual protocol files contain resource-specific endpoint schemas (request/response formats, HTTP methods, specific business logic) avoiding duplication and establishing single source of truth for each aspect of REST API design.
 
 ---
+
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-13
+**Priority:** MUST-HAVE
 
 ### How to Use This Document
 
@@ -1350,42 +1347,52 @@ Response:
 
 ### Cross-References
 
-**Resource Organization:**
-- [architecture/009: Resource Catalog](../architecture/009_resource_catalog.md) - Complete resource inventory and entity mapping
+#### Related Principles Documents
+- Design Philosophy - API design consistency principle, resource taxonomy clarity, CLI-API parity mandate
+- Quality Attributes - Completeness (exhaustive 23-resource catalog via master index), Consistency (5 cross-cutting standards apply universally), Developer Experience (CLI parity for all user-facing endpoints)
 
-**Resource-Specific Protocols:**
-- [006: Token Management API](006_token_management_api.md) - IC Token CRUD endpoints (✅ Certain, Pilot)
-- [007: Authentication API](007_authentication_api.md) - User login/logout endpoints (✅ Certain, Pilot)
-- [008: User Management API](008_user_management_api.md) - User management endpoints (✅ Certain, Pilot)
-- [010: Agents API](010_agents_api.md) - Agent management endpoints (✅ MUST-HAVE)
-- [011: Providers API](011_providers_api.md) - Provider management endpoints (✅ MUST-HAVE)
-- [012: Analytics API](012_analytics_api.md) - Usage and spending analytics endpoints (✅ MUST-HAVE)
-- [013: Budget Limits API](013_budget_limits_api.md) - Budget modification endpoints, admin-only (✅ MUST-HAVE)
-- [014: API Tokens API](014_api_tokens_api.md) - API token management endpoints (✅ MUST-HAVE)
-- [015: Projects API](015_projects_api.md) - Project access endpoints (✅ NICE-TO-HAVE)
-- [016: Settings API](016_settings_api.md) - Settings management endpoints (📋 POST-PILOT)
-- [017: Budget Requests API](017_budget_requests_api.md) - Budget change request/approval workflow endpoints (✅ MUST-HAVE)
+#### Related Architecture Documents
+- [Architecture: Resource Catalog](../architecture/009_resource_catalog.md) - Complete inventory of 23 REST API resources with entity mapping patterns and authentication types
+- [Architecture: Entity Model](../architecture/007_entity_model.md) - Seven core entities (User, Master Project, Project, Agent, IP, IC Token, Budget Change Request) that Entity Resources map to via CRUD endpoints
+- [Architecture: Roles and Permissions](../architecture/006_roles_and_permissions.md) - Three roles (Admin, User, Viewer) determine User Token access scope for API resources, admin-only endpoints restricted
+- [Architecture: Data Flow](../architecture/004_data_flow.md) - REST API used in runtime initialization flow (IC Token validation → Provider → Response), applies to all authenticated resource types
 
-**Dependencies:**
-- [protocol/005: Budget Control Protocol](005_budget_control_protocol.md) - Budget handshake/report/refresh protocol
-- [architecture/007: Entity Model](../architecture/007_entity_model.md) - Domain entities (Agent, IC Token, Project, IP)
-- [architecture/006: Roles and Permissions](../architecture/006_roles_and_permissions.md) - Admin, Super User, Developer roles
+#### Used By
+- [Protocol: Budget Control Protocol](005_budget_control_protocol.md) - Uses REST API for budget handshake/report/refresh endpoints defined in Operation Resources
+- [Protocol: Token Management API](006_token_management_api.md) - Implements Entity Resource `/api/tokens` following REST conventions (✅ Certain, Pilot)
+- [Protocol: Authentication API](007_authentication_api.md) - Implements Operation Resources `/api/auth` following REST conventions (✅ Certain, Pilot)
+- [Protocol: User Management API](008_user_management_api.md) - Implements Entity Resource `/api/users` following REST conventions (✅ Certain, Pilot)
+- [Protocol: Agents API](010_agents_api.md) - Implements Entity Resource `/api/agents` following REST conventions (✅ MUST-HAVE)
+- [Protocol: Providers API](011_providers_api.md) - Implements Entity Resource `/api/providers` following REST conventions (✅ MUST-HAVE)
+- [Protocol: Analytics API](012_analytics_api.md) - Implements Analytics Resources `/api/analytics/*` following REST conventions (✅ MUST-HAVE)
+- [Protocol: Budget Limits API](013_budget_limits_api.md) - Implements Configuration Resource `/api/limits` following REST conventions (✅ MUST-HAVE)
+- [Protocol: API Tokens API](014_api_tokens_api.md) - Implements Entity Resource `/api/api-tokens` following REST conventions (✅ MUST-HAVE)
+- [Protocol: Projects API](015_projects_api.md) - Implements Entity Resource `/api/projects` following REST conventions (✅ NICE-TO-HAVE)
+- [Protocol: Settings API](016_settings_api.md) - Implements Configuration Resource `/api/settings` following REST conventions (📋 POST-PILOT)
+- [Protocol: Budget Requests API](017_budget_requests_api.md) - Implements Entity Resource `/api/budget/requests` following REST conventions (✅ MUST-HAVE)
+- [Protocol: WebSocket Protocol](003_websocket_protocol.md) - Real-time dashboard protocol complementing REST API for async notifications
+- [Capabilities: LLM Access Control](../capabilities/002_llm_access_control.md) - Uses budget API endpoints for enforcement via Operation Resources
+- [Features: Token Management CLI-API Parity](../features/004_token_management_cli_api_parity.md) - Complete CLI ↔ API endpoint mapping demonstrating 100% parity principle
+- [Features: CLI Architecture](../features/001_cli_architecture.md) - CLI structure mirrors REST API resource organization
+- iron_runtime - Calls budget protocol Operation Resources (handshake, report, refresh) for agent execution
+- iron_cli - Calls user-facing endpoints (tokens, auth, analytics, config) following CLI-API parity standard
+- iron_dashboard - Calls user-facing endpoints (tokens, analytics, config) for visual management interface
 
-**Used By:**
-- [capabilities/002: LLM Access Control](../capabilities/002_llm_access_control.md) - Uses budget API for enforcement
-- [architecture/004: Data Flow](../architecture/004_data_flow.md) - REST API in runtime initialization
-- `iron_runtime` - Calls budget protocol endpoints (handshake/report/refresh)
-- `iron_cli` - Calls user-facing endpoints (tokens, auth, usage)
-- `iron_dashboard` - Calls user-facing endpoints (tokens, analytics, config)
+#### Dependencies
+- [Standards: API Design Standards](../standards/api_design_standards.md) - Pagination, sorting, filtering patterns applied across all list endpoints
+- [Standards: Error Format Standards](../standards/error_format_standards.md) - Standard error JSON schema for 4xx/5xx responses across all endpoints
+- [Standards: ID Format Standards](../standards/id_format_standards.md) - Entity ID format `prefix_uuid` (agent_, provider_, token_, user_, project_) across all endpoints
+- [Standards: Data Format Standards](../standards/data_format_standards.md) - Timestamp ISO 8601, currency USD cents, duration seconds across all endpoints
+- HTTP/1.1 Standard (RFC 7231) - RESTful resource design principles, status codes, methods (GET read, POST create, PUT update, DELETE remove)
+- JWT Standard (RFC 7519) - Authentication token format for IC Token and User Token patterns
+- JSON Standard (RFC 8259) - Request/response payload format for all endpoints
 
-**Related:**
-- [003: WebSocket Protocol](003_websocket_protocol.md) - Real-time dashboard protocol
-- [features/004: Token Management CLI-API Parity](../features/004_token_management_cli_api_parity.md) - Complete CLI ↔ API mapping
-
-**Implementation:**
-- Module: `module/iron_control_api/` - REST API server (Rust/axum)
-- Source: `module/iron_control_api/src/routes/` - Endpoint handlers
-- Tests: `module/iron_control_api/tests/` - Endpoint integration tests
-- Specification: `module/iron_control_api/spec.md` - Implementation spec
-
----
+#### Implementation
+- Module: `module/iron_control_api/` - REST API server implementation (Rust/axum framework)
+- Source: `module/iron_control_api/src/routes/` - Endpoint handlers organized by resource type
+- Tests: `module/iron_control_api/tests/` - Endpoint integration tests validating all protocol specifications
+- Specification: `module/iron_control_api/spec.md` - Implementation specification for iron_control_api module
+- Ports: Control Panel Gateway HTTP server (port 8080) exposing all 23 REST API resources
+- Authentication: IC Token via `Authorization: Bearer ic_...` header, User Token via `Authorization: Bearer ...` header
+- CLI Mapping: Every user-facing API resource maps to `iron <resource-group> <action>` command (e.g., `iron tokens list` → `GET /api/tokens`)
+- SDK Mapping: Every user-facing API resource maps to SDK method `sdk.<resource_group>.<action>()` (e.g., `sdk.tokens.create()` → `POST /api/tokens`)

@@ -198,6 +198,12 @@ features = ["derive"]
 [workspace.dependencies.rand]
 version = "0.8"
 
+## Workspace Management
+
+[workspace.dependencies.workspace_tools]
+version = "0.11"
+features = ["serde", "secrets", "secure", "testing"]
+
 ## Cryptography (for token management and secrets)
 
 [workspace.dependencies.sha2]

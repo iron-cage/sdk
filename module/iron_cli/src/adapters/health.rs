@@ -34,7 +34,6 @@ where
   let mut output_data = HashMap::new();
   output_data.insert( "status".to_string(), "health check".to_string() );
   output_data.insert( "health".to_string(), health.status.clone() );
-  output_data.insert( "version".to_string(), health.version.clone() );
 
   let output = formatter.format_single( &output_data );
 

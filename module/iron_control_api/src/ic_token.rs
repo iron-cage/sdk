@@ -14,6 +14,7 @@
 use jsonwebtoken::{ decode, encode, DecodingKey, EncodingKey, Header, Validation };
 use serde::{ Deserialize, Serialize };
 use std::time::{ SystemTime, UNIX_EPOCH };
+use crate::error::ValidationError;
 
 /// IC Token JWT claims
 ///
@@ -97,12 +98,16 @@ impl IcTokenClaims
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), String >
+  pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Check issuer
     if self.issuer != "iron-control-panel"
     {
-      return Err( format!( "Invalid issuer: {}", self.issuer ) );
+      return Err( ValidationError::InvalidValue
+      {
+        field: "issuer".to_string(),
+        reason: format!( "expected 'iron-control-panel', got '{}'", self.issuer ),
+      } );
     }
 
     // Check expiration
@@ -115,14 +120,18 @@ impl IcTokenClaims
 
       if now > exp
       {
-        return Err( "Token expired".to_string() );
+        return Err( ValidationError::Custom( "Token expired".to_string() ) );
       }
     }
 
     // Check agent_id format (basic validation)
     if !self.agent_id.starts_with( "agent_" )
     {
-      return Err( format!( "Invalid agent_id format: {}", self.agent_id ) );
+      return Err( ValidationError::InvalidFormat
+      {
+        field: "agent_id".to_string(),
+        expected: "must start with 'agent_'".to_string(),
+      } );
     }
 
     Ok( () )
@@ -188,7 +197,7 @@ impl IcTokenManager
     .map_err( |e| format!( "JWT decode error: {e}" ) )?;
 
     // Validate claims
-    token_data.claims.validate()?;
+    token_data.claims.validate().map_err( |e| e.to_string() )?;
 
     Ok( token_data.claims )
   }

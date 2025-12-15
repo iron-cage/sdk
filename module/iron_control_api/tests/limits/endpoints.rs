@@ -56,7 +56,7 @@ async fn test_endpoint_valid_request_accepted()
     "project_id": null,
     "max_tokens_per_day": 1000000,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -91,7 +91,7 @@ async fn test_endpoint_all_none_rejected()
     "project_id": null,
     "max_tokens_per_day": null,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -129,7 +129,7 @@ async fn test_endpoint_zero_value_rejected()
     "project_id": null,
     "max_tokens_per_day": 0,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -167,7 +167,7 @@ async fn test_endpoint_negative_value_rejected()
     "project_id": null,
     "max_tokens_per_day": -100,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -205,7 +205,7 @@ async fn test_endpoint_overflow_rejected()
     "project_id": null,
     "max_tokens_per_day": i64::MAX,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -243,7 +243,7 @@ async fn test_endpoint_valid_multiple_limits_accepted()
     "project_id": "project_abc",
     "max_tokens_per_day": 1000000,
     "max_requests_per_minute": 100,
-    "max_cost_per_month_cents": 50000,
+    "max_cost_per_month_microdollars": 50000,
   });
 
   let request = Request::builder()
@@ -265,7 +265,7 @@ async fn test_endpoint_valid_multiple_limits_accepted()
   assert_eq!( status, StatusCode::CREATED );
   assert_eq!( body.max_tokens_per_day, Some( 1000000 ) );
   assert_eq!( body.max_requests_per_minute, Some( 100 ) );
-  assert_eq!( body.max_cost_per_month_cents, Some( 50000 ) );
+  assert_eq!( body.max_cost_per_month_microdollars, Some( 50000 ) );
 }
 
 /// Test mixed valid/invalid rejected.
@@ -279,7 +279,7 @@ async fn test_endpoint_mixed_valid_invalid_rejected()
     "project_id": null,
     "max_tokens_per_day": 1000000,
     "max_requests_per_minute": 0,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -332,7 +332,7 @@ async fn test_update_limit_all_none_rejected()
   let request_body = json!({
     "max_tokens_per_day": null,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -368,7 +368,7 @@ async fn test_update_limit_negative_value_rejected()
   let request_body = json!({
     "max_tokens_per_day": -100,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()
@@ -404,7 +404,7 @@ async fn test_update_limit_overflow_rejected()
   let request_body = json!({
     "max_tokens_per_day": i64::MAX,
     "max_requests_per_minute": null,
-    "max_cost_per_month_cents": null,
+    "max_cost_per_month_microdollars": null,
   });
 
   let request = Request::builder()

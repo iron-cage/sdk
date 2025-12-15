@@ -17,7 +17,12 @@
 //! - **Acceptable:** 3-5 successes + transaction conflicts logged
 //! - **Bug:** < 3 successes or > 5 successes (overspending)
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions, Error as SqlxError };
+#[ path = "common/mod.rs" ]
+mod common;
+
+use sqlx::{ SqlitePool, Error as SqlxError };
+use common::test_db;
+use iron_test_db::TestDatabase;
 use std::sync::{ Arc, Mutex };
 
 /// Diagnostic result for each transaction attempt
@@ -29,43 +34,6 @@ struct TransactionResult
   error_type: Option<String>,
   spent_seen: Option<i64>,
   timestamp_ms: u128,
-}
-
-/// Create test database
-async fn create_test_database() -> SqlitePool
-{
-  let pool = SqlitePoolOptions::new()
-    .max_connections( 10 ) // Increased for concurrency
-    .connect( "sqlite::memory:?cache=shared" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create test database" );
-
-  sqlx::raw_sql( "PRAGMA foreign_keys = ON;" )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to enable foreign keys" );
-
-  // Create budgets table
-  sqlx::query(
-    "CREATE TABLE IF NOT EXISTS budgets (
-      id INTEGER PRIMARY KEY,
-      total_cents INTEGER NOT NULL,
-      spent_cents INTEGER NOT NULL DEFAULT 0,
-      CHECK(spent_cents >= 0),
-      CHECK(spent_cents <= total_cents)
-    )"
-  )
-  .execute( &pool )
-  .await
-  .expect( "LOUD FAILURE: Failed to create budgets table" );
-
-  // Create budget: $50 total
-  sqlx::query( "INSERT INTO budgets (id, total_cents, spent_cents) VALUES (1, 5000, 0)" )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to create budget" );
-
-  pool
 }
 
 /// Attempt to spend from budget with detailed error logging
@@ -202,7 +170,8 @@ async fn attempt_spend(
 #[ignore] // Flaky diagnostic test - run manually with `cargo test -- --ignored`
 async fn test_budget_concurrent_spending_diagnostic()
 {
-  let pool = create_test_database().await;
+  let db: TestDatabase = test_db::create_test_db().await;
+  let pool = db.pool().clone();
 
   // Shared results collector
   let results = Arc::new( Mutex::new( Vec::new() ) );

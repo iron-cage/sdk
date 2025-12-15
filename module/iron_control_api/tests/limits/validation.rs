@@ -6,7 +6,7 @@
 //! |-------|--------------|----------------|------------|
 //! | max_tokens_per_day | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
 //! | max_requests_per_minute | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
-//! | max_cost_per_month_cents | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
+//! | max_cost_per_month_microdollars | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
 //! | (all limits) | at least one set | all None | - |
 //!
 //! ## Corner Cases Covered
@@ -30,7 +30,7 @@ async fn test_valid_single_limit_tokens()
     project_id: None,
     max_tokens_per_day: Some( 1000000 ),
     max_requests_per_minute: None,
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -51,7 +51,7 @@ async fn test_valid_single_limit_requests()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: Some( 60 ),
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -72,7 +72,7 @@ async fn test_valid_single_limit_cost()
     project_id: Some( "project_123".to_string() ),
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_cents: Some( 500000 ),
+    max_cost_per_month_microdollars: Some( 500000 ),
   };
 
   let result = request.validate();
@@ -93,7 +93,7 @@ async fn test_valid_multiple_limits()
     project_id: None,
     max_tokens_per_day: Some( 1000000 ),
     max_requests_per_minute: Some( 100 ),
-    max_cost_per_month_cents: Some( 500000 ),
+    max_cost_per_month_microdollars: Some( 500000 ),
   };
 
   let result = request.validate();
@@ -114,7 +114,7 @@ async fn test_all_none_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -123,7 +123,7 @@ async fn test_all_none_rejected()
     "LOUD FAILURE: Request with all None limits must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "at least one" ) || err_msg.contains( "required" ),
     "LOUD FAILURE: Error message must indicate at least one limit is required. Got: {}",
@@ -141,7 +141,7 @@ async fn test_zero_tokens_per_day_rejected()
     project_id: None,
     max_tokens_per_day: Some( 0 ),
     max_requests_per_minute: None,
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -150,7 +150,7 @@ async fn test_zero_tokens_per_day_rejected()
     "LOUD FAILURE: Zero max_tokens_per_day must be rejected"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "positive" ) || err_msg.contains( "greater than" ) || err_msg.contains( "must be" ),
     "LOUD FAILURE: Error message must indicate value must be positive. Got: {}",
@@ -168,7 +168,7 @@ async fn test_negative_tokens_per_day_rejected()
     project_id: None,
     max_tokens_per_day: Some( -100 ),
     max_requests_per_minute: None,
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -188,7 +188,7 @@ async fn test_zero_requests_per_minute_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: Some( 0 ),
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -208,7 +208,7 @@ async fn test_negative_requests_per_minute_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: Some( -10 ),
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -228,13 +228,13 @@ async fn test_zero_cost_per_month_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_cents: Some( 0 ),
+    max_cost_per_month_microdollars: Some( 0 ),
   };
 
   let result = request.validate();
   assert!(
     result.is_err(),
-    "LOUD FAILURE: Zero max_cost_per_month_cents must be rejected"
+    "LOUD FAILURE: Zero max_cost_per_month_microdollars must be rejected"
   );
 }
 
@@ -248,13 +248,13 @@ async fn test_negative_cost_per_month_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_cents: Some( -500 ),
+    max_cost_per_month_microdollars: Some( -500 ),
   };
 
   let result = request.validate();
   assert!(
     result.is_err(),
-    "LOUD FAILURE: Negative max_cost_per_month_cents must be rejected"
+    "LOUD FAILURE: Negative max_cost_per_month_microdollars must be rejected"
   );
 }
 
@@ -268,7 +268,7 @@ async fn test_overflow_tokens_per_day_rejected()
     project_id: None,
     max_tokens_per_day: Some( i64::MAX ),
     max_requests_per_minute: None,
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -277,7 +277,7 @@ async fn test_overflow_tokens_per_day_rejected()
     "LOUD FAILURE: i64::MAX max_tokens_per_day must be rejected (overflow risk)"
   );
 
-  let err_msg = result.unwrap_err();
+  let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "too large" ) || err_msg.contains( "maximum" ) || err_msg.contains( "overflow" ),
     "LOUD FAILURE: Error must mention value is too large. Got: {}",
@@ -295,7 +295,7 @@ async fn test_overflow_requests_per_minute_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: Some( i64::MAX ),
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -315,13 +315,13 @@ async fn test_overflow_cost_per_month_rejected()
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_cents: Some( i64::MAX ),
+    max_cost_per_month_microdollars: Some( i64::MAX ),
   };
 
   let result = request.validate();
   assert!(
     result.is_err(),
-    "LOUD FAILURE: i64::MAX max_cost_per_month_cents must be rejected (overflow risk)"
+    "LOUD FAILURE: i64::MAX max_cost_per_month_microdollars must be rejected (overflow risk)"
   );
 }
 
@@ -335,7 +335,7 @@ async fn test_mixed_valid_invalid_rejected()
     project_id: None,
     max_tokens_per_day: Some( 1000000 ),  // Valid
     max_requests_per_minute: Some( -10 ), // Invalid
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();
@@ -355,7 +355,7 @@ async fn test_boundary_value_one_accepted()
     project_id: None,
     max_tokens_per_day: Some( 1 ),
     max_requests_per_minute: Some( 1 ),
-    max_cost_per_month_cents: Some( 1 ),
+    max_cost_per_month_microdollars: Some( 1 ),
   };
 
   let result = request.validate();
@@ -378,7 +378,7 @@ async fn test_max_safe_limit_accepted()
     project_id: None,
     max_tokens_per_day: Some( MAX_SAFE ),
     max_requests_per_minute: None,
-    max_cost_per_month_cents: None,
+    max_cost_per_month_microdollars: None,
   };
 
   let result = request.validate();

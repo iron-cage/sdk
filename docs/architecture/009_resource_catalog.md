@@ -1,19 +1,73 @@
-# Resource Catalog
+# Architecture: Resource Catalog
 
-**Purpose:** Exhaustive inventory of all REST API resources, their mapping to entities, and authentication patterns.
-**Status:** Specification
-**Version:** 1.0.0
-**Last Updated:** 2025-12-10
+### Scope
 
-> **Note:** This document catalogs REST API resources exposed by the Control Panel. For entity definitions, see [007_entity_model.md](007_entity_model.md).
+This document provides an exhaustive catalog of all REST API resources exposed by the Iron Cage Control Panel.
+
+**In Scope:**
+- Complete inventory of 23 API resources across four resource types (Entity, Operation, Analytics, Configuration)
+- Four resource type taxonomy (Entity Resources: CRUD 1:1 or 1:N entity mapping; Operation Resources: RPC-style multi-entity actions; Analytics Resources: read-only derived data aggregations; Configuration Resources: admin-only system settings)
+- Entity mapping patterns (Direct 1:1 resource-to-entity, Multiple Resources per Entity 1:N, Resource Spans Multiple Entities N:1, No Direct Mapping for derived data)
+- Three authentication patterns (IC Token: agent auth JWT with ic_ prefix long-lived; User Token: Control Panel access 30-day refreshable; No Authentication: public health/version endpoints)
+- Certainty classification (8 Certain Pilot-required resources, 13 MUST-HAVE production-critical, 1 NICE-TO-HAVE UX enhancement, 1 POST-PILOT future implementation)
+- CLI-API parity principle (every user-facing API resource maps to iron CLI command group)
+- HTTP method conventions (GET read, POST create/action, PUT update, DELETE remove)
+- Resource naming conventions (plural for entities /api/tokens, singular/verb for operations /api/auth)
+- Protocol document references (13 detailed API specifications in Protocol collection)
+- Inventory tables (Entity: 6 resources, Operation: 4 resources, Analytics: 8 resources, Configuration: 3 resources, System: 2 resources)
+
+**Out of Scope:**
+- Detailed request/response schemas (covered in individual Protocol documents 006-017)
+- Authentication implementation details (covered in Protocol 007: Authentication API)
+- Budget control protocol specifics (covered in Protocol 005: Budget Control Protocol)
+- User management RBAC rules (covered in Architecture 006: Roles and Permissions)
+- Entity relationships and lifecycle (covered in Architecture 007: Entity Model)
+- REST API design principles (covered in Protocol 002: REST API Protocol)
+- HTTP status codes and error handling (covered in Protocol 002)
+- Rate limiting and throttling (covered in Protocol 002)
+- Pagination and filtering implementation (covered in Protocol 002)
+- Specific endpoint request/response examples (covered in Protocol 006-017)
+
+### Purpose
+
+**User Need**: Architects, backend developers, SDK developers, and CLI developers need a single authoritative catalog of all 23 REST API resources exposed by the Iron Cage Control Panel to understand the complete API surface (four resource types: Entity CRUD 1:1 mapping, Operation RPC-style actions, Analytics derived data, Configuration admin settings), entity mappings (1:1, 1:N, N:1, derived), authentication requirements (IC Token agent auth, User Token dashboard access, public endpoints), certainty levels (8 Certain Pilot-required, 13 MUST-HAVE production-critical, 1 NICE-TO-HAVE, 1 POST-PILOT), and CLI-API parity mappings for consistent implementation across API endpoints, Python SDK methods, and iron CLI command groups.
+
+**Solution**: Exhaustive inventory organized by four resource types with detailed tables cataloging:
+
+**Complete Resource Inventory (23 Total Resources):**
+
+| Resource Type | Count | Examples | Purpose |
+|---------------|-------|----------|---------|
+| **Entity Resources** | 6 | `/api/tokens`, `/api/users`, `/api/agents` | CRUD operations, 1:1 or 1:N entity mapping |
+| **Operation Resources** | 4 | `/api/auth`, `/api/budget/handshake` | RPC-style actions, multi-entity operations |
+| **Analytics Resources** | 8 | `/api/usage`, `/api/metrics` | Read-only derived data, aggregations |
+| **Configuration Resources** | 3 | `/api/limits`, `/api/settings` | Admin-only system configuration |
+| **System Resources** | 2 | `/api/health`, `/api/version` | Public operational monitoring |
+
+**Three Authentication Patterns:**
+- **IC Token**: Agent authentication (JWT with `ic_` prefix, long-lived until agent deleted, used by iron_runtime)
+- **User Token**: Control Panel access (JWT, 30-day refreshable, user + project scope, used by iron_cli and web dashboard)
+- **No Authentication**: Public endpoints (`/api/health`, `/api/version`)
+
+**Certainty Classification:**
+- ✅ **Certain (8)**: Required for Pilot launch
+- ✅ **MUST-HAVE (13)**: Critical for production, specifications complete
+- ✅ **NICE-TO-HAVE (1)**: Enhances UX, specification complete
+- 📋 **POST-PILOT (1)**: Future implementation, specification prepared
+
+**CLI-API Parity**: Every user-facing API resource maps to `iron` CLI command group (e.g., `/api/tokens` → `iron tokens`, `/api/agents` → `iron agents`).
+
+**Key Insight**: Resource taxonomy uses four distinct patterns (Entity Resources for CRUD with direct entity mapping, Operation Resources for RPC-style multi-entity actions, Analytics Resources for read-only derived aggregations, Configuration Resources for admin-only system settings) with three-tier authentication model (IC Token for agent runtime, User Token for human users, public for monitoring) and four-level certainty classification (Certain Pilot-required, MUST-HAVE production-critical with complete specifications, NICE-TO-HAVE UX enhancements, POST-PILOT future work) ensuring comprehensive API surface coverage across 23 resources with consistent CLI parity (every user-facing API resource has corresponding iron CLI command group) and clear entity mapping patterns (1:1 direct, 1:N multiple resources per entity, N:1 resource spans entities, derived for analytics with no direct mapping).
 
 ---
 
-## User Need
+**Status:** Specification
+**Version:** 1.0.0
+**Last Updated:** 2025-12-13
 
-Understand all available REST API resources, how they map to domain entities, and which are certain vs uncertain.
+**Note:** This document references the entity model from [007_entity_model.md](007_entity_model.md). For entity definitions, relationships, and lifecycle details, see that document.
 
-## Resource Taxonomy
+### Resource Taxonomy
 
 **Four Resource Types:**
 
@@ -91,7 +145,7 @@ Understand all available REST API resources, how they map to domain entities, an
 - `/api/limits` → `iron limits set`
 - `/api/settings` → `iron settings update`
 
-## Complete Resource Inventory
+### Complete Resource Inventory
 
 ### Entity Resources
 
@@ -172,7 +226,7 @@ Understand all available REST API resources, how they map to domain entities, an
 - System resources certain (standard endpoints)
 - No authentication required
 
-## Resource-Entity Mapping Patterns
+### Resource-Entity Mapping Patterns
 
 **Four Mapping Patterns:**
 
@@ -236,7 +290,7 @@ Understand all available REST API resources, how they map to domain entities, an
 - Computation/aggregation involved
 - CLI provides reporting commands
 
-## Authentication Patterns
+### Authentication Patterns
 
 **Three Authentication Types:**
 
@@ -286,7 +340,7 @@ Understand all available REST API resources, how they map to domain entities, an
 
 **Purpose:** Operational monitoring, discovery
 
-## CLI-API Parity
+### CLI-API Parity
 
 **Principle:** Every user-facing API resource maps to CLI command group.
 
@@ -329,7 +383,7 @@ Understand all available REST API resources, how they map to domain entities, an
 
 **Parity Details:** See [../features/004_token_management_cli_api_parity.md](../features/004_token_management_cli_api_parity.md) for complete mapping.
 
-## Certainty Status
+### Certainty Status
 
 ### ✅ Certain Resources (Pilot Required)
 
@@ -418,6 +472,72 @@ Understand all available REST API resources, how they map to domain entities, an
 
 **Total:** 23 resources with complete specifications across all priority levels.
 
+### Implementation & CLI Parity Status
+
+**Last Updated:** 2025-12-14
+
+**REST API Implementation Status:**
+
+| Domain | Endpoints Implemented | Total Specified | Implementation % |
+|--------|----------------------|-----------------|------------------|
+| **Health/Version** | 2/2 | 2 | 100% ✅ |
+| **Authentication** | 4/4 | 4 | 100% ✅ |
+| **Users** | 8/8 | 8 | 100% ✅ |
+| **API Tokens** | 7/7 | 7 | 100% ✅ |
+| **Usage** | 3/3 | 3 | 100% ✅ |
+| **Limits** | 5/5 | 5 | 100% ✅ |
+| **Providers** | 7/7 | 7 | 100% ✅ |
+| **Keys** | 1/1 | 1 | 100% ✅ |
+| **Agents** | 6/6 | 6 | 100% ✅ |
+| **Budget** | 11/11 | 11 | 100% ✅ |
+| **Analytics** | 10/10 | 10 | 100% ✅ |
+| **TOTAL** | **64/64** | **64** | **100% ✅** |
+
+**CLI-API Parity Status:**
+
+| REST Endpoint(s) | CLI Command Group | CLI Commands | Status |
+|------------------|-------------------|--------------|--------|
+| `GET /api/health` | - | - | ❌ No CLI (public endpoint) |
+| `GET /api/v1/version` | - | - | ❌ No CLI (public endpoint) |
+| `POST /api/v1/auth/login` | `.auth` | `login` | ✅ Mapped |
+| `POST /api/v1/auth/refresh` | `.auth` | `refresh` | ✅ Mapped |
+| `POST /api/v1/auth/logout` | `.auth` | `logout` | ✅ Mapped |
+| `POST /api/v1/auth/validate` | `.auth` | `validate` | ✅ Mapped |
+| `/api/v1/users/*` (8 endpoints) | `.user` | `list, create, get, update, delete, set_role, reset_password, get_permissions` | ✅ Mapped (8 commands) |
+| `/api/v1/api-tokens/*` (7 endpoints) | `.api_token` | `list, create, get, revoke` | ⚠️ Partial (4/7 mapped) |
+| `/api/v1/usage/*` (3 endpoints) | - | - | ❌ No CLI |
+| `/api/v1/limits/*` (5 endpoints) | `.budget_limit` | `get, set` | ⚠️ Partial (2/5 mapped) |
+| `/api/v1/providers/*` (7 endpoints) | `.provider` | `list, create, get, update, delete, assign_agents, list_agents, remove_agent` | ✅ Mapped (8 commands) |
+| `GET /api/v1/keys` | - | - | ❌ No CLI (agent-only) |
+| `/api/v1/agents/*` (6 endpoints) | `.agent` | `list, create, get, update, delete, assign_providers, list_providers, remove_provider` | ✅ Mapped (8 commands) |
+| `/api/v1/budget/handshake` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/report` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/refresh` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/return` | - | - | ❌ No CLI (agent-facing) |
+| `/api/v1/budget/requests/*` (5 endpoints) | `.budget_request` | `list, create, get, approve, reject, cancel` | ✅ Mapped (6 commands) |
+| `/api/v1/analytics/*` (10 endpoints) | `.analytics` | `usage, spending, metrics, usage_by_agent, usage_by_provider, spending_by_period, export_usage, export_spending` | ✅ Mapped (8 commands) |
+
+**CLI Parity Summary:**
+- **✅ Full Parity (47 commands):** Agents, Providers, Analytics, Users, Budget Requests, Auth
+- **⚠️ Partial Parity:** API Tokens (4/7), Limits (2/5)
+- **❌ No CLI (Expected):** Health, Version (public), Keys (agent-only), Budget protocol endpoints (agent-facing), Usage endpoints (basic tracking)
+- **Total CLI Commands:** 47 (covers 47/64 REST endpoints = 73% coverage)
+
+**Gaps Analysis:**
+1. **API Tokens:** Missing PUT (update), POST (validate), POST/:id/rotate commands
+2. **Limits:** Missing POST (create), GET/:id (get), PUT/:id (update), DELETE/:id (delete) - only has get/set for agent budgets
+3. **Usage:** `/api/usage/*` endpoints not exposed in CLI (use `/api/v1/analytics/*` instead via `.analytics` commands)
+4. **Health/Version:** Public monitoring endpoints intentionally not exposed in CLI
+5. **Keys:** `/api/v1/keys` is user token endpoint, agent-only access, not needed in CLI
+6. **Budget Protocol:** Agent-facing endpoints not exposed in CLI (used by iron_runtime directly)
+
+**Recent Changes (2025-12-14):**
+- ✅ Implemented `/api/v1/version` endpoint (build-time metadata with `vergen`)
+- ✅ Removed `version` field from `/api/health` response (rollback impossible via type system)
+- ✅ Documented `/api/keys` endpoint (Protocol 018: Keys API)
+- ✅ Removed `/api/traces` debugging endpoint (inappropriate for production)
+- ✅ Documented `/api/usage` vs `/api/v1/analytics` distinction (Protocol 012, different data sources and purposes)
+
 ### ❌ Missing Resources (Intentionally Not Exposed)
 
 **Entities Without Direct API:**
@@ -432,7 +552,7 @@ Understand all available REST API resources, how they map to domain entities, an
 - **User** - Now has direct CRUD API at `/api/users` (Certain, admin-only access with RBAC, [008_user_management_api.md](../protocol/008_user_management_api.md))
 - **Master Project** - Now has read-only API at `/api/projects` (NICE-TO-HAVE, returns single Master Project in Pilot, [015_projects_api.md](../protocol/015_projects_api.md))
 
-## Transition Criteria
+### Transition Criteria
 
 **When Uncertain → Certain:**
 
@@ -449,8 +569,58 @@ Understand all available REST API resources, how they map to domain entities, an
 3. Design alternatives unclear
 4. Not blocking other work
 
+### Cross-References
+
+#### Related Principles Documents
+- Design Philosophy - API design consistency principle, resource taxonomy clarity, CLI-API parity
+- Quality Attributes - Completeness (exhaustive 23-resource catalog), Consistency (four resource type patterns), Developer Experience (CLI parity for all user-facing resources)
+
+#### Related Architecture Documents
+- [Architecture: Entity Model](007_entity_model.md) - Seven core entities (User, Master Project, Project, Agent, IP, IC Token, Budget Change Request) with relationships, Entity Resources map 1:1 or 1:N to these entities
+- [Architecture: Roles and Permissions](006_roles_and_permissions.md) - Three roles (Admin, User, Viewer) determine User Token access scope for API resources, admin-only resources restricted
+- [Architecture: Data Flow](004_data_flow.md) - API requests follow eleven-step flow (IC Token validation → Provider → Response), applies to all resource types
+- [Architecture: Service Integration](005_service_integration.md) - Control Panel Gateway service (port 8080) exposes all cataloged API resources via HTTP endpoints
+
+#### Used By
+- [Protocol: REST API Protocol](../protocol/002_rest_api_protocol.md) - Defines HTTP conventions, status codes, error handling for all 23 cataloged resources
+- [Protocol: Budget Control Protocol](../protocol/005_budget_control_protocol.md) - Implements Operation Resources `/api/budget/handshake`, `/api/budget/report`, `/api/budget/refresh`
+- [Protocol: Token Management API](../protocol/006_token_management_api.md) - Implements Entity Resource `/api/tokens` (IC Token CRUD)
+- [Protocol: Authentication API](../protocol/007_authentication_api.md) - Implements Operation Resources `/api/auth` (login, refresh, logout)
+- [Protocol: User Management API](../protocol/008_user_management_api.md) - Implements Entity Resource `/api/users` (admin-only CRUD)
+- [Protocol: Agents API](../protocol/010_agents_api.md) - Implements Entity Resource `/api/agents` (agent lifecycle CRUD)
+- [Protocol: Providers API](../protocol/011_providers_api.md) - Implements Entity Resource `/api/providers` (IP integration CRUD)
+- [Protocol: Analytics API](../protocol/012_analytics_api.md) - Implements Analytics Resources `/api/usage`, `/api/metrics`, `/api/analytics/*`
+- [Protocol: Budget Limits API](../protocol/013_budget_limits_api.md) - Implements Configuration Resource `/api/limits` (budget threshold configuration)
+- [Protocol: API Tokens API](../protocol/014_api_tokens_api.md) - Implements Entity Resource `/api/api-tokens` (dashboard authentication tokens)
+- [Protocol: Projects API](../protocol/015_projects_api.md) - Implements Entity Resource `/api/projects` (read-only Pilot, full CRUD post-Pilot)
+- [Protocol: Settings API](../protocol/016_settings_api.md) - Implements Configuration Resource `/api/settings` (system-wide configuration)
+- [Protocol: Budget Requests API](../protocol/017_budget_requests_api.md) - Implements Entity Resource `/api/budget/requests` (budget modification requests)
+- Python SDK Implementation - Maps API resources to SDK methods (e.g., `sdk.tokens.create()` → `POST /api/tokens`)
+- iron CLI Implementation - Maps API resources to command groups (e.g., `iron tokens list` → `GET /api/tokens`)
+- Web Dashboard - Consumes User Token authenticated resources for visual management interface
+- iron_runtime - Consumes IC Token authenticated Operation Resources for budget control
+
+#### Dependencies
+- [Architecture: Entity Model](007_entity_model.md) - Seven entities define Entity Resources mapping (1:1 direct, 1:N multiple resources per entity)
+- [Architecture: Roles and Permissions](006_roles_and_permissions.md) - Three roles (Admin, User, Viewer) determine resource access control
+- [Protocol: REST API Protocol](../protocol/002_rest_api_protocol.md) - HTTP conventions, status codes, error handling framework for all resources
+- HTTP Standard - RESTful resource design principles (GET read, POST create, PUT update, DELETE remove)
+- JWT Standard - Authentication token format for IC Token and User Token patterns
+
+#### Implementation
+- Control Panel Gateway: HTTP server (port 8080) exposing all 23 API resources
+- Entity Resources: CRUD endpoints with 1:1 or 1:N entity mapping (e.g., `/api/tokens`, `/api/agents`)
+- Operation Resources: RPC-style POST endpoints for multi-entity actions (e.g., `/api/auth`, `/api/budget/handshake`)
+- Analytics Resources: GET-only endpoints returning derived aggregations (e.g., `/api/usage`, `/api/metrics`)
+- Configuration Resources: Admin-only endpoints for system settings (e.g., `/api/limits`, `/api/settings`)
+- System Resources: Public endpoints for operational monitoring (e.g., `/api/health`, `/api/version`)
+- IC Token Authentication: `Authorization: Bearer ic_...` header for agent runtime resources
+- User Token Authentication: `Authorization: Bearer ...` header for Control Panel resources
+- CLI Commands: `iron <resource-group> <action>` mapping to API endpoints (e.g., `iron tokens list` → `GET /api/tokens`)
+- SDK Methods: `sdk.<resource_group>.<action>()` mapping to API endpoints (e.g., `sdk.tokens.create()` → `POST /api/tokens`)
+
 ---
 
 *Related: [007_entity_model.md](007_entity_model.md) (entities) | [../protocol/002_rest_api_protocol.md](../protocol/002_rest_api_protocol.md) (API protocol) | [../protocol/005_budget_control_protocol.md](../protocol/005_budget_control_protocol.md) (budget protocol)*
 
-**Last Updated:** 2025-12-10
+**Last Updated:** 2025-12-13
