@@ -36,11 +36,13 @@ variable "BUCKET_NAME" {
 # JWT secret key for signing access and refresh tokens
 variable "JWT_SECRET" {
   description = "JWT secret key for signing access and refresh tokens"
+  sensitive   = true
 }
 
 # Master key for AES-256-GCM encryption of AI provider API keys
 variable "IRON_SECRETS_MASTER_KEY" {
   description = "Master key for AES-256-GCM encryption of AI provider API keys"
+  sensitive   = true
 }
 
 # SQLite connection string for pilot mode
@@ -56,11 +58,13 @@ variable "TAG" {
 # Secret key used to sign and validate IP-based access tokens
 variable "IP_TOKEN_KEY" {
   description = "Secret key used to sign and validate IP-based access tokens"
+  sensitive   = true
 }
 
 # Secret used to sign and verify internal Iron Cage authentication tokens
 variable "IC_TOKEN_SECRET" {
   description = "Secret used to sign and verify internal Iron Cage authentication tokens"
+  sensitive   = true
 }
 
 # Comma-separated list of allowed CORS origins for API access
