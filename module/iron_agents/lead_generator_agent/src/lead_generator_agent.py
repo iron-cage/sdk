@@ -6,6 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
 from apollo_tools import tools_list
+from openai import OpenAI, AsyncOpenAI
 
 try:
     from iron_cage import LlmRouter
@@ -27,11 +28,11 @@ def get_router_config(mode_selection):
         # Check if token exists
         if os.environ.get("IC_TOKEN"):
             # If both token and server URL exist - use server mode
-            server_url = os.environ.get("IC_SERVER", "http://localhost:8080")
+            # Default to local dev control plane
+            server_url = os.environ.get("IC_SERVER", "http://localhost:3001")
             return {
                 "api_key": os.environ["IC_TOKEN"],
                 "server_url": server_url,
-                "budget": 10.0
             }
         else:
             raise ValueError("Mode 2 selected, but IC_TOKEN not found in secrets!")
@@ -42,7 +43,6 @@ def get_router_config(mode_selection):
         if os.environ.get("OPENAI_API_KEY"):
             return {
                 "provider_key": os.environ["OPENAI_API_KEY"],
-                "budget": 5.0
             }
         else:
             raise ValueError("Mode 3 selected, but OPENAI_API_KEY not found!")
@@ -71,29 +71,49 @@ def setup_llm():
 
         # === OPTION WITHOUT ROUTER (Direct) ===
         if not router_config:
-            print("> Initializing Direct OpenAI Connection...")
+            print("> Initializing Direct OpenAI Connection (LangChain)...")
             if not os.environ.get("OPENAI_API_KEY"):
                 print("❌ Error: OPENAI_API_KEY missing.")
                 sys.exit(1)
-            return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+            print("⚠️  Direct mode: no proxy/analytics/budget enforcement.")
+            return ChatOpenAI(model="gpt-4o-mini", temperature=0), None, False
 
         # === OPTION WITH ROUTER (Iron Cage) ===
         print(f"\n> Initializing Iron Cage Router...")
-        
-        # Here we simply pass the dictionary as arguments (**kwargs)
-        # This works for both {api_key, server_url} and {provider_key} configs
-        router = LlmRouter(**router_config)
-        
-        print(f"> Connected via Proxy on port {router.port}")
-        if router.budget:
-            print(f"> Budget Limit: ${router.budget}")
 
-        return ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-            base_url=router.base_url,
-            api_key=router.api_key
-        )
+        router = LlmRouter(**router_config)
+
+        print(f"> Connected via Proxy on port {router.port}")
+        # Budget is server-controlled in mode 2; local budget only applies in mode 3 if provided.
+        if router_config.get("server_url"):
+            print(f"> Server URL: {router_config['server_url']}")
+        proxy_base = router.base_url.rstrip("/")
+        print(f"> Proxy base URL: {proxy_base}")
+
+        # Mode-specific client:
+        if router_config.get("server_url"):
+            # Mode 2 (server): use raw OpenAI SDK to match E2E behavior
+            os.environ["OPENAI_BASE_URL"] = proxy_base
+            os.environ["OPENAI_API_KEY"] = router.api_key
+            client = OpenAI(base_url=proxy_base, api_key=router.api_key)
+            AsyncOpenAI.default_client = AsyncOpenAI(base_url=proxy_base, api_key=router.api_key)
+            print("\n--- Initialized OpenAI Client (SDK) ---")
+            print(client)
+            print("---------------------------------------")
+            return client, router, True
+        else:
+            # Mode 3 (local proxy): keep LangChain client
+            llm = ChatOpenAI(
+                model="gpt-4o-mini",
+                base_url=proxy_base,
+                api_key=router.api_key    # proxy expects this token
+            )
+            OpenAI.default_client = OpenAI(base_url=proxy_base, api_key=router.api_key)
+            AsyncOpenAI.default_client = AsyncOpenAI(base_url=proxy_base, api_key=router.api_key)
+            print("\n--- Initialized ChatOpenAI Object Log ---")
+            print(llm)
+            print("-----------------------------------------")
+            return llm, router, False
 
     except Exception as e:
         print(f"❌ Error setting up LLM: {e}")
@@ -115,41 +135,64 @@ def main():
     print("|         LeadGen Agent         |")
     print("--------------------------------")
     
-    llm = setup_llm()
+    llm, router, use_openai_sdk = setup_llm()
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-    
-    agent = create_tool_calling_agent(llm, tools_list, prompt)
-    
-    agent_executor = AgentExecutor(
-        agent=agent, 
-        tools=tools_list, 
-        verbose=True,
-        handle_parsing_errors=True
-    )
+    if not use_openai_sdk:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+        
+        agent = create_tool_calling_agent(llm, tools_list, prompt)
+        
+        agent_executor = AgentExecutor(
+            agent=agent, 
+            tools=tools_list, 
+            verbose=True,
+            handle_parsing_errors=True
+        )
     
     print("\nAgent is ready. Waiting for commands.")
-    while True:
-        try:
-            user_query = input("\nEnter query (or 'exit'): ")
-            if user_query.lower() in ['exit', 'quit']: break
-            if not user_query.strip(): continue
-
-            print("Processing...")
-            result = agent_executor.invoke({"input": user_query})
-            
-            raw = result["output"].replace("```json", "").replace("```", "").strip()
+    try:
+        while True:
             try:
-                print("\nRESULT (JSON):")
-                print(json.dumps(json.loads(raw), indent=2, ensure_ascii=False))
-            except:
-                print(raw)
-        except Exception as e:
-            print(f"Error: {e}")
+                user_query = input("\nEnter query (or 'exit'): ")
+                if user_query.lower() in ['exit', 'quit']: break
+                if not user_query.strip(): continue
+
+                if router:
+                    print(f"Processing... (proxy {router.base_url})")
+                else:
+                    print("Processing... (direct OpenAI)")
+
+                if use_openai_sdk:
+                    # Simple SDK call (no tools) in server mode
+                    response = llm.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_query},
+                        ],
+                    )
+                    answer = response.choices[0].message.content
+                    print("\nRESULT:")
+                    print(answer)
+                else:
+                    result = agent_executor.invoke({"input": user_query})
+                    
+                    raw = result["output"].replace("```json", "").replace("```", "").strip()
+                    try:
+                        print("\nRESULT (JSON):")
+                        print(json.dumps(json.loads(raw), indent=2, ensure_ascii=False))
+                    except:
+                        print(raw)
+            except Exception as e:
+                print(f"Error: {e}")
+    finally:
+        # Keep router alive for the session; stop it on exit.
+        if router and getattr(router, "is_running", False):
+            router.stop()
 
 if __name__ == "__main__":
     main()
