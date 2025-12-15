@@ -37,6 +37,7 @@ const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviderKeyId = ref<number | null>(null)
+const initialBudgetUsd = ref<number | null>(null)
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -96,12 +97,13 @@ const { data: providers } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_id?: number | null }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
     selectedProviderKeyId.value = null
+    initialBudgetUsd.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -146,6 +148,11 @@ function handleCreateAgent() {
     return
   }
 
+  if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
+    createError.value = 'Initial budget (USD) is required and must be positive'
+    return
+  }
+
   const providerKeyId = Number(selectedProviderKeyId.value)
   const providerRecord = providers.value?.find(p => p.id === providerKeyId)
   if (!providerRecord) {
@@ -153,11 +160,14 @@ function handleCreateAgent() {
     return
   }
 
+  const budgetMicros = Math.round(initialBudgetUsd.value * 1_000_000)
+
   createError.value = ''
   createMutation.mutate({
     name: name.value,
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
+    initial_budget_microdollars: budgetMicros,
   })
 }
 
@@ -499,7 +509,7 @@ async function copyTokenToClipboard() {
           </div>
 
           <div class="space-y-2">
-            <Label for="create-provider-key">Assigned Provider Key (optional)</Label>
+            <Label for="create-provider-key">Assigned Provider Key (required)</Label>
             <select
               id="create-provider-key"
               v-model="selectedProviderKeyId"
@@ -515,6 +525,22 @@ async function copyTokenToClipboard() {
                 {{ providerKey.id }} - {{ providerKey.provider }}
               </option>
             </select>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="create-budget">Initial Budget (USD)</Label>
+            <Input
+              id="create-budget"
+              v-model.number="initialBudgetUsd"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="10.00"
+              :disabled="createMutation.isPending.value"
+            />
+            <p class="text-xs text-gray-500">
+              Required. Used to create the agent's budget (microdollars on backend).
+            </p>
           </div>
         </div>
 
@@ -562,7 +588,7 @@ async function copyTokenToClipboard() {
           </div>
 
           <div class="space-y-2">
-            <Label for="update-provider-key">Assigned Provider Key (optional)</Label>
+            <Label for="update-provider-key">Assigned Provider Key</Label>
             <select
               id="update-provider-key"
               v-model="selectedProviderKeyId"
