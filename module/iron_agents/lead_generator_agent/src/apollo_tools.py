@@ -1,7 +1,14 @@
 import requests
 import json
-from langchain.tools import tool
-from config import APOLLO_API_KEY
+try:
+    from langchain_core.tools import tool
+except ImportError:  # pragma: no cover
+    from langchain.tools import tool
+
+try:
+    from config import APOLLO_API_KEY
+except ImportError:  # pragma: no cover
+    from .config import APOLLO_API_KEY
 
 # --- Tool for Searching Leads ---
 @tool
