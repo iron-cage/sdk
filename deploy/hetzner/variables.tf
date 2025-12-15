@@ -53,6 +53,26 @@ variable "TAG" {
   description = "Docker image tag"
 }
 
+# Secret key used to sign and validate IP-based access tokens
+variable "IP_TOKEN_KEY" {
+  description = "Secret key used to sign and validate IP-based access tokens"
+}
+
+# Secret used to sign and verify internal Iron Cage authentication tokens
+variable "IC_TOKEN_SECRET" {
+  description = "Secret used to sign and verify internal Iron Cage authentication tokens"
+}
+
+# Comma-separated list of allowed CORS origins for API access
+variable "ALLOWED_ORIGINS" {
+  description = "Comma-separated list of allowed CORS origins for API access"
+}
+
+# TCP port on which the backend HTTP API listens for incoming requests
+variable "SERVER_PORT" {
+  description = "TCP port on which the backend HTTP API listens for incoming requests"
+}
+
 # Google Cloud Platform credentials
 data "local_sensitive_file" "service_account_creds" {
   filename = var.GOOGLE_SE_CREDS_PATH

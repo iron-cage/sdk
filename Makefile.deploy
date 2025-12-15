@@ -31,6 +31,10 @@ REQUIRED_SECRET_VARIABLES:= \
 	DATABASE_URL \
 	JWT_SECRET \
 	IRON_SECRETS_MASTER_KEY \
+	IP_TOKEN_KEY \
+	IC_TOKEN_SECRET \
+	ALLOWED_ORIGINS \
+	SERVER_PORT
 
 $(foreach v,$(REQUIRED_SECRET_VARIABLES),\
   $(if $($v),,$(error Required secret variable '$(v)' is missing or empty after including $(LOCAL_SECRETS_FILE))))
@@ -44,6 +48,10 @@ PROJECT_NAME 				:= $(call strip_quotes,$(PROJECT_NAME))
 DATABASE_URL 				:= $(call strip_quotes,$(DATABASE_URL))
 JWT_SECRET 					:= $(call strip_quotes,$(JWT_SECRET))
 IRON_SECRETS_MASTER_KEY 	:= $(call strip_quotes,$(IRON_SECRETS_MASTER_KEY))
+IP_TOKEN_KEY 				:= $(call strip_quotes,$(IP_TOKEN_KEY))
+IC_TOKEN_SECRET 			:= $(call strip_quotes,$(IC_TOKEN_SECRET))
+ALLOWED_ORIGINS 			:= $(call strip_quotes,$(ALLOWED_ORIGINS))
+SERVER_PORT 				:= $(call strip_quotes,$(SERVER_PORT))
 
 export ENVIRONMENT ?= test
 ENVIRONMENT 				:= $(call strip_quotes,$(ENVIRONMENT))
@@ -129,6 +137,10 @@ deploy: check_gcp_keys check_env_variables build_image
 	-e TF_VAR_DATABASE_URL="$(DATABASE_URL)" \
 	-e TF_VAR_ENVIRONMENT="$(ENVIRONMENT)" \
 	-e TF_VAR_TAG="$(TAG)" \
+	-e TF_VAR_IP_TOKEN_KEY="$(IP_TOKEN_KEY)" \
+	-e TF_VAR_IC_TOKEN_SECRET="$(IC_TOKEN_SECRET)" \
+	-e TF_VAR_ALLOWED_ORIGINS="$(ALLOWED_ORIGINS)" \
+	-e TF_VAR_SERVER_PORT="$(SERVER_PORT)" \
 	-e CSP="$(CSP)" \
 	-e TF_VAR_GOOGLE_SE_CREDS_PATH="/app/$(GOOGLE_SE_CREDS_PATH)" \
 	-e GOOGLE_APPLICATION_CREDENTIALS="/app/$(GOOGLE_SE_CREDS_PATH)" \
@@ -243,6 +255,10 @@ z_destroy_all:
 			-e TF_VAR_JWT_SECRET="$(JWT_SECRET)" \
 			-e TF_VAR_IRON_SECRETS_MASTER_KEY="$(IRON_SECRETS_MASTER_KEY)" \
 			-e TF_VAR_DATABASE_URL="$(DATABASE_URL)" \
+			-e TF_VAR_IP_TOKEN_KEY="$(IP_TOKEN_KEY)" \
+			-e TF_VAR_IC_TOKEN_SECRET="$(IC_TOKEN_SECRET)" \
+			-e TF_VAR_ALLOWED_ORIGINS="$(ALLOWED_ORIGINS)" \
+			-e TF_VAR_SERVER_PORT="$(SERVER_PORT)" \
 			-e CSP="$(CSP)" \
 			-e TF_VAR_SECRET_RSA_PRIVATE_KEY_PATH="/app/$(SECRET_RSA_PRIVATE_KEY_PATH)" \
 			-e TF_VAR_SECRET_RSA_PUBLIC_KEY_PATH="/app/$(SECRET_RSA_PUBLIC_KEY_PATH)" \

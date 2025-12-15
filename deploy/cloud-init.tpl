@@ -28,6 +28,10 @@ write_files:
       JWT_SECRET=${jwt_secret}
       IRON_SECRETS_MASTER_KEY=${iron_secrets_master_key}
       DATABASE_URL=${database_url}
+      IP_TOKEN_KEY=${ip_token_key}
+      IC_TOKEN_SECRET=${ic_token_key}
+      ALLOWED_ORIGINS=${allowed_origins}
+      SERVER_PORT=${server_port}
 
   - path: /root/init.sh
     permissions: '0700'
