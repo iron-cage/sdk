@@ -52,6 +52,19 @@ pub struct UpdateAgentRequest {
     pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateAgentBudgetRequest {
+    pub total_allocated_microdollars: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AgentBudgetResponse {
+    pub agent_id: i64,
+    pub total_allocated: i64,
+    pub total_spent: i64,
+    pub budget_remaining: i64,
+}
+
 /// List all agents (filtered by user role)
 pub async fn list_agents(
     State(pool): State<SqlitePool>,
@@ -468,6 +481,92 @@ pub async fn delete_agent(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT /api/v1/agents/:id/budget
+///
+/// Update an agent's total allocated budget (microdollars).
+/// Recomputes budget_remaining = total_allocated - total_spent.
+pub async fn update_agent_budget(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<i64>,
+    user: AuthenticatedUser,
+    Json(req): Json<UpdateAgentBudgetRequest>,
+) -> Result<Json<AgentBudgetResponse>, (StatusCode, String)> {
+    if user.0.role != "admin" {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Only administrators can update agent budgets".to_string(),
+        ));
+    }
+
+    if req.total_allocated_microdollars <= 0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "total_allocated_microdollars must be positive".to_string(),
+        ));
+    }
+
+    // Ensure agent exists and get owner_id (for potential future checks)
+    let agent_exists: Option<String> = sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))?;
+
+    if agent_exists.is_none() {
+        return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
+    }
+
+    // Get current spent (create row if missing)
+    let budget_row: Option<(i64,)> = sqlx::query_as(
+        "SELECT total_spent FROM agent_budgets WHERE agent_id = ?"
+    )
+    .bind(id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))?;
+
+    let total_spent = budget_row.map(|r| r.0).unwrap_or(0);
+
+    if req.total_allocated_microdollars < total_spent {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "total_allocated_microdollars cannot be less than total_spent".to_string(),
+        ));
+    }
+
+    let budget_remaining = req.total_allocated_microdollars - total_spent;
+    let now_ms = chrono::Utc::now().timestamp_millis();
+
+    // Upsert budget row
+    sqlx::query(
+        r#"
+        INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(agent_id) DO UPDATE SET
+          total_allocated = excluded.total_allocated,
+          total_spent = agent_budgets.total_spent,
+          budget_remaining = excluded.total_allocated - agent_budgets.total_spent,
+          updated_at = excluded.updated_at
+        "#
+    )
+    .bind(id)
+    .bind(req.total_allocated_microdollars)
+    .bind(total_spent)
+    .bind(budget_remaining)
+    .bind(now_ms)
+    .bind(now_ms)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))?;
+
+    Ok(Json(AgentBudgetResponse {
+        agent_id: id,
+        total_allocated: req.total_allocated_microdollars,
+        total_spent,
+        budget_remaining,
+    }))
 }
 
 /// Token list item for agent tokens endpoint

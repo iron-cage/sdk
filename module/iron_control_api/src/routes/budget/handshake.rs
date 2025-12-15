@@ -11,6 +11,7 @@ use axum::
   response::{ IntoResponse, Json },
 };
 use iron_token_manager::provider_key_storage::ProviderType;
+use iron_token_manager::error::TokenError;
 use serde::{ Deserialize, Serialize };
 use uuid::Uuid;
 
@@ -396,7 +397,7 @@ pub async fn handshake(
   let _key_record = match state.provider_key_storage.get_key( key_id ).await
   {
     Ok( record ) => record,
-    Err( crate::error::TokenError::Database( sqlx::Error::RowNotFound ) ) =>
+    Err( TokenError::Database( sqlx::Error::RowNotFound ) ) =>
     {
       return (
         StatusCode::NOT_FOUND,
@@ -525,14 +526,22 @@ pub async fn handshake(
     "Budget lease granted, deducted from usage_limits"
   );
 
+  let budget_remaining_after = state
+    .agent_budget_manager
+    .get_budget_status( agent_id )
+    .await
+    .ok()
+    .flatten()
+    .map( |b| b.budget_remaining )
+    .unwrap_or( 0 );
+
   // Return successful handshake response
-  // budget_remaining is 0 because we grant the full remaining budget as the lease
   ( StatusCode::OK, Json( HandshakeResponse
   {
     ip_token,
     lease_id,
     budget_granted: budget_to_grant,
-    budget_remaining: 0, // Full budget granted to lease
+    budget_remaining: budget_remaining_after,
     expires_at: None, // No expiration by default
   } ) )
     .into_response()
