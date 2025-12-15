@@ -4,6 +4,19 @@
 
 ---
 
+## ⚠️ CRITICAL: Default Execution Location
+
+**By default (95% of deployments), agents run LOCALLY on the developer machine, NOT in the cloud.**
+
+- **Local Execution (Default, 95%):** Agents run as local processes on developer machine. No Kubernetes, no containers, no cloud deployment. The Runtime intercepts LLM calls via iron_sdk and runs all safety/cost/audit checks locally before sending prompts to LLM providers.
+- **Server Execution (Future, 5%):** Agents run in cloud (Kubernetes pods) for hosted execution. This document describes the server execution architecture.
+
+**This document describes the Kubernetes-based orchestration architecture for server execution mode (future capability). The default local execution mode does not use Kubernetes - agents simply run as local processes.**
+
+**Key Privacy Guarantee:** In local mode (default), no data leaves the developer machine - all checks happen before sending prompts to LLM providers.
+
+---
+
 ## User Need
 
 Running AI agents in production requires:
@@ -12,7 +25,7 @@ Running AI agents in production requires:
 - Recovering from failures automatically
 - Updating agents without downtime
 
-## Core Idea
+## Core Idea (Server Execution Mode Only)
 
 Provide a **thin orchestration layer** on top of Kubernetes that:
 1. Manages agent lifecycle (deploy, scale, terminate)

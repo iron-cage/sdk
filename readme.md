@@ -4,48 +4,23 @@ Control Panel and Agent Runtime for Iron Cage AI agent management.
 
 ## Overview
 
-**iron_runtime** is one of two repositories in the Iron Cage project:
-- **iron_runtime** (this repo) - Control Panel, Agent Runtime, runtime services
-- **iron_cage** - Sandboxing only (OS-level isolation via Landlock, seccomp, rlimits)
-
-This repository contains the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
+Iron Runtime provides the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
 
 ## Architecture at a Glance
 
-This simplified diagram shows Iron Cage's three-boundary architecture at the highest level, designed for board presentations and non-technical stakeholders.
+This diagram shows Iron Cage's three-boundary architecture at the highest level, designed for architecture reviews and technical stakeholders.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                   IRON CAGE ARCHITECTURE                            │
-└─────────────────────────────────────────────────────────────────────┘
+![Iron Cage Architecture - Three-Boundary Model](asset/architecture3.webp)
 
-        DEVELOPER                  YOUR CLOUD                OPENAI/ANTHROPIC
-        (Private)                  (Controlled)              (3rd Party)
-
-    ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-    │              │  Setup   │ Control Panel│          │              │
-    │  AI Agent    │─Token(1)─>│ (Management) │          │              │
-    │+ iron_sdk    │          └──────────────┘          │              │
-    │              │                  ║                 │              │
-    │  Your Code   │          ┌──────────────┐          │  LLM API     │
-    │  Your Data   │  Prompt  │   Gateway    │  Prompt  │              │
-    │  RAG Docs    │─IC Token─>│  (Runtime)   │─IP Token─>│  Process    │
-    │              │   (2)    │              │   (3)    │  Request     │
-    │  Responses   │<─────────│  + Safety    │<─────────│              │
-    │              │          │  + Cost      │          │              │
-    └──────────────┘          │  + Audit     │          └──────────────┘
-                              └──────────────┘
-                                     ║
-                              (async logging)
-
-    ✓ Runs Locally            ✓ Your Control           ⚠️ Third Party
-    ✓ Code NEVER Sent         ✓ Budget Limits          ⚠️ Prompts Sent
-    ✓ Data NEVER Sent         ✓ Safety Rules           ⚠️ Provider ToS
-```
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally
+- **Middle (Your Cloud - Management Plane):** Control Panel for setup and management - **NOT IN DATA PATH**
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+- **Critical:** Request/response arrows go **AROUND** Control Panel (bypass architecture)
 
 **Key Points:**
-- **Left (Developer Machine):** Agent + iron_sdk run 100% locally. Your code, data, and RAG documents NEVER leave your machine. Only prompts are sent out.
-- **Middle (Your Cloud):** Control Panel manages users/agents/tokens (setup only, step 1). Gateway validates requests and translates IC Token → IP Token (runtime only, steps 2-3).
+- **Left (Developer Machine):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally. Nothing leaves your machine except prompts after local validation.
+- **Middle (Your Cloud):** Control Panel ONLY for setup and management. NOT in request path. Handles user management, token generation, and analytics.
 - **Right (Third Party):** LLM provider receives only prompts with IP Token. Never sees your code, data, or IC Token.
 
 **Business Value:**
@@ -54,10 +29,6 @@ This simplified diagram shows Iron Cage's three-boundary architecture at the hig
 3. **Security:** Input/output validation protects against prompt injection, PII leaks, and credential exposure
 4. **Compliance:** Complete audit trail for regulatory requirements and accountability
 5. **Flexibility:** Use any LLM provider (OpenAI, Anthropic, custom) without vendor lock-in
-
-## Repository Architecture
-
-See [`docs/repository_architecture.md`](docs/repository_architecture.md) for complete documentation of the two-repository split.
 
 ## Workspace Organization
 
@@ -207,7 +178,7 @@ See [`contributing.md`](contributing.md) for contributor workflow.
 ## Status
 
 **Version:** 0.1.0
-**Status:** Migration in progress from iron_cage monorepo
+**Status:** Active development
 
 ## License
 

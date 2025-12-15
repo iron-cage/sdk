@@ -1,5 +1,18 @@
 # Architecture: Service Integration
 
+## ⚠️ CRITICAL: Default Deployment Location
+
+**By default, ALL runtime services (Gateway, Safety, Cost, Tool Proxy, Audit) run LOCALLY on the developer machine, NOT in the cloud.**
+
+- **Local Execution (Default, 95%):** Gateway + all services run as localhost processes on developer machine alongside the agent
+- **Server Execution (Future, 5%):** Gateway + services may run in cloud for hosted agent execution
+
+**This document describes the service architecture and communication patterns. The deployment location (local vs cloud) does not change how services communicate with each other.**
+
+**Key Privacy Guarantee:** When running locally (default), no data leaves the developer machine - all checks happen before sending prompts to LLM providers.
+
+---
+
 ### Scope
 
 This document defines the five core runtime services and their communication patterns, with Gateway as the central orchestrator for Safety, Cost, Tool Proxy, and Audit services.
