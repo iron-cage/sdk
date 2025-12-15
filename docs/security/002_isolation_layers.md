@@ -1,5 +1,20 @@
 # Security: Isolation Layers
 
+## ⚠️ CRITICAL: Isolation Architecture Context
+
+**This document describes the multi-layer isolation architecture for Server Execution Mode (future, 5% of deployments).**
+
+**In Local Execution Mode (default, 95% of deployments):**
+- Agents run as local processes on developer machine
+- No container isolation (agents run in developer's environment)
+- Standard OS-level process isolation applies
+- Safety guaranteed by local Safety Service checking all LLM calls before sending
+- Agent code executes with developer's permissions and access
+
+**This multi-layer isolation architecture (containers, seccomp, Landlock, network policies) applies ONLY to Server Execution Mode** where agents run in cloud infrastructure (Kubernetes) and need strong isolation from each other and the host system.
+
+---
+
 ### Scope
 
 This document defines the four-layer isolation architecture for Iron Runtime's agent execution environment. It specifies isolation technologies, isolation modes, and escape prevention strategies through defense-in-depth design.
