@@ -62,7 +62,7 @@ interface LimitRecord {
   project_id?: string
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_cents?: number
+  max_cost_per_month_microdollars?: number  // Backend uses microdollars (1 cent = 10,000 microdollars)
   created_at: number
 }
 
@@ -71,26 +71,13 @@ interface CreateLimitRequest {
   project_id?: string
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_cents?: number
+  max_cost_per_month_microdollars?: number  // Backend uses microdollars
 }
 
 interface UpdateLimitRequest {
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_cents?: number
-}
-
-interface TraceRecord {
-  id: number
-  token_id: number
-  request_id: string
-  provider: string
-  model: string
-  input_tokens: number
-  output_tokens: number
-  cost: number
-  timestamp: number
-  metadata?: Record<string, unknown>
+  max_cost_per_month_microdollars?: number  // Backend uses microdollars
 }
 
 // AI Provider Key types
@@ -301,15 +288,6 @@ export function useApi() {
     })
   }
 
-  // Traces API methods
-  async function getTraces(): Promise<TraceRecord[]> {
-    return fetchApi<TraceRecord[]>('/api/v1/traces')
-  }
-
-  async function getTrace(id: number): Promise<TraceRecord> {
-    return fetchApi<TraceRecord>(`/api/v1/traces/${id}`)
-  }
-
   // Provider Key API methods
   async function getProviderKeys(): Promise<ProviderKey[]> {
     return fetchApi<ProviderKey[]>('/api/v1/providers')
@@ -470,6 +448,32 @@ export function useApi() {
   }
 
   // ============================================================================
+  // IC Token API (Agent Runtime Authentication)
+  // ============================================================================
+
+  async function generateIcToken(agentId: number): Promise<IcTokenResponse> {
+    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token`, {
+      method: 'POST',
+    })
+  }
+
+  async function getIcTokenStatus(agentId: number): Promise<IcTokenStatus> {
+    return fetchApi<IcTokenStatus>(`/api/v1/agents/${agentId}/ic-token`)
+  }
+
+  async function regenerateIcToken(agentId: number): Promise<IcTokenResponse> {
+    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token/regenerate`, {
+      method: 'POST',
+    })
+  }
+
+  async function revokeIcToken(agentId: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/agents/${agentId}/ic-token`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============================================================================
   // Analytics API (Protocol 012)
   // ============================================================================
 
@@ -589,8 +593,6 @@ export function useApi() {
     createLimit,
     updateLimit,
     deleteLimit,
-    getTraces,
-    getTrace,
     getProviderKeys,
     getProviderKey,
     createProviderKey,
@@ -615,6 +617,11 @@ export function useApi() {
     getAgentTokens,
     createAgentToken,
     updateTokenProvider,
+    // IC Token methods (agent runtime authentication)
+    generateIcToken,
+    getIcTokenStatus,
+    regenerateIcToken,
+    revokeIcToken,
     // Analytics (Protocol 012)
     getAnalyticsSpendingTotal,
     getAnalyticsSpendingByProvider,
@@ -653,6 +660,23 @@ export interface Agent {
   name: string
   providers: string[]
   created_at: number
+  has_ic_token?: boolean
+  ic_token_created_at?: number
+}
+
+// IC Token types
+export interface IcTokenResponse {
+  agent_id: number
+  ic_token: string
+  created_at: number
+  warning: string
+  old_token_invalidated?: boolean
+}
+
+export interface IcTokenStatus {
+  agent_id: number
+  has_ic_token: boolean
+  created_at: number | null
 }
 
 export type {
@@ -664,7 +688,6 @@ export type {
   LimitRecord,
   CreateLimitRequest,
   UpdateLimitRequest,
-  TraceRecord,
   ProviderType,
   ProviderKey,
   CreateProviderKeyRequest,

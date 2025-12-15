@@ -38,7 +38,7 @@ const { data: limits, isLoading, error, refetch } = useQuery({
 
 // Create limit mutation
 const createMutation = useMutation({
-  mutationFn: ( data: { user_id: string; project_id?: string; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_cents?: number } ) =>
+  mutationFn: ( data: { user_id: string; project_id?: string; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_microdollars?: number } ) =>
     api.createLimit( data ),
   onSuccess: () => {
     showCreateModal.value = false
@@ -52,8 +52,8 @@ const createMutation = useMutation({
 
 // Update limit mutation
 const updateMutation = useMutation({
-  mutationFn: ( data: { id: number; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_cents?: number } ) =>
-    api.updateLimit( data.id, { max_tokens_per_day: data.max_tokens_per_day, max_requests_per_minute: data.max_requests_per_minute, max_cost_per_month_cents: data.max_cost_per_month_cents } ),
+  mutationFn: ( data: { id: number; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_microdollars?: number } ) =>
+    api.updateLimit( data.id, { max_tokens_per_day: data.max_tokens_per_day, max_requests_per_minute: data.max_requests_per_minute, max_cost_per_month_microdollars: data.max_cost_per_month_microdollars } ),
   onSuccess: () => {
     showEditModal.value = false
     editingLimit.value = null
@@ -81,6 +81,16 @@ function resetForm() {
   editError.value = ''
 }
 
+// Convert cents to microdollars (1 cent = 10,000 microdollars)
+function centsToMicrodollars( cents: number | undefined ): number | undefined {
+  return cents ? cents * 10000 : undefined
+}
+
+// Convert microdollars to cents (1 cent = 10,000 microdollars)
+function microdollarsToCents( microdollars: number | undefined ): number | undefined {
+  return microdollars ? Math.round( microdollars / 10000 ) : undefined
+}
+
 function handleCreateLimit() {
   createError.value = ''
 
@@ -93,9 +103,11 @@ function handleCreateLimit() {
   createMutation.mutate({
     user_id: authStore.username || 'default',
     project_id: projectId.value || undefined,
-    max_tokens_per_day: maxTokensPerDay.value,
-    max_requests_per_minute: maxRequestsPerMinute.value,
-    max_cost_per_month_cents: maxCostPerMonthCents.value,
+    // Convert empty string/falsy to undefined (backend expects i64 or null, not "")
+    max_tokens_per_day: maxTokensPerDay.value || undefined,
+    max_requests_per_minute: maxRequestsPerMinute.value || undefined,
+    // Convert cents (UI) to microdollars (backend)
+    max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
   })
 }
 
@@ -103,7 +115,8 @@ function openEditModal( limit: LimitRecord ) {
   editingLimit.value = limit
   maxTokensPerDay.value = limit.max_tokens_per_day
   maxRequestsPerMinute.value = limit.max_requests_per_minute
-  maxCostPerMonthCents.value = limit.max_cost_per_month_cents
+  // Convert microdollars (backend) to cents (UI)
+  maxCostPerMonthCents.value = microdollarsToCents( limit.max_cost_per_month_microdollars )
   editError.value = ''
   showEditModal.value = true
 }
@@ -120,9 +133,11 @@ function handleUpdateLimit() {
 
   updateMutation.mutate({
     id: editingLimit.value.id,
-    max_tokens_per_day: maxTokensPerDay.value,
-    max_requests_per_minute: maxRequestsPerMinute.value,
-    max_cost_per_month_cents: maxCostPerMonthCents.value,
+    // Convert empty string/falsy to undefined (backend expects i64 or null, not "")
+    max_tokens_per_day: maxTokensPerDay.value || undefined,
+    max_requests_per_minute: maxRequestsPerMinute.value || undefined,
+    // Convert cents (UI) to microdollars (backend)
+    max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
   })
 }
 
@@ -206,7 +221,7 @@ function formatCost( cents: number ): string {
               {{ limit.max_requests_per_minute?.toLocaleString() || '-' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-              {{ limit.max_cost_per_month_cents ? formatCost( limit.max_cost_per_month_cents ) : '-' }}
+              {{ limit.max_cost_per_month_microdollars ? formatCost( microdollarsToCents( limit.max_cost_per_month_microdollars ) || 0 ) : '-' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate( limit.created_at ) }}

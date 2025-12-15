@@ -12,7 +12,7 @@ interface AuthTokens {
   token_type: string
   expires_in: number
   user: {
-    id: number
+    id: string  // User ID like 'user_admin' - used for FK relations
     email: string
     role: string
     name: string
@@ -87,7 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, credentials.email)
+    saveTokens(tokens, tokens.user.id)  // Use user.id for FK relations, not email
   }
 
   // Refresh access token
@@ -110,7 +110,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, username.value || 'unknown')
+    saveTokens(tokens, tokens.user.id)  // Use user.id from response
   }
 
   // Logout

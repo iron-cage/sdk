@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent } from '../composables/useApi'
+import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 
 import {
   Dialog,
@@ -39,12 +40,53 @@ const selectedProviders = ref<string[]>([])
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
+const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
+const icTokenStatusLoading = ref(false)
+const icTokenError = ref('')
+const tokenActionLoadingId = ref<number | null>(null)
+const showTokenDialog = ref(false)
+const tokenDialogValue = ref('')
+const tokenDialogAgentName = ref('')
+const tokenDialogWarning = ref('')
+const copyMessage = ref('')
 
 // Fetch agents
 const { data: agents, isLoading, error, refetch } = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
+
+// Fetch IC token status for each agent once agents are loaded
+watch(
+  () => agents?.value,
+  async (agentList) => {
+    if (!agentList) {
+      icTokenStatuses.value = {}
+      return
+    }
+
+    icTokenStatusLoading.value = true
+    icTokenError.value = ''
+    const statusMap: Record<number, IcTokenStatus> = {}
+
+    await Promise.all(
+      agentList.map(async (agent) => {
+        try {
+          const status = await api.getIcTokenStatus(agent.id)
+          statusMap[agent.id] = status
+        } catch (err) {
+          if (!icTokenError.value) {
+            icTokenError.value = err instanceof Error ? err.message : 'Failed to load IC token status'
+          }
+        }
+      })
+    )
+
+    icTokenStatuses.value = statusMap
+    icTokenStatusLoading.value = false
+  },
+  { immediate: true }
+)
 
 // Fetch providers for selection
 const { data: providers } = useQuery({
@@ -151,6 +193,106 @@ function toggleProvider(providerType: string) {
     selectedProviders.value.push(providerType)
   }
 }
+
+function formatTimestamp(timestamp?: number | null): string {
+  if (!timestamp) return '-'
+  // IC token timestamps are seconds; agent created_at is milliseconds. Normalize to ms for display.
+  const millis = timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000
+  return new Date(millis).toLocaleString()
+}
+
+function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
+  return icTokenStatuses.value[agentId]
+}
+
+async function handleGenerateIcToken(agent: Agent) {
+  tokenActionLoadingId.value = agent.id
+  icTokenError.value = ''
+  try {
+    const response = await api.generateIcToken(agent.id)
+    icTokenStatuses.value = {
+      ...icTokenStatuses.value,
+      [agent.id]: {
+        agent_id: agent.id,
+        has_ic_token: true,
+        created_at: response.created_at,
+      },
+    }
+    tokenDialogAgentName.value = agent.name
+    tokenDialogValue.value = response.ic_token
+    tokenDialogWarning.value = response.warning
+    copyMessage.value = ''
+    showTokenDialog.value = true
+  } catch (err) {
+    icTokenError.value = err instanceof Error ? err.message : 'Failed to generate IC token'
+  } finally {
+    tokenActionLoadingId.value = null
+  }
+}
+
+async function handleRegenerateIcToken(agent: Agent) {
+  if (!confirm(`Regenerate IC token for ${agent.name}? This will invalidate the current token.`)) {
+    return
+  }
+
+  tokenActionLoadingId.value = agent.id
+  icTokenError.value = ''
+  try {
+    const response = await api.regenerateIcToken(agent.id)
+    icTokenStatuses.value = {
+      ...icTokenStatuses.value,
+      [agent.id]: {
+        agent_id: agent.id,
+        has_ic_token: true,
+        created_at: response.created_at,
+      },
+    }
+    tokenDialogAgentName.value = agent.name
+    tokenDialogValue.value = response.ic_token
+    tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
+    copyMessage.value = ''
+    showTokenDialog.value = true
+  } catch (err) {
+    icTokenError.value = err instanceof Error ? err.message : 'Failed to regenerate IC token'
+  } finally {
+    tokenActionLoadingId.value = null
+  }
+}
+
+async function handleRevokeIcToken(agent: Agent) {
+  if (!confirm(`Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`)) {
+    return
+  }
+
+  tokenActionLoadingId.value = agent.id
+  icTokenError.value = ''
+  try {
+    await api.revokeIcToken(agent.id)
+    icTokenStatuses.value = {
+      ...icTokenStatuses.value,
+      [agent.id]: {
+        agent_id: agent.id,
+        has_ic_token: false,
+        created_at: null,
+      },
+    }
+  } catch (err) {
+    icTokenError.value = err instanceof Error ? err.message : 'Failed to revoke IC token'
+  } finally {
+    tokenActionLoadingId.value = null
+  }
+}
+
+async function copyTokenToClipboard() {
+  if (!tokenDialogValue.value) return
+
+  try {
+    await navigator.clipboard.writeText(tokenDialogValue.value)
+    copyMessage.value = 'Copied to clipboard'
+  } catch (err) {
+    copyMessage.value = err instanceof Error ? err.message : 'Copy failed'
+  }
+}
 </script>
 
 <template>
@@ -161,6 +303,10 @@ function toggleProvider(providerType: string) {
         Create Agent
       </Button>
     </div>
+
+    <Alert v-if="icTokenError" variant="destructive" class="mb-4">
+      <AlertDescription>{{ icTokenError }}</AlertDescription>
+    </Alert>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
@@ -187,6 +333,9 @@ function toggleProvider(providerType: string) {
               Providers
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              IC Token
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
             </th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -210,6 +359,32 @@ function toggleProvider(providerType: string) {
                 </span>
               </div>
             </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
+                Loading...
+              </div>
+              <div v-else>
+                <Badge
+                  v-if="getIcTokenStatus(agent.id)?.has_ic_token"
+                  variant="default"
+                >
+                  Active
+                </Badge>
+                <Badge
+                  v-else
+                  variant="outline"
+                  class="text-gray-700"
+                >
+                  None
+                </Badge>
+                <div
+                  v-if="getIcTokenStatus(agent.id)?.created_at"
+                  class="text-xs text-gray-500 mt-1"
+                >
+                  Created {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
+                </div>
+              </div>
+            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(agent.created_at) }}
             </td>
@@ -226,6 +401,29 @@ function toggleProvider(providerType: string) {
                   <DropdownMenuItem @click="router.push(`/agents/${agent.id}/tokens`)">
                     Manage Tokens
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
+                    @click="handleGenerateIcToken(agent)"
+                    :disabled="tokenActionLoadingId === agent.id"
+                  >
+                    {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
+                  </DropdownMenuItem>
+                  <template v-else>
+                    <DropdownMenuItem
+                      @click="handleRegenerateIcToken(agent)"
+                      :disabled="tokenActionLoadingId === agent.id"
+                    >
+                      {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      @click="handleRevokeIcToken(agent)"
+                      :disabled="tokenActionLoadingId === agent.id"
+                      class="text-red-600"
+                    >
+                      Revoke IC Token
+                    </DropdownMenuItem>
+                  </template>
                   <template v-if="authStore.isAdmin">
                     <DropdownMenuSeparator />
                     <DropdownMenuItem @click="openUpdateModal(agent)">
@@ -399,6 +597,42 @@ function toggleProvider(providerType: string) {
             variant="destructive"
           >
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- IC Token Display Modal -->
+    <Dialog v-model:open="showTokenDialog">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>IC Token for {{ tokenDialogAgentName }}</DialogTitle>
+          <DialogDescription>
+            Store this token securely. It is shown only once. Update your agents with this value immediately.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-3">
+          <div class="bg-gray-100 border rounded-md p-3 font-mono text-sm break-all">
+            {{ tokenDialogValue }}
+          </div>
+          <p class="text-sm text-yellow-700">
+            {{ tokenDialogWarning }}
+          </p>
+          <p class="text-xs text-gray-500">
+            After closing this dialog you will not be able to view the token again. Regenerate if you need a new value.
+          </p>
+          <p v-if="copyMessage" class="text-sm text-gray-600">
+            {{ copyMessage }}
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showTokenDialog = false">
+            Close
+          </Button>
+          <Button @click="copyTokenToClipboard">
+            Copy Token
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -140,6 +140,9 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 020: Add account lockout fields (Protocol 007)
   apply_migration_020( pool ).await?;
 
+  // Migration 021: Add IC token fields to agents table
+  apply_migration_021( pool ).await?;
+
   Ok( () )
 }
 
@@ -644,6 +647,38 @@ async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
         .await
         .map_err( |e| {
           eprintln!("Migration 020 failed: {e:?}");
+          crate::error::TokenError::Generic
+        } )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 021: Add IC token fields to agents table
+///
+/// Adds columns for IC token storage metadata:
+/// - `ic_token_hash` (TEXT)
+/// - `ic_token_created_at` (INTEGER)
+#[ allow( dead_code ) ]
+async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_021_completed'"
+  )
+      .fetch_one( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/021_add_ic_token_to_agents.sql" );
+
+    sqlx::raw_sql( migration )
+        .execute( pool )
+        .await
+        .map_err( |e| {
+          eprintln!("Migration 021 failed: {e:?}");
           crate::error::TokenError::Generic
         } )?;
   }
