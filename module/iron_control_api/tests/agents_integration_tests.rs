@@ -47,12 +47,11 @@ mod common;
 
 use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::TestAppState };
 use axum::{
-  Router, body::Body, extract::FromRef, http::{ Method, Request, StatusCode }, routing::{ delete as delete_route, get, post, put }
+  Router, body::Body, http::{ Method, Request, StatusCode }, routing::{ delete as delete_route, get, post, put }
 };
-use iron_control_api::routes::agents::AgentState;
 use tower::ServiceExt;
 use serde_json::json;
-use sqlx::{Row, SqlitePool, pool};
+use sqlx::{Row, SqlitePool};
 
 
 /// Test schema for agents integration tests

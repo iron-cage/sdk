@@ -20,8 +20,6 @@
 //! duplicated test database infrastructure. See module/iron_test_db/tests/
 //! migration_verification.rs for full migration rationale.
 
-use std::result;
-use sqlx::Row;
 use iron_test_db::{ TestDatabase, TestDatabaseBuilder };
 
 /// Authentication schema for iron_control_api tests

@@ -13,7 +13,6 @@ use iron_control_api::routes::usage::UsageState;
 use iron_control_api::routes::agents::AgentState;
 use axum::extract::FromRef;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use iron_token_manager::agent_budget::AgentBudgetManager;
 use iron_control_api::ic_token::IcTokenManager;
 use iron_control_api::jwt_auth::JwtSecret;
@@ -144,19 +143,6 @@ pub async fn create_test_auth_state() -> AuthState
   AuthState::new( TEST_JWT_SECRET.to_string(), "sqlite::memory:" )
     .await
     .expect( "LOUD FAILURE: Failed to create test AuthState" )
-}
-
-/// Create test TokenState with in-memory database and seed test users.
-pub async fn create_test_token_state() -> TokenState
-{
-  let token_state = TokenState::new( "sqlite::memory:" )
-    .await
-    .expect( "LOUD FAILURE: Failed to create test TokenState" );
-
-  // Seed test users for FK constraint compliance
-  seed_test_users_for_tokens( token_state.storage.pool() ).await;
-
-  token_state
 }
 
 /// Create test UsageState with in-memory database.
