@@ -14,7 +14,10 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
     - industry: Company industry or keyword (e.g., "Jewelry", "SaaS", "Real Estate").
     - location: Country or city.
     """
-    url = "https://api.apollo.io/v1/mixed_people/search"
+    # Apollo deprecated /mixed_people/search for API callers; use api_search.
+    url = "https://api.apollo.io/v1/mixed_people/api_search"
+    if not APOLLO_API_KEY:
+        return "Apollo API key missing. Set APOLLO_API_KEY in your environment."
     
     # --- Prepare and Execute API Request ---
     # Forms the headers and payload for the request to Apollo.
