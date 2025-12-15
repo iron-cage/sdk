@@ -95,7 +95,7 @@ services:
       ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED}
       RUST_LOG: info
     ports:
-    - "3001:3001"
+    - "${SERVER_PORT}:${SERVER_PORT}"
     volumes:
       - sqlite_data:/app/data
     networks:
@@ -135,6 +135,6 @@ volumes:
 EOF
 
 docker compose up -d
-ufw allow 3001/tcp
+ufw allow ${SERVER_PORT}/tcp
 
 __msg_success "Deployment successful! App is available at: http://localhost:80"
