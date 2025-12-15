@@ -67,17 +67,17 @@ impl AuthState {
       sqlx::raw_sql(migration_007).execute(&db_pool).await?;
     }
 
-    // Migration 019: Add account lockout fields
-    let migration_019_completed: i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_019_completed'",
+    // Migration 020: Add account lockout fields
+    let migration_020_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_020_completed'",
     )
     .fetch_one(&db_pool)
     .await?;
 
-    if migration_019_completed == 0 {
-      let migration_019 =
-        include_str!("../../../../iron_token_manager/migrations/019_add_account_lockout_fields.sql");
-      sqlx::raw_sql(migration_019).execute(&db_pool).await?;
+    if migration_020_completed == 0 {
+      let migration_020 =
+        include_str!("../../../../iron_token_manager/migrations/020_add_account_lockout_fields.sql");
+      sqlx::raw_sql(migration_020).execute(&db_pool).await?;
     }
 
     Ok(Self {
