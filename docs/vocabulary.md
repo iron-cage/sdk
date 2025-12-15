@@ -27,13 +27,13 @@
 
 | Term | Definition |
 |------|------------|
-| **Control Plane** | Management layer: API Gateway, Dashboard, Scheduler |
-| **Data Plane** | Processing layer: Safety, Cost, Reliability, Observability services |
-| **Agent Runtime** | Execution layer: Agent pods, SDK, Sandbox |
+| **Control Plane** | Management layer: API Gateway, Dashboard, Scheduler. Cloud-based by default (management only, NOT in request path) |
+| **Data Plane** | Processing layer: Safety, Cost, Reliability, Observability services. **By default (95%)**, runs LOCALLY on developer machine. Only in Server Execution Mode (5%, future) runs in cloud |
+| **Agent Runtime** | Execution layer: Agent execution environment. **By default (95%)**, agent runs as local process on developer machine. Only in Server Execution Mode (5%, future) runs in cloud (Kubernetes pods) |
 | **Local Execution** | Agent runs on developer's machine (primary). Control Panel manages budget via IC Token protocol. See [architecture/001](architecture/001_execution_models.md) |
 | **Server Execution** | Agent runs on Iron Cage servers (future, post-pilot). Control Panel manages budget identically to local execution |
 | **Control Panel** | ALWAYS present standalone admin service. Admin allocates budgets, manages developers, stores IP Tokens, monitors spending. See [architecture/003](architecture/003_service_boundaries.md) |
-| **Gateway** | Central orchestrator that routes requests through processing layers. See also **API Gateway** (production service at gateway.ironcage.ai) |
+| **Gateway** | Central orchestrator that routes requests through processing layers. **By default (95%)**, runs LOCALLY on developer machine (localhost:8084). Only in Server Execution Mode (5%, future) runs in cloud. See [architecture/005](architecture/005_service_integration.md) |
 | **Layer Model** | Six processing layers: Safety, Cost, Reliability, Provider, Output Safety, Observability |
 | **Service Boundaries** | Separation between Control Plane, Data Plane, and Agent Runtime |
 | **Data Flow** | End-to-end request journey from user input to LLM response |

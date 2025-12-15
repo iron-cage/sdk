@@ -23,26 +23,36 @@ This simplified diagram shows Iron Cage's three-boundary architecture at the hig
         (Private)                  (Controlled)              (3rd Party)
 
     ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-    │              │          │              │          │              │
-    │  AI Agent    │  ━━━━━>  │   Gateway    │  ━━━━━>  │  LLM API     │
-    │              │          │   + Safety   │          │              │
-    │  Your Code   │          │   + Cost     │          │  Process     │
-    │  Your Data   │          │   + Audit    │          │  AI Request  │
-    │              │          │              │          │              │
-    │              │  <━━━━━  │   Control    │  <━━━━━  │              │
-    │  Responses   │          │   Budget     │          │              │
-    │              │          │              │          │              │
-    └──────────────┘          └──────────────┘          └──────────────┘
+    │  AI Agent    │  Setup   │ Control Panel│          │              │
+    │              │─Token(1)─>│ (Management) │          │              │
+    │+ iron_sdk    │          │              │          │              │
+    │  Runtime     │          │ • User mgmt  │          │  LLM API     │
+    │ ┌──────────┐ │          │ • Tokens     │          │              │
+    │ │ Safety   │ │          │ • Analytics  │          │              │
+    │ │ Cost     │ │          │              │          │              │
+    │ │ Audit    │ │          │ NOT in       │          │              │
+    │ └──────────┘ │          │ request path │          │              │
+    │              │          └──────────────┘          │              │
+    │  Gateway     │                                    │              │
+    │ (Validator)  │  Prompt + IP Token                 │              │
+    │ (Translator) │─────────────────────────────(2)───>│  Process     │
+    │              │                                    │  Request     │
+    │  Your Code   │                                    │              │
+    │  Your Data   │<───────────────────────────────────│              │
+    │  RAG Docs    │            Response                │  Response    │
+    │              │                                    │              │
+    └──────────────┘                                    └──────────────┘
 
-    ✓ Runs Locally            ✓ Your Control           ⚠️ Third Party
-    ✓ Data Private            ✓ Budget Limits          ⚠️ Provider ToS
-    ✓ Code Private            ✓ Safety Rules           ⚠️ Prompts Sent
+    ✓ 100% Local              ✓ Setup Only             ⚠️ Third Party
+    ✓ Gateway Local           ✓ Management             ⚠️ Prompts Sent
+    ✓ Code NEVER Sent         ✓ Token Generation       ⚠️ Provider ToS
+    ✓ Data NEVER Sent         ✓ Analytics
 ```
 
 **Key Points:**
-- **Left (Developer Machine):** Developer keeps code and data private on their machine. AI agents run locally, maintaining complete privacy for proprietary code and sensitive data.
-- **Middle (Your Cloud):** Your organization controls budgets, safety policies, and monitoring. Gateway enforces spending limits, validates content for security, and maintains comprehensive audit trails.
-- **Right (Third Party):** Third-party LLM provider (OpenAI, Anthropic) processes AI requests per their terms of service. Only prompts and responses transit to provider - never your code or data.
+- **Left (Developer Machine):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally. Nothing leaves your machine except prompts after local validation.
+- **Middle (Your Cloud):** Control Panel ONLY for setup and management. NOT in request path. Handles user management, token generation, and analytics.
+- **Right (Third Party):** LLM provider receives only prompts with IP Token. Never sees your code, data, or IC Token.
 
 **Business Value:**
 1. **Privacy First:** Agent code and data never leave developer machines (100% local execution)
