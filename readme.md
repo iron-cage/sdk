@@ -10,7 +10,7 @@ Iron Runtime provides the core runtime modules for AI agent management including
 
 This diagram shows Iron Cage's three-boundary architecture at the highest level, designed for architecture reviews and technical stakeholders.
 
-![Iron Cage Architecture - Three-Boundary Model](asset/architecture1_paddings.webp)
+![Iron Cage Architecture - Three-Boundary Model](asset/architecture3.webp)
 
 **Visual Guide:**
 - **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), and Gateway ALL run 100% locally
