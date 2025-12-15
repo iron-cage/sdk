@@ -1171,55 +1171,125 @@ pub async fn remove_provider_from_agent(
     }))
 }
 
-// TODO: implement get_agent_status
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BudgetStatus {
+    pub total: i64,
+    pub spent: i64,
+    pub remaining: i64,
+    pub percent_used: f64,
+}
 
-// /// Get agent status
-// pub async fn get_agent_status(
-//     State(pool): State<SqlitePool>,
-//     Path(id): Path<i64>,
-//     user: AuthenticatedUser,
-// ) -> Result<Json<Agent>, (StatusCode, Json<ErrorResponse>)> {
-//     let service = AgentService::new(pool);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequestMetrics {
+    pub total: i64,
+    pub today: i64,
+    pub last_hour: i64,
+}
 
-//     let agent = service.get_agent_details(id).await.map_err(|e| {
-//         (
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             Json(ErrorResponse {
-//                 error: ErrorDetail {
-//                     code: "INTERNAL_ERROR".to_string(),
-//                     message: Some(format!("Database error: {}", e)),
-//                     fields: None,
-//                 },
-//             }),
-//         )
-//     })?;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentStatusResponse {
+    pub agent_id: i64,
+    pub status: String,
+    pub budget: BudgetStatus,
+    pub requests: RequestMetrics,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_request_at: Option<String>,
+    pub checked_at: String,
+}
 
-//     let agent = match agent {
-//         Some(a) => a,
-//         None => return Err((
-//             StatusCode::NOT_FOUND,
-//             Json(ErrorResponse {
-//                 error: ErrorDetail {
-//                     code: "AGENT_NOT_FOUND".to_string(),
-//                     message: Some(format!("Agent '{}' does not exist", id)),
-//                     fields: None,
-//                 },
-//             }),
-//         )),
-//     };
+/// Get agent status - Real-time budget and usage information
+pub async fn get_agent_status(
+    State(state): State<AgentState>,
+    Path(id): Path<i64>,
+    user: AuthenticatedUser,
+) -> Result<Json<AgentStatusResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let service = &state.agent_service;
 
-//     if user.0.sub != agent.user_id && user.0.role != "admin" {
-//         return Err((
-//             StatusCode::FORBIDDEN,
-//             Json(ErrorResponse {
-//                 error: ErrorDetail {
-//                     code: "FORBIDDEN".to_string(),
-//                     message: Some("Insufficient permissions".to_string()),
-//                     fields: None,
-//                 },
-//             }),
-//         ));
-//     }
+    // Fetch agent details
+    let agent = service.get_agent_details(id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "INTERNAL_ERROR".to_string(),
+                    message: Some(format!("Database error: {}", e)),
+                    fields: None,
+                },
+            }),
+        )
+    })?;
 
-//     Ok(Json(Agent::from(agent)))
-// }
+    let agent = match agent {
+        Some(a) => a,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponse {
+                    error: ErrorDetail {
+                        code: "AGENT_NOT_FOUND".to_string(),
+                        message: Some(format!("Agent '{}' does not exist", id)),
+                        fields: None,
+                    },
+                }),
+            ))
+        }
+    };
+
+    // Authorization check
+    if user.0.sub != agent.user_id && user.0.role != "admin" {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "FORBIDDEN".to_string(),
+                    message: Some("Insufficient permissions".to_string()),
+                    fields: None,
+                },
+            }),
+        ));
+    }
+
+    // Get request metrics from service
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let (total_requests, today_requests, last_hour_requests, last_request_ms) =
+        service.get_agent_request_metrics(id, now_ms).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: ErrorDetail {
+                        code: "INTERNAL_ERROR".to_string(),
+                        message: Some(format!("Database error: {}", e)),
+                        fields: None,
+                    },
+                }),
+            )
+        })?;
+
+    // Format timestamps to ISO 8601
+    let last_request_at = last_request_ms.and_then(|ms| {
+        chrono::DateTime::from_timestamp(ms / 1000, ((ms % 1000) * 1_000_000) as u32)
+            .map(|dt| dt.to_rfc3339())
+    });
+
+    let checked_at = chrono::DateTime::from_timestamp(now_ms / 1000, ((now_ms % 1000) * 1_000_000) as u32)
+        .map(|dt| dt.to_rfc3339())
+        .unwrap_or_default();
+
+    Ok(Json(AgentStatusResponse {
+        agent_id: id,
+        status: agent.status,
+        budget: BudgetStatus {
+            total: agent.budget,
+            spent: agent.spent,
+            remaining: agent.remaining,
+            percent_used: agent.percent_used,
+        },
+        requests: RequestMetrics {
+            total: total_requests,
+            today: today_requests,
+            last_hour: last_hour_requests,
+        },
+        last_request_at,
+        checked_at,
+    }))
+}

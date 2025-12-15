@@ -887,6 +887,88 @@ impl AgentService
 
   
 
+  /// Get request metrics for an agent
+  ///
+  /// # Arguments
+  ///
+  /// * `agent_id` - Agent ID
+  /// * `now_ms` - Current time in milliseconds since epoch
+  ///
+  /// # Returns
+  ///
+  /// Tuple of (total_requests, today_requests, last_hour_requests, last_request_ms)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn get_agent_request_metrics(
+    &self,
+    agent_id: i64,
+    now_ms: i64,
+  ) -> Result<(i64, i64, i64, Option<i64>)> {
+    let today_start_ms = {
+      let today = chrono::Utc::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
+      today.timestamp_millis()
+    };
+    let one_hour_ago_ms = now_ms - (60 * 60 * 1000);
+
+    // Query total requests
+    let total_requests: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM analytics_events WHERE agent_id = ?",
+    )
+    .bind(agent_id)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| {
+      error!("Error querying total requests: {}", e);
+      crate::error::TokenError::Generic
+    })?;
+
+    // Query today's requests
+    let today_requests: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM analytics_events WHERE agent_id = ? AND timestamp_ms >= ?",
+    )
+    .bind(agent_id)
+    .bind(today_start_ms)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| {
+      error!("Error querying today's requests: {}", e);
+      crate::error::TokenError::Generic
+    })?;
+
+    // Query last hour requests
+    let last_hour_requests: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM analytics_events WHERE agent_id = ? AND timestamp_ms >= ?",
+    )
+    .bind(agent_id)
+    .bind(one_hour_ago_ms)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| {
+      error!("Error querying last hour requests: {}", e);
+      crate::error::TokenError::Generic
+    })?;
+
+    // Query last request timestamp
+    let last_request_ms: Option<i64> = sqlx::query_scalar(
+      "SELECT MAX(timestamp_ms) FROM analytics_events WHERE agent_id = ?",
+    )
+    .bind(agent_id)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| {
+      error!("Error querying last request timestamp: {}", e);
+      crate::error::TokenError::Generic
+    })?;
+
+    Ok((total_requests, today_requests, last_hour_requests, last_request_ms))
+  }
+
   /// Get database pool for test verification
   ///
   /// **Warning:** Test-only method for accessing internal state

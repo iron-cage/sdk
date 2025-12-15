@@ -113,6 +113,7 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
     .route( "/api/agents", post( iron_control_api::routes::agents::create_agent ) )
     .route( "/api/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/agents/:id/details", get( iron_control_api::routes::agents::get_agent_details ) )
+    .route( "/api/agents/:id/status", get( iron_control_api::routes::agents::get_agent_status ) )
     .route( "/api/agents/:id", put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
     .route( "/api/agents/:id/providers", get( iron_control_api::routes::agents::get_agent_providers ).put( iron_control_api::routes::agents::assign_providers_to_agent ) )
@@ -1021,4 +1022,248 @@ async fn test_remove_provider_from_agent() {
   let agent: RemoveProviderFromAgentResponse = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( agent.remaining_providers.len(), 0 );
+}
+
+// ============================================================================
+// Agent Status Tests
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentStatusResponse {
+    pub agent_id: i64,
+    pub status: String,
+    pub budget: BudgetStatus,
+    pub requests: RequestMetrics,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_request_at: Option<String>,
+    pub checked_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BudgetStatus {
+    pub total: i64,
+    pub spent: i64,
+    pub remaining: i64,
+    pub percent_used: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequestMetrics {
+    pub total: i64,
+    pub today: i64,
+    pub last_hour: i64,
+}
+
+#[ tokio::test ]
+async fn test_get_agent_status_as_admin_success() {
+  let ( app, pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let owner_id = create_unique_test_user( &pool, "status_admin_test@test.com" ).await;
+
+  // Create agent
+  let now = chrono::Utc::now().timestamp_millis();
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id, status) VALUES (?, ?, ?, ?, ?)" )
+    .bind( "Status Test Agent" )
+    .bind( "[]" )
+    .bind( now )
+    .bind( &owner_id )
+    .bind( "active" )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let agent_id = result.last_insert_rowid();
+
+  // Create budget
+  sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( agent_id )
+    .bind( 100000000i64 )
+    .bind( 25000000i64 )
+    .bind( 75000000i64 )
+    .bind( now )
+    .bind( now )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  // Insert some analytics events for this agent
+  sqlx::query( "INSERT INTO analytics_events (timestamp_ms, event_type, agent_id, provider, model, input_tokens, output_tokens, cost_micros, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)" )
+    .bind( now - 1000 )
+    .bind( "llm_request_completed" )
+    .bind( agent_id )
+    .bind( "openai" )
+    .bind( "gpt-4" )
+    .bind( 100 )
+    .bind( 50 )
+    .bind( 5000 )
+    .bind( now - 1000 )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( format!( "/api/agents/{}/status", agent_id ) )
+        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( response.status(), StatusCode::OK, "Admin should retrieve agent status" );
+
+  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+    .await
+    .unwrap();
+  let status: AgentStatusResponse = serde_json::from_slice( &body_bytes ).unwrap();
+
+  assert_eq!( status.agent_id, agent_id );
+  assert_eq!( status.status, "active" );
+  assert_eq!( status.budget.total, 100000000 );
+  assert_eq!( status.budget.spent, 25000000 );
+  assert_eq!( status.budget.remaining, 75000000 );
+  assert_eq!( status.requests.total, 1, "Should have 1 total request" );
+  assert!( status.last_request_at.is_some(), "Should have last_request_at timestamp" );
+  assert!( !status.checked_at.is_empty(), "Should have checked_at timestamp" );
+}
+
+#[ tokio::test ]
+async fn test_get_agent_status_as_owner_success() {
+  let ( app, pool, _admin_token, user_token, _admin_id, user_id ) = create_agents_router().await;
+
+  // Create agent owned by the user
+  let now = chrono::Utc::now().timestamp_millis();
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id, status) VALUES (?, ?, ?, ?, ?)" )
+    .bind( "User Status Agent" )
+    .bind( "[]" )
+    .bind( now )
+    .bind( &user_id )
+    .bind( "active" )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let agent_id = result.last_insert_rowid();
+
+  // Create budget with zero spent
+  sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( agent_id )
+    .bind( 50000000i64 )
+    .bind( 0i64 )
+    .bind( 50000000i64 )
+    .bind( now )
+    .bind( now )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( format!( "/api/agents/{}/status", agent_id ) )
+        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( response.status(), StatusCode::OK, "Owner should retrieve agent status" );
+
+  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+    .await
+    .unwrap();
+  let status: AgentStatusResponse = serde_json::from_slice( &body_bytes ).unwrap();
+
+  assert_eq!( status.agent_id, agent_id );
+  assert_eq!( status.budget.total, 50000000 );
+  assert_eq!( status.budget.spent, 0 );
+  assert_eq!( status.requests.total, 0, "Should have 0 requests (no analytics events)" );
+  assert!( status.last_request_at.is_none(), "Should have no last_request_at when no requests" );
+}
+
+#[ tokio::test ]
+async fn test_get_agent_status_unauthorized() {
+  let ( app, _pool, _admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( "/api/agents/999999/status" )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( response.status(), StatusCode::UNAUTHORIZED, "Unauthenticated request should fail" );
+}
+
+#[ tokio::test ]
+async fn test_get_agent_status_forbidden() {
+  let ( app, pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
+  let other_owner_id = create_unique_test_user( &pool, "status_forbidden_test@test.com" ).await;
+
+  // Create agent owned by different user
+  let now = chrono::Utc::now().timestamp_millis();
+  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id, status) VALUES (?, ?, ?, ?, ?)" )
+    .bind( "Other User Agent" )
+    .bind( "[]" )
+    .bind( now )
+    .bind( &other_owner_id )
+    .bind( "active" )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let agent_id = result.last_insert_rowid();
+
+  // Create budget
+  sqlx::query( "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" )
+    .bind( agent_id )
+    .bind( 100000000i64 )
+    .bind( 0i64 )
+    .bind( 100000000i64 )
+    .bind( now )
+    .bind( now )
+    .execute( &pool )
+    .await
+    .unwrap();
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( format!( "/api/agents/{}/status", agent_id ) )
+        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( response.status(), StatusCode::FORBIDDEN, "User should not access other user's agent status" );
+}
+
+#[ tokio::test ]
+async fn test_get_agent_status_not_found() {
+  let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+
+  let response = app
+    .oneshot(
+      Request::builder()
+        .method( Method::GET )
+        .uri( "/api/agents/999999/status" )
+        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .body( Body::empty() )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!( response.status(), StatusCode::NOT_FOUND, "Non-existent agent should return 404" );
 }
