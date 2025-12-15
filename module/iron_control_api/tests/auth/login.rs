@@ -34,7 +34,7 @@ async fn test_infrastructure_verification()
   let pool = db.pool();
 
   // Create test user
-  let ( user_id, password_hash ) = create_test_user( pool, "testuser" ).await;
+  let ( user_id, password_hash ) = create_test_user( pool, "test_user" ).await;
 
   // Verify user ID is positive
   assert!(
