@@ -139,6 +139,7 @@ impl IcTokenClaims
 }
 
 /// IC Token manager for generating and validating IC Tokens
+#[derive(Clone, Debug)]
 pub struct IcTokenManager
 {
   secret: String,

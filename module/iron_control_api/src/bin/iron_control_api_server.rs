@@ -53,6 +53,8 @@
 use axum::{
   Router, http::{ Method, header }, routing::{ delete, get, post, put }
 };
+use iron_control_api::routes::agents::AgentState;
+use sqlx::{Pool, Sqlite};
 use std::{ net::SocketAddr, env };
 use tower_http::cors::CorsLayer;
 use workspace_tools::workspace;
@@ -209,7 +211,7 @@ struct AppState
   providers: iron_control_api::routes::providers::ProvidersState,
   keys: iron_control_api::routes::keys::KeysState,
   users: iron_control_api::routes::users::UserManagementState,
-  agents: sqlx::SqlitePool,
+  agents: iron_control_api::routes::agents::AgentState,
   budget: iron_control_api::routes::budget::BudgetState,
   analytics: iron_control_api::routes::analytics::AnalyticsState,
 }
@@ -284,8 +286,14 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::users::Use
   }
 }
 
+impl axum::extract::FromRef< AppState > for Pool< Sqlite > {
+  fn from_ref( state: &AppState ) -> Self {
+    state.agents.pool.clone()
+  }
+}
+
 /// Enable agent routes to access SqlitePool from combined AppState
-impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::agents::AgentState
 {
   fn from_ref( state: &AppState ) -> Self
   {
@@ -598,7 +606,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Initialize budget state (Protocol 005: Budget Control Protocol)
   // crypto_service_for_budget enables Feature 014: Agent Provider Key retrieval
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
-    ic_token_secret,
+    ic_token_secret.clone(),
     &ip_token_key,
     &provider_key_master_bytes,
     auth_state.jwt_secret.clone(),
@@ -607,6 +615,16 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   )
   .await
   .expect( "LOUD FAILURE: Failed to initialize budget state" );
+
+  // Initialize agent state (uses pool and secrets from other states)
+  let agent_state = AgentState
+  {
+    pool: agents_pool.clone(),
+    agent_budget_manager: budget_state.agent_budget_manager.clone(),
+    token_storage: keys_state.token_storage.clone(),
+    ic_token_manager: budget_state.ic_token_manager.clone(),
+    jwt_secret: auth_state.jwt_secret.clone(),
+  };
 
   // Create combined app state
   let app_state = AppState
@@ -618,10 +636,11 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     providers: providers_state,
     keys: keys_state,
     users: user_management_state,
-    agents: agents_pool,
+    agents: agent_state,
     budget: budget_state,
     analytics: analytics_state,
   };
+
 
   // Fix(ironcage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
   // Root cause: Hardcoded origins prevented multi-domain production deployment
@@ -806,6 +825,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "  GET  /api/v1/analytics/usage/requests" );
   tracing::info!( "  GET  /api/v1/analytics/usage/tokens/by-agent" );
   tracing::info!( "  GET  /api/v1/analytics/usage/models" );
+  tracing::info!( "  POST  /api/v1/agents" );
 
   // Fix(login-connect-info): Enable ConnectInfo extraction for per-IP rate limiting
   // Root cause: Login handler uses ConnectInfo<SocketAddr> for per-IP rate limiting

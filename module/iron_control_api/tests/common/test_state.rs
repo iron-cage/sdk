@@ -10,6 +10,13 @@ use sqlx::SqlitePool;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::routes::tokens::TokenState;
 use iron_control_api::routes::usage::UsageState;
+use iron_control_api::routes::agents::AgentState;
+use axum::extract::FromRef;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use iron_token_manager::agent_budget::AgentBudgetManager;
+use iron_control_api::ic_token::IcTokenManager;
+use iron_control_api::jwt_auth::JwtSecret;
 
 /// Test JWT secret for all tests (consistent across test runs).
 pub const TEST_JWT_SECRET: &str = "test_jwt_secret_key_for_testing_12345";
@@ -240,11 +247,27 @@ impl axum::extract::FromRef< TestAppState > for TokenState
 }
 
 /// Enable SqlitePool extraction from TestAppState.
-impl axum::extract::FromRef< TestAppState > for SqlitePool
+impl FromRef< TestAppState > for SqlitePool
 {
   fn from_ref( state: &TestAppState ) -> Self
   {
     state.database.clone()
+  }
+}
+
+/// Enable AgentState extraction from TestAppState.
+impl FromRef< TestAppState > for AgentState
+{
+  fn from_ref( state: &TestAppState ) -> Self
+  {
+    AgentState
+    {
+      pool: state.database.clone(),
+      agent_budget_manager: Arc::new(  AgentBudgetManager::from_pool( state.database.clone() ) ),
+      token_storage: Arc::new( (*state.tokens.storage).clone() ),
+      ic_token_manager: Arc::new(  IcTokenManager::new( TEST_JWT_SECRET.to_string() ) ),
+      jwt_secret: Arc::new( JwtSecret::new( TEST_JWT_SECRET.to_string() ) ),
+    }
   }
 }
 

@@ -14,15 +14,47 @@
 //! - Admins: Full access to all agents
 //! - Regular users: Can only view agents they own
 
+use std::sync::Arc;
+
 use axum::{
-    extract::{Path, State},
+    extract::{FromRef, Path, State},
     http::StatusCode,
     response::Json,
 };
+use iron_token_manager::{agent_budget::AgentBudgetManager, storage::TokenStorage};
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, SqlitePool};
+use sqlx::{Pool, Row, Sqlite, SqlitePool};
+use tokio::sync::Mutex;
+use crate::{ic_token::{IcTokenClaims, IcTokenManager}, jwt_auth::JwtSecret, routes::auth::AuthState};
 
 use crate::jwt_auth::AuthenticatedUser;
+
+#[derive(Clone)]
+pub struct AgentState {
+    pub pool: Pool< Sqlite >,
+    pub agent_budget_manager: Arc<AgentBudgetManager>,
+    pub token_storage: Arc<TokenStorage>,
+    pub ic_token_manager: Arc<IcTokenManager>,
+    pub jwt_secret: Arc<JwtSecret>,
+}
+
+impl AgentState {
+    pub async fn new(database_url: &str, ic_token_secret: &str, jwt_secret_key: &str) -> Result< Self, Box< dyn std::error::Error > > {
+        let pool = Pool::<Sqlite>::connect(database_url).await?;
+        let token_storage = Arc::new(TokenStorage::from_pool(pool.clone()));
+        let agent_budget_manager = Arc::new(AgentBudgetManager::from_pool(pool.clone()));
+        let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret.to_string()));
+        let jwt_secret = Arc::new(JwtSecret::new(jwt_secret_key.to_string()));
+
+        Ok(Self {
+            pool,
+            token_storage,
+            agent_budget_manager,
+            ic_token_manager,
+            jwt_secret,
+        })
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Agent {
@@ -34,6 +66,7 @@ pub struct Agent {
     providers_json: Option<String>,
     pub created_at: i64,
     pub owner_id: String,
+    pub ic_token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +79,28 @@ pub struct CreateAgentRequest {
 pub struct UpdateAgentRequest {
     pub name: Option<String>,
     pub providers: Option<Vec<String>>,
+}
+
+
+impl FromRef< AgentState > for AuthState
+{
+  fn from_ref( state: &AgentState ) -> Self
+  {
+    AuthState
+    {
+      jwt_secret: state.jwt_secret.clone(),
+      db_pool: state.pool.clone(),
+      rate_limiter: crate::rate_limiter::LoginRateLimiter::new(),
+    }
+  }
+}
+
+impl FromRef< AgentState > for sqlx::SqlitePool
+{
+  fn from_ref( state: &AgentState ) -> Self
+  {
+    state.pool.clone()
+  }
 }
 
 /// List all agents (filtered by user role)
@@ -62,7 +117,8 @@ pub async fn list_agents(
                 name,
                 providers as providers_json,
                 created_at,
-                owner_id
+                owner_id,
+                ic_token
             FROM agents
             ORDER BY created_at DESC
             "#
@@ -84,7 +140,8 @@ pub async fn list_agents(
                 name,
                 providers as providers_json,
                 created_at,
-                owner_id
+                owner_id,
+                ic_token
             FROM agents
             WHERE owner_id = ?
             ORDER BY created_at DESC
@@ -124,7 +181,8 @@ pub async fn get_agent(
             name,
             providers as providers_json,
             created_at,
-            owner_id
+            owner_id,
+            ic_token
         FROM agents
         WHERE id = ?
         "#
@@ -158,11 +216,14 @@ pub async fn get_agent(
 
 /// Create a new agent (admin only)
 pub async fn create_agent(
-    State(pool): State<SqlitePool>,
+    State(state): State<AgentState>,
     user: AuthenticatedUser,
     Json(req): Json<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
     // Only admins can create agents
+    let AgentState { pool, token_storage, agent_budget_manager: _, ic_token_manager, jwt_secret: _ } = state;
+    let CreateAgentRequest { name, providers } = req;
+    
     if user.0.role != "admin" {
         return Err((
             StatusCode::FORBIDDEN,
@@ -170,7 +231,7 @@ pub async fn create_agent(
         ));
     }
 
-    let providers_json = serde_json::to_string(&req.providers).map_err(|e| {
+    let providers_json = serde_json::to_string(&providers).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("JSON error: {}", e),
@@ -185,7 +246,7 @@ pub async fn create_agent(
         VALUES (?, ?, ?, ?)
         "#
     )
-    .bind(&req.name)
+    .bind(&name)
     .bind(&providers_json)
     .bind(created_at)
     .bind(&owner_id)
@@ -198,13 +259,26 @@ pub async fn create_agent(
         )
     })?;
 
+    let agent_id = result.last_insert_rowid();
+
+    let claims = IcTokenClaims::new(agent_id.to_string(), agent_id.to_string(), vec![], None);
+    let plaintext_token = ic_token_manager.generate_token(&claims).unwrap();
+
+    token_storage.create_token(&plaintext_token, &owner_id, None, Some(&name), Some(agent_id), None).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create token: {}", e),
+        )
+    })?;
+
     let agent = Agent {
-        id: result.last_insert_rowid(),
-        name: req.name,
-        providers: req.providers,
+        id: agent_id,
+        name,
+        providers: providers,
         providers_json: Some(providers_json),
         created_at,
         owner_id,
+        ic_token: plaintext_token,
     };
 
     Ok((StatusCode::CREATED, Json(agent)))
@@ -284,7 +358,8 @@ pub async fn update_agent(
             name,
             providers as providers_json,
             created_at,
-            owner_id
+            owner_id,
+            ic_token
         FROM agents
         WHERE id = ?
         "#

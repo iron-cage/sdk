@@ -6,7 +6,6 @@
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions, Row };
 use crate::token_generator::TokenGenerator;
 use crate::error::Result;
-
 /// Token metadata returned from storage
 #[ derive( Debug, Clone ) ]
 pub struct TokenMetadata
@@ -583,6 +582,17 @@ impl TokenStorage
   pub fn pool( &self ) -> &SqlitePool
   {
     &self.pool
+  }
+
+  /// Get token generator for hash operations
+  ///
+  /// # Returns
+  ///
+  /// Reference to the token generator used for hashing token values
+  #[ must_use ]
+  pub fn generator( &self ) -> &TokenGenerator
+  {
+    &self.generator
   }
 
   /// Log audit event to `audit_log` table

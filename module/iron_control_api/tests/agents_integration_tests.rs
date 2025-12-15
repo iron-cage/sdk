@@ -47,11 +47,9 @@ mod common;
 
 use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::TestAppState };
 use axum::{
-  Router,
-  routing::{ get, post, put, delete as delete_route },
-  http::{ StatusCode, Request, Method },
-  body::Body,
+  Router, body::Body, extract::FromRef, http::{ Method, Request, StatusCode }, routing::{ delete as delete_route, get, post, put }
 };
+use iron_control_api::routes::agents::AgentState;
 use tower::ServiceExt;
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -63,7 +61,8 @@ CREATE TABLE IF NOT EXISTS agents (
   name TEXT NOT NULL,
   providers TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  owner_id TEXT REFERENCES users(id) ON DELETE CASCADE
+  owner_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  ic_token TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS api_tokens (
@@ -79,6 +78,8 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
 );
 "#;
+
+
 
 /// Helper to create test router with agents endpoints
 async fn create_agents_router() -> ( Router, SqlitePool, String, String, String, String )
@@ -123,7 +124,8 @@ async fn test_create_agent_as_admin_success()
 
   let request_body = json!({
     "name": "Test Agent",
-    "providers": ["openai", "anthropic"]
+    "providers": ["openai", "anthropic"],
+    "requested_budget_microdollars": 1000000
   });
 
   let response = app
@@ -157,7 +159,8 @@ async fn test_create_agent_as_user_forbidden()
 
   let request_body = json!({
     "name": "Test Agent",
-    "providers": ["openai"]
+    "providers": ["openai"],
+    "requested_budget_microdollars": 1000000
   });
 
   let response = app
@@ -183,7 +186,8 @@ async fn test_create_agent_without_auth_unauthorized()
 
   let request_body = json!({
     "name": "Test Agent",
-    "providers": ["openai"]
+    "providers": ["openai"],
+    "requested_budget_microdollars": 1000000
   });
 
   let response = app
@@ -785,6 +789,7 @@ async fn test_create_agent_ignores_owner_id_in_request()
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
+    "requested_budget_microdollars": 1000000,
     "owner_id": user_id  // Trying to set different owner
   });
 
