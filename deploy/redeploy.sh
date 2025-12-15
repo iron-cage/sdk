@@ -94,6 +94,8 @@ services:
       IRON_DEPLOYMENT_MODE: ${IRON_DEPLOYMENT_MODE}
       ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED}
       RUST_LOG: info
+    ports:
+    - "3001:3001"
     volumes:
       - sqlite_data:/app/data
     networks:
@@ -133,5 +135,6 @@ volumes:
 EOF
 
 docker compose up -d
+ufw allow 3001/tcp
 
 __msg_success "Deployment successful! App is available at: http://localhost:80"
