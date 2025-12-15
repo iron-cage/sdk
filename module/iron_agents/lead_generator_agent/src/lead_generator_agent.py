@@ -1,146 +1,115 @@
 import sys
 import os
 import json
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
 from apollo_tools import tools_list
-from config import IC_TOKEN, OPENAI_API_KEY
 
-# --- 1. INTELLIGENT PATH SETUP ---
-# Check if Iron Cage library is available
-def setup_python_paths():
-    current = os.path.dirname(os.path.abspath(__file__))
-    module_root = None
-
-    while True:
-        possible_sdk = os.path.join(current, "iron_sdk")
-        if os.path.exists(possible_sdk):
-            module_root = current
-            break
-        parent = os.path.dirname(current)
-        if parent == current: break
-        current = parent
-
-    if module_root:
-        print(f"DEBUG: Found module root at: {module_root}")
-        
-        if module_root not in sys.path:
-            sys.path.insert(0, module_root)
-
-        runtime_python_path = os.path.join(module_root, "iron_runtime", "python")
-        if os.path.exists(runtime_python_path):
-            print(f"DEBUG: Found Python runtime wrapper at: {runtime_python_path}")
-            sys.path.insert(0, runtime_python_path)
-        else:
-            print("DEBUG: iron_runtime/python folder not found (maybe pure Rust?)")
-            
-        return True
-    else:
-        print("DEBUG: Could not auto-detect 'module' folder structure.")
-        return False
-
-paths_configured = setup_python_paths()
-
-LlmRouter = None
-IRON_CAGE_AVAILABLE = False
-
-if paths_configured:
+try:
+    from iron_cage import LlmRouter
+    IRON_CAGE_AVAILABLE = True
+except ImportError:
     try:
-        try:
-            import iron_runtime
-            print("✅ Successfully imported iron_runtime")
-        except ImportError as e:
-            print(f"⚠️  Still cannot import iron_runtime: {e}")
-
         from iron_sdk import LlmRouter
-        
         IRON_CAGE_AVAILABLE = True
-        print("✅ Iron SDK & Runtime loaded.")
-        
-    except ImportError as e:
-        print(f"⚠️  Import Failed: {e}")
-        print("   Running in Direct Mode only.")
+    except ImportError:
         IRON_CAGE_AVAILABLE = False
 
-# Validation
-if not OPENAI_API_KEY:
-    print("CRITICAL ERROR: OPENAI_API_KEY is missing via config.")
-    sys.exit(1)
+# --- ROUTER CONFIGURATION (As in your example) ---
+def get_router_config(mode_selection):
+    """
+    Returns router configuration based on environment variables and user selection.
+    """
+    # If user selected Mode 2 (Iron Cage Server)
+    if mode_selection == "2":
+        # Check if token exists
+        if os.environ.get("IC_TOKEN"):
+            # If both token and server URL exist - use server mode
+            server_url = os.environ.get("IC_SERVER", "http://localhost:8080")
+            return {
+                "api_key": os.environ["IC_TOKEN"],
+                "server_url": server_url,
+                "budget": 10.0
+            }
+        else:
+            raise ValueError("Mode 2 selected, but IC_TOKEN not found in secrets!")
 
-# --- System Prompt for the Agent ---
-# Defines the agent's role, algorithm, and strict output format.
+    # If user selected Mode 3 (Local Iron Proxy) - "Secret/Standalone Mode"
+    # This runs protection locally using your OpenAI key directly
+    if mode_selection == "3":
+        if os.environ.get("OPENAI_API_KEY"):
+            return {
+                "provider_key": os.environ["OPENAI_API_KEY"],
+                "budget": 5.0
+            }
+        else:
+            raise ValueError("Mode 3 selected, but OPENAI_API_KEY not found!")
+
+    # Mode 1 (Direct) returns None because no router is needed
+    return None
+
+
+# --- LLM SETUP ---
+def setup_llm():
+    print("\n--- SELECT MODE ---")
+    print("1. Direct OpenAI (Unprotected)")
+    print("2. Iron Cage Server (IC_TOKEN)")
+    print("3. Iron Cage Local (Protects OpenAI Key)")
+    
+    choice = input("Select option (1-3): ").strip()
+
+    # Validate library availability
+    if choice in ["2", "3"] and not IRON_CAGE_AVAILABLE:
+        print("❌ Error: 'iron-sdk' library not found. Cannot use Iron Cage modes.")
+        print("   Running: uv pip install -e ../../iron_sdk")
+        sys.exit(1)
+
+    try:
+        router_config = get_router_config(choice)
+
+        # === OPTION WITHOUT ROUTER (Direct) ===
+        if not router_config:
+            print("> Initializing Direct OpenAI Connection...")
+            if not os.environ.get("OPENAI_API_KEY"):
+                print("❌ Error: OPENAI_API_KEY missing.")
+                sys.exit(1)
+            return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+        # === OPTION WITH ROUTER (Iron Cage) ===
+        print(f"\n> Initializing Iron Cage Router...")
+        
+        # Here we simply pass the dictionary as arguments (**kwargs)
+        # This works for both {api_key, server_url} and {provider_key} configs
+        router = LlmRouter(**router_config)
+        
+        print(f"> Connected via Proxy on port {router.port}")
+        if router.budget:
+            print(f"> Budget Limit: ${router.budget}")
+
+        return ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0,
+            base_url=router.base_url,
+            api_key=router.api_key
+        )
+
+    except Exception as e:
+        print(f"❌ Error setting up LLM: {e}")
+        sys.exit(1)
+
+
+# --- MAIN AGENT LOGIC ---
 system_prompt = """
 You are an API proxy. Your only goal is to return raw data in JSON format.
-
 ALGORITHM:
 1. Use `search_leads` to get IDs.
 2. For EACH found ID, call `get_lead_details`.
-3. Collect all results from `get_lead_details` as a JSON.
-
-OUTPUT FORMAT (CRITICAL):
-- Return all and ONLY a valid JSON Array (list of objects).
-- Do not write any text, do not say hello, do not explain anything.
-- Do not use Markdown (no ```json).
-- Do not truncate data.
-- Do not revrite or modify the data.
-
-Example output:
-[
-  {{ "id": "123", "name": "John" }},
-  {{ "id": "456", "name": "Criss" }}
-]
+3. Collect all results.
+OUTPUT: JSON Array only. No markdown.
 """
 
-# --- Create Prompt Template ---
-# Combines the system instruction, user input, and a placeholder for intermediate steps.
-def setup_llm():
-    """
-    Interactively asks the user which mode to use.
-    """
-    print("\n--- SELECT MODE ---")
-    print("1. OpenAI API mode")
-    print("2. Iron Cage  mode")
-    
-    choice = input("Select option (1 or 2): ").strip()
-    
-    # --- OPTION 2: IRON CAGE ---
-    if choice == "2":
-        if not IC_TOKEN:
-            print("Error: IC_TOKEN is missing in secrets")
-            sys.exit(1)
-
-        print("\n> Initializing Iron Cage Router...")
-        
-        server_url = "http://localhost:8080" 
-        
-        try:
-            router = LlmRouter(
-                api_key=IC_TOKEN,
-                server_url=server_url, 
-                budget=10.0
-            )
-            
-            print(f"> Connected via Iron Cage Proxy on port {router.port}")
-            return ChatOpenAI(
-                model="gpt-5-nano",
-                temperature=0,
-                base_url=router.base_url,
-                api_key=router.api_key
-            )
-        except Exception as e:
-            print(f"Error initializing Router: {e}")
-            sys.exit(1)
-
-    # --- OPTION 1: DIRECT MODE ---
-    else:
-        print("\n> Initializing Direct OpenAI Connection...")
-        return ChatOpenAI(
-            model="gpt-5-nano", 
-            temperature=0
-        )
-
-# --- Main Execution Function ---
 def main():
     print("--------------------------------")
     print("|         LeadGen Agent         |")
@@ -160,44 +129,27 @@ def main():
         agent=agent, 
         tools=tools_list, 
         verbose=True,
-        max_iterations=20,
         handle_parsing_errors=True
     )
     
     print("\nAgent is ready. Waiting for commands.")
-    print("--------------------------------")
     while True:
         try:
             user_query = input("\nEnter query (or 'exit'): ")
             if user_query.lower() in ['exit', 'quit']: break
             if not user_query.strip(): continue
 
-            print("Processing request...")
-            
-            # --- Run the Agent to Process the Request ---
-            # Passes the user's query to the agent for execution.
+            print("Processing...")
             result = agent_executor.invoke({"input": user_query})
             
-            # --- Process and Print the Result ---
-            # Cleans up the agent's response to remove extra characters.
-            raw_output = result["output"].replace("```json", "").replace("```", "").strip()
-            
+            raw = result["output"].replace("```json", "").replace("```", "").strip()
             try:
-                # Attempts to parse the text response as JSON and print it.
-                data = json.loads(raw_output)
-                
                 print("\nRESULT (JSON):")
-                print(json.dumps(data, indent=2, ensure_ascii=False))
-                
-            except json.JSONDecodeError:
-                # If the response is not valid JSON, prints the raw text.
-                print("\nAgent did not return valid JSON. Raw text:")
-                print(raw_output)
-                
+                print(json.dumps(json.loads(raw), indent=2, ensure_ascii=False))
+            except:
+                print(raw)
         except Exception as e:
             print(f"Error: {e}")
 
-# --- Program Entry Point ---
-# Runs the main function if the script is executed directly.
 if __name__ == "__main__":
     main()
