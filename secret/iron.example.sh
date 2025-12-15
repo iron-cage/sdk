@@ -67,3 +67,16 @@ SERVER_PORT=""
 #   development - explicit dev mode, enables DB wipe on startup
 #   production  - confirmed production deployment
 IRON_DEPLOYMENT_MODE="pilot"
+
+# =============================================================================
+# DATABASE SEEDING (optional)
+# =============================================================================
+
+# Enable demo seed mode for production demo deployments
+# When database is empty:
+#
+# false (default): No auto-seeding - empty database, create users via API
+# true:            Seed demo accounts (admin@ironcage.ai / IronDemo2025!)
+#
+# See docs/demo_credentials.md for full list of demo accounts
+ENABLE_DEMO_SEED="false"
