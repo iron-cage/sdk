@@ -632,7 +632,7 @@ pub async fn update_agent(
             }),
         )),
     };
-
+    println!("{} {}", user.0.sub, agent.owner_id);
     // Permission check
     if user.0.role != "admin" && user.0.sub != agent.owner_id {
         return Err((

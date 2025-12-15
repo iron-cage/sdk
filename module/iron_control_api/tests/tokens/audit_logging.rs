@@ -191,7 +191,7 @@ async fn test_revoke_token_logs_revocation()
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
-  let create_response = router.clone().oneshot( create_request ).await.unwrap();
+  let create_response: hyper::Response<Body> = router.clone().oneshot( create_request ).await.unwrap();
   assert_eq!( create_response.status(), StatusCode::CREATED );
 
   let body_bytes = axum::body::to_bytes( create_response.into_body(), usize::MAX ).await.unwrap();

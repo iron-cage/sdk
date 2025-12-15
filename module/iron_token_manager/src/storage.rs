@@ -368,8 +368,6 @@ impl TokenStorage
   /// Returns error if token ID not found
   pub async fn get_token_metadata( &self, token_id: i64 ) -> Result< TokenMetadata >
   {
-    println!("{}", token_id);
-
     let row = sqlx::query(
       "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at, revoked_at \
        FROM api_tokens WHERE id = $1"
@@ -377,8 +375,7 @@ impl TokenStorage
     .bind( token_id )
     .fetch_one( &self.pool )
     .await
-    .unwrap();
-    // .map_err( crate::error::TokenError::Database )?;
+    .map_err( crate::error::TokenError::Database )?;
 
     Ok( TokenMetadata {
       id: row.get( "id" ),

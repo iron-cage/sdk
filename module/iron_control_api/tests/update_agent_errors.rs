@@ -10,6 +10,7 @@ use iron_control_api::routes::agents::{ErrorResponse};
 use sqlx::SqlitePool;
 use serde_json::json;
 use tower::ServiceExt;
+use tracing_subscriber::fmt::format;
 
 async fn create_agents_router() -> ( Router, SqlitePool, String, String, String, String )
 {
@@ -32,8 +33,7 @@ async fn test_update_agent_validation_error() {
 
     // Create agent
     let now = chrono::Utc::now().timestamp_millis();
-    sqlx::query("INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)")
-        .bind("agent_val")
+    let result = sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
         .bind("Test Agent")
         .bind("[]")
         .bind(now)
@@ -41,6 +41,8 @@ async fn test_update_agent_validation_error() {
         .execute(&pool)
         .await
         .unwrap();
+
+    let agent_id = result.last_insert_rowid();
 
     let request_body = json!({
         "name": "",
@@ -50,7 +52,7 @@ async fn test_update_agent_validation_error() {
     let response = app.oneshot(
         Request::builder()
             .method(Method::PUT)
-            .uri("/api/agents/agent_val")
+            .uri(format!("/api/agents/{}", agent_id))
             .header("content-type", "application/json")
             .header("authorization", format!("Bearer {}", admin_token))
             .body(Body::from(serde_json::to_string(&request_body).unwrap()))
@@ -73,8 +75,7 @@ async fn test_update_agent_no_fields() {
 
     // Create agent
     let now = chrono::Utc::now().timestamp_millis();
-    sqlx::query("INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)")
-        .bind("agent_no_fields")
+    let result = sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
         .bind("Test Agent")
         .bind("[]")
         .bind(now)
@@ -83,12 +84,14 @@ async fn test_update_agent_no_fields() {
         .await
         .unwrap();
 
+    let agent_id = result.last_insert_rowid();
+
     let request_body = json!({});
 
     let response = app.oneshot(
         Request::builder()
             .method(Method::PUT)
-            .uri("/api/agents/agent_no_fields")
+            .uri(format!("/api/agents/{}", agent_id))
             .header("content-type", "application/json")
             .header("authorization", format!("Bearer {}", admin_token))
             .body(Body::from(serde_json::to_string(&request_body).unwrap()))
@@ -109,8 +112,7 @@ async fn test_update_agent_forbidden() {
 
     // Create agent owned by admin
     let now = chrono::Utc::now().timestamp_millis();
-    sqlx::query("INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)")
-        .bind("agent_admin_update")
+    let result = sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
         .bind("Admin Agent")
         .bind("[]")
         .bind(now)
@@ -119,6 +121,8 @@ async fn test_update_agent_forbidden() {
         .await
         .unwrap();
 
+    let agent_id = result.last_insert_rowid();
+
     let request_body = json!({
         "name": "New Name"
     });
@@ -126,7 +130,7 @@ async fn test_update_agent_forbidden() {
     let response = app.oneshot(
         Request::builder()
             .method(Method::PUT)
-            .uri("/api/agents/agent_admin_update")
+            .uri(format!("/api/agents/{}", agent_id))
             .header("content-type", "application/json")
             .header("authorization", format!("Bearer {}", user_token))
             .body(Body::from(serde_json::to_string(&request_body).unwrap()))
@@ -152,7 +156,7 @@ async fn test_update_agent_not_found() {
     let response = app.oneshot(
         Request::builder()
             .method(Method::PUT)
-            .uri("/api/agents/agent_invalid")
+            .uri("/api/agents/454")
             .header("content-type", "application/json")
             .header("authorization", format!("Bearer {}", admin_token))
             .body(Body::from(serde_json::to_string(&request_body).unwrap()))
@@ -164,5 +168,5 @@ async fn test_update_agent_not_found() {
     let error_response: ErrorResponse = serde_json::from_slice(&body_bytes).unwrap();
     
     assert_eq!(error_response.error.code, "AGENT_NOT_FOUND");
-    assert_eq!(error_response.error.message.unwrap(), "Agent 'agent_invalid' does not exist");
+    assert_eq!(error_response.error.message.unwrap(), "Agent '454' does not exist");
 }

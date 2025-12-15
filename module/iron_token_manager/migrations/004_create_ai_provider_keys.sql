@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS ai_provider_keys
 );
 
 -- Indexes for common queries
--- CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_user_id ON ai_provider_keys( user_id );
+CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_user_id ON ai_provider_keys( user_id );
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_provider ON ai_provider_keys( provider );
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_is_enabled ON ai_provider_keys( is_enabled );
 

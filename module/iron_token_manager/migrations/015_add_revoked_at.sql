@@ -9,7 +9,7 @@
 --   - NULL when token is rotated or otherwise deactivated
 --   - Enables distinguishing revoked (409) from rotated (404) states
 
-ALTER TABLE api_tokens ADD COLUMN revoked_at INTEGER;
+-- ALTER TABLE api_tokens ADD COLUMN revoked_at INTEGER;
 
 -- Note: Existing inactive tokens will have revoked_at = NULL
 -- This is correct as we cannot retroactively determine the reason

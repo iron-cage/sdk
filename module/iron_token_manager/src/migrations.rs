@@ -67,34 +67,17 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
     } )?;
 
   // Migration 001: Initial schema (5 core tables)
-  apply_migration_001( pool ).await.map_err( |e| {
-    eprintln!("Migration 001 failed: {e:?}");
-    e
-  } )?;
+  apply_migration_001( pool ).await?;
 
   // Migration 002: Length constraints (guarded)
-  apply_migration_002( pool ).await.map_err( |e| {
-    eprintln!("Migration 002 failed: {e:?}");
-    e
-  } )?;
-
+  apply_migration_002( pool ).await?;
   // Migration 003: Users table (guarded)
-  apply_migration_003( pool ).await.map_err( |e| {
-    eprintln!("Migration 003 failed: {e:?}");
-    e
-  } )?;
-
+  apply_migration_003( pool ).await?;
   // Migration 004: AI provider keys
-  apply_migration_004( pool ).await.map_err( |e| {
-    eprintln!("Migration 004 failed: {e:?}");
-    e
-  } )?;
+  apply_migration_004( pool ).await?;
 
   // Migration 005: Enhanced users table
-  apply_migration_005( pool ).await.map_err( |e| {
-    eprintln!("Migration 005 failed: {e:?}");
-    e
-  } )?;
+  apply_migration_005( pool ).await?;
 
   // Migration 006: User audit log
   apply_migration_006( pool ).await?;

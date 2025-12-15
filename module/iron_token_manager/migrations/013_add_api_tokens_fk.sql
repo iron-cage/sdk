@@ -23,7 +23,7 @@ SELECT strftime('%s', 'now') * 1000
 WHERE NOT EXISTS (SELECT 1 FROM _migration_013_completed);
 
 -- Temporarily disable foreign key checks during table rebuild
-PRAGMA foreign_keys = OFF;
+-- PRAGMA foreign_keys = OFF;
 
 -- Rebuild api_tokens table with FK constraint
 -- Step 1: Create new table with FK
@@ -78,7 +78,7 @@ ALTER TABLE api_tokens_new RENAME TO api_tokens;
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_project_id ON api_tokens(project_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_is_active ON api_tokens(is_active);
--- CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
 
 -- Re-enable foreign key checks
 PRAGMA foreign_keys = ON;

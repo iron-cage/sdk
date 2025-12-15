@@ -992,7 +992,7 @@ pub async fn rotate_token(
       &existing_metadata.user_id,
       existing_metadata.project_id.as_deref(),
       existing_metadata.name.as_deref(),
-      Some(existing_metadata.agent_id.unwrap()),
+      existing_metadata.agent_id,
       existing_metadata.provider.as_deref(),
     )
     .await
@@ -1107,7 +1107,7 @@ pub async fn revoke_token(
   };
 
   // Verify ownership - user can only revoke their own tokens (Protocol 014 requirement)
-  if metadata.user_id != *user_id || claims.role != "admin" 
+  if metadata.user_id != *user_id && claims.role != "admin" 
   {
     return (
       StatusCode::FORBIDDEN,
