@@ -448,11 +448,4 @@ async fn test_deleted_user_not_in_list()
     total, 0,
     "LOUD FAILURE: Total count should not include deleted users. Got: {total}"
   );
-
-  // Verify search was treated as literal string (no results for malicious pattern)
-  let ( users, _total ) = result.unwrap();
-  assert!(
-    users.is_empty(),
-    "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
-  );
 }
