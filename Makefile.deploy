@@ -108,9 +108,12 @@ build_image: ## Builds uarust_conf_site image
 		-f module/iron_dashboard/Dockerfile \
 		-t name:$(TF_VAR_IMAGE_NAME)_front \
 		--build-arg VITE_API_URL="/api" \
+		--build-arg SERVER_PORT=$(SERVER_PORT) \
+		--build-arg CSP"/api" \
 		-t $(TAG)_front
 	docker build . \
 		-f module/iron_control_api/Dockerfile \
+		--build-arg SERVER_PORT=$(SERVER_PORT) \
 		-t name:$(TF_VAR_IMAGE_NAME)_back \
 		-t $(TAG)_back
 
