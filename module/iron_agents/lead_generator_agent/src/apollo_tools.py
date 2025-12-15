@@ -1,6 +1,6 @@
 import requests
 import json
-from langchain.agents import tool
+from langchain.tools import tool
 from config import APOLLO_API_KEY
 
 # --- Tool for Searching Leads ---

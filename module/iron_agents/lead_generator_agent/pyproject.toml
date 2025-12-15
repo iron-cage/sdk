@@ -7,13 +7,17 @@ requires-python = ">=3.12"
 dependencies = [
     "iron-sdk",
     "iron-runtime",
-    "langchain==0.3.7",
-    "langchain-community==0.3.7",
-    "langchain-core==0.3.19",
-    "langchain-openai==0.2.9",
-    "pydantic>=2.0",
-    "python-dotenv>=1.2.1",
-    "requests>=2.32.5",
+
+    # LangChain Ecosystem (Modular)
+    "langchain",            # Metapackage
+    "langchain-core",       # Contains AgentExecutor, ChatPromptTemplate
+    "langchain-openai",     # Contains ChatOpenAI
+    "langchain-community",  # Contains useful tools and utilities
+
+    # Utilities
+    "pydantic>=2.0",               # For data validation
+    "python-dotenv>=1.2.1",        # For environment variables
+    "requests>=2.32.5",            # For general HTTP requests
 ]
 
 [dependency-groups]
