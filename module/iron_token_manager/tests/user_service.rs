@@ -551,4 +551,11 @@ async fn test_sql_injection_search()
     users.is_empty(),
     "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
   );
+
+  // Verify search was treated as literal string (no results for malicious pattern)
+  let ( users, _total ) = result.unwrap();
+  assert!(
+    users.is_empty(),
+    "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
+  );
 }
