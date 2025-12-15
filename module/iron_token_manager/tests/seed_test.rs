@@ -49,7 +49,7 @@ use sqlx::SqlitePool;
       .fetch_one( &pool )
       .await
       .unwrap();
-    assert_eq!( user_count, 5, "Should create 5 users (admin, developer, viewer, tester, guest)" );
+	    assert_eq!( user_count, 5, "Should create 5 users (admin, demo, viewer, tester, guest)" );
 
     // Verify provider keys created
     let provider_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM ai_provider_keys" )
@@ -106,14 +106,14 @@ use sqlx::SqlitePool;
     .unwrap();
     assert_eq!( admin_role, "admin", "Admin should have admin role" );
 
-    // Verify developer role
-    let dev_role: String = sqlx::query_scalar(
-      "SELECT role FROM users WHERE username = 'developer'"
-    )
-    .fetch_one( &pool )
-    .await
-    .unwrap();
-    assert_eq!( dev_role, "user", "Developer should have user role" );
+	    // Verify demo role
+	    let dev_role: String = sqlx::query_scalar(
+	      "SELECT role FROM users WHERE username = 'demo'"
+	    )
+	    .fetch_one( &pool )
+	    .await
+	    .unwrap();
+	    assert_eq!( dev_role, "user", "Demo user should have user role" );
 
     // Verify inactive user
     let viewer_active: i64 = sqlx::query_scalar(

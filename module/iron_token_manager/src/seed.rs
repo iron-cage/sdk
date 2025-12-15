@@ -3,12 +3,6 @@
 //! - **Default**: No auto-seeding (database remains empty)
 //! - **Demo Mode** (`ENABLE_DEMO_SEED=true`): Seeds `admin@ironcage.ai` with `IronDemo2025!`
 //!
-//! Provides functions to populate database with realistic sample data for manual testing.
-//! Supports two modes controlled by `ENABLE_DEMO_SEED` environment variable:
-//!
-//! - **Local Development** (default): Seeds `admin@admin.com` with password `testpass`
-//! - **Production Demo** (`ENABLE_DEMO_SEED=true`): Seeds `admin@ironcage.ai` with `IronDemo2025!`
-//!
 //! # Usage
 //!
 //! ```rust,ignore
@@ -126,7 +120,7 @@ pub async fn wipe_database( pool: &SqlitePool ) -> Result< () >
 /// Seed all tables with sample data
 ///
 /// Populates database with realistic development data:
-/// - 5 sample users (admin, developer, viewer, tester, guest)
+/// - 5 sample users (admin, demo, viewer, tester, guest)
 /// - 2 AI provider keys (`OpenAI`, `Anthropic`)
 /// - 8 API tokens (various scopes and states)
 /// - 3 usage limits (different tiers, some users have no limits)
@@ -183,7 +177,7 @@ fn demo_users() -> Vec< SeedUser >
   vec![
     SeedUser { id: "user_admin", username: "admin", email: "admin@ironcage.ai", role: "admin", is_active: true, days_ago: 0 },
     SeedUser { id: "user_demo", username: "demo", email: "demo@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
-    SeedUser { id: "user_viewer", username: "viewer", email: "viewer@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
+    SeedUser { id: "user_viewer", username: "viewer", email: "viewer@ironcage.ai", role: "user", is_active: false, days_ago: 0 },
     SeedUser { id: "user_tester", username: "tester", email: "tester@ironcage.ai", role: "user", is_active: true, days_ago: 7 },
     SeedUser { id: "user_guest", username: "guest", email: "guest@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
   ]
@@ -194,7 +188,7 @@ fn demo_users() -> Vec< SeedUser >
 /// Creates 5 demo users (only when `ENABLE_DEMO_SEED=true`):
 /// - `admin@ironcage.ai` (admin, active)
 /// - `demo@ironcage.ai` (user, active)
-/// - `viewer@ironcage.ai` (user, active)
+/// - `viewer@ironcage.ai` (user, inactive)
 /// - `tester@ironcage.ai` (user, active)
 /// - `guest@ironcage.ai` (user, active)
 /// - Password: `IronDemo2025!`
@@ -461,7 +455,7 @@ async fn seed_api_tokens( pool: &SqlitePool ) -> Result< () >
 ///
 /// Creates 3 limit tiers:
 /// - Admin unlimited
-/// - Developer standard tier
+/// - Demo standard tier
 /// - Free tier
 async fn seed_usage_limits( pool: &SqlitePool ) -> Result< () >
 {

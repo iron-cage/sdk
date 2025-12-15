@@ -27,7 +27,7 @@ async fn validate_seeded_users_count()
 
   assert_eq!(
     user_count, 5,
-    "LOUD FAILURE: Seed should create exactly 5 users (admin, developer, viewer, tester, guest)"
+    "LOUD FAILURE: Seed should create exactly 5 users (admin, demo, viewer, tester, guest)"
   );
 }
 
@@ -50,20 +50,20 @@ async fn validate_admin_user_properties()
 }
 
 #[ tokio::test ]
-async fn validate_developer_user_properties()
+async fn validate_demo_user_properties()
 {
   let db = create_test_db_with_seed().await;
 
-  let developer: ( String, String, i64 ) = sqlx::query_as(
-    "SELECT username, role, is_active FROM users WHERE username = 'developer'"
+  let demo: ( String, String, i64 ) = sqlx::query_as(
+    "SELECT username, role, is_active FROM users WHERE username = 'demo'"
   )
   .fetch_one( db.pool() )
   .await
-  .expect( "LOUD FAILURE: Developer user should exist" );
+  .expect( "LOUD FAILURE: Demo user should exist" );
 
-  assert_eq!( developer.0, "developer", "Username should be 'developer'" );
-  assert_eq!( developer.1, "user", "Role should be 'user' (not admin)" );
-  assert_eq!( developer.2, 1, "Developer should be active" );
+  assert_eq!( demo.0, "demo", "Username should be 'demo'" );
+  assert_eq!( demo.1, "user", "Role should be 'user' (not admin)" );
+  assert_eq!( demo.2, 1, "Demo user should be active" );
 }
 
 #[ tokio::test ]
@@ -244,20 +244,20 @@ async fn validate_admin_unlimited_limits()
   let admin_limit: ( String, Option< i64 >, Option< i64 >, Option< i64 > ) = sqlx::query_as(
     "SELECT user_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month
      FROM usage_limits
-     WHERE user_id = 'admin'"
+     WHERE user_id = 'user_admin'"
   )
   .fetch_one( db.pool() )
   .await
   .expect( "LOUD FAILURE: Admin usage limit should exist" );
 
-  assert_eq!( admin_limit.0, "admin", "User ID should match" );
+  assert_eq!( admin_limit.0, "user_admin", "User ID should match" );
   assert_eq!( admin_limit.1, None, "Max tokens should be UNLIMITED (NULL)" );
   assert_eq!( admin_limit.2, None, "Max requests should be UNLIMITED (NULL)" );
   assert_eq!( admin_limit.3, None, "Max cost should be UNLIMITED (NULL)" );
 }
 
 #[ tokio::test ]
-async fn validate_developer_standard_tier()
+async fn validate_demo_standard_tier()
 {
   let db = create_test_db_with_seed().await;
 
@@ -266,13 +266,13 @@ async fn validate_developer_standard_tier()
       "SELECT user_id, max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month,
               current_tokens_today, current_requests_this_minute, current_cost_microdollars_this_month
        FROM usage_limits
-       WHERE user_id = 'developer'"
+       WHERE user_id = 'user_demo'"
     )
     .fetch_one( db.pool() )
     .await
-    .expect( "LOUD FAILURE: Developer usage limit should exist" );
+    .expect( "LOUD FAILURE: Demo usage limit should exist" );
 
-  assert_eq!( dev_limit.0, "developer", "User ID should match" );
+  assert_eq!( dev_limit.0, "user_demo", "User ID should match" );
   assert_eq!( dev_limit.1, Some( 1_000_000 ), "Max tokens should be 1M/day" );
   assert_eq!( dev_limit.2, Some( 60 ), "Max requests should be 60/minute" );
   assert_eq!( dev_limit.3, Some( 50_000_000 ), "Max cost should be $50/month (50M microdollars)" );
@@ -289,13 +289,13 @@ async fn validate_viewer_near_limit()
   let viewer_limit: ( String, Option< i64 >, i64 ) = sqlx::query_as(
     "SELECT user_id, max_tokens_per_day, current_tokens_today
      FROM usage_limits
-     WHERE user_id = 'viewer'"
+     WHERE user_id = 'user_viewer'"
   )
   .fetch_one( db.pool() )
   .await
   .expect( "LOUD FAILURE: Viewer usage limit should exist" );
 
-  assert_eq!( viewer_limit.0, "viewer", "User ID should match" );
+  assert_eq!( viewer_limit.0, "user_viewer", "User ID should match" );
   assert_eq!( viewer_limit.1, Some( 100_000 ), "Max tokens should be 100k/day" );
   assert_eq!(
     viewer_limit.2, 95_000,
@@ -380,7 +380,7 @@ async fn validate_all_users_have_same_password_hash()
 {
   let db = create_test_db_with_seed().await;
 
-  // All users should have the same password hash (bcrypt of "password123")
+  // All users should have the same password hash (demo password)
   let password_hashes: Vec< ( String, ) > =
     sqlx::query_as( "SELECT DISTINCT password_hash FROM users" )
       .fetch_all( db.pool() )
@@ -390,11 +390,11 @@ async fn validate_all_users_have_same_password_hash()
   assert_eq!(
     password_hashes.len(),
     1,
-    "LOUD FAILURE: All users should have the SAME password hash (password123)"
+    "LOUD FAILURE: All users should have the SAME password hash"
   );
 
-  // Bcrypt hash of "testpass" with cost=12 (matches src/seed.rs:166)
-  let expected_hash = "$2b$12$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2";
+  // Bcrypt hash of "IronDemo2025!" with cost=12 (matches module/iron_token_manager/src/seed.rs)
+  let expected_hash = "$2b$12$AJbkR5cbO1NDN8vXQ2FSr.02E7lvpf6X7fp7yfBkppqHWtHF8vh86";
   assert_eq!(
     password_hashes[ 0 ].0, expected_hash,
     "Password hash should match documented bcrypt hash (cost=12)"
