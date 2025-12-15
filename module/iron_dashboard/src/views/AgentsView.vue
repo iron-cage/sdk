@@ -36,7 +36,7 @@ const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
-const selectedProviders = ref<string[]>([])
+const selectedProviderKeyId = ref<number | null>(null)
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -96,12 +96,12 @@ const { data: providers } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[] }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_id?: number | null }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
-    selectedProviders.value = []
+    selectedProviderKeyId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -112,13 +112,13 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[] }) =>
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
-    selectedProviders.value = []
+    selectedProviderKeyId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -136,28 +136,53 @@ const deleteMutation = useMutation({
 })
 
 function handleCreateAgent() {
-  if (!name.value || selectedProviders.value.length === 0) {
-    createError.value = 'Name and at least one Provider are required'
+  if (!name.value) {
+    createError.value = 'Name is required'
     return
   }
-  
+
+  if (selectedProviderKeyId.value === null) {
+    createError.value = 'Provider key is required'
+    return
+  }
+
+  const providerKeyId = Number(selectedProviderKeyId.value)
+  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
+  if (!providerRecord) {
+    createError.value = 'Selected provider key not found'
+    return
+  }
+
   createError.value = ''
   createMutation.mutate({
     name: name.value,
-    providers: selectedProviders.value,
+    providers: [providerRecord.provider],
+    provider_key_id: providerKeyId,
   })
 }
 
 function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
-  selectedProviders.value = [...agent.providers]
+  selectedProviderKeyId.value = agent.provider_key_id ?? null
   showUpdateModal.value = true
 }
 
 function handleUpdateAgent() {
-  if (!selectedAgent.value || !name.value || selectedProviders.value.length === 0) {
-    createError.value = 'Name and at least one Provider are required'
+  if (!selectedAgent.value || !name.value) {
+    createError.value = 'Name is required'
+    return
+  }
+
+  if (selectedProviderKeyId.value === null) {
+    createError.value = 'Provider key is required'
+    return
+  }
+
+  const providerKeyId = Number(selectedProviderKeyId.value)
+  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
+  if (!providerRecord) {
+    createError.value = 'Selected provider key not found'
     return
   }
 
@@ -165,7 +190,8 @@ function handleUpdateAgent() {
   updateMutation.mutate({
     id: selectedAgent.value.id,
     name: name.value,
-    providers: selectedProviders.value,
+    providers: [providerRecord.provider],
+    provider_key_id: providerKeyId,
   })
 }
 
@@ -184,14 +210,6 @@ function confirmDelete() {
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
-}
-
-function toggleProvider(providerType: string) {
-  if (selectedProviders.value.includes(providerType)) {
-    selectedProviders.value = selectedProviders.value.filter(p => p !== providerType)
-  } else {
-    selectedProviders.value.push(providerType)
-  }
 }
 
 function formatTimestamp(timestamp?: number | null): string {
@@ -333,6 +351,9 @@ async function copyTokenToClipboard() {
               Providers
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Provider Key
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               IC Token
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -358,6 +379,9 @@ async function copyTokenToClipboard() {
                   {{ provider }}
                 </span>
               </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {{ agent.provider_key_id ?? 'None' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
@@ -475,21 +499,22 @@ async function copyTokenToClipboard() {
           </div>
 
           <div class="space-y-2">
-            <Label>Providers</Label>
-            <div class="space-y-2 border rounded-md p-4">
-              <div v-for="provider in providers" :key="provider.id" class="flex items-center space-x-2">
-                <input 
-                  type="checkbox"
-                  :id="`create-provider-${provider.id}`" 
-                  :checked="selectedProviders.includes(provider.provider)"
-                  @change="toggleProvider(provider.provider)"
-                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <Label :for="`create-provider-${provider.id}`" class="text-sm font-normal cursor-pointer">
-                  {{ provider.provider }}
-                </Label>
-              </div>
-            </div>
+            <Label for="create-provider-key">Assigned Provider Key (optional)</Label>
+            <select
+              id="create-provider-key"
+              v-model="selectedProviderKeyId"
+              :disabled="createMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option :value="null">None</option>
+              <option
+                v-for="providerKey in providers"
+                :key="providerKey.id"
+                :value="providerKey.id"
+              >
+                {{ providerKey.id }} - {{ providerKey.provider }}
+              </option>
+            </select>
           </div>
         </div>
 
@@ -537,21 +562,22 @@ async function copyTokenToClipboard() {
           </div>
 
           <div class="space-y-2">
-            <Label>Providers</Label>
-            <div class="space-y-2 border rounded-md p-4">
-              <div v-for="provider in providers" :key="provider.id" class="flex items-center space-x-2">
-                <input 
-                  type="checkbox"
-                  :id="`update-provider-${provider.id}`" 
-                  :checked="selectedProviders.includes(provider.provider)"
-                  @change="toggleProvider(provider.provider)"
-                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <Label :for="`update-provider-${provider.id}`" class="text-sm font-normal cursor-pointer">
-                  {{ provider.provider }}
-                </Label>
-              </div>
-            </div>
+            <Label for="update-provider-key">Assigned Provider Key (optional)</Label>
+            <select
+              id="update-provider-key"
+              v-model="selectedProviderKeyId"
+              :disabled="updateMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option :value="null">None</option>
+              <option
+                v-for="providerKey in providers"
+                :key="providerKey.id"
+                :value="providerKey.id"
+              >
+                {{ providerKey.id }} - {{ providerKey.provider }}
+              </option>
+            </select>
           </div>
         </div>
 

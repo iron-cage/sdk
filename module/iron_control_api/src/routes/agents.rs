@@ -34,18 +34,21 @@ pub struct Agent {
     providers_json: Option<String>,
     pub created_at: i64,
     pub owner_id: String,
+    pub provider_key_id: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAgentRequest {
     pub name: String,
     pub providers: Vec<String>,
+    pub provider_key_id: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateAgentRequest {
     pub name: Option<String>,
     pub providers: Option<Vec<String>>,
+    pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
 }
 
 /// List all agents (filtered by user role)
@@ -62,7 +65,8 @@ pub async fn list_agents(
                 name,
                 providers as providers_json,
                 created_at,
-                owner_id
+                owner_id,
+                provider_key_id
             FROM agents
             ORDER BY created_at DESC
             "#
@@ -84,7 +88,8 @@ pub async fn list_agents(
                 name,
                 providers as providers_json,
                 created_at,
-                owner_id
+                owner_id,
+                provider_key_id
             FROM agents
             WHERE owner_id = ?
             ORDER BY created_at DESC
@@ -124,7 +129,8 @@ pub async fn get_agent(
             name,
             providers as providers_json,
             created_at,
-            owner_id
+            owner_id,
+            provider_key_id
         FROM agents
         WHERE id = ?
         "#
@@ -179,16 +185,35 @@ pub async fn create_agent(
     let created_at = chrono::Utc::now().timestamp_millis();
     let owner_id = user.0.sub.clone();
 
+    // Validate provider_key_id if provided
+    if let Some(key_id) = req.provider_key_id {
+        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+            .bind(key_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Database error: {}", e),
+                )
+            })?;
+
+        if exists.is_none() {
+            return Err((StatusCode::NOT_FOUND, "Provider key not found".to_string()));
+        }
+    }
+
     let result = sqlx::query(
         r#"
-        INSERT INTO agents (name, providers, created_at, owner_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO agents (name, providers, created_at, owner_id, provider_key_id)
+        VALUES (?, ?, ?, ?, ?)
         "#
     )
     .bind(&req.name)
     .bind(&providers_json)
     .bind(created_at)
     .bind(&owner_id)
+    .bind(req.provider_key_id)
     .execute(&pool)
     .await
     .map_err(|e| {
@@ -205,6 +230,7 @@ pub async fn create_agent(
         providers_json: Some(providers_json),
         created_at,
         owner_id,
+        provider_key_id: req.provider_key_id,
     };
 
     Ok((StatusCode::CREATED, Json(agent)))
@@ -276,6 +302,38 @@ pub async fn update_agent(
             })?;
     }
 
+    // Update provider_key_id if provided (Some(Some(id)) sets; Some(None) clears)
+    if let Some(provider_key_id_opt) = req.provider_key_id {
+        if let Some(key_id) = provider_key_id_opt {
+            let exists: Option<i64> =
+                sqlx::query_scalar("SELECT id FROM ai_provider_keys WHERE id = ?")
+                    .bind(key_id)
+                    .fetch_optional(&pool)
+                    .await
+                    .map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("Database error: {}", e),
+                        )
+                    })?;
+            if exists.is_none() {
+                return Err((StatusCode::NOT_FOUND, "Provider key not found".to_string()));
+            }
+        }
+
+        sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+            .bind(provider_key_id_opt)
+            .bind(id)
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Database error: {}", e),
+                )
+            })?;
+    }
+
     // Fetch updated agent
     let mut agent = sqlx::query_as::<_, Agent>(
         r#"
@@ -284,7 +342,8 @@ pub async fn update_agent(
             name,
             providers as providers_json,
             created_at,
-            owner_id
+            owner_id,
+            provider_key_id
         FROM agents
         WHERE id = ?
         "#
