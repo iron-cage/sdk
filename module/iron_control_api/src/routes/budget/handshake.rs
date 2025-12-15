@@ -12,6 +12,7 @@ use axum::
 };
 use iron_token_manager::provider_key_storage::ProviderType;
 use iron_token_manager::error::TokenError;
+use iron_secrets::crypto::EncryptedSecret;
 use serde::{ Deserialize, Serialize };
 use uuid::Uuid;
 
@@ -163,6 +164,39 @@ pub async fn handshake(
     }
   };
 
+  // Helper: create a dev placeholder provider key for agent_1 if missing
+  async fn create_dev_provider_key_for_agent1(
+    state: &BudgetState,
+    provider_type: ProviderType,
+    owner_id: &str,
+  ) -> Result<i64, TokenError>
+  {
+    let key_owner = if owner_id.trim().is_empty() { "user_admin" } else { owner_id };
+
+    let plaintext = format!( "sk-dev-agent1-{}-placeholder", provider_type.as_str() );
+    let encrypted: EncryptedSecret = state.provider_key_crypto.encrypt( &plaintext )
+      .map_err( |_| TokenError::Generic )?;
+
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let result = sqlx::query(
+      "INSERT INTO ai_provider_keys \
+       (provider, encrypted_api_key, encryption_nonce, base_url, description, is_enabled, created_at, user_id) \
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)"
+    )
+    .bind( provider_type.as_str() )
+    .bind( encrypted.ciphertext_base64() )
+    .bind( encrypted.nonce_base64() )
+    .bind::<Option<&str>>( None )
+    .bind( "Auto-generated dev key for agent_1" )
+    .bind( now_ms )
+    .bind( key_owner )
+    .execute( &state.db_pool )
+    .await
+    .map_err( TokenError::Database )?;
+
+    Ok( result.last_insert_rowid() )
+  }
+
   // Get agent_id from IC Token claims
   let agent_id_str = &claims.agent_id;
 
@@ -246,6 +280,8 @@ pub async fn handshake(
         .into_response();
     }
   };
+
+  let owner_for_key = if owner_id.trim().is_empty() { "user_admin".to_string() } else { owner_id.clone() };
 
   // Ensure agent budget row exists (seed from owner's usage limit if needed)
   if state.agent_budget_manager.get_budget_status( agent_id ).await.ok().flatten().is_none()
@@ -362,23 +398,89 @@ pub async fn handshake(
     }
   };
 
-  // Get provider key ID (use provided or fetch first available for provider)
+  // Get provider key ID (use provided or fetch first available; auto-create for agent_1 if missing)
   let key_id = match request.provider_key_id
   {
-    Some( id ) => id,
+    Some( id ) =>
+    {
+      match state.provider_key_storage.get_key( id ).await
+      {
+        Ok( _ ) => id,
+        Err( TokenError::Database( sqlx::Error::RowNotFound ) ) if agent_id == 1 =>
+        {
+          match create_dev_provider_key_for_agent1( &state, provider_type, &owner_for_key ).await
+          {
+            Ok( new_id ) =>
+            {
+              let _ = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+                .bind( new_id )
+                .bind( agent_id )
+                .execute( &state.db_pool )
+                .await;
+              new_id
+            }
+            Err( e ) =>
+            {
+              tracing::error!( "Failed to auto-create provider key: {}", e );
+              return (
+                StatusCode::NOT_FOUND,
+                Json( serde_json::json!({ "error": "Provider key not found" }) ),
+              )
+                .into_response();
+            }
+          }
+        }
+        Err( err ) =>
+        {
+          tracing::error!( "Database error fetching provider key: {}", err );
+          return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json( serde_json::json!({ "error": "Key storage unavailable" }) ),
+          )
+            .into_response();
+        }
+      }
+    }
     None =>
     {
-      // Get first available key for this provider
+      // Get first available key for this provider, or auto-create for agent_1
       match state.provider_key_storage.get_keys_by_provider( provider_type ).await
       {
         Ok( keys ) if !keys.is_empty() => keys[ 0 ],
         Ok( _ ) =>
         {
-          return (
-            StatusCode::NOT_FOUND,
-            Json( serde_json::json!({ "error": format!( "No API keys configured for provider: {}", request.provider ) }) ),
-          )
-            .into_response();
+          if agent_id == 1
+          {
+          match create_dev_provider_key_for_agent1( &state, provider_type, &owner_id ).await
+            {
+              Ok( new_id ) =>
+              {
+                let _ = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+                  .bind( new_id )
+                  .bind( agent_id )
+                  .execute( &state.db_pool )
+                  .await;
+                new_id
+              }
+              Err( e ) =>
+              {
+                tracing::error!( "Failed to auto-create provider key: {}", e );
+                return (
+                  StatusCode::NOT_FOUND,
+                  Json( serde_json::json!({ "error": "No API keys configured for provider" }) ),
+                )
+                  .into_response();
+              }
+            }
+          }
+          else
+          {
+            return (
+              StatusCode::NOT_FOUND,
+              Json( serde_json::json!({ "error": "No API keys configured for provider" }) ),
+            )
+              .into_response();
+          }
         }
         Err( err ) =>
         {
