@@ -137,6 +137,9 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 019: Add provider_key_id to agents table (Feature 014)
   apply_migration_019( pool ).await?;
 
+  // Migration 020: Add account lockout fields (Protocol 007)
+  apply_migration_020( pool ).await?;
+
   Ok( () )
 }
 
@@ -608,6 +611,39 @@ async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
         .await
         .map_err( |e| {
           eprintln!("Migration 019 failed: {e:?}");
+          crate::error::TokenError::Generic
+        } )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 020: Add account lockout fields (Protocol 007)
+///
+/// Adds columns to users table for login attempt tracking and lockout:
+/// - `failed_login_count`: Counter for consecutive failed login attempts
+/// - `last_failed_login`: Timestamp of most recent failed login
+/// - `locked_until`: Timestamp when account lockout expires
+#[ allow( dead_code ) ]
+async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_020_completed'"
+  )
+      .fetch_one( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/020_add_account_lockout_fields.sql" );
+
+    sqlx::raw_sql( migration )
+        .execute( pool )
+        .await
+        .map_err( |e| {
+          eprintln!("Migration 020 failed: {e:?}");
           crate::error::TokenError::Generic
         } )?;
   }

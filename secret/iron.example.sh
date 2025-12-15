@@ -23,6 +23,10 @@ DATABASE_URL="sqlite://./iron.db?mode=rwc"
 # SECURITY: Generate a unique value for production!
 JWT_SECRET=""
 
+# IC Token secret for agent authentication (Protocol 005)
+# Used to sign/verify IC tokens for budget handshake
+IC_TOKEN_SECRET=""
+
 # =============================================================================
 # AI PROVIDER KEY ENCRYPTION
 # =============================================================================
@@ -36,6 +40,22 @@ JWT_SECRET=""
 # - Backup in separate secure location
 # - For production: use AWS KMS or similar
 IRON_SECRETS_MASTER_KEY=""
+
+# =============================================================================
+# CORS CONFIGURATION
+# =============================================================================
+
+# Allowed origins for CORS (comma-separated URLs)
+# Controls which web domains can make API requests from a browser
+# Example: "http://localhost:5173,http://localhost:3001"
+ALLOWED_ORIGINS=""
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+
+# Server port (1-65535)
+SERVER_PORT=""
 
 # =============================================================================
 # DEPLOYMENT MODE (optional)
