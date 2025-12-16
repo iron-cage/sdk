@@ -65,8 +65,10 @@ REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoin
 
 **Analytics (Protocol 012):**
 - `POST /api/v1/analytics/events` - Report LLM request events
+- `GET /api/v1/analytics/events/list` - List analytics events with pagination
 - `GET /api/v1/analytics/spending/*` - Spending metrics endpoints
 - `GET /api/v1/analytics/usage/*` - Usage metrics endpoints
+- `GET /api/v1/analytics/budget/status` - Budget status for all agents
 
 **Agent Provider Keys (Feature 014):**
 - `POST /api/v1/agents/provider-key` - Retrieve assigned provider API key for agent (IC Token auth)

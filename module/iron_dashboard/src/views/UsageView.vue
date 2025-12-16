@@ -3,11 +3,25 @@ import { ref, computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod } from '../composables/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 const api = useApi()
 
+// Agent selector
+const selectedAgentId = ref<number | null>(null)
+
+// Fetch agents for dropdown
+const { data: agents } = useQuery({
+  queryKey: ['agents'],
+  queryFn: () => api.getAgents(),
+})
+
 // Period selector
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
+
+// Logs pagination
+const logsPage = ref(1)
+const logsPerPage = 10
 
 const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
   { value: 'today', label: 'Today' },
@@ -18,10 +32,13 @@ const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
   { value: 'all-time', label: 'All Time' },
 ]
 
-// Fetch from Protocol 012 endpoints
+// Fetch from Protocol 012 endpoints with agent filter
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
-  queryKey: ['analytics-requests', selectedPeriod],
-  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value }),
+  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId],
+  queryFn: () => api.getAnalyticsUsageRequests({
+    period: selectedPeriod.value,
+    agent_id: selectedAgentId.value ?? undefined,
+  }),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
@@ -34,8 +51,31 @@ const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuer
   queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value }),
 })
 
+const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
+  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId],
+  queryFn: () => api.getAnalyticsSpendingTotal({
+    period: selectedPeriod.value,
+    agent_id: selectedAgentId.value ?? undefined,
+  }),
+})
+
+// Fetch recent events/logs
+const { data: eventsList, isLoading: eventsLoading } = useQuery({
+  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
+  queryFn: () => api.getAnalyticsEventsList(
+    {
+      period: selectedPeriod.value,
+      agent_id: selectedAgentId.value ?? undefined,
+    },
+    {
+      page: logsPage.value,
+      per_page: logsPerPage,
+    }
+  ),
+})
+
 const isLoading = computed(() =>
-  requestsLoading.value || providerLoading.value || modelLoading.value
+  requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
 )
 const error = computed(() =>
   requestsError.value || providerError.value || modelError.value
@@ -44,7 +84,7 @@ const error = computed(() =>
 // Computed values from Protocol 012 responses
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
 const successRate = computed(() => requestStats.value?.success_rate || 0)
-const totalSpend = computed(() => spendingByProvider.value?.summary.total_spend || 0)
+const totalSpend = computed(() => spendingTotal.value?.total_spend || 0)
 const totalInputTokens = computed(() =>
   modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0
 )
@@ -81,6 +121,18 @@ function formatCost(cost: number): string {
 function formatNumber(num: number): string {
   return num.toLocaleString()
 }
+
+function formatTimestamp(ms: number): string {
+  return new Date(ms).toLocaleString()
+}
+
+function formatMicrodollars(micros: number): string {
+  return `$${(micros / 1_000_000).toFixed(4)}`
+}
+
+function loadMoreLogs() {
+  logsPage.value++
+}
 </script>
 
 <template>
@@ -88,15 +140,28 @@ function formatNumber(num: number): string {
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Usage Analytics</h1>
 
-      <!-- Period selector -->
-      <select
-        v-model="selectedPeriod"
-        class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option v-for="option in periodOptions" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
-      </select>
+      <div class="flex items-center gap-4">
+        <!-- Agent selector -->
+        <select
+          v-model="selectedAgentId"
+          class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option :value="null">All Agents</option>
+          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+            {{ agent.name }}
+          </option>
+        </select>
+
+        <!-- Period selector -->
+        <select
+          v-model="selectedPeriod"
+          class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option v-for="option in periodOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <!-- Loading state -->
@@ -242,6 +307,76 @@ function formatNumber(num: number): string {
           </CardContent>
         </Card>
       </div>
+
+      <!-- Recent Logs -->
+      <Card>
+        <CardHeader class="flex flex-row items-center justify-between">
+          <CardTitle>Recent Logs</CardTitle>
+          <span v-if="eventsList" class="text-sm text-gray-500">
+            {{ eventsList.pagination.total }} total events
+          </span>
+        </CardHeader>
+        <CardContent>
+          <div v-if="eventsLoading" class="text-center text-gray-600 py-4">
+            Loading logs...
+          </div>
+          <div v-else-if="!eventsList?.data.length" class="text-center text-gray-600 py-4">
+            No logs available
+          </div>
+          <div v-else>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tokens</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="event in eventsList.data" :key="event.event_id">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {{ formatTimestamp(event.timestamp_ms) }}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      {{ event.agent_name }}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {{ event.model }}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                      <span
+                        class="px-2 py-1 text-xs font-medium rounded-full"
+                        :class="event.event_type === 'llm_request_completed'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'"
+                      >
+                        {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {{ formatNumber(event.input_tokens + event.output_tokens) }}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {{ formatMicrodollars(event.cost_micros) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Load More Button -->
+            <div v-if="eventsList.pagination.page < eventsList.pagination.total_pages" class="mt-4 text-center">
+              <Button variant="outline" @click="loadMoreLogs">
+                Load More Logs
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   </div>
 </template>

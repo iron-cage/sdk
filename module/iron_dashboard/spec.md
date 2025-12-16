@@ -17,11 +17,12 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 ## Scope
 
 **In Scope:**
-- Real-time agent monitoring (state, progress, costs)
+- Dashboard with global analytics (spending, success rate, agent count)
+- Agent management UI (create, list, edit, delete agents)
 - Token management UI (create, list, revoke tokens)
-- Usage analytics with charts
-- Budget control dashboard with alerts
-- WebSocket integration for live updates
+- Usage analytics with per-agent filtering and recent logs
+- Budget control for agents
+- User management (admin only)
 
 **Out of Scope:**
 - REST API backend (see iron_control_api)
@@ -40,8 +41,9 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 - Vue 3 - Frontend framework
 - TypeScript - Type safety
 - Vite - Build tool
-- Chart.js - Data visualization
+- TanStack Query (vue-query) - Data fetching and caching
 - Tailwind CSS - Styling
+- shadcn/vue - UI components
 
 **Optional:**
 - None
@@ -51,10 +53,16 @@ Web control panel for Iron Cage administration. Vue 3 SPA providing real-time ag
 ## Core Concepts
 
 **Key Components:**
-- **Dashboard View:** Main monitoring interface with agent state
-- **Token Manager:** CRUD UI for API tokens
-- **Analytics Charts:** Cost and usage visualization
-- **WebSocket Client:** Real-time event handling
+- **Dashboard View:** Global analytics overview (spending, success rate, agents count)
+- **Agents View:** Agent CRUD with budget assignment
+- **Usage Analytics View:** Per-agent analytics with logs table, provider/model breakdowns
+- **Budgets View:** Agent budget management
+- **Providers View:** AI provider configuration (admin)
+- **Users View:** User management (admin)
+
+**Shared Components:**
+- **MainLayout:** Sidebar navigation with active page indicator
+- **Card Components:** Reusable UI cards from shadcn/vue
 
 ---
 

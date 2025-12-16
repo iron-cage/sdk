@@ -54,9 +54,12 @@ pub use shared::{
   ModelUsage,
   ModelUsageSummary,
   ModelUsageResponse,
+  EventsListQuery,
+  EventsListResponse,
+  AnalyticsEventWithAgent,
 };
 
-pub use ingestion::post_event;
+pub use ingestion::{ post_event, list_events };
 pub use spending::{
   get_spending_total,
   get_spending_by_agent,

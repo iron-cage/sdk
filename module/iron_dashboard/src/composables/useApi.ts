@@ -527,6 +527,19 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
   }
 
+  async function getAnalyticsEventsList(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams
+  ): Promise<EventsListResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`)
+  }
+
   async function getBudgetStatus(
     page?: number,
     per_page?: number
@@ -646,6 +659,7 @@ export function useApi() {
     getAnalyticsSpendingByProvider,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
+    getAnalyticsEventsList,
     getBudgetStatus,
     // Budget Request Workflow
     createBudgetRequest,
@@ -833,6 +847,28 @@ export interface ModelUsage {
 export interface ModelUsageResponse {
   data: ModelUsage[]
   summary: { unique_models: number; total_requests: number; total_spend: number }
+  pagination: { page: number; per_page: number; total: number; total_pages: number }
+  period: string
+  calculated_at: string
+}
+
+export interface AnalyticsEvent {
+  event_id: string
+  timestamp_ms: number
+  event_type: string
+  model: string
+  provider: string
+  input_tokens: number
+  output_tokens: number
+  cost_micros: number
+  agent_id: number
+  agent_name: string
+  error_code?: string
+  error_message?: string
+}
+
+export interface EventsListResponse {
+  data: AnalyticsEvent[]
   pagination: { page: number; per_page: number; total: number; total_pages: number }
   period: string
   calculated_at: string

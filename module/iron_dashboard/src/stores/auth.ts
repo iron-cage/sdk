@@ -63,6 +63,11 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = null
     username.value = null
     role.value = null
+
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('username')
+    localStorage.removeItem('role')
   }
 
   // Login

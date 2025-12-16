@@ -36,11 +36,12 @@ const budgetAgentName = ref('')
 const budgetUsd = ref<number | undefined>(undefined)
 const budgetError = ref('')
 
-// Fetch limits
-const { data: limits, isLoading, error, refetch } = useQuery({
+// Fetch limits (hidden - global limits not integrated)
+const { data: _limits, isLoading: _isLoading, error: _error, refetch: _refetch } = useQuery({
   queryKey: ['limits'],
   queryFn: () => api.getLimits(),
 })
+void _limits; void _isLoading; void _error; void _refetch
 
 // Fetch agents (for owner lookup)
 const { data: agents } = useQuery({
@@ -132,7 +133,7 @@ function handleCreateLimit() {
   })
 }
 
-function openEditModal( limit: LimitRecord ) {
+function _openEditModal( limit: LimitRecord ) {
   editingLimit.value = limit
   maxTokensPerDay.value = limit.max_tokens_per_day
   maxRequestsPerMinute.value = limit.max_requests_per_minute
@@ -141,6 +142,7 @@ function openEditModal( limit: LimitRecord ) {
   editError.value = ''
   showEditModal.value = true
 }
+void _openEditModal
 
 function handleUpdateLimit() {
   if( !editingLimit.value ) return
@@ -162,15 +164,17 @@ function handleUpdateLimit() {
   })
 }
 
-function handleDeleteLimit( limit: LimitRecord ) {
+function _handleDeleteLimit( limit: LimitRecord ) {
   if( confirm( `Delete limit ${limit.id}? This action cannot be undone.` ) ) {
     deleteMutation.mutate( limit.id )
   }
 }
+void _handleDeleteLimit
 
-function formatDate( timestamp: number ): string {
+function _formatDate( timestamp: number ): string {
   return new Date( timestamp ).toLocaleString()
 }
+void _formatDate
 
 function formatCost( cents: number ): string {
   return `$${( cents / 100 ).toFixed( 2 )}`
@@ -233,26 +237,30 @@ function handleUpdateBudget() {
 <template>
   <div>
     <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Agent Budgets</h1>
+    </div>
+
+    <!-- Global Limits hidden - not integrated with iron_cage runtime
+    <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Usage Limits</h1>
       <Button @click="showCreateModal = true">
         Create New Limit
       </Button>
     </div>
 
-    <!-- Loading state -->
     <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
       <p class="text-gray-600">Loading limits...</p>
     </div>
 
-    <!-- Error state -->
     <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
       <p class="text-red-600">Error loading limits: {{ error.message }}</p>
       <Button @click="() => refetch()" variant="secondary" class="mt-4">
         Retry
       </Button>
     </div>
+    -->
 
-    <!-- Limits table -->
+    <!-- Global Limits table - hidden
     <div v-else-if="limits && limits.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
@@ -324,19 +332,18 @@ function handleUpdateBudget() {
       </table>
     </div>
 
-    <!-- Empty state -->
     <div v-else class="bg-white rounded-lg shadow p-6 text-center">
       <p class="text-gray-600 mb-4">No limits configured</p>
       <Button @click="showCreateModal = true">
         Create First Limit
       </Button>
     </div>
+    -->
 
     <!-- Agent Budgets -->
-    <div class="mt-10 bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-white rounded-lg shadow overflow-hidden">
       <div class="flex items-center justify-between px-6 py-4 border-b">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">Agent Budgets</h2>
           <p class="text-sm text-gray-500">Allocated, spent, and remaining budget per agent.</p>
         </div>
         <div class="space-x-2">

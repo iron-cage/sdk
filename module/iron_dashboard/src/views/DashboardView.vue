@@ -1,57 +1,32 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi, type TokenMetadata } from '../composables/useApi'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { useApi } from '../composables/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const router = useRouter()
 const api = useApi()
 
-// Fetch tokens for dashboard stats
-const { data: tokens, isLoading, error } = useQuery({
-  queryKey: ['tokens'],
-  queryFn: () => api.getTokens(),
+// Fetch spending analytics
+const { data: spending, isLoading: spendingLoading } = useQuery({
+  queryKey: ['analytics-spending'],
+  queryFn: () => api.getAnalyticsSpendingTotal({ period: 'all-time' }),
 })
 
-// Compute statistics
-const stats = computed(() => {
-  if( !tokens.value ) return { total: 0, active: 0, revoked: 0 }
-
-  const active = tokens.value.filter( ( t: TokenMetadata ) => t.is_active ).length
-  const revoked = tokens.value.filter( ( t: TokenMetadata ) => !t.is_active ).length
-
-  return {
-    total: tokens.value.length,
-    active,
-    revoked,
-  }
+// Fetch request usage analytics
+const { data: requestUsage, isLoading: requestsLoading } = useQuery({
+  queryKey: ['analytics-requests'],
+  queryFn: () => api.getAnalyticsUsageRequests({ period: 'all-time' }),
 })
 
-// Recent tokens (last 5)
-const recentTokens = computed(() => {
-  if( !tokens.value ) return []
-  return [ ...tokens.value ]
-    .sort( ( a, b ) => b.created_at - a.created_at )
-    .slice( 0, 5 )
+// Fetch agents count
+const { data: agents, isLoading: agentsLoading } = useQuery({
+  queryKey: ['agents'],
+  queryFn: () => api.getAgents(),
 })
 
-function formatDate( timestamp: number ): string {
-  return new Date( timestamp ).toLocaleString()
-}
+const isLoading = spendingLoading || requestsLoading || agentsLoading
 
-function navigateToTokens() {
-  router.push( '/tokens' )
-}
-
-function navigateToUsage() {
-  router.push( '/usage' )
-}
-
-function navigateToLimits() {
-  router.push( '/limits' )
+function formatCurrency(usd: number): string {
+  return `$${usd.toFixed(3)}`
 }
 </script>
 
@@ -64,19 +39,14 @@ function navigateToLimits() {
       <p class="text-gray-600">Loading dashboard...</p>
     </div>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading dashboard: {{ error.message }}</p>
-    </div>
-
     <!-- Dashboard content -->
     <div v-else>
       <!-- Stats cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <!-- Total tokens -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Total Spending -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Total Tokens</CardTitle>
+            <CardTitle class="text-sm font-medium text-gray-600">Total Spending</CardTitle>
             <div class="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
               <svg
                 class="h-6 w-6 text-blue-600"
@@ -88,20 +58,23 @@ function navigateToLimits() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
             </div>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-gray-900">{{ stats.total }}</div>
+            <div class="text-3xl font-bold text-gray-900">
+              {{ spending ? formatCurrency(spending.total_spend) : '$0.00' }}
+            </div>
+            <p class="text-xs text-gray-500 mt-1">All time</p>
           </CardContent>
         </Card>
 
-        <!-- Active tokens -->
+        <!-- Success Rate -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Active Tokens</CardTitle>
+            <CardTitle class="text-sm font-medium text-gray-600">Success Rate</CardTitle>
             <div class="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
               <svg
                 class="h-6 w-6 text-green-600"
@@ -119,17 +92,22 @@ function navigateToLimits() {
             </div>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-green-600">{{ stats.active }}</div>
+            <div class="text-3xl font-bold" :class="requestUsage && requestUsage.success_rate >= 95 ? 'text-green-600' : requestUsage && requestUsage.success_rate >= 80 ? 'text-yellow-600' : 'text-red-600'">
+              {{ requestUsage ? requestUsage.success_rate.toFixed(1) : '0' }}%
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ requestUsage ? `${requestUsage.successful_requests} / ${requestUsage.total_requests} requests` : 'No requests' }}
+            </p>
           </CardContent>
         </Card>
 
-        <!-- Revoked tokens -->
+        <!-- Total Agents -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Revoked Tokens</CardTitle>
-            <div class="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
+            <CardTitle class="text-sm font-medium text-gray-600">Active Agents</CardTitle>
+            <div class="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
               <svg
-                class="h-6 w-6 text-red-600"
+                class="h-6 w-6 text-purple-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -138,97 +116,25 @@ function navigateToLimits() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
             </div>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-red-600">{{ stats.revoked }}</div>
+            <div class="text-3xl font-bold text-purple-600">
+              {{ agents ? agents.length : 0 }}
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Registered agents</p>
           </CardContent>
         </Card>
       </div>
-
-      <!-- Quick actions -->
-      <Card class="mb-6">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="flex flex-wrap gap-3">
-            <Button @click="navigateToTokens">
-              Manage Tokens
-            </Button>
-            <Button @click="navigateToUsage" variant="secondary">
-              View Usage Analytics
-            </Button>
-            <Button @click="navigateToLimits" variant="secondary">
-              Configure Limits
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- Recent tokens -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Tokens</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="recentTokens.length === 0" class="text-center text-gray-600 py-4">
-            No tokens found. Generate your first token to get started.
-          </div>
-          <div v-else class="overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Provider
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="token in recentTokens" :key="token.id">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ token.id }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ token.provider || '-' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ token.name || '-' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {{ formatDate( token.created_at ) }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <Badge :variant="token.is_active ? 'default' : 'destructive'">
-                      {{ token.is_active ? 'Active' : 'Revoked' }}
-                    </Badge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="mt-4 pt-4 border-t border-gray-200">
-              <Button @click="navigateToTokens" variant="ghost" size="sm">
-                View all tokens →
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   </div>
 </template>
