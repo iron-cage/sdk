@@ -314,7 +314,7 @@ version = "0.3.0"
 path = "module/iron_control_api"
 
 [workspace.dependencies.iron_runtime]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_runtime"
 
 [workspace.dependencies.iron_secrets]
