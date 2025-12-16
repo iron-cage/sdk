@@ -291,7 +291,7 @@ path = "module/iron_telemetry"
 ## Workspace Crates (internal modules)
 
 [workspace.dependencies.iron_runtime_state]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_runtime_state"
 
 [workspace.dependencies.iron_test_db]
