@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type LimitRecord } from '../composables/useApi'
+import { useApi, type LimitRecord, type Agent, type BudgetStatus } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,11 +24,17 @@ const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const editingLimit = ref<LimitRecord | null>(null)
 const projectId = ref('')
+const overrideUserId = ref<string | null>(null)
 const maxTokensPerDay = ref<number | undefined>(undefined)
 const maxRequestsPerMinute = ref<number | undefined>(undefined)
 const maxCostPerMonthCents = ref<number | undefined>(undefined)
 const createError = ref('')
 const editError = ref('')
+const showBudgetModal = ref(false)
+const budgetAgentId = ref<number | null>(null)
+const budgetAgentName = ref('')
+const budgetUsd = ref<number | null>(null)
+const budgetError = ref('')
 
 // Fetch limits
 const { data: limits, isLoading, error, refetch } = useQuery({
@@ -36,9 +42,21 @@ const { data: limits, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getLimits(),
 })
 
+// Fetch agents (for owner lookup)
+const { data: agents } = useQuery({
+  queryKey: ['agents-for-limits'],
+  queryFn: () => api.getAgents(),
+})
+
+// Fetch agent budget status
+const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError, refetch: refetchBudget } = useQuery({
+  queryKey: ['budget-status'],
+  queryFn: () => api.getBudgetStatus(),
+})
+
 // Create limit mutation
 const createMutation = useMutation({
-  mutationFn: ( data: { user_id: string; project_id?: string; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_cents?: number } ) =>
+  mutationFn: ( data: { user_id: string; project_id?: string; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_microdollars?: number } ) =>
     api.createLimit( data ),
   onSuccess: () => {
     showCreateModal.value = false
@@ -52,8 +70,8 @@ const createMutation = useMutation({
 
 // Update limit mutation
 const updateMutation = useMutation({
-  mutationFn: ( data: { id: number; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_cents?: number } ) =>
-    api.updateLimit( data.id, { max_tokens_per_day: data.max_tokens_per_day, max_requests_per_minute: data.max_requests_per_minute, max_cost_per_month_cents: data.max_cost_per_month_cents } ),
+  mutationFn: ( data: { id: number; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_microdollars?: number } ) =>
+    api.updateLimit( data.id, { max_tokens_per_day: data.max_tokens_per_day, max_requests_per_minute: data.max_requests_per_minute, max_cost_per_month_microdollars: data.max_cost_per_month_microdollars } ),
   onSuccess: () => {
     showEditModal.value = false
     editingLimit.value = null
@@ -74,6 +92,7 @@ const deleteMutation = useMutation({
 
 function resetForm() {
   projectId.value = ''
+  overrideUserId.value = null
   maxTokensPerDay.value = undefined
   maxRequestsPerMinute.value = undefined
   maxCostPerMonthCents.value = undefined
@@ -81,8 +100,20 @@ function resetForm() {
   editError.value = ''
 }
 
+// Convert cents to microdollars (1 cent = 10,000 microdollars)
+function centsToMicrodollars( cents: number | undefined ): number | undefined {
+  return cents ? cents * 10000 : undefined
+}
+
+// Convert microdollars to cents (1 cent = 10,000 microdollars)
+function microdollarsToCents( microdollars: number | undefined ): number | undefined {
+  return microdollars ? Math.round( microdollars / 10000 ) : undefined
+}
+
 function handleCreateLimit() {
   createError.value = ''
+
+  const userId = overrideUserId.value || authStore.username || 'default'
 
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
@@ -91,11 +122,13 @@ function handleCreateLimit() {
   }
 
   createMutation.mutate({
-    user_id: authStore.username || 'default',
+    user_id: userId,
     project_id: projectId.value || undefined,
-    max_tokens_per_day: maxTokensPerDay.value,
-    max_requests_per_minute: maxRequestsPerMinute.value,
-    max_cost_per_month_cents: maxCostPerMonthCents.value,
+    // Convert empty string/falsy to undefined (backend expects i64 or null, not "")
+    max_tokens_per_day: maxTokensPerDay.value || undefined,
+    max_requests_per_minute: maxRequestsPerMinute.value || undefined,
+    // Convert cents (UI) to microdollars (backend)
+    max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
   })
 }
 
@@ -103,7 +136,8 @@ function openEditModal( limit: LimitRecord ) {
   editingLimit.value = limit
   maxTokensPerDay.value = limit.max_tokens_per_day
   maxRequestsPerMinute.value = limit.max_requests_per_minute
-  maxCostPerMonthCents.value = limit.max_cost_per_month_cents
+  // Convert microdollars (backend) to cents (UI)
+  maxCostPerMonthCents.value = microdollarsToCents( limit.max_cost_per_month_microdollars )
   editError.value = ''
   showEditModal.value = true
 }
@@ -111,6 +145,8 @@ function openEditModal( limit: LimitRecord ) {
 function handleUpdateLimit() {
   if( !editingLimit.value ) return
   editError.value = ''
+
+  const userId = overrideUserId.value || authStore.username || 'default'
 
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
@@ -120,9 +156,12 @@ function handleUpdateLimit() {
 
   updateMutation.mutate({
     id: editingLimit.value.id,
-    max_tokens_per_day: maxTokensPerDay.value,
-    max_requests_per_minute: maxRequestsPerMinute.value,
-    max_cost_per_month_cents: maxCostPerMonthCents.value,
+    // Convert empty string/falsy to undefined (backend expects i64 or null, not "")
+    max_tokens_per_day: maxTokensPerDay.value || undefined,
+    max_requests_per_minute: maxRequestsPerMinute.value || undefined,
+    // Convert cents (UI) to microdollars (backend)
+    max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
+    user_id: userId,
   })
 }
 
@@ -138,6 +177,58 @@ function formatDate( timestamp: number ): string {
 
 function formatCost( cents: number ): string {
   return `$${( cents / 100 ).toFixed( 2 )}`
+}
+
+function findOwnerByAgentId(agentId: number): string | null {
+  const match = agents?.value?.find((a: Agent) => a.id === agentId)
+  return match?.owner_id || null
+}
+
+function openCreateLimitForAgent(agentId: number) {
+  const owner = findOwnerByAgentId(agentId)
+  if (owner) {
+    overrideUserId.value = owner
+  }
+  projectId.value = ''
+  maxTokensPerDay.value = undefined
+  maxRequestsPerMinute.value = undefined
+  maxCostPerMonthCents.value = undefined
+  createError.value = ''
+  showCreateModal.value = true
+}
+
+function openBudgetModal(row: BudgetStatus) {
+  budgetAgentId.value = row.agent_id
+  budgetAgentName.value = row.agent_name
+  budgetUsd.value = Number((row.budget / 1_000_000).toFixed(2))
+  budgetError.value = ''
+  showBudgetModal.value = true
+}
+
+const updateBudgetMutation = useMutation({
+  mutationFn: (data: { agentId: number; total_allocated_microdollars: number }) =>
+    api.updateAgentBudget(data.agentId, data.total_allocated_microdollars),
+  onSuccess: () => {
+    showBudgetModal.value = false
+    queryClient.invalidateQueries({ queryKey: ['budget-status'] })
+  },
+  onError: (err) => {
+    budgetError.value = err instanceof Error ? err.message : 'Failed to update budget'
+  },
+})
+
+function handleUpdateBudget() {
+  if (!budgetAgentId.value) return
+  if (!budgetUsd.value || budgetUsd.value <= 0) {
+    budgetError.value = 'Budget must be greater than zero'
+    return
+  }
+
+  const micros = Math.round(budgetUsd.value * 1_000_000)
+  updateBudgetMutation.mutate({
+    agentId: budgetAgentId.value,
+    total_allocated_microdollars: micros,
+  })
 }
 </script>
 
@@ -206,7 +297,7 @@ function formatCost( cents: number ): string {
               {{ limit.max_requests_per_minute?.toLocaleString() || '-' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-              {{ limit.max_cost_per_month_cents ? formatCost( limit.max_cost_per_month_cents ) : '-' }}
+              {{ limit.max_cost_per_month_microdollars ? formatCost( microdollarsToCents( limit.max_cost_per_month_microdollars ) || 0 ) : '-' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate( limit.created_at ) }}
@@ -241,6 +332,81 @@ function formatCost( cents: number ): string {
       <Button @click="showCreateModal = true">
         Create First Limit
       </Button>
+    </div>
+
+    <!-- Agent Budgets -->
+    <div class="mt-10 bg-white rounded-lg shadow overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Agent Budgets</h2>
+          <p class="text-sm text-gray-500">Allocated, spent, and remaining budget per agent.</p>
+        </div>
+        <div class="space-x-2">
+          <Button variant="outline" size="sm" @click="refetchBudget">
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div v-if="isBudgetLoading" class="p-6 text-gray-600">
+        Loading agent budgets...
+      </div>
+      <div v-else-if="budgetQueryError" class="p-6 text-red-600">
+        Error loading budgets: {{ budgetQueryError.message }}
+      </div>
+      <div v-else-if="budgetStatus?.data?.length">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Agent
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Allocated
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Spent
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Remaining
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Used
+              </th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {{ row.agent_name }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                ${{ (row.budget / 1_000_000).toFixed(2) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                ${{ (row.spent / 1_000_000).toFixed(2) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                ${{ (row.remaining / 1_000_000).toFixed(2) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                {{ row.percent_used.toFixed(1) }}%
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <Button size="sm" variant="secondary" @click="openBudgetModal(row)">
+                  Update Budget
+                </Button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="p-6 text-gray-600">
+        No agent budget data available.
+      </div>
     </div>
 
     <!-- Create limit modal -->
@@ -394,6 +560,48 @@ function formatCost( cents: number ): string {
             :disabled="updateMutation.isPending.value"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Limit' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Update Agent Budget Modal -->
+    <Dialog v-model:open="showBudgetModal">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Agent Budget</DialogTitle>
+          <DialogDescription>
+            Set the total allocated budget for {{ budgetAgentName }} (in USD). Remaining will be recalculated automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Alert v-if="budgetError" variant="destructive">
+          <AlertDescription>{{ budgetError }}</AlertDescription>
+        </Alert>
+
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <Label for="budget-amount">Total Budget (USD)</Label>
+            <Input
+              id="budget-amount"
+              v-model.number="budgetUsd"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="e.g., 50.00"
+            />
+            <p class="text-xs text-gray-500">
+              This sets the total budget. Remaining will be total minus spent.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showBudgetModal = false">
+            Cancel
+          </Button>
+          <Button @click="handleUpdateBudget">
+            Update Budget
           </Button>
         </DialogFooter>
       </DialogContent>

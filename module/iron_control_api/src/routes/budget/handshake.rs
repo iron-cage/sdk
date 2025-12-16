@@ -11,6 +11,8 @@ use axum::
   response::{ IntoResponse, Json },
 };
 use iron_token_manager::provider_key_storage::ProviderType;
+use iron_token_manager::error::TokenError;
+use iron_secrets::crypto::EncryptedSecret;
 use serde::{ Deserialize, Serialize };
 use uuid::Uuid;
 
@@ -162,6 +164,39 @@ pub async fn handshake(
     }
   };
 
+  // Helper: create a dev placeholder provider key for agent_1 if missing
+  async fn create_dev_provider_key_for_agent1(
+    state: &BudgetState,
+    provider_type: ProviderType,
+    owner_id: &str,
+  ) -> Result<i64, TokenError>
+  {
+    let key_owner = if owner_id.trim().is_empty() { "user_admin" } else { owner_id };
+
+    let plaintext = format!( "sk-dev-agent1-{}-placeholder", provider_type.as_str() );
+    let encrypted: EncryptedSecret = state.provider_key_crypto.encrypt( &plaintext )
+      .map_err( |_| TokenError::Generic )?;
+
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let result = sqlx::query(
+      "INSERT INTO ai_provider_keys \
+       (provider, encrypted_api_key, encryption_nonce, base_url, description, is_enabled, created_at, user_id) \
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)"
+    )
+    .bind( provider_type.as_str() )
+    .bind( encrypted.ciphertext_base64() )
+    .bind( encrypted.nonce_base64() )
+    .bind::<Option<&str>>( None )
+    .bind( "Auto-generated dev key for agent_1" )
+    .bind( now_ms )
+    .bind( key_owner )
+    .execute( &state.db_pool )
+    .await
+    .map_err( TokenError::Database )?;
+
+    Ok( result.last_insert_rowid() )
+  }
+
   // Get agent_id from IC Token claims
   let agent_id_str = &claims.agent_id;
 
@@ -246,10 +281,74 @@ pub async fn handshake(
     }
   };
 
+  let owner_for_key = if owner_id.trim().is_empty() { "user_admin".to_string() } else { owner_id.clone() };
+
+  // Ensure agent budget row exists (seed from owner's usage limit if needed)
+  if state.agent_budget_manager.get_budget_status( agent_id ).await.ok().flatten().is_none()
+  {
+    // Fetch owner's usage limit to seed a budget cap if available
+    let limit_row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
+      "SELECT max_cost_per_month_microdollars, current_cost_microdollars_this_month
+       FROM usage_limits
+       WHERE user_id = ?
+       LIMIT 1"
+    )
+    .bind( &owner_id )
+    .fetch_optional( &state.db_pool )
+    .await
+    .map_err( |_| () )
+    .ok()
+    .flatten();
+
+    let (limit_max, current_cost) = limit_row
+      .map( |(max, cost)| (max.unwrap_or(0), cost.unwrap_or(0)) )
+      .unwrap_or( (0, 0) );
+
+    let available_from_limit = if limit_max > current_cost { limit_max - current_cost } else { 0 };
+    let seed_budget = if available_from_limit > 0 { available_from_limit } else { HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET };
+
+    if seed_budget <= 0
+    {
+      return (
+        StatusCode::FORBIDDEN,
+        Json( serde_json::json!({ "error": "Budget limit exceeded" }) ),
+      )
+        .into_response();
+    }
+
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let _ = sqlx::query(
+      "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+       VALUES (?, ?, 0, ?, ?, ?)"
+    )
+    .bind( agent_id )
+    .bind( seed_budget )
+    .bind( seed_budget )
+    .bind( now_ms )
+    .bind( now_ms )
+    .execute( &state.db_pool )
+    .await;
+  }
+
+  // Get provider API key
+  let provider_type = match request.provider.as_str()
+  {
+    "openai" => ProviderType::OpenAI,
+    "anthropic" => ProviderType::Anthropic,
+    _ =>
+    {
+      return (
+        StatusCode::BAD_REQUEST,
+        Json( serde_json::json!({ "error": format!( "Unsupported provider: {}", request.provider ) }) ),
+      )
+        .into_response();
+    }
+  };
+
   // Fix(issue-budget-006): Atomically check and reserve budget to prevent TOCTOU race
   //
   // Root cause: get_budget_status() and record_spending() were separate operations,
-  // creating race window where concurrent requests could both pass budget check before either
+  // creating race window where concurrent requests could both pass the check before either
   // recorded spending, causing negative budget (invariant violation).
   //
   // Pitfall: Time-of-check to time-of-use (TOCTOU) races occur when check and update are
@@ -299,38 +398,89 @@ pub async fn handshake(
     }
   };
 
-  // Get provider API key
-  let provider_type = match request.provider.as_str()
-  {
-    "openai" => ProviderType::OpenAI,
-    "anthropic" => ProviderType::Anthropic,
-    _ =>
-    {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json( serde_json::json!({ "error": format!( "Unsupported provider: {}", request.provider ) }) ),
-      )
-        .into_response();
-    }
-  };
-
-  // Get provider key ID (use provided or fetch first available for provider)
+  // Get provider key ID (use provided or fetch first available; auto-create for agent_1 if missing)
   let key_id = match request.provider_key_id
   {
-    Some( id ) => id,
+    Some( id ) =>
+    {
+      match state.provider_key_storage.get_key( id ).await
+      {
+        Ok( _ ) => id,
+        Err( TokenError::Database( sqlx::Error::RowNotFound ) ) if agent_id == 1 =>
+        {
+          match create_dev_provider_key_for_agent1( &state, provider_type, &owner_for_key ).await
+          {
+            Ok( new_id ) =>
+            {
+              let _ = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+                .bind( new_id )
+                .bind( agent_id )
+                .execute( &state.db_pool )
+                .await;
+              new_id
+            }
+            Err( e ) =>
+            {
+              tracing::error!( "Failed to auto-create provider key: {}", e );
+              return (
+                StatusCode::NOT_FOUND,
+                Json( serde_json::json!({ "error": "Provider key not found" }) ),
+              )
+                .into_response();
+            }
+          }
+        }
+        Err( err ) =>
+        {
+          tracing::error!( "Database error fetching provider key: {}", err );
+          return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json( serde_json::json!({ "error": "Key storage unavailable" }) ),
+          )
+            .into_response();
+        }
+      }
+    }
     None =>
     {
-      // Get first available key for this provider
+      // Get first available key for this provider, or auto-create for agent_1
       match state.provider_key_storage.get_keys_by_provider( provider_type ).await
       {
         Ok( keys ) if !keys.is_empty() => keys[ 0 ],
         Ok( _ ) =>
         {
-          return (
-            StatusCode::NOT_FOUND,
-            Json( serde_json::json!({ "error": format!( "No API keys configured for provider: {}", request.provider ) }) ),
-          )
-            .into_response();
+          if agent_id == 1
+          {
+          match create_dev_provider_key_for_agent1( &state, provider_type, &owner_id ).await
+            {
+              Ok( new_id ) =>
+              {
+                let _ = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+                  .bind( new_id )
+                  .bind( agent_id )
+                  .execute( &state.db_pool )
+                  .await;
+                new_id
+              }
+              Err( e ) =>
+              {
+                tracing::error!( "Failed to auto-create provider key: {}", e );
+                return (
+                  StatusCode::NOT_FOUND,
+                  Json( serde_json::json!({ "error": "No API keys configured for provider" }) ),
+                )
+                  .into_response();
+              }
+            }
+          }
+          else
+          {
+            return (
+              StatusCode::NOT_FOUND,
+              Json( serde_json::json!({ "error": "No API keys configured for provider" }) ),
+            )
+              .into_response();
+          }
         }
         Err( err ) =>
         {
@@ -349,6 +499,14 @@ pub async fn handshake(
   let _key_record = match state.provider_key_storage.get_key( key_id ).await
   {
     Ok( record ) => record,
+    Err( TokenError::Database( sqlx::Error::RowNotFound ) ) =>
+    {
+      return (
+        StatusCode::NOT_FOUND,
+        Json( serde_json::json!({ "error": "Provider key not found" }) ),
+      )
+        .into_response();
+    }
     Err( err ) =>
     {
       tracing::error!( "Database error fetching provider key: {}", err );
@@ -470,14 +628,22 @@ pub async fn handshake(
     "Budget lease granted, deducted from usage_limits"
   );
 
+  let budget_remaining_after = state
+    .agent_budget_manager
+    .get_budget_status( agent_id )
+    .await
+    .ok()
+    .flatten()
+    .map( |b| b.budget_remaining )
+    .unwrap_or( 0 );
+
   // Return successful handshake response
-  // budget_remaining is 0 because we grant the full remaining budget as the lease
   ( StatusCode::OK, Json( HandshakeResponse
   {
     ip_token,
     lease_id,
     budget_granted: budget_to_grant,
-    budget_remaining: 0, // Full budget granted to lease
+    budget_remaining: budget_remaining_after,
     expires_at: None, // No expiration by default
   } ) )
     .into_response()
