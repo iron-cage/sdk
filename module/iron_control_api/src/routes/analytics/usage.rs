@@ -211,7 +211,7 @@ pub async fn get_usage_models(
   let ( start_ms, end_ms ) = params.period.to_range();
   let offset = ( page.page - 1 ) * page.per_page;
 
-  let rows: Result< Vec< ModelUsageRow >, _ > = sqlx::query_as(
+  let mut query = String::from(
     r#"SELECT
          model,
          provider,
@@ -221,20 +221,33 @@ pub async fn get_usage_models(
          COALESCE(SUM(output_tokens), 0) as output_tokens
        FROM analytics_events
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-       AND event_type = 'llm_request_completed'
-       GROUP BY model, provider
-       ORDER BY request_count DESC
-       LIMIT ? OFFSET ?"#
-  )
+       AND event_type = 'llm_request_completed'"#
+  );
+
+  if params.agent_id.is_some()
+  {
+    query.push_str( " AND agent_id = ?" );
+  }
+
+  query.push_str( " GROUP BY model, provider ORDER BY request_count DESC LIMIT ? OFFSET ?" );
+
+  let mut q = sqlx::query_as::< _, ModelUsageRow >( &query )
     .bind( start_ms )
-    .bind( end_ms )
+    .bind( end_ms );
+
+  if let Some( agent_id ) = params.agent_id
+  {
+    q = q.bind( agent_id );
+  }
+
+  let rows = q
     .bind( page.per_page as i64 )
     .bind( offset as i64 )
     .fetch_all( &state.pool )
     .await;
 
   // Query totals
-  let totals: ( i64, i64, i64 ) = sqlx::query_as(
+  let mut totals_query = String::from(
     r#"SELECT
          COUNT(DISTINCT model || provider) as unique_models,
          COUNT(*) as total_requests,
@@ -242,12 +255,23 @@ pub async fn get_usage_models(
        FROM analytics_events
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?
        AND event_type = 'llm_request_completed'"#
-  )
+  );
+
+  if params.agent_id.is_some()
+  {
+    totals_query.push_str( " AND agent_id = ?" );
+  }
+
+  let mut tq = sqlx::query_as::< _, ( i64, i64, i64 ) >( &totals_query )
     .bind( start_ms )
-    .bind( end_ms )
-    .fetch_one( &state.pool )
-    .await
-    .unwrap_or( ( 0, 0, 0 ) );
+    .bind( end_ms );
+
+  if let Some( agent_id ) = params.agent_id
+  {
+    tq = tq.bind( agent_id );
+  }
+
+  let totals = tq.fetch_one( &state.pool ).await.unwrap_or( ( 0, 0, 0 ) );
 
   match rows
   {

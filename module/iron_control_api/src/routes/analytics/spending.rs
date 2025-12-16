@@ -200,7 +200,7 @@ pub async fn get_spending_by_provider(
 {
   let ( start_ms, end_ms ) = params.period.to_range();
 
-  let rows: Result< Vec< ( String, i64, i64, i64 ) >, _ > = sqlx::query_as(
+  let mut query = String::from(
     r#"SELECT
          provider,
          COALESCE(SUM(cost_micros), 0) as spending_micros,
@@ -208,14 +208,26 @@ pub async fn get_spending_by_provider(
          COUNT(DISTINCT agent_id) as agent_count
        FROM analytics_events
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-       AND event_type = 'llm_request_completed'
-       GROUP BY provider
-       ORDER BY spending_micros DESC"#
-  )
+       AND event_type = 'llm_request_completed'"#
+  );
+
+  if params.agent_id.is_some()
+  {
+    query.push_str( " AND agent_id = ?" );
+  }
+
+  query.push_str( " GROUP BY provider ORDER BY spending_micros DESC" );
+
+  let mut q = sqlx::query_as::< _, ( String, i64, i64, i64 ) >( &query )
     .bind( start_ms )
-    .bind( end_ms )
-    .fetch_all( &state.pool )
-    .await;
+    .bind( end_ms );
+
+  if let Some( agent_id ) = params.agent_id
+  {
+    q = q.bind( agent_id );
+  }
+
+  let rows = q.fetch_all( &state.pool ).await;
 
   match rows
   {
