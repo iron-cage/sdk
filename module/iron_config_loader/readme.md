@@ -2,7 +2,10 @@
 
 Unified configuration management for Iron Runtime with precedence-based resolution.
 
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/Wandalen/iron_runtime)
+[![Status](https://img.shields.io/badge/status-active-green.svg)](https://github.com/Wandalen/iron_runtime)
 [![Documentation](https://img.shields.io/badge/docs.rs-iron_config_loader-E5E7EB.svg)](https://docs.rs/iron_config_loader)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Wandalen/iron_runtime/blob/master/LICENSE)
 
 ## Configuration Precedence
 

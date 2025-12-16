@@ -222,13 +222,8 @@ uv sync  # Installs dependencies and creates .venv
 See [`contributing.md`](contributing.md) for contributor workflow.
 </details>
 
-
 ## Status
 
-**Version:** 0.1.0
-**Status:** Active development
-
-
-## License
-
-MIT
+- **Version:** 0.3.0
+- **Status:** Active development
+- **License:** MIT
