@@ -277,7 +277,7 @@ features = [ "enabled" ]
 ## Foundation Modules (local workspace crates)
 
 [workspace.dependencies.iron_types]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_types"
 
 [workspace.dependencies.iron_cost]
