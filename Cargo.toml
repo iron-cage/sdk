@@ -310,7 +310,7 @@ version = "0.2"
 path = "module/iron_reliability"
 
 [workspace.dependencies.iron_control_api]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_control_api"
 
 [workspace.dependencies.iron_runtime]
