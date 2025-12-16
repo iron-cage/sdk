@@ -2,22 +2,22 @@
 
 # Iron Cage - AI Control Panel
 
-Control Panel and Agent Runtime for Iron Cage AI agent management.
+Most AI frameworks assume R&D. We assume production in regulated industries.
 
 <p align="center">
-<a href="https://github.com/iron-cage/iron_runtime/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=build&color=E5E7EB" alt="Deploy CI" /></a>
+<a href="https://github.com/iron-cage/iron_runtime/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=build&color=E5E7EB" alt="build" /></a>
 &nbsp;
-<a href="https://github.com/iron-cage/iron_runtime"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="License" /></a>
+<a href="https://github.com/iron-cage/iron_runtime"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="license" /></a>
 &nbsp;
-<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/🌐_website-ironcage.ai-E5E7EB.svg" alt="Website" /></a>
+<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
 &nbsp;
-<a href="https://ironcage.ai/docs"><img src="https://img.shields.io/badge/📖_docs-ironcage.ai-E5E7EB.svg" alt="Documentation" /></a>
+<a href="https://ironcage.ai/docs"><img src="https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg" alt="docs" /></a>
 <br>
-<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/💬_discord-join-60A5FA.svg" alt="Discord" /></a>
+<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/discord-join-E5E7EB.svg" alt="discord" /></a>
 &nbsp;
-<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/🐙_github-iron--cage-E5E7EB.svg" alt="GitHub" /></a>
+<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/github-iron--cage-E5E7EB.svg" alt="github" /></a>
 &nbsp;
-<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/🐦_twitter-@ironcageai-E5E7EB.svg" alt="Twitter" /></a>
+<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/twitter-@ironcageai-E5E7EB.svg" alt="twitter" /></a>
 </p>
 
 </div>

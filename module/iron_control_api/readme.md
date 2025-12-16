@@ -49,6 +49,19 @@ axum::serve(listener, app).await?;
 <details>
 <summary>Architecture</summary>
 
+### System Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
+
+### Deployment Modes
+
 **Pilot/Demo Mode (Current):**
 - Single Rust process (localhost:8080)
 - Shared iron_runtime_state (DashMap + SQLite) with iron_runtime
