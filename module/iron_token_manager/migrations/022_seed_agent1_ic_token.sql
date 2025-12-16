@@ -1,6 +1,5 @@
 -- Seed dev IC token hash for agent_1 (demo/dev only)
 -- Hash corresponds to dev_ic_token inserted in migration 017
--- Token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhZ2VudF9pZCI6ImFnZW50XzEiLCJidWRnZXRfaWQiOiJidWRnZXRfdGVzdCIsImlhdCI6MTc2NTU0OTExNSwiaXNzIjoiaXJvbi1jb250cm9sLXBhbmVsIiwicGVybWlzc2lvbnMiOlsibGxtOmNhbGwiLCJhbmFseXRpY3M6d3JpdGUiXX0.9cJZnr4OP7pIp30ntTR9NRgfNhDykEPFW_Ew1PYn-zU
 -- SHA-256: 897b52e23fde48c0c98b1f5aa80b80292cf1d8301adc51e7475d36068d53733a
 
 UPDATE agents

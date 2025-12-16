@@ -123,7 +123,9 @@ async fn test_create_agent_as_admin_success()
 
   let request_body = json!({
     "name": "Test Agent",
-    "providers": ["openai", "anthropic"]
+    "providers": ["openai", "anthropic"],
+    "provider_key_id": 1,
+    "initial_budget_microdollars": 1000000
   });
 
   let response = app
@@ -157,7 +159,9 @@ async fn test_create_agent_as_user_forbidden()
 
   let request_body = json!({
     "name": "Test Agent",
-    "providers": ["openai"]
+    "providers": ["openai"],
+    "provider_key_id": 1,
+    "initial_budget_microdollars": 1000000
   });
 
   let response = app
@@ -183,7 +187,9 @@ async fn test_create_agent_without_auth_unauthorized()
 
   let request_body = json!({
     "name": "Test Agent",
-    "providers": ["openai"]
+    "providers": ["openai"],
+    "provider_key_id": 1,
+    "initial_budget_microdollars": 1000000
   });
 
   let response = app

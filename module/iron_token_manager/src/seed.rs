@@ -1,10 +1,10 @@
 //! Database seeding utilities for development and testing
 //!
 //! Provides functions to populate database with realistic sample data for manual testing.
-//! Supports two modes controlled by `ENABLE_DEMO_SEED` environment variable:
+//! Seeding is controlled by the `ENABLE_DEMO_SEED` environment variable:
 //!
-//! - **Local Development** (default): Seeds `admin@admin.com` with password `testpass`
-//! - **Production Demo** (`ENABLE_DEMO_SEED=true`): Seeds `admin@ironcage.ai` with `IronDemo2025!`
+//! - **Default** (no env var): No seeding - database remains empty
+//! - **Demo Mode** (`ENABLE_DEMO_SEED=true`): Seeds `admin@ironcage.ai` with `IronDemo2025!`
 //!
 //! # Usage
 //!
