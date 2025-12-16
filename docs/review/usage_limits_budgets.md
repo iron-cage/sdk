@@ -25,6 +25,8 @@ Limit for cost is ensured using check_cost_allowed() module/iron_token_manager/s
 
 *NO USAGES FOUND, PRESENTS ONLY 1 TEST*
 
+However, in handshake() module/iron_control_api/src/routes/budget/handshake.rs:291-294 usage limit cost is read and in module/iron_control_api/src/routes/budget/handshake.rs:609 cost limit is updated, so actually cost limit is ensured moment of budget_leasing.
+
 ### Result
 
-Usage Limits currently not used to limit requests in production code. 
+Usage Limits cost used in handshake process.
