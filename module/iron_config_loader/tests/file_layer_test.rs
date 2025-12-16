@@ -2,8 +2,8 @@
 //!
 //! Tests loading configuration from TOML files with proper precedence.
 
-use iron_config::layer::FileLayer;
-use iron_config::ConfigLayer;
+use iron_config_loader::layer::FileLayer;
+use iron_config_loader::ConfigLayer;
 use std::fs;
 use tempfile::TempDir;
 

@@ -1,5 +1,5 @@
 [package]
-name = "iron_config"
+name = "iron_config_loader"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

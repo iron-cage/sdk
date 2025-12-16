@@ -14,7 +14,7 @@ members = [
   "module/iron_test_db",
 
   # Configuration
-  "module/iron_config",
+  "module/iron_config_loader",
 
   # Feature layer
   "module/iron_safety",
@@ -293,8 +293,8 @@ path = "module/iron_runtime_state"
 [workspace.dependencies.iron_test_db]
 path = "module/iron_test_db"
 
-[workspace.dependencies.iron_config]
-path = "module/iron_config"
+[workspace.dependencies.iron_config_loader]
+path = "module/iron_config_loader"
 
 [workspace.dependencies.iron_safety]
 path = "module/iron_safety"

@@ -22,7 +22,7 @@ iron_types = { workspace = true }
 iron_runtime_state = { workspace = true }
 iron_telemetry = { workspace = true }
 iron_cost = { workspace = true }
-iron_config = { workspace = true }
+iron_config_loader = { workspace = true }
 workspace_tools = { workspace = true }
 
 # LLM API clients (DO NOT duplicate - use workspace crates)

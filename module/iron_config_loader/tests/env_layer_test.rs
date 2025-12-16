@@ -2,7 +2,7 @@
 //!
 //! Verifies environment variable configuration layer behavior.
 
-use iron_config::layer::{ EnvLayer, ConfigLayer };
+use iron_config_loader::layer::{ EnvLayer, ConfigLayer };
 use std::env;
 
 #[ test ]

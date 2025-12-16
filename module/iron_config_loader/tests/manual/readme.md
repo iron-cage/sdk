@@ -1,6 +1,6 @@
-# Manual Testing Plan: iron_config (Phase 2 Configuration Unification)
+# Manual Testing Plan: iron_config_loader (Phase 2 Configuration Unification)
 
-Manual testing plan for iron_config crate focusing on environment variable precedence, file config loading, and edge cases.
+Manual testing plan for iron_config_loader crate focusing on environment variable precedence, file config loading, and edge cases.
 
 ## Purpose
 
@@ -24,8 +24,8 @@ Before running manual tests, ensure:
 
 ```bash
 # Create temp test directory
-mkdir -p /tmp/iron_config_manual_test
-cd /tmp/iron_config_manual_test
+mkdir -p /tmp/iron_config_loader_manual_test
+cd /tmp/iron_config_loader_manual_test
 
 # Create test config file
 cat > config.toml <<EOF
@@ -195,7 +195,7 @@ EOF
 
 **Last Run:** 2024-12-15
 **Result:** ✅ 36/36 tests PASSING
-**Command:** `w3 .test l::3` in `module/iron_config`
+**Command:** `w3 .test l::3` in `module/iron_config_loader`
 
 **Coverage:**
 - Environment variable precedence (all corner cases)

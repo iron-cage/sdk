@@ -7,7 +7,7 @@
 //! 4. Workspace defaults
 //! 5. Crate defaults (lowest)
 
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 use std::env;
 
 #[ test ]

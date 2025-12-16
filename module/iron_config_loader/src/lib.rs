@@ -19,7 +19,7 @@
 //! # Examples
 //!
 //! ```rust,ignore
-//! use iron_config::ConfigLoader;
+//! use iron_config_loader::ConfigLoader;
 //! use serde::Deserialize;
 //!
 //! #[derive(Deserialize)]

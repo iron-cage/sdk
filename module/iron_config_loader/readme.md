@@ -1,8 +1,8 @@
-# iron_config
+# iron_config_loader
 
 Unified configuration management for Iron Runtime with precedence-based resolution.
 
-[![Documentation](https://img.shields.io/badge/docs.rs-iron_config-E5E7EB.svg)](https://docs.rs/iron_config)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_config_loader-E5E7EB.svg)](https://docs.rs/iron_config_loader)
 
 ## Configuration Precedence
 
@@ -30,7 +30,7 @@ Configuration is resolved using the following precedence (highest to lowest):
 ### Basic Example
 
 ```rust
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -139,7 +139,7 @@ println!("{}", loader.debug_summary());
 **Cargo.toml**:
 ```toml
 [dependencies]
-iron_config = { workspace = true }
+iron_config_loader = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 ```
 
@@ -151,7 +151,7 @@ Before (custom config loading):
 let config = load_config_from_multiple_sources()?;
 ```
 
-After (iron_config):
+After (iron_config_loader):
 ```rust
 // New: Single line with full precedence system
 let loader = ConfigLoader::new("my_module")?;
@@ -180,7 +180,7 @@ This crate is part of Phase 2 (Configuration Unification) of the workspace_tools
 <summary>File Structure & Dependencies</summary>
 
 ```
-iron_config/
+iron_config_loader/
 ├── src/
 │   ├── lib.rs           # Public API
 │   ├── error.rs         # Error types
