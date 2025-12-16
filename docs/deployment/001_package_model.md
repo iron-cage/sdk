@@ -18,9 +18,9 @@ Understand what ships together and how to deploy each component.
 |---------|----------|----------|---------|
 | **1. Control Panel** | API + Dashboard | Docker image | `docker pull` |
 | **2. Marketing Site** | Static website | HTML/CSS/JS | CDN deploy |
-| **3. Agent Runtime** | SDK + core services | PyPI wheel | `uv pip install iron-sdk` |
-| **4. Sandbox** | OS isolation | PyPI wheel | `uv pip install` |
-| **5. CLI Tools** | Token management + wrapper | Binary + PyPI | Download + uv pip |
+| **3. Agent Runtime** | SDK + core services | PyPI wheel | `uv pip install iron-cage` |
+| **4. Sandbox** | OS isolation | PyPI wheel | `pip install` |
+| **5. CLI Tools** | Token management + wrapper | Binary + PyPI | Download + pip |
 
 ## Package Characteristics
 
@@ -35,21 +35,27 @@ Understand what ships together and how to deploy each component.
 ## Key Principle
 
 - **Control Panel** = REQUIRED for all deployments (admin service, always standalone)
-- **Agent Runtime** = single `uv pip install iron-sdk` for all protection features
-  - Developers install ONLY `iron-sdk` (user-facing Python package)
-  - The `iron-cage` package (Rust runtime binary) is automatically installed as a dependency
+- **Agent Runtime** = single `uv pip install iron-cage` for all protection features
+  - Single package with Rust runtime + PyO3 Python bindings
   - Uses Library mode: runtime embedded via PyO3 (in-process, <0.1ms overhead)
 - **Sandbox** = optional, security-focused teams only
 - **CLI Tools** = binary + Python wrapper, installed together
 
-**Package Hierarchy (Agent Runtime):**
+**Package Structure (Agent Runtime):**
 ```
-Developer installs → iron-sdk (PyPI package with decorators, configs)
-    └─ Automatically installs → iron-cage (PyPI wheel with Rust binary)
-        └─ Contains → iron_runtime (Rust crate, internal implementation)
+uv pip install iron-cage
+    └─ iron_cage (Python module via PyO3)
+        └─ iron_runtime (Rust crate, internal implementation)
 ```
 
-**Key insight:** Developers interact with `iron-sdk` ONLY - never need to know about `iron-cage` or `iron_runtime`.
+**Usage:**
+```python
+from iron_cage import LlmRouter
+
+with LlmRouter(provider_key="sk-xxx", budget=10.0) as router:
+    # Use router.base_url with OpenAI client
+    pass
+```
 
 **Deployment Mode:**
 - **Pilot:** Library mode (runtime embedded in SDK, single process, PyO3)

@@ -991,7 +991,7 @@ Developer → Install SDK:
             uv pip install iron_sdk
             ↓
 Developer → Write agent code:
-            from iron_sdk import configure
+            from iron_cage import configure
             configure()  # reads IRON_IC_TOKEN from env
 
             import openai

@@ -38,8 +38,8 @@
 | **Service Boundaries** | Separation between Control Plane, Data Plane, and Agent Runtime |
 | **Data Flow** | End-to-end request journey from user input to LLM response |
 | **Execution Models** | Where agents execute: Local (primary) vs Server (future, post-pilot) |
-| **Library Mode** | Default SDK deployment where runtime embedded in-process via PyO3. Developer code: `from iron_sdk import protect_agent`. Overhead: ~0.5ms (FFI). Single process, no separate runtime. See [architecture/008](architecture/008_runtime_modes.md) |
-| **Router Mode** | Optional deployment where runtime runs as separate process exposing HTTP API. Two use cases: (1) Non-SDK frameworks (LangChain, CrewAI) point to localhost:8080, (2) iron_sdk optionally configured for HTTP. Same developer code as Library mode for SDK users. Overhead: ~5ms (HTTP). See [architecture/008](architecture/008_runtime_modes.md) |
+| **Library Mode** | Default SDK deployment where runtime embedded in-process via PyO3. Developer code: `from iron_cage import LlmRouter`. Overhead: ~0.5ms (FFI). Single process, no separate runtime. See [architecture/008](architecture/008_runtime_modes.md) |
+| **Router Mode** | Optional deployment where runtime runs as separate process exposing HTTP API. Two use cases: (1) Non-SDK frameworks (LangChain, CrewAI) point to localhost:8080, (2) iron_cage optionally configured for HTTP. Same developer code as Library mode for SDK users. Overhead: ~5ms (HTTP). See [architecture/008](architecture/008_runtime_modes.md) |
 
 ### Entities
 
@@ -118,7 +118,7 @@
 |------|------------|
 | **Package 1: Control Panel** | Docker image with iron_control_api + iron_dashboard |
 | **Package 2: Marketing Site** | Static website (ironcage.ai) |
-| **Package 3: Agent Runtime** | PyPI package (iron-sdk - user installs) with Python SDK; automatically includes iron-cage (PyPI wheel with Rust runtime binary, internal dependency) |
+| **Package 3: Agent Runtime** | PyPI package (iron-cage), Python module (iron_cage), source in module/iron_sdk |
 | **Package 4: Sandbox** | PyPI wheel (iron-sandbox) with OS isolation |
 | **Package 5: CLI Tools** | Binary (iron_cli) + PyPI wrapper (iron-cli-py) |
 
@@ -138,7 +138,7 @@
 | **iron_sandbox** | OS-level isolation legacy bindings (Rust, deprecated) |
 | **iron_sandbox_core** | OS sandboxing core with Landlock, seccomp (Rust) |
 | **iron_sandbox_py** | Python sandbox API (Python + PyO3) |
-| **iron_sdk** | Python SDK with decorators (Python, includes examples/) |
+| **iron_sdk** | Source folder for Python SDK (PyPI: iron-cage, import: iron_cage) |
 | **iron_secrets** | Encrypted secrets management (Rust) |
 | **iron_site** | Marketing website (Vue 3 + TypeScript, static) |
 | **iron_runtime_state** | Local state management with SQLite (Rust) |

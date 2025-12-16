@@ -16,7 +16,7 @@ Choose your path based on what you want to do:
 - Python 3.9+ (`python --version`)
 
 ```bash
-pip install iron-sdk
+uv pip install iron-cage
 ```
 
 ### Step 2: Get IC Token
@@ -27,21 +27,37 @@ Contact your admin to receive an IC Token (budget credential).
 
 ```python
 import os
-from iron_sdk import protect_agent, BudgetConfig, SafetyConfig
+from iron_cage import LlmRouter
+from openai import OpenAI
 
-@protect_agent(
-  ic_token=os.getenv("IC_TOKEN"),
-  budget=BudgetConfig(max_usd=50.0),
-  safety=SafetyConfig(pii_detection=True)
-)
-def my_agent(prompt: str) -> str:
-  return llm.chat(prompt)  # Your existing agent code unchanged
+# Use with Iron Cage server
+with LlmRouter(
+    api_key=os.getenv("IC_TOKEN"),
+    server_url=os.getenv("IC_SERVER"),
+) as router:
+    client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+    print(response.choices[0].message.content)
+```
+
+Or with direct provider key (for testing):
+```python
+from iron_cage import LlmRouter
+from openai import OpenAI
+
+with LlmRouter(provider_key="sk-xxx", budget=10.0) as router:
+    client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+    # ... use client
 ```
 
 ### Step 4: Run
 
 ```bash
 export IC_TOKEN="your-token-here"
+export IC_SERVER="http://localhost:3001"
 python my_agent.py
 ```
 
@@ -187,16 +203,16 @@ uv sync  # Installs dependencies and creates .venv
 
 ## Troubleshooting
 
-### "ModuleNotFoundError: No module named 'iron_sdk'"
+### "ModuleNotFoundError: No module named 'iron_cage'"
 
-**Solution:** Install iron-sdk:
+**Solution:** Install iron-cage:
 ```bash
-pip install iron-sdk
+uv pip install iron-cage
 ```
 
 ### "Should I install iron-cage?"
 
-**Answer:** No! iron-cage is automatically installed when you `pip install iron-sdk`. You never interact with it directly.
+**Answer:** Yes! `uv pip install iron-cage` is what you install. Then import with `from iron_cage import LlmRouter`.
 
 ### "Do I need Rust installed?"
 

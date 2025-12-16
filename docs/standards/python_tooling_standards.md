@@ -351,7 +351,7 @@ grep "requires-python" module/iron_sdk/pyproject.toml
 
 **A:** Not for development. Use `uv add` instead.
 
-For **end users** installing published packages: `pip install iron-sdk` is fine.
+For **end users** installing published packages: `uv pip install iron-cage` is fine.
 For **developers** working on Iron Runtime: use `uv sync` / `uv add`.
 
 ### Q: How do I add a dependency?

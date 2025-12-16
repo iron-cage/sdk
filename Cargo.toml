@@ -25,12 +25,13 @@ members = [
   # Integration layer
   "module/iron_control_api",
   "module/iron_runtime",
+  "module/iron_sdk",
 
   # Application layer
   "module/iron_cli",
 
   # NOTE: Non-Rust modules (not in Cargo workspace):
-  # Python: iron_cli_py, iron_sdk, iron_testing
+  # Python: iron_cli_py, iron_testing
   # Frontend: iron_dashboard (Vue.js)
   # iron_control_schema: Removed (spec-only, no implementation, zero dependents)
 ]
@@ -332,6 +333,9 @@ path = "module/iron_cli"
 [workspace.dependencies.iron_runtime_analytics]
 version = "0.3.0"
 path = "module/iron_runtime_analytics"
+
+[workspace.dependencies.iron_sdk]
+path = "module/iron_sdk"
 
 ## HTTP Client
 
