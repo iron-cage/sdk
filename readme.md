@@ -7,17 +7,17 @@ Most AI frameworks assume R&D. We assume production in regulated industries.
 <p align="center">
 <a href="https://github.com/iron-cage/sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/sdk/deploy.yaml?branch=master&label=build&color=E5E7EB" alt="build" /></a>
 &nbsp;
-<a href="https://github.com/iron-cage/sdk/blob/master/license"><img src="https://img.shields.io/badge/License-MIT-E5E7EB?logo=opensourceinitiative&logoColor=white" alt="license" /></a>
+<a href="https://github.com/iron-cage/sdk/blob/master/license"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="license" /></a>
 &nbsp;
-<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/%F0%9F%8C%90_website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
+<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
 &nbsp;
-<a href="https://ironcage.ai/#/docs"><img src="https://img.shields.io/badge/📖_docs-ironcage.ai-E5E7EB.svg" alt="Documentation" alt="docs" /></a>
+<a href="https://docs.rs/iron_runtime"><img src="https://img.shields.io/badge/docs.rs-iron__runtime-E5E7EB.svg" alt="docs" /></a>
 <br>
-<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/Discord-Join-white?logo=discord&logoColor=white" alt="discord" /></a>
+<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/discord-join-E5E7EB.svg" alt="discord" /></a>
 &nbsp;
-<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/GitHub-iron--cage-E5E7EB?logo=github&logoColor=0" alt="github" /></a>
+<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/github-iron--cage-E5E7EB.svg" alt="github" /></a>
 &nbsp;
-<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/twitter-@ironcageai-fff?logo=x&logoColor=white" alt="twitter" /></a>
+<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/twitter-@ironcageai-E5E7EB.svg" alt="twitter" /></a>
 </p>
 
 </div>
