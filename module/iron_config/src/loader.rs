@@ -273,7 +273,7 @@ impl ConfigLoader
       if let Some( suffix ) = key.strip_prefix( &format!( "{}.", prefix ) )
       {
         // Reconstruct nested structure
-        self.insert_nested( &mut section, suffix, value.value.clone() );
+        Self::insert_nested( &mut section, suffix, value.value.clone() );
       }
     }
 
@@ -289,7 +289,7 @@ impl ConfigLoader
   }
 
   /// Insert value into nested TOML table
-  fn insert_nested( &self, table: &mut toml::Table, key_path: &str, value: toml::Value )
+  fn insert_nested( table: &mut toml::Table, key_path: &str, value: toml::Value )
   {
     let parts: Vec< &str > = key_path.split( '.' ).collect();
 
@@ -308,7 +308,7 @@ impl ConfigLoader
         .as_table_mut()
         .unwrap();
 
-      self.insert_nested( nested, &rest, value );
+      Self::insert_nested( nested, &rest, value );
     }
   }
 

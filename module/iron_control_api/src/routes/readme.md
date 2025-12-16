@@ -14,6 +14,7 @@ REST API route handlers for all iron_control_api HTTP endpoints.
 | `auth/` | Handles authentication endpoints (Protocol 007) |
 | `budget/` | Handles budget control endpoints (Protocol 005) |
 | `health.rs` | Implements health check endpoint returning server status |
+| `ic_token.rs` | IC Token generation, management, and revocation endpoints |
 | `keys.rs` | Fetches decrypted AI provider keys by token |
 | `limits.rs` | Handles usage limit CRUD endpoints |
 | `mod.rs` | Declares and re-exports all route handler modules |

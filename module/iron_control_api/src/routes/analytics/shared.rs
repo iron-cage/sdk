@@ -458,7 +458,7 @@ pub struct AgentBudgetRow
 {
   pub agent_id: i64,
   pub agent_name: String,
-  pub total_allocated: f64,
-  pub total_spent: f64,
-  pub budget_remaining: f64,
+  pub total_allocated: i64,
+  pub total_spent: i64,
+  pub budget_remaining: i64,
 }
