@@ -2,7 +2,7 @@
 
 Python command-line tool for Iron Cage with wrapper architecture for operations and native Python for developer experience.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
 
 > [!WARNING]
 > **Development Status:** Architecture defined (v0.3.0) - Wrapper and native command implementations pending

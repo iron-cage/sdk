@@ -2,7 +2,7 @@
 
 REST API and WebSocket endpoints for programmatic control of Iron Cage runtime and real-time dashboard communication.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
 
 > [!IMPORTANT]
 > **Test Coverage:** 379 tests (100% pass rate) - Protocol 014 (111 tests), Protocol 010 (39 tests), Protocol 012 (30 tests), Security (173 tests)

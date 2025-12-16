@@ -2,7 +2,7 @@
 
 Agent orchestration and Python bridge for AI agent execution. Provides **LlmRouter** - a local proxy server for transparent LLM API key management with OpenAI and Anthropic support.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
 
 > [!IMPORTANT]
 > **Audience:** Platform contributors developing the iron_runtime Rust crate. **End Users:** See [iron_sdk documentation](../iron_sdk/readme.md) - just `pip install iron-sdk`
