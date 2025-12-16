@@ -306,7 +306,7 @@ version = "0.3.0"
 path = "module/iron_safety"
 
 [workspace.dependencies.iron_reliability]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_reliability"
 
 [workspace.dependencies.iron_control_api]
