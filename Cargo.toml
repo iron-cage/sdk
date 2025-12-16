@@ -285,7 +285,7 @@ version = "0.3.0"
 path = "module/iron_cost"
 
 [workspace.dependencies.iron_telemetry]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_telemetry"
 
 ## Workspace Crates (internal modules)
