@@ -15,7 +15,6 @@ def _load_config():
         secret_file = os.path.join(current_path, "secret", "-agent_secret.sh")
         
         if os.path.exists(secret_file):
-            print(f"DEBUG: Config loaded from: {secret_file}")
             # override=True is important to ensure variables are updated
             load_dotenv(secret_file, override=True)
             return True
