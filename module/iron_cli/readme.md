@@ -1,8 +1,10 @@
 # iron_cli
 
-Command-line interface for LLM token management using unilang framework.
+Command-line interface for LLM token management using the unilang framework.
 
 [![Documentation](https://img.shields.io/badge/docs.rs-iron_cli-E5E7EB.svg)](https://docs.rs/iron_cli)
+
+[Video Demonstarion](https://drive.google.com/file/d/18oR3CgS6LANX9iFO9TbFjPvS0P84tmt4/view?usp=sharing)
 
 ## Installation
 
