@@ -37,7 +37,7 @@ const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviderKeyId = ref<number | null>(null)
-const initialBudgetUsd = ref<number | null>(null)
+const initialBudgetUsd = ref<number | undefined>(undefined)
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -103,7 +103,7 @@ const createMutation = useMutation({
     showCreateModal.value = false
     name.value = ''
     selectedProviderKeyId.value = null
-    initialBudgetUsd.value = null
+    initialBudgetUsd.value = undefined
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },

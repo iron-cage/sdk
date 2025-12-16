@@ -728,9 +728,6 @@ export type {
   ApproveBudgetRequestResponse,
   RejectBudgetRequestRequest,
   RejectBudgetRequestResponse,
-  AgentBudgetResponse,
-  BudgetStatus,
-  BudgetStatusResponse,
 }
 
 // ============================================================================
@@ -778,6 +775,13 @@ export interface SpendingByProviderResponse {
   summary: { total_spend: number; total_requests: number; providers_count: number }
   period: string
   calculated_at: string
+}
+
+export interface Pagination {
+  page: number
+  per_page: number
+  total: number
+  total_pages: number
 }
 
 // Budget status (agent budgets)

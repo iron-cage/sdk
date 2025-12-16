@@ -33,7 +33,7 @@ const editError = ref('')
 const showBudgetModal = ref(false)
 const budgetAgentId = ref<number | null>(null)
 const budgetAgentName = ref('')
-const budgetUsd = ref<number | null>(null)
+const budgetUsd = ref<number | undefined>(undefined)
 const budgetError = ref('')
 
 // Fetch limits
@@ -146,8 +146,6 @@ function handleUpdateLimit() {
   if( !editingLimit.value ) return
   editError.value = ''
 
-  const userId = overrideUserId.value || authStore.username || 'default'
-
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
     editError.value = 'At least one limit must be specified'
@@ -161,7 +159,6 @@ function handleUpdateLimit() {
     max_requests_per_minute: maxRequestsPerMinute.value || undefined,
     // Convert cents (UI) to microdollars (backend)
     max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
-    user_id: userId,
   })
 }
 
@@ -184,7 +181,7 @@ function findOwnerByAgentId(agentId: number): string | null {
   return match?.owner_id || null
 }
 
-function openCreateLimitForAgent(agentId: number) {
+function _openCreateLimitForAgent(agentId: number) {
   const owner = findOwnerByAgentId(agentId)
   if (owner) {
     overrideUserId.value = owner
@@ -196,6 +193,7 @@ function openCreateLimitForAgent(agentId: number) {
   createError.value = ''
   showCreateModal.value = true
 }
+void _openCreateLimitForAgent
 
 function openBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
