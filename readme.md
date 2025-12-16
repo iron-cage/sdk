@@ -1,12 +1,26 @@
-# Iron Runtime
+<div align="center">
+
+# Iron Cage - AI Control Panel
 
 Control Panel and Agent Runtime for Iron Cage AI agent management.
 
-[![Deploy CI](https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=deploy)](https://github.com/iron-cage/iron_runtime/actions)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iron-cage/iron_runtime)
-[![Discord](https://img.shields.io/badge/discord-join-7289da.svg)](https://discord.gg/aR5fujCZhv)
+<p align="center">
+<a href="https://github.com/iron-cage/iron_runtime/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=build&color=4A5568" alt="Deploy CI" /></a>
+&nbsp;
+<a href="https://github.com/iron-cage/iron_runtime"><img src="https://img.shields.io/badge/license-MIT-4A5568.svg" alt="License" /></a>
+&nbsp;
+<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/🌐_website-ironcage.ai-4A5568.svg" alt="Website" /></a>
+&nbsp;
+<a href="https://ironcage.ai/docs"><img src="https://img.shields.io/badge/📖_docs-ironcage.ai-4A5568.svg" alt="Documentation" /></a>
+<br>
+<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/💬_discord-join-6D82CC.svg" alt="Discord" /></a>
+&nbsp;
+<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/🐙_github-iron--cage-4A5568.svg" alt="GitHub" /></a>
+&nbsp;
+<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/🐦_twitter-@ironcageai-4A5568.svg" alt="Twitter" /></a>
+</p>
 
-[🌐 Website](https://ironcage.ai) • [📖 Documentation](https://ironcage.ai/docs) • [🐙 GitHub](https://github.com/iron-cage) • [🐦 Twitter](https://x.com/ironcageai)
+</div>
 
 ---
 

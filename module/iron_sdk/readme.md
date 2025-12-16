@@ -2,7 +2,7 @@
 
 Pythonic SDK layer for Iron Cage agent protection with decorators and framework integrations.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
 
 > [!WARNING]
 > **Development Status:** Initial scaffolding - Core features pending implementation

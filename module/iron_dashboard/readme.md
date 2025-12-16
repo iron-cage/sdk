@@ -2,7 +2,7 @@
 
 Web dashboard for real-time Iron Cage agent monitoring and token management.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
 
 > [!IMPORTANT]
 > **Prerequisites:** Node.js 20+, iron_control_api backend running on http://localhost:3001

@@ -2,7 +2,7 @@
 
 Agent execution state management and audit logging.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
 
 ## Installation
 

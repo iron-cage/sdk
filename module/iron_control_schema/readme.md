@@ -2,7 +2,7 @@
 
 PostgreSQL schema for Iron Cage Control Panel (production mode).
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-4A5568.svg)](https://ironcage.ai/docs)
 
 > [!WARNING]
 > **Module Type:** Spec-only (no implementation yet) - Planned for Q1 2026
