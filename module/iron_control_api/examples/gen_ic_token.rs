@@ -9,5 +9,5 @@ fn main() {
         vec!["llm:call".to_string(), "analytics:write".to_string()],
         None,
     );
-    println!("{}", manager.generate_token(&claims).unwrap());
+    println!("{}", manager.generate_token(&claims).expect("Failed to generate token"));
 }

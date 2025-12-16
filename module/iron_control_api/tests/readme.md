@@ -69,6 +69,7 @@ tests/
 | `protocol_005_enforcement_simple.rs` | Test Protocol 005 multi-layer enforcement | Enforcement checks → Security validation | NOT budget flow (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT metrics (protocol_005_migration_metrics.rs) |
 | `protocol_005_migration_metrics.rs` | Test Protocol 005 migration completeness metrics | Migration metrics → Quantitative validation | NOT enforcement (protocol_005_enforcement_simple.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT types (budget_routes.rs) |
 | `protocol_005_rollback_verification.rs` | Test Protocol 005 rollback impossibility | Rollback attempts → Prevention validation | NOT enforcement checks (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types (budget_routes.rs) |
+| `protocol_005_immutability_infrastructure.rs` | Bug reproducers for Protocol 005 infrastructure gaps (issue-003) | Infrastructure state → Gap documentation | NOT functional tests (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT rollback (protocol_005_rollback_verification.rs), NOT budget flow (budget_routes.rs) |
 | `budget_database_state.rs` | Test Protocol 005 database state corner cases | Database state scenarios → Enforcement validation | NOT enforcement layers (protocol_005_enforcement_simple.rs), NOT metrics (protocol_005_migration_metrics.rs), NOT types/crypto (budget_routes.rs), NOT rollback (protocol_005_rollback_verification.rs) |
 | `budget_concurrency.rs` | Test Protocol 005 concurrent access scenarios | Concurrent requests → Race condition prevention | NOT database state (budget_database_state.rs), NOT input validation (budget_corner_cases.rs), NOT security (budget_security.rs), NOT types/crypto (budget_routes.rs) |
 | `budget_corner_cases.rs` | Test Protocol 005 input validation edge cases | Edge case inputs → Validation robustness | NOT concurrency (budget_concurrency.rs), NOT database state (budget_database_state.rs), NOT security (budget_security.rs), NOT types (budget_routes.rs) |
@@ -83,12 +84,12 @@ tests/
 
 ## Test Coverage Summary
 
-**Total Tests:** 499 (all passing, 8 implementation bugs fixed, +26 Protocol 005 tests, +120 Migration tests)
+**Total Tests:** 504 (499 passing, 5 failing infrastructure bug reproducers for issue-003, 8 implementation bugs fixed, +26 Protocol 005 tests, +120 Migration tests)
 
 **Phase 1 Security Additions** (2025-12-06):
 - **issue-001:** 3 DoS protection bug reproducer tests (unbounded string inputs)
 - **issue-002:** 2 NULL byte injection bug reproducer tests
-- **issue-003:** 4 database infrastructure tests (isolation, rollback, concurrency, constraints)
+- **issue-003:** 4 database infrastructure tests (isolation, rollback, concurrency, constraints) + 5 Protocol 005 infrastructure bug reproducers (2025-12-14)
 - **Security:** 28 corner case tests (command injection, path traversal, XSS, SQL injection, concurrency, uniqueness)
 - **Baseline:** 201 tests → **Phase 1 Complete:** 266 tests (+65 tests, +32%)
 

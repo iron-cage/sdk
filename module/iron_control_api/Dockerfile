@@ -43,8 +43,11 @@ RUN useradd -m -u 1000 iron && \
   chown -R iron:iron /app
 USER iron
 
+ARG SERVER_PORT=3001
+ENV SERVER_PORT=${SERVER_PORT}
+
 # Expose API port
-EXPOSE 3001
+EXPOSE ${SERVER_PORT}
 
 # Run the server
 CMD ["/app/iron_control_api_server"]

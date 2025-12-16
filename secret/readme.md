@@ -1,10 +1,36 @@
-# Configuration Reference for `secret/-secret.sh`
+# Secret Management
 
-This document explains how to configure the `secret/-secret.sh` file used by the root **Makefile** to deploy the application to cloud providers (Hetzner) with a single command:
+This directory contains all sensitive credentials and API keys for the Iron Runtime workspace. This document explains how to configure the `secret/-secret.sh` file used by the root **Makefile** to deploy the application to cloud providers (Hetzner) with a single command:
 
 ```bash
 make -f Makefile.deploy deploy
 ```
+
+## Naming Convention
+
+The secret files **MUST** start with a hyphen (`-`) prefix:
+- `-secret.sh` - Development server configuration
+
+## File Format
+
+Secret files use shell-sourceable `key=value` format:
+
+```sh
+# Source secrets into your environment
+source secret/-secret.sh
+```
+
+## Directory Structure
+
+```
+secret/
+├── readme.md           # This documentation file (committed)
+├── secret.template.sh     # Template for secrets (committed)
+├── -secret.sh        # Server secrets (gitignored)
+└── *.*               # Additional service-specific secrets (gitignored)
+```
+
+# Configuration Reference for `secret/-secret.sh`
 
 The `secret/-secret.sh` file contains **all secrets and environment-specific settings**.  
 It is sourced by the Makefile before starting the Docker-based Terraform environment, and its variables are passed into all Terraform modules and helper scripts.
@@ -26,7 +52,6 @@ It is sourced by the Makefile before starting the Docker-based Terraform environ
     - [1. GCP / Terraform parameters](#1-gcp--terraform-parameters)
     - [2. Docker / Artifact Registry](#2-docker--artifact-registry)
     - [3. Terraform modules root](#3-terraform-modules-root)
-- [Minimal Configuration Examples](#minimal-configuration-examples)
 - [Retrieving Keys](#retrieving-keys)
     - [How to get `service_account.json` (GCP service account key)](#how-to-get-service_accountjson-gcp-service-account-key)
     - [How to get `SECRET_STATE_ARCHIVE_KEY`](#how-to-get-secret_state_archive_key)
@@ -42,6 +67,7 @@ Example structure:
 secret/
   |- -secret.sh                 # main secrets file (NOT committed)
   |- readme.md                  # this documentation file
+  |- secret.template.sh         # Template for secrets
   |- service_account.json       # GCP service account key (name is configurable)
   |- id_rsa                     # SSH private key
   |- id_rsa.pub                 # SSH public key
@@ -116,10 +142,16 @@ Depending on the chosen `CSP`, some additional variables are required.
 |--------------------------|----------|---------------------------|
 | `DATABASE_URL`            | Yes      | SQLite connection string for pilot mode   |
 | `JWT_SECRET`              | Yes      | JWT secret key for signing access and refresh tokens   |
+| `IC_TOKEN_SECRET`         | Yes      | IC Token secret for agent authentication (Protocol 005)   |
+| `IP_TOKEN_KEY`            | Yes      | Secret key used to sign and validate IP-based access tokens   |
 | `IRON_SECRETS_MASTER_KEY` | Yes      | Master key for AES-256-GCM encryption of AI provider API keys   |
+| `ALLOWED_ORIGINS`         | Yes      | Allowed origins for CORS (comma-separated URLs)   |
+| `SERVER_PORT`             | Yes      | TCP port on which the backend HTTP API listens for incoming requests   |
+| `IRON_DEPLOYMENT_MODE`    | Yes      | Explicit deployment mode   |
+| `ENABLE_DEMO_SEED`        | Yes      | Value only for testing or demo data seeding    |
 
-> Generate secrets:
-- For JWT_SECRET `openssl rand -hex 32` 
+> Generate secrets use commands:
+- For JWT_SECRET and others `openssl rand -hex 32` 
 - For IRON_SECRETS_MASTER_KEY `openssl rand -base64 32`
 
 ### 7. AI Models key
@@ -161,43 +193,6 @@ These variables are optional. If omitted, the Makefile / scripts will derive **s
 | Variable  | Type     | Default / Behaviour                      |
 |---------- |----------|-------------------------------------------|
 | `TF_DIR`  | Optional | Base directory for Terraform modules; default is `deploy` |
-
----
-
-## Minimal Configuration Examples
-
-- **Minimal `secret/-secret.sh`**
-
-```bash
-# Cloud provider:  hetzner
-CSP="hetzner"
-SECRET_HETZNER_CLOUD_TOKEN="YOUR_HETZNER_API_TOKEN"
-# Project name (for tags and defaults)
-PROJECT_NAME="project_name"
-# Required secrets
-SECRET_STATE_ARCHIVE_KEY="change-me-random-string"
-GOOGLE_SE_CREDS_PATH="secret/service_account.json"
-SECRET_RSA_PRIVATE_KEY_PATH="secret/id_rsa"
-SECRET_RSA_PUBLIC_KEY_PATH="secret/id_rsa.pub"
-
-# Optional (can be miss) overrides
-# Google cloud region
-TF_VAR_REGION="europe-central2"
-# Project id for deployed resources | Can be set in secret/-secret.sh
-TF_VAR_PROJECT_ID=
-# Artifact Repository name for pushing the Docker images | Should not have "_"
-TF_VAR_REPO_NAME=
-# Pushed image name | Can have "_"
-TF_VAR_IMAGE_NAME=
-# Helper var for tagging local image
-TAG=
-# Zone location for the resource
-TF_VAR_ZONE=
-# Cloud Storage bucket name | must be unique | Should not have "_"
-TF_VAR_BUCKET_NAME=
-# Base terraform directory
-TF_DIR=
-```
 
 ---
 
@@ -251,200 +246,3 @@ This key is retrieved from your **Hetzner Cloud Console**:
 6. Create the token and copy it.
 
 Paste the token value into your `secret/-secret.sh` as `SECRET_HETZNER_CLOUD_TOKEN` (or the exact variable name used in your Makefile).
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Secret Management
-
-This directory contains all sensitive credentials and API keys for the Iron Runtime workspace.
-
-## Directory Structure
-
-```
-secret/
-├── readme.md           # This documentation file (committed)
-├── iron.example.sh     # Template for server secrets (committed)
-├── api_keys.example.sh # Template for API keys (committed)
-├── -iron.sh            # Server secrets: JWT, master key, database (gitignored)
-├── -api_keys.sh        # AI provider API keys (gitignored)
-└── -*.sh               # Additional service-specific secrets (gitignored)
-```
-
-## Naming Convention
-
-All secret files **MUST** start with a hyphen (`-`) prefix:
-- `-iron.sh` - Iron Runtime server configuration
-- `-api_keys.sh` - AI provider API keys (OpenAI, Anthropic, Gemini)
-- `-database.conf` - Database credentials (if needed beyond SQLite)
-
-The hyphen prefix ensures files are:
-1. Automatically gitignored (via `-*` pattern)
-2. Less likely to be accidentally processed by tools
-3. Clearly identifiable as sensitive
-
-## File Format
-
-Secret files use shell-sourceable `key=value` format:
-
-```sh
-# Source secrets into your environment
-source secret/-iron.sh
-source secret/-api_keys.sh
-```
-
-## Setup Instructions
-
-### Quick Setup
-
-```bash
-# 1. Copy example templates
-cp secret/iron.example.sh secret/-iron.sh
-cp secret/api_keys.example.sh secret/-api_keys.sh
-
-# 2. Generate and add secrets to -iron.sh
-echo "JWT_SECRET: $(openssl rand -hex 32)"
-echo "IRON_SECRETS_MASTER_KEY: $(openssl rand -base64 32)"
-
-# 3. Edit -iron.sh and -api_keys.sh with your values
-```
-
-### 1. Server Secrets (`-iron.sh`)
-
-Copy from template and fill in generated values:
-
-```bash
-cp secret/iron.example.sh secret/-iron.sh
-```
-
-Generate secrets:
-```bash
-# Generate JWT secret (64 hex chars)
-openssl rand -hex 32
-
-# Generate master key for encryption (base64)
-openssl rand -base64 32
-```
-
-### 2. AI Provider API Keys (`-api_keys.sh`)
-
-Copy from template and add your API keys:
-
-```bash
-cp secret/api_keys.example.sh secret/-api_keys.sh
-```
-
-Get your keys from:
-- OpenAI: https://platform.openai.com/api-keys
-- Anthropic: https://console.anthropic.com/settings/keys
-- Google Gemini: https://aistudio.google.com/app/apikey
-
-## Usage
-
-### Loading Secrets in Shell
-
-```bash
-# Load all secrets
-source secret/-iron.sh
-source secret/-api_keys.sh
-
-# Run server
-cargo run --bin iron_control_api_server
-```
-
-### Loading Secrets in Rust Tests
-
-Integration tests use the workspace_tools crate to load secrets:
-
-```rust
-let api_key = workspace_tools::secret::load_secret("anthropic_api_key")
-    .expect("ANTHROPIC_API_KEY not found in secret/-api_keys.sh");
-```
-
-### Docker Compose
-
-For Docker deployments, secrets are passed via environment variables:
-
-```bash
-source secret/-iron.sh
-source secret/-api_keys.sh
-docker compose up -d
-```
-
-## Security Notes
-
-1. **Never commit secrets** - All `-*` files are gitignored
-2. **Backup master key** - Loss of `IRON_SECRETS_MASTER_KEY` = loss of encrypted API keys
-3. **Production security** - Use proper secret management (AWS KMS, HashiCorp Vault, etc.)
-4. **CI/CD** - Use secure environment variables or secret management systems
-
-### ⚠️ Production Secret Validation
-
-**CRITICAL:** The Iron Control API server will **REFUSE TO START** if default development secrets are detected in production environments.
-
-**Validated Secrets:**
-- `JWT_SECRET` - Must not be `dev-secret-change-in-production`
-- `IC_TOKEN_SECRET` - Must not be `dev-ic-token-secret-change-in-production`
-- `IP_TOKEN_KEY` - Must not be all zeros (`0000...0000`)
-
-**Production Mode Detection:**
-The server detects production mode through:
-- `IRON_DEPLOYMENT_MODE=production` environment variable
-- Kubernetes environment (`KUBERNETES_SERVICE_HOST`)
-- AWS environment (`AWS_EXECUTION_ENV`)
-- Heroku environment (`DYNO`)
-- Release builds (`--release` flag)
-
-**What Happens:**
-If the server detects production mode with insecure default secrets, it will:
-1. Log a critical error listing all insecure secrets
-2. Provide remediation instructions (`openssl rand -hex 32`)
-3. **Panic and refuse to start**
-
-**Example Error:**
-```
-❌ CRITICAL SECURITY ERROR: Production deployment with insecure default secrets
-❌ The following secrets are using INSECURE DEFAULT VALUES:
-❌   - JWT_SECRET
-❌   - IC_TOKEN_SECRET
-❌   - IP_TOKEN_KEY
-❌ REFUSING TO START SERVER
-```
-
-**How to Fix:**
-```bash
-# Generate secure secrets
-export JWT_SECRET=$(openssl rand -hex 32)
-export IC_TOKEN_SECRET=$(openssl rand -hex 32)
-export IP_TOKEN_KEY=$(openssl rand -hex 32)
-
-# Or update secret/-iron.sh with generated values
-```
-
-**Implementation Details:**
-- Validation logic: `module/iron_control_api/src/bin/iron_control_api_server.rs:380-452`
-- Test scenarios: `module/iron_control_api/tests/production_secret_validation_test.rs`
-- Security fix: Fix(production-secret-validation) - blocks startup with insecure defaults
-
-## Migration from .env
-
-If you have an existing `.env` file, migrate your secrets:
-
-```bash
-# Create secret files from .env
-grep -E "^(DATABASE_URL|JWT_SECRET|IRON_SECRETS_MASTER_KEY)" .env > secret/-iron.sh
-grep -E "^(OPENAI|ANTHROPIC|GEMINI)" .env > secret/-api_keys.sh
-
-# Remove old .env file
-rm .env
-```
-

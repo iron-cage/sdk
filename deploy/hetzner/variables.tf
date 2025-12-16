@@ -36,11 +36,13 @@ variable "BUCKET_NAME" {
 # JWT secret key for signing access and refresh tokens
 variable "JWT_SECRET" {
   description = "JWT secret key for signing access and refresh tokens"
+  sensitive   = true
 }
 
 # Master key for AES-256-GCM encryption of AI provider API keys
 variable "IRON_SECRETS_MASTER_KEY" {
   description = "Master key for AES-256-GCM encryption of AI provider API keys"
+  sensitive   = true
 }
 
 # SQLite connection string for pilot mode
@@ -51,6 +53,38 @@ variable "DATABASE_URL" {
 # Docker image tag
 variable "TAG" {
   description = "Docker image tag"
+}
+
+# Secret key used to sign and validate IP-based access tokens
+variable "IP_TOKEN_KEY" {
+  description = "Secret key used to sign and validate IP-based access tokens"
+  sensitive   = true
+}
+
+# Secret used to sign and verify internal Iron Cage authentication tokens
+variable "IC_TOKEN_SECRET" {
+  description = "Secret used to sign and verify internal Iron Cage authentication tokens"
+  sensitive   = true
+}
+
+# Comma-separated list of allowed CORS origins for API access
+variable "ALLOWED_ORIGINS" {
+  description = "Comma-separated list of allowed CORS origins for API access"
+}
+
+# TCP port on which the backend HTTP API listens for incoming requests
+variable "SERVER_PORT" {
+  description = "TCP port on which the backend HTTP API listens for incoming requests"
+}
+
+# Explicit deployment mode
+variable "IRON_DEPLOYMENT_MODE" {
+  description = "Explicit deployment mode"
+}
+
+# Enable demo seed mode
+variable "ENABLE_DEMO_SEED" {
+  description = "Enable demo seed mode"
 }
 
 # Google Cloud Platform credentials

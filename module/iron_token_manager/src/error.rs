@@ -23,6 +23,14 @@ pub enum TokenError
   Generic,
   /// Database error preserving sqlx details for FK constraint detection
   Database( sqlx::Error ),
+  /// Validation error with specific field and reason
+  Validation
+  {
+    /// Field that failed validation
+    field: String,
+    /// Reason for validation failure
+    reason: String,
+  },
 }
 
 impl core::fmt::Display for TokenError
@@ -33,6 +41,7 @@ impl core::fmt::Display for TokenError
     {
       Self::Generic => write!( f, "Token management error" ),
       Self::Database( e ) => write!( f, "Database error: {e}" ),
+      Self::Validation { field, reason } => write!( f, "Validation error: {field} - {reason}" ),
     }
   }
 }

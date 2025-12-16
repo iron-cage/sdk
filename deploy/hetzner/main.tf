@@ -58,6 +58,12 @@ resource "hcloud_server" "main_resource" {
     iron_secrets_master_key   = "${var.IRON_SECRETS_MASTER_KEY}"
     database_url              = "${var.DATABASE_URL}"
     tag                       = "${var.TAG}"
+    ip_token_key              = "${var.IP_TOKEN_KEY}"
+    ic_token_key              = "${var.IC_TOKEN_SECRET}"
+    iron_deployment_mode      = "${var.IRON_DEPLOYMENT_MODE}"
+    allowed_origins           = "${var.ALLOWED_ORIGINS}"
+    server_port               = "${var.SERVER_PORT}"
+    enable_demo_seed          = "${var.ENABLE_DEMO_SEED}"
     service_account_creds_b64 = "${base64encode(data.local_sensitive_file.service_account_creds.content)}"
   })
 }

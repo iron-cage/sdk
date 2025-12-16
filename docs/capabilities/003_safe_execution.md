@@ -4,6 +4,20 @@
 
 ---
 
+## ⚠️ CRITICAL: Sandbox Architecture Context
+
+**This document describes the container-based sandbox architecture for Server Execution Mode (future, 5% of deployments).**
+
+**In Local Execution Mode (default, 95% of deployments):**
+- Agents run as local processes on developer machine
+- No container isolation (agents run in developer's environment)
+- Safety guaranteed by local Safety Service checking all LLM calls before sending
+- Code execution happens in developer's local environment with standard OS-level process isolation
+
+**This sandbox architecture applies ONLY to Server Execution Mode** where agents run in cloud (Kubernetes) and need strong isolation from each other and the host system.
+
+---
+
 ## User Need
 
 AI agents that execute code (Python, shell, SQL) pose risks:
@@ -12,7 +26,7 @@ AI agents that execute code (Python, shell, SQL) pose risks:
 - Can read secrets, access databases, make network calls
 - No audit trail of what was executed
 
-## Core Idea
+## Core Idea (Server Execution Mode Only)
 
 Execute untrusted code in **isolated containers** with:
 1. Filesystem isolation (can't access host)
