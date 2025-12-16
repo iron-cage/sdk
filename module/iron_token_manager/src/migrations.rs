@@ -689,9 +689,9 @@ async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 022: Seed dev IC token hash for agent_1
+/// Migration 022: Seed dev IC token hash for `agent_1`
 ///
-/// Sets ic_token_hash/ic_token_created_at for agent_1 using the pre-generated dev IC token
+/// Sets `ic_token_hash`/`ic_token_created_at` for `agent_1` using the pre-generated dev IC token
 /// from migration 017. Safe to run multiple times (only updates when hash is NULL).
 #[ allow( dead_code ) ]
 async fn apply_migration_022( pool: &SqlitePool ) -> Result< () >

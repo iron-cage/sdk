@@ -29,6 +29,7 @@ use crate::error::Result;
 /// Returns true if `ENABLE_DEMO_SEED=true` is set, false otherwise.
 /// When enabled, seeds database with demo accounts for production demos.
 /// When disabled (default), database remains empty - no auto-seeding.
+#[must_use]
 pub fn is_demo_seed_enabled() -> bool
 {
   std::env::var( "ENABLE_DEMO_SEED" )
@@ -221,7 +222,7 @@ pub async fn seed_users( pool: &SqlitePool ) -> Result< () >
     .bind( password_hash )
     .bind( user.email )
     .bind( user.role )
-    .bind( if user.is_active { 1 } else { 0 } )
+    .bind( i32::from( user.is_active ) )
     .bind( created_at )
     .execute( pool )
     .await

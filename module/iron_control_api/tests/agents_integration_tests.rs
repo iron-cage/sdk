@@ -55,6 +55,7 @@ use axum::{
 use tower::ServiceExt;
 use serde_json::json;
 use sqlx::SqlitePool;
+use iron_secrets::crypto::CryptoService;
 
 /// Test schema for agents integration tests
 const AGENTS_SCHEMA: &str = r#"
@@ -99,6 +100,30 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
   // Generate tokens using TEST_JWT_SECRET
   let admin_token = create_test_access_token( &admin_id, "admin@admin.com", "admin", "test_jwt_secret_key_for_testing_12345" );
   let user_token = create_test_access_token( &user_id, "regular_user@mail.com", "user", "test_jwt_secret_key_for_testing_12345" );
+
+  // Seed provider key for agent tests (id=1 is used by tests)
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  let test_provider_key = "sk-test_key_for_integration_tests";
+  let provider_key_master: [u8; 32] = [42u8; 32];
+  let crypto_service = CryptoService::new( &provider_key_master )
+    .expect( "LOUD FAILURE: Should create crypto service" );
+  let encrypted = crypto_service.encrypt( test_provider_key )
+    .expect( "LOUD FAILURE: Should encrypt provider key" );
+
+  sqlx::query(
+    "INSERT OR IGNORE INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+  .bind( 1i64 )
+  .bind( "openai" )
+  .bind( encrypted.ciphertext_base64() )
+  .bind( encrypted.nonce_base64() )
+  .bind( 1 )
+  .bind( now_ms )
+  .bind( &admin_id )
+  .execute( &app_state.database )
+  .await
+  .expect( "LOUD FAILURE: Failed to seed provider key" );
 
   let router = Router::new()
     .route( "/api/agents", get( iron_control_api::routes::agents::list_agents ) )
@@ -149,7 +174,8 @@ async fn test_create_agent_as_admin_success()
   let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
 
   assert_eq!( agent[ "name" ].as_str().unwrap(), "Test Agent" );
-  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 2 );
+  // Implementation normalizes providers to match the provider key's provider
+  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 1 );
 }
 
 #[ tokio::test ]
@@ -791,6 +817,8 @@ async fn test_create_agent_ignores_owner_id_in_request()
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
+    "provider_key_id": 1,
+    "initial_budget_microdollars": 1000000,
     "owner_id": user_id  // Trying to set different owner
   });
 
