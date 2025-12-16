@@ -330,7 +330,7 @@ version = "0.3.0"
 path = "module/iron_cli"
 
 [workspace.dependencies.iron_runtime_analytics]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_runtime_analytics"
 
 ## HTTP Client
