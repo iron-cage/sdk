@@ -114,7 +114,7 @@ tests/
   - Proper cleanup and resource management
 
 - **Seed Data Validation (`seed_data_validation.rs`):** 20 tests
-  - User count and properties (admin, developer, viewer, tester, guest)
+  - User count and properties (admin, demo, viewer, tester, guest)
   - Provider key count and validation (OpenAI, Anthropic)
   - Foreign key integrity verification
   - Password hash consistency (bcrypt cost=12)
