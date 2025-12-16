@@ -277,47 +277,61 @@ features = [ "enabled" ]
 ## Foundation Modules (local workspace crates)
 
 [workspace.dependencies.iron_types]
+version = "0.2"
 path = "module/iron_types"
 
 [workspace.dependencies.iron_cost]
+version = "0.2"
 path = "module/iron_cost"
 
 [workspace.dependencies.iron_telemetry]
+version = "0.2"
 path = "module/iron_telemetry"
 
 ## Workspace Crates (internal modules)
 
 [workspace.dependencies.iron_runtime_state]
+version = "0.2"
 path = "module/iron_runtime_state"
 
 [workspace.dependencies.iron_test_db]
+version = "0.2"
 path = "module/iron_test_db"
 
 [workspace.dependencies.iron_config_loader]
+version = "0.3"
 path = "module/iron_config_loader"
 
 [workspace.dependencies.iron_safety]
+version = "0.2"
 path = "module/iron_safety"
 
 [workspace.dependencies.iron_reliability]
+version = "0.2"
 path = "module/iron_reliability"
 
 [workspace.dependencies.iron_control_api]
+version = "0.2"
 path = "module/iron_control_api"
 
 [workspace.dependencies.iron_runtime]
+version = "0.2"
 path = "module/iron_runtime"
 
 [workspace.dependencies.iron_secrets]
+version = "0.2"
 path = "module/iron_secrets"
 
 [workspace.dependencies.iron_token_manager]
+version = "0.2"
 path = "module/iron_token_manager"
 
 [workspace.dependencies.iron_cli]
+version = "0.2"
 path = "module/iron_cli"
 
 [workspace.dependencies.iron_runtime_analytics]
+version = "0.2"
 path = "module/iron_runtime_analytics"
 
 ## HTTP Client
