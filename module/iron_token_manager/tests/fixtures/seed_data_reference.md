@@ -19,20 +19,23 @@ seed_all( &pool ).await?;
 
 ---
 
-## Users (3 total)
+## Users (5 total)
 
 | Username    | Role  | Active | Password        | Created At      | Notes                          |
 |-------------|-------|--------|-----------------|-----------------|--------------------------------|
-| `admin`     | admin | ✓ Yes  | `password123`   | now             | Admin user with unlimited access |
-| `developer` | user  | ✓ Yes  | `password123`   | now             | Standard developer account       |
-| `viewer`    | user  | ✗ No   | `password123`   | now             | Inactive user (for testing revocation) |
+| `admin`     | admin | ✓ Yes  | `IronDemo2025!` | now             | Admin user with unlimited access |
+| `demo`      | user  | ✓ Yes  | `IronDemo2025!` | now             | Standard demo account (tiered limits) |
+| `viewer`    | user  | ✗ No   | `IronDemo2025!` | now             | Inactive user (for revocation testing) |
+| `tester`    | user  | ✓ Yes  | `IronDemo2025!` | 7 days ago      | Older account (backdated created_at) |
+| `guest`     | user  | ✓ Yes  | `IronDemo2025!` | now             | No tokens (edge case) |
 
-**Password Hash:** All users use bcrypt hash of `password123` with cost=4 (fast for dev testing)
-- Hash: `$2b$04$xQa5kFZZhNGwPDXqJvw9XuXUdQEPAqXwNMOqQcU6MqWxPLxOVyJqO`
+**Password Hash:** All users use bcrypt hash of `IronDemo2025!` with cost=12
+- Hash: `$2b$12$AJbkR5cbO1NDN8vXQ2FSr.02E7lvpf6X7fp7yfBkppqHWtHF8vh86`
 
 **User IDs:**
-- Primary key: Auto-incremented integer
-- Referenced as: `user_admin`, `user_developer`, `user_viewer` in foreign key columns
+- Primary key: `users.id` (string)
+- Values: `user_admin`, `user_demo`, `user_viewer`, `user_tester`, `user_guest`
+- Referenced by foreign key columns as `user_*`
 
 ---
 
@@ -57,15 +60,18 @@ seed_all( &pool ).await?;
 
 ---
 
-## API Tokens (5 total)
+## API Tokens (8 total)
 
 | Token Hash                            | Name                  | User ID        | Project ID      | Active | Expires At       | Notes                              |
 |---------------------------------------|-----------------------|----------------|-----------------|--------|------------------|------------------------------------|
 | `admin_token_hash_placeholder_aaa111` | Admin Master Token    | `user_admin`   | NULL            | ✓ Yes  | Never            | Permanent admin token              |
-| `dev_token_hash_placeholder_bbb222`   | Developer Token       | `user_developer` | NULL          | ✓ Yes  | now + 30 days    | Expires in 30 days                 |
-| `project_token_hash_placeholder_ccc333` | Project Alpha Token | `user_developer` | `project_alpha` | ✓ Yes  | Never            | Project-scoped token               |
+| `dev_token_hash_placeholder_bbb222`   | Developer Token       | `user_demo`    | NULL            | ✓ Yes  | now + 30 days    | Expires in 30 days                 |
+| `project_token_hash_placeholder_ccc333` | Project Alpha Token | `user_demo`    | `project_alpha` | ✓ Yes  | Never            | Project-scoped token               |
 | `inactive_token_hash_placeholder_ddd444` | Inactive Token     | `user_viewer`  | NULL            | ✗ No   | Never            | Inactive (for revocation testing)  |
-| `expired_token_hash_placeholder_eee555` | Expired Token       | `user_developer` | NULL          | ✓ Yes  | now - 30 days    | Already expired (for expiry tests) |
+| `expired_token_hash_placeholder_eee555` | Expired Token       | `user_demo`    | NULL            | ✓ Yes  | now - 30 days    | Already expired (for expiry tests) |
+| `expiring_soon_token_hash_placeholder_fff666` | Expiring Soon Token | `user_demo` | `project_beta` | ✓ Yes  | now + 7 days     | Expires soon (rotation testing)    |
+| `tester_token_hash_placeholder_ggg777` | Tester Token        | `user_tester`  | NULL            | ✓ Yes  | now + 14 days    | Short expiry (created 7 days ago)  |
+| `tester_token_2_hash_placeholder_hhh888` | Tester Token 2     | `user_tester`  | `project_alpha` | ✓ Yes  | Never            | Second tester token (rotation)     |
 
 **Token Hash Format:** Placeholder strings (not real hashes, for testing only)
 
@@ -82,20 +88,20 @@ seed_all( &pool ).await?;
 
 ## Usage Limits (3 total)
 
-| User ID        | Project ID | Max Tokens/Day | Max Requests/Min | Max Cost/Month | Current Tokens Today | Current Requests/Min | Current Cost This Month | Notes                        |
+| User ID        | Project ID | Max Tokens/Day | Max Requests/Min | Max Cost/Month (microdollars) | Current Tokens Today | Current Requests/Min | Current Cost This Month (microdollars) | Notes                        |
 |----------------|------------|----------------|------------------|----------------|----------------------|----------------------|-------------------------|------------------------------|
 | `user_admin`   | NULL       | Unlimited      | Unlimited        | Unlimited      | 0                    | 0                    | $0.00                   | Admin has no limits          |
-| `user_developer` | NULL     | 1,000,000      | 60               | $50.00         | 250,000              | 15                   | $12.50                  | Standard developer tier      |
-| `user_viewer`  | NULL       | 100,000        | 10               | $0.00 (free)   | 95,000 ⚠️             | 2                    | $0.00                   | Free tier, near daily limit! |
+| `user_demo`    | NULL       | 1,000,000      | 60               | $50.00 (50,000,000) | 250,000              | 15                   | $12.50 (12,500,000)        | Standard demo tier           |
+| `user_viewer`  | NULL       | 100,000        | 10               | $0.00 (0)      | 95,000 ⚠️             | 2                    | $0.00 (0)               | Free tier, near daily limit! |
 
 **Limit Representation:**
 - `NULL` = Unlimited (no limit enforced)
 - Integer values = Hard limit
 
-**Cost Format:** Stored as cents
-- $50.00 = 5000 cents
-- $12.50 = 1250 cents
-- $0.00 = 0 cents
+**Cost Format:** Stored as microdollars (`$1.00 = 1_000_000` microdollars)
+- $50.00 = 50_000_000 microdollars
+- $12.50 = 12_500_000 microdollars
+- $0.00 = 0 microdollars
 
 **Current Usage:**
 - These are *current* counters that would be reset periodically
@@ -127,9 +133,9 @@ seed_all( &pool ).await?;
 
 ```
 users
-  └─> ai_provider_keys (user_id references users.username)
-  └─> api_tokens (user_id references users.username)
-  └─> usage_limits (user_id references users.username)
+  └─> ai_provider_keys (user_id references users.id)
+  └─> api_tokens (user_id references users.id)
+  └─> usage_limits (user_id references users.id)
 
 ai_provider_keys
   └─> project_provider_key_assignments (provider_key_id references ai_provider_keys.id)
@@ -152,20 +158,20 @@ See `wipe_database()` in `src/seed.rs` for the exact deletion order.
 ## Common Testing Scenarios
 
 ### Scenario 1: Admin Testing
-- **User:** `admin` / `password123`
+- **User:** `admin` / `IronDemo2025!`
 - **Token:** `admin_token_hash_placeholder_aaa111`
 - **Limits:** Unlimited (no restrictions)
 - **Access:** All projects, all providers
 
-### Scenario 2: Standard Developer Testing
-- **User:** `developer` / `password123`
+### Scenario 2: Standard Demo Testing
+- **User:** `demo` / `IronDemo2025!`
 - **Token:** `dev_token_hash_placeholder_bbb222` (user-level) or `project_token_hash_placeholder_ccc333` (project-scoped)
 - **Limits:** 1M tokens/day (250k used), 60 req/min (15 used), $50/month ($12.50 used)
 - **Projects:** `project_alpha` (via project token)
 - **Providers:** OpenAI + Anthropic (via project assignments)
 
 ### Scenario 3: Near-Limit Testing
-- **User:** `viewer` / `password123`
+- **User:** `viewer` / `IronDemo2025!`
 - **Limits:** 100k tokens/day (**95k used** ⚠️ near limit!)
 - **Purpose:** Test rate limiting and quota enforcement
 
@@ -205,10 +211,10 @@ let day_ms = 24 * 60 * 60 * 1000;  // Milliseconds per day
 ## Safety Warnings
 
 ⚠️ **NEVER USE IN PRODUCTION:**
-- Passwords are predictable (`password123`)
+- Passwords are predictable (`IronDemo2025!`)
 - Encryption keys are fake placeholders
 - Token hashes are simple strings (not cryptographic hashes)
-- Cost factor for bcrypt is only 4 (for speed, not security)
+- Predictable seed data is for test/demo environments only
 
 ✅ **Safe for:**
 - Development environments
