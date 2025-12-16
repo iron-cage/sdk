@@ -1,45 +1,39 @@
-# Iron SDK
+# Iron Cage
 
-Pythonic SDK layer for Iron Cage agent protection with decorators and framework integrations.
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](license)
 
-> [!WARNING]
-> **Development Status:** Initial scaffolding - Core features pending implementation
-
+Python SDK for Iron Cage AI agent protection. Provides LlmRouter and Runtime for protecting AI agents with budget tracking, safety controls, and LLM API proxying.
 
 ## Installation
 
 ```bash
-pip install iron-sdk
+uv pip install iron-cage
 ```
 
 > [!IMPORTANT]
 > **Requirements:** Python 3.9+ (`python --version`)
 
-**About Dependencies:**
-
-The `iron-cage` package (containing the Rust runtime) is automatically installed as a dependency - you never need to install or interact with it directly.
-
-**Package Hierarchy:**
-```
-What you install:  pip install iron-sdk
-What you import:   from iron_sdk import protect_agent
-Automatic (internal): iron-cage (Rust runtime, auto-installed)
-Internal (never seen): iron_runtime (Rust crate)
-```
-
 
 ## Quick Start
 
 ```python
-from iron_sdk import protect_agent, BudgetConfig, SafetyConfig
+from iron_cage import LlmRouter
+from openai import OpenAI
 
-@protect_agent(
-  budget=BudgetConfig(max_usd=50.0),
-  safety=SafetyConfig(pii_detection=True),
-)
-def my_agent(input: str) -> str:
-  # Your agent code here
-  return llm.generate(input)
+# Use with Iron Cage server
+with LlmRouter(api_key="ic_xxx", server_url="https://api.iron-cage.io") as router:
+    client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+    print(response.choices[0].message.content)
+
+# Or with direct provider key (for testing)
+with LlmRouter(provider_key="sk-xxx", budget=10.0) as router:
+    client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+    # ... use client
 ```
 
 
@@ -47,21 +41,75 @@ def my_agent(input: str) -> str:
 
 ![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
 
-**Visual Guide:**
-- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
-- **Middle (Management Plane):** Control Panel - NOT in data path
-- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+Iron Cage uses a two-crate architecture:
 
-See [root readme](../../readme.md) for detailed architecture explanation.
+| Crate | Language | Purpose |
+|-------|----------|---------|
+| `iron_runtime` | Pure Rust | Core implementation - LlmRouter, AgentRuntime, policies |
+| `iron_sdk` (folder) | Rust + Python | PyO3 bindings exposing iron_runtime to Python |
+
+**Package Hierarchy:**
+```
+What you install:  uv pip install iron-cage
+What you import:   from iron_cage import LlmRouter, Runtime
+Internal:          iron_runtime (Rust crate, linked at compile time)
+```
 
 
 ## Key Features
 
-- `@protect_agent` decorator for function-level protection
-- Context managers (`with Budget(...)`, `with Protection(...)`)
-- Framework integrations (LangChain, CrewAI, AutoGPT)
-- Typed configuration classes
-- Async/await support
+- **LLM Proxy**: Local HTTP proxy that intercepts OpenAI/Anthropic API requests
+- **Budget Control**: Set and track spending limits in USD
+- **Auto-detection**: Automatically detects provider from API key format
+- **Context Manager**: Clean resource management with `with` statement
+- **Type Stubs**: Full IDE support with `.pyi` files
+
+
+## API Reference
+
+### LlmRouter
+
+```python
+LlmRouter(
+    api_key: str = None,           # Iron Cage API token
+    server_url: str = None,        # Iron Cage server URL
+    cache_ttl_seconds: int = 300,  # API key cache TTL
+    budget: float = None,          # Budget limit in USD
+    provider_key: str = None,      # Direct provider API key
+)
+```
+
+**Properties:**
+- `base_url` - URL for OpenAI client (e.g., "http://127.0.0.1:52431/v1")
+- `api_key` - API key to use with client
+- `port` - Port the proxy is listening on
+- `provider` - Detected provider ("openai" or "anthropic")
+- `is_running` - Whether proxy is running
+- `budget` - Current budget limit in USD
+- `budget_status` - Tuple of (spent, limit) in USD
+
+**Methods:**
+- `total_spent()` - Get total spent in USD
+- `set_budget(amount_usd)` - Set budget limit
+- `stop()` - Stop the proxy server
+
+### Runtime
+
+```python
+Runtime(
+    budget: float,           # Budget limit in USD
+    verbose: bool = False,   # Enable verbose logging
+)
+```
+
+**Properties:**
+- `budget` - Budget limit
+- `verbose` - Verbose setting
+
+**Methods:**
+- `start_agent(script_path)` - Start an agent
+- `stop_agent(agent_id)` - Stop an agent
+- `get_metrics(agent_id)` - Get agent metrics as JSON
 
 
 <details>
@@ -69,16 +117,16 @@ See [root readme](../../readme.md) for detailed architecture explanation.
 
 ```bash
 # LangChain integration
-pip install iron-sdk[langchain]
+uv pip install iron-cage[langchain]
 
 # CrewAI integration
-pip install iron-sdk[crewai]
-
-# AutoGPT integration
-pip install iron-sdk[autogpt]
+uv pip install iron-cage[crewai]
 
 # All integrations
-pip install iron-sdk[all]
+uv pip install iron-cage[all]
+
+# Examples dependencies
+uv pip install iron-cage[examples]
 ```
 
 </details>
@@ -87,63 +135,36 @@ pip install iron-sdk[all]
 <details>
 <summary>Examples</summary>
 
-See `examples/` directory for 20+ runnable examples:
+See `examples/` directory for runnable examples:
 - `examples/langchain/` - LangChain integration examples
 - `examples/crewai/` - CrewAI integration examples
-- `examples/autogpt/` - AutoGPT integration examples
-- `examples/patterns/` - Protection pattern examples
 - `examples/raw_api/` - Direct API usage examples
+- `examples/patterns/` - Protection pattern examples
 
 Run examples:
 ```bash
-python examples/langchain/simple_chat.py
+python examples/lead_gen_agent.py
 ```
 
 </details>
 
 
-<details>
-<summary>Development Status & Roadmap</summary>
+## Development
 
-**Current Phase:** Initial scaffolding
+```bash
+# Build the Python package
+cd module/iron_sdk
+maturin develop
 
-**Pending Implementation:**
-- Core decorator (@protect_agent)
-- Context managers (Budget, Protection)
-- Configuration classes
-- Framework integrations (LangChain, CrewAI, AutoGPT)
-
-</details>
-
-
-<details>
-<summary>Scope & Boundaries</summary>
-
-**Responsibilities:**
-Provides a clean, Pythonic API for protecting AI agents with budget tracking, PII detection, and reliability patterns. Wraps the low-level PyO3 bindings from iron_runtime with decorators, context managers, and typed configurations for ergonomic Python usage.
-
-**In Scope:**
-- `@protect_agent` decorator for function-level protection
-- Context managers (`with Budget(...)`, `with Protection(...)`)
-- Typed configuration classes (BudgetConfig, SafetyConfig, ReliabilityConfig)
-- Framework integrations (LangChain, CrewAI, AutoGPT)
-- Async/await support for async agents
-- Error handling with Python exceptions
-
-**Out of Scope:**
-- PyO3 FFI bindings (see iron_runtime)
-- Budget calculation logic (see iron_cost)
-- PII detection patterns (see iron_safety)
-- Circuit breaker implementation (see iron_reliability)
-
-</details>
+# Run tests
+pytest tests/
+```
 
 
 ## Documentation
 
 - **Specification:** See `spec.md` for complete technical requirements
-- **API Reference:** Coming soon
-- **Examples:** See `examples/` directory for runnable examples
+- **Examples:** See `examples/` directory
 
 
 ## License

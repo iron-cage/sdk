@@ -8,14 +8,15 @@
 
 ### Responsibility
 
-Agent orchestrator bridging Python AI agents with Rust governance infrastructure via PyO3. Provides LlmRouter for transparent API key management and request proxying to OpenAI/Anthropic. Intercepts LLM calls, applies safety/cost/reliability policies, manages agent lifecycle.
+Pure Rust agent orchestrator providing LlmRouter for transparent API key management and request proxying to OpenAI/Anthropic. Intercepts LLM calls, applies safety/cost/reliability policies, manages agent lifecycle.
+
+**Note:** Python bindings are provided by `iron_sdk` module (PyPI: `iron-cage`, import: `iron_cage`).
 
 ---
 
 ### Scope
 
 **In Scope:**
-- Python-Rust FFI via PyO3 for agent execution
 - LlmRouter - Local proxy for LLM API requests with automatic key management
 - Multi-provider support (OpenAI, Anthropic) with auto-detection
 - LLM call interception and policy enforcement
@@ -24,6 +25,7 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 - Budget enforcement with Protocol 005 integration
 
 **Out of Scope:**
+- Python bindings (see iron_sdk module)
 - Multi-agent orchestration (pilot: single agent)
 - Agent sandboxing (see iron_sandbox)
 - REST API endpoints (see iron_control_api)
@@ -33,7 +35,7 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 ### Dependencies
 
 **Required:** iron_runtime_state, iron_cost, iron_safety, iron_reliability, iron_telemetry
-**External:** pyo3, tokio, axum, reqwest
+**External:** tokio, axum, reqwest
 
 **Features:**
 - `enabled` - Core functionality (default)
@@ -46,7 +48,6 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 
 - **LlmRouter:** Local HTTP proxy for LLM API requests. Starts on random port, accepts IC_TOKEN, fetches real API keys via agent's assigned provider key, auto-detects provider from API key format, forwards requests with real API key, tracks costs.
 - **AgentRuntime:** Manages agent lifecycle, coordinates policies
-- **PyO3 Bridge:** Exposes Rust runtime to Python agents
 - **Policy Enforcer:** Applies safety/cost/reliability rules
 - **Event Broadcaster:** Sends state updates via WebSocket
 
@@ -54,7 +55,7 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 
 ### Integration Points
 
-**Used by:** iron_sdk, iron_api, Python agents
+**Used by:** iron_sdk (Python bindings), iron_api, Rust applications
 **Uses:** iron_runtime_state, iron_cost, iron_safety, iron_reliability, iron_telemetry, iron_runtime_analytics, Iron Cage Server (provider keys via Feature 014)
 
 ---
@@ -63,9 +64,9 @@ Agent orchestrator bridging Python AI agents with Rust governance infrastructure
 
 - Unit tests: `tests/llm_router_test.rs` (provider detection, path stripping, model detection)
 - Integration tests: `tests/llm_router_integration_test.rs` (lifecycle, feature-gated)
-- Python E2E: `python/tests/test_llm_router_e2e.py`, `test_budget_e2e.py`, `test_analytics_*.py`
+- Python tests: See `iron_sdk` module
 
 ---
 
-*For detailed specification, see spec/-archived_detailed_spec.md*
 *For architecture concepts, see docs/architecture/001_execution_models.md*
+*For Python bindings, see module/iron_sdk*

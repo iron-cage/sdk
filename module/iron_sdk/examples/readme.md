@@ -60,7 +60,7 @@ Iron Examples provides 20+ production-ready examples demonstrating Iron Cage pro
 
 ```bash
 # Install SDK with examples and framework dependencies
-pip install iron-sdk[examples,langchain]
+uv pip install iron-cage[examples,langchain]
 
 # Run an example (from module/iron_sdk/ directory)
 python examples/langchain/simple_chat.py
@@ -72,15 +72,15 @@ python examples/langchain/simple_chat.py
 
 ```bash
 # SDK with examples
-pip install iron-sdk[examples]
+uv pip install iron-cage[examples]
 
 # With specific framework
-pip install iron-sdk[examples,langchain]
-pip install iron-sdk[examples,crewai]
-pip install iron-sdk[examples,autogpt]
+uv pip install iron-cage[examples,langchain]
+uv pip install iron-cage[examples,crewai]
+uv pip install iron-cage[examples,autogpt]
 
 # All frameworks
-pip install iron-sdk[examples,all]
+uv pip install iron-cage[examples,all]
 ```
 
 **Requirements:**

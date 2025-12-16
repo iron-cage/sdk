@@ -85,7 +85,7 @@ Each quality attribute translates abstract design principles (from Principles 00
 
 | Aspect | Target | Example |
 |--------|--------|---------|
-| **Installation** | Single command | `uv pip install iron-sdk` |
+| **Installation** | Single command | `uv pip install iron-cage` |
 | **Configuration** | Zero config defaults | Works with IC Token only |
 | **API Style** | Pythonic | `@protect_agent` decorator |
 | **Error Messages** | Actionable | "Budget exceeded: $10.50 of $10.00 spent" |
