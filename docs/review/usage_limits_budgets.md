@@ -27,4 +27,4 @@ Limit for cost is ensured using check_cost_allowed() module/iron_token_manager/s
 
 ### Result
 
-Usage Limits currently not used to limit in production code. 
+Usage Limits currently not used to limit requests in production code. 
