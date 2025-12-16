@@ -1,16 +1,30 @@
-# Usage limits and agent budget (2025-12-16)
+# Cost/Month Limit + Budget connection
 
-## Usage limits
+## Main question
 
-Current usage limits status:
- - Usage limits on startup are seeded for each different user (impossible to understand from dashboard as user name not shown in table row) (module/iron_token_manager/src/seed.rs line 468-534)
- - When new limit is created, it uses user_id from request, just creating new limit without overriding existing.
- - It's possible to create limit for non-existing project 
- - List_all_limits returns all limits without filtration by user
+ - How setting up limit reflects on agent budget?
+ 
+## Searching Evidences
 
+### Limit endpoints
 
-## Agent Budgets
+Limits are connected to dashboard using simple CRUD endpoints. Limits don't affect budgets in endpoints.
 
-Current agent budget status:
- - Agent budget is initialized with agent creation automatically.
- - In table row budget_status is shown.
+Evidences:
+ - module/iron_dashboard/src/composables/useApi.ts:262-289
+ - module/iron_control_api/src/routes/limits.rs:275-519
+ - module/iron_token_manager/src/limit_enforcer.rs:445-609, 109-150
+
+### Cost ensurement logic
+
+Budget is validated in check_budget() function: module/iron_runtime/src/llm_router/proxy.rs:166-216 using CostController. 
+
+Budget reservation logic in: module/iron_token_manager/src/agent_budget.rs:260 uses agent_budget table.
+
+Limit for cost is ensured using check_cost_allowed() module/iron_token_manager/src/limit_enforcer.rs:263 
+
+*NO USAGES FOUND, PRESENTS ONLY 1 TEST*
+
+### Result
+
+Usage Limits currently not used to limit in production code. 
