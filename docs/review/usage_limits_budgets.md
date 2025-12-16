@@ -27,6 +27,25 @@ Limit for cost is ensured using check_cost_allowed() module/iron_token_manager/s
 
 However, in handshake() module/iron_control_api/src/routes/budget/handshake.rs:291-294 usage limit cost is read and in module/iron_control_api/src/routes/budget/handshake.rs:609 cost limit is updated, so actually cost limit is ensured moment of budget_leasing.
 
-### Result
+## Result
 
 Usage Limits cost used in handshake process.
+
+## How to introduce native mуthod from LimitEnforcer?
+
+*LimitEnforcer* from *module/iron_token_manager/src/limit_enforcer.rs*
+
+1) Add `LimitEnforcer` to `BudgetState`
+2) Instead of calling row "SELECT ... from usage_limits" use LimitEnforcer method `check_cost_allowed` . If it returns `false`, throw error "budget exceeded"
+3) Instead of calling row "UPDATE usage_limits ..." use `LimitEnforcer` method `increment_cost`.
+
+## Bug found (module/iron_control_api/src/routes/budget/handshake.rs line 290-294)
+Usage limit is set for user personally, but user can have many limits. In query 
+```sql
+SELECT max_cost_per_month_microdollars, current_cost_microdollars_this_month
+       FROM usage_limits
+       WHERE user_id = ?
+       LIMIT 1
+```
+limit is retrieved specifically for user, but ignoring project, so actually this limit is first created limit.
+
