@@ -1,6 +1,6 @@
 [project]
 name = "iron-cli-py"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python CLI for Iron Cage token management and agent control"
 authors = [
   {name = "Iron Cage Team"}

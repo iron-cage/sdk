@@ -11,7 +11,7 @@ Most AI frameworks assume R&D. We assume production in regulated industries.
 &nbsp;
 <a href="https://ironcage.ai"><img src="https://img.shields.io/badge/website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
 &nbsp;
-<a href="https://ironcage.ai/docs"><img src="https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg" alt="docs" /></a>
+<a href="https://docs.rs/iron_runtime"><img src="https://img.shields.io/badge/docs.rs-iron__runtime-E5E7EB.svg" alt="docs" /></a>
 <br>
 <a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/discord-join-E5E7EB.svg" alt="discord" /></a>
 &nbsp;
