@@ -2,23 +2,7 @@
 
 Shared types and traits for the Iron Cage multi-agent safety framework.
 
-### Scope
-
-**Responsibilities:**
-Defines shared types, traits, and error types used across all iron_cage crates as foundation layer. Provides type-safe builders for configuration, comprehensive error handling with error_tools integration, and Serde serialization support. Requires Rust 1.75+, all platforms supported, serves as dependency for all other workspace crates.
-
-**In Scope:**
-- Common configuration types (SafetyConfig, CostConfig, ReliabilityConfig)
-- Shared error types and Result aliases
-- Core trait definitions (Agent, SafetyGuard, CostTracker, CircuitBreaker)
-- Type-safe builders for configuration
-- Serde serialization support (behind `enabled` feature)
-
-**Out of Scope:**
-- Implementation logic (see iron_cage_safety, iron_cage_cost, iron_cage_reliability)
-- CLI interface (see iron_cage_cli)
-- Python bindings (see iron_cage_cli)
-- Business logic or orchestration
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
 ## Installation
 
@@ -27,12 +11,14 @@ Defines shared types, traits, and error types used across all iron_cage crates a
 iron_cage_types = { version = "0.1", features = ["full"] }
 ```
 
+
 ## Features
 
 - `enabled` (default): Core functionality with all required dependencies
 - `full`: All functionality (currently same as `enabled`)
 
-## Example
+
+## Quick Start
 
 ```rust
 use iron_cage_types::{Config, SafetyConfig, CostConfig};
@@ -54,16 +40,37 @@ let config = Config {
 let json = serde_json::to_string(&config)?;
 ```
 
+
 ## Documentation
 
 - [API Reference](https://docs.rs/iron_cage_types)
 - [Architecture Guide](docs/architecture.md)
 
-## License
 
-MIT
+<details>
+<summary>Scope & Boundaries</summary>
 
-## Directory Structure
+**Responsibilities:**
+Defines shared types, traits, and error types used across all iron_cage crates as foundation layer. Provides type-safe builders for configuration, comprehensive error handling with error_tools integration, and Serde serialization support. Requires Rust 1.75+, all platforms supported, serves as dependency for all other workspace crates.
+
+**In Scope:**
+- Common configuration types (SafetyConfig, CostConfig, ReliabilityConfig)
+- Shared error types and Result aliases
+- Core trait definitions (Agent, SafetyGuard, CostTracker, CircuitBreaker)
+- Type-safe builders for configuration
+- Serde serialization support (behind `enabled` feature)
+
+**Out of Scope:**
+- Implementation logic (see iron_cage_safety, iron_cage_cost, iron_cage_reliability)
+- CLI interface (see iron_cage_cli)
+- Python bindings (see iron_cage_cli)
+- Business logic or orchestration
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -76,3 +83,9 @@ MIT
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+MIT

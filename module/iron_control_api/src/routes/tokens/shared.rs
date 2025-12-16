@@ -138,7 +138,25 @@ impl CreateTokenRequest
           character: "NULL".to_string(),
         } );
       }
+
+      // Fix(issue-xss-stored-vulnerability): Prevent Stored XSS in name field
+      // Root cause: Accepted HTML tags in text fields, relying on frontend to escape (insecure by default)
+      // Pitfall: Never trust frontend to escape user input - validate at API boundary (secure by default, defense in depth)
+
+      // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
+      if name.contains( '<' ) || name.contains( '>' )
+      {
+        return Err( ValidationError::InvalidCharacter
+        {
+          field: "name".to_string(),
+          character: "HTML tags".to_string(),
+        } );
+      }
     }
+
+    // Fix(issue-xss-stored-vulnerability): Prevent Stored XSS in description field
+    // Root cause: Accepted HTML tags in text fields, relying on frontend to escape (insecure by default)
+    // Pitfall: Never trust frontend to escape user input - validate at API boundary (secure by default, defense in depth)
 
     // Validate description if provided (Protocol 014: max 500 chars)
     if let Some( ref description ) = self.description
@@ -159,6 +177,17 @@ impl CreateTokenRequest
         {
           field: "description".to_string(),
           character: "NULL".to_string(),
+        } );
+      }
+
+      // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
+      // This is a defense-in-depth measure: even if frontend fails to escape, XSS cannot execute
+      if description.contains( '<' ) || description.contains( '>' )
+      {
+        return Err( ValidationError::InvalidCharacter
+        {
+          field: "description".to_string(),
+          character: "HTML tags".to_string(),
         } );
       }
     }
@@ -190,6 +219,16 @@ impl CreateTokenRequest
           character: "NULL".to_string(),
         } );
       }
+
+      // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
+      if user_id.contains( '<' ) || user_id.contains( '>' )
+      {
+        return Err( ValidationError::InvalidCharacter
+        {
+          field: "user_id".to_string(),
+          character: "HTML tags".to_string(),
+        } );
+      }
     }
 
     if let Some( ref project_id ) = self.project_id
@@ -214,6 +253,16 @@ impl CreateTokenRequest
         {
           field: "project_id".to_string(),
           character: "NULL".to_string(),
+        } );
+      }
+
+      // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
+      if project_id.contains( '<' ) || project_id.contains( '>' )
+      {
+        return Err( ValidationError::InvalidCharacter
+        {
+          field: "project_id".to_string(),
+          character: "HTML tags".to_string(),
         } );
       }
     }

@@ -2,9 +2,32 @@
 
 Control Panel and Agent Runtime for Iron Cage AI agent management.
 
+[![Deploy CI](https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=deploy)](https://github.com/iron-cage/iron_runtime/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iron-cage/iron_runtime)
+[![Discord](https://img.shields.io/badge/discord-join-7289da.svg)](https://discord.gg/aR5fujCZhv)
+
+[🌐 Website](https://ironcage.ai) • [📖 Documentation](https://ironcage.ai/docs) • [🐙 GitHub](https://github.com/iron-cage) • [🐦 Twitter](https://x.com/ironcageai)
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture at a Glance](#architecture-at-a-glance)
+- [Workspace Organization](#workspace-organization)
+- [Documentation](#documentation)
+- [Installation & Usage](#installation--usage)
+  - [For Python Developers (Using Iron SDK)](#for-python-developers-using-iron-sdk)
+  - [For Control Panel Admins](#for-control-panel-admins)
+  - [For Platform Contributors](#for-platform-contributors)
+- [Status](#status)
+- [License](#license)
+
+
 ## Overview
 
 Iron Runtime provides the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
+
 
 ## Architecture at a Glance
 
@@ -30,7 +53,11 @@ This diagram shows Iron Cage's three-boundary architecture at the highest level,
 4. **Compliance:** Complete audit trail for regulatory requirements and accountability
 5. **Flexibility:** Use any LLM provider (OpenAI, Anthropic, custom) without vendor lock-in
 
+
 ## Workspace Organization
+
+<details>
+<summary>Module Responsibilities & Boundaries (click to expand - 19 modules across 7 layers)</summary>
 
 | Entity | Responsibility | Input→Output | Scope | Out of Scope |
 |--------|----------------|--------------|-------|--------------|
@@ -61,7 +88,8 @@ Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
 Frontend:       iron_dashboard
 ```
 
----
+</details>
+
 
 ## Documentation
 
@@ -93,13 +121,13 @@ Frontend:       iron_dashboard
 
 **Complete Index:** [docs/readme.md](docs/readme.md) - All documentation organized by category
 
----
 
 ## Installation & Usage
 
 ### For Python Developers (Using Iron SDK)
 
-**99% of users - you just want to protect your AI agents:**
+> [!TIP]
+> **99% of users** - you just want to protect your AI agents
 
 **Prerequisites:**
 - Python 3.9+ (`python --version`)
@@ -124,9 +152,11 @@ def my_agent(prompt: str) -> str:
 - [SDK Documentation](module/iron_sdk/readme.md) - Full API reference
 - [Examples](module/iron_sdk/examples/) - Runnable code examples
 
+
 ### For Control Panel Admins
 
-**Deploying the Control Panel service for your team:**
+> [!IMPORTANT]
+> **Deploying the Control Panel service for your team**
 
 ```bash
 # Clone repository
@@ -149,6 +179,7 @@ docker compose up -d
 - [Getting Started Guide](docs/getting_started.md) § Deploy Control Panel - Complete walkthrough
 - [Deployment Guide](docs/deployment_guide.md) - Production deployment and troubleshooting
 - [Docker Compose Architecture](docs/deployment/006_docker_compose_deployment.md) - Design details
+
 
 ### For Platform Contributors
 
@@ -175,10 +206,12 @@ uv sync  # Installs dependencies and creates .venv
 See [`contributing.md`](contributing.md) for contributor workflow.
 </details>
 
+
 ## Status
 
 **Version:** 0.1.0
 **Status:** Active development
+
 
 ## License
 

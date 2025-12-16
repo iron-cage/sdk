@@ -2,23 +2,7 @@
 
 LLM model pricing data and cost calculation.
 
-### Scope
-
-**Responsibilities:**
-Provides pricing data for various LLM models (OpenAI, Anthropic, Google, etc.) loaded from LiteLLM pricing JSON. Supports cost calculation for budget enforcement and pre-reservation. Requires Rust 1.75+, all platforms supported.
-
-**In Scope:**
-- Model pricing lookup
-- Cost calculation (input/output tokens)
-- Max cost estimation for budget pre-reservation
-- Thread-safe concurrent access
-
-**Out of Scope:**
-- Budget tracking (application-level concern)
-- PII detection (see iron_cage_safety)
-- Circuit breaker logic (see iron_cage_reliability)
-- Agent lifecycle (see iron_cage_cli)
-- LLM API integration (see iron_cage_cli)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
 ## Installation
 
@@ -27,12 +11,14 @@ Provides pricing data for various LLM models (OpenAI, Anthropic, Google, etc.) l
 iron_cage_cost = { version = "0.1", features = ["full"] }
 ```
 
+
 ## Features
 
 - `enabled` (default): Full pricing functionality
 - `full`: All functionality (currently same as `enabled`)
 
-## Example
+
+## Quick Start
 
 ```rust
 use iron_cost::pricing::PricingManager;
@@ -52,14 +38,36 @@ if let Some(model) = pricing.get("gpt-4-turbo") {
 }
 ```
 
+
 ## Documentation
 
 - [API Reference](https://docs.rs/iron_cage_cost)
 
-## License
 
-MIT
-## Directory Structure
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Provides pricing data for various LLM models (OpenAI, Anthropic, Google, etc.) loaded from LiteLLM pricing JSON. Supports cost calculation for budget enforcement and pre-reservation. Requires Rust 1.75+, all platforms supported.
+
+**In Scope:**
+- Model pricing lookup
+- Cost calculation (input/output tokens)
+- Max cost estimation for budget pre-reservation
+- Thread-safe concurrent access
+
+**Out of Scope:**
+- Budget tracking (application-level concern)
+- PII detection (see iron_cage_safety)
+- Circuit breaker logic (see iron_cage_reliability)
+- Agent lifecycle (see iron_cage_cli)
+- LLM API integration (see iron_cage_cli)
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -77,3 +85,9 @@ MIT
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+MIT

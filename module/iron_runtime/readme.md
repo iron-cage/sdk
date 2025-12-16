@@ -1,37 +1,11 @@
 # iron_runtime
 
-**Audience:** Platform contributors developing the iron_runtime Rust crate
-**End Users:** See [iron_sdk documentation](../iron_sdk/readme.md) - just `pip install iron-sdk`
-
 Agent orchestration and Python bridge for AI agent execution. Provides **LlmRouter** - a local proxy server for transparent LLM API key management with OpenAI and Anthropic support.
 
-**Package Flow:** This Rust crate → builds to iron-cage PyPI wheel → auto-installed by iron-sdk
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
-### Scope
-
-**Responsibilities:**
-Bridges Python AI agents with Rust-based safety, cost, and reliability infrastructure via PyO3. Provides LlmRouter for transparent API key management and request proxying. Manages agent lifecycle (spawn, monitor, shutdown), intercepts LLM calls for policy enforcement, coordinates tokio async runtime, and provides WebSocket server for real-time dashboard updates.
-
-**In Scope:**
-- Python-Rust FFI via PyO3 (agent execution bridge)
-- LlmRouter - Local proxy for LLM API requests
-- Multi-provider support (OpenAI, Anthropic) with auto-detection
-- Agent lifecycle management (spawn, monitor, shutdown)
-- LLM call interception and policy enforcement
-- Tokio async runtime coordination
-- WebSocket server for dashboard real-time updates
-- Configuration management (CLI args to RuntimeConfig)
-- Single-agent execution model
-
-**Out of Scope:**
-- REST API endpoints (see iron_control_api)
-- PII detection logic (see iron_safety)
-- Cost calculation (see iron_cost)
-- Circuit breaker patterns (see iron_reliability)
-- Token management (see iron_token_manager)
-- State persistence (see iron_runtime_state)
-- Multi-agent orchestration (future)
-- Distributed runtime (future)
+> [!IMPORTANT]
+> **Audience:** Platform contributors developing the iron_runtime Rust crate. **End Users:** See [iron_sdk documentation](../iron_sdk/readme.md) - just `pip install iron-sdk`
 
 ## Installation
 
@@ -198,7 +172,9 @@ with LlmRouter(api_key=token, server_url=url) as router:
 # Router automatically stops on exit
 ```
 
-## API Reference
+
+<details>
+<summary>API Reference</summary>
 
 ### LlmRouter
 
@@ -247,7 +223,11 @@ In direct mode, the router automatically:
 - API keys starting with `sk-ant-` → Anthropic
 - All other `sk-*` keys → OpenAI
 
-## Testing
+</details>
+
+
+<details>
+<summary>Testing</summary>
 
 ```bash
 cd module/iron_runtime
@@ -266,7 +246,11 @@ python python/examples/test_manual.py anthropic  # Test Anthropic API
 python python/examples/test_manual.py gateway    # Test OpenAI client → Claude
 ```
 
-## Example (Rust)
+</details>
+
+
+<details>
+<summary>Example (Rust)</summary>
 
 ```rust
 use iron_runtime::LlmRouter;
@@ -286,11 +270,41 @@ println!("Proxy running at: {}", base_url);
 router.shutdown();
 ```
 
-## License
+</details>
 
-Apache-2.0
 
-## Directory Structure
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Bridges Python AI agents with Rust-based safety, cost, and reliability infrastructure via PyO3. Provides LlmRouter for transparent API key management and request proxying. Manages agent lifecycle (spawn, monitor, shutdown), intercepts LLM calls for policy enforcement, coordinates tokio async runtime, and provides WebSocket server for real-time dashboard updates.
+
+**In Scope:**
+- Python-Rust FFI via PyO3 (agent execution bridge)
+- LlmRouter - Local proxy for LLM API requests
+- Multi-provider support (OpenAI, Anthropic) with auto-detection
+- Agent lifecycle management (spawn, monitor, shutdown)
+- LLM call interception and policy enforcement
+- Tokio async runtime coordination
+- WebSocket server for dashboard real-time updates
+- Configuration management (CLI args to RuntimeConfig)
+- Single-agent execution model
+
+**Out of Scope:**
+- REST API endpoints (see iron_control_api)
+- PII detection logic (see iron_safety)
+- Cost calculation (see iron_cost)
+- Circuit breaker patterns (see iron_reliability)
+- Token management (see iron_token_manager)
+- State persistence (see iron_runtime_state)
+- Multi-agent orchestration (future)
+- Distributed runtime (future)
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -302,4 +316,11 @@ Apache-2.0
 **Notes:**
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+
+</details>
+
+
+## License
+
+Apache-2.0
 

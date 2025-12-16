@@ -2,35 +2,15 @@
 
 User management, API token management, authentication, and rate limiting.
 
-### Scope
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
-**Responsibilities:**
-Manages user accounts with RBAC (admin/user/viewer roles) and comprehensive audit logging. Handles API token lifecycle with secure generation, SHA-256 hashing, and SQLite storage. Provides JWT authentication, usage tracking, quota enforcement, and token bucket rate limiting for API access control.
+## Installation
 
-**In Scope:**
-- **User Management:** Account lifecycle (create, suspend, activate, delete with soft delete)
-- **RBAC:** Three roles (admin, user, viewer) with permission-based access control
-- **Audit Logging:** Append-only user_audit_log with immutability guarantees
-- **Password Security:** BCrypt hashing (cost 12), secure password reset
-- Cryptographic token generation (Base64, high-entropy)
-- SHA-256 token hashing (never store plaintext)
-- Token CRUD operations (create, verify, revoke, list)
-- Token expiration and deactivation
-- Usage tracking per token (requests, tokens, cost)
-- Quota enforcement (daily limits, cost caps)
-- Token bucket rate limiting (requests per second)
-- JWT authentication and validation
-- SQLite persistence with proper constraints
+```toml
+[dependencies]
+iron_token_manager = { path = "../iron_token_manager" }
+```
 
-**Out of Scope:**
-- OAuth2/OIDC integration (future)
-- API key rotation automation (future)
-- Multi-tenant token isolation (future)
-- Token analytics and reporting (future)
-- REST API endpoints (see iron_control_api)
-- Dashboard UI (see iron_dashboard)
-- Cost calculation (see iron_cost)
-- Budget tracking (see iron_cost)
 
 ## Token Types
 
@@ -51,16 +31,8 @@ This module manages API tokens for Control Panel authentication.
 - IC Token: For Runtime (agent execution, budget-linked)
 - API Token: For Control Panel API (CRUD operations)
 
----
 
-## Installation
-
-```toml
-[dependencies]
-iron_token_manager = { path = "../iron_token_manager" }
-```
-
-## Example
+## Quick Start
 
 ### User Management
 
@@ -116,7 +88,9 @@ if limiter.check("user-001")? {
 }
 ```
 
-## Development
+
+<details>
+<summary>Development Workflow</summary>
 
 ### Quick Start: Fresh Environment
 
@@ -184,7 +158,11 @@ Viewer:     iron_dev_viewer_token_003
 - [Database Initialization](./docs/database_initialization.md) - Schema and migrations
 - [Configuration](./docs/configuration.md) - Config file reference
 
-## Testing
+</details>
+
+
+<details>
+<summary>Testing Infrastructure</summary>
 
 ### Test Database Infrastructure
 
@@ -286,11 +264,45 @@ let db = create_test_db_v2().await;
 
 Both approaches are currently supported for backward compatibility.
 
-## License
+</details>
 
-Apache-2.0
 
-## Directory Structure
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Manages user accounts with RBAC (admin/user/viewer roles) and comprehensive audit logging. Handles API token lifecycle with secure generation, SHA-256 hashing, and SQLite storage. Provides JWT authentication, usage tracking, quota enforcement, and token bucket rate limiting for API access control.
+
+**In Scope:**
+- **User Management:** Account lifecycle (create, suspend, activate, delete with soft delete)
+- **RBAC:** Three roles (admin, user, viewer) with permission-based access control
+- **Audit Logging:** Append-only user_audit_log with immutability guarantees
+- **Password Security:** BCrypt hashing (cost 12), secure password reset
+- Cryptographic token generation (Base64, high-entropy)
+- SHA-256 token hashing (never store plaintext)
+- Token CRUD operations (create, verify, revoke, list)
+- Token expiration and deactivation
+- Usage tracking per token (requests, tokens, cost)
+- Quota enforcement (daily limits, cost caps)
+- Token bucket rate limiting (requests per second)
+- JWT authentication and validation
+- SQLite persistence with proper constraints
+
+**Out of Scope:**
+- OAuth2/OIDC integration (future)
+- API key rotation automation (future)
+- Multi-tenant token isolation (future)
+- Token analytics and reporting (future)
+- REST API endpoints (see iron_control_api)
+- Dashboard UI (see iron_dashboard)
+- Cost calculation (see iron_cost)
+- Budget tracking (see iron_cost)
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -319,3 +331,9 @@ Apache-2.0
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+Apache-2.0

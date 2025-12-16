@@ -2,31 +2,15 @@
 
 Command-line interface for LLM token management using unilang framework.
 
-### Scope
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
-**Responsibilities:**
-Provides command-line access to all Iron Cage token management features using the unilang keyword::value syntax. Implements hexagonal architecture with pure handlers for business logic, async adapters for I/O, and multiple output formatters for terminal display.
+## Installation
 
-**In Scope:**
-- Token CRUD commands (generate, list, get, rotate, revoke)
-- Authentication commands (login, refresh, logout)
-- Usage reporting commands (show, by_project, by_provider, export)
-- Limits management commands (list, get, create, update, delete)
-- Traces inspection commands (list, get, export)
-- Health check and version commands
-- Unilang keyword::value command syntax
-- Multiple output formats (table, expanded, json, yaml)
-- Hierarchical configuration (CLI, env, local, global, defaults)
+```toml
+[dependencies]
+iron_cli = { path = "../iron_cli" }
+```
 
-**Out of Scope:**
-- REST API server implementation (see iron_control_api)
-- Token generation logic (see iron_token_manager)
-- Budget enforcement logic (see iron_cost)
-- GUI/dashboard interface (see iron_dashboard)
-- Python CLI wrapper (see iron_cli_py)
-- Framework integrations (see iron_sdk)
-
----
 
 ## Authoritative Role
 
@@ -54,7 +38,7 @@ iron_cli_py (Python)         iron_cli (Rust)
      │ usage.*  ─────────────────▶│ Usage reporting
      │ limits.* ─────────────────▶│ Limits management
      │ traces.* ─────────────────▶│ Traces inspection
-     │ auth.*   ─────────────────▶│ Authentication
+     │ auth.*   ───────────────── │ Authentication
      │ health   ─────────────────▶│ Health/version
      │                            │
      │ NATIVE COMMANDS:           │
@@ -63,28 +47,6 @@ iron_cli_py (Python)         iron_cli (Rust)
      └────────────────────────────┘
 ```
 
----
-
-## Architecture
-
-**Current Status:** Unilang migration in progress (Phases 1-6 complete)
-
-### Layers (Hexagonal Architecture)
-
-```
-CLI (unilang) → Adapter (async I/O) → Handler (pure logic) → Formatter (output)
-     ↓               ↓                      ↓                      ↓
-VerifiedCommand   Services          HashMap validation      Table/JSON/YAML
-```
-
-**Components:**
-- **Handlers** (`src/handlers/`) - Pure business logic, no I/O, fully testable
-- **Adapters** (`src/adapters/`) - Async I/O bridge, calls handlers + services
-  - **HttpAdapter** - Production implementation using reqwest HTTP client
-  - **InMemoryAdapter** - Test-only implementation (compile_error! guard enforced)
-- **Services** - Service traits (AuthService, TokenService, UsageService, LimitsService, TracesService, HealthService, StorageService)
-- **Formatters** (`src/formatting.rs`) - Universal output (table/expanded/json/yaml)
-- **Config** (`src/config.rs`) - Hierarchical configuration system
 
 ## Quick Start
 
@@ -108,7 +70,34 @@ iron-token .health
 iron-token .version
 ```
 
-## Command Syntax
+
+<details>
+<summary>Architecture</summary>
+
+**Current Status:** Unilang migration in progress (Phases 1-6 complete)
+
+### Layers (Hexagonal Architecture)
+
+```
+CLI (unilang) → Adapter (async I/O) → Handler (pure logic) → Formatter (output)
+     ↓               ↓                      ↓                      ↓
+ VerifiedCommand   Services          HashMap validation      Table/JSON/YAML
+```
+
+**Components:**
+- **Handlers** (`src/handlers/`) - Pure business logic, no I/O, fully testable
+- **Adapters** (`src/adapters/`) - Async I/O bridge, calls handlers + services
+  - **HttpAdapter** - Production implementation using reqwest HTTP client
+  - **InMemoryAdapter** - Test-only implementation (compile_error! guard enforced)
+- **Services** - Service traits (AuthService, TokenService, UsageService, LimitsService, TracesService, HealthService, StorageService)
+- **Formatters** (`src/formatting.rs`) - Universal output (table/expanded/json/yaml)
+- **Config** (`src/config.rs`) - Hierarchical configuration system
+
+</details>
+
+
+<details>
+<summary>Command Syntax</summary>
 
 **Unilang keyword::value format:**
 ```bash
@@ -184,7 +173,11 @@ iron-token .command.subcommand param1::value1 param2::value2
 .version
 ```
 
-## Configuration
+</details>
+
+
+<details>
+<summary>Configuration</summary>
 
 **Configuration Hierarchy** (highest to lowest priority):
 1. CLI arguments (keyword::value)
@@ -223,7 +216,11 @@ let config = Config::builder()
     .build();
 ```
 
-## Output Formats
+</details>
+
+
+<details>
+<summary>Output Formats</summary>
 
 All commands support multiple output formats:
 
@@ -241,7 +238,11 @@ iron-token .tokens.list format::json
 iron-token .tokens.list format::yaml
 ```
 
-## Testing
+</details>
+
+
+<details>
+<summary>Testing</summary>
 
 **Test Commands:**
 ```bash
@@ -265,7 +266,11 @@ RUSTFLAGS="-D warnings" cargo nextest run --all-features
 - Config tests: 13 tests (configuration system)
 - Format tests: 19 tests (output formatting)
 
-## Development
+</details>
+
+
+<details>
+<summary>Development</summary>
 
 **Architecture Principles:**
 - **No mocking** - Use real alternative implementations (InMemoryAdapter)
@@ -305,7 +310,11 @@ tests/
 └── formatting.rs       # Formatter tests
 ```
 
-## Migration Status
+</details>
+
+
+<details>
+<summary>Migration Status</summary>
 
 **Completed Phases (6/10):**
 - ✅ Phase 1: Project Structure (YAML commands, feature flags)
@@ -329,11 +338,39 @@ tests/
 - Architecture purity: Hexagonal ✓
 - No mocking: ✓
 
-## License
+</details>
 
-MIT
 
-## Directory Structure
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Provides command-line access to all Iron Cage token management features using the unilang keyword::value syntax. Implements hexagonal architecture with pure handlers for business logic, async adapters for I/O, and multiple output formatters for terminal display.
+
+**In Scope:**
+- Token CRUD commands (generate, list, get, rotate, revoke)
+- Authentication commands (login, refresh, logout)
+- Usage reporting commands (show, by_project, by_provider, export)
+- Limits management commands (list, get, create, update, delete)
+- Traces inspection commands (list, get, export)
+- Health check and version commands
+- Unilang keyword::value command syntax
+- Multiple output formats (table, expanded, json, yaml)
+- Hierarchical configuration (CLI, env, local, global, defaults)
+
+**Out of Scope:**
+- REST API server implementation (see iron_control_api)
+- Token generation logic (see iron_token_manager)
+- Budget enforcement logic (see iron_cost)
+- GUI/dashboard interface (see iron_dashboard)
+- Python CLI wrapper (see iron_cli_py)
+- Framework integrations (see iron_sdk)
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -350,3 +387,9 @@ MIT
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+MIT

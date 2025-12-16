@@ -2,7 +2,38 @@
 
 Agent execution state management and audit logging.
 
-### Scope
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+
+## Installation
+
+```toml
+[dependencies]
+iron_runtime_state = { path = "../iron_runtime_state" }
+```
+
+
+## Quick Start
+
+```rust
+use iron_runtime_state::StateManager;
+use std::sync::Arc;
+
+// Create shared state manager
+let state = Arc::new(StateManager::new("./state.db")?);
+
+// Update agent state (thread-safe)
+state.update_agent("agent_001", AgentState::Running)?;
+
+// Retrieve current state
+let agent = state.get_agent("agent_001")?;
+
+// Log audit event
+state.log_event("agent_001", "PII detected and redacted")?;
+```
+
+
+<details>
+<summary>Scope & Boundaries</summary>
 
 **Responsibilities:**
 Manages agent execution state with fast in-memory access (DashMap) for real-time dashboard updates and persistent SQLite storage for compliance audit trails. Provides thread-safe concurrent access for multiple crates reading and writing state simultaneously.
@@ -26,37 +57,11 @@ Manages agent execution state with fast in-memory access (DashMap) for real-time
 - Dashboard UI (see iron_dashboard)
 - WebSocket broadcasting (see iron_control_api)
 
-## Installation
+</details>
 
-```toml
-[dependencies]
-iron_runtime_state = { path = "../iron_runtime_state" }
-```
 
-## Example
-
-```rust
-use iron_runtime_state::StateManager;
-use std::sync::Arc;
-
-// Create shared state manager
-let state = Arc::new(StateManager::new("./state.db")?);
-
-// Update agent state (thread-safe)
-state.update_agent("agent_001", AgentState::Running)?;
-
-// Retrieve current state
-let agent = state.get_agent("agent_001")?;
-
-// Log audit event
-state.log_event("agent_001", "PII detected and redacted")?;
-```
-
-## License
-
-Apache-2.0
-
-## Directory Structure
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -68,3 +73,9 @@ Apache-2.0
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+Apache-2.0

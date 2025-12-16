@@ -2,23 +2,7 @@
 
 PII detection and output validation for multi-agent systems.
 
-### Scope
-
-**Responsibilities:**
-Detects and redacts PII (emails, phones, SSNs, credit cards) from AI agent outputs with configurable safety policies and optional SQLite-based audit logging. Provides real-time validation preventing data breaches before agent responses reach users. Requires Rust 1.75+, all platforms supported, optional SQLite audit trail with `audit` feature.
-
-**In Scope:**
-- PII pattern detection (emails, phones, SSNs, credit cards)
-- Output redaction and sanitization
-- Safety audit trail (with `audit` feature)
-- Configurable safety policies
-- Real-time validation of agent outputs
-
-**Out of Scope:**
-- Cost tracking (see iron_cage_cost)
-- Circuit breaker logic (see iron_cage_reliability)
-- Agent lifecycle management (see iron_cage_cli)
-- Configuration management (see iron_cage_types)
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
 ## Installation
 
@@ -27,13 +11,15 @@ Detects and redacts PII (emails, phones, SSNs, credit cards) from AI agent outpu
 iron_cage_safety = { version = "0.1", features = ["full"] }
 ```
 
+
 ## Features
 
 - `enabled` (default): Core PII detection without audit logging
 - `full`: All functionality including audit trail
 - `audit`: SQLite-based audit logging
 
-## Example
+
+## Quick Start
 
 ```rust
 use iron_cage_safety::PiiDetector;
@@ -51,16 +37,37 @@ if detector.check(text) {
 }
 ```
 
+
 ## Documentation
 
 - [API Reference](https://docs.rs/iron_cage_safety)
 - [Safety Patterns Guide](docs/patterns.md)
 
-## License
 
-MIT
+<details>
+<summary>Scope & Boundaries</summary>
 
-## Directory Structure
+**Responsibilities:**
+Detects and redacts PII (emails, phones, SSNs, credit cards) from AI agent outputs with configurable safety policies and optional SQLite-based audit logging. Provides real-time validation preventing data breaches before agent responses reach users. Requires Rust 1.75+, all platforms supported, optional SQLite audit trail with `audit` feature.
+
+**In Scope:**
+- PII pattern detection (emails, phones, SSNs, credit cards)
+- Output redaction and sanitization
+- Safety audit trail (with `audit` feature)
+- Configurable safety policies
+- Real-time validation of agent outputs
+
+**Out of Scope:**
+- Cost tracking (see iron_cage_cost)
+- Circuit breaker logic (see iron_cage_reliability)
+- Agent lifecycle management (see iron_cage_cli)
+- Configuration management (see iron_cage_types)
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -72,3 +79,9 @@ MIT
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+MIT

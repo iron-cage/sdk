@@ -2,9 +2,7 @@
 
 Unified configuration management for Iron Runtime with precedence-based resolution.
 
-## Overview
-
-`iron_config` provides a standardized configuration system across all Iron Runtime modules using a 5-layer precedence hierarchy. Configuration is loaded from multiple sources with clear priority ordering, eliminating configuration fragmentation and duplication.
+[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
 
 ## Configuration Precedence
 
@@ -16,7 +14,6 @@ Configuration is resolved using the following precedence (highest to lowest):
 4. **Workspace Defaults** - `{workspace}/config/{module}.default.toml`
 5. **Crate Defaults** - Hardcoded defaults in crate (lowest priority)
 
-Higher priority sources override lower priority sources.
 
 ## Features
 
@@ -27,7 +24,8 @@ Higher priority sources override lower priority sources.
 - **Source tracking**: Know which layer provided each configuration value
 - **Workspace-relative paths**: Context-independent configuration files
 
-## Usage
+
+## Quick Start
 
 ### Basic Example
 
@@ -72,7 +70,9 @@ export IRON_TOKEN_MANAGER_DATABASE_MAX_CONNECTIONS="10"
 export IRON_TOKEN_MANAGER_DATABASE_POOL_TIMEOUT="60"
 ```
 
-### Configuration Files
+
+<details>
+<summary>Configuration Files</summary>
 
 Configuration files use TOML format:
 
@@ -94,7 +94,11 @@ auto_seed = false
 debug = true  # Personal preference
 ```
 
-### Advanced Usage
+</details>
+
+
+<details>
+<summary>Advanced Usage</summary>
 
 **Load with specific environment**:
 ```rust
@@ -124,7 +128,11 @@ println!("Database URL: {} (from {})", url, source);
 println!("{}", loader.debug_summary());
 ```
 
-## Integration
+</details>
+
+
+<details>
+<summary>Integration & Migration</summary>
 
 ### Adding to your crate
 
@@ -150,19 +158,26 @@ let loader = ConfigLoader::new("my_module")?;
 let config: MyConfig = loader.get_section("my_section")?;
 ```
 
-## Testing
+</details>
 
-Run tests:
-```bash
-cargo test --all-features
-```
 
-Run tests with clippy:
-```bash
-cargo clippy --all-targets --all-features -- -D warnings
-```
+<details>
+<summary>Phase 2 Status</summary>
 
-## File Structure
+This crate is part of Phase 2 (Configuration Unification) of the workspace_tools adoption plan:
+
+- ✅ Create unified configuration system
+- ✅ Migrate iron_token_manager (verified via 5-tier testing)
+- ✅ Migrate iron_cli (verified via 5-tier testing)
+- ⏳ Migrate iron_control_api (future work)
+- ✅ Eliminate module-specific config loaders (iron_token_manager, iron_cli)
+- ⏳ Workspace-wide migration (future phases)
+
+</details>
+
+
+<details>
+<summary>File Structure & Dependencies</summary>
 
 ```
 iron_config/
@@ -187,16 +202,21 @@ iron_config/
 - **thiserror** - Error handling
 - **dirs** - User directory detection
 
-## Phase 2 Status
+</details>
 
-This crate is part of Phase 2 (Configuration Unification) of the workspace_tools adoption plan:
 
-- ✅ Create unified configuration system
-- ✅ Migrate iron_token_manager (verified via 5-tier testing)
-- ✅ Migrate iron_cli (verified via 5-tier testing)
-- ⏳ Migrate iron_control_api (future work)
-- ✅ Eliminate module-specific config loaders (iron_token_manager, iron_cli)
-- ⏳ Workspace-wide migration (future phases)
+## Testing
+
+Run tests:
+```bash
+cargo test --all-features
+```
+
+Run tests with clippy:
+```bash
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
 
 ## License
 
