@@ -33,7 +33,6 @@
 
 use serde::{ Deserialize, Serialize };
 use iron_config::ConfigLoader;
-use workspace_tools::workspace;
 
 /// Complete configuration for token manager
 #[ derive( Debug, Clone, Serialize, Deserialize ) ]
@@ -241,17 +240,9 @@ impl Config
   /// Get default configuration as TOML string
   fn get_defaults_toml() -> String
   {
-    // Try to use workspace-relative path, fallback to current directory
-    let db_url = workspace()
-      .ok()
-      .map_or_else(
-        || "sqlite://./iron.db?mode=rwc".to_string(),
-        | ws | format!( "sqlite://{}?mode=rwc", ws.root().join( "iron.db" ).display() )
-      );
-
-    format!( r#"
+    r#"
 [database]
-url = "{db_url}"
+url = "sqlite:///./iron.db?mode=rwc"
 max_connections = 5
 auto_migrate = true
 foreign_keys = true
@@ -260,13 +251,12 @@ foreign_keys = true
 debug = true
 auto_seed = false
 wipe_and_seed = false
-"# )
+"#.to_string()
   }
 
   /// Create a default development configuration
   ///
-  /// Uses workspace-relative database path if workspace detected,
-  /// otherwise falls back to current directory.
+  /// Uses the canonical `./iron.db` database path relative to current directory.
   ///
   /// Useful for testing and examples.
   ///

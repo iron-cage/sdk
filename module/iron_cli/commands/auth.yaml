@@ -6,10 +6,10 @@
   version: 1.0.0
   idempotent: false
   arguments:
-  - name: username
-    description: Username for authentication
+  - name: email
+    description: Email for authentication
     kind: String
-    hint: Email address or username
+    hint: Email address used for login
     attributes:
       optional: false
       multiple: false
@@ -44,9 +44,9 @@
     aliases: []
     tags: []
   examples:
-  - .auth.login username::alice@example.com
-  - .auth.login username::alice@example.com password::secret123
-  - .auth.login username::bob format::json
+  - .auth.login email::alice@example.com
+  - .auth.login email::alice@example.com password::secret123
+  - .auth.login email::bob@example.com format::json
   aliases: []
   tags: []
 - name: .auth.refresh

@@ -27,3 +27,4 @@ mod agent_ids_parameter_test;
 mod output_file_parameter_test;
 mod message_parameter_test;
 mod new_password_parameter_test;
+mod threshold_parameter_test;
