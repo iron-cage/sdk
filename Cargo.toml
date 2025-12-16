@@ -281,7 +281,7 @@ version = "0.3.0"
 path = "module/iron_types"
 
 [workspace.dependencies.iron_cost]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_cost"
 
 [workspace.dependencies.iron_telemetry]
