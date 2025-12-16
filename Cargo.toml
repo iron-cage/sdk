@@ -295,7 +295,6 @@ version = "0.3.0"
 path = "module/iron_runtime_state"
 
 [workspace.dependencies.iron_test_db]
-version = "0.2"
 path = "module/iron_test_db"
 
 [workspace.dependencies.iron_config_loader]
