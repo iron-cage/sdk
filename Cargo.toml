@@ -319,7 +319,7 @@ version = "0.2"
 path = "module/iron_runtime"
 
 [workspace.dependencies.iron_secrets]
-version = "0.2"
+version = "0.3.0"
 path = "module/iron_secrets"
 
 [workspace.dependencies.iron_token_manager]
