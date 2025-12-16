@@ -26,6 +26,7 @@
 
 use iron_config::ConfigLoader;
 use std::time::Duration;
+use base64::{ Engine, engine::general_purpose::URL_SAFE_NO_PAD };
 
 /// Control API configuration
 #[derive(Debug, Clone)]
@@ -107,5 +108,29 @@ timeout = 30
   {
     self.timeout = timeout;
     self
+  }
+
+  /// Extract user ID (subject) from JWT token
+  ///
+  /// Parses the JWT token payload and extracts the "sub" claim.
+  /// Returns None if token is missing or invalid.
+  pub fn get_user_id( &self ) -> Option< String >
+  {
+    let token = self.api_token.as_ref()?;
+
+    // JWT format: header.payload.signature
+    let parts: Vec< &str > = token.split( '.' ).collect();
+    if parts.len() != 3
+    {
+      return None;
+    }
+
+    // Decode payload (base64url encoded)
+    let payload_bytes = URL_SAFE_NO_PAD.decode( parts[ 1 ] ).ok()?;
+    let payload_str = String::from_utf8( payload_bytes ).ok()?;
+
+    // Parse as JSON and extract "sub" claim
+    let payload: serde_json::Value = serde_json::from_str( &payload_str ).ok()?;
+    payload.get( "sub" )?.as_str().map( |s| s.to_string() )
   }
 }

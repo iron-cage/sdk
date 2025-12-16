@@ -3,14 +3,13 @@
 //! ## Purpose
 //!
 //! Validates the `id` parameter across all commands that use it.
-//! The `id` parameter is used for generic resource identification (agents, projects, budget requests, etc.).
+//! The `id` parameter is used for generic resource identification (agents, projects, etc.).
 //!
 //! ## Coverage
 //!
-//! Commands tested (25 total):
+//! Commands tested:
 //! - .agent.get, .agent.update, .agent.delete, .agent.add_provider, .agent.remove_provider
-//! - .project.get, .project.update, .project.delete
-//! - .budget_request.get, .budget_request.approve, .budget_request.reject, .budget_request.cancel
+//! - .project.get
 //! - And others...
 //!
 //! ## Test Categories
@@ -99,7 +98,7 @@ mod tests
     server.shutdown().await;
   }
 
-  /// Test id parameter across different resource types (agent, project, budget_request)
+  /// Test id parameter across different resource types (agent, project)
   #[tokio::test]
   async fn test_id_cross_resource_consistency()
   {
@@ -120,11 +119,8 @@ mod tests
     // Test id parameter with project.get
     let result2 = harness.run( "iron", &[ ".project.get", &format!( "id::{}", test_uuid ) ] ).await;
 
-    // Test id parameter with budget_request.get
-    let result3 = harness.run( "iron", &[ ".budget_request.get", &format!( "id::{}", test_uuid ) ] ).await;
-
     // All should handle the UUID consistently (succeed or "not found", not format error)
-    for result in [ result1, result2, result3 ] {
+    for result in [ result1, result2 ] {
       if !result.success() {
         assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
           "Should not fail with id format error. Stderr: {}", result.stderr );

@@ -24,8 +24,8 @@ Contains command definitions for Iron Control API operations (iron binary):
 | agents.yaml | Defines agent management commands (.agent.*) |
 | analytics.yaml | Defines analytics commands (.analytics.*) |
 | api_tokens.yaml | Defines API token commands (.api_token.*) |
-| budget_limits.yaml | Defines budget limit commands (.budget.limits.*) |
-| budget_requests.yaml | Defines budget request commands (.budget_request.*) |
+| budget_limits.yaml | Defines budget limit commands (.budget_limit.*) |
+| budget.yaml | Defines budget status command (.budget.status) |
 | projects.yaml | Defines project management commands (.project.*) |
 | providers.yaml | Defines provider management commands (.provider.*) |
 | users.yaml | Defines user management commands (.user.*) |
@@ -36,7 +36,7 @@ Contains command definitions for Iron Control API operations (iron binary):
 - Authentication, token CRUD, usage, limits, traces, health
 
 **control/ Subdirectory (9 files):** Control API CLI (iron binary)
-- Agents, providers, analytics, budgets, API tokens, projects, budget requests, users
+- Agents, providers, analytics, budgets, API tokens, projects, users
 
 ## Validation
 

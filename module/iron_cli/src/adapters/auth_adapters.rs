@@ -69,7 +69,7 @@ pub async fn login_adapter(
 
   // 4. Build request body
   let body = json!({
-    "username": username,
+    "email": username,
     "password": password,
   });
 
@@ -80,10 +80,12 @@ pub async fn login_adapter(
     .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Login failed: {}", e ) ) ) )?;
 
   // 6. Extract tokens from response
+  // API returns "user_token" (fallback to "access_token" for compatibility)
   let access_token = response
-    .get( "access_token" )
+    .get( "user_token" )
+    .or_else( || response.get( "access_token" ) )
     .and_then( |v| v.as_str() )
-    .ok_or_else( || AdapterError::ExtractionError( "Missing access_token in response".to_string() ) )?;
+    .ok_or_else( || AdapterError::ExtractionError( "Missing user_token/access_token in response".to_string() ) )?;
 
   let refresh_token = response
     .get( "refresh_token" )

@@ -57,7 +57,7 @@ pub mod analytics_adapters;
 pub mod budget_limit_adapters;
 pub mod api_token_adapters;
 pub mod project_adapters;
-pub mod budget_request_adapters;
+pub mod budget_adapters;
 pub mod user_adapters;
 
 pub use http_client::ControlApiClient;

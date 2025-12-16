@@ -19,7 +19,6 @@ mod export_format_parameter_test;
 mod output_parameter_test;
 mod project_id_parameter_test;
 mod status_parameter_test;
-mod reason_parameter_test;
 mod period_parameter_test;
 mod provider_id_parameter_test;
 mod provider_ids_parameter_test;

@@ -191,6 +191,39 @@ impl ControlApiClient
     self.handle_response( response ).await
   }
 
+  /// Make PATCH request
+  ///
+  /// ## Parameters
+  ///
+  /// - path: API endpoint path (e.g., "/api/v1/budget/requests/{id}/approve")
+  /// - body: JSON request body
+  ///
+  /// ## Returns
+  ///
+  /// JSON response as serde_json::Value
+  pub async fn patch(
+    &self,
+    path: &str,
+    body: Value,
+  ) -> Result<Value, ControlApiError>
+  {
+    let url = format!( "{}{}", self.config.base_url, path );
+
+    let mut request = self.client.patch( &url )
+      .json( &body );
+
+    // Add authorization header if token configured
+    if let Some( ref token ) = self.config.api_token
+    {
+      request = request.header( "Authorization", format!( "Bearer {}", token ) );
+    }
+
+    let response = request.send().await
+      .map_err( |e| ControlApiError::NetworkError( e.to_string() ) )?;
+
+    self.handle_response( response ).await
+  }
+
   /// Handle HTTP response
   ///
   /// Checks status code and parses JSON body.
@@ -211,6 +244,12 @@ impl ControlApiClient
         status_code: status.as_u16(),
         message: error_body,
       });
+    }
+
+    // Handle 204 No Content (e.g., delete operations)
+    if status.as_u16() == 204
+    {
+      return Ok( serde_json::json!({ "status": "success" }) );
     }
 
     // Parse JSON response

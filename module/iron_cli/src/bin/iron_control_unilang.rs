@@ -1,6 +1,6 @@
 //! Unilang-based CLI entry point for iron (Control API)
 //!
-//! This CLI provides access to the Iron Cage Control API with 47 commands
+//! This CLI provides access to the Iron Cage Control API with commands
 //! for managing agents, providers, analytics, budgets, projects, and users.
 //!
 //! Architecture:
@@ -10,18 +10,18 @@
 //! - Handlers are pure functions (no I/O, no async)
 //! - Adapters bridge handlers to REST API (I/O layer)
 //!
-//! Commands (47 total):
-//! - Agents (8): .agent.{list,create,get,update,delete,assign_providers,list_providers,remove_provider}
+//! Commands:
+//! - Agents (12): .agent.{list,create,get,update,delete,assign_providers,list_providers,remove_provider,ic_token.*}
 //! - Providers (8): .provider.{list,create,get,update,delete,assign_agents,list_agents,remove_agent}
 //! - Analytics (8): .analytics.{usage,spending,metrics,usage_by_agent,usage_by_provider,spending_by_period,export_usage,export_spending}
-//! - Budget Limits (2): .budget_limit.{get,set}
+//! - Budget (3): .budget_limit.{get,set}, .budget.status
 //! - API Tokens (4): .api_token.{list,create,get,revoke}
 //! - Projects (2): .project.{list,get}
-//! - Budget Requests (6): .budget_request.{list,create,get,approve,reject,cancel}
+//! - Users (8): .user.{list,create,get,update,delete,set_role,reset_password,get_permissions}
+//!
 
 // Binary entry points are allowed to use println! for final output
 #![allow(clippy::disallowed_macros)]
-//! - Users (8): .user.{list,create,get,update,delete,set_role,reset_password,get_permissions}
 //!
 //! Implementation Status: Phase 3 - Command execution
 //! - ✅ Binary entry point created
@@ -245,6 +245,22 @@ fn route_to_handler(
     {
       runtime.block_on( iron_cli::adapters::control::agent_adapters::remove_provider_adapter( params ) )
     }
+    ".agent.ic_token.generate" =>
+    {
+      runtime.block_on( iron_cli::adapters::control::agent_adapters::generate_ic_token_adapter( params ) )
+    }
+    ".agent.ic_token.status" =>
+    {
+      runtime.block_on( iron_cli::adapters::control::agent_adapters::get_ic_token_status_adapter( params ) )
+    }
+    ".agent.ic_token.regenerate" =>
+    {
+      runtime.block_on( iron_cli::adapters::control::agent_adapters::regenerate_ic_token_adapter( params ) )
+    }
+    ".agent.ic_token.revoke" =>
+    {
+      runtime.block_on( iron_cli::adapters::control::agent_adapters::revoke_ic_token_adapter( params ) )
+    }
 
     // Provider commands
     ".provider.list" =>
@@ -352,30 +368,10 @@ fn route_to_handler(
       runtime.block_on( iron_cli::adapters::control::project_adapters::get_project_adapter( params ) )
     }
 
-    // Budget request commands
-    ".budget_request.list" =>
+    // Budget commands
+    ".budget.status" =>
     {
-      runtime.block_on( iron_cli::adapters::control::budget_request_adapters::list_budget_requests_adapter( params ) )
-    }
-    ".budget_request.create" =>
-    {
-      runtime.block_on( iron_cli::adapters::control::budget_request_adapters::create_budget_request_adapter( params ) )
-    }
-    ".budget_request.get" =>
-    {
-      runtime.block_on( iron_cli::adapters::control::budget_request_adapters::get_budget_request_adapter( params ) )
-    }
-    ".budget_request.approve" =>
-    {
-      runtime.block_on( iron_cli::adapters::control::budget_request_adapters::approve_budget_request_adapter( params ) )
-    }
-    ".budget_request.reject" =>
-    {
-      runtime.block_on( iron_cli::adapters::control::budget_request_adapters::reject_budget_request_adapter( params ) )
-    }
-    ".budget_request.cancel" =>
-    {
-      runtime.block_on( iron_cli::adapters::control::budget_request_adapters::cancel_budget_request_adapter( params ) )
+      runtime.block_on( iron_cli::adapters::control::budget_adapters::budget_status_adapter( params ) )
     }
 
     // User commands
