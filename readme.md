@@ -5,9 +5,9 @@
 Most AI frameworks assume R&D. We assume production in regulated industries.
 
 <p align="center">
-<a href="https://github.com/iron-cage/iron_runtime/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=build&color=E5E7EB" alt="build" /></a>
+<a href="https://github.com/iron-cage/sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/sdk/deploy.yaml?branch=master&label=build&color=E5E7EB" alt="build" /></a>
 &nbsp;
-<a href="https://github.com/iron-cage/iron_runtime"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="license" /></a>
+<a href="https://github.com/iron-cage/sdk/blob/master/license"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="license" /></a>
 &nbsp;
 <a href="https://ironcage.ai"><img src="https://img.shields.io/badge/website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
 &nbsp;
@@ -222,13 +222,8 @@ uv sync  # Installs dependencies and creates .venv
 See [`contributing.md`](contributing.md) for contributor workflow.
 </details>
 
-
 ## Status
 
-**Version:** 0.1.0
-**Status:** Active development
-
-
-## License
-
-MIT
+- **Version:** 0.3.0
+- **Status:** Active development
+- **License:** MIT
