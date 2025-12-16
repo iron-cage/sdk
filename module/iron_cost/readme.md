@@ -2,7 +2,7 @@
 
 LLM model pricing data and cost calculation.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_cost-E5E7EB.svg)](https://docs.rs/iron_cost)
 
 ## Installation
 

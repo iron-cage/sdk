@@ -2,7 +2,7 @@
 
 REST API and WebSocket endpoints for programmatic control of Iron Cage runtime and real-time dashboard communication.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_control_api-E5E7EB.svg)](https://docs.rs/iron_control_api)
 
 > [!IMPORTANT]
 > **Test Coverage:** 379 tests (100% pass rate) - Protocol 014 (111 tests), Protocol 010 (39 tests), Protocol 012 (30 tests), Security (173 tests)
@@ -48,6 +48,19 @@ axum::serve(listener, app).await?;
 
 <details>
 <summary>Architecture</summary>
+
+### System Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
+
+### Deployment Modes
 
 **Pilot/Demo Mode (Current):**
 - Single Rust process (localhost:8080)

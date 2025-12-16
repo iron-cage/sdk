@@ -2,7 +2,7 @@
 
 PII detection and output validation for multi-agent systems.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_safety-E5E7EB.svg)](https://docs.rs/iron_safety)
 
 ## Installation
 

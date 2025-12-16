@@ -2,8 +2,6 @@
 
 Web dashboard for real-time Iron Cage agent monitoring and token management.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
-
 > [!IMPORTANT]
 > **Prerequisites:** Node.js 20+, iron_control_api backend running on http://localhost:3001
 
@@ -37,6 +35,18 @@ npm run dev
 ```
 
 Dashboard will be available at **http://localhost:5173**
+
+
+## Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
 
 
 <details>

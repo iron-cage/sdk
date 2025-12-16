@@ -2,8 +2,6 @@
 
 Pythonic SDK layer for Iron Cage agent protection with decorators and framework integrations.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
-
 > [!WARNING]
 > **Development Status:** Initial scaffolding - Core features pending implementation
 
@@ -43,6 +41,18 @@ def my_agent(input: str) -> str:
   # Your agent code here
   return llm.generate(input)
 ```
+
+
+## Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
 
 
 ## Key Features

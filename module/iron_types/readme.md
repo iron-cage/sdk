@@ -2,7 +2,7 @@
 
 Shared types and traits for the Iron Cage multi-agent safety framework.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_types-E5E7EB.svg)](https://docs.rs/iron_types)
 
 ## Installation
 

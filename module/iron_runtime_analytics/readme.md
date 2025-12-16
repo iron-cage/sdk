@@ -2,7 +2,7 @@
 
 Lock-free event-based analytics for Python LlmRouter.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-E5E7EB.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_runtime_analytics-E5E7EB.svg)](https://docs.rs/iron_runtime_analytics)
 
 ## Installation
 

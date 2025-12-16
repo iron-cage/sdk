@@ -1,6 +1,6 @@
 [project]
 name = "iron-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pythonic SDK layer for Iron Cage agent protection with decorators and framework integrations"
 authors = [
   {name = "Iron Cage Team"}
@@ -19,7 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "iron-runtime>=0.1.0",  # Depends on Iron Runtime package with LlmRouter
+  "iron-runtime>=0.2.0",  # Depends on Iron Runtime package with LlmRouter
 ]
 
 [project.optional-dependencies]
