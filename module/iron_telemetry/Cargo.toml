@@ -8,7 +8,7 @@ description = "Logging and tracing infrastructure for Iron Cage AI agent managem
 repository = "https://github.com/.../iron_cage"
 readme = "readme.md"
 keywords = ["ai", "agent", "logging", "tracing", "telemetry"]
-categories = ["development-tools", "diagnostics"]
+categories = ["development-tools", "development-tools::debugging"]
 
 [features]
 default = ["enabled"]
