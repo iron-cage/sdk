@@ -38,7 +38,7 @@ build-backend = "maturin"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"
-module-name = "iron_runtime"
+module-name = "iron_cage"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

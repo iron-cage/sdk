@@ -62,7 +62,7 @@ interface LimitRecord {
   project_id?: string
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_cents?: number
+  max_cost_per_month_microdollars?: number  // Backend uses microdollars (1 cent = 10,000 microdollars)
   created_at: number
 }
 
@@ -71,26 +71,13 @@ interface CreateLimitRequest {
   project_id?: string
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_cents?: number
+  max_cost_per_month_microdollars?: number  // Backend uses microdollars
 }
 
 interface UpdateLimitRequest {
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_cents?: number
-}
-
-interface TraceRecord {
-  id: number
-  token_id: number
-  request_id: string
-  provider: string
-  model: string
-  input_tokens: number
-  output_tokens: number
-  cost: number
-  timestamp: number
-  metadata?: Record<string, unknown>
+  max_cost_per_month_microdollars?: number  // Backend uses microdollars
 }
 
 // AI Provider Key types
@@ -301,15 +288,6 @@ export function useApi() {
     })
   }
 
-  // Traces API methods
-  async function getTraces(): Promise<TraceRecord[]> {
-    return fetchApi<TraceRecord[]>('/api/v1/traces')
-  }
-
-  async function getTrace(id: number): Promise<TraceRecord> {
-    return fetchApi<TraceRecord>(`/api/v1/traces/${id}`)
-  }
-
   // Provider Key API methods
   async function getProviderKeys(): Promise<ProviderKey[]> {
     return fetchApi<ProviderKey[]>('/api/v1/providers')
@@ -421,18 +399,25 @@ export function useApi() {
     return fetchApi<Agent>(`/api/v1/agents/${id}`)
   }
 
-  async function createAgent(data: { name: string; providers: string[] }): Promise<Agent> {
+  async function createAgent(data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }): Promise<Agent> {
     return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async function updateAgent(data: { id: number; name?: string; providers?: string[] }): Promise<Agent> {
+  async function updateAgent(data: { id: number; name?: string; providers?: string[]; provider_key_id?: number | null }): Promise<Agent> {
     const { id, ...updateData } = data
     return fetchApi<Agent>(`/api/v1/agents/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updateData),
+    })
+  }
+
+  async function updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse> {
+    return fetchApi<AgentBudgetResponse>(`/api/v1/agents/${agentId}/budget`, {
+      method: 'PUT',
+      body: JSON.stringify({ total_allocated_microdollars }),
     })
   }
 
@@ -466,6 +451,32 @@ export function useApi() {
     await fetchApi<void>(`/api/v1/api-tokens/${tokenId}`, {
       method: 'PUT',
       body: JSON.stringify({ provider }),
+    })
+  }
+
+  // ============================================================================
+  // IC Token API (Agent Runtime Authentication)
+  // ============================================================================
+
+  async function generateIcToken(agentId: number): Promise<IcTokenResponse> {
+    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token`, {
+      method: 'POST',
+    })
+  }
+
+  async function getIcTokenStatus(agentId: number): Promise<IcTokenStatus> {
+    return fetchApi<IcTokenStatus>(`/api/v1/agents/${agentId}/ic-token`)
+  }
+
+  async function regenerateIcToken(agentId: number): Promise<IcTokenResponse> {
+    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token/regenerate`, {
+      method: 'POST',
+    })
+  }
+
+  async function revokeIcToken(agentId: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/agents/${agentId}/ic-token`, {
+      method: 'DELETE',
     })
   }
 
@@ -514,6 +525,17 @@ export function useApi() {
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
+  }
+
+  async function getBudgetStatus(
+    page?: number,
+    per_page?: number
+  ): Promise<BudgetStatusResponse> {
+    const params = new URLSearchParams()
+    if (page) params.append('page', String(page))
+    if (per_page) params.append('per_page', String(per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
   }
 
   // ============================================================================
@@ -589,8 +611,6 @@ export function useApi() {
     createLimit,
     updateLimit,
     deleteLimit,
-    getTraces,
-    getTrace,
     getProviderKeys,
     getProviderKey,
     createProviderKey,
@@ -611,15 +631,22 @@ export function useApi() {
     getAgent,
     createAgent,
     updateAgent,
+    updateAgentBudget,
     deleteAgent,
     getAgentTokens,
     createAgentToken,
     updateTokenProvider,
+    // IC Token methods (agent runtime authentication)
+    generateIcToken,
+    getIcTokenStatus,
+    regenerateIcToken,
+    revokeIcToken,
     // Analytics (Protocol 012)
     getAnalyticsSpendingTotal,
     getAnalyticsSpendingByProvider,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
+    getBudgetStatus,
     // Budget Request Workflow
     createBudgetRequest,
     getBudgetRequest,
@@ -653,6 +680,31 @@ export interface Agent {
   name: string
   providers: string[]
   created_at: number
+  owner_id?: string
+  provider_key_id?: number | null
+  has_ic_token?: boolean
+  ic_token_created_at?: number
+}
+
+export interface AgentBudgetResponse {
+  agent_id: number
+  total_allocated: number
+  total_spent: number
+  budget_remaining: number
+}
+// IC Token types
+export interface IcTokenResponse {
+  agent_id: number
+  ic_token: string
+  created_at: number
+  warning: string
+  old_token_invalidated?: boolean
+}
+
+export interface IcTokenStatus {
+  agent_id: number
+  has_ic_token: boolean
+  created_at: number | null
 }
 
 export type {
@@ -664,7 +716,6 @@ export type {
   LimitRecord,
   CreateLimitRequest,
   UpdateLimitRequest,
-  TraceRecord,
   ProviderType,
   ProviderKey,
   CreateProviderKeyRequest,
@@ -677,6 +728,9 @@ export type {
   ApproveBudgetRequestResponse,
   RejectBudgetRequestRequest,
   RejectBudgetRequestResponse,
+  AgentBudgetResponse,
+  BudgetStatus,
+  BudgetStatusResponse,
 }
 
 // ============================================================================
@@ -724,6 +778,33 @@ export interface SpendingByProviderResponse {
   summary: { total_spend: number; total_requests: number; providers_count: number }
   period: string
   calculated_at: string
+}
+
+// Budget status (agent budgets)
+export interface BudgetStatusResponse {
+  data: BudgetStatus[]
+  summary: {
+    total_agents: number
+    active: number
+    exhausted: number
+    critical: number
+    high: number
+    medium: number
+    low: number
+  }
+  pagination: Pagination
+  calculated_at: string
+}
+
+export interface BudgetStatus {
+  agent_id: number
+  agent_name: string
+  budget: number
+  spent: number
+  remaining: number
+  percent_used: number
+  status: string
+  risk_level: string
 }
 
 export interface RequestUsageResponse {

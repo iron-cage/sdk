@@ -6,6 +6,7 @@ pub mod agents;
 pub mod agent_provider_key;
 pub mod analytics;
 pub mod health;
+pub mod ic_token;
 pub mod tokens;
 pub mod usage;
 pub mod limits;

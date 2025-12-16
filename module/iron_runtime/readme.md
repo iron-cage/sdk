@@ -249,21 +249,45 @@ In direct mode, the router automatically:
 
 ## Testing
 
+### Build iron_cage inside a uv virtualenv
+
+1) `cd module/iron_runtime`  
+2) `uv sync --extra dev --extra examples` (installs pytest + OpenAI/Anthropic clients into `.venv`)  
+3) `uv run maturin develop` (builds the `iron_cage` extension into the venv)  
+4) Verify: `uv run python - <<'PY'\nfrom iron_cage import LlmRouter; print('iron_cage import OK', LlmRouter)\nPY`
+
+### Fresh venv + server E2E (step-by-step)
+
+From repo root:
+- `uv venv .venv && source .venv/bin/activate` (or deactivate any other venv to avoid the `VIRTUAL_ENV ... does not match` warning)
+- `cd module/iron_runtime`
+- `uv sync --extra dev --extra examples`
+- `uv run maturin develop` (warning about `python/.../iron_runtime` is expected; optional: `pip install patchelf` to silence rpath warning)
+- Sanity check: `uv run python - <<'PY'\nfrom iron_cage import LlmRouter; print('import OK', LlmRouter)\nPY`
+- Run server E2E: `IC_TOKEN=ic_xxx IC_SERVER=http://localhost:3001 uv run pytest python/tests/test_llm_router_e2e.py -v`
+  - For Rust logs, add `-s` and `RUST_LOG=trace`.
+
+### Run Python tests
+
+- E2E suites auto-skip without credentials. Set `IC_TOKEN` + `IC_SERVER` for server-mode tests; set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for direct-mode budget tests (these spend real money—use tiny budgets).  
+- Server path: `IC_TOKEN=ic_xxx IC_SERVER=http://localhost:3001 uv run pytest python/tests/test_llm_router_e2e.py -v`  
+- Direct path: `OPENAI_API_KEY=sk-xxx uv run pytest python/tests/test_budget_e2e.py -k openai -v`  
+- Full sweep (requires all credentials): `IC_TOKEN=... IC_SERVER=... OPENAI_API_KEY=... uv run pytest python/tests -v`  
+- Add `RUST_LOG=info` to see router logs during test runs.
+
+### Run Rust tests
+
 ```bash
 cd module/iron_runtime
+cargo test -p iron_runtime
+```
 
-# Run Rust tests
-cargo test
+### Manual examples
 
-# Run Python tests (requires IC_TOKEN and IC_SERVER)
-export IC_TOKEN=your_token
-export IC_SERVER=http://localhost:3000
-python -m pytest python/tests/ -v
-
-# Manual testing
-python python/examples/test_manual.py openai     # Test OpenAI API
-python python/examples/test_manual.py anthropic  # Test Anthropic API
-python python/examples/test_manual.py gateway    # Test OpenAI client → Claude
+```bash
+uv run python python/examples/test_manual.py openai     # Test OpenAI API
+uv run python python/examples/test_manual.py anthropic  # Test Anthropic API
+uv run python python/examples/test_manual.py gateway    # Test OpenAI client → Claude
 ```
 
 ## Example (Rust)
@@ -302,4 +326,3 @@ Apache-2.0
 **Notes:**
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
-
