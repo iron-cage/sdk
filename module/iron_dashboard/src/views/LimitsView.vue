@@ -236,8 +236,8 @@ function handleUpdateBudget() {
 
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Agent Budgets</h1>
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Agent Budgets</h1>
     </div>
 
     <!-- Global Limits hidden - not integrated with iron_cage runtime
@@ -341,7 +341,7 @@ function handleUpdateBudget() {
     -->
 
     <!-- Agent Budgets -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
       <div class="flex items-center justify-between px-6 py-4 border-b">
         <div>
           <p class="text-sm text-gray-500">Allocated, spent, and remaining budget per agent.</p>
@@ -360,47 +360,47 @@ function handleUpdateBudget() {
         Error loading budgets: {{ budgetQueryError.message }}
       </div>
       <div v-else-if="budgetStatus?.data?.length">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-[600px] w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Agent
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Allocated
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Spent
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Remaining
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Used
               </th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ row.agent_name }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 ${{ (row.budget / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 ${{ (row.spent / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 ${{ (row.remaining / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 {{ row.percent_used.toFixed(1) }}%
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <Button size="sm" variant="secondary" @click="openBudgetModal(row)">
                   Update Budget
                 </Button>

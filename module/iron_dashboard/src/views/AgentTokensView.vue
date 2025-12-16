@@ -176,16 +176,16 @@ function copyToken(token: string) {
 
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900">
           Agent Tokens: {{ agent?.name || 'Loading...' }}
         </h1>
         <router-link to="/agents" class="text-sm text-blue-600 hover:underline">
           &larr; Back to Agents
         </router-link>
       </div>
-      <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
+      <Button v-if="authStore.isAdmin" @click="showCreateModal = true" class="w-full sm:w-auto">
         Generate New Token
       </Button>
     </div>
@@ -204,56 +204,56 @@ function copyToken(token: string) {
     </div>
 
     <!-- Tokens table -->
-    <div v-else-if="tokens && tokens.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
+    <div v-else-if="tokens && tokens.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+      <table class="min-w-[700px] w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               ID
             </th>
-            <th v-if="authStore.isAdmin" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th v-if="authStore.isAdmin" class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               User
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Provider
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Description
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
             </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-for="token in tokens" :key="token.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ token.id }}
             </td>
-            <td v-if="authStore.isAdmin" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td v-if="authStore.isAdmin" class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ token.user_id }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <Badge variant="outline">{{ token.provider || '-' }}</Badge>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ token.name || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(token.created_at) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <Badge :variant="token.is_active ? 'default' : 'destructive'">
                 {{ token.is_active ? 'Active' : 'Revoked' }}
               </Badge>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
               <Button
                 v-if="token.is_active && agent && agent.providers.length > 1 && canManageToken(token)"
                 @click="openSwitchProviderModal(token)"

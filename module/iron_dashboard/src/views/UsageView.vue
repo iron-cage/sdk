@@ -42,13 +42,19 @@ const { data: requestStats, isLoading: requestsLoading, error: requestsError } =
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
-  queryKey: ['analytics-spending-provider', selectedPeriod],
-  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value }),
+  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId],
+  queryFn: () => api.getAnalyticsSpendingByProvider({
+    period: selectedPeriod.value,
+    agent_id: selectedAgentId.value ?? undefined,
+  }),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
-  queryKey: ['analytics-models', selectedPeriod],
-  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value }),
+  queryKey: ['analytics-models', selectedPeriod, selectedAgentId],
+  queryFn: () => api.getAnalyticsUsageModels({
+    period: selectedPeriod.value,
+    agent_id: selectedAgentId.value ?? undefined,
+  }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
@@ -137,14 +143,14 @@ function loadMoreLogs() {
 
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Usage Analytics</h1>
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Analytics</h1>
 
-      <div class="flex items-center gap-4">
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
         <!-- Agent selector -->
         <select
           v-model="selectedAgentId"
-          class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option :value="null">All Agents</option>
           <option v-for="agent in agents" :key="agent.id" :value="agent.id">
@@ -155,7 +161,7 @@ function loadMoreLogs() {
         <!-- Period selector -->
         <select
           v-model="selectedPeriod"
-          class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option v-for="option in periodOptions" :key="option.value" :value="option.value">
             {{ option.label }}
@@ -177,7 +183,7 @@ function loadMoreLogs() {
     <!-- Analytics content -->
     <div v-else>
       <!-- Summary statistics -->
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6">
         <!-- Total requests -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -324,30 +330,30 @@ function loadMoreLogs() {
             No logs available
           </div>
           <div v-else>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
+            <div class="overflow-x-auto touch-pan-x">
+              <table class="min-w-[600px] w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tokens</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tokens</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <tr v-for="event in eventsList.data" :key="event.event_id">
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {{ formatTimestamp(event.timestamp_ms) }}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                       {{ event.agent_name }}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {{ event.model }}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap">
                       <span
                         class="px-2 py-1 text-xs font-medium rounded-full"
                         :class="event.event_type === 'llm_request_completed'
@@ -357,10 +363,10 @@ function loadMoreLogs() {
                         {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
                       </span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {{ formatNumber(event.input_tokens + event.output_tokens) }}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {{ formatMicrodollars(event.cost_micros) }}
                     </td>
                   </tr>

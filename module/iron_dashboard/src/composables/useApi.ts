@@ -500,6 +500,7 @@ export function useApi() {
   ): Promise<SpendingByProviderResponse> {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`)
   }
@@ -521,6 +522,7 @@ export function useApi() {
   ): Promise<ModelUsageResponse> {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
