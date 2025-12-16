@@ -5,13 +5,13 @@
 Control Panel and Agent Runtime for Iron Cage AI agent management.
 
 <p align="center">
-<a href="https://github.com/iron-cage/iron_runtime/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=build&color=E5E7EB" alt="Deploy CI" /></a>
+<a href="https://github.com/iron-cage/sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/sdk/deploy.yaml?branch=master&label=build&color=E5E7EB" alt="Deploy CI" /></a>
 &nbsp;
-<a href="https://github.com/iron-cage/iron_runtime"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="License" /></a>
+<a href="https://github.com/iron-cage/sdk/blob/master/license"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="License" /></a>
 &nbsp;
 <a href="https://ironcage.ai"><img src="https://img.shields.io/badge/🌐_website-ironcage.ai-E5E7EB.svg" alt="Website" /></a>
 &nbsp;
-<a href="https://ironcage.ai/docs"><img src="https://img.shields.io/badge/📖_docs-ironcage.ai-E5E7EB.svg" alt="Documentation" /></a>
+<a href="https://ironcage.ai/#/docs"><img src="https://img.shields.io/badge/📖_docs-ironcage.ai-E5E7EB.svg" alt="Documentation" /></a>
 <br>
 <a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/💬_discord-join-60A5FA.svg" alt="Discord" /></a>
 &nbsp;
