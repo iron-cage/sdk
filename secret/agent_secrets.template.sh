@@ -12,5 +12,6 @@ OPENAI_API_KEY="<Get it from: https://platform.openai.com/account/api-keys>"
 APOLLO_API_KEY="<Get it from: https://developer.apollo.io/keys>"
 # IronCage API token for accessing IronCage services
 IC_TOKEN="<Get it from: https://app.ironcage.ai/user/settings → API Tokens>"
+IC_SERVER="<IronCage server address, e.g., https://dashboard.ironcage.ai>"
 
 # -------------------------------------------------------------------------------------------------------------
