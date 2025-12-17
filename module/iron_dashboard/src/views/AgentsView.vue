@@ -38,6 +38,7 @@ const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviderKeyId = ref<number | null>(null)
 const initialBudgetUsd = ref<number | undefined>(undefined)
+const selectedOwnerId = ref<string | null>(null)  // For owner assignment
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -95,15 +96,23 @@ const { data: providers } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
+// Fetch users for owner selection (admin only)
+const { data: users } = useQuery({
+  queryKey: ['users-for-agents'],
+  queryFn: () => api.getUsers({ is_active: true }),
+  enabled: authStore.isAdmin,
+})
+
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number; owner_id?: string }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
     selectedProviderKeyId.value = null
     initialBudgetUsd.value = undefined
+    selectedOwnerId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -114,13 +123,14 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null }) =>
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null; owner_id?: string }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
     selectedProviderKeyId.value = null
+    selectedOwnerId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -168,6 +178,7 @@ function handleCreateAgent() {
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
     initial_budget_microdollars: budgetMicros,
+    owner_id: selectedOwnerId.value || undefined,
   })
 }
 
@@ -175,6 +186,7 @@ function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
   selectedProviderKeyId.value = agent.provider_key_id ?? null
+  selectedOwnerId.value = agent.owner_id ?? null
   showUpdateModal.value = true
 }
 
@@ -202,6 +214,7 @@ function handleUpdateAgent() {
     name: name.value,
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
+    owner_id: selectedOwnerId.value || undefined,
   })
 }
 
@@ -358,6 +371,9 @@ async function copyTokenToClipboard() {
               Name
             </th>
             <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Owner
+            </th>
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Providers
             </th>
             <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -378,6 +394,9 @@ async function copyTokenToClipboard() {
           <tr v-for="agent in agents" :key="agent.id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               {{ agent.name }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ agent.owner_id || 'Unknown' }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               <div class="flex gap-1 flex-wrap">
@@ -432,10 +451,6 @@ async function copyTokenToClipboard() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem @click="router.push(`/agents/${agent.id}/tokens`)">
-                    Manage Tokens
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
                     @click="handleGenerateIcToken(agent)"
@@ -542,6 +557,28 @@ async function copyTokenToClipboard() {
               Required. Used to create the agent's budget (microdollars on backend).
             </p>
           </div>
+
+          <div v-if="authStore.isAdmin" class="space-y-2">
+            <Label for="create-owner">Assign to User (optional)</Label>
+            <select
+              id="create-owner"
+              v-model="selectedOwnerId"
+              :disabled="createMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option :value="null">Current User ({{ authStore.username }})</option>
+              <option
+                v-for="user in users?.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.username }} ({{ user.email || 'no email' }})
+              </option>
+            </select>
+            <p class="text-xs text-gray-500">
+              Leave empty to assign to yourself.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
@@ -602,6 +639,24 @@ async function copyTokenToClipboard() {
                 :value="providerKey.id"
               >
                 {{ providerKey.id }} - {{ providerKey.provider }}
+              </option>
+            </select>
+          </div>
+
+          <div v-if="authStore.isAdmin" class="space-y-2">
+            <Label for="update-owner">Owner</Label>
+            <select
+              id="update-owner"
+              v-model="selectedOwnerId"
+              :disabled="updateMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option
+                v-for="user in users?.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.username }} ({{ user.email || 'no email' }})
               </option>
             </select>
           </div>

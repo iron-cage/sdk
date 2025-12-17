@@ -15,10 +15,10 @@
 //! - `test_get_agent_without_auth_unauthorized`: Prevents unauthenticated agent access
 //! - `test_delete_agent_without_auth_unauthorized`: Prevents unauthenticated agent deletion
 //! - `test_delete_nonexistent_agent_as_admin`: Verifies proper 404 error handling
-//! - `test_create_agent_ignores_owner_id_in_request`: Prevents authorization bypass via owner_id override
+//! - `test_admin_can_assign_agent_to_other_user`: Admins can assign agents to other users via owner_id
 //!
-//! These tests ensure authentication middleware cannot be accidentally removed and that
-//! owner_id is always derived from JWT claims, never from request body.
+//! These tests ensure authentication middleware cannot be accidentally removed.
+//! Note: Admins can specify owner_id to assign agents to other users; regular users cannot.
 //!
 //! ## Test Matrix
 //!
@@ -27,7 +27,7 @@
 //! | `test_create_agent_as_admin_success` | Admin creates agent | POST /api/agents with admin token, valid agent data | 201 Created, agent in DB with correct owner_id | ✅ |
 //! | `test_create_agent_as_user_forbidden` | Regular user creates agent | POST /api/agents with user token, valid agent data | 403 Forbidden | ✅ |
 //! | `test_create_agent_without_auth_unauthorized` | Unauthenticated creation | POST /api/agents without auth header, valid agent data | 401 Unauthorized | ✅ |
-//! | `test_create_agent_ignores_owner_id_in_request` | Authorization bypass attempt | POST /api/agents with admin token, request includes owner_id field | 201 Created, owner_id derived from JWT (not request) | ✅ |
+//! | `test_admin_can_assign_agent_to_other_user` | Admin assigns agent to user | POST /api/agents with admin token, request includes owner_id field | 201 Created, owner_id set to specified user | ✅ |
 //! | `test_list_agents_as_admin_sees_all` | Admin lists all agents | GET /api/agents with admin token, DB has agents from multiple users | 200 OK, all agents returned | ✅ |
 //! | `test_list_agents_as_user_sees_only_accessible` | User lists accessible agents | GET /api/agents with user token, DB has user's agents + others | 200 OK, only user's agents returned | ✅ |
 //! | `test_list_agents_without_auth_unauthorized` | Unauthenticated listing | GET /api/agents without auth header | 401 Unauthorized | ✅ |
@@ -809,17 +809,17 @@ async fn test_delete_nonexistent_agent_as_admin()
 // ============================================================================
 
 #[ tokio::test ]
-async fn test_create_agent_ignores_owner_id_in_request()
+async fn test_admin_can_assign_agent_to_other_user()
 {
-  let ( app, pool, admin_token, _user_token, admin_id, user_id ) = create_agents_router().await;
+  let ( app, pool, admin_token, _user_token, _admin_id, user_id ) = create_agents_router().await;
 
-  // Attempt to create agent with different owner_id in request body
+  // Admin creates agent and assigns it to another user
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
     "initial_budget_microdollars": 1000000,
-    "owner_id": user_id  // Trying to set different owner
+    "owner_id": user_id  // Admin assigns agent to user
   });
 
   let response = app
@@ -841,7 +841,7 @@ async fn test_create_agent_ignores_owner_id_in_request()
     "Agent creation should succeed"
   );
 
-  // Verify owner_id is set to admin (from JWT), not user_id (from request body)
+  // Verify owner_id is set to the specified user (admin can assign to others)
   let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
     .await
     .unwrap();
@@ -856,7 +856,7 @@ async fn test_create_agent_ignores_owner_id_in_request()
     .unwrap();
 
   assert_eq!(
-    row.0, admin_id,
-    "Owner ID should be set to authenticated user (admin), not request body value"
+    row.0, user_id,
+    "Owner ID should be set to specified user (admin can assign agents to other users)"
   );
 }

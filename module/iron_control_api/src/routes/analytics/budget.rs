@@ -18,13 +18,15 @@ use super::shared::{
 /// GET /api/v1/analytics/budget/status
 ///
 /// Requires JWT authentication.
+/// Admins see all agents; regular users see only their owned agents.
 pub async fn get_budget_status(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< BudgetStatusQuery >,
 ) -> impl IntoResponse
 {
   let offset = ( params.page - 1 ) * params.per_page;
+  let is_admin = user.0.role == "admin";
 
   // Query budget status from agent_budgets table
   let mut query = String::from(
@@ -39,6 +41,12 @@ pub async fn get_budget_status(
        WHERE 1=1"#
   );
 
+  // Filter by owner for non-admins
+  if !is_admin
+  {
+    query.push_str( " AND a.owner_id = ?" );
+  }
+
   if params.agent_id.is_some()
   {
     query.push_str( " AND a.id = ?" );
@@ -48,6 +56,12 @@ pub async fn get_budget_status(
 
   let mut q = sqlx::query_as::< _, AgentBudgetRow >( &query );
 
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    q = q.bind( &user.0.sub );
+  }
+
   if let Some( agent_id ) = params.agent_id
   {
     q = q.bind( agent_id );
@@ -56,11 +70,19 @@ pub async fn get_budget_status(
 
   let rows = q.fetch_all( &state.pool ).await;
 
-  // Query total count
-  let total_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM agents" )
-    .fetch_one( &state.pool )
-    .await
-    .unwrap_or( 0 );
+  // Query total count (filtered by owner for non-admins)
+  let total_count: i64 = if is_admin {
+    sqlx::query_scalar( "SELECT COUNT(*) FROM agents" )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( 0 )
+  } else {
+    sqlx::query_scalar( "SELECT COUNT(*) FROM agents WHERE owner_id = ?" )
+      .bind( &user.0.sub )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( 0 )
+  };
 
   match rows
   {

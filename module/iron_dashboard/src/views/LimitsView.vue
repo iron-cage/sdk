@@ -401,7 +401,12 @@ function handleUpdateBudget() {
                 {{ row.percent_used.toFixed(1) }}%
               </td>
               <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <Button size="sm" variant="secondary" @click="openBudgetModal(row)">
+                <Button
+                  v-if="authStore.isAdmin"
+                  size="sm"
+                  variant="secondary"
+                  @click="openBudgetModal(row)"
+                >
                   Update Budget
                 </Button>
               </td>

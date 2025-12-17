@@ -22,13 +22,15 @@ use super::shared::{
 /// GET /api/v1/analytics/usage/requests
 ///
 /// Requires JWT authentication.
+/// Admins see all usage; regular users see only their owned agents' usage.
 pub async fn get_usage_requests(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
 {
   let ( start_ms, end_ms ) = params.period.to_range();
+  let is_admin = user.0.role == "admin";
 
   let mut query = String::from(
     r#"SELECT
@@ -38,6 +40,12 @@ pub async fn get_usage_requests(
        FROM analytics_events
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?"#
   );
+
+  // Filter by owned agents for non-admins
+  if !is_admin
+  {
+    query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+  }
 
   if params.agent_id.is_some()
   {
@@ -51,6 +59,12 @@ pub async fn get_usage_requests(
   let mut q = sqlx::query_as::< _, ( i64, i64, i64 ) >( &query )
     .bind( start_ms )
     .bind( end_ms );
+
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    q = q.bind( &user.0.sub );
+  }
 
   if let Some( agent_id ) = params.agent_id
   {
@@ -94,8 +108,9 @@ pub async fn get_usage_requests(
 /// GET /api/v1/analytics/usage/tokens/by-agent
 ///
 /// Requires JWT authentication.
+/// Admins see all usage; regular users see only their owned agents' usage.
 pub async fn get_usage_tokens(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
   Query( page ): Query< PaginationQuery >,
@@ -103,8 +118,10 @@ pub async fn get_usage_tokens(
 {
   let ( start_ms, end_ms ) = params.period.to_range();
   let offset = ( page.page - 1 ) * page.per_page;
+  let is_admin = user.0.role == "admin";
 
-  let rows: Result< Vec< TokensByAgentRow >, _ > = sqlx::query_as(
+  // Build query with optional owner filter
+  let base_query = if is_admin {
     r#"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -119,42 +136,108 @@ pub async fn get_usage_tokens(
        GROUP BY e.agent_id
        ORDER BY (input_tokens + output_tokens) DESC
        LIMIT ? OFFSET ?"#
-  )
-    .bind( start_ms )
-    .bind( end_ms )
-    .bind( page.per_page as i64 )
-    .bind( offset as i64 )
-    .fetch_all( &state.pool )
-    .await;
-
-  // Query totals
-  let totals: ( i64, i64 ) = sqlx::query_as(
+  } else {
     r#"SELECT
-         COALESCE(SUM(input_tokens), 0),
-         COALESCE(SUM(output_tokens), 0)
-       FROM analytics_events
-       WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-       AND event_type = 'llm_request_completed'"#
-  )
-    .bind( start_ms )
-    .bind( end_ms )
-    .fetch_one( &state.pool )
-    .await
-    .unwrap_or( ( 0, 0 ) );
+         e.agent_id,
+         a.name as agent_name,
+         COALESCE(SUM(e.input_tokens), 0) as input_tokens,
+         COALESCE(SUM(e.output_tokens), 0) as output_tokens,
+         COUNT(*) as request_count
+       FROM analytics_events e
+       LEFT JOIN agents a ON e.agent_id = a.id
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+       AND e.event_type = 'llm_request_completed'
+       AND e.agent_id IS NOT NULL
+       AND a.owner_id = ?
+       GROUP BY e.agent_id
+       ORDER BY (input_tokens + output_tokens) DESC
+       LIMIT ? OFFSET ?"#
+  };
 
-  // Query total count
-  let total_count: i64 = sqlx::query_scalar(
-    r#"SELECT COUNT(DISTINCT agent_id)
-       FROM analytics_events
-       WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-       AND event_type = 'llm_request_completed'
-       AND agent_id IS NOT NULL"#
-  )
-    .bind( start_ms )
-    .bind( end_ms )
-    .fetch_one( &state.pool )
-    .await
-    .unwrap_or( 0 );
+  let rows: Result< Vec< TokensByAgentRow >, _ > = if is_admin {
+    sqlx::query_as( base_query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( page.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  } else {
+    sqlx::query_as( base_query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( &user.0.sub )
+      .bind( page.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  };
+
+  // Query totals (filtered by owner for non-admins)
+  let totals: ( i64, i64 ) = if is_admin {
+    sqlx::query_as(
+      r#"SELECT
+           COALESCE(SUM(input_tokens), 0),
+           COALESCE(SUM(output_tokens), 0)
+         FROM analytics_events
+         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
+         AND event_type = 'llm_request_completed'"#
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( ( 0, 0 ) )
+  } else {
+    sqlx::query_as(
+      r#"SELECT
+           COALESCE(SUM(e.input_tokens), 0),
+           COALESCE(SUM(e.output_tokens), 0)
+         FROM analytics_events e
+         INNER JOIN agents a ON e.agent_id = a.id
+         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+         AND e.event_type = 'llm_request_completed'
+         AND a.owner_id = ?"#
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( &user.0.sub )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( ( 0, 0 ) )
+  };
+
+  // Query total count (filtered by owner for non-admins)
+  let total_count: i64 = if is_admin {
+    sqlx::query_scalar(
+      r#"SELECT COUNT(DISTINCT agent_id)
+         FROM analytics_events
+         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
+         AND event_type = 'llm_request_completed'
+         AND agent_id IS NOT NULL"#
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( 0 )
+  } else {
+    sqlx::query_scalar(
+      r#"SELECT COUNT(DISTINCT e.agent_id)
+         FROM analytics_events e
+         INNER JOIN agents a ON e.agent_id = a.id
+         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+         AND e.event_type = 'llm_request_completed'
+         AND e.agent_id IS NOT NULL
+         AND a.owner_id = ?"#
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( &user.0.sub )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( 0 )
+  };
 
   match rows
   {
@@ -201,8 +284,9 @@ pub async fn get_usage_tokens(
 /// GET /api/v1/analytics/usage/models
 ///
 /// Requires JWT authentication.
+/// Admins see all usage; regular users see only their owned agents' usage.
 pub async fn get_usage_models(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
   Query( page ): Query< PaginationQuery >,
@@ -210,6 +294,7 @@ pub async fn get_usage_models(
 {
   let ( start_ms, end_ms ) = params.period.to_range();
   let offset = ( page.page - 1 ) * page.per_page;
+  let is_admin = user.0.role == "admin";
 
   let mut query = String::from(
     r#"SELECT
@@ -224,6 +309,12 @@ pub async fn get_usage_models(
        AND event_type = 'llm_request_completed'"#
   );
 
+  // Filter by owned agents for non-admins
+  if !is_admin
+  {
+    query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+  }
+
   if params.agent_id.is_some()
   {
     query.push_str( " AND agent_id = ?" );
@@ -234,6 +325,12 @@ pub async fn get_usage_models(
   let mut q = sqlx::query_as::< _, ModelUsageRow >( &query )
     .bind( start_ms )
     .bind( end_ms );
+
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    q = q.bind( &user.0.sub );
+  }
 
   if let Some( agent_id ) = params.agent_id
   {
@@ -246,7 +343,7 @@ pub async fn get_usage_models(
     .fetch_all( &state.pool )
     .await;
 
-  // Query totals
+  // Query totals (filtered by owner for non-admins)
   let mut totals_query = String::from(
     r#"SELECT
          COUNT(DISTINCT model || provider) as unique_models,
@@ -257,6 +354,12 @@ pub async fn get_usage_models(
        AND event_type = 'llm_request_completed'"#
   );
 
+  // Filter by owned agents for non-admins
+  if !is_admin
+  {
+    totals_query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+  }
+
   if params.agent_id.is_some()
   {
     totals_query.push_str( " AND agent_id = ?" );
@@ -265,6 +368,12 @@ pub async fn get_usage_models(
   let mut tq = sqlx::query_as::< _, ( i64, i64, i64 ) >( &totals_query )
     .bind( start_ms )
     .bind( end_ms );
+
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    tq = tq.bind( &user.0.sub );
+  }
 
   if let Some( agent_id ) = params.agent_id
   {

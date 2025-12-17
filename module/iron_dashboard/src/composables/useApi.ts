@@ -399,14 +399,26 @@ export function useApi() {
     return fetchApi<Agent>(`/api/v1/agents/${id}`)
   }
 
-  async function createAgent(data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }): Promise<Agent> {
+  async function createAgent(data: {
+    name: string
+    providers: string[]
+    provider_key_id: number
+    initial_budget_microdollars: number
+    owner_id?: string  // Admins can assign to other users
+  }): Promise<Agent> {
     return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async function updateAgent(data: { id: number; name?: string; providers?: string[]; provider_key_id?: number | null }): Promise<Agent> {
+  async function updateAgent(data: {
+    id: number
+    name?: string
+    providers?: string[]
+    provider_key_id?: number | null
+    owner_id?: string  // Admins can reassign to other users
+  }): Promise<Agent> {
     const { id, ...updateData } = data
     return fetchApi<Agent>(`/api/v1/agents/${id}`, {
       method: 'PUT',
