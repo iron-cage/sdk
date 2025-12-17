@@ -32,6 +32,7 @@ Test CLI parameter validation across all command parameters.
 | `provider_parameter_test.rs` | Test Provider parameter validation |
 | `role_parameter_test.rs` | Test Role parameter validation |
 | `status_parameter_test.rs` | Test Status parameter validation |
+| `threshold_parameter_test.rs` | Test Threshold parameter validation |
 | `token_id_parameter_test.rs` | Test Token Id parameter validation |
 | `username_parameter_test.rs` | Test Username parameter validation |
 
