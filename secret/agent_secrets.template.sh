@@ -13,6 +13,6 @@ APOLLO_API_KEY="<Get it from: https://developer.apollo.io/keys>"
 # IronCage API token for accessing IronCage services
 IC_TOKEN="<Get it from: https://app.ironcage.ai/user/settings → API Tokens>"
 # IconCage default server address
-IC_SERVER="<Get it from: https://app.ironcage.ai/user/settings → API Tokens>"
+IC_SERVER="<Get it from your server page>"
 
 # -------------------------------------------------------------------------------------------------------------
