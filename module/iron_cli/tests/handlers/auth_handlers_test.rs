@@ -30,7 +30,7 @@ use iron_cli::handlers::{ auth_handlers::*, CliError };
 fn test_login_handler_success()
 {
   let mut params = HashMap::new();
-  params.insert("username".into(), "alice@example.com".into());
+  params.insert("email".into(), "alice@example.com".into());
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
@@ -40,26 +40,26 @@ fn test_login_handler_success()
   let output = result.unwrap();
   assert!(
     output.contains("alice@example.com"),
-    "Output should contain username: {}",
+    "Output should contain email: {}",
     output
   );
 }
 
 #[test]
-fn test_login_handler_missing_username()
+fn test_login_handler_missing_email()
 {
   let mut params = HashMap::new();
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
 
-  assert!(result.is_err(), "Should fail without username");
+  assert!(result.is_err(), "Should fail without email");
 
   match result.unwrap_err()
   {
     CliError::MissingParameter(name) =>
     {
-      assert_eq!(name, "username", "Error should mention 'username'");
+      assert_eq!(name, "email", "Error should mention 'email'");
     }
     other => panic!("Wrong error type: {:?}", other),
   }
@@ -69,7 +69,7 @@ fn test_login_handler_missing_username()
 fn test_login_handler_missing_password()
 {
   let mut params = HashMap::new();
-  params.insert("username".into(), "alice@example.com".into());
+  params.insert("email".into(), "alice@example.com".into());
 
   let result = login_handler(&params);
 
@@ -86,21 +86,21 @@ fn test_login_handler_missing_password()
 }
 
 #[test]
-fn test_login_handler_empty_username()
+fn test_login_handler_empty_email()
 {
   let mut params = HashMap::new();
-  params.insert("username".into(), "".into());
+  params.insert("email".into(), "".into());
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
 
-  assert!(result.is_err(), "Should fail with empty username");
+  assert!(result.is_err(), "Should fail with empty email");
 
   match result.unwrap_err()
   {
     CliError::InvalidParameter { param, reason } =>
     {
-      assert_eq!(param, "username");
+      assert_eq!(param, "email");
       assert!(
         reason.contains("empty"),
         "Reason should mention 'empty': {}",
@@ -112,21 +112,21 @@ fn test_login_handler_empty_username()
 }
 
 #[test]
-fn test_login_handler_username_too_short()
+fn test_login_handler_email_too_short()
 {
   let mut params = HashMap::new();
-  params.insert("username".into(), "ab".into()); // Only 2 chars
+  params.insert("email".into(), "ab".into()); // Only 2 chars
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
 
-  assert!(result.is_err(), "Should fail with username < 3 chars");
+  assert!(result.is_err(), "Should fail with email < 3 chars");
 
   match result.unwrap_err()
   {
     CliError::InvalidParameter { param, reason } =>
     {
-      assert_eq!(param, "username");
+      assert_eq!(param, "email");
       assert!(
         reason.contains("3") || reason.contains("least"),
         "Reason should mention minimum length: {}",
@@ -138,22 +138,22 @@ fn test_login_handler_username_too_short()
 }
 
 #[test]
-fn test_login_handler_username_too_long()
+fn test_login_handler_email_too_long()
 {
   let mut params = HashMap::new();
-  let long_username = "a".repeat(101); // 101 chars (max is 100)
-  params.insert("username".into(), long_username);
+  let long_email = "a".repeat(101); // 101 chars (max is 100)
+  params.insert("email".into(), long_email);
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
 
-  assert!(result.is_err(), "Should fail with username > 100 chars");
+  assert!(result.is_err(), "Should fail with email > 100 chars");
 
   match result.unwrap_err()
   {
     CliError::InvalidParameter { param, reason } =>
     {
-      assert_eq!(param, "username");
+      assert_eq!(param, "email");
       assert!(
         reason.contains("100") || reason.contains("most"),
         "Reason should mention maximum length: {}",
@@ -165,21 +165,21 @@ fn test_login_handler_username_too_long()
 }
 
 #[test]
-fn test_login_handler_invalid_username_pattern()
+fn test_login_handler_invalid_email_pattern()
 {
   let mut params = HashMap::new();
-  params.insert("username".into(), "alice!@#$%^&*()".into()); // Invalid chars
+  params.insert("email".into(), "alice!@#$%^&*()".into()); // Invalid chars
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
 
-  assert!(result.is_err(), "Should fail with invalid username pattern");
+  assert!(result.is_err(), "Should fail with invalid email pattern");
 
   match result.unwrap_err()
   {
     CliError::InvalidParameter { param, reason } =>
     {
-      assert_eq!(param, "username");
+      assert_eq!(param, "email");
       assert!(
         reason.contains("pattern") || reason.contains("format"),
         "Reason should mention pattern: {}",
@@ -194,7 +194,7 @@ fn test_login_handler_invalid_username_pattern()
 fn test_login_handler_empty_password()
 {
   let mut params = HashMap::new();
-  params.insert("username".into(), "alice@example.com".into());
+  params.insert("email".into(), "alice@example.com".into());
   params.insert("password".into(), "".into());
 
   let result = login_handler(&params);
@@ -225,7 +225,7 @@ fn test_login_handler_all_formats()
   for format in formats
   {
     let mut params = HashMap::new();
-    params.insert("username".into(), "alice@example.com".into());
+    params.insert("email".into(), "alice@example.com".into());
     params.insert("password".into(), "secret123".into());
     params.insert("format".into(), format.into());
 

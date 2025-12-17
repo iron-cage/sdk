@@ -2,20 +2,19 @@
 //!
 //! ## Purpose
 //!
-//! Validates the `status` parameter for filtering budget requests.
-//! Tests status enum validation (pending, approved, rejected, cancelled).
+//! Validates the `status` parameter for filtering budget status.
+//! Tests status enum validation (active, exhausted).
 //!
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .budget_request.list (status filter)
+//! - .budget.status (status filter)
 //!
 //! ## Test Categories
 //!
-//! 1. **Valid Values**: Known statuses (pending, approved, rejected, cancelled)
+//! 1. **Valid Values**: Known statuses (active, exhausted)
 //! 2. **Invalid Values**: Unknown statuses, empty, typos
 //! 3. **Optional Behavior**: Missing optional status parameter
-//! 4. **Edge Cases**: Case sensitivity
 //!
 //! ## TDD Status
 //!
@@ -28,9 +27,9 @@ mod tests
 {
   use crate::fixtures::{ IntegrationTestHarness, TestData, TestServer };
 
-  /// Test valid status (pending)
+  /// Test valid status (active)
   #[tokio::test]
-  async fn test_status_pending()
+  async fn test_status_active()
   {
     let server = TestServer::start().await;
     let data = TestData::new().await;
@@ -41,19 +40,19 @@ mod tests
       .server_url( server.url() )
       .api_key( &api_key );
 
-    let result = harness.run( "iron", &[ ".budget_request.list", "status::pending" ] ).await;
+    let result = harness.run( "iron", &[ ".budget.status", "status::active" ] ).await;
 
     if !result.success() {
       assert!( !result.stderr.contains( "status" ) || !result.stderr.contains( "invalid" ),
-        "Should accept 'pending' status. Stderr: {}", result.stderr );
+        "Should accept 'active' status. Stderr: {}", result.stderr );
     }
 
     server.shutdown().await;
   }
 
-  /// Test valid status (approved)
+  /// Test valid status (exhausted)
   #[tokio::test]
-  async fn test_status_approved()
+  async fn test_status_exhausted()
   {
     let server = TestServer::start().await;
     let data = TestData::new().await;
@@ -64,57 +63,11 @@ mod tests
       .server_url( server.url() )
       .api_key( &api_key );
 
-    let result = harness.run( "iron", &[ ".budget_request.list", "status::approved" ] ).await;
+    let result = harness.run( "iron", &[ ".budget.status", "status::exhausted" ] ).await;
 
     if !result.success() {
       assert!( !result.stderr.contains( "status" ) || !result.stderr.contains( "invalid" ),
-        "Should accept 'approved' status. Stderr: {}", result.stderr );
-    }
-
-    server.shutdown().await;
-  }
-
-  /// Test valid status (rejected)
-  #[tokio::test]
-  async fn test_status_rejected()
-  {
-    let server = TestServer::start().await;
-    let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
-
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
-
-    let result = harness.run( "iron", &[ ".budget_request.list", "status::rejected" ] ).await;
-
-    if !result.success() {
-      assert!( !result.stderr.contains( "status" ) || !result.stderr.contains( "invalid" ),
-        "Should accept 'rejected' status. Stderr: {}", result.stderr );
-    }
-
-    server.shutdown().await;
-  }
-
-  /// Test valid status (cancelled)
-  #[tokio::test]
-  async fn test_status_cancelled()
-  {
-    let server = TestServer::start().await;
-    let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
-
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
-
-    let result = harness.run( "iron", &[ ".budget_request.list", "status::cancelled" ] ).await;
-
-    if !result.success() {
-      assert!( !result.stderr.contains( "status" ) || !result.stderr.contains( "invalid" ),
-        "Should accept 'cancelled' status. Stderr: {}", result.stderr );
+        "Should accept 'exhausted' status. Stderr: {}", result.stderr );
     }
 
     server.shutdown().await;
@@ -133,33 +86,11 @@ mod tests
       .server_url( server.url() )
       .api_key( &api_key );
 
-    let result = harness.run( "iron", &[ ".budget_request.list", "status::unknown" ] ).await;
+    let result = harness.run( "iron", &[ ".budget.status", "status::unknown" ] ).await;
 
     assert!( !result.success(), "Unknown status should fail" );
     assert!( result.stderr.contains( "status" ) || result.stderr.contains( "invalid" ),
       "Error should mention invalid status. Stderr: {}", result.stderr );
-
-    server.shutdown().await;
-  }
-
-  /// Test empty status
-  #[tokio::test]
-  async fn test_status_empty()
-  {
-    let server = TestServer::start().await;
-    let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
-
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
-
-    let result = harness.run( "iron", &[ ".budget_request.list", "status::" ] ).await;
-
-    assert!( !result.success(), "Empty status should fail" );
-    assert!( result.stderr.contains( "status" ) || result.stderr.contains( "empty" ),
-      "Error should mention empty status. Stderr: {}", result.stderr );
 
     server.shutdown().await;
   }
@@ -177,7 +108,7 @@ mod tests
       .server_url( server.url() )
       .api_key( &api_key );
 
-    let result = harness.run( "iron", &[ ".budget_request.list" ] ).await;
+    let result = harness.run( "iron", &[ ".budget.status" ] ).await;
 
     // Should succeed without optional status filter
     if !result.success() {

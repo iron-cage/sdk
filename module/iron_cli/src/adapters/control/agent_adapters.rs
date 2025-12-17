@@ -76,23 +76,22 @@ pub async fn create_agent_adapter(
 
   // Build request body
   let name = params.get( "name" ).unwrap(); // Already validated
+  let providers_str = params.get( "providers" ).unwrap(); // Already validated
+  let provider_key_id = params.get( "provider_key_id" ).unwrap(); // Already validated
   let budget = params.get( "budget" ).unwrap(); // Already validated
 
-  let mut body = json!({
+  // Parse providers as comma-separated list
+  let providers: Vec< String > = providers_str
+    .split( ',' )
+    .map( |s| s.trim().to_string() )
+    .collect();
+
+  let body = json!({
     "name": name,
-    "budget": budget.parse::< i64 >().expect( "Budget parameter validated by handler" ),
+    "providers": providers,
+    "provider_key_id": provider_key_id.parse::< i64 >().expect( "provider_key_id validated by handler" ),
+    "initial_budget_microdollars": budget.parse::< i64 >().expect( "Budget parameter validated by handler" ),
   });
-
-  // Add optional provider_ids
-  if let Some( provider_ids ) = params.get( "provider_ids" )
-  {
-    let ids: Vec< String > = provider_ids
-      .split( ',' )
-      .map( |s| s.trim().to_string() )
-      .collect();
-
-    body[ "provider_ids" ] = json!( ids );
-  }
 
   // Make HTTP POST request
   let response = client
@@ -351,6 +350,130 @@ pub async fn remove_provider_adapter(
 
   // Make HTTP DELETE request
   let path = format!( "/api/v1/agents/{}/providers/{}", id, provider_id );
+  let response = client
+    .delete( &path )
+    .await
+    .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
+
+  // Format output
+  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
+
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
+}
+
+/// Generate IC token for agent
+pub async fn generate_ic_token_adapter(
+  params: &HashMap< String, String >,
+) -> Result< String, String >
+{
+  // Validate parameters using handler
+  agent_handlers::generate_ic_token_handler( params )
+    .map_err( |e| e.to_string() )?;
+
+  // Create HTTP client
+  let config = ControlApiConfig::load();
+  let client = ControlApiClient::new( config );
+
+  // Get agent ID
+  let id = params.get( "id" ).unwrap(); // Already validated
+
+  // Make HTTP POST request
+  let path = format!( "/api/v1/agents/{}/ic-token", id );
+  let response = client
+    .post( &path, json!({}) )
+    .await
+    .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
+
+  // Format output
+  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
+
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
+}
+
+/// Get IC token status for agent
+pub async fn get_ic_token_status_adapter(
+  params: &HashMap< String, String >,
+) -> Result< String, String >
+{
+  // Validate parameters using handler
+  agent_handlers::get_ic_token_status_handler( params )
+    .map_err( |e| e.to_string() )?;
+
+  // Create HTTP client
+  let config = ControlApiConfig::load();
+  let client = ControlApiClient::new( config );
+
+  // Get agent ID
+  let id = params.get( "id" ).unwrap(); // Already validated
+
+  // Make HTTP GET request
+  let path = format!( "/api/v1/agents/{}/ic-token", id );
+  let response = client
+    .get( &path, None )
+    .await
+    .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
+
+  // Format output
+  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
+
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
+}
+
+/// Regenerate IC token for agent
+pub async fn regenerate_ic_token_adapter(
+  params: &HashMap< String, String >,
+) -> Result< String, String >
+{
+  // Validate parameters using handler
+  agent_handlers::regenerate_ic_token_handler( params )
+    .map_err( |e| e.to_string() )?;
+
+  // Create HTTP client
+  let config = ControlApiConfig::load();
+  let client = ControlApiClient::new( config );
+
+  // Get agent ID
+  let id = params.get( "id" ).unwrap(); // Already validated
+
+  // Make HTTP POST request
+  let path = format!( "/api/v1/agents/{}/ic-token/regenerate", id );
+  let response = client
+    .post( &path, json!({}) )
+    .await
+    .map_err( |e| format!( "HTTP request failed: {}", e ) )?;
+
+  // Format output
+  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "table" );
+
+  let output_format = OutputFormat::from_str( format ).unwrap_or_default();
+  let formatter = TreeFmtFormatter::new( output_format );
+  formatter.format_value( &response )
+}
+
+/// Revoke IC token for agent
+pub async fn revoke_ic_token_adapter(
+  params: &HashMap< String, String >,
+) -> Result< String, String >
+{
+  // Validate parameters using handler
+  agent_handlers::revoke_ic_token_handler( params )
+    .map_err( |e| e.to_string() )?;
+
+  // Create HTTP client
+  let config = ControlApiConfig::load();
+  let client = ControlApiClient::new( config );
+
+  // Get agent ID
+  let id = params.get( "id" ).unwrap(); // Already validated
+
+  // Make HTTP DELETE request
+  let path = format!( "/api/v1/agents/{}/ic-token", id );
   let response = client
     .delete( &path )
     .await

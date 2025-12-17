@@ -56,15 +56,17 @@ pub fn list_providers_handler(
 
 /// Handle .provider.create command
 ///
-/// Creates new provider with name and configuration.
+/// Creates new provider with type and API key.
 ///
 /// ## Parameters
 ///
 /// Required:
-/// - name: String (non-empty, max 100 chars)
+/// - provider: String ("openai" or "anthropic")
 /// - api_key: String (non-empty)
 ///
 /// Optional:
+/// - base_url: String (custom API endpoint)
+/// - description: String (provider key description)
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
 pub fn create_provider_handler(
@@ -72,22 +74,22 @@ pub fn create_provider_handler(
 ) -> Result<String, CliError>
 {
   // Validate required parameters
-  let name = params
-    .get("name")
-    .ok_or(CliError::MissingParameter("name"))?;
+  let provider = params
+    .get("provider")
+    .ok_or(CliError::MissingParameter("provider"))?;
 
   let api_key = params
     .get("api_key")
     .ok_or(CliError::MissingParameter("api_key"))?;
 
-  // Validate name
-  validate_non_empty(name, "name")?;
+  // Validate provider type
+  validate_non_empty(provider, "provider")?;
 
-  if name.len() > 100
+  if provider != "openai" && provider != "anthropic"
   {
     return Err(CliError::InvalidParameter {
-      param: "name",
-      reason: "cannot exceed 100 characters",
+      param: "provider",
+      reason: "must be 'openai' or 'anthropic'",
     });
   }
 
@@ -110,8 +112,8 @@ pub fn create_provider_handler(
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
 
   Ok(format!(
-    "Provider creation parameters valid\nName: {}\nFormat: {}",
-    name, format
+    "Provider creation parameters valid\nProvider: {}\nFormat: {}",
+    provider, format
   ))
 }
 

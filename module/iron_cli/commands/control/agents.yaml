@@ -61,7 +61,7 @@
 - name: .agent.create
   namespace: ''
   description: Create new agent with specified configuration
-  hint: Creates agent with budget and optional providers
+  hint: Creates agent with budget and provider key
   status: stable
   version: 1.0.0
   arguments:
@@ -77,10 +77,10 @@
     validation_rules: []
     aliases: []
     tags: []
-  - name: budget
-    kind: Integer
-    description: Token budget
-    hint: Maximum tokens this agent can use
+  - name: providers
+    kind: String
+    description: Comma-separated list of providers
+    hint: e.g., openai or openai,anthropic
     attributes:
       optional: false
       multiple: false
@@ -89,12 +89,24 @@
     validation_rules: []
     aliases: []
     tags: []
-  - name: provider_ids
-    kind: String
-    description: Comma-separated provider IDs
-    hint: Optional list of provider IDs to assign
+  - name: provider_key_id
+    kind: Integer
+    description: Provider key ID
+    hint: ID of the provider key to use
     attributes:
-      optional: true
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: budget
+    kind: Integer
+    description: Initial budget in microdollars
+    hint: e.g., 1000000 = $1.00
+    attributes:
+      optional: false
       multiple: false
       interactive: false
       sensitive: false
@@ -127,7 +139,7 @@
     tags: []
   idempotent: false
   examples:
-  - .agent.create name::example_name budget::123
+  - .agent.create name::my-agent providers::openai provider_key_id::1 budget::1000000
   aliases: []
   tags: []
 - name: .agent.get
@@ -440,5 +452,149 @@
   idempotent: false
   examples:
   - .agent.remove_provider id::abc123 provider_id::abc123
+  aliases: []
+  tags: []
+- name: .agent.ic_token.generate
+  namespace: ''
+  description: Generate IC token for agent
+  hint: Token value shown only once - save it securely
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to generate token for
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.ic_token.generate id::abc123
+  aliases: []
+  tags: []
+- name: .agent.ic_token.status
+  namespace: ''
+  description: Get IC token status for agent
+  hint: Shows if token exists and when created (not the actual token)
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to check token status
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .agent.ic_token.status id::abc123
+  aliases: []
+  tags: []
+- name: .agent.ic_token.regenerate
+  namespace: ''
+  description: Regenerate IC token for agent
+  hint: Invalidates old token and generates new one
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to regenerate token for
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.ic_token.regenerate id::abc123
+  aliases: []
+  tags: []
+- name: .agent.ic_token.revoke
+  namespace: ''
+  description: Revoke IC token for agent
+  hint: Token becomes invalid immediately
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: id
+    kind: String
+    description: Agent ID
+    hint: UUID of agent to revoke token for
+    attributes:
+      optional: false
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: ["agent_id"]
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: false
+  examples:
+  - .agent.ic_token.revoke id::abc123
   aliases: []
   tags: []

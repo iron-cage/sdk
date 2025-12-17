@@ -167,7 +167,7 @@ impl HttpAdapter
 #[ derive( Serialize ) ]
 struct LoginRequest
 {
-  username: String,
+  email: String,
   password: String,
 }
 
@@ -184,7 +184,7 @@ impl AuthService for HttpAdapter
   async fn login( &self, username: &str, password: &str ) -> Result<Tokens, ServiceError>
   {
     let req_body = LoginRequest {
-      username: username.to_string(),
+      email: username.to_string(),
       password: password.to_string(),
     };
 
