@@ -35,8 +35,12 @@ const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviderKeyId = ref<number | null>(null)
+<<<<<<< HEAD
 const initialBudgetUsd = ref<number | undefined>(undefined)
 const selectedOwnerId = ref<string | null>(null)  // For owner assignment
+=======
+const initialBudgetUsd = ref<number | null>(null)
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -103,14 +107,22 @@ const { data: users } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
+<<<<<<< HEAD
   mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number; owner_id?: string }) =>
+=======
+  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }) =>
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
     selectedProviderKeyId.value = null
+<<<<<<< HEAD
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = null
+=======
+    initialBudgetUsd.value = null
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -121,14 +133,21 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
+<<<<<<< HEAD
   mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null; owner_id?: string }) =>
+=======
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null }) =>
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
     selectedProviderKeyId.value = null
+<<<<<<< HEAD
     selectedOwnerId.value = null
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -176,7 +195,10 @@ function handleCreateAgent() {
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
     initial_budget_microdollars: budgetMicros,
+<<<<<<< HEAD
     owner_id: selectedOwnerId.value || undefined,
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
   })
 }
 
@@ -184,7 +206,10 @@ function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
   selectedProviderKeyId.value = agent.provider_key_id ?? null
+<<<<<<< HEAD
   selectedOwnerId.value = agent.owner_id ?? null
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
   showUpdateModal.value = true
 }
 
@@ -212,7 +237,10 @@ function handleUpdateAgent() {
     name: name.value,
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
+<<<<<<< HEAD
     owner_id: selectedOwnerId.value || undefined,
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
   })
 }
 
@@ -374,6 +402,7 @@ async function copyTokenToClipboard() {
             <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Providers
             </th>
+<<<<<<< HEAD
             <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Provider Key
             </th>
@@ -381,6 +410,15 @@ async function copyTokenToClipboard() {
               IC Token
             </th>
             <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+=======
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Provider Key
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              IC Token
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
               Created
             </th>
             <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -407,10 +445,17 @@ async function copyTokenToClipboard() {
                 </span>
               </div>
             </td>
+<<<<<<< HEAD
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ agent.provider_key_id ?? 'None' }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+=======
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {{ agent.provider_key_id ?? 'None' }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
               <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
                 Loading...
               </div>
@@ -436,7 +481,11 @@ async function copyTokenToClipboard() {
                 </div>
               </div>
             </td>
+<<<<<<< HEAD
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+=======
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
               {{ formatDate(agent.created_at) }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -456,6 +505,17 @@ async function copyTokenToClipboard() {
                   >
                     {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
                   </DropdownMenuItem>
+<<<<<<< HEAD
+=======
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
+                    @click="handleGenerateIcToken(agent)"
+                    :disabled="tokenActionLoadingId === agent.id"
+                  >
+                    {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
+                  </DropdownMenuItem>
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
                   <template v-else>
                     <DropdownMenuItem
                       @click="handleRegenerateIcToken(agent)"
@@ -554,6 +614,7 @@ async function copyTokenToClipboard() {
             <p class="text-xs text-gray-500">
               Required. Used to create the agent's budget (microdollars on backend).
             </p>
+<<<<<<< HEAD
           </div>
 
           <div v-if="authStore.isAdmin" class="space-y-2">
@@ -576,6 +637,8 @@ async function copyTokenToClipboard() {
             <p class="text-xs text-gray-500">
               Leave empty to assign to yourself.
             </p>
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
           </div>
         </div>
 
@@ -639,6 +702,7 @@ async function copyTokenToClipboard() {
                 {{ providerKey.id }} - {{ providerKey.provider }}
               </option>
             </select>
+<<<<<<< HEAD
           </div>
 
           <div v-if="authStore.isAdmin" class="space-y-2">
@@ -657,6 +721,8 @@ async function copyTokenToClipboard() {
                 {{ user.username }} ({{ user.email || 'no email' }})
               </option>
             </select>
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
           </div>
         </div>
 

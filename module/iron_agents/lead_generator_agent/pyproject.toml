@@ -5,10 +5,14 @@ description = "Required dependencies for the lead search agent to work"
 readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
+<<<<<<< HEAD
     "iron-sdk",
     "iron-runtime",
 
     # LangChain Ecosystem (Modular)
+=======
+    "iron-cage",
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     "langchain==1.2.0",            # Metapackage
     "langchain-core==1.2.1",       # Contains AgentExecutor, ChatPromptTemplate
     "langchain-openai==1.1.3",     # Contains ChatOpenAI
@@ -30,7 +34,3 @@ dev = [
 pythonpath = "src"
 addopts = "-v"
 testpaths = ["tests"]
-
-[tool.uv.sources]
-iron-sdk = { path = "../../iron_sdk", editable = true }
-iron-runtime = { path = "../../iron_runtime", editable = true }

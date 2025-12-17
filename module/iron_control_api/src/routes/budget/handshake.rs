@@ -288,7 +288,11 @@ pub async fn handshake(
   {
     // Fetch owner's usage limit to seed a budget cap if available
     let limit_row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
+<<<<<<< HEAD
       "SELECT max_cost_microdollars_per_month, current_cost_microdollars_this_month
+=======
+      "SELECT max_cost_per_month_microdollars, current_cost_microdollars_this_month
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
        FROM usage_limits
        WHERE user_id = ?
        LIMIT 1"
@@ -296,6 +300,7 @@ pub async fn handshake(
     .bind( &owner_id )
     .fetch_optional( &state.db_pool )
     .await
+<<<<<<< HEAD
     .ok()
     .flatten();
 
@@ -319,6 +324,18 @@ pub async fn handshake(
         }
       }
     };
+=======
+    .map_err( |_| () )
+    .ok()
+    .flatten();
+
+    let (limit_max, current_cost) = limit_row
+      .map( |(max, cost)| (max.unwrap_or(0), cost.unwrap_or(0)) )
+      .unwrap_or( (0, 0) );
+
+    let available_from_limit = if limit_max > current_cost { limit_max - current_cost } else { 0 };
+    let seed_budget = if available_from_limit > 0 { available_from_limit } else { HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET };
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
 
     if seed_budget <= 0
     {
@@ -330,7 +347,11 @@ pub async fn handshake(
     }
 
     let now_ms = chrono::Utc::now().timestamp_millis();
+<<<<<<< HEAD
     if let Err( err ) = sqlx::query(
+=======
+    let _ = sqlx::query(
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
       "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
        VALUES (?, ?, 0, ?, ?, ?)"
     )
@@ -340,6 +361,7 @@ pub async fn handshake(
     .bind( now_ms )
     .bind( now_ms )
     .execute( &state.db_pool )
+<<<<<<< HEAD
     .await
     {
       tracing::error!( "Database error creating agent budget: {}", err );
@@ -349,6 +371,9 @@ pub async fn handshake(
       )
         .into_response();
     }
+=======
+    .await;
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
   }
 
   // Get provider API key

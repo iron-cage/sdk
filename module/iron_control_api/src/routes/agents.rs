@@ -43,9 +43,12 @@ pub struct CreateAgentRequest {
     pub providers: Vec<String>,
     pub provider_key_id: i64,
     pub initial_budget_microdollars: i64,
+<<<<<<< HEAD
     /// Optional owner_id - admins can assign agents to other users.
     /// If not provided, defaults to the authenticated user.
     pub owner_id: Option<String>,
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,8 +56,11 @@ pub struct UpdateAgentRequest {
     pub name: Option<String>,
     pub providers: Option<Vec<String>>,
     pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
+<<<<<<< HEAD
     /// Optional owner_id - only admins can reassign agents to other users.
     pub owner_id: Option<String>,
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
 }
 
 #[derive(Debug, Deserialize)]
@@ -461,6 +467,7 @@ pub async fn update_agent(
 
     }
 
+<<<<<<< HEAD
     // Update owner_id if provided (admin only - already checked above)
     // Note: owner_id references users.id (e.g., "user_demo"), not users.username
     if let Some(ref new_owner) = req.owner_id {
@@ -498,6 +505,8 @@ pub async fn update_agent(
             })?;
     }
 
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     // Fetch updated agent
     let mut agent = sqlx::query_as::<_, Agent>(
         r#"

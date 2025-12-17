@@ -399,6 +399,7 @@ export function useApi() {
     return fetchApi<Agent>(`/api/v1/agents/${id}`)
   }
 
+<<<<<<< HEAD
   async function createAgent(data: {
     name: string
     providers: string[]
@@ -406,12 +407,16 @@ export function useApi() {
     initial_budget_microdollars: number
     owner_id?: string  // Admins can assign to other users
   }): Promise<Agent> {
+=======
+  async function createAgent(data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }): Promise<Agent> {
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
+<<<<<<< HEAD
   async function updateAgent(data: {
     id: number
     name?: string
@@ -419,6 +424,9 @@ export function useApi() {
     provider_key_id?: number | null
     owner_id?: string  // Admins can reassign to other users
   }): Promise<Agent> {
+=======
+  async function updateAgent(data: { id: number; name?: string; providers?: string[]; provider_key_id?: number | null }): Promise<Agent> {
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     const { id, ...updateData } = data
     return fetchApi<Agent>(`/api/v1/agents/${id}`, {
       method: 'PUT',
@@ -541,6 +549,7 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
   }
 
+<<<<<<< HEAD
   async function getAnalyticsEventsList(
     filters?: AnalyticsFilters,
     pagination?: PaginationParams
@@ -554,6 +563,8 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`)
   }
 
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
   async function getBudgetStatus(
     page?: number,
     per_page?: number
@@ -673,7 +684,10 @@ export function useApi() {
     getAnalyticsSpendingByProvider,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
+<<<<<<< HEAD
     getAnalyticsEventsList,
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
     getBudgetStatus,
     // Budget Request Workflow
     createBudgetRequest,
@@ -756,6 +770,9 @@ export type {
   ApproveBudgetRequestResponse,
   RejectBudgetRequestRequest,
   RejectBudgetRequestResponse,
+  AgentBudgetResponse,
+  BudgetStatus,
+  BudgetStatusResponse,
 }
 
 // ============================================================================
@@ -805,6 +822,7 @@ export interface SpendingByProviderResponse {
   calculated_at: string
 }
 
+<<<<<<< HEAD
 export interface Pagination {
   page: number
   per_page: number
@@ -812,6 +830,8 @@ export interface Pagination {
   total_pages: number
 }
 
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
 // Budget status (agent budgets)
 export interface BudgetStatusResponse {
   data: BudgetStatus[]
@@ -865,6 +885,7 @@ export interface ModelUsageResponse {
   period: string
   calculated_at: string
 }
+<<<<<<< HEAD
 
 export interface AnalyticsEvent {
   event_id: string
@@ -887,3 +908,5 @@ export interface EventsListResponse {
   period: string
   calculated_at: string
 }
+=======
+>>>>>>> f326cba9b63f81a68e9971089276fd64a0ba039f
