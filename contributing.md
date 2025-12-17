@@ -578,6 +578,79 @@ For complete Python workflow documentation, see [Python Tooling Standards](docs/
 
 ---
 
+## Publishing to PyPI
+
+### Prerequisites
+
+```bash
+# Install maturin (build tool for Rust+Python)
+uv pip install maturin twine
+
+# PyPI account required: https://pypi.org/account/register/
+# Create API token: https://pypi.org/manage/account/token/
+```
+
+### Build the Wheel
+
+```bash
+cd module/iron_sdk
+
+# Build release wheel
+maturin build --release
+
+# Build for specific Python versions
+maturin build --release --interpreter python3.9 python3.10 python3.11 python3.12 python3.13
+```
+
+Wheels are output to `target/wheels/`
+
+### Test on TestPyPI (Recommended)
+
+```bash
+# Upload to TestPyPI first
+twine upload --repository testpypi target/wheels/*
+
+# Test install from TestPyPI
+uv pip install --index-url https://test.pypi.org/simple/ iron-cage
+```
+
+### Publish to PyPI
+
+```bash
+# Option 1: Using twine
+twine upload target/wheels/*
+
+# Option 2: Using maturin directly
+maturin publish
+```
+
+### API Token Authentication
+
+Create `~/.pypirc`:
+```ini
+[pypi]
+username = __token__
+password = pypi-xxxxx...
+
+[testpypi]
+username = __token__
+password = pypi-xxxxx...
+```
+
+Or pass directly:
+```bash
+maturin publish --username __token__ --password pypi-xxxxx
+```
+
+### Quick Publish Command
+
+```bash
+cd module/iron_sdk
+maturin build --release && twine upload target/wheels/*
+```
+
+---
+
 ## Testing Standards
 
 ### Test Execution

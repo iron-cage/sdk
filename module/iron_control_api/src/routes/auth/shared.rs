@@ -37,7 +37,7 @@ impl AuthState {
 
     if migration_003_completed == 0 {
       let migration_003 =
-        include_str!("../../../../iron_token_manager/migrations/003_create_users_table.sql");
+        include_str!("../../../migrations/003_create_users_table.sql");
       sqlx::raw_sql(migration_003).execute(&db_pool).await?;
     }
 
@@ -50,7 +50,7 @@ impl AuthState {
 
     if migration_006_completed == 0 {
       let migration_006 =
-        include_str!("../../../../iron_token_manager/migrations/006_create_user_audit_log.sql");
+        include_str!("../../../migrations/006_create_user_audit_log.sql");
       sqlx::raw_sql(migration_006).execute(&db_pool).await?;
     }
 
@@ -63,7 +63,7 @@ impl AuthState {
 
     if migration_007_completed == 0 {
       let migration_007 =
-        include_str!("../../../../iron_token_manager/migrations/007_create_blacklist_table.sql");
+        include_str!("../../../migrations/007_create_blacklist_table.sql");
       sqlx::raw_sql(migration_007).execute(&db_pool).await?;
     }
 
@@ -76,7 +76,7 @@ impl AuthState {
 
     if migration_020_completed == 0 {
       let migration_020 =
-        include_str!("../../../../iron_token_manager/migrations/020_add_account_lockout_fields.sql");
+        include_str!("../../../migrations/020_add_account_lockout_fields.sql");
       sqlx::raw_sql(migration_020).execute(&db_pool).await?;
     }
 

@@ -1,10 +1,10 @@
 //! Configuration system with hierarchical precedence
 //!
-//! Uses `iron_config` for unified configuration loading with 5-layer precedence.
+//! Uses `iron_config_loader` for unified configuration loading with 5-layer precedence.
 //!
 //! ## Configuration Hierarchy (highest to lowest priority)
 //!
-//! 1. CLI arguments (keyword::value parameters, applied after iron_config loading)
+//! 1. CLI arguments (keyword::value parameters, applied after iron_config_loader loading)
 //! 2. Environment variables (`IRON_CLI_*` format, e.g., `IRON_CLI_API_URL`)
 //! 3. Project config (`{workspace}/config/iron_cli.{env}.toml`)
 //! 4. User config (`~/.config/iron/iron_cli.toml`)
@@ -28,7 +28,7 @@
 //! let api_url = config.get("api_url").unwrap_or_default();
 //\! ```
 
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 use std::collections::HashMap;
 
 /// Configuration error types
@@ -164,7 +164,7 @@ impl ConfigBuilder
     }
   }
 
-  /// Load configuration from `iron_config` with 5-layer precedence
+  /// Load configuration from `iron_config_loader` with 5-layer precedence
   ///
   /// # Panics
   ///
@@ -192,7 +192,7 @@ impl ConfigBuilder
     self
   }
 
-  /// Add CLI arguments (highest priority, overrides iron_config)
+  /// Add CLI arguments (highest priority, overrides iron_config_loader)
   pub fn with_cli_args(mut self, cli_args: HashMap<String, String>) -> Self
   {
     // CLI args override everything, including iron_config

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent } from '../composables/useApi'
+import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 
 import {
   Dialog,
@@ -35,16 +36,58 @@ const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
-const selectedProviders = ref<string[]>([])
+const selectedProviderKeyId = ref<number | null>(null)
+const initialBudgetUsd = ref<number | null>(null)
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
+const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
+const icTokenStatusLoading = ref(false)
+const icTokenError = ref('')
+const tokenActionLoadingId = ref<number | null>(null)
+const showTokenDialog = ref(false)
+const tokenDialogValue = ref('')
+const tokenDialogAgentName = ref('')
+const tokenDialogWarning = ref('')
+const copyMessage = ref('')
 
 // Fetch agents
 const { data: agents, isLoading, error, refetch } = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
+
+// Fetch IC token status for each agent once agents are loaded
+watch(
+  () => agents?.value,
+  async (agentList) => {
+    if (!agentList) {
+      icTokenStatuses.value = {}
+      return
+    }
+
+    icTokenStatusLoading.value = true
+    icTokenError.value = ''
+    const statusMap: Record<number, IcTokenStatus> = {}
+
+    await Promise.all(
+      agentList.map(async (agent) => {
+        try {
+          const status = await api.getIcTokenStatus(agent.id)
+          statusMap[agent.id] = status
+        } catch (err) {
+          if (!icTokenError.value) {
+            icTokenError.value = err instanceof Error ? err.message : 'Failed to load IC token status'
+          }
+        }
+      })
+    )
+
+    icTokenStatuses.value = statusMap
+    icTokenStatusLoading.value = false
+  },
+  { immediate: true }
+)
 
 // Fetch providers for selection
 const { data: providers } = useQuery({
@@ -54,12 +97,13 @@ const { data: providers } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[] }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
-    selectedProviders.value = []
+    selectedProviderKeyId.value = null
+    initialBudgetUsd.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -70,13 +114,13 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[] }) =>
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
-    selectedProviders.value = []
+    selectedProviderKeyId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -94,28 +138,61 @@ const deleteMutation = useMutation({
 })
 
 function handleCreateAgent() {
-  if (!name.value || selectedProviders.value.length === 0) {
-    createError.value = 'Name and at least one Provider are required'
+  if (!name.value) {
+    createError.value = 'Name is required'
     return
   }
-  
+
+  if (selectedProviderKeyId.value === null) {
+    createError.value = 'Provider key is required'
+    return
+  }
+
+  if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
+    createError.value = 'Initial budget (USD) is required and must be positive'
+    return
+  }
+
+  const providerKeyId = Number(selectedProviderKeyId.value)
+  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
+  if (!providerRecord) {
+    createError.value = 'Selected provider key not found'
+    return
+  }
+
+  const budgetMicros = Math.round(initialBudgetUsd.value * 1_000_000)
+
   createError.value = ''
   createMutation.mutate({
     name: name.value,
-    providers: selectedProviders.value,
+    providers: [providerRecord.provider],
+    provider_key_id: providerKeyId,
+    initial_budget_microdollars: budgetMicros,
   })
 }
 
 function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
-  selectedProviders.value = [...agent.providers]
+  selectedProviderKeyId.value = agent.provider_key_id ?? null
   showUpdateModal.value = true
 }
 
 function handleUpdateAgent() {
-  if (!selectedAgent.value || !name.value || selectedProviders.value.length === 0) {
-    createError.value = 'Name and at least one Provider are required'
+  if (!selectedAgent.value || !name.value) {
+    createError.value = 'Name is required'
+    return
+  }
+
+  if (selectedProviderKeyId.value === null) {
+    createError.value = 'Provider key is required'
+    return
+  }
+
+  const providerKeyId = Number(selectedProviderKeyId.value)
+  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
+  if (!providerRecord) {
+    createError.value = 'Selected provider key not found'
     return
   }
 
@@ -123,7 +200,8 @@ function handleUpdateAgent() {
   updateMutation.mutate({
     id: selectedAgent.value.id,
     name: name.value,
-    providers: selectedProviders.value,
+    providers: [providerRecord.provider],
+    provider_key_id: providerKeyId,
   })
 }
 
@@ -144,11 +222,103 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
 }
 
-function toggleProvider(providerType: string) {
-  if (selectedProviders.value.includes(providerType)) {
-    selectedProviders.value = selectedProviders.value.filter(p => p !== providerType)
-  } else {
-    selectedProviders.value.push(providerType)
+function formatTimestamp(timestamp?: number | null): string {
+  if (!timestamp) return '-'
+  // IC token timestamps are seconds; agent created_at is milliseconds. Normalize to ms for display.
+  const millis = timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000
+  return new Date(millis).toLocaleString()
+}
+
+function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
+  return icTokenStatuses.value[agentId]
+}
+
+async function handleGenerateIcToken(agent: Agent) {
+  tokenActionLoadingId.value = agent.id
+  icTokenError.value = ''
+  try {
+    const response = await api.generateIcToken(agent.id)
+    icTokenStatuses.value = {
+      ...icTokenStatuses.value,
+      [agent.id]: {
+        agent_id: agent.id,
+        has_ic_token: true,
+        created_at: response.created_at,
+      },
+    }
+    tokenDialogAgentName.value = agent.name
+    tokenDialogValue.value = response.ic_token
+    tokenDialogWarning.value = response.warning
+    copyMessage.value = ''
+    showTokenDialog.value = true
+  } catch (err) {
+    icTokenError.value = err instanceof Error ? err.message : 'Failed to generate IC token'
+  } finally {
+    tokenActionLoadingId.value = null
+  }
+}
+
+async function handleRegenerateIcToken(agent: Agent) {
+  if (!confirm(`Regenerate IC token for ${agent.name}? This will invalidate the current token.`)) {
+    return
+  }
+
+  tokenActionLoadingId.value = agent.id
+  icTokenError.value = ''
+  try {
+    const response = await api.regenerateIcToken(agent.id)
+    icTokenStatuses.value = {
+      ...icTokenStatuses.value,
+      [agent.id]: {
+        agent_id: agent.id,
+        has_ic_token: true,
+        created_at: response.created_at,
+      },
+    }
+    tokenDialogAgentName.value = agent.name
+    tokenDialogValue.value = response.ic_token
+    tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
+    copyMessage.value = ''
+    showTokenDialog.value = true
+  } catch (err) {
+    icTokenError.value = err instanceof Error ? err.message : 'Failed to regenerate IC token'
+  } finally {
+    tokenActionLoadingId.value = null
+  }
+}
+
+async function handleRevokeIcToken(agent: Agent) {
+  if (!confirm(`Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`)) {
+    return
+  }
+
+  tokenActionLoadingId.value = agent.id
+  icTokenError.value = ''
+  try {
+    await api.revokeIcToken(agent.id)
+    icTokenStatuses.value = {
+      ...icTokenStatuses.value,
+      [agent.id]: {
+        agent_id: agent.id,
+        has_ic_token: false,
+        created_at: null,
+      },
+    }
+  } catch (err) {
+    icTokenError.value = err instanceof Error ? err.message : 'Failed to revoke IC token'
+  } finally {
+    tokenActionLoadingId.value = null
+  }
+}
+
+async function copyTokenToClipboard() {
+  if (!tokenDialogValue.value) return
+
+  try {
+    await navigator.clipboard.writeText(tokenDialogValue.value)
+    copyMessage.value = 'Copied to clipboard'
+  } catch (err) {
+    copyMessage.value = err instanceof Error ? err.message : 'Copy failed'
   }
 }
 </script>
@@ -161,6 +331,10 @@ function toggleProvider(providerType: string) {
         Create Agent
       </Button>
     </div>
+
+    <Alert v-if="icTokenError" variant="destructive" class="mb-4">
+      <AlertDescription>{{ icTokenError }}</AlertDescription>
+    </Alert>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
@@ -187,6 +361,12 @@ function toggleProvider(providerType: string) {
               Providers
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Provider Key
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              IC Token
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
             </th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -210,6 +390,35 @@ function toggleProvider(providerType: string) {
                 </span>
               </div>
             </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {{ agent.provider_key_id ?? 'None' }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
+                Loading...
+              </div>
+              <div v-else>
+                <Badge
+                  v-if="getIcTokenStatus(agent.id)?.has_ic_token"
+                  variant="default"
+                >
+                  Active
+                </Badge>
+                <Badge
+                  v-else
+                  variant="outline"
+                  class="text-gray-700"
+                >
+                  None
+                </Badge>
+                <div
+                  v-if="getIcTokenStatus(agent.id)?.created_at"
+                  class="text-xs text-gray-500 mt-1"
+                >
+                  Created {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
+                </div>
+              </div>
+            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(agent.created_at) }}
             </td>
@@ -226,6 +435,29 @@ function toggleProvider(providerType: string) {
                   <DropdownMenuItem @click="router.push(`/agents/${agent.id}/tokens`)">
                     Manage Tokens
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
+                    @click="handleGenerateIcToken(agent)"
+                    :disabled="tokenActionLoadingId === agent.id"
+                  >
+                    {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
+                  </DropdownMenuItem>
+                  <template v-else>
+                    <DropdownMenuItem
+                      @click="handleRegenerateIcToken(agent)"
+                      :disabled="tokenActionLoadingId === agent.id"
+                    >
+                      {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      @click="handleRevokeIcToken(agent)"
+                      :disabled="tokenActionLoadingId === agent.id"
+                      class="text-red-600"
+                    >
+                      Revoke IC Token
+                    </DropdownMenuItem>
+                  </template>
                   <template v-if="authStore.isAdmin">
                     <DropdownMenuSeparator />
                     <DropdownMenuItem @click="openUpdateModal(agent)">
@@ -277,21 +509,38 @@ function toggleProvider(providerType: string) {
           </div>
 
           <div class="space-y-2">
-            <Label>Providers</Label>
-            <div class="space-y-2 border rounded-md p-4">
-              <div v-for="provider in providers" :key="provider.id" class="flex items-center space-x-2">
-                <input 
-                  type="checkbox"
-                  :id="`create-provider-${provider.id}`" 
-                  :checked="selectedProviders.includes(provider.provider)"
-                  @change="toggleProvider(provider.provider)"
-                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <Label :for="`create-provider-${provider.id}`" class="text-sm font-normal cursor-pointer">
-                  {{ provider.provider }}
-                </Label>
-              </div>
-            </div>
+            <Label for="create-provider-key">Assigned Provider Key (required)</Label>
+            <select
+              id="create-provider-key"
+              v-model="selectedProviderKeyId"
+              :disabled="createMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option :value="null">None</option>
+              <option
+                v-for="providerKey in providers"
+                :key="providerKey.id"
+                :value="providerKey.id"
+              >
+                {{ providerKey.id }} - {{ providerKey.provider }}
+              </option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="create-budget">Initial Budget (USD)</Label>
+            <Input
+              id="create-budget"
+              v-model.number="initialBudgetUsd"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="10.00"
+              :disabled="createMutation.isPending.value"
+            />
+            <p class="text-xs text-gray-500">
+              Required. Used to create the agent's budget (microdollars on backend).
+            </p>
           </div>
         </div>
 
@@ -339,21 +588,22 @@ function toggleProvider(providerType: string) {
           </div>
 
           <div class="space-y-2">
-            <Label>Providers</Label>
-            <div class="space-y-2 border rounded-md p-4">
-              <div v-for="provider in providers" :key="provider.id" class="flex items-center space-x-2">
-                <input 
-                  type="checkbox"
-                  :id="`update-provider-${provider.id}`" 
-                  :checked="selectedProviders.includes(provider.provider)"
-                  @change="toggleProvider(provider.provider)"
-                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <Label :for="`update-provider-${provider.id}`" class="text-sm font-normal cursor-pointer">
-                  {{ provider.provider }}
-                </Label>
-              </div>
-            </div>
+            <Label for="update-provider-key">Assigned Provider Key</Label>
+            <select
+              id="update-provider-key"
+              v-model="selectedProviderKeyId"
+              :disabled="updateMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option :value="null">None</option>
+              <option
+                v-for="providerKey in providers"
+                :key="providerKey.id"
+                :value="providerKey.id"
+              >
+                {{ providerKey.id }} - {{ providerKey.provider }}
+              </option>
+            </select>
           </div>
         </div>
 
@@ -399,6 +649,42 @@ function toggleProvider(providerType: string) {
             variant="destructive"
           >
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- IC Token Display Modal -->
+    <Dialog v-model:open="showTokenDialog">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>IC Token for {{ tokenDialogAgentName }}</DialogTitle>
+          <DialogDescription>
+            Store this token securely. It is shown only once. Update your agents with this value immediately.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-3">
+          <div class="bg-gray-100 border rounded-md p-3 font-mono text-sm break-all">
+            {{ tokenDialogValue }}
+          </div>
+          <p class="text-sm text-yellow-700">
+            {{ tokenDialogWarning }}
+          </p>
+          <p class="text-xs text-gray-500">
+            After closing this dialog you will not be able to view the token again. Regenerate if you need a new value.
+          </p>
+          <p v-if="copyMessage" class="text-sm text-gray-600">
+            {{ copyMessage }}
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showTokenDialog = false">
+            Close
+          </Button>
+          <Button @click="copyTokenToClipboard">
+            Copy Token
           </Button>
         </DialogFooter>
       </DialogContent>

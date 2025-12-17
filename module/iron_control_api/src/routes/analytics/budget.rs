@@ -77,9 +77,11 @@ pub async fn get_budget_status(
       };
 
       let mut data: Vec< BudgetStatus > = rows.iter().filter_map( |row| {
-        let percent_used = if row.total_allocated > 0.0
+        let total_allocated_f = row.total_allocated as f64;
+        let total_spent_f = row.total_spent as f64;
+        let percent_used = if row.total_allocated > 0
         {
-          ( row.total_spent / row.total_allocated ) * 100.0
+          ( total_spent_f / total_allocated_f ) * 100.0
         }
         else
         {
@@ -137,9 +139,9 @@ pub async fn get_budget_status(
         Some( BudgetStatus {
           agent_id: row.agent_id,
           agent_name: row.agent_name.clone(),
-          budget: row.total_allocated,
-          spent: row.total_spent,
-          remaining: row.budget_remaining,
+          budget: row.total_allocated as f64,
+          spent: row.total_spent as f64,
+          remaining: row.budget_remaining as f64,
           percent_used,
           status: status.to_string(),
           risk_level: risk_level.to_string(),

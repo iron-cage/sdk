@@ -2,47 +2,70 @@
 
 Python command-line tool for Iron Cage with wrapper architecture for operations and native Python for developer experience.
 
-### Scope
+> [!WARNING]
+> **Development Status:** Architecture defined (v0.3.0) - Wrapper and native command implementations pending
 
-**Responsibilities:**
-Provides Python-based command-line tool for Iron Cage with two implementation patterns:
-1. **Developer Experience** (native Python): Project init, config, agent control, secrets
-2. **Operations** (wrapper to iron_cli): Token, usage, limits, traces via iron_cli binary
+## Installation
 
-**See:** [ADR-002](../../pilot/decisions/002-cli-architecture.md) for architecture decision.
+```bash
+# Option 1: Bundled binary (recommended)
+uv pip install iron-cli-py[binary]
 
-**In Scope:**
+# Option 2: System binary (requires iron_cli in PATH)
+uv pip install iron-cli-py
+cargo install iron-cli  # or download from releases
 
-*Native Commands (Python implementation):*
-- Project initialization from templates (LangChain, CrewAI, AutoGPT)
-- Configuration management (create, validate, edit iron.toml)
-- Agent control commands (start, stop, status)
-- Secrets management interface (add, rotate, list secrets)
-- Interactive mode for guided setup
-- Rich terminal output (colors, progress bars, tables)
-- Programmatic library usage (import iron_cli_py)
+# Option 3: Custom path
+export IRON_CLI_PATH=/path/to/iron-token
+uv pip install iron-cli-py
 
-*Wrapper Commands (delegate to iron_cli binary):*
-- Token operations (generate, list, rotate, revoke, validate, inspect)
-- Usage reporting (show, by_project, by_provider, export)
-- Limits management (list, get, create, update, delete)
-- Traces inspection (list, get, export)
-- Authentication (login, refresh, logout)
-- Health check and version
+# With secure credential storage
+uv pip install iron-cli-py[keyring]
 
-**Out of Scope:**
-- Token generation algorithm (delegated to iron_cli)
-- Usage calculation logic (delegated to iron_cli)
-- Limits enforcement logic (delegated to iron_cli)
-- REST API server (see iron_control_api)
-- Python SDK decorators (see iron_sdk)
-- Framework integrations (see iron_sdk)
+# With .env file support
+uv pip install iron-cli-py[dotenv]
+```
 
----
+> [!IMPORTANT]
+> **Requirements:** Python 3.9+, uv package manager, iron_cli binary (for wrapper commands)
 
-## Architecture
+
+## Quick Start
+
+```bash
+# Initialize new project from template (NATIVE)
+iron-py init --template langchain --name my-agent
+
+# Validate configuration (NATIVE)
+iron-py config validate --file iron.toml
+
+# Generate token (WRAPPER → iron_cli)
+iron-py token generate --project my-app --output token.json
+
+# Start agent (NATIVE)
+iron-py agent start --config iron.toml
+```
+
+
+<details>
+<summary>Architecture</summary>
+
+### System Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
+
+### CLI Architecture
 
 iron_cli_py uses a **wrapper pattern** for operations commands, delegating to iron_cli binary while providing Python-native developer experience features.
+
+**See:** [ADR-002](../../pilot/decisions/002-cli-architecture.md) for architecture decision.
 
 ```
                     ┌──────────────────────┐
@@ -92,59 +115,8 @@ iron_cli_py uses a **wrapper pattern** for operations commands, delegating to ir
 | `auth *` | Wrapper | Delegates to iron_cli |
 | `health`, `version` | Wrapper | Delegates to iron_cli |
 
----
+### Binary Discovery Order
 
-## Quick Start
-
-```bash
-# Install CLI with bundled binary (recommended)
-uv pip install iron-cli-py[binary]
-
-# Or install CLI only (requires iron_cli in PATH)
-uv pip install iron-cli-py
-
-# Initialize new project from template (NATIVE)
-iron-py init --template langchain --name my-agent
-
-# Validate configuration (NATIVE)
-iron-py config validate --file iron.toml
-
-# Generate token (WRAPPER → iron_cli)
-iron-py token generate --project my-app --output token.json
-
-# Start agent (NATIVE)
-iron-py agent start --config iron.toml
-```
-
----
-
-## Installation
-
-```bash
-# Option 1: Bundled binary (recommended)
-uv pip install iron-cli-py[binary]
-
-# Option 2: System binary (requires iron_cli in PATH)
-uv pip install iron-cli-py
-cargo install iron-cli  # or download from releases
-
-# Option 3: Custom path
-export IRON_CLI_PATH=/path/to/iron-token
-uv pip install iron-cli-py
-
-# With secure credential storage
-uv pip install iron-cli-py[keyring]
-
-# With .env file support
-uv pip install iron-cli-py[dotenv]
-```
-
-**Requirements:**
-- Python 3.9+
-- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- iron_cli binary (for wrapper commands)
-
-**Binary Discovery Order:**
 1. `IRON_CLI_PATH` environment variable
 2. Bundled binary (`iron_cli_py/bin/iron-token`)
 3. System PATH (`which iron-token`)
@@ -152,9 +124,11 @@ uv pip install iron-cli-py[dotenv]
 5. `/usr/local/bin/iron-token`
 6. `/usr/bin/iron-token`
 
----
+</details>
 
-## Native Commands
+
+<details>
+<summary>Native Commands (Python Implementation)</summary>
 
 ### Project Initialization
 
@@ -188,11 +162,13 @@ iron-py secrets rotate OPENAI_API_KEY
 iron-py secrets list
 ```
 
----
+</details>
 
-## Wrapper Commands
 
-These commands delegate to iron_cli binary with Click-to-unilang syntax translation:
+<details>
+<summary>Wrapper Commands (Delegates to iron_cli)</summary>
+
+These commands delegate to iron_cli binary with Click-to-unilang syntax translation.
 
 ### Token Operations
 
@@ -232,9 +208,11 @@ iron-py traces get --trace-id trace-123
 iron-py traces export --output traces.json --format json
 ```
 
----
+</details>
 
-## Programmatic Usage
+
+<details>
+<summary>Programmatic Usage</summary>
 
 ```python
 from iron_cli_py import TokenGenerator, ConfigManager, ProjectInitializer
@@ -254,7 +232,7 @@ initializer = ProjectInitializer(template="langchain")
 initializer.create_project(name="my-agent", path="./my-agent")
 ```
 
----
+</details>
 
 ## Documentation
 
@@ -263,9 +241,9 @@ initializer.create_project(name="my-agent", path="./my-agent")
 - **CLI Architecture Guide:** See [docs/features/001_cli_architecture.md](../../docs/features/001_cli_architecture.md)
 - **iron_cli (authoritative):** See [module/iron_cli/readme.md](../iron_cli/readme.md)
 
----
 
-## Development Status
+<details>
+<summary>Development Status</summary>
 
 **Current Phase:** Architecture defined (v0.3.0)
 
@@ -293,7 +271,46 @@ initializer.create_project(name="my-agent", path="./my-agent")
 - Secrets management commands
 - Interactive mode for guided setup
 
----
+</details>
+
+
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Provides Python-based command-line tool for Iron Cage with two implementation patterns:
+1. **Developer Experience** (native Python): Project init, config, agent control, secrets
+2. **Operations** (wrapper to iron_cli): Token, usage, limits, traces via iron_cli binary
+
+**In Scope:**
+
+*Native Commands (Python implementation):*
+- Project initialization from templates (LangChain, CrewAI, AutoGPT)
+- Configuration management (create, validate, edit iron.toml)
+- Agent control commands (start, stop, status)
+- Secrets management interface (add, rotate, list secrets)
+- Interactive mode for guided setup
+- Rich terminal output (colors, progress bars, tables)
+- Programmatic library usage (import iron_cli_py)
+
+*Wrapper Commands (delegate to iron_cli binary):*
+- Token operations (generate, list, rotate, revoke, validate, inspect)
+- Usage reporting (show, by_project, by_provider, export)
+- Limits management (list, get, create, update, delete)
+- Traces inspection (list, get, export)
+- Authentication (login, refresh, logout)
+- Health check and version
+
+**Out of Scope:**
+- Token generation algorithm (delegated to iron_cli)
+- Usage calculation logic (delegated to iron_cli)
+- Limits enforcement logic (delegated to iron_cli)
+- REST API server (see iron_control_api)
+- Python SDK decorators (see iron_sdk)
+- Framework integrations (see iron_sdk)
+
+</details>
+
 
 ## License
 

@@ -2,43 +2,10 @@
 
 Web dashboard for real-time Iron Cage agent monitoring and token management.
 
-## Scope
-
-**Responsibilities:**
-Provides Vue 3-based web interface for monitoring agent execution, managing API tokens, tracking usage costs, setting budget limits, and viewing request traces. Features real-time WebSocket updates, REST API integration with iron_control_api backend, and accessible UI components. Supports authentication, session management, and responsive layouts for desktop/mobile. Requires Node.js 20+, modern browsers (Chrome 120+, Firefox 120+, Safari 17+).
-
-**In Scope:**
-- Authentication and session management (JWT tokens, localStorage)
-- Dashboard view (agent status, budget metrics, recent requests)
-- Token management (create, rotate, revoke API tokens)
-- Usage analytics (cost breakdown by provider/model)
-- Budget limit management (create, update, delete limits)
-- Request trace visualization (detailed per-request data)
-- Real-time updates (WebSocket integration)
-- Responsive layout (desktop 1920x1080, mobile 390x844)
-- Accessibility (WCAG 2.1 Level AA, keyboard navigation, screen readers)
-- REST API integration (iron_control_api endpoints)
-
-**Out of Scope:**
-- Multi-user management → Pilot is single-user (see spec.md §2.2)
-- Role-based access control → Pilot has no roles (see spec.md §2.2)
-- Advanced analytics → Pilot uses tables only (see spec.md §FR-4)
-- Export functionality → Pilot is view-only (see spec.md §2.2)
-- Backend implementation → Use iron_control_api module
-- API authentication → Backend responsibility (see iron_control_api/spec.md)
-- Data persistence → Backend responsibility (see iron_control_api/spec.md)
-
----
+> [!IMPORTANT]
+> **Prerequisites:** Node.js 20+, iron_control_api backend running on http://localhost:3001
 
 ## Installation
-
-### Prerequisites
-
-- **Node.js:** 20.0.0 or higher
-- **npm:** 10.0.0 or higher
-- **Backend:** iron_control_api running on http://localhost:3001
-
-### Setup
 
 ```bash
 # Navigate to frontend directory
@@ -54,9 +21,36 @@ cp .env.example .env.local
 # VITE_API_URL defaults to http://localhost:3001
 ```
 
----
 
-## Features
+## Quick Start
+
+```bash
+# Terminal 1: Start backend
+cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
+cargo run
+
+# Terminal 2: Start frontend
+cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_dashboard
+npm run dev
+```
+
+Dashboard will be available at **http://localhost:5173**
+
+
+## Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
+
+
+<details>
+<summary>Features</summary>
 
 ### Authentication
 - Secure login/logout flow
@@ -106,9 +100,11 @@ cp .env.example .env.local
 - Color contrast ≥4.5:1 (measured via axe DevTools)
 - Screen reader support (NVDA, JAWS tested)
 
----
+</details>
 
-## Development
+
+<details>
+<summary>Development</summary>
 
 ### Start Development Server
 
@@ -119,16 +115,6 @@ npm run dev
 Starts Vite dev server on **http://localhost:5173** with hot module replacement (HMR).
 
 **Backend Required:** Ensure iron_control_api is running on http://localhost:3001 before starting frontend.
-
-```bash
-# Terminal 1: Start backend
-cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_control_api
-cargo run
-
-# Terminal 2: Start frontend
-cd /home/user1/pro/lib/wip_iron/iron_cage/dev/module/iron_dashboard
-npm run dev
-```
 
 ### Build for Production
 
@@ -166,9 +152,11 @@ npx eslint src/
 
 Runs ESLint on source files (Vue + TypeScript rules).
 
----
+</details>
 
-## Project Structure
+
+<details>
+<summary>Project Structure</summary>
 
 ```
 module/iron_dashboard/
@@ -198,9 +186,11 @@ module/iron_dashboard/
 └── .env.example           # Environment variable template
 ```
 
----
+</details>
 
-## Responsibility Table
+
+<details>
+<summary>Responsibility Table</summary>
 
 **CRITICAL:** This table lists EVERY file and subdirectory in module/iron_dashboard/ (Complete Entity Coverage per files_structure.rulebook.md).
 
@@ -233,7 +223,8 @@ module/iron_dashboard/
 
 **Note:** `README.md` (uppercase, original Vue template) is superseded by `readme.md` (lowercase, iron_cage standard). The uppercase version should be removed after migration completes.
 
----
+</details>
+
 
 ## Documentation
 
@@ -257,9 +248,9 @@ module/iron_dashboard/
 - [TanStack Query Documentation](https://tanstack.com/query/latest) - Async state management
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Utility classes reference
 
----
 
-## Technology Stack
+<details>
+<summary>Technology Stack</summary>
 
 - **Framework:** Vue 3.5.24 (Composition API, `<script setup>`)
 - **Language:** TypeScript 5.9.3 (strict mode)
@@ -276,9 +267,11 @@ module/iron_dashboard/
 - **Server State:** TanStack Vue Query 5.92.0 (async state, caching)
 - **Routing:** Vue Router 4.6.3 (client-side routing)
 
----
+</details>
 
-## Browser Compatibility
+
+<details>
+<summary>Browser Compatibility</summary>
 
 **Supported:**
 - Chrome 120+ (primary)
@@ -291,15 +284,48 @@ module/iron_dashboard/
 - Chrome < 100
 - Safari < 16
 
----
+</details>
 
-## Migration Status
+
+<details>
+<summary>Migration Status</summary>
 
 **Current Status:** Phase 1 - Documentation Creation
 
 This module was migrated from `dev/frontend/` to `dev/module/iron_dashboard/` to maintain consistency with other Iron Cage modules (iron_control_api, iron_cli, iron_runtime). The migration follows TDD principles with verification scripts ensuring correctness.
 
----
+</details>
+
+
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Provides Vue 3-based web interface for monitoring agent execution, managing API tokens, tracking usage costs, setting budget limits, and viewing request traces. Features real-time WebSocket updates, REST API integration with iron_control_api backend, and accessible UI components. Supports authentication, session management, and responsive layouts for desktop/mobile. Requires Node.js 20+, modern browsers (Chrome 120+, Firefox 120+, Safari 17+).
+
+**In Scope:**
+- Authentication and session management (JWT tokens, localStorage)
+- Dashboard view (agent status, budget metrics, recent requests)
+- Token management (create, rotate, revoke API tokens)
+- Usage analytics (cost breakdown by provider/model)
+- Budget limit management (create, update, delete limits)
+- Request trace visualization (detailed per-request data)
+- Real-time updates (WebSocket integration)
+- Responsive layout (desktop 1920x1080, mobile 390x844)
+- Accessibility (WCAG 2.1 Level AA, keyboard navigation, screen readers)
+- REST API integration (iron_control_api endpoints)
+
+**Out of Scope:**
+- Multi-user management → Pilot is single-user (see spec.md §2.2)
+- Role-based access control → Pilot has no roles (see spec.md §2.2)
+- Advanced analytics → Pilot uses tables only (see spec.md §FR-4)
+- Export functionality → Pilot is view-only (see spec.md §2.2)
+- Backend implementation → Use iron_control_api module
+- API authentication → Backend responsibility (see iron_control_api/spec.md)
+- Data persistence → Backend responsibility (see iron_control_api/spec.md)
+
+</details>
+
 
 ## License
 

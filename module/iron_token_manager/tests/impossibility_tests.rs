@@ -2,7 +2,7 @@
 //!
 //! These tests verify that old configuration methods are IMPOSSIBLE to use,
 //! not just unused. They actively check that old patterns have been deleted
-//! and that the new way (`iron_config`) is the ONLY way.
+//! and that the new way (`iron_config_loader`) is the ONLY way.
 
 // test_kind: bug_reproducer(issue-001)
 //! # Bug: Pattern Detection Failed to Catch Formatting Variations
@@ -231,28 +231,28 @@ fn new_way_is_required()
   );
 
   assert!(
-    source.contains( "use iron_config" ) || source.contains( "iron_config::" ),
-    "FAILURE: iron_config import not found - new way missing"
+    source.contains( "use iron_config_loader" ) || source.contains( "iron_config_loader::" ),
+    "FAILURE: iron_config_loader import not found - new way missing"
   );
 }
 
 #[test]
-fn iron_config_dependency_is_required()
+fn iron_config_loader_dependency_is_required()
 {
   let cargo_toml = std::fs::read_to_string( "Cargo.toml" )
     .expect( "Cargo.toml should exist" );
 
   assert!(
-    cargo_toml.contains( "iron_config" ),
-    "FAILURE: iron_config dependency missing from Cargo.toml"
+    cargo_toml.contains( "iron_config_loader" ),
+    "FAILURE: iron_config_loader dependency missing from Cargo.toml"
   );
 
   // Verify it's a workspace dependency (not optional, not dev-only)
   assert!(
-    cargo_toml.contains( "iron_config = { workspace = true }" ) ||
-    cargo_toml.contains( "iron_config = {workspace = true}" ) ||
-    cargo_toml.contains( "iron_config={workspace=true}" ),
-    "FAILURE: iron_config must be a workspace dependency in [dependencies]"
+    cargo_toml.contains( "iron_config_loader = { workspace = true }" ) ||
+    cargo_toml.contains( "iron_config_loader = {workspace = true}" ) ||
+    cargo_toml.contains( "iron_config_loader={workspace=true}" ),
+    "FAILURE: iron_config_loader must be a workspace dependency in [dependencies]"
   );
 }
 

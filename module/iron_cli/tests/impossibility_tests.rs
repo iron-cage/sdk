@@ -138,14 +138,14 @@ fn no_manual_env_var_in_config_rs()
 }
 
 #[test]
-fn iron_config_dependency_is_required()
+fn iron_config_loader_dependency_is_required()
 {
   let cargo_toml = std::fs::read_to_string( "Cargo.toml" )
     .expect( "Cargo.toml should exist" );
 
   assert!(
-    cargo_toml.contains( "iron_config" ),
-    "FAILURE: iron_config dependency missing from Cargo.toml"
+    cargo_toml.contains( "iron_config_loader" ),
+    "FAILURE: iron_config_loader dependency missing from Cargo.toml"
   );
 }
 

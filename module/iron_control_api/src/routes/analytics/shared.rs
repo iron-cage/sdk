@@ -440,7 +440,7 @@ impl AnalyticsState
       .await?;
 
     // Run migration
-    let migration = include_str!( "../../../../iron_token_manager/migrations/011_create_analytics_events.sql" );
+    let migration = include_str!( "../../../migrations/011_create_analytics_events.sql" );
     sqlx::raw_sql( migration ).execute( &pool ).await?;
 
     let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
@@ -458,7 +458,7 @@ pub struct AgentBudgetRow
 {
   pub agent_id: i64,
   pub agent_name: String,
-  pub total_allocated: f64,
-  pub total_spent: f64,
-  pub budget_remaining: f64,
+  pub total_allocated: i64,
+  pub total_spent: i64,
+  pub budget_remaining: i64,
 }

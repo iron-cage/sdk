@@ -45,7 +45,7 @@ Option B (PyO3): Python --FFI--> Rust    ~0.1ms per call
 
 ```python
 # Python code calls Rust seamlessly
-from iron_sdk import protect_agent
+from iron_cage import protect_agent
 
 @protect_agent(budget_usd=1.0)  # Rust validation
 def my_agent(prompt: str) -> str:
@@ -64,7 +64,7 @@ def my_agent(prompt: str) -> str:
 
 **Architecture:**
 ```
-from iron_sdk import protect_agent → PyO3 FFI → Runtime (in-process)
+from iron_cage import protect_agent → PyO3 FFI → Runtime (in-process)
 ```
 
 **Characteristics:**
@@ -88,7 +88,7 @@ from iron_sdk import protect_agent → PyO3 FFI → Runtime (in-process)
 
 **Scenario 2: iron_sdk HTTP Deployment (Optional)**
 - iron_sdk users who want HTTP instead of PyO3
-- Same code: `from iron_sdk import protect_agent`
+- Same code: `from iron_cage import protect_agent`
 - SDK configured to use HTTP internally: `export IRON_RUNTIME_URL=http://localhost:8080`
 - Useful for debugging (inspect HTTP) or process isolation
 - HTTP overhead (5ms) acceptable for these use cases

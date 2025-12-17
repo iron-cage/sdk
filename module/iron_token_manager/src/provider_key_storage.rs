@@ -217,14 +217,18 @@ impl ProviderKeyStorage
       "SELECT id, provider, encrypted_api_key, encryption_nonce, base_url, \
        description, is_enabled, created_at, last_used_at, balance_cents, \
        balance_updated_at, user_id \
-       FROM ai_provider_keys WHERE id = $1"
+       FROM ai_provider_keys WHERE id = ?"
     )
     .bind( key_id )
-    .fetch_one( &self.pool )
+    .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
-    Ok( row_to_record( &row ) )
+    match row
+    {
+      Some( row ) => Ok( row_to_record( &row ) ),
+      None => Err( crate::error::TokenError::Database( sqlx::Error::RowNotFound ) ),
+    }
   }
 
   /// Get a provider key by ID (metadata only, no encrypted data)
@@ -237,14 +241,18 @@ impl ProviderKeyStorage
     let row = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, encrypted_api_key, balance_updated_at, user_id \
-       FROM ai_provider_keys WHERE id = $1"
+       FROM ai_provider_keys WHERE id = ?"
     )
     .bind( key_id )
-    .fetch_one( &self.pool )
+    .fetch_optional( &self.pool )
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err( crate::error::TokenError::Database )?;
 
-    Ok( row_to_metadata( &row ) )
+    match row
+    {
+      Some( row ) => Ok( row_to_metadata( &row ) ),
+      None => Err( crate::error::TokenError::Database( sqlx::Error::RowNotFound ) ),
+    }
   }
 
   /// List all keys for a user (metadata only)
@@ -551,4 +559,3 @@ fn row_to_record( row : &sqlx::sqlite::SqliteRow ) -> ProviderKeyRecord
     encryption_nonce : row.get( "encryption_nonce" ),
   }
 }
-

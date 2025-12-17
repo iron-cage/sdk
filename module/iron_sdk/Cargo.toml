@@ -1,0 +1,42 @@
+[package]
+name = "iron_sdk"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Python SDK for Iron Cage AI agent protection - PyO3 bindings"
+repository = "https://github.com/.../iron_sdk"
+readme = "readme.md"
+keywords = ["sdk", "python", "pyo3", "ai-agent", "llm"]
+categories = ["api-bindings"]
+
+[lib]
+name = "iron_cage"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["full"]
+enabled = [
+  "dep:pyo3",
+  "dep:iron_runtime",
+  "dep:tokio",
+  "dep:serde_json",
+]
+analytics = ["iron_runtime/analytics"]
+full = ["enabled", "analytics"]
+
+[dependencies]
+# PyO3 for Python bindings
+pyo3 = { workspace = true, features = ["extension-module", "auto-initialize"], optional = true }
+
+# Iron Cage crates
+iron_runtime = { path = "../iron_runtime", features = ["full"], optional = true }
+
+# Async runtime (for blocking on async calls)
+tokio = { workspace = true, features = ["rt-multi-thread"], optional = true }
+
+# JSON serialization
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

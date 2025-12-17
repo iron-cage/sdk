@@ -212,6 +212,7 @@ struct AppState
   agents: sqlx::SqlitePool,
   budget: iron_control_api::routes::budget::BudgetState,
   analytics: iron_control_api::routes::analytics::AnalyticsState,
+  ic_token: iron_control_api::routes::ic_token::IcTokenState,
 }
 
 /// Enable auth routes and extractors to access AuthState from combined AppState
@@ -320,6 +321,15 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::analytics:
   fn from_ref( state: &AppState ) -> Self
   {
     state.analytics.clone()
+  }
+}
+
+/// Enable IC token routes to access IcTokenState from combined AppState
+impl axum::extract::FromRef< AppState > for iron_control_api::routes::ic_token::IcTokenState
+{
+  fn from_ref( state: &AppState ) -> Self
+  {
+    state.ic_token.clone()
   }
 }
 
@@ -580,6 +590,15 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Get database pool for agents (before moving token_state)
   let agents_pool = token_state.storage.pool().clone();
 
+  // Initialize IC token state for agent IC token management
+  let ic_token_manager = std::sync::Arc::new(
+    iron_control_api::ic_token::IcTokenManager::new( ic_token_secret.clone() )
+  );
+  let ic_token_state = iron_control_api::routes::ic_token::IcTokenState {
+    pool: agents_pool.clone(),
+    ic_token_manager,
+  };
+
   // Seed database with test data if empty (development convenience)
   let user_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
     .fetch_one( &agents_pool )
@@ -592,7 +611,11 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     iron_token_manager::seed::seed_all( &agents_pool )
       .await
       .expect( "LOUD FAILURE: Failed to seed database" );
-    tracing::info!( "✓ Database seeded with demo accounts (see docs/demo_credentials.md)" );
+    tracing::info!( "✓ Database seeded (admin@ironcage.ai / IronDemo2025!)" );
+  }
+  else if user_count == 0
+  {
+    tracing::info!( "Empty database - no auto-seeding (set ENABLE_DEMO_SEED=true to seed demo accounts)" );
   }
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
@@ -621,6 +644,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     agents: agents_pool,
     budget: budget_state,
     analytics: analytics_state,
+    ic_token: ic_token_state,
   };
 
   // Fix(ironcage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
@@ -708,7 +732,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
     .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
+    .route( "/api/v1/agents/:id/budget", axum::routing::put( iron_control_api::routes::agents::update_agent_budget ) )
     .route( "/api/v1/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
+
+    // IC Token management endpoints (agent authentication with budget runtime)
+    .route( "/api/v1/agents/:id/ic-token", post( iron_control_api::routes::ic_token::generate_ic_token ) )
+    .route( "/api/v1/agents/:id/ic-token", get( iron_control_api::routes::ic_token::get_ic_token_status ) )
+    .route( "/api/v1/agents/:id/ic-token/regenerate", post( iron_control_api::routes::ic_token::regenerate_ic_token ) )
+    .route( "/api/v1/agents/:id/ic-token", delete( iron_control_api::routes::ic_token::revoke_ic_token ) )
 
     // Budget Control Protocol endpoints (Protocol 005)
     .route( "/api/v1/budget/handshake", post( iron_control_api::routes::budget::handshake ) )
