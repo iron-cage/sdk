@@ -12,6 +12,8 @@ pub struct AuthState {
   pub jwt_secret: Arc<JwtSecret>,
   pub db_pool: Pool<Sqlite>,
   pub rate_limiter: crate::rate_limiter::LoginRateLimiter,
+  /// Whether rate limiting is enabled (only in production mode)
+  pub rate_limiting_enabled: bool,
 }
 
 impl AuthState {
@@ -21,11 +23,12 @@ impl AuthState {
   ///
   /// * `jwt_secret_key` - Secret key for JWT signing
   /// * `database_url` - Database connection string
+  /// * `rate_limiting_enabled` - Whether to enable rate limiting (should be true in production)
   ///
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new(jwt_secret_key: String, database_url: &str) -> Result<Self, sqlx::Error> {
+  pub async fn new(jwt_secret_key: String, database_url: &str, rate_limiting_enabled: bool) -> Result<Self, sqlx::Error> {
     let db_pool = SqlitePool::connect(database_url).await?;
 
     // Run migration 003 (users table) if not already applied
@@ -84,6 +87,7 @@ impl AuthState {
       jwt_secret: Arc::new(JwtSecret::new(jwt_secret_key)),
       db_pool,
       rate_limiter: crate::rate_limiter::LoginRateLimiter::new(),
+      rate_limiting_enabled,
     })
   }
 }

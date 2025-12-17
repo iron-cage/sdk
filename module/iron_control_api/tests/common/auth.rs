@@ -274,6 +274,19 @@ async fn inject_connect_info( mut request: Request, next: Next ) -> Response
 #[allow(dead_code)]
 pub async fn create_auth_router( pool: SqlitePool ) -> Router
 {
+  create_auth_router_internal( pool, false ).await
+}
+
+/// Create auth router with rate limiting enabled for rate limit tests
+#[allow(dead_code)]
+pub async fn create_auth_router_with_rate_limiting( pool: SqlitePool ) -> Router
+{
+  create_auth_router_internal( pool, true ).await
+}
+
+/// Internal function to create auth router with configurable rate limiting
+async fn create_auth_router_internal( pool: SqlitePool, rate_limiting_enabled: bool ) -> Router
+{
   let auth_state = AuthState
   {
     jwt_secret: Arc::new( iron_control_api::jwt_auth::JwtSecret::new(
@@ -281,6 +294,7 @@ pub async fn create_auth_router( pool: SqlitePool ) -> Router
     ) ),
     db_pool: pool,
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
+    rate_limiting_enabled,
   };
 
   Router::new()
@@ -351,6 +365,7 @@ pub async fn create_full_router( pool: SqlitePool ) -> Router
     jwt_secret: jwt_secret.clone(),
     db_pool: pool.clone(),
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
+    rate_limiting_enabled: false, // Disabled for tests
   };
 
   // Create user management state

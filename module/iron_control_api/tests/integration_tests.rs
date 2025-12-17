@@ -54,6 +54,7 @@ async fn create_auth_router() -> Router
     jwt_secret: Arc::new( JwtSecret::new( "test_secret_key_12345".to_string() ) ),
     db_pool: db_pool.clone(),
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
+    rate_limiting_enabled: false, // Disabled for tests
   };
 
   let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);

@@ -41,6 +41,8 @@ impl FromRef< BudgetState > for AuthState
       jwt_secret: state.jwt_secret.clone(),
       db_pool: state.db_pool.clone(),
       rate_limiter: crate::rate_limiter::LoginRateLimiter::new(),
+      // Budget endpoints use IC Token auth, not login rate limiting
+      rate_limiting_enabled: false,
     }
   }
 }

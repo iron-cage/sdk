@@ -78,8 +78,8 @@ async fn bug_reproducer_login_requires_connect_info()
   // Create in-memory database for testing (same pattern as common/auth.rs)
   let database_url = "sqlite::memory:?cache=shared";
 
-  // Initialize auth state
-  let auth_state = AuthState::new( "test-secret".to_string(), database_url )
+  // Initialize auth state (rate limiting disabled for tests)
+  let auth_state = AuthState::new( "test-secret".to_string(), database_url, false )
     .await
     .expect( "Failed to initialize auth state" );
 

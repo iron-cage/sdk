@@ -100,6 +100,7 @@ async fn create_test_router() -> Router
     db_pool: db_pool.clone(),
     jwt_secret: Arc::new(JwtSecret::new("test_secret".to_string())),
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
+    rate_limiting_enabled: false, // Disabled for tests
   };
 
   let user_state = UserManagementState::new( db_pool, permission_checker );
