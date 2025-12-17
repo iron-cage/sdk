@@ -55,7 +55,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **[features/](features/readme.md)** | 6 (001-006) | Feature documentation (CLI architecture, token management, user management) |
 | **[decisions/](decisions/readme.md)** | 6 (adr_002-007) | Architecture Decision Records (ADR format) |
 | **[enforcement/](enforcement/readme.md)** | 3 | Enforcement infrastructure documentation (mechanisms, contracts, impossibility proofs) |
-
+| **[review/](review/readme.md)** | 1 | Providing review and analysis on issues and findings. |
 ### Reference Documents
 
 | Document | Description |
