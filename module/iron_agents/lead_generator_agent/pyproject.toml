@@ -1,12 +1,22 @@
 [project]
 name = "iron-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Required dependencies for the lead search agent to work"
+authors = [
+  {name = "Iron Cage Team"}
+]
 readme = "readme.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "iron-sdk",
-    "iron-runtime",
     "langchain==0.3.7",
     "langchain-community==0.3.7",
     "langchain-core==0.3.19",
@@ -28,6 +38,9 @@ pythonpath = "src"
 addopts = "-v"
 testpaths = ["tests"]
 
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.uv.sources]
 iron-sdk = { path = "../../iron_sdk", editable = true }
-iron-runtime = { path = "../../iron_runtime", editable = true }

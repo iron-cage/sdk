@@ -1,6 +1,6 @@
 //! Token API configuration
 //!
-//! Uses `iron_config` for unified configuration loading with 5-layer precedence.
+//! Uses `iron_config_loader` for unified configuration loading with 5-layer precedence.
 //!
 //! ## Configuration Sources (Priority Order)
 //!
@@ -27,7 +27,7 @@
 //! Token API uses keyring-stored access tokens, not static API tokens.
 //! See keyring module for auth token management.
 
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 use std::time::Duration;
 
 /// Token API configuration
@@ -55,7 +55,7 @@ impl Default for TokenApiConfig
 
 impl TokenApiConfig
 {
-  /// Load configuration using `iron_config` with 5-layer precedence
+  /// Load configuration using `iron_config_loader` with 5-layer precedence
   ///
   /// Environment variables: `IRON_TOKEN_API_URL`, `IRON_TOKEN_API_TIMEOUT`
   ///

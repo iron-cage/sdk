@@ -2,23 +2,27 @@
 
 Test database infrastructure for Iron Runtime crates.
 
-## Responsibility
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_test_db-E5E7EB.svg)](https://docs.rs/iron_test_db)
 
-Provides ergonomic builders for creating isolated test databases with automatic cleanup, migration management, and table wiping.
+## Installation
+
+```toml
+[dev-dependencies]
+iron_test_db = { path = "../iron_test_db" }
+```
+
 
 ## Features
 
 - **Fluent Builder API**: Ergonomic database creation with `TestDatabaseBuilder`
 - **Automatic Cleanup**: RAII-based cleanup via `TempDir` and `Drop`
-- **Three Storage Modes**:
-  - **InMemory**: Fast, no cleanup needed
-  - **TempFile**: Realistic I/O, automatic file cleanup
-  - **SharedMemory**: Read-only sharing across tests
+- **Three Storage Modes**: InMemory (fast), TempFile (realistic I/O), SharedMemory (read-only sharing)
 - **Migration Registry**: Centralized migration management with automatic guards
 - **Automatic Table Wiping**: Topological sort respects foreign key dependencies
 - **No Mocking**: Real SQLite databases for all tests
 
-## Usage
+
+## Quick Start
 
 ### Basic Test Database
 
@@ -113,11 +117,12 @@ let db = TestDatabaseBuilder::new()
   .await?;
 ```
 
+
 ## Key Innovations
 
 ### Automatic Dependency Detection
 
-No need to manually track foreign key order when wiping tables. The crate automatically discovers dependencies via `pragma_foreign_key_list()` and performs topological sort:
+No need to manually track foreign key order when wiping tables:
 
 ```rust
 // Old way (manual, fragile)
@@ -151,7 +156,25 @@ let registry = MigrationRegistry::new()
 registry.apply_all( pool ).await?;  // Automatically tracked
 ```
 
-## Integration with Existing Crates
+
+## Design Principles
+
+1. **No Mocking**: Use real SQLite databases, not mocks
+2. **Automatic Cleanup**: RAII-based, no manual cleanup required
+3. **Loud Failures**: Explicit error messages for debugging
+4. **Zero Configuration**: Sensible defaults, customize when needed
+5. **Test Isolation**: Each test gets fresh database (no shared state)
+
+
+## Performance
+
+- **In-memory databases**: ~5ms setup overhead per test
+- **File-based databases**: ~65ms setup overhead per test
+- **Shared memory**: ~2ms setup overhead per test (amortized)
+
+
+<details>
+<summary>Integration with Existing Crates</summary>
 
 Add to `Cargo.toml`:
 
@@ -181,23 +204,11 @@ pub async fn create_test_db_v2() -> iron_test_db::TestDatabase
 }
 ```
 
-## Design Principles
+</details>
 
-1. **No Mocking**: Use real SQLite databases, not mocks
-2. **Automatic Cleanup**: RAII-based, no manual cleanup required
-3. **Loud Failures**: Explicit error messages for debugging
-4. **Zero Configuration**: Sensible defaults, customize when needed
-5. **Test Isolation**: Each test gets fresh database (no shared state)
 
-## Performance
-
-- **In-memory databases**: ~5ms setup overhead per test
-- **File-based databases**: ~65ms setup overhead per test
-- **Shared memory**: ~2ms setup overhead per test (amortized)
-
-For performance-critical tests, prefer in-memory or shared memory modes.
-
-## Testing the Tests
+<details>
+<summary>Testing the Tests</summary>
 
 The crate includes comprehensive infrastructure tests:
 
@@ -209,30 +220,42 @@ cargo test --all-features
 cargo test --test infrastructure_tests test_wipe_respects_foreign_keys
 ```
 
-## Known Limitations
+</details>
+
+
+<details>
+<summary>Known Limitations</summary>
 
 - **SQLite only**: PostgreSQL/MySQL support planned for future
 - **No transaction rollback**: SQLite savepoint limitations
 - **No parallel writes**: Shared memory databases are read-only for parallel tests
 
-## Migration from Old Helpers
+</details>
 
-See `/docs/guides/migration_guide.md` (TODO) for step-by-step migration instructions.
 
-## Contributing
+<details>
+<summary>Scope & Boundaries</summary>
 
-When adding features:
+**Responsibilities:**
+Provides ergonomic builders for creating isolated test databases with automatic cleanup, migration management, and table wiping.
 
-1. Add tests to `tests/infrastructure_tests.rs`
-2. Update this readme
-3. Verify all tests pass: `cargo test --all-features`
-4. Run clippy: `cargo clippy --all-targets --all-features`
+**In Scope:**
+- Fluent Builder API
+- Automatic Cleanup (RAII)
+- Three Storage Modes (InMemory, TempFile, SharedMemory)
+- Migration Registry
+- Automatic Table Wiping with dependency detection
 
-## License
+**Out of Scope:**
+- PostgreSQL/MySQL support (future)
+- Production database management
+- Database migrations for production schemas
 
-MIT OR Apache-2.0
+</details>
 
-## Directory Structure
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -248,3 +271,19 @@ MIT OR Apache-2.0
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## Contributing
+
+When adding features:
+
+1. Add tests to `tests/infrastructure_tests.rs`
+2. Update this readme
+3. Verify all tests pass: `cargo test --all-features`
+4. Run clippy: `cargo clippy --all-targets --all-features`
+
+
+## License
+
+MIT OR Apache-2.0

@@ -121,7 +121,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 
 **Primary deployment packages:**
 1. **Control Panel** (Package 1) - Docker container with iron_control_api + iron_dashboard
-2. **Agent Runtime** (Package 3) - PyPI package (iron-sdk - user installs); automatically includes iron-cage (PyPI wheel with Rust runtime, internal dependency)
+2. **Agent Runtime** (Package 3) - PyPI package (iron-cage), Python module (iron_cage), source in module/iron_sdk
 3. **CLI Tools** (Package 5) - Binary + PyPI wheel (iron-cli + iron-cli-py)
 
 ---

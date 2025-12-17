@@ -1,14 +1,12 @@
 //! Core runtime for AI agent execution with integrated safety and cost controls.
 //!
-//! Provides agent lifecycle management, Python bindings for LangChain/CrewAI
-//! integration, and local LLM proxy for request interception. Orchestrates
-//! all Iron Runtime subsystems (budget, PII detection, analytics, circuit breakers).
+//! Provides agent lifecycle management and local LLM proxy for request interception.
+//! Orchestrates all Iron Runtime subsystems (budget, PII detection, analytics, circuit breakers).
 //!
 //! # Purpose
 //!
 //! This crate is the execution engine for Iron Runtime:
 //! - Agent lifecycle management (spawn, monitor, stop agents)
-//! - Python-Rust bridge via PyO3 for seamless Python integration
 //! - LLM Router: Local proxy intercepting OpenAI/Anthropic API calls
 //! - Integrated safety controls (PII detection, budget enforcement)
 //! - Real-time metrics and state management
@@ -21,10 +19,9 @@
 //! ## Core Components
 //!
 //! 1. **Agent Runtime**: Manages agent processes and lifecycle
-//! 2. **PyO3 Bridge**: Exposes Rust runtime to Python as `iron_cage` module
-//! 3. **LLM Router**: Transparent proxy for LLM API requests
-//! 4. **State Manager**: Persists agent state and metrics
-//! 5. **Telemetry**: Structured logging for all operations
+//! 2. **LLM Router**: Transparent proxy for LLM API requests
+//! 3. **State Manager**: Persists agent state and metrics
+//! 4. **Telemetry**: Structured logging for all operations
 //!
 //! ## Integration Layer
 //!
@@ -35,32 +32,16 @@
 //! - **iron_reliability**: Circuit breakers for provider failures
 //! - **iron_runtime_state**: Agent state persistence
 //!
-//! ## Execution Flow
+//! ## Python Bindings
 //!
-//! ```text
-//! Python Agent Script
-//!        ↓
-//! PyO3 Bridge (iron_cage module)
-//!        ↓
-//! Agent Runtime (spawn/monitor)
-//!        ↓
-//! LLM Router (intercept API calls)
-//!        ↓
-//! Safety Pipeline:
-//!   1. Budget check (iron_cost)
-//!   2. Circuit breaker check (iron_reliability)
-//!   3. Forward to LLM provider
-//!   4. PII detection on response (iron_safety)
-//!   5. Record analytics (iron_runtime_analytics)
-//!   6. Return to agent
-//! ```
+//! Python bindings are provided by the `iron_sdk` crate (see ADR-010).
+//! This crate (`iron_runtime`) is pure Rust with no PyO3 dependencies.
 //!
 //! # Key Types
 //!
 //! - [`AgentRuntime`] - Main runtime managing agent lifecycle
 //! - [`RuntimeConfig`] - Runtime configuration (budget, verbosity)
 //! - [`AgentHandle`] - Handle to running agent for control
-//! - [`pyo3_bridge::Runtime`] - Python-exposed runtime class
 //! - [`llm_router::LlmRouter`] - Local LLM proxy server
 //!
 //! # Public API
@@ -98,128 +79,6 @@
 //! }
 //! ```
 //!
-//! ## Python API
-//!
-//! Python agents import `iron_cage` module for integrated controls:
-//!
-//! ```python
-//! from iron_cage import Runtime, LlmRouter
-//! from langchain.agents import AgentExecutor
-//! from langchain_openai import ChatOpenAI
-//!
-//! # Create runtime with budget
-//! runtime = Runtime(budget=100.0, verbose=True)
-//!
-//! # Start LLM router (intercepts API calls)
-//! router = LlmRouter(port=8000)
-//! router.start()
-//!
-//! # Point LangChain to local router instead of OpenAI directly
-//! llm = ChatOpenAI(
-//!     base_url="http://localhost:8000/v1",
-//!     api_key="your-key"  # Forwarded to real provider
-//! )
-//!
-//! # All LLM calls now go through Iron Runtime safety pipeline
-//! agent = AgentExecutor(llm=llm, ...)
-//! result = agent.run("Process this data...")
-//!
-//! # Get metrics
-//! metrics = runtime.get_metrics(agent_id)
-//! print(f"Budget spent: ${metrics['budget_spent']}")
-//! print(f"PII detections: {metrics['pii_detections']}")
-//!
-//! # Stop when done
-//! runtime.stop_agent(agent_id)
-//! router.stop()
-//! ```
-//!
-//! ## LLM Router Usage
-//!
-//! The LLM Router acts as a transparent proxy:
-//!
-//! ```python
-//! from iron_cage import LlmRouter
-//!
-//! # Start router on port 8000
-//! router = LlmRouter(port=8000)
-//! router.start()
-//!
-//! # Now any HTTP client can use it
-//! # Point your LLM library to: http://localhost:8000/v1
-//! # Router supports:
-//! # - OpenAI API format (/v1/chat/completions)
-//! # - Anthropic API format (/v1/messages)
-//! # - Streaming responses
-//! # - Budget enforcement
-//! # - PII detection
-//! # - Request tracing
-//! ```
-//!
-//! # Python Integration
-//!
-//! ## PyO3 Module
-//!
-//! Iron Runtime compiles to a Python extension module `iron_cage.so`:
-//!
-//! ```bash
-//! # Build Python module
-//! maturin develop --release
-//!
-//! # Import in Python
-//! import iron_cage
-//! runtime = iron_cage.Runtime(budget=100.0)
-//! ```
-//!
-//! ## LangChain Integration
-//!
-//! Seamless integration with LangChain agents:
-//!
-//! ```python
-//! from langchain.agents import initialize_agent, Tool
-//! from langchain_openai import ChatOpenAI
-//! from iron_cage import Runtime, LlmRouter
-//!
-//! # Setup Iron Runtime
-//! runtime = Runtime(budget=50.0)
-//! router = LlmRouter(port=8000)
-//! router.start()
-//!
-//! # Configure LangChain to use local router
-//! llm = ChatOpenAI(base_url="http://localhost:8000/v1")
-//!
-//! # Create agent with Iron Runtime controls
-//! tools = [Tool(name="search", func=search_function, ...)]
-//! agent = initialize_agent(tools, llm, agent="zero-shot-react")
-//!
-//! # All LLM calls automatically protected by Iron Runtime
-//! result = agent.run("Research topic and generate report")
-//! ```
-//!
-//! ## CrewAI Integration
-//!
-//! Works with CrewAI multi-agent frameworks:
-//!
-//! ```python
-//! from crewai import Agent, Task, Crew
-//! from langchain_openai import ChatOpenAI
-//! from iron_cage import Runtime, LlmRouter
-//!
-//! runtime = Runtime(budget=100.0)
-//! router = LlmRouter(port=8000)
-//! router.start()
-//!
-//! llm = ChatOpenAI(base_url="http://localhost:8000/v1")
-//!
-//! # Create crew with protected LLM
-//! agent = Agent(role="Researcher", llm=llm, ...)
-//! task = Task(description="...", agent=agent)
-//! crew = Crew(agents=[agent], tasks=[task])
-//!
-//! # Execute with Iron Runtime protection
-//! result = crew.kickoff()
-//! ```
-//!
 //! # Safety Controls
 //!
 //! Runtime enforces multiple safety layers:
@@ -248,6 +107,7 @@
 //! # Feature Flags
 //!
 //! - `enabled` - Enable full runtime (disabled for library-only builds)
+//! - `analytics` - Enable analytics recording via iron_runtime_analytics
 //!
 //! # Performance
 //!
@@ -259,17 +119,6 @@
 //! - Total proxy overhead: <10ms per request
 //!
 //! Streaming responses have near-zero buffering latency.
-//!
-//! # Development Status
-//!
-//! Current implementation status:
-//! - ✓ Agent lifecycle management
-//! - ✓ PyO3 module structure
-//! - ✓ State management
-//! - ✓ Telemetry integration
-//! - ⏳ LLM Router implementation (in progress)
-//! - ⏳ Async PyO3 bridge (planned)
-//! - ⏳ Full safety pipeline integration (planned)
 
 #![cfg_attr(not(feature = "enabled"), allow(unused_variables, dead_code))]
 
@@ -278,7 +127,6 @@
 pub mod llm_router;
 
 #[cfg(feature = "enabled")]
-#[allow(clippy::useless_conversion)] // PyO3 macros generate useless conversions in PyResult return types
 mod implementation
 {
   use std::sync::Arc;
@@ -316,10 +164,15 @@ mod implementation
       }
     }
 
+    /// Get the runtime configuration
+    pub fn config(&self) -> &RuntimeConfig
+    {
+      &self.config
+    }
+
     /// Start an agent from Python script path
     pub async fn start_agent(&self, _script_path: &std::path::Path) -> Result<AgentHandle, anyhow::Error>
     {
-      // TODO: Implement agent spawning and PyO3 bridge
       let agent_id = iron_types::AgentId::generate();
 
       iron_telemetry::log_agent_event(agent_id.as_str(), "agent_started");
@@ -355,97 +208,10 @@ mod implementation
       self.state.get_agent_state(agent_id)
     }
   }
-
-  // PyO3 bridge module (enabled feature includes pyo3 dependency)
-  pub mod pyo3_bridge
-  {
-    use pyo3::prelude::*;
-
-    /// Python-exposed Runtime class
-    #[pyclass]
-    pub struct Runtime
-    {
-      inner: super::AgentRuntime,
-    }
-
-    #[pymethods]
-    impl Runtime
-    {
-      /// Create new runtime
-      #[new]
-      #[pyo3(signature = (budget, verbose=None))]
-      fn new(budget: f64, verbose: Option<bool>) -> Self
-      {
-        let config = super::RuntimeConfig {
-          budget,
-          verbose: verbose.unwrap_or(false),
-        };
-
-        Self {
-          inner: super::AgentRuntime::new(config),
-        }
-      }
-
-      /// Start an agent (synchronous wrapper for async)
-      fn start_agent(&self, _script_path: String) -> PyResult<String>
-      {
-        // Async bridge with pyo3-asyncio not yet implemented
-        // For now, return a placeholder
-        Ok("agent_placeholder".to_string())
-      }
-
-      /// Stop an agent
-      fn stop_agent(&self, _agent_id: String) -> PyResult<()>
-      {
-        // Async bridge not yet implemented
-        Ok(())
-      }
-
-      /// Get agent metrics as JSON string
-      fn get_metrics(&self, agent_id: String) -> PyResult<Option<String>>
-      {
-        match self.inner.get_metrics(&agent_id)
-        {
-          Some(state) => {
-            let json = serde_json::json!({
-              "agent_id": state.agent_id.as_str(),
-              "status": format!("{:?}", state.status),
-              "budget_spent": state.budget_spent,
-              "pii_detections": state.pii_detections,
-            });
-            Ok(Some(json.to_string()))
-          }
-          None => Ok(None),
-        }
-      }
-    }
-
-    /// Python module definition
-    #[pymodule]
-    fn iron_runtime(m: &Bound<'_, PyModule>) -> PyResult<()>
-    {
-      m.add_class::<Runtime>()?;
-      m.add_class::<crate::llm_router::LlmRouter>()?;
-      Ok(())
-    }
-  }
 }
 
 #[cfg(feature = "enabled")]
 pub use implementation::*;
-
-/// Python module definition - must be at crate root for PyO3
-#[cfg(feature = "enabled")]
-use pyo3::prelude::*;
-
-#[cfg(feature = "enabled")]
-#[pymodule]
-fn iron_cage(m: &Bound<'_, PyModule>) -> PyResult<()>
-{
-  m.add_class::<implementation::pyo3_bridge::Runtime>()?;
-  m.add_class::<llm_router::LlmRouter>()?;
-  Ok(())
-}
 
 #[cfg(not(feature = "enabled"))]
 mod stub
@@ -477,6 +243,11 @@ mod stub
     pub fn new(config: RuntimeConfig) -> Self
     {
       Self { config }
+    }
+
+    pub fn config(&self) -> &RuntimeConfig
+    {
+      &self.config
     }
 
     pub async fn start_agent(&self, _script_path: &Path) -> Result<AgentHandle, anyhow::Error>

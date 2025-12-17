@@ -33,7 +33,7 @@ This document defines the two runtime deployment configurations for Iron Cage Ru
 
 ```python
 # Same code for Router AND Library mode
-from iron_sdk import protect_agent
+from iron_cage import protect_agent
 
 @protect_agent(ic_token=os.getenv("IC_TOKEN"))
 def my_agent(prompt: str):
@@ -111,8 +111,8 @@ Agent Code → iron_sdk → PyO3 → Runtime (in-process) → Control Panel → 
 **Default deployment for iron_sdk users.**
 
 **Integration:**
-- Install SDK: `uv pip install iron-sdk`
-- Use in code: `from iron_sdk import protect_agent`
+- Install SDK: `uv pip install iron-cage`
+- Use in code: `from iron_cage import protect_agent`
 - **No separate runtime process needed** (embedded via PyO3)
 
 **Characteristics:**
@@ -169,7 +169,7 @@ Agent Code → iron_sdk → PyO3 → Runtime (in-process) → Control Panel → 
 ### Key Clarifications
 
 **"Mode" is internal SDK configuration, not developer API:**
-- Developer writes same code: `from iron_sdk import protect_agent`
+- Developer writes same code: `from iron_cage import protect_agent`
 - Mode determines how SDK communicates with runtime (HTTP vs PyO3)
 - Configured via environment variable or runtime deployment choice
 
@@ -213,7 +213,7 @@ Agent Code → iron_sdk → PyO3 → Runtime (in-process) → Control Panel → 
 #### Implementation
 - CLI: `iron-runtime --mode=router --port=8080` - Start Router mode HTTP server
 - Environment: `export IRON_RUNTIME_URL=http://localhost:8080` - Configure SDK for Router mode
-- SDK: `from iron_sdk import protect_agent` - Same import for both modes
+- SDK: `from iron_cage import protect_agent` - Same import for both modes
 - SDK Default: Library mode (PyO3 embedded, no IRON_RUNTIME_URL)
 - Framework: Change endpoint configuration (api.openai.com → localhost:8080) for Router mode
 - Router HTTP: OpenAI-compatible API at configured port

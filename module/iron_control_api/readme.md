@@ -2,30 +2,12 @@
 
 REST API and WebSocket endpoints for programmatic control of Iron Cage runtime and real-time dashboard communication.
 
-### Scope
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_control_api-E5E7EB.svg)](https://docs.rs/iron_control_api)
 
-**Responsibilities:**
-Provides REST API and WebSocket endpoints for programmatic control of Iron Cage runtime (agent lifecycle, monitoring, metrics) and real-time dashboard communication. Enables external tools, CI/CD pipelines, and web dashboards to start agents, monitor execution, and receive live updates via standardized HTTP/WebSocket interfaces. Supports Pilot Mode (localhost, shared iron_runtime_state) and Production Mode (distributed, PostgreSQL + Redis). Requires Rust 1.75+, all platforms supported, integrates with iron_runtime for orchestration and iron_runtime_state for persistence.
+[Video Demonstarion](https://drive.google.com/file/d/18oR3CgS6LANX9iFO9TbFjPvS0P84tmt4/view?usp=sharing)
 
-**In Scope:**
-- REST API for token management (FR-7): Create, rotate, revoke, list API tokens
-- REST API for usage analytics (FR-8): Query usage by project, provider, aggregates
-- REST API for budget limits (FR-9): CRUD operations for budget constraints
-- REST API for request traces (FR-10): List and retrieve execution traces
-- WebSocket server for real-time dashboard updates
-- CORS support for browser-based dashboards
-- Request validation and error handling (DoS protection, NULL byte injection prevention)
-- Comprehensive test coverage (353 tests, 100% pass rate)
-
-**Out of Scope:**
-- API authentication (JWT tokens) - Deferred to Post-Pilot (spec.md § 2.2)
-- Rate limiting (per-IP, per-key) - Deferred to Post-Pilot (spec.md § 2.2)
-- Distributed API gateway (multi-node) - Deferred to Post-Pilot (spec.md § 2.2)
-- GraphQL interface - Pilot uses REST only (spec.md § 2.2)
-- Webhook notifications (external systems) - Pilot uses WebSocket only (spec.md § 2.2)
-- Agent lifecycle REST endpoints - See iron_cli
-- Runtime orchestration - See iron_runtime
-- State persistence - See iron_runtime_state
+> [!IMPORTANT]
+> **Test Coverage:** 379 tests (100% pass rate) - Protocol 014 (111 tests), Protocol 010 (39 tests), Protocol 012 (30 tests), Security (173 tests)
 
 ## Installation
 
@@ -39,7 +21,48 @@ iron_control_api = { version = "0.1", features = ["enabled"] }
 - `default = ["enabled"]`: Standard configuration
 - `enabled`: Full API functionality (depends on iron_types, iron_runtime_state, iron_token_manager, iron_telemetry, iron_cost)
 
-## Architecture
+
+## Quick Start
+
+```rust
+use iron_control_api::routes;
+use axum::{Router, routing::{get, post}};
+
+// Create API router with endpoints
+let app = Router::new()
+  // Token management
+  .route( "/api/v1/api-tokens", post( routes::tokens::create_token ) )
+  .route( "/api/v1/api-tokens/validate", post( routes::tokens::validate_token ) )
+  .route( "/api/v1/api-tokens", get( routes::tokens::list_tokens ) )
+  // Agent management
+  .route( "/api/v1/agents", post( routes::agents::create_agent ) )
+  .route( "/api/v1/agents", get( routes::agents::list_agents ) )
+  // Analytics
+  .route( "/api/v1/analytics/spending/total", get( routes::analytics::get_spending_total ) )
+  // Health check
+  .route( "/api/health", get( routes::health::health_check ) );
+
+// Start server
+let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+axum::serve(listener, app).await?;
+```
+
+
+<details>
+<summary>Architecture</summary>
+
+### System Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
+
+### Deployment Modes
 
 **Pilot/Demo Mode (Current):**
 - Single Rust process (localhost:8080)
@@ -52,7 +75,11 @@ iron_control_api = { version = "0.1", features = ["enabled"] }
 - Telemetry ingestion endpoints (POST /v1/telemetry/events)
 - Full authentication and rate limiting
 
-## API Endpoints
+</details>
+
+
+<details>
+<summary>API Endpoints</summary>
 
 **Health Check:**
 - `GET /api/health` - Server health status
@@ -139,32 +166,11 @@ iron_control_api = { version = "0.1", features = ["enabled"] }
 - `GET /api/v1/analytics/usage/tokens/by-agent` - Token usage by agent
 - `GET /api/v1/analytics/usage/models` - Model usage
 
-## Example
+</details>
 
-```rust
-use iron_control_api::routes;
-use axum::{Router, routing::{get, post}};
 
-// Create API router with endpoints
-let app = Router::new()
-  // Token management
-  .route( "/api/v1/api-tokens", post( routes::tokens::create_token ) )
-  .route( "/api/v1/api-tokens/validate", post( routes::tokens::validate_token ) )
-  .route( "/api/v1/api-tokens", get( routes::tokens::list_tokens ) )
-  // Agent management
-  .route( "/api/v1/agents", post( routes::agents::create_agent ) )
-  .route( "/api/v1/agents", get( routes::agents::list_agents ) )
-  // Analytics
-  .route( "/api/v1/analytics/spending/total", get( routes::analytics::get_spending_total ) )
-  // Health check
-  .route( "/api/health", get( routes::health::health_check ) );
-
-// Start server
-let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
-axum::serve(listener, app).await?;
-```
-
-## Testing
+<details>
+<summary>Testing</summary>
 
 **Test Coverage:** 379 tests (100% pass rate)
 - Unit tests: Token validation, usage calculations, limit enforcement, agent management
@@ -184,7 +190,11 @@ w3 .test l::3
 
 **Manual testing:** See `tests/manual/readme.md` for comprehensive test procedures
 
-## Security
+</details>
+
+
+<details>
+<summary>Security</summary>
 
 **Defense-in-Depth Architecture:**
 - **Layer 1:** Type-safe validation at API boundary (ValidatedUserId/ValidatedProjectId newtypes)
@@ -198,13 +208,18 @@ w3 .test l::3
 - Atomic operations: SQLite IMMEDIATE transactions prevent race conditions
 - Input validation: Malformed JSON, wrong Content-Type, invalid HTTP methods rejected
 
+</details>
+
+
 ## Documentation
 
 - **Specification:** `spec.md` - Complete API specification with all 10 Functional Requirements
 - **Test Documentation:** `tests/readme.md` - Test organization and coverage summary
 - **Manual Tests:** `tests/manual/readme.md` - Manual testing procedures for FR-7/8/9/10
 
-## Status
+
+<details>
+<summary>Status</summary>
 
 **Version:** 0.5 (2025-12-12)
 **Implementation:** ✅ COMPLETE (Protocol 014 Tokens + Protocol 010 Agents + Protocol 012 Analytics + Phases 1-5 QA)
@@ -223,7 +238,11 @@ w3 .test l::3
 
 **Next Steps:** Complete Phase 3 enhancements (templates, batch ops, search/filtering), Phase 5 QA completion (performance testing, documentation)
 
-## Docker Deployment
+</details>
+
+
+<details>
+<summary>Docker Deployment</summary>
 
 ### Build Backend Docker Image
 
@@ -315,7 +334,40 @@ The Dockerfile uses multi-stage builds for security and efficiency:
 - [Getting Started Guide](../../docs/getting_started.md) § Deploy Control Panel - Quickstart
 - [Deployment Guide](../../docs/deployment_guide.md) - Production procedures
 
-## Directory Structure
+</details>
+
+
+<details>
+<summary>Scope & Boundaries</summary>
+
+**Responsibilities:**
+Provides REST API and WebSocket endpoints for programmatic control of Iron Cage runtime (agent lifecycle, monitoring, metrics) and real-time dashboard communication. Enables external tools, CI/CD pipelines, and web dashboards to start agents, monitor execution, and receive live updates via standardized HTTP/WebSocket interfaces. Supports Pilot Mode (localhost, shared iron_runtime_state) and Production Mode (distributed, PostgreSQL + Redis). Requires Rust 1.75+, all platforms supported, integrates with iron_runtime for orchestration and iron_runtime_state for persistence.
+
+**In Scope:**
+- REST API for token management (FR-7): Create, rotate, revoke, list API tokens
+- REST API for usage analytics (FR-8): Query usage by project, provider, aggregates
+- REST API for budget limits (FR-9): CRUD operations for budget constraints
+- REST API for request traces (FR-10): List and retrieve execution traces
+- WebSocket server for real-time dashboard updates
+- CORS support for browser-based dashboards
+- Request validation and error handling (DoS protection, NULL byte injection prevention)
+- Comprehensive test coverage (353 tests, 100% pass rate)
+
+**Out of Scope:**
+- API authentication (JWT tokens) - Deferred to Post-Pilot (spec.md § 2.2)
+- Rate limiting (per-IP, per-key) - Deferred to Post-Pilot (spec.md § 2.2)
+- Distributed API gateway (multi-node) - Deferred to Post-Pilot (spec.md § 2.2)
+- GraphQL interface - Pilot uses REST only (spec.md § 2.2)
+- Webhook notifications (external systems) - Pilot uses WebSocket only (spec.md § 2.2)
+- Agent lifecycle REST endpoints - See iron_cli
+- Runtime orchestration - See iron_runtime
+- State persistence - See iron_runtime_state
+
+</details>
+
+
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -336,4 +388,6 @@ The Dockerfile uses multi-stage builds for security and efficiency:
 **Notes:**
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
+
+</details>
 

@@ -2,7 +2,36 @@
 
 Encrypted secrets storage and access control for AI agents.
 
-### Scope
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_secrets-E5E7EB.svg)](https://docs.rs/iron_secrets)
+
+## Installation
+
+```toml
+[dependencies]
+iron_secrets = { path = "../iron_secrets" }
+```
+
+
+## Quick Start
+
+```rust
+use iron_secrets::SecretsManager;
+
+// Initialize with master key from environment
+let manager = SecretsManager::new("./secrets.db")?;
+
+// Store encrypted secret
+manager.create("openai-api-key", "sk-proj-abc123...")?;
+
+// Retrieve decrypted secret for agent use
+let api_key = manager.get("openai-api-key")?;
+
+// Audit trail is automatically maintained
+```
+
+
+<details>
+<summary>Scope & Boundaries</summary>
 
 **Responsibilities:**
 Provides secure secrets management with AES-256-GCM encryption at rest, Argon2id key derivation, role-based access control, and comprehensive audit logging. Enables safe storage and runtime injection of sensitive credentials (API keys, database passwords, tokens).
@@ -28,35 +57,11 @@ Provides secure secrets management with AES-256-GCM encryption at rest, Argon2id
 - REST API endpoints (see iron_control_api)
 - Dashboard UI (see iron_dashboard)
 
-## Installation
+</details>
 
-```toml
-[dependencies]
-iron_secrets = { path = "../iron_secrets" }
-```
 
-## Example
-
-```rust
-use iron_secrets::SecretsManager;
-
-// Initialize with master key from environment
-let manager = SecretsManager::new("./secrets.db")?;
-
-// Store encrypted secret
-manager.create("openai-api-key", "sk-proj-abc123...")?;
-
-// Retrieve decrypted secret for agent use
-let api_key = manager.get("openai-api-key")?;
-
-// Audit trail is automatically maintained
-```
-
-## License
-
-Apache-2.0
-
-## Directory Structure
+<details>
+<summary>Directory Structure</summary>
 
 ### Source Files
 
@@ -74,3 +79,9 @@ Apache-2.0
 - Entries marked 'TBD' require manual documentation
 - Entries marked '⚠️ ANTI-PATTERN' should be renamed to specific responsibilities
 
+</details>
+
+
+## License
+
+Apache-2.0

@@ -31,7 +31,7 @@ Consolidate to 5 deployment packages:
 
 2. **Merge iron_examples into iron_sdk** as examples/ subdirectory
    - iron_sdk now includes: core SDK + examples/ directory
-   - Examples ship with `uv pip install iron-sdk[examples]`
+   - Examples ship with `uv pip install iron-cage[examples]`
    - Clearer that examples demonstrate SDK usage
 
 3. **Create iron_control_schema skeleton** for consistency

@@ -1,14 +1,53 @@
-# Iron Runtime
+<div align="center">
 
-Control Panel and Agent Runtime for Iron Cage AI agent management.
+# Iron Cage - AI Control Panel
+
+Most AI frameworks assume R&D. We assume production in regulated industries.
+
+<p align="center">
+<a href="https://github.com/iron-cage/sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/sdk/deploy.yaml?branch=master&label=build&color=E5E7EB" alt="build" /></a>
+&nbsp;
+<a href="https://github.com/iron-cage/sdk/blob/master/license"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="license" /></a>
+&nbsp;
+<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
+&nbsp;
+<a href="https://docs.rs/iron_runtime"><img src="https://img.shields.io/badge/docs.rs-iron__runtime-E5E7EB.svg" alt="docs" /></a>
+<br>
+<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/discord-join-E5E7EB.svg" alt="discord" /></a>
+&nbsp;
+<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/github-iron--cage-E5E7EB.svg" alt="github" /></a>
+&nbsp;
+<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/twitter-@ironcageai-E5E7EB.svg" alt="twitter" /></a>
+</p>
+
+</div>
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture at a Glance](#architecture-at-a-glance)
+- [Workspace Organization](#workspace-organization)
+- [Documentation](#documentation)
+- [Installation & Usage](#installation--usage)
+  - [For Python Developers (Using Iron SDK)](#for-python-developers-using-iron-sdk)
+  - [For Control Panel Admins](#for-control-panel-admins)
+  - [For Platform Contributors](#for-platform-contributors)
+- [Status](#status)
+- [License](#license)
+
 
 ## Overview
 
 Iron Runtime provides the core runtime modules for AI agent management including safety controls, cost tracking, reliability patterns, and the Control Panel web application.
 
+
 ## Architecture at a Glance
 
 This diagram shows Iron Cage's three-boundary architecture at the highest level, designed for architecture reviews and technical stakeholders.
+
+[Video Demonstarion](https://drive.google.com/file/d/18oR3CgS6LANX9iFO9TbFjPvS0P84tmt4/view?usp=sharing)
 
 ![Iron Cage Architecture - Three-Boundary Model](asset/architecture3.webp)
 
@@ -30,7 +69,11 @@ This diagram shows Iron Cage's three-boundary architecture at the highest level,
 4. **Compliance:** Complete audit trail for regulatory requirements and accountability
 5. **Flexibility:** Use any LLM provider (OpenAI, Anthropic, custom) without vendor lock-in
 
+
 ## Workspace Organization
+
+<details>
+<summary>Module Responsibilities & Boundaries (click to expand - 19 modules across 7 layers)</summary>
 
 | Entity | Responsibility | Input→Output | Scope | Out of Scope |
 |--------|----------------|--------------|-------|--------------|
@@ -61,7 +104,8 @@ Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
 Frontend:       iron_dashboard
 ```
 
----
+</details>
+
 
 ## Documentation
 
@@ -93,13 +137,13 @@ Frontend:       iron_dashboard
 
 **Complete Index:** [docs/readme.md](docs/readme.md) - All documentation organized by category
 
----
 
 ## Installation & Usage
 
 ### For Python Developers (Using Iron SDK)
 
-**99% of users - you just want to protect your AI agents:**
+> [!TIP]
+> **99% of users** - you just want to protect your AI agents
 
 **Prerequisites:**
 - Python 3.9+ (`python --version`)
@@ -124,9 +168,11 @@ def my_agent(prompt: str) -> str:
 - [SDK Documentation](module/iron_sdk/readme.md) - Full API reference
 - [Examples](module/iron_sdk/examples/) - Runnable code examples
 
+
 ### For Control Panel Admins
 
-**Deploying the Control Panel service for your team:**
+> [!IMPORTANT]
+> **Deploying the Control Panel service for your team**
 
 ```bash
 # Clone repository
@@ -149,6 +195,7 @@ docker compose up -d
 - [Getting Started Guide](docs/getting_started.md) § Deploy Control Panel - Complete walkthrough
 - [Deployment Guide](docs/deployment_guide.md) - Production deployment and troubleshooting
 - [Docker Compose Architecture](docs/deployment/006_docker_compose_deployment.md) - Design details
+
 
 ### For Platform Contributors
 
@@ -177,9 +224,6 @@ See [`contributing.md`](contributing.md) for contributor workflow.
 
 ## Status
 
-**Version:** 0.1.0
-**Status:** Active development
-
-## License
-
-MIT
+- **Version:** 0.3.0
+- **Status:** Active development
+- **License:** MIT

@@ -440,7 +440,7 @@ impl AnalyticsState
       .await?;
 
     // Run migration
-    let migration = include_str!( "../../../../iron_token_manager/migrations/011_create_analytics_events.sql" );
+    let migration = include_str!( "../../../migrations/011_create_analytics_events.sql" );
     sqlx::raw_sql( migration ).execute( &pool ).await?;
 
     let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );

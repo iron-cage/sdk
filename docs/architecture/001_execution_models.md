@@ -143,7 +143,7 @@ Developer Machine              Control Panel (Admin Service)
 
 **Developer code IDENTICAL for both modes:**
 ```python
-from iron_sdk import protect_agent
+from iron_cage import protect_agent
 
 @protect_agent(ic_token=os.getenv("IC_TOKEN"))
 def my_agent(prompt: str):

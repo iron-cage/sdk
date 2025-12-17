@@ -27,7 +27,7 @@
 //! ## Authentication
 //!
 //! API token passed via Authorization header: Bearer <token>
-//! Token loaded from: `iron_config` layers or `IRON_CONTROL_API_TOKEN` env var
+//! Token loaded from: `iron_config_loader` layers or `IRON_CONTROL_API_TOKEN` env var
 //!
 //! ## Error Handling
 //!
