@@ -165,6 +165,7 @@ impl SyncClient {
     /// Sync unsynced events to server
     pub async fn sync_events(&self) -> usize {
         let events = self.event_store.unsynced_events();
+        tracing::trace!("Analytics sync: {} unsynced events queued", events.len());
         if events.is_empty() {
             return 0;
         }
@@ -179,9 +180,11 @@ impl SyncClient {
         }).collect();
 
         if llm_events.is_empty() {
+            tracing::info!("Analytics sync: 0 LLM events eligible for upload");
             return 0;
         }
 
+        tracing::info!("Analytics sync: uploading {} LLM events", llm_events.len());
         let url = format!("{}/api/v1/analytics/events", self.config.server_url);
         let mut synced_ids = Vec::new();
         let total = llm_events.len();
@@ -189,6 +192,7 @@ impl SyncClient {
         for event in llm_events {
             let event_id = event.event_id();
             let request = event_to_request(&event, &self.config.ic_token);
+            tracing::trace!("Analytics sync: sending event_id={}", event_id);
 
             match self.http_client.post(&url).json(&request).send().await {
                 Ok(resp) if resp.status().is_success() => {
@@ -211,6 +215,7 @@ impl SyncClient {
         if !synced_ids.is_empty() {
             self.event_store.mark_synced(&synced_ids);
             tracing::debug!("Synced {}/{} events", synced_ids.len(), total);
+            tracing::trace!("Analytics sync: marked {} events as synced", synced_ids.len());
         }
 
         synced_ids.len()
