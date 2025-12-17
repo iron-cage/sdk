@@ -14,7 +14,7 @@ members = [
   "module/iron_test_db",
 
   # Configuration
-  "module/iron_config",
+  "module/iron_config_loader",
 
   # Feature layer
   "module/iron_safety",
@@ -25,20 +25,19 @@ members = [
   # Integration layer
   "module/iron_control_api",
   "module/iron_runtime",
+  "module/iron_sdk",
 
   # Application layer
   "module/iron_cli",
 
-  # Database schemas (spec-only)
-  "module/iron_control_schema",
-
   # NOTE: Non-Rust modules (not in Cargo workspace):
-  # Python: iron_cli_py, iron_sdk, iron_testing
+  # Python: iron_cli_py, iron_testing
   # Frontend: iron_dashboard (Vue.js)
+  # iron_control_schema: Removed (spec-only, no implementation, zero dependents)
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["iron_cage contributors"]
@@ -279,51 +278,64 @@ features = [ "enabled" ]
 ## Foundation Modules (local workspace crates)
 
 [workspace.dependencies.iron_types]
+version = "0.3.0"
 path = "module/iron_types"
 
 [workspace.dependencies.iron_cost]
+version = "0.3.0"
 path = "module/iron_cost"
 
 [workspace.dependencies.iron_telemetry]
+version = "0.3.0"
 path = "module/iron_telemetry"
 
 ## Workspace Crates (internal modules)
 
 [workspace.dependencies.iron_runtime_state]
+version = "0.3.0"
 path = "module/iron_runtime_state"
 
 [workspace.dependencies.iron_test_db]
 path = "module/iron_test_db"
 
-[workspace.dependencies.iron_config]
-path = "module/iron_config"
+[workspace.dependencies.iron_config_loader]
+version = "0.4.0"
+path = "module/iron_config_loader"
 
 [workspace.dependencies.iron_safety]
+version = "0.3.0"
 path = "module/iron_safety"
 
 [workspace.dependencies.iron_reliability]
+version = "0.3.0"
 path = "module/iron_reliability"
 
 [workspace.dependencies.iron_control_api]
+version = "0.3.0"
 path = "module/iron_control_api"
 
 [workspace.dependencies.iron_runtime]
+version = "0.3.0"
 path = "module/iron_runtime"
 
 [workspace.dependencies.iron_secrets]
+version = "0.3.0"
 path = "module/iron_secrets"
 
 [workspace.dependencies.iron_token_manager]
+version = "0.4.0"
 path = "module/iron_token_manager"
 
 [workspace.dependencies.iron_cli]
+version = "0.3.0"
 path = "module/iron_cli"
 
-[workspace.dependencies.iron_control_schema]
-path = "module/iron_control_schema"
-
 [workspace.dependencies.iron_runtime_analytics]
+version = "0.3.0"
 path = "module/iron_runtime_analytics"
+
+[workspace.dependencies.iron_sdk]
+path = "module/iron_sdk"
 
 ## HTTP Client
 

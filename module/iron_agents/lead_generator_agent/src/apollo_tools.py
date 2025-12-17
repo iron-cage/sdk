@@ -1,11 +1,14 @@
 import requests
 import json
-from langchain.agents import tool
-from config import APOLLO_API_KEY
+try:
+    from langchain_core.tools import tool
+except ImportError:  # pragma: no cover
+    from langchain.tools import tool
 
-# Immediate validation
-if not APOLLO_API_KEY:
-    raise ValueError("CRITICAL: APOLLO_API_KEY is missing. Check your 'secret/-secrets.sh' file.")
+try:
+    from config import APOLLO_API_KEY
+except ImportError:  # pragma: no cover
+    from .config import APOLLO_API_KEY
 
 # --- Tool for Searching Leads ---
 @tool
@@ -18,7 +21,10 @@ def search_leads(job_title: str, industry: str | None = None, location: str | No
     - industry: Company industry or keyword (e.g., "Jewelry", "SaaS", "Real Estate").
     - location: Country or city.
     """
-    url = "https://api.apollo.io/v1/mixed_people/search"
+    # Apollo deprecated /mixed_people/search for API callers; use api_search.
+    url = "https://api.apollo.io/v1/mixed_people/api_search"
+    if not APOLLO_API_KEY:
+        return "Apollo API key missing. Set APOLLO_API_KEY in your environment."
     
     # --- Prepare and Execute API Request ---
     # Forms the headers and payload for the request to Apollo.

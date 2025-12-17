@@ -1,6 +1,6 @@
 //! Control API configuration
 //!
-//! Uses `iron_config` for unified configuration loading with 5-layer precedence.
+//! Uses `iron_config_loader` for unified configuration loading with 5-layer precedence.
 //!
 //! ## Configuration Sources (Priority Order)
 //!
@@ -24,7 +24,7 @@
 //! timeout = 30
 //! ```
 
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 use std::time::Duration;
 
 /// Control API configuration
@@ -56,7 +56,7 @@ impl Default for ControlApiConfig
 
 impl ControlApiConfig
 {
-  /// Load configuration using `iron_config` with 5-layer precedence
+  /// Load configuration using `iron_config_loader` with 5-layer precedence
   ///
   /// Environment variables: `IRON_CONTROL_API_URL`, `IRON_CONTROL_API_TOKEN`, `IRON_CONTROL_API_TIMEOUT`
   ///

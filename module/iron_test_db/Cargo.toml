@@ -5,6 +5,7 @@ edition.workspace = true
 authors = ["Iron Runtime Team"]
 description = "Test database infrastructure for Iron Runtime crates"
 license.workspace = true
+publish = false
 
 [features]
 enabled = []

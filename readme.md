@@ -1,12 +1,26 @@
-# Iron Runtime
+<div align="center">
 
-Control Panel and Agent Runtime for Iron Cage AI agent management.
+# Iron Cage - AI Control Panel
 
-[![Deploy CI](https://img.shields.io/github/actions/workflow/status/iron-cage/iron_runtime/deploy-check.yml?branch=master&label=deploy)](https://github.com/iron-cage/iron_runtime/actions)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iron-cage/iron_runtime)
-[![Discord](https://img.shields.io/badge/discord-join-7289da.svg)](https://discord.gg/aR5fujCZhv)
+Most AI frameworks assume R&D. We assume production in regulated industries.
 
-[🌐 Website](https://ironcage.ai) • [📖 Documentation](https://ironcage.ai/docs) • [🐙 GitHub](https://github.com/iron-cage) • [🐦 Twitter](https://x.com/ironcageai)
+<p align="center">
+<a href="https://github.com/iron-cage/sdk/actions"><img src="https://img.shields.io/github/actions/workflow/status/iron-cage/sdk/deploy.yaml?branch=master&label=build&color=E5E7EB" alt="build" /></a>
+&nbsp;
+<a href="https://github.com/iron-cage/sdk/blob/master/license"><img src="https://img.shields.io/badge/license-MIT-E5E7EB.svg" alt="license" /></a>
+&nbsp;
+<a href="https://ironcage.ai"><img src="https://img.shields.io/badge/website-ironcage.ai-E5E7EB.svg" alt="website" /></a>
+&nbsp;
+<a href="https://docs.rs/iron_runtime"><img src="https://img.shields.io/badge/docs.rs-iron__runtime-E5E7EB.svg" alt="docs" /></a>
+<br>
+<a href="https://discord.gg/aR5fujCZhv"><img src="https://img.shields.io/badge/discord-join-E5E7EB.svg" alt="discord" /></a>
+&nbsp;
+<a href="https://github.com/iron-cage"><img src="https://img.shields.io/badge/github-iron--cage-E5E7EB.svg" alt="github" /></a>
+&nbsp;
+<a href="https://x.com/ironcageai"><img src="https://img.shields.io/badge/twitter-@ironcageai-E5E7EB.svg" alt="twitter" /></a>
+</p>
+
+</div>
 
 ---
 
@@ -32,6 +46,8 @@ Iron Runtime provides the core runtime modules for AI agent management including
 ## Architecture at a Glance
 
 This diagram shows Iron Cage's three-boundary architecture at the highest level, designed for architecture reviews and technical stakeholders.
+
+[Video Demonstarion](https://drive.google.com/file/d/18oR3CgS6LANX9iFO9TbFjPvS0P84tmt4/view?usp=sharing)
 
 ![Iron Cage Architecture - Three-Boundary Model](asset/architecture3.webp)
 
@@ -206,13 +222,8 @@ uv sync  # Installs dependencies and creates .venv
 See [`contributing.md`](contributing.md) for contributor workflow.
 </details>
 
-
 ## Status
 
-**Version:** 0.1.0
-**Status:** Active development
-
-
-## License
-
-MIT
+- **Version:** 0.3.0
+- **Status:** Active development
+- **License:** MIT

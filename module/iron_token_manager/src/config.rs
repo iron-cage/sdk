@@ -1,6 +1,6 @@
 //! Configuration management for token manager
 //!
-//! This module provides unified configuration loading using `iron_config` with
+//! This module provides unified configuration loading using `iron_config_loader` with
 //! environment variable overrides. Supports development, test, and production configurations.
 //!
 //! # Configuration Layers (Precedence: highest to lowest)
@@ -32,7 +32,7 @@
 //! ```
 
 use serde::{ Deserialize, Serialize };
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 use workspace_tools::workspace;
 
 /// Complete configuration for token manager
@@ -162,7 +162,7 @@ impl Config
   /// Load configuration from default environment
   ///
   /// Determines environment from `IRON_ENV` variable (defaults to "development").
-  /// Uses `iron_config`'s 5-layer precedence system.
+  /// Uses `iron_config_loader`'s 5-layer precedence system.
   ///
   /// # Errors
   ///
@@ -182,7 +182,7 @@ impl Config
 
   /// Load configuration from specific environment
   ///
-  /// Uses `iron_config`'s `ConfigLoader` with 5-layer precedence:
+  /// Uses `iron_config_loader`'s `ConfigLoader` with 5-layer precedence:
   /// 1. Environment variables (`IRON_TOKEN_MANAGER_*`)
   /// 2. Project config (`{workspace}/config/iron_token_manager.{env}.toml`)
   /// 3. User config (`~/.config/iron/iron_token_manager.toml`)
@@ -207,8 +207,8 @@ impl Config
     // Get default configuration as TOML
     let defaults = Self::get_defaults_toml();
 
-    // Use iron_config's ConfigLoader with defaults
-    // Note: iron_config automatically detects IRON_ENV for environment-specific configs
+    // Use iron_config_loader's ConfigLoader with defaults
+    // Note: iron_config_loader automatically detects IRON_ENV for environment-specific configs
     let loader = ConfigLoader::with_defaults( "iron_token_manager", &defaults )
       .map_err( |_| crate::error::TokenError::Generic )?;
 

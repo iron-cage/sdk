@@ -16,7 +16,7 @@ Know where to get each package and how updates are delivered.
 |---------|---------|-----|
 | Control Panel | Docker Hub | `ironcage/control-panel` |
 | Marketing Site | CDN | `ironcage.ai` |
-| Agent Runtime | PyPI | `uv pip install iron-sdk` |
+| Agent Runtime | PyPI | `uv pip install iron-cage` |
 | Sandbox | PyPI | `uv pip install iron-sandbox` |
 | CLI Tools | GitHub + PyPI | Binary + `uv pip install iron-cli` |
 

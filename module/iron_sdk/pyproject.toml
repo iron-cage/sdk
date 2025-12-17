@@ -1,34 +1,41 @@
 [project]
-name = "iron-sdk"
-version = "0.1.0"
-description = "Pythonic SDK layer for Iron Cage agent protection with decorators and framework integrations"
+name = "iron-cage"
+version = "0.2.0"
+description = "Iron SDK - Python SDK for AI agent protection with LLM proxy and safety controls"
 authors = [
   {name = "Iron Cage Team"}
 ]
 readme = "readme.md"
 requires-python = ">=3.9"
-license = {text = "Apache-2.0"}
+license = {text = "MIT"}
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
-dependencies = [
-  "iron-runtime>=0.1.0",  # Depends on Iron Runtime package with LlmRouter
-]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0",
+  "pytest-asyncio>=0.24.0",
   "pytest-cov>=4.0.0",
   "black>=24.0.0",
   "mypy>=1.0.0",
   "ruff>=0.1.0",
+]
+examples = [
+  "langchain>=0.3.0",
+  "langchain-community>=0.3.0",
+  "langchain-openai>=0.2.0",
+  "openai>=1.50.0",
+  "typing-extensions>=4.12.0",
 ]
 langchain = ["langchain>=0.1.0"]
 crewai = ["crewai>=0.1.0"]
@@ -36,8 +43,13 @@ autogpt = ["autogpt>=0.1.0"]
 all = ["langchain>=0.1.0", "crewai>=0.1.0", "autogpt>=0.1.0"]
 
 [build-system]
-requires = ["setuptools>=65.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "iron_cage"
 
 [tool.black]
 line-length = 100

@@ -17,6 +17,7 @@ The agent follows a two-step process:
 -   **API Tokens:**
     -   OpenAI API Token (GPT-4o model access).
     -   Apollo.io API Token (Master Token recommended).
+    -   Iron Cage API Token (Master Token recommended).
 
 ### Installation
 
@@ -31,12 +32,13 @@ This project is configured to use `uv` for dependency management.
 
 
 
-Create a file named `-secrets.sh` in the secret folder with tokens. You can use secrets.template to copypaste variables.
+Create a file named `-agent_secrets.sh` in the secret folder with tokens. You can use agent_secrets.template to copypaste variables.
 
-**File: -secrets.sh**
+**File: -agent_secrets.sh**
 ```
 OPENAI_API_KEY=sk-your_openai_token_here
 APOLLO_API_KEY=your_apollo_api_token_here
+IC_TOKEN=your_ic_token_here
 ```
 
 ### Project Structure
@@ -46,14 +48,14 @@ APOLLO_API_KEY=your_apollo_api_token_here
 ├── .venv/                               # Virtual environment managed by uv
 ├── pyproject.toml                       # Project dependencies definition
 ├── uv.lock                              # Dependency lock file
-├── secret
-│   ├── -secrets.sh                      # File with API tokens  
-│   ├── -secrets.template.sh             # Template for creating a file -secrets.sh 
-│   └── readme.md                        # Secrets documentation
+├── docs
+│   └── readme.md                        # Guideline for lead generation agent
 ├── src
 │   ├── apollo_tools.py                  # Tool definitions for Apollo API interaction
+│   ├── config.py                        # Tool for finding secrets folder and imports tokens
+│   ├── readme.md                        # File Responsibility Table
 │   └── lead_generator_agent.py          # Main entry point and agent logic
-├── test
+├── tests
 │   ├── test_agent.py                    # Tests for agent
 │   └── test_apollo_tools.py             # Tests for apollo tools
 ├── license                              # License
@@ -113,7 +115,18 @@ Example output:
 ### How to run an agent:
 1. Sync all by `uv sync`
 2. Create a file -secrets.sh and paste related tokets
-3. Move to folder `src` and type `uv run lead_generator_agent.py` in a console
+3. Install iron_cage library
+```md
+ cd module/iron_runtime
+
+  # Create venv and install dependencies
+  uv venv
+  uv pip install maturin
+
+  # Then build
+  uv run maturin develop
+```
+3. Move to folder `cd module/iron_agent/lead_generator_agent/src` and type `uv run lead_generator_agent.py` in a console
 4. Type a prompt in a console, for example: `Find 3 Jewelry Founders in Germany`
 5. Wait for answer
 

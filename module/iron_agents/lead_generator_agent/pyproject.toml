@@ -7,20 +7,23 @@ requires-python = ">=3.12"
 dependencies = [
     "iron-sdk",
     "iron-runtime",
-    "langchain==0.3.7",
-    "langchain-community==0.3.7",
-    "langchain-core==0.3.19",
-    "langchain-openai==0.2.9",
-    "pydantic>=2.0",
-    "python-dotenv>=1.2.1",
-    "requests>=2.32.5",
+
+    # LangChain Ecosystem (Modular)
+    "langchain==1.2.0",            # Metapackage
+    "langchain-core==1.2.1",       # Contains AgentExecutor, ChatPromptTemplate
+    "langchain-openai==1.1.3",     # Contains ChatOpenAI
+    "langchain-community==0.4.1",  # Contains useful tools and utilities
+    "langgraph==1.0.5",            # Contains create_react_agent
+
+    # Utilities
+    "pydantic==2.12.5",            # For data validation
+    "python-dotenv>=1.2.1",        # For environment variables
+    "requests>=2.32.5",            # For general HTTP requests
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
-    "pytest-mock>=3.15.1",
-    "requests-mock>=1.12.1",
 ]
 
 [tool.pytest.ini_options]

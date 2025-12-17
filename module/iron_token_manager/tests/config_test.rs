@@ -119,11 +119,11 @@ fn test_load_config()
 fn test_env_override()
 {
   let _env = EnvTestGuard::new();
-  // Use iron_config standard environment variable naming: IRON_TOKEN_MANAGER_*
+  // Use iron_config_loader standard environment variable naming: IRON_TOKEN_MANAGER_*
   std::env::set_var( "IRON_TOKEN_MANAGER_DATABASE_URL", "sqlite:///override.db?mode=rwc" );
   std::env::set_var( "IRON_TOKEN_MANAGER_DATABASE_MAX_CONNECTIONS", "10" );
 
-  // Load config - iron_config automatically applies environment variable overrides
+  // Load config - iron_config_loader automatically applies environment variable overrides
   let config = Config::load().expect( "Should load config with env overrides" );
 
   assert_eq!( config.database.url, "sqlite:///override.db?mode=rwc", "IRON_TOKEN_MANAGER_DATABASE_URL environment variable should override database URL" );

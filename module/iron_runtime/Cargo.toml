@@ -1,6 +1,6 @@
 [package]
 name = "iron_runtime"
-version.workspace = true
+version= "0.3.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -20,9 +20,6 @@ enabled = [
   "dep:iron_cost",
   "dep:iron_reliability",
   "dep:tokio",
-  "dep:pyo3",
-  # pyo3-asyncio temporarily disabled due to version conflict
-  # "dep:pyo3-asyncio",
   "dep:serde",
   "dep:serde_json",
   "dep:uuid",
@@ -45,10 +42,7 @@ iron_cost = { workspace = true, features = ["full"], optional = true }
 iron_reliability = { workspace = true, features = ["full"], optional = true }
 iron_runtime_analytics = { workspace = true, features = ["full"], optional = true }
 
-# Python FFI
-pyo3 = { workspace = true, features = ["extension-module", "auto-initialize"], optional = true }
-# pyo3-asyncio temporarily disabled due to version conflict with pyo3 0.22
-# pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"], optional = true }
+# Note: PyO3 moved to iron_sdk (ADR-010)
 
 # Async runtime
 tokio = { workspace = true, features = ["full"], optional = true }
@@ -80,4 +74,5 @@ iron_types = { workspace = true, features = ["test-helpers"] }
 
 [lib]
 name = "iron_runtime"
-crate-type = ["rlib", "cdylib"]
+# Pure Rust library (PyO3 moved to iron_sdk per ADR-010)
+crate-type = ["rlib"]

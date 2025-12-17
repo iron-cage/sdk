@@ -2,8 +2,6 @@
 
 Container module for agent implementations and examples.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
-
 ## Structure
 
 ```text

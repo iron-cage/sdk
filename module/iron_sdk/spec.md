@@ -1,74 +1,95 @@
 # iron_sdk - Specification
 
-**Module:** iron_sdk
+**Module:** iron_sdk (source folder)
+**PyPI Package:** iron-cage
+**Python Module:** iron_cage
 **Layer:** 5 (Integration)
 **Status:** Active
-
-> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
 
 ---
 
 ## Responsibility
 
-Pythonic SDK layer for Iron Cage agent protection. Provides @protect_agent decorator, context managers, typed configurations, and framework integrations (LangChain, CrewAI, AutoGPT). Includes examples/ directory with runnable framework examples.
+Python SDK for Iron Cage AI agent protection. Provides PyO3 bindings for `iron_runtime`, exposing LlmRouter and Runtime to Python agents. Enables budget tracking, safety controls, and LLM API proxying for Python AI frameworks (LangChain, CrewAI, AutoGPT).
+
+---
+
+## Installation
+
+```bash
+uv pip install iron-cage
+```
+
+```python
+from iron_cage import LlmRouter
+
+with LlmRouter(provider_key="sk-xxx", budget=10.0) as router:
+    client = OpenAI(base_url=router.base_url, api_key=router.api_key)
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+```
 
 ---
 
 ## Scope
 
 **In Scope:**
-- @protect_agent decorator for function-level protection
-- Context managers (with Budget(...), with Protection(...))
-- Typed configuration classes (BudgetConfig, SafetyConfig, ReliabilityConfig)
-- Framework integrations (LangChain, CrewAI, AutoGPT)
-- Examples directory (merged from iron_examples per ADR-006)
-- Async/await support for async agents
+- PyO3 bindings for iron_runtime (LlmRouter, Runtime)
+- Context manager support (`with LlmRouter(...) as router:`)
+- Simple top-level imports (`from iron_cage import LlmRouter`)
+- Type stubs for IDE support (`.pyi` files)
+- Python tests and examples
 
 **Out of Scope:**
 - Core runtime functionality (see iron_runtime)
 - OS-level sandboxing (see iron_sandbox)
 - CLI functionality (see iron_cli_py)
-- Direct PyO3 FFI (hidden behind Pythonic API)
 
 ---
 
 ## Dependencies
 
 **Required Modules:**
-- iron-cage - PyPI package containing iron_runtime (Rust runtime binary, automatically installed as pip dependency - users never interact with it directly)
+- iron_runtime - Rust crate dependency (provides core LlmRouter, AgentRuntime)
 
 **Required External:**
-- Python 3.8+
-
-**Installation:**
-Users install ONLY `iron-sdk` - the `iron-cage` dependency is automatically installed by pip.
+- pyo3 - Python bindings
+- Python 3.9+
 
 **Optional:**
-- langchain - LangChain integration
-- crewai - CrewAI integration
-- autogpt - AutoGPT integration
+- langchain - LangChain integration examples
+- crewai - CrewAI integration examples
+- autogpt - AutoGPT integration examples
 
 ---
 
 ## Core Concepts
 
 **Key Components:**
-- **Protect Decorator:** @protect_agent for transparent protection
-- **Context Managers:** Resource management with Budget, Protection
-- **Config Classes:** Typed configuration for BudgetConfig, SafetyConfig
-- **Examples:** Framework integration examples in examples/ directory
+- **LlmRouter:** PyO3 wrapper for iron_runtime::llm_router::LlmRouter
+- **Runtime:** PyO3 wrapper for iron_runtime::AgentRuntime
+- **Context Manager:** Automatic cleanup via `__enter__`/`__exit__`
 
 ---
 
 ## Integration Points
 
 **Used by:**
-- Developers - Python agents using SDK
+- Python developers - AI agents using SDK
 
 **Uses:**
-- iron_runtime - Via PyO3 FFI for actual protection
+- iron_runtime - Core Rust implementation (via Rust crate dependency)
 
 ---
 
-*For detailed API specification, see spec/-archived_detailed_spec.md*
+## Testing
+
+- Python tests: `tests/test_*.py`
+- E2E tests: `tests/test_llm_router_e2e.py`, `tests/test_budget_e2e.py`
+- Integration tests: `tests/test_analytics_*.py`
+
+---
+
 *For examples, see examples/ directory*

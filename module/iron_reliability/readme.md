@@ -2,7 +2,7 @@
 
 Circuit breakers and fault tolerance for multi-agent systems.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_reliability-E5E7EB.svg)](https://docs.rs/iron_reliability)
 
 ## Installation
 

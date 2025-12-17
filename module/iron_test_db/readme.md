@@ -2,7 +2,7 @@
 
 Test database infrastructure for Iron Runtime crates.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_test_db-E5E7EB.svg)](https://docs.rs/iron_test_db)
 
 ## Installation
 

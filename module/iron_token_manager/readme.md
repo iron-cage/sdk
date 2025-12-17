@@ -2,7 +2,7 @@
 
 User management, API token management, authentication, and rate limiting.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs.rs-iron_token_manager-E5E7EB.svg)](https://docs.rs/iron_token_manager)
 
 ## Installation
 

@@ -2,8 +2,6 @@
 
 Python command-line tool for Iron Cage with wrapper architecture for operations and native Python for developer experience.
 
-[![Documentation](https://img.shields.io/badge/docs-ironcage.ai-blue.svg)](https://ironcage.ai/docs)
-
 > [!WARNING]
 > **Development Status:** Architecture defined (v0.3.0) - Wrapper and native command implementations pending
 
@@ -51,6 +49,19 @@ iron-py agent start --config iron.toml
 
 <details>
 <summary>Architecture</summary>
+
+### System Architecture
+
+![Iron Cage Architecture - Three-Boundary Model](https://raw.githubusercontent.com/Wandalen/iron_runtime/master/asset/architecture3_1k.webp)
+
+**Visual Guide:**
+- **Left (Developer Zone):** Agent, iron_sdk, Runtime (Safety/Cost/Audit), Gateway - 100% local
+- **Middle (Management Plane):** Control Panel - NOT in data path
+- **Right (Provider Zone):** LLM provider receives only prompts with IP Token
+
+See [root readme](../../readme.md) for detailed architecture explanation.
+
+### CLI Architecture
 
 iron_cli_py uses a **wrapper pattern** for operations commands, delegating to iron_cli binary while providing Python-native developer experience features.
 
