@@ -239,32 +239,29 @@ pub async fn list_events(
        LIMIT ? OFFSET ?"#
   };
 
-  let rows_result: Result< Vec< ( String, i64, String, String, String, i64, i64, i64, i64, String, Option< String >, Option< String > ) >, _ > =
-    if let Some( agent_id ) = params.agent_id
-    {
-      sqlx::query_as( query )
-        .bind( start_ms )
-        .bind( end_ms )
-        .bind( agent_id )
-        .bind( params.per_page as i64 )
-        .bind( offset as i64 )
-        .fetch_all( &state.pool )
-        .await
-    }
-    else
-    {
-      sqlx::query_as( query )
-        .bind( start_ms )
-        .bind( end_ms )
-        .bind( params.per_page as i64 )
-        .bind( offset as i64 )
-        .fetch_all( &state.pool )
-        .await
-    };
-
-  let rows = match rows_result
+  let data: Vec< AnalyticsEventWithAgent > = match if let Some( agent_id ) = params.agent_id
   {
-    Ok( r ) => r,
+    sqlx::query_as( query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( agent_id )
+      .bind( params.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  }
+  else
+  {
+    sqlx::query_as( query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( params.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  }
+  {
+    Ok( rows ) => rows,
     Err( e ) =>
     {
       tracing::error!( "Failed to fetch events: {}", e );
@@ -274,25 +271,6 @@ pub async fn list_events(
       }) ) ).into_response();
     }
   };
-
-  let data: Vec< AnalyticsEventWithAgent > = rows.into_iter().map( |row|
-  {
-    AnalyticsEventWithAgent
-    {
-      event_id: row.0,
-      timestamp_ms: row.1,
-      event_type: row.2,
-      model: row.3,
-      provider: row.4,
-      input_tokens: row.5,
-      output_tokens: row.6,
-      cost_micros: row.7,
-      agent_id: row.8,
-      agent_name: row.9,
-      error_code: row.10,
-      error_message: row.11,
-    }
-  }).collect();
 
   let response = EventsListResponse
   {

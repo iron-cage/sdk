@@ -413,23 +413,6 @@ pub struct ModelUsageResponse
   pub calculated_at: String,
 }
 
-/// Analytics event record for list endpoint
-#[derive( Debug, Serialize, FromRow )]
-pub struct AnalyticsEvent
-{
-  pub event_id: String,
-  pub timestamp_ms: i64,
-  pub event_type: String,
-  pub model: String,
-  pub provider: String,
-  pub input_tokens: i64,
-  pub output_tokens: i64,
-  pub cost_micros: i64,
-  pub agent_id: i64,
-  pub error_code: Option< String >,
-  pub error_message: Option< String >,
-}
-
 /// Events list query parameters
 #[derive( Debug, Clone, Default, Deserialize )]
 pub struct EventsListQuery
@@ -456,7 +439,7 @@ pub struct EventsListResponse
 }
 
 /// Event with agent name
-#[derive( Debug, Serialize )]
+#[derive( Debug, Serialize, FromRow )]
 pub struct AnalyticsEventWithAgent
 {
   pub event_id: String,
