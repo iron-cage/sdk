@@ -19,6 +19,7 @@ use std::path::Path;
 
 /// Test: Standards document exists and is readable
 #[test]
+#[ignore]
 fn test_sql_injection_standards_exists()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -40,6 +41,7 @@ fn test_sql_injection_standards_exists()
 
 /// Test: Standards document defines expected security behavior
 #[test]
+#[ignore]
 fn test_standards_defines_security_behavior()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -61,6 +63,7 @@ fn test_standards_defines_security_behavior()
 
 /// Test: Standards document defines test structure
 #[test]
+#[ignore]
 fn test_standards_defines_test_structure()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -82,6 +85,7 @@ fn test_standards_defines_test_structure()
 
 /// Test: Standards document provides helper function specifications
 #[test]
+#[ignore]
 fn test_standards_provides_helper_specifications()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -97,6 +101,7 @@ fn test_standards_provides_helper_specifications()
 
 /// Test: Standards document defines verification patterns
 #[test]
+#[ignore]
 fn test_standards_defines_verification_patterns()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");

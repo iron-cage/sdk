@@ -32,7 +32,7 @@
 //! ```
 
 use serde::{ Deserialize, Serialize };
-use iron_config::ConfigLoader;
+use iron_config_loader::ConfigLoader;
 
 /// Complete configuration for token manager
 #[ derive( Debug, Clone, Serialize, Deserialize ) ]

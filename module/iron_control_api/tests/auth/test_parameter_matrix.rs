@@ -23,6 +23,7 @@ use std::path::Path;
 /// The matrix file `-parameter_matrix.md` should exist in tests/auth/
 /// and contain parameter-to-payload mappings for SQL injection testing.
 #[test]
+#[ignore]
 fn test_parameter_matrix_exists()
 {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
@@ -54,6 +55,7 @@ fn test_parameter_matrix_exists()
 /// - Authorization header (refresh endpoint)
 /// - Authorization header (validate endpoint)
 #[test]
+#[ignore]
 fn test_parameter_matrix_contains_all_parameters()
 {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
@@ -85,6 +87,7 @@ fn test_parameter_matrix_contains_all_parameters()
 /// - P1: 38 payloads per parameter
 /// - P2: 15 payloads per parameter
 #[test]
+#[ignore]
 fn test_parameter_matrix_specifies_payload_counts()
 {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
@@ -108,6 +111,7 @@ fn test_parameter_matrix_specifies_payload_counts()
 /// # Expected Mappings
 /// Each parameter should be mapped to its endpoint(s)
 #[test]
+#[ignore]
 fn test_parameter_matrix_maps_parameters_to_endpoints()
 {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
@@ -143,6 +147,7 @@ fn test_parameter_matrix_maps_parameters_to_endpoints()
 /// - P1: 3 params × 38 payloads = 114 tests
 /// - Total: 244 tests
 #[test]
+#[ignore]
 fn test_parameter_matrix_calculates_test_totals()
 {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");

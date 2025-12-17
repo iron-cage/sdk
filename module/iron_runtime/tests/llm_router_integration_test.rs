@@ -49,13 +49,13 @@ fn test_router_starts_and_stops()
 
   let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
-  assert!( router.running() );
-  assert!( router.port > 0, "Router should be assigned a valid port" );
+  assert!( router.is_running() );
+  assert!( router.get_port() > 0, "Router should be assigned a valid port" );
   assert!( router.get_base_url().contains( "127.0.0.1" ) );
   assert!( router.get_base_url().contains( "/v1" ) );
 
   // Provider should be detected
-  let provider = &router.provider;
+  let provider = router.get_provider();
   assert!(
     provider == "openai" || provider == "anthropic" || provider == "unknown",
     "Unexpected provider: {}",
@@ -63,7 +63,7 @@ fn test_router_starts_and_stops()
   );
 
   router.shutdown();
-  assert!( !router.running() );
+  assert!( !router.is_running() );
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn test_router_provider_detection()
 
   let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
-  let provider = &router.provider;
+  let provider = router.get_provider();
   debug!( "Detected provider: {}", provider );
 
   // Provider should be one of the known values
@@ -100,7 +100,7 @@ fn test_router_base_url_format()
   assert!( base_url.ends_with( "/v1" ) );
 
   // Port should be in valid range
-  let port = router.port;
+  let port = router.get_port();
   assert!( port > 1024, "Port should be > 1024, got {}", port );
   assert!( port < 65535, "Port should be < 65535, got {}", port );
 
@@ -115,7 +115,7 @@ fn test_router_api_key_passthrough()
   let mut router = LlmRouter::create( token.clone(), server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
   // API key should be the same as the input token
-  assert_eq!( router.api_key, token, "Router should store the provided API key" );
+  assert_eq!( router.get_api_key(), token, "Router should store the provided API key" );
 
   router.shutdown();
 }
@@ -128,7 +128,7 @@ fn test_router_custom_cache_ttl()
   // Create with custom cache TTL
   let mut router = LlmRouter::create( token, server, 60 ).expect("LOUD FAILURE: Failed to create router");
 
-  assert!( router.running() );
+  assert!( router.is_running() );
 
   router.shutdown();
 }
@@ -146,9 +146,9 @@ fn test_router_invalid_server_url()
   // Router should still start (connection errors happen on first request)
   let mut router = LlmRouter::create( token, server, 300 ).expect("LOUD FAILURE: Failed to create router");
 
-  assert!( router.running() );
+  assert!( router.is_running() );
   // Provider will be "unknown" since it couldn't fetch the key
-  assert_eq!( router.provider, "unknown", "Provider should be unknown when server is unreachable" );
+  assert_eq!( router.get_provider(), "unknown", "Provider should be unknown when server is unreachable" );
 
   router.shutdown();
 }
