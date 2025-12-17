@@ -170,9 +170,9 @@ function getProviderBadgeClass(providerType: ProviderType): string {
 
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">AI Provider Keys</h1>
-      <Button @click="showCreateModal = true">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">AI Provider Keys</h1>
+      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
         Add Provider Key
       </Button>
     </div>
@@ -191,44 +191,44 @@ function getProviderBadgeClass(providerType: ProviderType): string {
     </div>
 
     <!-- Provider keys table -->
-    <div v-else-if="providerKeys && providerKeys.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
+    <div v-else-if="providerKeys && providerKeys.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+      <table class="min-w-[700px] w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Provider
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Description
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               API Key
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
             </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-for="key in providerKeys" :key="key.id">
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <Badge :class="getProviderBadgeClass(key.provider)">
                 {{ getProviderLabel(key.provider) }}
               </Badge>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ key.description || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
               {{ key.masked_key }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <Button
                 @click="handleToggleEnabled(key)"
                 :disabled="toggleMutation.isPending.value"
@@ -239,10 +239,10 @@ function getProviderBadgeClass(providerType: ProviderType): string {
                 {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
               </Button>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(key.created_at) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
               <Button
                 @click="openEditModal(key)"
                 :disabled="updateMutation.isPending.value"

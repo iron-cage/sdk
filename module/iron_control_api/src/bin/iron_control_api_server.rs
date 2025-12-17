@@ -756,6 +756,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
     // Analytics endpoints (Protocol 012)
     .route( "/api/v1/analytics/events", post( iron_control_api::routes::analytics::post_event ) )
+    .route( "/api/v1/analytics/events/list", get( iron_control_api::routes::analytics::list_events ) )
     .route( "/api/v1/analytics/spending/total", get( iron_control_api::routes::analytics::get_spending_total ) )
     .route( "/api/v1/analytics/spending/by-agent", get( iron_control_api::routes::analytics::get_spending_by_agent ) )
     .route( "/api/v1/analytics/spending/by-provider", get( iron_control_api::routes::analytics::get_spending_by_provider ) )

@@ -24,12 +24,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const api = useApi()
 const queryClient = useQueryClient()
-const router = useRouter()
 const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
@@ -37,7 +35,8 @@ const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviderKeyId = ref<number | null>(null)
-const initialBudgetUsd = ref<number | null>(null)
+const initialBudgetUsd = ref<number | undefined>(undefined)
+const selectedOwnerId = ref<string | null>(null)  // For owner assignment
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -95,15 +94,23 @@ const { data: providers } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
+// Fetch users for owner selection (admin only)
+const { data: users } = useQuery({
+  queryKey: ['users-for-agents'],
+  queryFn: () => api.getUsers({ is_active: true }),
+  enabled: authStore.isAdmin,
+})
+
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number; owner_id?: string }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
     selectedProviderKeyId.value = null
-    initialBudgetUsd.value = null
+    initialBudgetUsd.value = undefined
+    selectedOwnerId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -114,13 +121,14 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null }) =>
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null; owner_id?: string }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
     selectedProviderKeyId.value = null
+    selectedOwnerId.value = null
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -168,6 +176,7 @@ function handleCreateAgent() {
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
     initial_budget_microdollars: budgetMicros,
+    owner_id: selectedOwnerId.value || undefined,
   })
 }
 
@@ -175,6 +184,7 @@ function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
   selectedProviderKeyId.value = agent.provider_key_id ?? null
+  selectedOwnerId.value = agent.owner_id ?? null
   showUpdateModal.value = true
 }
 
@@ -202,6 +212,7 @@ function handleUpdateAgent() {
     name: name.value,
     providers: [providerRecord.provider],
     provider_key_id: providerKeyId,
+    owner_id: selectedOwnerId.value || undefined,
   })
 }
 
@@ -325,9 +336,9 @@ async function copyTokenToClipboard() {
 
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Agents</h1>
-      <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Agents</h1>
+      <Button v-if="authStore.isAdmin" @click="showCreateModal = true" class="w-full sm:w-auto">
         Create Agent
       </Button>
     </div>
@@ -350,39 +361,45 @@ async function copyTokenToClipboard() {
     </div>
 
     <!-- Agents table -->
-    <div v-else-if="agents && agents.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
+    <div v-else-if="agents && agents.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+      <table class="min-w-[700px] w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Name
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Owner
+            </th>
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Providers
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Provider Key
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               IC Token
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
             </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-for="agent in agents" :key="agent.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               {{ agent.name }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ agent.owner_id || 'Unknown' }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               <div class="flex gap-1 flex-wrap">
-                <span 
-                  v-for="provider in agent.providers" 
+                <span
+                  v-for="provider in agent.providers"
                   :key="provider"
                   class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
                 >
@@ -390,10 +407,10 @@ async function copyTokenToClipboard() {
                 </span>
               </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ agent.provider_key_id ?? 'None' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
                 Loading...
               </div>
@@ -419,10 +436,10 @@ async function copyTokenToClipboard() {
                 </div>
               </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(agent.created_at) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <Button variant="ghost" size="sm">
@@ -432,10 +449,6 @@ async function copyTokenToClipboard() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem @click="router.push(`/agents/${agent.id}/tokens`)">
-                    Manage Tokens
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
                     @click="handleGenerateIcToken(agent)"
@@ -542,6 +555,28 @@ async function copyTokenToClipboard() {
               Required. Used to create the agent's budget (microdollars on backend).
             </p>
           </div>
+
+          <div v-if="authStore.isAdmin" class="space-y-2">
+            <Label for="create-owner">Assign to User (optional)</Label>
+            <select
+              id="create-owner"
+              v-model="selectedOwnerId"
+              :disabled="createMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option :value="null">Current User ({{ authStore.username }})</option>
+              <option
+                v-for="user in users?.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.username }} ({{ user.email || 'no email' }})
+              </option>
+            </select>
+            <p class="text-xs text-gray-500">
+              Leave empty to assign to yourself.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
@@ -602,6 +637,24 @@ async function copyTokenToClipboard() {
                 :value="providerKey.id"
               >
                 {{ providerKey.id }} - {{ providerKey.provider }}
+              </option>
+            </select>
+          </div>
+
+          <div v-if="authStore.isAdmin" class="space-y-2">
+            <Label for="update-owner">Owner</Label>
+            <select
+              id="update-owner"
+              v-model="selectedOwnerId"
+              :disabled="updateMutation.isPending.value"
+              class="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option
+                v-for="user in users?.users"
+                :key="user.id"
+                :value="user.id"
+              >
+                {{ user.username }} ({{ user.email || 'no email' }})
               </option>
             </select>
           </div>

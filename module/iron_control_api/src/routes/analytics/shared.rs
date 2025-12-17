@@ -413,6 +413,49 @@ pub struct ModelUsageResponse
   pub calculated_at: String,
 }
 
+/// Events list query parameters
+#[derive( Debug, Clone, Default, Deserialize )]
+pub struct EventsListQuery
+{
+  #[serde( default )]
+  pub period: Period,
+  pub agent_id: Option< i64 >,
+  #[serde( default = "default_page" )]
+  pub page: u32,
+  #[serde( default = "default_events_per_page" )]
+  pub per_page: u32,
+}
+
+fn default_events_per_page() -> u32 { 10 }
+
+/// GET /api/v1/analytics/events - Response
+#[derive( Debug, Serialize )]
+pub struct EventsListResponse
+{
+  pub data: Vec< AnalyticsEventWithAgent >,
+  pub pagination: Pagination,
+  pub period: String,
+  pub calculated_at: String,
+}
+
+/// Event with agent name
+#[derive( Debug, Serialize, FromRow )]
+pub struct AnalyticsEventWithAgent
+{
+  pub event_id: String,
+  pub timestamp_ms: i64,
+  pub event_type: String,
+  pub model: String,
+  pub provider: String,
+  pub input_tokens: i64,
+  pub output_tokens: i64,
+  pub cost_micros: i64,
+  pub agent_id: i64,
+  pub agent_name: String,
+  pub error_code: Option< String >,
+  pub error_message: Option< String >,
+}
+
 // ============================================================================
 // State
 // ============================================================================

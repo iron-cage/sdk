@@ -33,21 +33,31 @@ Visual representation of iron_dashboard's navigation hierarchy, route structure,
 │   ├── Shows: Agent status, budget metrics, active agents
 │   └── Real-time: WebSocket updates for agent status
 │
-├── /tokens (authenticated)
-│   ├── Shows: Token list with status (active/revoked)
-│   └── Actions: Create, rotate, revoke tokens
+├── /agents (authenticated)
+│   ├── Shows: Agent list with status, owner, providers
+│   ├── Actions: Create, edit, delete agents (admin only for edit/delete)
+│   └── Features: Owner assignment (admin only), IC token generation
 │
 ├── /usage (authenticated)
 │   ├── Shows: Cost breakdown by provider/model/time period
-│   └── Data: Total cost, requests, tokens consumed
+│   ├── Data: Total cost, requests, tokens consumed
+│   └── Features: Recent logs with "Load More" pagination
 │
 ├── /limits (authenticated)
-│   ├── Shows: Budget limits (daily/weekly/monthly)
-│   └── Actions: Create, update, delete limits
+│   ├── Shows: Budget limits per agent
+│   └── Actions: Update budget (admin only)
 │
-└── /traces (authenticated)
-    ├── Shows: Request trace list with timestamps
-    └── Detail: Per-request data (prompt, completion, cost, latency)
+├── /providers (authenticated)
+│   ├── Shows: Provider keys list
+│   └── Actions: Create, update, delete provider keys (admin only)
+│
+├── /users (authenticated)
+│   ├── Shows: User list with roles
+│   └── Actions: Create, update, delete users (admin only)
+│
+└── /budget-requests (authenticated)
+    ├── Shows: Budget increase requests
+    └── Actions: Approve/reject requests (admin only)
 ```
 
 ---
@@ -57,7 +67,7 @@ Visual representation of iron_dashboard's navigation hierarchy, route structure,
 ### Primary Navigation (Sidebar)
 
 **Location:** Left sidebar (collapsible on mobile)
-**Component:** `src/components/MainLayout.vue:42-142`
+**Component:** `src/components/MainLayout.vue`
 
 **Menu Structure:**
 1. **Dashboard** (`/dashboard`)
@@ -65,21 +75,32 @@ Visual representation of iron_dashboard's navigation hierarchy, route structure,
    - Always visible when authenticated
    - Default landing page after login
 
-2. **Tokens** (`/tokens`)
-   - Icon: Key
-   - Token management operations
+2. **Agents** (`/agents`)
+   - Icon: Users
+   - Agent management (create, edit, delete)
+   - Owner assignment (admin only)
 
 3. **Usage Analytics** (`/usage`)
    - Icon: Bar Chart
    - Cost and usage visualization
+   - Recent logs with pagination
 
 4. **Limits** (`/limits`)
    - Icon: Lock
-   - Budget limit configuration
+   - Budget status per agent
+   - Budget modification (admin only)
 
-5. **Traces** (`/traces`)
+5. **Providers** (`/providers`)
+   - Icon: Key
+   - Provider key management (admin only)
+
+6. **Users** (`/users`)
+   - Icon: Users
+   - User management (admin only)
+
+7. **Budget Requests** (`/budget-requests`)
    - Icon: Document
-   - Request-level trace data
+   - Budget increase request approval (admin only)
 
 ### Secondary Navigation (Header)
 
@@ -140,17 +161,23 @@ Visual representation of iron_dashboard's navigation hierarchy, route structure,
 
 ## Access Control Matrix
 
-| Route        | Authentication Required | Redirect If Unauthenticated | Redirect If Authenticated |
-|--------------|-------------------------|-----------------------------|-----------------------------|
-| `/login`     | No                      | -                           | `/dashboard`                |
-| `/dashboard` | Yes                     | `/login`                    | -                           |
-| `/tokens`    | Yes                     | `/login`                    | -                           |
-| `/usage`     | Yes                     | `/login`                    | -                           |
-| `/limits`    | Yes                     | `/login`                    | -                           |
-| `/traces`    | Yes                     | `/login`                    | -                           |
-| `/` (root)   | -                       | Redirects to `/dashboard` (guarded) | - |
+| Route             | Auth Required | Admin Only | Redirect If Unauth |
+|-------------------|---------------|------------|---------------------|
+| `/login`          | No            | No         | → `/dashboard` if auth |
+| `/dashboard`      | Yes           | No         | → `/login`          |
+| `/agents`         | Yes           | Edit/Delete only | → `/login`     |
+| `/usage`          | Yes           | No         | → `/login`          |
+| `/limits`         | Yes           | Budget edit only | → `/login`     |
+| `/providers`      | Yes           | Yes        | → `/login`          |
+| `/users`          | Yes           | Yes        | → `/login`          |
+| `/budget-requests`| Yes           | Approve only | → `/login`        |
+| `/` (root)        | -             | -          | → `/dashboard`      |
 
-**Implementation:** `src/router/index.ts:52-63` (navigation guard using `meta.requiresAuth`)
+**Role-Based Data Filtering:**
+- **Admin:** Sees all agents, budgets, and analytics
+- **User:** Sees only owned agents and their data
+
+**Implementation:** `src/router/index.ts` (navigation guard using `meta.requiresAuth`)
 
 ---
 

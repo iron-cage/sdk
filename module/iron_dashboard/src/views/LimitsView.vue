@@ -33,14 +33,15 @@ const editError = ref('')
 const showBudgetModal = ref(false)
 const budgetAgentId = ref<number | null>(null)
 const budgetAgentName = ref('')
-const budgetUsd = ref<number | null>(null)
+const budgetUsd = ref<number | undefined>(undefined)
 const budgetError = ref('')
 
-// Fetch limits
-const { data: limits, isLoading, error, refetch } = useQuery({
+// Fetch limits (hidden - global limits not integrated)
+const { data: _limits, isLoading: _isLoading, error: _error, refetch: _refetch } = useQuery({
   queryKey: ['limits'],
   queryFn: () => api.getLimits(),
 })
+void _limits; void _isLoading; void _error; void _refetch
 
 // Fetch agents (for owner lookup)
 const { data: agents } = useQuery({
@@ -132,7 +133,7 @@ function handleCreateLimit() {
   })
 }
 
-function openEditModal( limit: LimitRecord ) {
+function _openEditModal( limit: LimitRecord ) {
   editingLimit.value = limit
   maxTokensPerDay.value = limit.max_tokens_per_day
   maxRequestsPerMinute.value = limit.max_requests_per_minute
@@ -141,12 +142,11 @@ function openEditModal( limit: LimitRecord ) {
   editError.value = ''
   showEditModal.value = true
 }
+void _openEditModal
 
 function handleUpdateLimit() {
   if( !editingLimit.value ) return
   editError.value = ''
-
-  const userId = overrideUserId.value || authStore.username || 'default'
 
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
@@ -161,19 +161,20 @@ function handleUpdateLimit() {
     max_requests_per_minute: maxRequestsPerMinute.value || undefined,
     // Convert cents (UI) to microdollars (backend)
     max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
-    user_id: userId,
   })
 }
 
-function handleDeleteLimit( limit: LimitRecord ) {
+function _handleDeleteLimit( limit: LimitRecord ) {
   if( confirm( `Delete limit ${limit.id}? This action cannot be undone.` ) ) {
     deleteMutation.mutate( limit.id )
   }
 }
+void _handleDeleteLimit
 
-function formatDate( timestamp: number ): string {
+function _formatDate( timestamp: number ): string {
   return new Date( timestamp ).toLocaleString()
 }
+void _formatDate
 
 function formatCost( cents: number ): string {
   return `$${( cents / 100 ).toFixed( 2 )}`
@@ -184,7 +185,7 @@ function findOwnerByAgentId(agentId: number): string | null {
   return match?.owner_id || null
 }
 
-function openCreateLimitForAgent(agentId: number) {
+function _openCreateLimitForAgent(agentId: number) {
   const owner = findOwnerByAgentId(agentId)
   if (owner) {
     overrideUserId.value = owner
@@ -196,6 +197,7 @@ function openCreateLimitForAgent(agentId: number) {
   createError.value = ''
   showCreateModal.value = true
 }
+void _openCreateLimitForAgent
 
 function openBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
@@ -234,6 +236,11 @@ function handleUpdateBudget() {
 
 <template>
   <div>
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Agent Budgets</h1>
+    </div>
+
+    <!-- Global Limits hidden - not integrated with iron_cage runtime
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Usage Limits</h1>
       <Button @click="showCreateModal = true">
@@ -241,20 +248,19 @@ function handleUpdateBudget() {
       </Button>
     </div>
 
-    <!-- Loading state -->
     <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
       <p class="text-gray-600">Loading limits...</p>
     </div>
 
-    <!-- Error state -->
     <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
       <p class="text-red-600">Error loading limits: {{ error.message }}</p>
       <Button @click="() => refetch()" variant="secondary" class="mt-4">
         Retry
       </Button>
     </div>
+    -->
 
-    <!-- Limits table -->
+    <!-- Global Limits table - hidden
     <div v-else-if="limits && limits.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
@@ -326,19 +332,18 @@ function handleUpdateBudget() {
       </table>
     </div>
 
-    <!-- Empty state -->
     <div v-else class="bg-white rounded-lg shadow p-6 text-center">
       <p class="text-gray-600 mb-4">No limits configured</p>
       <Button @click="showCreateModal = true">
         Create First Limit
       </Button>
     </div>
+    -->
 
     <!-- Agent Budgets -->
-    <div class="mt-10 bg-white rounded-lg shadow overflow-hidden">
+    <div class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
       <div class="flex items-center justify-between px-6 py-4 border-b">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">Agent Budgets</h2>
           <p class="text-sm text-gray-500">Allocated, spent, and remaining budget per agent.</p>
         </div>
         <div class="space-x-2">
@@ -355,48 +360,53 @@ function handleUpdateBudget() {
         Error loading budgets: {{ budgetQueryError.message }}
       </div>
       <div v-else-if="budgetStatus?.data?.length">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-[600px] w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Agent
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Allocated
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Spent
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Remaining
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Used
               </th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ row.agent_name }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 ${{ (row.budget / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 ${{ (row.spent / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 ${{ (row.remaining / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 {{ row.percent_used.toFixed(1) }}%
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <Button size="sm" variant="secondary" @click="openBudgetModal(row)">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <Button
+                  v-if="authStore.isAdmin"
+                  size="sm"
+                  variant="secondary"
+                  @click="openBudgetModal(row)"
+                >
                   Update Budget
                 </Button>
               </td>

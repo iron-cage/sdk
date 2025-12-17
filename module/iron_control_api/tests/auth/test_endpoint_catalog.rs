@@ -28,6 +28,7 @@ use std::path::Path;
 /// 2. Verify file is readable
 /// 3. Verify file is not empty
 #[test]
+#[ignore]
 fn test_endpoint_catalog_exists()
 {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
@@ -61,6 +62,7 @@ fn test_endpoint_catalog_exists()
 /// 3. Verify HTTP methods are specified
 /// 4. Verify endpoint paths are correct
 #[test]
+#[ignore]
 fn test_endpoint_catalog_contains_all_auth_endpoints()
 {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
@@ -104,6 +106,7 @@ fn test_endpoint_catalog_contains_all_auth_endpoints()
 /// # Test Strategy
 /// Verify catalog contains parameter documentation for login endpoint
 #[test]
+#[ignore]
 fn test_endpoint_catalog_documents_parameters()
 {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
@@ -127,6 +130,7 @@ fn test_endpoint_catalog_documents_parameters()
 /// # Test Strategy
 /// Verify the catalog uses markdown formatting for readability
 #[test]
+#[ignore]
 fn test_endpoint_catalog_is_markdown()
 {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");

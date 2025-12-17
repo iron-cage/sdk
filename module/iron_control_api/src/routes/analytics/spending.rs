@@ -24,13 +24,15 @@ use super::shared::{
 /// GET /api/v1/analytics/spending/total
 ///
 /// Requires JWT authentication.
+/// Admins see all spending; regular users see only their owned agents' spending.
 pub async fn get_spending_total(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
 {
   let ( start_ms, end_ms ) = params.period.to_range();
+  let is_admin = user.0.role == "admin";
 
   let mut query = String::from(
     r#"SELECT COALESCE(SUM(cost_micros), 0) as total
@@ -38,6 +40,12 @@ pub async fn get_spending_total(
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?
        AND event_type = 'llm_request_completed'"#
   );
+
+  // Filter by owned agents for non-admins
+  if !is_admin
+  {
+    query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+  }
 
   if params.agent_id.is_some()
   {
@@ -51,6 +59,12 @@ pub async fn get_spending_total(
   let mut q = sqlx::query_scalar::< _, i64 >( &query )
     .bind( start_ms )
     .bind( end_ms );
+
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    q = q.bind( &user.0.sub );
+  }
 
   if let Some( agent_id ) = params.agent_id
   {
@@ -92,8 +106,9 @@ pub async fn get_spending_total(
 /// GET /api/v1/analytics/spending/by-agent
 ///
 /// Requires JWT authentication.
+/// Admins see all agents; regular users see only their owned agents.
 pub async fn get_spending_by_agent(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
   Query( page ): Query< PaginationQuery >,
@@ -101,9 +116,10 @@ pub async fn get_spending_by_agent(
 {
   let ( start_ms, end_ms ) = params.period.to_range();
   let offset = ( page.page - 1 ) * page.per_page;
+  let is_admin = user.0.role == "admin";
 
-  // Query spending by agent with budget info
-  let rows: Result< Vec< SpendingByAgentRow >, _ > = sqlx::query_as(
+  // Build query with optional owner filter
+  let base_query = if is_admin {
     r#"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -119,27 +135,76 @@ pub async fn get_spending_by_agent(
        GROUP BY e.agent_id
        ORDER BY spending_micros DESC
        LIMIT ? OFFSET ?"#
-  )
-    .bind( start_ms )
-    .bind( end_ms )
-    .bind( page.per_page as i64 )
-    .bind( offset as i64 )
-    .fetch_all( &state.pool )
-    .await;
+  } else {
+    r#"SELECT
+         e.agent_id,
+         a.name as agent_name,
+         COALESCE(SUM(e.cost_micros), 0) as spending_micros,
+         COUNT(*) as request_count,
+         ab.total_allocated as budget
+       FROM analytics_events e
+       LEFT JOIN agents a ON e.agent_id = a.id
+       LEFT JOIN agent_budgets ab ON e.agent_id = ab.agent_id
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+       AND e.event_type = 'llm_request_completed'
+       AND e.agent_id IS NOT NULL
+       AND a.owner_id = ?
+       GROUP BY e.agent_id
+       ORDER BY spending_micros DESC
+       LIMIT ? OFFSET ?"#
+  };
 
-  // Query total count
-  let total_count: i64 = sqlx::query_scalar(
-    r#"SELECT COUNT(DISTINCT agent_id)
-       FROM analytics_events
-       WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-       AND event_type = 'llm_request_completed'
-       AND agent_id IS NOT NULL"#
-  )
-    .bind( start_ms )
-    .bind( end_ms )
-    .fetch_one( &state.pool )
-    .await
-    .unwrap_or( 0 );
+  // Query spending by agent with budget info
+  let rows: Result< Vec< SpendingByAgentRow >, _ > = if is_admin {
+    sqlx::query_as( base_query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( page.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  } else {
+    sqlx::query_as( base_query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( &user.0.sub )
+      .bind( page.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  };
+
+  // Query total count (filtered by owner for non-admins)
+  let total_count: i64 = if is_admin {
+    sqlx::query_scalar(
+      r#"SELECT COUNT(DISTINCT agent_id)
+         FROM analytics_events
+         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
+         AND event_type = 'llm_request_completed'
+         AND agent_id IS NOT NULL"#
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( 0 )
+  } else {
+    sqlx::query_scalar(
+      r#"SELECT COUNT(DISTINCT e.agent_id)
+         FROM analytics_events e
+         INNER JOIN agents a ON e.agent_id = a.id
+         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+         AND e.event_type = 'llm_request_completed'
+         AND e.agent_id IS NOT NULL
+         AND a.owner_id = ?"#
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( &user.0.sub )
+      .fetch_one( &state.pool )
+      .await
+      .unwrap_or( 0 )
+  };
 
   match rows
   {
@@ -192,15 +257,17 @@ pub async fn get_spending_by_agent(
 /// GET /api/v1/analytics/spending/by-provider
 ///
 /// Requires JWT authentication.
+/// Admins see all spending; regular users see only their owned agents' spending.
 pub async fn get_spending_by_provider(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
 {
   let ( start_ms, end_ms ) = params.period.to_range();
+  let is_admin = user.0.role == "admin";
 
-  let rows: Result< Vec< ( String, i64, i64, i64 ) >, _ > = sqlx::query_as(
+  let mut query = String::from(
     r#"SELECT
          provider,
          COALESCE(SUM(cost_micros), 0) as spending_micros,
@@ -208,14 +275,38 @@ pub async fn get_spending_by_provider(
          COUNT(DISTINCT agent_id) as agent_count
        FROM analytics_events
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-       AND event_type = 'llm_request_completed'
-       GROUP BY provider
-       ORDER BY spending_micros DESC"#
-  )
+       AND event_type = 'llm_request_completed'"#
+  );
+
+  // Filter by owned agents for non-admins
+  if !is_admin
+  {
+    query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+  }
+
+  if params.agent_id.is_some()
+  {
+    query.push_str( " AND agent_id = ?" );
+  }
+
+  query.push_str( " GROUP BY provider ORDER BY spending_micros DESC" );
+
+  let mut q = sqlx::query_as::< _, ( String, i64, i64, i64 ) >( &query )
     .bind( start_ms )
-    .bind( end_ms )
-    .fetch_all( &state.pool )
-    .await;
+    .bind( end_ms );
+
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    q = q.bind( &user.0.sub );
+  }
+
+  if let Some( agent_id ) = params.agent_id
+  {
+    q = q.bind( agent_id );
+  }
+
+  let rows = q.fetch_all( &state.pool ).await;
 
   match rows
   {
@@ -266,13 +357,15 @@ pub async fn get_spending_by_provider(
 /// GET /api/v1/analytics/spending/avg-per-request
 ///
 /// Requires JWT authentication.
+/// Admins see all spending; regular users see only their owned agents' spending.
 pub async fn get_spending_avg(
-  _user: AuthenticatedUser,
+  user: AuthenticatedUser,
   State( state ): State< AnalyticsState >,
   Query( params ): Query< AnalyticsQuery >,
 ) -> impl IntoResponse
 {
   let ( start_ms, end_ms ) = params.period.to_range();
+  let is_admin = user.0.role == "admin";
 
   let mut query = String::from(
     r#"SELECT
@@ -284,6 +377,12 @@ pub async fn get_spending_avg(
        WHERE timestamp_ms >= ? AND timestamp_ms <= ?
        AND event_type = 'llm_request_completed'"#
   );
+
+  // Filter by owned agents for non-admins
+  if !is_admin
+  {
+    query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+  }
 
   if params.agent_id.is_some()
   {
@@ -297,6 +396,12 @@ pub async fn get_spending_avg(
   let mut q = sqlx::query_as::< _, ( i64, i64, i64, i64 ) >( &query )
     .bind( start_ms )
     .bind( end_ms );
+
+  // Bind owner_id for non-admins
+  if !is_admin
+  {
+    q = q.bind( &user.0.sub );
+  }
 
   if let Some( agent_id ) = params.agent_id
   {
