@@ -38,9 +38,14 @@ _load_config()
 APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 IC_TOKEN = os.getenv("IC_TOKEN")
+IC_SERVER = os.getenv("IC_SERVER")
 
 # Optional: Debug check
 if not APOLLO_API_KEY:
-    print("Warning: APOLLO_API_KEY is missing in environment.")
+    print("Warning: APOLLO_API_KEY is missing in environment!")
 if not OPENAI_API_KEY:
-    print("Warning: OPENAI_API_KEY is missing in environment.")
+    print("Warning: OPENAI_API_KEY is missing in environment!")
+if not IC_TOKEN:
+    print("Warning: IC_TOKEN is missing in environment!")
+if not IC_SERVER:
+    print("Warning: IC_SERVER is missing in environment!")
