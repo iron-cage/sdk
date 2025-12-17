@@ -5,17 +5,15 @@ description = "Required dependencies for the lead search agent to work"
 readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
-    "iron-sdk",
-    "iron-runtime",
-
-    # LangChain Ecosystem (Modular)
-    "langchain",            # Metapackage
-    "langchain-core",       # Contains AgentExecutor, ChatPromptTemplate
-    "langchain-openai",     # Contains ChatOpenAI
-    "langchain-community",  # Contains useful tools and utilities
+    "iron-cage",
+    "langchain==1.2.0",            # Metapackage
+    "langchain-core==1.2.1",       # Contains AgentExecutor, ChatPromptTemplate
+    "langchain-openai==1.1.3",     # Contains ChatOpenAI
+    "langchain-community==0.4.1",  # Contains useful tools and utilities
+    "langgraph==1.0.5",            # Contains create_react_agent
 
     # Utilities
-    "pydantic>=2.0",               # For data validation
+    "pydantic==2.12.5",            # For data validation
     "python-dotenv>=1.2.1",        # For environment variables
     "requests>=2.32.5",            # For general HTTP requests
 ]
@@ -23,15 +21,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
-    "pytest-mock>=3.15.1",
-    "requests-mock>=1.12.1",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
 addopts = "-v"
 testpaths = ["tests"]
-
-[tool.uv.sources]
-iron-sdk = { path = "../../iron_sdk", editable = true }
-iron-runtime = { path = "../../iron_runtime", editable = true }
