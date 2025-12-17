@@ -24,12 +24,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const api = useApi()
 const queryClient = useQueryClient()
-const router = useRouter()
 const authStore = useAuthStore()
 
 const showCreateModal = ref(false)

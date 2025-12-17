@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi, type AnalyticsPeriod } from '../composables/useApi'
+import { useApi, type AnalyticsPeriod, type AnalyticsEvent } from '../composables/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -19,9 +19,12 @@ const { data: agents } = useQuery({
 // Period selector
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
 
-// Logs pagination
+// Logs pagination - accumulate logs across pages
 const logsPage = ref(1)
 const logsPerPage = 10
+const accumulatedLogs = ref<AnalyticsEvent[]>([])
+const totalEvents = ref(0)
+const totalPages = ref(1)
 
 const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
   { value: 'today', label: 'Today' },
@@ -66,7 +69,7 @@ const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
 })
 
 // Fetch recent events/logs
-const { data: eventsList, isLoading: eventsLoading } = useQuery({
+const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
   queryFn: () => api.getAnalyticsEventsList(
     {
@@ -78,6 +81,27 @@ const { data: eventsList, isLoading: eventsLoading } = useQuery({
       per_page: logsPerPage,
     }
   ),
+})
+
+// Accumulate logs when new data arrives
+watch(eventsList, (newData) => {
+  if (newData) {
+    if (logsPage.value === 1) {
+      // First page - replace all
+      accumulatedLogs.value = newData.data
+    } else {
+      // Append new logs
+      accumulatedLogs.value = [...accumulatedLogs.value, ...newData.data]
+    }
+    totalEvents.value = newData.pagination.total
+    totalPages.value = newData.pagination.total_pages
+  }
+})
+
+// Reset when filters change
+watch([selectedPeriod, selectedAgentId], () => {
+  logsPage.value = 1
+  accumulatedLogs.value = []
 })
 
 const isLoading = computed(() =>
@@ -318,15 +342,15 @@ function loadMoreLogs() {
       <Card>
         <CardHeader class="flex flex-row items-center justify-between">
           <CardTitle>Recent Logs</CardTitle>
-          <span v-if="eventsList" class="text-sm text-gray-500">
-            {{ eventsList.pagination.total }} total events
+          <span v-if="totalEvents > 0" class="text-sm text-gray-500">
+            Showing {{ accumulatedLogs.length }} of {{ totalEvents }} events
           </span>
         </CardHeader>
         <CardContent>
-          <div v-if="eventsLoading" class="text-center text-gray-600 py-4">
+          <div v-if="eventsLoading && accumulatedLogs.length === 0" class="text-center text-gray-600 py-4">
             Loading logs...
           </div>
-          <div v-else-if="!eventsList?.data.length" class="text-center text-gray-600 py-4">
+          <div v-else-if="accumulatedLogs.length === 0" class="text-center text-gray-600 py-4">
             No logs available
           </div>
           <div v-else>
@@ -343,7 +367,7 @@ function loadMoreLogs() {
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="event in eventsList.data" :key="event.event_id">
+                  <tr v-for="event in accumulatedLogs" :key="event.event_id">
                     <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {{ formatTimestamp(event.timestamp_ms) }}
                     </td>
@@ -375,9 +399,9 @@ function loadMoreLogs() {
             </div>
 
             <!-- Load More Button -->
-            <div v-if="eventsList.pagination.page < eventsList.pagination.total_pages" class="mt-4 text-center">
-              <Button variant="outline" @click="loadMoreLogs">
-                Load More Logs
+            <div v-if="logsPage < totalPages" class="mt-4 text-center">
+              <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
+                {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>
             </div>
           </div>

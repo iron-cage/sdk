@@ -6,21 +6,11 @@ use std::sync::{ Mutex, MutexGuard };
 
 static ENV_LOCK: Mutex<()> = Mutex::new( () );
 
+#[derive(Default)]
 struct EnvSnapshot
 {
   database_url: Option< OsString >,
   max_connections: Option< OsString >,
-}
-
-impl Default for EnvSnapshot
-{
-  fn default() -> Self
-  {
-    Self {
-      database_url: None,
-      max_connections: None,
-    }
-  }
 }
 
 impl EnvSnapshot
@@ -80,7 +70,7 @@ impl Drop for EnvTestGuard
 {
   fn drop(&mut self)
   {
-    std::mem::take( &mut self.snapshot ).restore();
+    core::mem::take( &mut self.snapshot ).restore();
   }
 }
 

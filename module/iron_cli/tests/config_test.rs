@@ -23,25 +23,13 @@ use std::sync::{ Mutex, MutexGuard };
 
 static ENV_LOCK: Mutex<()> = Mutex::new( () );
 
+#[derive(Default)]
 struct EnvSnapshot
 {
   api_url: Option< OsString >,
   format: Option< OsString >,
   user: Option< OsString >,
   token: Option< OsString >,
-}
-
-impl Default for EnvSnapshot
-{
-  fn default() -> Self
-  {
-    Self {
-      api_url: None,
-      format: None,
-      user: None,
-      token: None,
-    }
-  }
 }
 
 impl EnvSnapshot
