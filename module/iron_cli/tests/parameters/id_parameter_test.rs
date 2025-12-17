@@ -3,14 +3,14 @@
 //! ## Purpose
 //!
 //! Validates the `id` parameter across all commands that use it.
-//! The `id` parameter is used for generic resource identification (agents, projects, budget requests, etc.).
+//! The `id` parameter is used for generic resource identification (agents, projects, etc.).
 //!
 //! ## Coverage
 //!
-//! Commands tested (25 total):
+//! Commands tested:
 //! - .agent.get, .agent.update, .agent.delete, .agent.add_provider, .agent.remove_provider
-//! - .project.get, .project.update, .project.delete
-//! - .budget_request.get, .budget_request.approve, .budget_request.reject, .budget_request.cancel
+//! - .agent.ic_token.generate, .agent.ic_token.status, .agent.ic_token.regenerate, .agent.ic_token.revoke
+//! - .project.get
 //! - And others...
 //!
 //! ## Test Categories
@@ -99,7 +99,7 @@ mod tests
     server.shutdown().await;
   }
 
-  /// Test id parameter across different resource types (agent, project, budget_request)
+  /// Test id parameter across different resource types (agent, project)
   #[tokio::test]
   async fn test_id_cross_resource_consistency()
   {
@@ -120,11 +120,8 @@ mod tests
     // Test id parameter with project.get
     let result2 = harness.run( "iron", &[ ".project.get", &format!( "id::{}", test_uuid ) ] ).await;
 
-    // Test id parameter with budget_request.get
-    let result3 = harness.run( "iron", &[ ".budget_request.get", &format!( "id::{}", test_uuid ) ] ).await;
-
     // All should handle the UUID consistently (succeed or "not found", not format error)
-    for result in [ result1, result2, result3 ] {
+    for result in [ result1, result2 ] {
       if !result.success() {
         assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
           "Should not fail with id format error. Stderr: {}", result.stderr );
@@ -221,6 +218,318 @@ mod tests
     assert!( !result.success(), "Single character id should fail" );
     assert!( result.stderr.contains( "id" ) || result.stderr.contains( "invalid" ) || result.stderr.contains( "UUID" ),
       "Error should mention invalid id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  // =====================================================
+  // IC Token Command Tests
+  // =====================================================
+
+  /// Test .agent.ic_token.generate with valid id
+  #[tokio::test]
+  async fn test_ic_token_generate_valid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.generate", "id::550e8400-e29b-41d4-a716-446655440000" ] ).await;
+
+    // Should succeed or fail with "not found", not format error
+    if !result.success() {
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with id format error. Stderr: {}", result.stderr );
+    }
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.generate with missing id
+  #[tokio::test]
+  async fn test_ic_token_generate_missing_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.generate" ] ).await;
+
+    assert!( !result.success(), "Missing required id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "required" ),
+      "Error should mention missing id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.generate with invalid id
+  #[tokio::test]
+  async fn test_ic_token_generate_invalid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.generate", "id::not-a-uuid" ] ).await;
+
+    assert!( !result.success(), "Invalid id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "invalid" ) || result.stderr.contains( "UUID" ),
+      "Error should mention invalid id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.status with valid id
+  #[tokio::test]
+  async fn test_ic_token_status_valid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.status", "id::550e8400-e29b-41d4-a716-446655440000" ] ).await;
+
+    // Should succeed or fail with "not found", not format error
+    if !result.success() {
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with id format error. Stderr: {}", result.stderr );
+    }
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.status with missing id
+  #[tokio::test]
+  async fn test_ic_token_status_missing_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.status" ] ).await;
+
+    assert!( !result.success(), "Missing required id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "required" ),
+      "Error should mention missing id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.status with invalid id
+  #[tokio::test]
+  async fn test_ic_token_status_invalid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.status", "id::not-a-uuid" ] ).await;
+
+    assert!( !result.success(), "Invalid id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "invalid" ) || result.stderr.contains( "UUID" ),
+      "Error should mention invalid id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.regenerate with valid id
+  #[tokio::test]
+  async fn test_ic_token_regenerate_valid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.regenerate", "id::550e8400-e29b-41d4-a716-446655440000" ] ).await;
+
+    // Should succeed or fail with "not found", not format error
+    if !result.success() {
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with id format error. Stderr: {}", result.stderr );
+    }
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.regenerate with missing id
+  #[tokio::test]
+  async fn test_ic_token_regenerate_missing_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.regenerate" ] ).await;
+
+    assert!( !result.success(), "Missing required id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "required" ),
+      "Error should mention missing id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.regenerate with invalid id
+  #[tokio::test]
+  async fn test_ic_token_regenerate_invalid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.regenerate", "id::not-a-uuid" ] ).await;
+
+    assert!( !result.success(), "Invalid id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "invalid" ) || result.stderr.contains( "UUID" ),
+      "Error should mention invalid id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.revoke with valid id
+  #[tokio::test]
+  async fn test_ic_token_revoke_valid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.revoke", "id::550e8400-e29b-41d4-a716-446655440000" ] ).await;
+
+    // Should succeed or fail with "not found", not format error
+    if !result.success() {
+      assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+        "Should not fail with id format error. Stderr: {}", result.stderr );
+    }
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.revoke with missing id
+  #[tokio::test]
+  async fn test_ic_token_revoke_missing_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.revoke" ] ).await;
+
+    assert!( !result.success(), "Missing required id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "required" ),
+      "Error should mention missing id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test .agent.ic_token.revoke with invalid id
+  #[tokio::test]
+  async fn test_ic_token_revoke_invalid_id()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let result = harness.run( "iron", &[ ".agent.ic_token.revoke", "id::not-a-uuid" ] ).await;
+
+    assert!( !result.success(), "Invalid id should fail" );
+    assert!( result.stderr.contains( "id" ) || result.stderr.contains( "invalid" ) || result.stderr.contains( "UUID" ),
+      "Error should mention invalid id. Stderr: {}", result.stderr );
+
+    server.shutdown().await;
+  }
+
+  /// Test IC token commands across all four operations with same agent id
+  #[tokio::test]
+  async fn test_ic_token_commands_consistency()
+  {
+    let server = TestServer::start().await;
+    let data = TestData::new().await;
+    let user_id = data.create_user( "test@example.com" ).await;
+    let api_key = data.create_api_key( user_id, "test-key" ).await;
+
+    let harness = IntegrationTestHarness::new()
+      .server_url( server.url() )
+      .api_key( &api_key );
+
+    let test_uuid = "550e8400-e29b-41d4-a716-446655440000";
+
+    // Test all IC token commands with the same id
+    let commands = [
+      ".agent.ic_token.generate",
+      ".agent.ic_token.status",
+      ".agent.ic_token.regenerate",
+      ".agent.ic_token.revoke",
+    ];
+
+    for cmd in commands {
+      let result = harness.run( "iron", &[ cmd, &format!( "id::{}", test_uuid ) ] ).await;
+
+      // All should handle the UUID consistently (succeed or "not found", not format error)
+      if !result.success() {
+        assert!( !result.stderr.contains( "id" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
+          "Command {} should not fail with id format error. Stderr: {}", cmd, result.stderr );
+      }
+    }
 
     server.shutdown().await;
   }

@@ -92,7 +92,7 @@ async fn test_login_integration_success()
   let command = create_verified_command(
     ".auth.login",
     &[
-      ( "username", "alice" ),
+      ( "email", "alice" ),
       ( "password", "password123" ),
     ],
   );
@@ -119,7 +119,7 @@ async fn test_login_integration_invalid_credentials()
   let command = create_verified_command(
     ".auth.login",
     &[
-      ( "username", "nonexistent" ),
+      ( "email", "nonexistent" ),
       ( "password", "wrong" ),
     ],
   );
@@ -317,7 +317,7 @@ async fn test_full_auth_workflow()
   let login_cmd = create_verified_command(
     ".auth.login",
     &[
-      ( "username", "workflow-user" ),
+      ( "email", "workflow-user" ),
       ( "password", "pass" ),
     ],
   );

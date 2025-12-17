@@ -89,7 +89,7 @@ async fn test_login_adapter_success()
   let command = create_verified_command(
     ".auth.login",
     &[
-      ("username", "alice@example.com"),
+      ("email", "alice@example.com"),
       ("password", "password123"),
     ],
   );
@@ -126,15 +126,15 @@ async fn test_login_adapter_missing_username()
     &formatter,
   ).await;
 
-  assert!( result.is_err(), "Should fail without username" );
+  assert!( result.is_err(), "Should fail without email" );
 
   match result.unwrap_err()
   {
     AdapterError::HandlerError( e ) =>
     {
       assert!(
-        e.to_string().contains( "username" ),
-        "Error should mention missing username"
+        e.to_string().contains( "email" ),
+        "Error should mention missing email"
       );
     }
     other => panic!( "Wrong error type: {:?}", other ),
@@ -150,7 +150,7 @@ async fn test_login_adapter_invalid_credentials()
   let command = create_verified_command(
     ".auth.login",
     &[
-      ("username", "alice@example.com"),
+      ("email", "alice@example.com"),
       ("password", "wrong_password"),
     ],
   );
@@ -187,7 +187,7 @@ async fn test_login_adapter_network_error()
   let command = create_verified_command(
     ".auth.login",
     &[
-      ("username", "alice@example.com"),
+      ("email", "alice@example.com"),
       ("password", "password123"),
     ],
   );
@@ -219,7 +219,7 @@ async fn test_login_adapter_json_format()
   let command = create_verified_command(
     ".auth.login",
     &[
-      ("username", "alice@example.com"),
+      ("email", "alice@example.com"),
       ("password", "password123"),
       ("format", "json"),
     ],

@@ -74,8 +74,8 @@ where
   let _ = auth_handlers::login_handler( &params )?;
 
   // Extract validated parameters
-  let username = params.get( "username" ).ok_or_else( || {
-    AdapterError::ExtractionError( "username missing after validation".to_string() )
+  let email = params.get( "email" ).ok_or_else( || {
+    AdapterError::ExtractionError( "email missing after validation".to_string() )
   })?;
 
   let password = params.get( "password" ).ok_or_else( || {
@@ -83,12 +83,12 @@ where
   })?;
 
   // Perform async authentication
-  let tokens = auth_service.login( username, password ).await?;
+  let tokens = auth_service.login( email, password ).await?;
 
   // Format output
   let mut output_data = HashMap::new();
   output_data.insert( "status".to_string(), "success".to_string() );
-  output_data.insert( "user".to_string(), username.clone() );
+  output_data.insert( "user".to_string(), email.clone() );
   output_data.insert( "access_token".to_string(), tokens.access_token.clone() );
 
   let output = formatter.format_single( &output_data );

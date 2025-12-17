@@ -36,15 +36,15 @@
   tags: []
 - name: .provider.create
   namespace: ''
-  description: Create new provider with API configuration
-  hint: Registers new LLM API provider
+  description: Create new provider key with API configuration
+  hint: Registers new LLM API provider key
   status: stable
   version: 1.0.0
   arguments:
-  - name: name
+  - name: provider
     kind: String
-    description: Provider name
-    hint: Unique identifier for provider
+    description: Provider type
+    hint: openai or anthropic
     attributes:
       optional: false
       multiple: false
@@ -56,7 +56,7 @@
   - name: api_key
     kind: String
     description: API key for provider
-    hint: Authentication key
+    hint: Authentication key (will be encrypted)
     attributes:
       optional: false
       multiple: false
@@ -65,10 +65,22 @@
     validation_rules: []
     aliases: []
     tags: []
-  - name: endpoint
+  - name: base_url
     kind: String
-    description: API endpoint URL
-    hint: Base URL for API calls
+    description: Custom API endpoint URL
+    hint: Optional custom base URL for API calls
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: description
+    kind: String
+    description: Provider key description
+    hint: Optional description for this key
     attributes:
       optional: true
       multiple: false
@@ -103,7 +115,7 @@
     tags: []
   idempotent: false
   examples:
-  - .provider.create name::example_name api_key::value
+  - .provider.create provider::openai api_key::sk-xxx
   aliases: []
   tags: []
 - name: .provider.get

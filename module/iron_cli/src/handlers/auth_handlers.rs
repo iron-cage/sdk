@@ -8,13 +8,13 @@ use crate::handlers::CliError;
 
 /// Handle .auth.login command
 ///
-/// Validates username and password parameters, returns formatted output.
+/// Validates email and password parameters, returns formatted output.
 /// Actual authentication happens in adapter layer (not here).
 ///
 /// ## Parameters
 ///
 /// Required:
-/// - username: String (3-100 chars, pattern: ^[a-zA-Z0-9@._-]+$)
+/// - email: String (3-100 chars, pattern: ^[a-zA-Z0-9@._-]+$)
 /// - password: String (non-empty)
 ///
 /// Optional:
@@ -24,46 +24,46 @@ pub fn login_handler(
 ) -> Result<String, CliError>
 {
   // Validate required parameters
-  let username = params
-    .get("username")
-    .ok_or(CliError::MissingParameter("username"))?;
+  let email = params
+    .get("email")
+    .ok_or(CliError::MissingParameter("email"))?;
 
   let password = params
     .get("password")
     .ok_or(CliError::MissingParameter("password"))?;
 
-  // Validate username format
-  if username.is_empty()
+  // Validate email format
+  if email.is_empty()
   {
     return Err(CliError::InvalidParameter {
-      param: "username",
+      param: "email",
       reason: "cannot be empty",
     });
   }
 
-  if username.len() < 3
+  if email.len() < 3
   {
     return Err(CliError::InvalidParameter {
-      param: "username",
+      param: "email",
       reason: "must be at least 3 characters",
     });
   }
 
-  if username.len() > 100
+  if email.len() > 100
   {
     return Err(CliError::InvalidParameter {
-      param: "username",
+      param: "email",
       reason: "must be at most 100 characters",
     });
   }
 
-  // Validate username pattern: ^[a-zA-Z0-9@._-]+$
-  if !username.chars().all(|c| {
+  // Validate email pattern: ^[a-zA-Z0-9@._-]+$
+  if !email.chars().all(|c| {
     c.is_ascii_alphanumeric() || matches!(c, '@' | '.' | '_' | '-')
   })
   {
     return Err(CliError::InvalidParameter {
-      param: "username",
+      param: "email",
       reason: "must match pattern ^[a-zA-Z0-9@._-]+$",
     });
   }
@@ -81,8 +81,8 @@ pub fn login_handler(
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
 
   Ok(format!(
-    "Login validation successful\nUsername: {}\nFormat: {}",
-    username, format
+    "Login validation successful\nEmail: {}\nFormat: {}",
+    email, format
   ))
 }
 

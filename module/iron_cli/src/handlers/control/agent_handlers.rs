@@ -56,13 +56,15 @@ pub fn list_agents_handler(
 
 /// Handle .agent.create command
 ///
-/// Creates new agent with name and budget.
+/// Creates new agent with name, providers, provider key, and budget.
 ///
 /// ## Parameters
 ///
 /// Required:
 /// - name: String (non-empty, max 100 chars, pattern: ^[a-zA-Z0-9_-]+$)
-/// - budget: String (non-negative integer)
+/// - providers: String (comma-separated list, e.g., "openai" or "openai,anthropic")
+/// - provider_key_id: String (positive integer)
+/// - budget: String (positive integer, in microdollars)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
@@ -75,6 +77,14 @@ pub fn create_agent_handler(
   let name = params
     .get("name")
     .ok_or(CliError::MissingParameter("name"))?;
+
+  let providers = params
+    .get("providers")
+    .ok_or(CliError::MissingParameter("providers"))?;
+
+  let provider_key_id_str = params
+    .get("provider_key_id")
+    .ok_or(CliError::MissingParameter("provider_key_id"))?;
 
   let budget_str = params
     .get("budget")
@@ -103,8 +113,28 @@ pub fn create_agent_handler(
     });
   }
 
-  // Validate budget
-  validate_non_negative_integer(budget_str, "budget")?;
+  // Validate providers
+  validate_non_empty(providers, "providers")?;
+
+  // Validate provider_key_id
+  let provider_key_id = validate_non_negative_integer(provider_key_id_str, "provider_key_id")?;
+  if provider_key_id == 0
+  {
+    return Err(CliError::InvalidParameter {
+      param: "provider_key_id",
+      reason: "must be a positive integer",
+    });
+  }
+
+  // Validate budget (must be positive for initial budget)
+  let budget = validate_non_negative_integer(budget_str, "budget")?;
+  if budget == 0
+  {
+    return Err(CliError::InvalidParameter {
+      param: "budget",
+      reason: "must be a positive integer (in microdollars)",
+    });
+  }
 
   // Validate optional dry run
   if let Some(dry_str) = params.get("dry")
@@ -122,8 +152,8 @@ pub fn create_agent_handler(
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
 
   Ok(format!(
-    "Agent creation parameters valid\nName: {}\nBudget: {}\nFormat: {}",
-    name, budget_str, format
+    "Agent creation parameters valid\nName: {}\nProviders: {}\nProvider Key ID: {}\nBudget: {}\nFormat: {}",
+    name, providers, provider_key_id_str, budget_str, format
   ))
 }
 
@@ -414,5 +444,125 @@ pub fn remove_provider_handler(
   Ok(format!(
     "Remove provider parameters valid\nAgent ID: {}\nProvider ID: {}\nFormat: {}",
     id, provider_id, format
+  ))
+}
+
+/// Handle .agent.ic_token.generate command
+///
+/// Generates IC token for agent.
+///
+/// ## Parameters
+///
+/// Required:
+/// - id: String (non-empty agent ID)
+///
+/// Optional:
+/// - format: String (table|json|yaml, default: table)
+pub fn generate_ic_token_handler(
+  params: &HashMap<String, String>,
+) -> Result<String, CliError>
+{
+  // Validate required parameter
+  let id = params
+    .get("id")
+    .ok_or(CliError::MissingParameter("id"))?;
+
+  validate_non_empty(id, "id")?;
+
+  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+
+  Ok(format!(
+    "Generate IC token parameters valid\nAgent ID: {}\nFormat: {}",
+    id, format
+  ))
+}
+
+/// Handle .agent.ic_token.status command
+///
+/// Gets IC token status for agent.
+///
+/// ## Parameters
+///
+/// Required:
+/// - id: String (non-empty agent ID)
+///
+/// Optional:
+/// - format: String (table|json|yaml, default: table)
+pub fn get_ic_token_status_handler(
+  params: &HashMap<String, String>,
+) -> Result<String, CliError>
+{
+  // Validate required parameter
+  let id = params
+    .get("id")
+    .ok_or(CliError::MissingParameter("id"))?;
+
+  validate_non_empty(id, "id")?;
+
+  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+
+  Ok(format!(
+    "Get IC token status parameters valid\nAgent ID: {}\nFormat: {}",
+    id, format
+  ))
+}
+
+/// Handle .agent.ic_token.regenerate command
+///
+/// Regenerates IC token for agent.
+///
+/// ## Parameters
+///
+/// Required:
+/// - id: String (non-empty agent ID)
+///
+/// Optional:
+/// - format: String (table|json|yaml, default: table)
+pub fn regenerate_ic_token_handler(
+  params: &HashMap<String, String>,
+) -> Result<String, CliError>
+{
+  // Validate required parameter
+  let id = params
+    .get("id")
+    .ok_or(CliError::MissingParameter("id"))?;
+
+  validate_non_empty(id, "id")?;
+
+  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+
+  Ok(format!(
+    "Regenerate IC token parameters valid\nAgent ID: {}\nFormat: {}",
+    id, format
+  ))
+}
+
+/// Handle .agent.ic_token.revoke command
+///
+/// Revokes IC token for agent.
+///
+/// ## Parameters
+///
+/// Required:
+/// - id: String (non-empty agent ID)
+///
+/// Optional:
+/// - format: String (table|json|yaml, default: table)
+pub fn revoke_ic_token_handler(
+  params: &HashMap<String, String>,
+) -> Result<String, CliError>
+{
+  // Validate required parameter
+  let id = params
+    .get("id")
+    .ok_or(CliError::MissingParameter("id"))?;
+
+  validate_non_empty(id, "id")?;
+
+  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+
+  Ok(format!(
+    "Revoke IC token parameters valid\nAgent ID: {}\nFormat: {}",
+    id, format
   ))
 }
