@@ -66,30 +66,34 @@ pub async fn login(
   }
 
   // GAP-006: Rate limiting check (5 attempts per 5 minutes per IP)
+  // Only enabled in production mode to allow rapid testing in development
   // Extract real client IP from TCP connection (secure, cannot be spoofed)
   let client_ip = addr.ip();
 
-  if let Err( retry_after_secs ) = state.rate_limiter.check_and_record( client_ip )
+  if state.rate_limiting_enabled
   {
-    tracing::warn!(
-      email = %request.email,
-      client_ip = %client_ip,
-      retry_after_secs = retry_after_secs,
-      "Rate limit exceeded for login attempt"
-    );
-    return (
-      StatusCode::TOO_MANY_REQUESTS,
-      Json( ErrorResponse {
-        error: ErrorDetail {
-          code: "RATE_LIMIT_EXCEEDED".to_string(),
-          message: format!( "Too many login attempts. Please try again in {} seconds.", retry_after_secs ),
-          details: Some( serde_json::json!({
-            "retry_after": retry_after_secs
-          })),
-        },
-      }),
-    )
-      .into_response();
+    if let Err( retry_after_secs ) = state.rate_limiter.check_and_record( client_ip )
+    {
+      tracing::warn!(
+        email = %request.email,
+        client_ip = %client_ip,
+        retry_after_secs = retry_after_secs,
+        "Rate limit exceeded for login attempt"
+      );
+      return (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json( ErrorResponse {
+          error: ErrorDetail {
+            code: "RATE_LIMIT_EXCEEDED".to_string(),
+            message: format!( "Too many login attempts. Please try again in {} seconds.", retry_after_secs ),
+            details: Some( serde_json::json!({
+              "retry_after": retry_after_secs
+            })),
+          },
+        }),
+      )
+        .into_response();
+    }
   }
 
   // Check account lockout before attempting authentication

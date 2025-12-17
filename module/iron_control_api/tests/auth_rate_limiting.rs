@@ -39,9 +39,11 @@ use tower::ServiceExt;
 
 mod common;
 
-/// Helper: Create router with auth routes
+/// Helper: Create router with auth routes (rate limiting enabled for this test file)
 async fn create_auth_router() -> Router {
-  let app_state = common::test_state::TestAppState::new().await;
+  let mut app_state = common::test_state::TestAppState::new().await;
+  // Enable rate limiting for these tests since they specifically test rate limiting behavior
+  app_state.auth.rate_limiting_enabled = true;
 
   // Create test socket address (127.0.0.1:8080)
   let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);

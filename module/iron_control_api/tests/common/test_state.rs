@@ -132,9 +132,10 @@ async fn seed_test_users_for_tokens( pool: &SqlitePool )
 }
 
 /// Create test AuthState with known JWT secret and in-memory database.
+/// Rate limiting is disabled for tests to allow rapid testing.
 pub async fn create_test_auth_state() -> AuthState
 {
-  AuthState::new( TEST_JWT_SECRET.to_string(), "sqlite::memory:" )
+  AuthState::new( TEST_JWT_SECRET.to_string(), "sqlite::memory:", false )
     .await
     .expect( "LOUD FAILURE: Failed to create test AuthState" )
 }
@@ -194,9 +195,10 @@ impl TestAppState
   /// Create new test application state with custom database path.
   ///
   /// Used for concurrency tests where shared database path is needed.
+  /// Rate limiting is disabled for tests to allow rapid testing.
   pub async fn with_db_path( db_path: &str ) -> Self
   {
-    let auth = AuthState::new( TEST_JWT_SECRET.to_string(), db_path )
+    let auth = AuthState::new( TEST_JWT_SECRET.to_string(), db_path, false )
       .await
       .expect( "LOUD FAILURE: Failed to create test AuthState with custom db_path" );
 

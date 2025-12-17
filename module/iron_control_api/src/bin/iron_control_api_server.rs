@@ -517,8 +517,23 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing::info!( "Initializing API server..." );
   tracing::info!( "Database: {}", database_url );
 
+  // Determine if rate limiting should be enabled (only in production modes)
+  let rate_limiting_enabled = matches!(
+    mode,
+    DeploymentMode::Production | DeploymentMode::ProductionUnconfirmed
+  );
+
+  if rate_limiting_enabled
+  {
+    tracing::info!( "✓ Rate limiting enabled (production mode)" );
+  }
+  else
+  {
+    tracing::info!( "⚠ Rate limiting disabled (development/pilot mode)" );
+  }
+
   // Initialize route states
-  let auth_state = iron_control_api::routes::auth::AuthState::new( jwt_secret, &database_url )
+  let auth_state = iron_control_api::routes::auth::AuthState::new( jwt_secret, &database_url, rate_limiting_enabled )
     .await
     .expect( "LOUD FAILURE: Failed to initialize auth state" );
 
