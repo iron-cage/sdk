@@ -96,7 +96,7 @@ watch(eventsList, (newData) => {
     totalEvents.value = newData.pagination.total
     totalPages.value = newData.pagination.total_pages
   }
-})
+}, { immediate: true })
 
 // Reset when filters change
 watch([selectedPeriod, selectedAgentId], () => {

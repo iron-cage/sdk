@@ -233,6 +233,15 @@ pub async fn create_agent(
     })?;
 
     let created_at = chrono::Utc::now().timestamp_millis();
+    let is_admin = user.0.role == "admin";
+
+    // Only admins can assign agents to other users
+    if req.owner_id.is_some() && !is_admin {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Only admins can assign agents to other users".to_string(),
+        ));
+    }
 
     // Determine owner_id: admins can specify, others default to self
     // Note: owner_id references users.id (e.g., "user_demo"), not users.username
