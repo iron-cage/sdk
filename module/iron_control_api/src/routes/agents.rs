@@ -43,6 +43,9 @@ pub struct CreateAgentRequest {
     pub providers: Vec<String>,
     pub provider_key_id: i64,
     pub initial_budget_microdollars: i64,
+    /// Optional owner_id - admins can assign agents to other users.
+    /// If not provided, defaults to the authenticated user.
+    pub owner_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,6 +53,8 @@ pub struct UpdateAgentRequest {
     pub name: Option<String>,
     pub providers: Option<Vec<String>>,
     pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
+    /// Optional owner_id - only admins can reassign agents to other users.
+    pub owner_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -228,7 +233,44 @@ pub async fn create_agent(
     })?;
 
     let created_at = chrono::Utc::now().timestamp_millis();
-    let owner_id = user.0.sub.clone();
+    let is_admin = user.0.role == "admin";
+
+    // Only admins can assign agents to other users
+    if req.owner_id.is_some() && !is_admin {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Only admins can assign agents to other users".to_string(),
+        ));
+    }
+
+    // Determine owner_id: admins can specify, others default to self
+    // Note: owner_id references users.id (e.g., "user_demo"), not users.username
+    let owner_id = if let Some(ref specified_owner) = req.owner_id {
+        // Validate that specified user exists (check users.id column)
+        let user_exists: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM users WHERE id = ?"
+        )
+        .bind(specified_owner)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?;
+
+        if user_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Specified owner_id '{}' does not exist", specified_owner),
+            ));
+        }
+
+        specified_owner.clone()
+    } else {
+        user.0.sub.clone()
+    };
 
     let result = sqlx::query(
         r#"
@@ -417,6 +459,43 @@ pub async fn update_agent(
                 })?;
         }
 
+    }
+
+    // Update owner_id if provided (admin only - already checked above)
+    // Note: owner_id references users.id (e.g., "user_demo"), not users.username
+    if let Some(ref new_owner) = req.owner_id {
+        // Validate that the new owner exists (check users.id column)
+        let user_exists: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM users WHERE id = ?"
+        )
+        .bind(new_owner)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Database error: {}", e),
+            )
+        })?;
+
+        if user_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Specified owner_id '{}' does not exist", new_owner),
+            ));
+        }
+
+        sqlx::query("UPDATE agents SET owner_id = ? WHERE id = ?")
+            .bind(new_owner)
+            .bind(id)
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Database error: {}", e),
+                )
+            })?;
     }
 
     // Fetch updated agent

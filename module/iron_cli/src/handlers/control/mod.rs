@@ -53,5 +53,5 @@ pub mod analytics_handlers;
 pub mod budget_limit_handlers;
 pub mod api_token_handlers;
 pub mod project_handlers;
-pub mod budget_request_handlers;
+pub mod budget_handlers;
 pub mod control_user_handlers;

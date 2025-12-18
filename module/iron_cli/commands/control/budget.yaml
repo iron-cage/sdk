@@ -1,0 +1,86 @@
+- name: .budget.status
+  namespace: ''
+  description: Get budget status across agents
+  hint: Shows budget usage, remaining amounts, and risk levels
+  status: stable
+  version: 1.0.0
+  arguments:
+  - name: agent_id
+    kind: Integer
+    description: Filter by specific agent
+    hint: Optional agent ID filter
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: threshold
+    kind: Integer
+    description: Filter agents above percentage used
+    hint: e.g., 80 for agents using more than 80%
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: status
+    kind: String
+    description: Filter by status
+    hint: active or exhausted
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: page
+    kind: Integer
+    description: Page number
+    hint: For pagination (default 1)
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: per_page
+    kind: Integer
+    description: Results per page
+    hint: Default 10
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  - name: format
+    kind: String
+    description: Output format
+    hint: table, json, or yaml
+    attributes:
+      optional: true
+      multiple: false
+      interactive: false
+      sensitive: false
+    validation_rules: []
+    aliases: []
+    tags: []
+  idempotent: true
+  examples:
+  - .budget.status
+  - .budget.status agent_id::1
+  - .budget.status threshold::80 status::active
+  aliases: []
+  tags: []

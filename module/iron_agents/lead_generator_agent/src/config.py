@@ -4,18 +4,17 @@ from dotenv import load_dotenv
 # --- Internal Configuration Logic ---
 def _load_config():
     """
-    Searches for the 'secret' folder and '-secrets.sh' file 
+    Searches for the 'secret' folder and '-agent_secret.sh' file 
     by moving up the directory tree.
     """
     # Start from the directory where this script is located
     current_path = os.path.dirname(os.path.abspath(__file__))
     
     while True:
-        # Construct the path: current_dir/secret/-secrets.sh
-        secret_file = os.path.join(current_path, "secret", "-secrets.sh")
+        # Construct the path: current_dir/secret/-agent_secret.sh
+        secret_file = os.path.join(current_path, "secret", "-agent_secret.sh")
         
         if os.path.exists(secret_file):
-            print(f"DEBUG: Config loaded from: {secret_file}")
             # override=True is important to ensure variables are updated
             load_dotenv(secret_file, override=True)
             return True
@@ -25,7 +24,7 @@ def _load_config():
         
         # Check if we have reached the root of the drive (e.g., C:\)
         if parent == current_path: 
-            print("WARNING: Config file 'secret/-secrets.sh' not found in any parent directory!")
+            print("WARNING: Config file 'secret/-agent_secret.sh' not found in any parent directory!")
             return False
             
         current_path = parent
@@ -38,9 +37,14 @@ _load_config()
 APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 IC_TOKEN = os.getenv("IC_TOKEN")
+IC_SERVER = os.getenv("IC_SERVER")
 
 # Optional: Debug check
 if not APOLLO_API_KEY:
-    print("Warning: APOLLO_API_KEY is missing in environment.")
+    print("Warning: APOLLO_API_KEY is missing in environment!")
 if not OPENAI_API_KEY:
-    print("Warning: OPENAI_API_KEY is missing in environment.")
+    print("Warning: OPENAI_API_KEY is missing in environment!")
+if not IC_TOKEN:
+    print("Warning: IC_TOKEN is missing in environment!")
+if not IC_SERVER:
+    print("Warning: IC_SERVER is missing in environment!")

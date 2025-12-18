@@ -28,12 +28,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/agents/:agentId/tokens',
-      name: 'agent-tokens',
-      component: () => import('../views/AgentTokensView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
       path: '/usage',
       name: 'usage',
       component: () => import('../views/UsageView.vue'),

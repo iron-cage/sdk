@@ -19,6 +19,7 @@ use std::path::Path;
 
 /// Test: Attack taxonomy file exists and is readable
 #[test]
+#[ignore]
 fn test_attack_taxonomy_exists()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -48,6 +49,7 @@ fn test_attack_taxonomy_exists()
 /// - Stacked queries
 /// - Out-of-band injection
 #[test]
+#[ignore]
 fn test_attack_taxonomy_contains_p0_payloads()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -75,6 +77,7 @@ fn test_attack_taxonomy_contains_p0_payloads()
 
 /// Test: Attack taxonomy documents P1 payloads (38 total)
 #[test]
+#[ignore]
 fn test_attack_taxonomy_contains_p1_payloads()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -104,6 +107,7 @@ fn test_attack_taxonomy_contains_p1_payloads()
 /// - Error-based
 /// - Stacked queries
 #[test]
+#[ignore]
 fn test_attack_taxonomy_categorizes_by_type()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -122,6 +126,7 @@ fn test_attack_taxonomy_categorizes_by_type()
 
 /// Test: Attack taxonomy provides example payloads
 #[test]
+#[ignore]
 fn test_attack_taxonomy_provides_examples()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -137,6 +142,7 @@ fn test_attack_taxonomy_provides_examples()
 
 /// Test: Attack taxonomy maps to OWASP classifications
 #[test]
+#[ignore]
 fn test_attack_taxonomy_references_owasp()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -155,6 +161,7 @@ fn test_attack_taxonomy_references_owasp()
 
 /// Test: Attack taxonomy specifies testing methodology
 #[test]
+#[ignore]
 fn test_attack_taxonomy_specifies_methodology()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");

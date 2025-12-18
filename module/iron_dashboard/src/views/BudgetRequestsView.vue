@@ -210,11 +210,11 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 
 <template>
   <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">
         Budget Requests
       </h1>
-      <Button @click="showCreateModal = true">
+      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
         Create Budget Request
       </Button>
     </div>
@@ -248,50 +248,50 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 
         <!-- My Requests Tab -->
         <TabsContent value="my-requests">
-          <div v-if="myRequests.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
+          <div v-if="myRequests.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+            <table class="min-w-[700px] w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Agent
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Justification
                   </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <tr v-for="request in myRequests" :key="request.id">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <Badge :variant="getStatusBadgeVariant(request.status)">
                       {{ request.status }}
                     </Badge>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-6 py-4 text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 text-sm text-gray-500">
                     <div class="max-w-xs truncate">
                       {{ request.justification }}
                     </div>
@@ -310,62 +310,62 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 
         <!-- Pending Approvals Tab (Admin Only) -->
         <TabsContent v-if="authStore.isAdmin" value="pending-approvals">
-          <div v-if="pendingRequests.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
+          <div v-if="pendingRequests.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+            <table class="min-w-[900px] w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Requester
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Agent
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Current Budget
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Requested
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Justification
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created
                   </th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <tr v-for="request in pendingRequests" :key="request.id">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.requester_id }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${{ request.current_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-6 py-4 text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 text-sm text-gray-500">
                     <div class="max-w-xs">
                       {{ request.justification }}
                     </div>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                     <Button
                       @click="handleApproveRequest(request)"
                       :disabled="approveMutation.isPending.value"
@@ -412,56 +412,56 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             </Select>
           </div>
 
-          <div v-if="filteredRequests.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
+          <div v-if="filteredRequests.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+            <table class="min-w-[800px] w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Requester
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Agent
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Justification
                   </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <tr v-for="request in filteredRequests" :key="request.id">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.requester_id }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <Badge :variant="getStatusBadgeVariant(request.status)">
                       {{ request.status }}
                     </Badge>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-6 py-4 text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 text-sm text-gray-500">
                     <div class="max-w-xs truncate">
                       {{ request.justification }}
                     </div>

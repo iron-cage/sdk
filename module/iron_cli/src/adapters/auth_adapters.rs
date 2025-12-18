@@ -4,7 +4,7 @@
 //!
 //! ## Authentication Flow
 //!
-//! 1. **Login:** username/password → API → access_token + refresh_token → keyring
+//! 1. **Login:** email/password → API → access_token + refresh_token → keyring
 //! 2. **Refresh:** refresh_token (keyring) → API → new access_token → keyring
 //! 3. **Logout:** Clear tokens from keyring
 //!
@@ -36,8 +36,8 @@ fn format_response( data: &Value, format: &str ) -> Result<String, AdapterError>
 ///
 /// ## Parameters
 ///
-/// - username: User credentials
-/// - password: User credentials
+/// - email: User email for authentication
+/// - password: User password
 /// - format: Output format (table|json|yaml, default: table)
 ///
 /// ## Flow
@@ -50,7 +50,7 @@ fn format_response( data: &Value, format: &str ) -> Result<String, AdapterError>
 /// ## Example
 ///
 /// ```bash
-/// iron-token .auth.login username::admin password::secret123
+/// iron-token .auth.login email::admin@example.com password::secret123
 /// ```
 pub async fn login_adapter(
   params: &HashMap<String, String>,
@@ -60,7 +60,7 @@ pub async fn login_adapter(
   auth_handlers::login_handler( params )?;
 
   // 2. Extract parameters
-  let username = params.get( "username" ).unwrap(); // Already validated
+  let email = params.get( "email" ).unwrap(); // Already validated
   let password = params.get( "password" ).unwrap(); // Already validated
 
   // 3. Create HTTP client
@@ -69,7 +69,7 @@ pub async fn login_adapter(
 
   // 4. Build request body
   let body = json!({
-    "username": username,
+    "email": email,
     "password": password,
   });
 
@@ -80,10 +80,12 @@ pub async fn login_adapter(
     .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Login failed: {}", e ) ) ) )?;
 
   // 6. Extract tokens from response
+  // API returns "user_token" (fallback to "access_token" for compatibility)
   let access_token = response
-    .get( "access_token" )
+    .get( "user_token" )
+    .or_else( || response.get( "access_token" ) )
     .and_then( |v| v.as_str() )
-    .ok_or_else( || AdapterError::ExtractionError( "Missing access_token in response".to_string() ) )?;
+    .ok_or_else( || AdapterError::ExtractionError( "Missing user_token/access_token in response".to_string() ) )?;
 
   let refresh_token = response
     .get( "refresh_token" )
@@ -102,8 +104,8 @@ pub async fn login_adapter(
 
   let success_data = json!({
     "status": "success",
-    "message": format!( "Login successful for user: {}", username ),
-    "username": username,
+    "message": format!( "Login successful for user: {}", email ),
+    "email": email,
   });
 
   format_response( &success_data, format )

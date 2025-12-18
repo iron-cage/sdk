@@ -1,11 +1,29 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
-const sidebarOpen = ref(true)
+
+const sidebarOpen = ref(false)
+
+function isActive(path: string): boolean {
+  return route.path === path || route.path.startsWith(path + '/')
+}
+
+function navLinkClass(path: string): string {
+  const base = 'flex items-center px-4 py-2 text-sm font-medium rounded-md'
+  if (isActive(path)) {
+    return `${base} bg-gray-800 text-white`
+  }
+  return `${base} text-gray-300 hover:bg-gray-800 hover:text-white`
+}
+
+function handleNavClick() {
+  sidebarOpen.value = false
+}
 
 async function handleLogout() {
   await authStore.logout()
@@ -15,26 +33,26 @@ async function handleLogout() {
 
 <template>
   <div class="min-h-screen bg-gray-100">
+    <!-- Mobile sidebar backdrop -->
+    <div
+      v-if="sidebarOpen"
+      class="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+      @click="sidebarOpen = false"
+    />
+
     <!-- Sidebar -->
     <div
-      :class="[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform transition-transform duration-300 ease-in-out',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-      ]"
+      class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform transition-transform duration-200 ease-in-out lg:translate-x-0"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="flex items-center justify-between h-16 px-4 bg-gray-800">
         <span class="text-xl font-semibold text-white">Iron Token</span>
         <button
-          @click="sidebarOpen = !sidebarOpen"
-          class="text-gray-400 hover:text-white focus:outline-none lg:hidden"
+          class="lg:hidden text-gray-400 hover:text-white"
+          @click="sidebarOpen = false"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
@@ -42,10 +60,11 @@ async function handleLogout() {
       <nav class="px-4 py-6 space-y-2">
         <router-link
           to="/dashboard"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
+          :class="navLinkClass('/dashboard')"
+          @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3"
+            class="w-5 h-5 mr-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -62,10 +81,11 @@ async function handleLogout() {
 
         <router-link
           to="/agents"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
+          :class="navLinkClass('/agents')"
+          @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3"
+            class="w-5 h-5 mr-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -88,10 +108,11 @@ async function handleLogout() {
 
         <router-link
           to="/usage"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
+          :class="navLinkClass('/usage')"
+          @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3"
+            class="w-5 h-5 mr-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -103,35 +124,16 @@ async function handleLogout() {
               d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
             />
           </svg>
-          Usage Analytics
+          Analytics
         </router-link>
 
         <router-link
           to="/limits"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
+          :class="navLinkClass('/limits')"
+          @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-          Limits
-        </router-link>
-
-        <router-link
-          to="/budget-requests"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
-        >
-          <svg
-            class="w-5 h-5 mr-3"
+            class="w-5 h-5 mr-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -143,16 +145,17 @@ async function handleLogout() {
               d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          Budget Requests
+          Budgets
         </router-link>
 
         <router-link
           v-if="authStore.isAdmin"
           to="/providers"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
+          :class="navLinkClass('/providers')"
+          @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3"
+            class="w-5 h-5 mr-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -164,16 +167,17 @@ async function handleLogout() {
               d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
             />
           </svg>
-          AI Providers
+          Providers
         </router-link>
 
         <router-link
           v-if="authStore.isAdmin"
           to="/users"
-          class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white"
+          :class="navLinkClass('/users')"
+          @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3"
+            class="w-5 h-5 mr-3 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -191,29 +195,25 @@ async function handleLogout() {
     </div>
 
     <!-- Main content -->
-    <div :class="['transition-all duration-300', sidebarOpen ? 'lg:ml-64' : '']">
+    <div class="lg:ml-64">
       <!-- Header -->
-      <header class="bg-white shadow-sm">
+      <header class="bg-white shadow-sm sticky top-0 z-30">
         <div class="flex items-center justify-between h-16 px-4">
+          <!-- Mobile menu button -->
           <button
-            @click="sidebarOpen = !sidebarOpen"
-            class="text-gray-500 hover:text-gray-700 focus:outline-none"
+            class="lg:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            @click="sidebarOpen = true"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
 
-          <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-700">{{ authStore.username }}</span>
+          <div class="flex items-center space-x-2 sm:space-x-4 ml-auto">
+            <span class="text-sm text-gray-700 hidden sm:inline">{{ authStore.username }}</span>
             <button
               @click="handleLogout"
-              class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
+              class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
             >
               Logout
             </button>
@@ -222,7 +222,7 @@ async function handleLogout() {
       </header>
 
       <!-- Page content -->
-      <main class="p-6">
+      <main class="p-4 sm:p-6">
         <router-view />
       </main>
     </div>

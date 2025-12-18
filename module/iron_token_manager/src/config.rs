@@ -1,6 +1,6 @@
 //! Configuration management for token manager
 //!
-//! This module provides unified configuration loading using `iron_config_loader` with
+//! This module provides unified configuration loading using `iron_config` with
 //! environment variable overrides. Supports development, test, and production configurations.
 //!
 //! # Configuration Layers (Precedence: highest to lowest)
@@ -33,7 +33,6 @@
 
 use serde::{ Deserialize, Serialize };
 use iron_config_loader::ConfigLoader;
-use workspace_tools::workspace;
 
 /// Complete configuration for token manager
 #[ derive( Debug, Clone, Serialize, Deserialize ) ]
@@ -162,7 +161,7 @@ impl Config
   /// Load configuration from default environment
   ///
   /// Determines environment from `IRON_ENV` variable (defaults to "development").
-  /// Uses `iron_config_loader`'s 5-layer precedence system.
+  /// Uses `iron_config`'s 5-layer precedence system.
   ///
   /// # Errors
   ///
@@ -182,7 +181,7 @@ impl Config
 
   /// Load configuration from specific environment
   ///
-  /// Uses `iron_config_loader`'s `ConfigLoader` with 5-layer precedence:
+  /// Uses `iron_config`'s `ConfigLoader` with 5-layer precedence:
   /// 1. Environment variables (`IRON_TOKEN_MANAGER_*`)
   /// 2. Project config (`{workspace}/config/iron_token_manager.{env}.toml`)
   /// 3. User config (`~/.config/iron/iron_token_manager.toml`)
@@ -207,8 +206,8 @@ impl Config
     // Get default configuration as TOML
     let defaults = Self::get_defaults_toml();
 
-    // Use iron_config_loader's ConfigLoader with defaults
-    // Note: iron_config_loader automatically detects IRON_ENV for environment-specific configs
+    // Use iron_config's ConfigLoader with defaults
+    // Note: iron_config automatically detects IRON_ENV for environment-specific configs
     let loader = ConfigLoader::with_defaults( "iron_token_manager", &defaults )
       .map_err( |_| crate::error::TokenError::Generic )?;
 
@@ -241,17 +240,9 @@ impl Config
   /// Get default configuration as TOML string
   fn get_defaults_toml() -> String
   {
-    // Try to use workspace-relative path, fallback to current directory
-    let db_url = workspace()
-      .ok()
-      .map_or_else(
-        || "sqlite://./iron.db?mode=rwc".to_string(),
-        | ws | format!( "sqlite://{}?mode=rwc", ws.root().join( "iron.db" ).display() )
-      );
-
-    format!( r#"
+    r#"
 [database]
-url = "{db_url}"
+url = "sqlite:///./iron.db?mode=rwc"
 max_connections = 5
 auto_migrate = true
 foreign_keys = true
@@ -260,13 +251,12 @@ foreign_keys = true
 debug = true
 auto_seed = false
 wipe_and_seed = false
-"# )
+"#.to_string()
   }
 
   /// Create a default development configuration
   ///
-  /// Uses workspace-relative database path if workspace detected,
-  /// otherwise falls back to current directory.
+  /// Uses the canonical `./iron.db` database path relative to current directory.
   ///
   /// Useful for testing and examples.
   ///

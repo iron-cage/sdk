@@ -185,6 +185,7 @@ mod implementation
   #[derive(Debug, Clone, Copy)]
   pub enum LogLevel
   {
+    Trace,
     Debug,
     Info,
     Warn,
@@ -197,10 +198,26 @@ mod implementation
     {
       match level
       {
+        LogLevel::Trace => LevelFilter::TRACE,
         LogLevel::Debug => LevelFilter::DEBUG,
         LogLevel::Info => LevelFilter::INFO,
         LogLevel::Warn => LevelFilter::WARN,
         LogLevel::Error => LevelFilter::ERROR,
+      }
+    }
+  }
+
+  impl LogLevel
+  {
+    fn as_str(&self) -> &'static str
+    {
+      match self
+      {
+        LogLevel::Trace => "trace",
+        LogLevel::Debug => "debug",
+        LogLevel::Info => "info",
+        LogLevel::Warn => "warn",
+        LogLevel::Error => "error",
       }
     }
   }
@@ -211,10 +228,16 @@ mod implementation
   /// Call this once at application startup.
   pub fn init_logging(level: LogLevel) -> Result<(), Box<dyn std::error::Error>>
   {
-    use tracing_subscriber::FmtSubscriber;
+    use tracing_subscriber::{EnvFilter, FmtSubscriber};
+
+    // Honor RUST_LOG if set; otherwise default to provided level.
+    let env_directive = std::env::var("RUST_LOG").unwrap_or_else(|_| level.as_str().to_string());
+    let env_filter = EnvFilter::new(env_directive);
 
     let subscriber = FmtSubscriber::builder()
-      .with_max_level(level)
+      .with_env_filter(env_filter)
+      // Allow env filter to drive the effective level; keep ceiling at TRACE to avoid suppressing RUST_LOG.
+      .with_max_level(tracing::level_filters::LevelFilter::TRACE)
       .with_target(false)
       .with_thread_ids(true)
       .with_line_number(true)

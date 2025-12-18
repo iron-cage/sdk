@@ -4,12 +4,15 @@
 //! Validates IC tokens to authenticate agent identity and prevents event duplication.
 
 use axum::{
-  extract::State,
+  extract::{ Query, State },
   http::StatusCode,
   response::{ IntoResponse, Json },
 };
 use chrono::Utc;
-use super::shared::{ AnalyticsEventRequest, EventResponse, AnalyticsState };
+use super::shared::{
+  AnalyticsEventRequest, EventResponse, AnalyticsState,
+  EventsListQuery, EventsListResponse, AnalyticsEventWithAgent, Pagination,
+};
 
 /// POST /api/v1/analytics/events
 ///
@@ -158,4 +161,124 @@ pub async fn post_event(
       }) ) ).into_response()
     }
   }
+}
+
+/// GET /api/v1/analytics/events
+///
+/// List analytics events with pagination and filtering.
+/// Returns recent events sorted by timestamp descending.
+pub async fn list_events(
+  State( state ): State< AnalyticsState >,
+  Query( params ): Query< EventsListQuery >,
+) -> impl IntoResponse
+{
+  let ( start_ms, end_ms ) = params.period.to_range();
+  let offset = ( params.page.saturating_sub( 1 ) ) * params.per_page;
+
+  // Build count query
+  let count_result: Result< i64, _ > = if let Some( agent_id ) = params.agent_id
+  {
+    sqlx::query_scalar(
+      "SELECT COUNT(*) FROM analytics_events WHERE timestamp_ms >= ? AND timestamp_ms <= ? AND agent_id = ?"
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( agent_id )
+      .fetch_one( &state.pool )
+      .await
+  }
+  else
+  {
+    sqlx::query_scalar(
+      "SELECT COUNT(*) FROM analytics_events WHERE timestamp_ms >= ? AND timestamp_ms <= ?"
+    )
+      .bind( start_ms )
+      .bind( end_ms )
+      .fetch_one( &state.pool )
+      .await
+  };
+
+  let total = match count_result
+  {
+    Ok( c ) => c as u32,
+    Err( e ) =>
+    {
+      tracing::error!( "Failed to count events: {}", e );
+      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+        "error": "DATABASE_ERROR",
+        "message": "Failed to count events"
+      }) ) ).into_response();
+    }
+  };
+
+  // Build data query with agent join
+  let query = if params.agent_id.is_some()
+  {
+    r#"SELECT
+         e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
+         e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
+         COALESCE(a.name, 'Unknown') as agent_name,
+         e.error_code, e.error_message
+       FROM analytics_events e
+       LEFT JOIN agents a ON e.agent_id = a.id
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ? AND e.agent_id = ?
+       ORDER BY e.timestamp_ms DESC
+       LIMIT ? OFFSET ?"#
+  }
+  else
+  {
+    r#"SELECT
+         e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
+         e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
+         COALESCE(a.name, 'Unknown') as agent_name,
+         e.error_code, e.error_message
+       FROM analytics_events e
+       LEFT JOIN agents a ON e.agent_id = a.id
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+       ORDER BY e.timestamp_ms DESC
+       LIMIT ? OFFSET ?"#
+  };
+
+  let data: Vec< AnalyticsEventWithAgent > = match if let Some( agent_id ) = params.agent_id
+  {
+    sqlx::query_as( query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( agent_id )
+      .bind( params.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  }
+  else
+  {
+    sqlx::query_as( query )
+      .bind( start_ms )
+      .bind( end_ms )
+      .bind( params.per_page as i64 )
+      .bind( offset as i64 )
+      .fetch_all( &state.pool )
+      .await
+  }
+  {
+    Ok( rows ) => rows,
+    Err( e ) =>
+    {
+      tracing::error!( "Failed to fetch events: {}", e );
+      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+        "error": "DATABASE_ERROR",
+        "message": "Failed to fetch events"
+      }) ) ).into_response();
+    }
+  };
+
+  let response = EventsListResponse
+  {
+    data,
+    pagination: Pagination::new( params.page, params.per_page, total ),
+    period: format!( "{:?}", params.period ).to_lowercase().replace( "days", "-days" ),
+    calculated_at: Utc::now().to_rfc3339(),
+  };
+
+  ( StatusCode::OK, Json( response ) ).into_response()
 }

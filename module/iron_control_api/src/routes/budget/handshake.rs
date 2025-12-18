@@ -288,7 +288,7 @@ pub async fn handshake(
   {
     // Fetch owner's usage limit to seed a budget cap if available
     let limit_row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
-      "SELECT max_cost_per_month_microdollars, current_cost_microdollars_this_month
+      "SELECT max_cost_microdollars_per_month, current_cost_microdollars_this_month
        FROM usage_limits
        WHERE user_id = ?
        LIMIT 1"
@@ -296,16 +296,29 @@ pub async fn handshake(
     .bind( &owner_id )
     .fetch_optional( &state.db_pool )
     .await
-    .map_err( |_| () )
     .ok()
     .flatten();
 
-    let (limit_max, current_cost) = limit_row
-      .map( |(max, cost)| (max.unwrap_or(0), cost.unwrap_or(0)) )
-      .unwrap_or( (0, 0) );
-
-    let available_from_limit = if limit_max > current_cost { limit_max - current_cost } else { 0 };
-    let seed_budget = if available_from_limit > 0 { available_from_limit } else { HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET };
+    // Determine seed budget based on owner's usage limits:
+    // - No record in usage_limits → block (owner must configure limits first)
+    // - Record with max_cost = NULL → block (no budget configured)
+    // - Record with max_cost = 0 → block (zero limit)
+    // - Record with max_cost > 0 → use remaining, block if exhausted
+    let seed_budget = match limit_row
+    {
+      None => 0, // No limits configured - block
+      Some( (limit_max_opt, current_cost_opt) ) =>
+      {
+        let current_cost = current_cost_opt.unwrap_or( 0 );
+        match limit_max_opt
+        {
+          None => 0, // No max_cost configured - block
+          Some( 0 ) => 0, // Explicit zero limit - block
+          Some( limit_max ) if limit_max > current_cost => limit_max - current_cost,
+          Some( _ ) => 0, // Limit exhausted - block
+        }
+      }
+    };
 
     if seed_budget <= 0
     {
@@ -317,7 +330,7 @@ pub async fn handshake(
     }
 
     let now_ms = chrono::Utc::now().timestamp_millis();
-    let _ = sqlx::query(
+    if let Err( err ) = sqlx::query(
       "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
        VALUES (?, ?, 0, ?, ?, ?)"
     )
@@ -327,7 +340,15 @@ pub async fn handshake(
     .bind( now_ms )
     .bind( now_ms )
     .execute( &state.db_pool )
-    .await;
+    .await
+    {
+      tracing::error!( "Database error creating agent budget: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Failed to create agent budget" }) ),
+      )
+        .into_response();
+    }
   }
 
   // Get provider API key

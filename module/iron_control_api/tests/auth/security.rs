@@ -292,7 +292,8 @@ async fn test_logout_event_generates_security_audit_log()
 async fn test_rate_limiting_blocks_excessive_attempts()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  // Use rate limiting enabled router for this test
+  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() ).await;
 
   // Attempt 6 logins in rapid succession
   for attempt in 1..=6

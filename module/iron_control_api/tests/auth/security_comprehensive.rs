@@ -101,7 +101,8 @@ async fn test_ip_based_rate_limiting()
   // Seed valid user for comparison
   common::auth::seed_test_user( &pool, "valid@example.com", "valid_password_123", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  // Use rate limiting enabled router for this test
+  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() ).await;
 
   // Phase 1: Establish baseline (valid login from different IP should succeed)
   // Use different IP to not interfere with rate limit count for IP A

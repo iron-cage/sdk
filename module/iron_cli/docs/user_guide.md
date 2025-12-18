@@ -211,18 +211,13 @@ View project information.
 | `.project.list` | List all projects | `format` |
 | `.project.get` | Get project details | `id`, `format` |
 
-### Budget Requests (6 commands)
+### Budget (1 command)
 
-Manage budget increase requests.
+View budget analytics across agents.
 
 | Command | Description | Parameters |
 |---------|-------------|------------|
-| `.budget_request.list` | List requests | `format` |
-| `.budget_request.create` | Create request | `agent_id`, `amount`, `reason`, `dry` |
-| `.budget_request.get` | Get request details | `id`, `format` |
-| `.budget_request.approve` | Approve request | `id`, `dry` |
-| `.budget_request.reject` | Reject request | `id`, `reason` (optional), `dry` |
-| `.budget_request.cancel` | Cancel request | `id`, `dry` |
+| `.budget.status` | Get budget status | `agent_id` (optional), `threshold` (optional), `status` (optional), `format` |
 
 ### Users (8 commands)
 
@@ -275,23 +270,20 @@ iron .analytics.usage_by_agent agent_id::agent_abc123
 iron .analytics.export_usage format_type::csv start_date::2025-01-01
 ```
 
-### Workflow 3: Budget Request Approval
+### Workflow 3: Budget Monitoring
 
 ```bash
-# Developer: Create budget request
-iron .budget_request.create \
-  agent_id::agent_abc123 \
-  amount::5000 \
-  reason::"Need more budget for Q1 workload"
+# Check budget status across all agents
+iron .budget.status
 
-# Admin: List pending requests
-iron .budget_request.list format::table
+# Filter by specific agent
+iron .budget.status agent_id::1
 
-# Admin: Review specific request
-iron .budget_request.get id::request_123
+# Find agents using more than 80% of budget
+iron .budget.status threshold::80
 
-# Admin: Approve request
-iron .budget_request.approve id::request_123
+# Find exhausted budgets
+iron .budget.status status::exhausted
 ```
 
 ### Workflow 4: User Management
@@ -484,25 +476,23 @@ iron .analytics.export_usage \
   end_date::2025-12-31
 ```
 
-### Budget Request Examples
+### Budget Status Examples
 
 ```bash
-# Create budget request
-iron .budget_request.create \
-  agent_id::agent_123 \
-  amount::10000 \
-  reason::"Q1 2025 increased workload"
+# Get budget status for all agents
+iron .budget.status
 
-# List all requests
-iron .budget_request.list
+# Get budget status for specific agent
+iron .budget.status agent_id::1
 
-# Approve request
-iron .budget_request.approve id::request_456
+# Find agents at risk (>80% budget used)
+iron .budget.status threshold::80
 
-# Reject request with reason
-iron .budget_request.reject \
-  id::request_789 \
-  reason::"Budget already allocated for Q1"
+# Find agents with exhausted budgets
+iron .budget.status status::exhausted
+
+# Export as JSON
+iron .budget.status format::json
 ```
 
 ---
@@ -737,7 +727,7 @@ export IRON_API_TOKEN="your-token-here"
 iron .agent.list                              # List agents
 iron .agent.create name::NAME budget::AMOUNT # Create agent
 iron .analytics.usage                         # View usage
-iron .budget_request.list                     # List budget requests
+iron .budget.status                           # View budget status
 iron .user.list                               # List users
 ```
 

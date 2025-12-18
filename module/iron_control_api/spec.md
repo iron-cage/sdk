@@ -1,86 +1,52 @@
 # iron_control_api - Specification
 
-**Module:** iron_control_api
-**Layer:** 5 (Integration)
-**Status:** Active
+**Module:** iron_control_api  
+**Layer:** 5 (Integration)  
+**Status:** Active  
+
+> **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
+
+## Responsibility
+
+REST + WebSocket control surface for Iron Cage. Exposes token/usage/budget/analytics endpoints, validates IC Tokens and JWT/RBAC, enforces agent token rules, and streams real-time events to the dashboard.
+
+## Scope
+
+**In Scope**
+- REST API for tokens, usage limits, traces, auth handshake, and user management
+- Budget Control (Protocol 005) handshake/report/return/refresh flows
+- Analytics ingress and queries (Protocol 012) for spending/usage
+- Agent token enforcement to protect credential endpoints
+- WebSocket broadcasting of agent/runtime events for dashboards
+- Authentication/authorization (IC Token validation, JWT, RBAC)
+
+**Out of Scope**
+- UI components (see iron_dashboard)
+- Token generation/rotation logic (see iron_token_manager)
+- Budget price computation (see iron_cost)
+- Runtime execution and LLM routing (see iron_runtime)
+
+## Dependencies
+
+**Required Modules:** iron_token_manager, iron_runtime_state, iron_telemetry, iron_cost, iron_secrets  
+**External:** axum/axum-extra, tower/tower-http, tokio, serde/serde_json, jsonwebtoken, sqlx (sqlite), reqwest, aes-gcm, bcrypt, tracing  
+**Features:** `enabled` (default core), `full` (alias)
+
+## Core Concepts
+
+- **REST Router:** HTTP surface for tokens, limits, usage, auth, and admin operations.  
+- **Budget Control Router:** Protocol 005 endpoints for lease handshake, usage reporting, refresh/return of budgets.  
+- **Analytics Router:** Protocol 012 ingestion and spending/usage queries.  
+- **Agent Token Enforcement:** Guards provider-key endpoints so agents only access their assigned keys.  
+- **WebSocket Broadcaster:** Pushes live agent/runtime events to dashboard clients.  
+- **Auth Middleware:** IC Token + JWT validation with role-based access controls.
+
+## Integration Points
+
+**Used by:** iron_dashboard, iron_sdk/CLI, iron_runtime (provider-key fetch, budget leases)  
+**Uses:** iron_token_manager, iron_runtime_state, iron_cost, iron_secrets, iron_telemetry  
+**External Services:** Database (sqlite/sqlx), LLM provider APIs (indirect via provider keys)
 
 ---
 
-### Responsibility
-
-REST API and WebSocket server for Iron Cage Control Panel. Provides HTTP endpoints for token management, usage tracking, budget control, and analytics. Coordinates real-time dashboard updates via WebSocket.
-
----
-
-### Scope
-
-**In Scope:**
-- REST API endpoints (tokens, usage, limits, traces, auth handshake, user management)
-- Budget control endpoints (Protocol 005: handshake, usage reporting, budget refresh)
-- Analytics endpoints (Protocol 012: event ingestion, spending/usage queries)
-- Agent token enforcement (blocking unauthorized credential access)
-- WebSocket server for dashboard real-time updates
-- Authentication and authorization (IC Token validation, JWT)
-- RBAC enforcement (role-based access control)
-
-**Out of Scope:**
-- Dashboard UI components (see iron_dashboard)
-- Token generation logic (see iron_token_manager)
-- Budget calculation (see iron_cost)
-
----
-
-### Dependencies
-
-**Required:** iron_token_manager, iron_runtime_state, iron_telemetry, iron_cost
-**External:** axum, tokio, tower-http
-
----
-
-### Core Concepts
-
-- **REST Router:** Handles HTTP endpoints for tokens, usage, limits
-- **Budget Control Router (Protocol 005):** Manages budget handshake, usage reporting, budget refresh
-- **Analytics Router (Protocol 012):** Event ingestion and spending/usage queries
-- **Agent Token Enforcement:** Blocks agent tokens from unauthorized credential endpoints
-- **WebSocket Server:** Broadcasts real-time agent events to dashboard
-- **Auth Middleware:** Validates IC Tokens and JWT, enforces authorization
-
----
-
-### API Contract Summary
-
-**Budget Control (Protocol 005):**
-- `POST /api/budget/handshake` - Exchange IC Token for IP Token (encrypted provider API key)
-- `POST /api/budget/report` - Report LLM usage for a budget lease
-- `POST /api/budget/return` - Return unused budget when a lease is closed
-- `POST /api/budget/refresh` - Request additional budget allocation
-
-**Budget Request Workflow (Protocol 012):**
-- `POST /api/v1/budget/requests` - Create budget change request
-- `GET /api/v1/budget/requests/:id` - Get request by ID
-- `GET /api/v1/budget/requests` - List requests with filtering
-- `PATCH /api/v1/budget/requests/:id/approve` - Approve request
-- `PATCH /api/v1/budget/requests/:id/reject` - Reject request
-
-**Analytics (Protocol 012):**
-- `POST /api/v1/analytics/events` - Report LLM request events
-- `GET /api/v1/analytics/spending/*` - Spending metrics endpoints
-- `GET /api/v1/analytics/usage/*` - Usage metrics endpoints
-
-**Agent Provider Keys (Feature 014):**
-- `POST /api/v1/agents/provider-key` - Retrieve assigned provider API key for agent (IC Token auth)
-
----
-
-### Integration Points
-
-**Used by:** iron_dashboard, iron_runtime, Developers (CLI/SDK)
-**Uses:** iron_token_manager, iron_runtime_state
-
----
-
-*For detailed API specification, see spec/-archived_detailed_spec.md*
-*For REST protocol, see docs/protocol/002_rest_api_protocol.md*
-*For Budget Control Protocol, see docs/protocol/005_budget_control_protocol.md*
-*For Analytics API, see docs/protocol/012_analytics_api.md*
+Cross-references: spec/-archived_detailed_spec.md; docs/protocol/002_rest_api_protocol.md; docs/protocol/005_budget_control_protocol.md; docs/protocol/012_analytics_api.md; docs/architecture/006_budget_control_protocol.md.

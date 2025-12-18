@@ -52,17 +52,22 @@ pub async fn create_provider_adapter(
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new( config );
 
-  let name = params.get( "name" ).unwrap(); // Already validated
+  let provider = params.get( "provider" ).unwrap(); // Already validated
   let api_key = params.get( "api_key" ).unwrap(); // Already validated
 
   let mut body = json!({
-    "name": name,
+    "provider": provider,
     "api_key": api_key,
   });
 
-  if let Some( endpoint ) = params.get( "endpoint" )
+  if let Some( base_url ) = params.get( "base_url" )
   {
-    body[ "endpoint" ] = json!( endpoint );
+    body[ "base_url" ] = json!( base_url );
+  }
+
+  if let Some( description ) = params.get( "description" )
+  {
+    body[ "description" ] = json!( description );
   }
 
   let response = client

@@ -71,6 +71,7 @@ async fn create_test_app() -> (Router, TestAppState) {
         db_pool: db_pool.clone(),
         jwt_secret,
         rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
+        rate_limiting_enabled: false, // Disabled for tests
     };
 
     let permission_checker = Arc::new(PermissionChecker::new());
