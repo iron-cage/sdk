@@ -327,7 +327,7 @@ version = "0.4.0"
 path = "module/iron_token_manager"
 
 [workspace.dependencies.iron_cli]
-version = "0.3.0"
+version = "0.4.0"
 path = "module/iron_cli"
 
 [workspace.dependencies.iron_runtime_analytics]
