@@ -331,7 +331,7 @@ version = "0.4.0"
 path = "module/iron_cli"
 
 [workspace.dependencies.iron_runtime_analytics]
-version = "0.3.0"
+version = "0.4.0"
 path = "module/iron_runtime_analytics"
 
 [workspace.dependencies.iron_sdk]
