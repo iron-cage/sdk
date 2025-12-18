@@ -50,6 +50,7 @@ build-backend = "maturin"
 features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "iron_cage"
+compatibility = "manylinux2014"
 
 [tool.black]
 line-length = 100
