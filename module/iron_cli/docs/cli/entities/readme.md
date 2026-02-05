@@ -4,8 +4,6 @@
 
 ## Commands
 
-### Token API Commands (9 commands)
-
 | Command | Description | Params |
 |---------|-------------|--------|
 | `.auth.login` | Authenticate user and obtain JWT tokens | 3 |
@@ -17,11 +15,6 @@
 | `.limits.create` | Create new limit | 5 |
 | `.limits.update` | Update existing limit | 5 |
 | `.limits.delete` | Delete limit | 2 |
-
-### Control API Commands (33 commands)
-
-| Command | Description | Params |
-|---------|-------------|--------|
 | `.agent.list` | List all agents | 4 |
 | `.agent.create` | Create new agent | 6 |
 | `.agent.get` | Get agent details | 2 |
@@ -52,13 +45,54 @@
 | `.user.set_role` | Set user role | 4 |
 | `.user.reset_password` | Reset user password | 4 |
 | `.user.get_permissions` | Get user permissions | 2 |
-| `.auth.login` | Authenticate (Control API) | 3 |
-| `.auth.refresh` | Refresh token (Control API) | 1 |
-| `.auth.logout` | Logout (Control API) | 1 |
 
 See [parameter_groups.md](../parameter_groups.md) for shared parameters (output, pagination, dry_run).
 
 **Namespaces**: [.auth](auth.md) | [.tokens](tokens.md) | [.analytics](analytics.md) | [.limits](limits.md) | [.agent](agent.md) | [.provider](provider.md) | [.budget](budget.md) | [.project](project.md) | [.user](user.md)
+
+## Priority
+
+| Priority | Command |
+|----------|---------|
+| 1 | `.auth.login` |
+| 1 | `.auth.refresh` |
+| 1 | `.auth.logout` |
+| 2 | `.tokens` |
+| 3 | `.provider.list` |
+| 3 | `.provider.create` |
+| 3 | `.provider.get` |
+| 3 | `.provider.update` |
+| 3 | `.provider.delete` |
+| 4 | `.agent.list` |
+| 4 | `.agent.create` |
+| 4 | `.agent.get` |
+| 4 | `.agent.update` |
+| 4 | `.agent.delete` |
+| 4 | `.agent.assign_providers` |
+| 4 | `.agent.list_providers` |
+| 4 | `.agent.remove_provider` |
+| 4 | `.provider.assign_agents` |
+| 4 | `.provider.list_agents` |
+| 4 | `.provider.remove_agent` |
+| 5 | `.analytics` |
+| 6 | `.budget_limit.get` |
+| 6 | `.budget_limit.set` |
+| 6 | `.budget.status` |
+| 7 | `.limits.list` |
+| 7 | `.limits.get` |
+| 7 | `.limits.create` |
+| 7 | `.limits.update` |
+| 7 | `.limits.delete` |
+| 8 | `.user.list` |
+| 8 | `.user.create` |
+| 8 | `.user.get` |
+| 8 | `.user.update` |
+| 8 | `.user.delete` |
+| 8 | `.user.set_role` |
+| 8 | `.user.reset_password` |
+| 8 | `.user.get_permissions` |
+| 9 | `.project.list` |
+| 9 | `.project.get` |
 
 ## Files
 
