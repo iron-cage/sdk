@@ -1,18 +1,18 @@
 <!-- task_system_metadata
 type: root
 version: 1.0
-highest_id: 6
+highest_id: 7
 last_allocation:
-  id: 6
+  id: 7
   crate: workspace
-  timestamp: 2026-02-06T09:45:00Z
+  timestamp: 2026-02-06T10:20:00Z
 -->
 
 # Master Task Index - Workspace
 
 **Last Updated**: 2026-02-06
 **Purpose**: Comprehensive task tracking for this workspace task folder
-**Total Tasks**: 6 tasks
+**Total Tasks**: 7 tasks
 
 ---
 
@@ -30,12 +30,12 @@ last_allocation:
 ## Global ID Registry
 
 <!-- registry_data
-highest_id: 6
+highest_id: 7
 -->
 
 **Current State:**
-- **Highest Allocated ID**: 6
-- **Active Tasks**: 6
+- **Highest Allocated ID**: 7
+- **Active Tasks**: 7
 - **Completed Tasks**: 0
 - **Backlog Tasks**: 0
 - **Task Systems**: 1 (root workspace task system)
@@ -43,7 +43,7 @@ highest_id: 6
 **ID Allocation Policy:**
 - All task IDs are allocated from this registry
 - IDs must be globally unique within this workspace task system
-- Next available ID: 7
+- Next available ID: 8
 
 ---
 
@@ -51,14 +51,15 @@ highest_id: 6
 
 **Note:** Workspace-level tasks for current implementation wave.
 
-| Order | ID | Advisability | Value | Easiness | Safety | Priority | Status | Agent | Task | Description |
-|-------|----|--------------:|------:|---------:|-------:|---------:|--------|-------|------|-------------|
-| 1 | [001](001-fix-ic-token-regeneration-invalidation.md) | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | `control-api-security-agent` | Fix IC token invalidation after regeneration | Ensure old IC tokens are rejected after regenerate/revoke |
-| 2 | [002](002-support-multiple-provider-keys-per-provider.md) | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | `provider-key-management-agent` | Support multiple keys per provider | Remove single-key behavior and enforce owner-scoped key selection |
-| 3 | [003](003-provider-key-spending-and-limits.md) | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | `budget-accounting-agent` | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
-| 4 | [004](004-per-ic-key-limits.md) | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | `ic-policy-limits-agent` | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
-| 5 | [005](005-add-gemini-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | `gemini-integration-agent` | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
-| 6 | [006](006-add-xai-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | `xai-integration-agent` | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
+| Order | ID | Advisability | Value | Easiness | Safety | Priority | Status | Task | Description |
+|-------|----|--------------:|------:|---------:|-------:|---------:|--------|------|-------------|
+| 1 | [001](001-fix-ic-token-regeneration-invalidation.md) | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | Fix IC token invalidation after regeneration | Ensure old IC tokens are rejected after regenerate/revoke |
+| 2 | [002](002-support-multiple-provider-keys-per-provider.md) | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | Support multiple keys per provider | Remove single-key behavior and enforce owner-scoped key selection |
+| 3 | [003](003-provider-key-spending-and-limits.md) | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
+| 4 | [004](004-per-ic-key-limits.md) | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
+| 5 | [005](005-add-gemini-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
+| 6 | [006](006-add-xai-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
+| 7 | [007](007-migrate-to-api-llm-bindings.md) | 235 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
 
 ---
 
@@ -66,14 +67,15 @@ highest_id: 6
 
 **Note:** Same as local index in this repository (single root task system).
 
-| Order | ID | Crate | Advisability | Value | Easiness | Safety | Priority | Status | Agent | Task | Description |
-|-------|----|-------|-------------:|------:|---------:|-------:|---------:|--------|-------|------|-------------|
-| 1 | [001](001-fix-ic-token-regeneration-invalidation.md) | workspace | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | `control-api-security-agent` | Fix IC token invalidation | Reject stale tokens after rotate/revoke |
-| 2 | [002](002-support-multiple-provider-keys-per-provider.md) | workspace | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | `provider-key-management-agent` | Multi-key provider support | Create and manage multiple keys per provider safely |
-| 3 | [003](003-provider-key-spending-and-limits.md) | workspace | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | `budget-accounting-agent` | Provider-key spending/limits | Enforce and expose key-level budgeting |
-| 4 | [004](004-per-ic-key-limits.md) | workspace | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | `ic-policy-limits-agent` | Per-IC-key limits | Independent IC policy limits per agent |
-| 5 | [005](005-add-gemini-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | `gemini-integration-agent` | Gemini provider integration | Add Gemini across API, runtime, analytics |
-| 6 | [006](006-add-xai-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | `xai-integration-agent` | xAI provider integration | Add xAI across API, runtime, analytics |
+| Order | ID | Crate | Advisability | Value | Easiness | Safety | Priority | Status | Task | Description |
+|-------|----|-------|-------------:|------:|---------:|-------:|---------:|--------|------|-------------|
+| 1 | [001](001-fix-ic-token-regeneration-invalidation.md) | workspace | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | Fix IC token invalidation | Reject stale tokens after rotate/revoke |
+| 2 | [002](002-support-multiple-provider-keys-per-provider.md) | workspace | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | Multi-key provider support | Create and manage multiple keys per provider safely |
+| 3 | [003](003-provider-key-spending-and-limits.md) | workspace | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Provider-key spending/limits | Enforce and expose key-level budgeting |
+| 4 | [004](004-per-ic-key-limits.md) | workspace | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Per-IC-key limits | Independent IC policy limits per agent |
+| 5 | [005](005-add-gemini-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Gemini provider integration | Add Gemini across API, runtime, analytics |
+| 6 | [006](006-add-xai-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | xAI provider integration | Add xAI across API, runtime, analytics |
+| 7 | [007](007-migrate-to-api-llm-bindings.md) | workspace | 235 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
 
 ---
 
@@ -98,20 +100,21 @@ highest_id: 6
 
 | Status | Count | Percentage | Location |
 |--------|-------|------------|----------|
-| 🔄 Planned | 6 | 100.0% | `task/` |
+| 🔄 Planned | 7 | 100.0% | `task/` |
 | ✅ Completed | 0 | 0.0% | `task/completed/` |
 | 📥 Backlog | 0 | 0.0% | `task/backlog/` |
-| **TOTAL** | **6** | **100%** | |
+| **TOTAL** | **7** | **100%** | |
 
 ### Tasks by Domain
 
 | Domain | Total | Planned | Completed | Backlog |
 |--------|-------|---------|-----------|---------|
 | Security & Auth | 1 | 1 | 0 | 0 |
-| Provider Key Management | 2 | 2 | 0 | 0 |
+| Provider Key Management | 1 | 1 | 0 | 0 |
 | Budget & Limits | 2 | 2 | 0 | 0 |
 | Provider Integrations | 2 | 2 | 0 | 0 |
-| **TOTAL** | **6** | **6** | **0** | **0** |
+| LLM Binding & Migration | 1 | 1 | 0 | 0 |
+| **TOTAL** | **7** | **7** | **0** | **0** |
 
 ---
 
@@ -155,6 +158,9 @@ Tasks are organized in this workspace as:
 - Task 005 (Gemini)
 - Task 006 (xAI)
 
+**LLM Binding Standardization and Migration**
+- Task 007 (migrate to `api_llm` bindings)
+
 ---
 
 ## Documentation
@@ -168,6 +174,6 @@ Tasks are organized in this workspace as:
 
 **2026-02-06**:
 - ✅ Created root task index for this workspace task system
-- ✅ Registered tasks 001-006 with explicit assigned agents and dependency mapping
-- ✅ Initialized global registry with highest ID `006` and next available ID `007`
-
+- ✅ Registered tasks 001-007 with implementation plans and acceptance criteria
+- ✅ Added `api_llm` binding migration task
+- ✅ Updated global registry to highest ID `007` and next available ID `008`
