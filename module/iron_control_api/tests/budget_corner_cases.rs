@@ -45,6 +45,7 @@ use common::budget::
 };
 use iron_control_api::ic_token::IcTokenClaims;
 use serde_json::json;
+use uuid::Uuid;
 use sqlx::Row;
 use tower::ServiceExt;
 
@@ -645,6 +646,7 @@ async fn test_handshake_future_dated_ic_token()
 
   let future_claims = IcTokenClaims
   {
+    token_id: Uuid::new_v4(),
     agent_id: "agent_201".to_string(),
     budget_id: "budget_201".to_string(),
     issued_at: future_timestamp,
@@ -1183,6 +1185,7 @@ async fn test_handshake_invalid_agent_id_zero()
   // Create IC Token with agent_id=0 (invalid)
   let zero_claims = IcTokenClaims
   {
+    token_id: Uuid::new_v4(),
     agent_id: "0".to_string(),  // Invalid: zero agent_id
     budget_id: "budget_0".to_string(),
     issued_at: std::time::SystemTime::now()
@@ -1244,6 +1247,7 @@ async fn test_handshake_invalid_agent_id_negative()
   // Create IC Token with agent_id=-1 (invalid)
   let negative_claims = IcTokenClaims
   {
+    token_id: Uuid::new_v4(),
     agent_id: "-1".to_string(),  // Invalid: negative agent_id
     budget_id: "budget_-1".to_string(),
     issued_at: std::time::SystemTime::now()

@@ -16,6 +16,7 @@ use serde::{ Deserialize, Serialize };
 use sha2::{ Sha256, Digest };
 use sqlx::SqlitePool;
 use std::time::{ SystemTime, UNIX_EPOCH };
+use uuid::Uuid;
 use crate::error::ValidationError;
 
 /// Compute SHA-256 hash of a token string (hex-encoded)
@@ -43,6 +44,8 @@ pub enum IcTokenRuntimeError
 /// IC Token JWT claims
 ///
 /// Per Protocol 005 specification, IC Tokens contain:
+/// - jti: Unique token identifier (UUID v4) — guarantees uniqueness even when
+///   two tokens are issued in the same second with identical claims
 /// - agent_id: Unique agent identifier (format: agent_<id>)
 /// - budget_id: Links to budget allocation
 /// - issued_at: Token creation time (Unix timestamp seconds)
@@ -52,6 +55,11 @@ pub enum IcTokenRuntimeError
 #[ derive( Debug, Clone, Serialize, Deserialize, PartialEq ) ]
 pub struct IcTokenClaims
 {
+  /// Unique token identifier (UUID v4, RFC 7519 §4.1.7)
+  /// Ensures each JWT has a unique signature even when issued in the same second
+  #[ serde( rename = "jti" ) ]
+  pub token_id: Uuid,
+
   /// Agent identifier (format: agent_<id>)
   pub agent_id: String,
 
@@ -103,6 +111,7 @@ impl IcTokenClaims
       .as_secs();
 
     Self {
+      token_id: Uuid::new_v4(),
       agent_id,
       budget_id,
       issued_at: now,
