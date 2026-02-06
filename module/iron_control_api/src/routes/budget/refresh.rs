@@ -155,40 +155,29 @@ pub async fn refresh_budget(
     } ) ) ).into_response();
   }
 
-  // Verify IC Token
-  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  // Verify IC Token (JWT signature + hash-check against database)
+  let ( agent_id, _claims ) = match state.ic_token_manager
+    .validate_ic_token_runtime( &request.ic_token, &state.db_pool )
+    .await
   {
-    Ok( claims ) => claims,
-    Err( _ ) =>
+    Ok( result ) => result,
+    Err( crate::ic_token::IcTokenRuntimeError::DatabaseError( e ) ) =>
     {
-      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
-      {
-        "error": "Invalid IC Token"
-      } ) ) ).into_response();
+      tracing::error!( "IC Token validation database error: {}", e );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Database error" }) ),
+      )
+        .into_response();
     }
-  };
-
-  // Extract agent_id from IC Token claims
-  // Claims.agent_id format: "agent_<id>"
-  let agent_id = match claims.agent_id.strip_prefix( "agent_" )
-  {
-    Some( id_str ) => match id_str.parse::< i64 >()
+    Err( e ) =>
     {
-      Ok( id ) => id,
-      Err( _ ) =>
-      {
-        return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
-        {
-          "error": "Invalid agent ID in IC Token"
-        } ) ) ).into_response();
-      }
-    },
-    None =>
-    {
-      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
-      {
-        "error": "Invalid IC Token agent_id format"
-      } ) ) ).into_response();
+      tracing::warn!( "IC Token validation failed: {:?}", e );
+      return (
+        StatusCode::UNAUTHORIZED,
+        Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
+      )
+        .into_response();
     }
   };
 

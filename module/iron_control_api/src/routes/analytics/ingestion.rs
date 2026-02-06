@@ -24,47 +24,31 @@ pub async fn post_event(
   Json( event ): Json< AnalyticsEventRequest >,
 ) -> impl IntoResponse
 {
-  // Verify IC Token and extract agent identity
-  let claims = match state.ic_token_manager.verify_token( &event.ic_token )
+  // Verify IC Token and extract agent identity (JWT signature + hash-check against database)
+  let ( agent_id, _claims ) = match state.ic_token_manager
+    .validate_ic_token_runtime( &event.ic_token, &state.pool )
+    .await
   {
-    Ok( claims ) => claims,
+    Ok( result ) => result,
+    Err( crate::ic_token::IcTokenRuntimeError::DatabaseError( e ) ) =>
+    {
+      tracing::error!( "IC Token validation database error: {}", e );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({
+          "error": "DATABASE_ERROR",
+          "message": "Database error"
+        }) )
+      ).into_response();
+    }
     Err( e ) =>
     {
-      tracing::warn!( "IC Token verification failed: {}", e );
+      tracing::warn!( "IC Token validation failed: {:?}", e );
       return (
         StatusCode::UNAUTHORIZED,
         Json( serde_json::json!({
           "error": "UNAUTHORIZED",
           "message": "Invalid or expired IC token"
-        }) )
-      ).into_response();
-    }
-  };
-
-  // Extract agent_id from token claims (format: "agent_<id>")
-  let agent_id: i64 = match claims.agent_id.strip_prefix( "agent_" )
-  {
-    Some( id_str ) => match id_str.parse()
-    {
-      Ok( id ) => id,
-      Err( _ ) =>
-      {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json( serde_json::json!({
-            "error": "INVALID_TOKEN",
-            "message": "Invalid agent_id format in token"
-          }) )
-        ).into_response();
-      }
-    },
-    None =>
-    {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json( serde_json::json!({
-          "error": "INVALID_TOKEN",
-          "message": "Invalid agent_id format in token"
         }) )
       ).into_response();
     }

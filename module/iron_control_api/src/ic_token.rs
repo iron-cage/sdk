@@ -13,8 +13,32 @@
 
 use jsonwebtoken::{ decode, encode, DecodingKey, EncodingKey, Header, Validation };
 use serde::{ Deserialize, Serialize };
+use sha2::{ Sha256, Digest };
+use sqlx::SqlitePool;
 use std::time::{ SystemTime, UNIX_EPOCH };
 use crate::error::ValidationError;
+
+/// Compute SHA-256 hash of a token string (hex-encoded)
+pub fn sha256_hash( token: &str ) -> String
+{
+  let mut hasher = Sha256::new();
+  hasher.update( token.as_bytes() );
+  format!( "{:x}", hasher.finalize() )
+}
+
+/// Error from IC Token runtime validation (JWT + hash-check)
+#[ derive( Debug ) ]
+pub enum IcTokenRuntimeError
+{
+  /// JWT signature invalid, claims invalid, or expired
+  InvalidToken( String ),
+  /// agent_id format invalid (not agent_<positive_number>)
+  InvalidAgentId( String ),
+  /// Agent not found, token revoked (hash NULL), or token rotated (hash mismatch)
+  TokenInactive( String ),
+  /// Database query failed
+  DatabaseError( String ),
+}
 
 /// IC Token JWT claims
 ///
@@ -200,6 +224,93 @@ impl IcTokenManager
     token_data.claims.validate().map_err( |e| e.to_string() )?;
 
     Ok( token_data.claims )
+  }
+
+  /// Validate IC Token for runtime endpoints: JWT verification + hash-check against database
+  ///
+  /// Fix(ic-token-invalidation): Runtime endpoints previously relied only on JWT signature
+  /// verification, allowing revoked or rotated tokens to remain usable. This method adds
+  /// a database hash-check to ensure only the current active token is accepted.
+  ///
+  /// Validation steps:
+  /// 1. Verify JWT signature and claims (existing `verify_token`)
+  /// 2. Parse `agent_id` from claims (format: `agent_<id>`)
+  /// 3. Hash raw token with SHA-256 and compare against `agents.ic_token_hash`
+  /// 4. Reject if agent missing, hash NULL (revoked), or hash mismatch (rotated)
+  ///
+  /// # Arguments
+  ///
+  /// * `token` - Raw JWT token string
+  /// * `pool` - Database connection pool for hash lookup
+  ///
+  /// # Returns
+  ///
+  /// `(agent_id, claims)` on success, `IcTokenRuntimeError` on failure
+  pub async fn validate_ic_token_runtime(
+    &self,
+    token: &str,
+    pool: &SqlitePool,
+  ) -> Result< ( i64, IcTokenClaims ), IcTokenRuntimeError >
+  {
+    // 1. Verify JWT signature and claims
+    let claims = self.verify_token( token )
+      .map_err( IcTokenRuntimeError::InvalidToken )?;
+
+    // 2. Parse agent_id (format: agent_<id>)
+    let agent_id: i64 = claims.agent_id
+      .strip_prefix( "agent_" )
+      .ok_or_else( || IcTokenRuntimeError::InvalidAgentId(
+        "Invalid agent_id format".to_string()
+      ) )?
+      .parse()
+      .map_err( |_| IcTokenRuntimeError::InvalidAgentId(
+        "Invalid agent_id - must be numeric".to_string()
+      ) )?;
+
+    if agent_id <= 0
+    {
+      return Err( IcTokenRuntimeError::InvalidAgentId(
+        "Invalid agent_id - must be positive".to_string()
+      ) );
+    }
+
+    // 3. Hash raw token and compare with stored hash
+    let token_hash = sha256_hash( token );
+
+    let stored_hash: Option< Option< String > > = sqlx::query_scalar(
+      "SELECT ic_token_hash FROM agents WHERE id = ?"
+    )
+    .bind( agent_id )
+    .fetch_optional( pool )
+    .await
+    .map_err( |e| IcTokenRuntimeError::DatabaseError(
+      format!( "Database error fetching agent: {e}" )
+    ) )?;
+
+    // 4. Match stored hash
+    match stored_hash
+    {
+      // Agent not found — generic error to prevent enumeration
+      None =>
+      {
+        Err( IcTokenRuntimeError::TokenInactive( "Agent not found".to_string() ) )
+      }
+      // ic_token_hash is NULL — token was revoked
+      Some( None ) =>
+      {
+        Err( IcTokenRuntimeError::TokenInactive( "IC Token has been revoked".to_string() ) )
+      }
+      // Hash mismatch — token was rotated via regenerate
+      Some( Some( ref hash ) ) if *hash != token_hash =>
+      {
+        Err( IcTokenRuntimeError::TokenInactive( "IC Token has been invalidated".to_string() ) )
+      }
+      // Hash matches — token is active
+      Some( Some( _ ) ) =>
+      {
+        Ok( ( agent_id, claims ) )
+      }
+    }
   }
 }
 

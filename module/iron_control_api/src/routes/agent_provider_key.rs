@@ -102,46 +102,31 @@ pub async fn get_provider_key(
     ).into_response();
   }
 
-  // 2. Verify IC Token
-  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  // 2-3. Verify IC Token (JWT signature + hash-check against database)
+  let ( agent_id, claims ) = match state.ic_token_manager
+    .validate_ic_token_runtime( &request.ic_token, &state.db_pool )
+    .await
   {
-    Ok( claims ) => claims,
-    Err( _ ) =>
+    Ok( result ) => result,
+    Err( crate::ic_token::IcTokenRuntimeError::DatabaseError( e ) ) =>
     {
+      tracing::error!( "IC Token validation database error: {}", e );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({
+          "error": "Database error",
+          "code": "INTERNAL_ERROR"
+        }) ),
+      ).into_response();
+    }
+    Err( e ) =>
+    {
+      tracing::warn!( "IC Token validation failed: {:?}", e );
       return (
         StatusCode::UNAUTHORIZED,
         Json( serde_json::json!({
           "error": "Invalid IC Token",
           "code": "UNAUTHORIZED"
-        }) ),
-      ).into_response();
-    }
-  };
-
-  // 3. Parse agent_id from claims (format: agent_<id>)
-  let agent_id: i64 = match claims.agent_id.strip_prefix( "agent_" )
-  {
-    Some( id_part ) => match id_part.parse()
-    {
-      Ok( id ) => id,
-      Err( _ ) =>
-      {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json( serde_json::json!({
-            "error": "Invalid agent_id format in token",
-            "code": "INVALID_TOKEN"
-          }) ),
-        ).into_response();
-      }
-    },
-    None =>
-    {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json( serde_json::json!({
-          "error": "Invalid agent_id format in token",
-          "code": "INVALID_TOKEN"
         }) ),
       ).into_response();
     }

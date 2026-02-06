@@ -23,11 +23,10 @@ use axum::{
     Json,
 };
 use serde::Serialize;
-use sha2::{Sha256, Digest};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 
-use crate::ic_token::{IcTokenClaims, IcTokenManager};
+use crate::ic_token::{sha256_hash, IcTokenClaims, IcTokenManager};
 use crate::jwt_auth::AuthenticatedUser;
 
 /// IC Token route state
@@ -54,12 +53,6 @@ pub struct IcTokenStatusResponse {
     pub created_at: Option<i64>,
 }
 
-/// Helper to compute SHA-256 hash of a token
-fn sha256_hash(token: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(token.as_bytes());
-    format!("{:x}", hasher.finalize())
-}
 
 /// Check if user has access to agent (owner or admin)
 async fn check_agent_access(

@@ -150,12 +150,24 @@ pub async fn handshake(
     } ) ) ).into_response();
   }
 
-  // Verify IC Token
-  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  // Verify IC Token (JWT signature + hash-check against database)
+  let ( agent_id, _claims ) = match state.ic_token_manager
+    .validate_ic_token_runtime( &request.ic_token, &state.db_pool )
+    .await
   {
-    Ok( claims ) => claims,
-    Err( _ ) =>
+    Ok( result ) => result,
+    Err( crate::ic_token::IcTokenRuntimeError::DatabaseError( e ) ) =>
     {
+      tracing::error!( "IC Token validation database error: {}", e );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({ "error": "Database error" }) ),
+      )
+        .into_response();
+    }
+    Err( e ) =>
+    {
+      tracing::warn!( "IC Token validation failed: {:?}", e );
       return (
         StatusCode::UNAUTHORIZED,
         Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
@@ -196,56 +208,6 @@ pub async fn handshake(
 
     Ok( result.last_insert_rowid() )
   }
-
-  // Get agent_id from IC Token claims
-  let agent_id_str = &claims.agent_id;
-
-  // Fix(authorization-bypass-handshake): Reject malformed agent_id instead of defaulting to 1
-  // Root cause: Code used .unwrap_or(1) when parsing agent_id from IC Token,
-  //             defaulting to agent_id=1 on parse failure. This allowed attackers to bypass
-  //             authorization by sending malformed agent_id values (alphabetic, special chars,
-  //             overflow, etc.), which would parse fail and default to using agent_id=1's budget.
-  // Pitfall: Never use fallback values for security-critical parsing. Always reject invalid
-  //          input with explicit error responses. Using .unwrap_or() for authorization data
-  //          is a critical anti-pattern - silently accepts malformed input, creates authorization
-  //          bypass when fallback is privileged, enables billing fraud.
-  // Test coverage: See tests/handshake_malformed_agent_id_test.rs
-  //
-  // Parse agent_id (format: agent_<id>) to get database ID
-  let agent_id : i64 = match agent_id_str.strip_prefix( "agent_" )
-  {
-    Some( id_part ) =>
-    {
-      match id_part.parse::< i64 >()
-      {
-        Ok( id ) if id > 0 => id,  // Valid positive ID
-        Ok( _ ) =>
-        {
-          return (
-            StatusCode::BAD_REQUEST,
-            Json( serde_json::json!({ "error": "Invalid agent_id - must be positive" }) ),
-          )
-            .into_response();
-        }
-        Err( _ ) =>
-        {
-          return (
-            StatusCode::BAD_REQUEST,
-            Json( serde_json::json!({ "error": "Invalid agent_id - must be numeric" }) ),
-          )
-            .into_response();
-        }
-      }
-    }
-    None =>
-    {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json( serde_json::json!({ "error": "Invalid agent_id format" }) ),
-      )
-        .into_response();
-    }
-  };
 
   // Get agent's owner_id to look up usage_limits
   let owner_id: Option< String > = match sqlx::query_scalar(
