@@ -51,7 +51,7 @@ async fn test_emoji_in_model_name()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease first
@@ -140,7 +140,7 @@ async fn test_non_latin_characters()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease first
@@ -212,7 +212,7 @@ async fn test_zero_width_characters()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease first
@@ -302,7 +302,7 @@ async fn test_rtl_override_attack()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease first

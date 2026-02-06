@@ -52,7 +52,7 @@ async fn test_refresh_null_additional_budget()
   let agent_id = 122i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create initial lease via handshake
@@ -120,7 +120,7 @@ async fn test_refresh_float_overflow_f64_max()
   let agent_id = 123i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create initial lease
@@ -186,7 +186,7 @@ async fn test_refresh_float_overflow_infinity()
   let agent_id = 124i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create initial lease
@@ -254,7 +254,7 @@ async fn test_refresh_nan_additional_budget()
   let agent_id = 125i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create initial lease

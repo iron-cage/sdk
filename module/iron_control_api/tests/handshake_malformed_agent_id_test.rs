@@ -138,18 +138,19 @@ async fn test_malformed_agent_id_alphabetic()
   let response = app.oneshot(request).await.unwrap();
 
   // CRITICAL: Must reject, NOT default to agent_id=1
+  // After hash-check standardization: all auth failures return 401 (prevents info leakage)
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Malformed agent_id (alphabetic) MUST return 400 Bad Request, not default to agent_id=1"
+    StatusCode::UNAUTHORIZED,
+    "Malformed agent_id (alphabetic) MUST return 401 Unauthorized, not default to agent_id=1"
   );
 
   let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
   let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
-    body_text.contains("numeric") || body_text.contains("Invalid agent_id"),
-    "Error message should indicate numeric requirement: {}",
+    body_text.contains("Invalid IC Token"),
+    "Error message should be generic 'Invalid IC Token': {}",
     body_text
   );
 }
@@ -181,8 +182,8 @@ async fn test_malformed_agent_id_special_chars()
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Malformed agent_id (special chars) MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Malformed agent_id (special chars) MUST return 401 Unauthorized"
   );
 }
 
@@ -215,8 +216,8 @@ async fn test_malformed_agent_id_overflow()
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Overflow agent_id MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Overflow agent_id MUST return 401 Unauthorized"
   );
 }
 
@@ -247,16 +248,16 @@ async fn test_malformed_agent_id_negative()
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Negative agent_id MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Negative agent_id MUST return 401 Unauthorized"
   );
 
   let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
   let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
-    body_text.contains("positive") || body_text.contains("Invalid agent_id"),
-    "Error message should indicate positive requirement: {}",
+    body_text.contains("Invalid IC Token"),
+    "Error message should be generic 'Invalid IC Token': {}",
     body_text
   );
 }
@@ -288,8 +289,8 @@ async fn test_malformed_agent_id_zero()
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Zero agent_id MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Zero agent_id MUST return 401 Unauthorized"
   );
 }
 

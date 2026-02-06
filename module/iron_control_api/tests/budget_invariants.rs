@@ -75,7 +75,7 @@ async fn test_budget_invariant_after_handshake()
   seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Perform handshake
@@ -165,7 +165,7 @@ async fn test_budget_invariant_after_report()
   seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state.clone() ).await;
 
   // Create lease through handshake (reserves budget properly)
@@ -277,7 +277,7 @@ async fn test_budget_invariant_after_refresh()
   seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state.clone() ).await;
 
   // Create initial lease through handshake

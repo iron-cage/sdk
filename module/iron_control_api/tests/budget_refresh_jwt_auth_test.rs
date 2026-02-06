@@ -41,7 +41,7 @@ async fn test_budget_refresh_without_jwt_returns_401()
   let agent_id = 400i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // First handshake to get a lease
   let handshake_body = json!(
@@ -112,7 +112,7 @@ async fn test_budget_refresh_with_invalid_jwt_returns_401()
   let agent_id = 401i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let handshake_body = json!(
@@ -182,7 +182,7 @@ async fn test_budget_refresh_with_valid_jwt_succeeds()
   let agent_id = 402i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let handshake_body = json!(

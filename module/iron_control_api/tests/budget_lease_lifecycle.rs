@@ -39,7 +39,7 @@ async fn test_report_on_expired_lease()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Step 1: Handshake to create lease
@@ -139,7 +139,7 @@ async fn test_report_on_revoked_lease()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Step 1: Handshake to create lease
@@ -247,7 +247,7 @@ async fn test_multiple_reports_same_lease()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Step 1: Handshake to create lease with $10 budget
@@ -368,7 +368,7 @@ async fn test_lease_budget_exhaustion()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Step 1: Handshake to create lease with $10 budget
@@ -491,7 +491,7 @@ async fn test_lease_renewal_workflow()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create JWT access token for refresh endpoint

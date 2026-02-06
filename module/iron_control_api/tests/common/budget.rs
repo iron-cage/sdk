@@ -124,11 +124,13 @@ pub async fn create_test_budget_state_no_crypto( pool: SqlitePool ) -> BudgetSta
   }
 }
 
-/// Helper: Generate IC Token for test agent
+/// Helper: Generate IC Token for test agent and store its hash in the database
 ///
-/// Creates IC Token with standard claims for testing.
+/// Creates IC Token with standard claims and stores SHA-256 hash in
+/// `agents.ic_token_hash` so that `validate_ic_token_runtime` accepts it.
+/// Agent must already exist in the database.
 #[ allow( dead_code ) ]
-pub fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
+pub async fn create_ic_token( pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager ) -> String
 {
   let claims = IcTokenClaims::new(
     format!( "agent_{}", agent_id ),
@@ -137,7 +139,18 @@ pub fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
     None,
   );
 
-  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
+  let token = manager.generate_token( &claims ).expect( "LOUD FAILURE: Should generate IC Token" );
+
+  let token_hash = iron_control_api::ic_token::sha256_hash( &token );
+
+  sqlx::query( "UPDATE agents SET ic_token_hash = ? WHERE id = ?" )
+    .bind( &token_hash )
+    .bind( agent_id )
+    .execute( pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to store ic_token_hash" );
+
+  token
 }
 
 /// Helper: Seed agent with budget and provider key

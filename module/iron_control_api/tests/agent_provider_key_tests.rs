@@ -162,8 +162,8 @@ async fn test_get_provider_key_success()
 
   let app = create_provider_key_router( state.clone() ).await;
 
-  // Generate IC token for agent_101
-  let ic_token = create_ic_token( 101, &state.ic_token_manager );
+  // Generate IC token for agent_101 and store hash for runtime validation
+  let ic_token = create_ic_token( &pool, 101, &state.ic_token_manager ).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -267,8 +267,8 @@ async fn test_get_provider_key_no_provider_assigned()
 
   let app = create_provider_key_router( state.clone() ).await;
 
-  // Generate IC token for agent_102
-  let ic_token = create_ic_token( 102, &state.ic_token_manager );
+  // Generate IC token for agent_102 and store hash for runtime validation
+  let ic_token = create_ic_token( &pool, 102, &state.ic_token_manager ).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -298,11 +298,11 @@ async fn test_get_provider_key_no_provider_assigned()
 async fn test_get_provider_key_agent_not_found()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool ).await;
+  let state = create_test_budget_state( pool.clone() ).await;
   let app = create_provider_key_router( state.clone() ).await;
 
   // Generate IC token for non-existent agent
-  let ic_token = create_ic_token( 99999, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 99999, &state.ic_token_manager ).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -318,7 +318,8 @@ async fn test_get_provider_key_agent_not_found()
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::NOT_FOUND, "Non-existent agent should return 404" );
+  // After hash-check validation: non-existent agent returns 401 (prevents agent enumeration)
+  assert_eq!( response.status(), StatusCode::UNAUTHORIZED, "Non-existent agent should return 401" );
 }
 
 #[ tokio::test ]
@@ -378,8 +379,8 @@ async fn test_get_provider_key_crypto_unavailable()
 
   let app = create_provider_key_router( state.clone() ).await;
 
-  // Generate IC token for agent_103
-  let ic_token = create_ic_token( 103, &state.ic_token_manager );
+  // Generate IC token for agent_103 and store hash for runtime validation
+  let ic_token = create_ic_token( &pool, 103, &state.ic_token_manager ).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -468,7 +469,7 @@ async fn test_get_provider_key_disabled_key()
 
   let app = create_provider_key_router( state.clone() ).await;
 
-  let ic_token = create_ic_token( 104, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 104, &state.ic_token_manager ).await;
   let request_body = json!({ "ic_token": ic_token });
 
   let response = app

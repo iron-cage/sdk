@@ -108,8 +108,8 @@ async fn test_handshake_decrypts_provider_key()
   .await
   .expect( "LOUD FAILURE: Should insert encrypted provider key" );
 
-  // Setup: Create IC Token
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  // Setup: Create IC Token and store hash for runtime validation
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Execute: Call handshake endpoint
   let app = common::budget::create_budget_router( state.clone() ).await;
@@ -202,7 +202,7 @@ async fn test_handshake_handles_decryption_failure()
   .await
   .unwrap();
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = common::budget::create_budget_router( state ).await;
 
   let request = Request::builder()

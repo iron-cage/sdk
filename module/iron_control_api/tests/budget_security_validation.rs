@@ -105,8 +105,8 @@ async fn test_missing_content_type()
   let agent_id = 501i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Send valid JSON but no content-type header
@@ -233,8 +233,8 @@ async fn test_handshake_missing_provider()
   let agent_id = 504i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Send handshake without provider
@@ -323,7 +323,7 @@ async fn test_report_missing_cost()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease first
@@ -440,8 +440,8 @@ async fn test_refresh_missing_current_lease_id()
   let agent_id = 508i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let access_token = common::create_test_access_token(
     "user_123",
     "test@example.com",
@@ -588,7 +588,7 @@ async fn test_oversized_model_name()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease first

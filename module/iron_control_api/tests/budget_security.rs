@@ -77,7 +77,7 @@ async fn test_sql_injection_in_provider_name()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Attempt SQL injection via provider field
@@ -137,7 +137,7 @@ async fn test_ic_token_authorization_enforcement()
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Create IC Token for agent 1
-  let ic_token_agent_1 = create_ic_token( agent_1, &state.ic_token_manager );
+  let ic_token_agent_1 = create_ic_token( &pool, agent_1, &state.ic_token_manager ).await;
 
   // Create lease for agent 1
   let app = create_budget_router( state.clone() ).await;
@@ -161,7 +161,7 @@ async fn test_ic_token_authorization_enforcement()
   let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
 
   // Attempt to refresh agent 1's lease using agent 2's IC Token (authorization violation)
-  let ic_token_agent_2 = create_ic_token( agent_2, &state.ic_token_manager );
+  let ic_token_agent_2 = create_ic_token( &pool, agent_2, &state.ic_token_manager ).await;
 
   // Create JWT token for authenticated request (GAP-003)
   let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
@@ -209,7 +209,7 @@ async fn test_ip_token_replay_prevention()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Perform first handshake
   let app1 = create_budget_router( state.clone() ).await;
@@ -282,7 +282,7 @@ async fn test_ic_token_invalid_signature()
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Create valid IC Token
-  let valid_ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let valid_ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Tamper with token by modifying payload (change agent_id claim)
   // JWT format: header.payload.signature
@@ -357,7 +357,7 @@ async fn test_provider_key_mismatch()
   .unwrap();
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Attempt handshake: request openai provider with anthropic provider_key_id
@@ -460,7 +460,7 @@ async fn test_disabled_provider_key_access()
   .unwrap();
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Attempt handshake with disabled provider key
@@ -506,7 +506,7 @@ async fn test_revoked_lease_usage_reporting()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let app = create_budget_router( state.clone() ).await;
@@ -583,7 +583,7 @@ async fn test_sql_injection_in_model_name()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let app = create_budget_router( state.clone() ).await;
@@ -668,7 +668,7 @@ async fn test_sql_injection_in_reason_field()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let app = create_budget_router( state.clone() ).await;
@@ -798,7 +798,7 @@ async fn test_refresh_on_revoked_lease()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let app = create_budget_router( state.clone() ).await;
@@ -876,7 +876,7 @@ async fn test_return_on_revoked_lease()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease via handshake
   let app = create_budget_router( state.clone() ).await;
@@ -950,7 +950,7 @@ async fn test_handshake_after_revocation()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create first lease via handshake
   let app = create_budget_router( state.clone() ).await;
@@ -1034,7 +1034,7 @@ async fn test_sql_injection_in_lease_id()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create valid lease first
   let app = create_budget_router( state.clone() ).await;
@@ -1119,7 +1119,7 @@ async fn test_xss_in_model_parameter()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create lease
   let app = create_budget_router( state.clone() ).await;

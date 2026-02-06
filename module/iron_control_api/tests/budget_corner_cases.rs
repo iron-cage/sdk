@@ -109,8 +109,8 @@ async fn test_handshake_whitespace_only_provider()
   let pool = setup_test_db().await;
   seed_agent_with_budget( &pool, 107, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( &pool, 1, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   let request = Request::builder()
@@ -196,8 +196,8 @@ async fn test_handshake_provider_over_max_length()
   let pool = setup_test_db().await;
   seed_agent_with_budget( &pool, 109, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let state = create_test_budget_state( pool.clone() ).await;
+  let ic_token = create_ic_token( &pool, 1, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Provider name of exactly 51 characters
@@ -276,7 +276,7 @@ async fn test_report_usage_negative_tokens()
   seed_agent_with_budget( &pool, 111, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 1, &state.ic_token_manager ).await;
 
   // Create lease first
   let app1 = create_budget_router( state.clone() ).await;
@@ -347,7 +347,7 @@ async fn test_report_usage_negative_cost()
   seed_agent_with_budget( &pool, 112, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 1, &state.ic_token_manager ).await;
 
   // Create lease first
   let app1 = create_budget_router( state.clone() ).await;
@@ -419,9 +419,9 @@ async fn test_error_messages_no_sensitive_data_leak()
   let pool = setup_test_db().await;
   // Don't seed any agent (agent doesn't exist)
 
-  let state = create_test_budget_state( pool ).await;
+  let state = create_test_budget_state( pool.clone() ).await;
   // Create IC Token for non-existent agent 999
-  let ic_token = create_ic_token( 999, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 999, &state.ic_token_manager ).await;
 
   let app = create_budget_router( state ).await;
 
@@ -468,7 +468,7 @@ async fn test_report_usage_zero_cost_cached_response()
   seed_agent_with_budget( &pool, 113, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 1, &state.ic_token_manager ).await;
 
   // Create lease first
   let app1 = create_budget_router( state.clone() ).await;
@@ -748,9 +748,9 @@ async fn test_handshake_null_provider_field()
   let pool = setup_test_db().await;
   seed_agent_with_budget( &pool, 202, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool ).await;
+  let state = create_test_budget_state( pool.clone() ).await;
   let router = create_budget_router( state.clone() ).await;
-  let ic_token = create_ic_token( 202, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 202, &state.ic_token_manager ).await;
 
   // Craft request with null provider
   let request_body = json!({
@@ -946,7 +946,7 @@ async fn test_report_usage_non_finite_cost()
 
   let state = create_test_budget_state( pool.clone() ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
-  let ic_token = create_ic_token( 205, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 205, &state.ic_token_manager ).await;
 
   // Create lease
   let handshake_request = json!({

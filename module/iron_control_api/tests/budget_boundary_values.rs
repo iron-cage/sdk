@@ -55,7 +55,7 @@ async fn test_cost_i64_max()
   seed_agent_with_budget( &pool, agent_id, i64::MAX ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create lease
@@ -145,7 +145,7 @@ async fn test_cost_zero()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Create lease
@@ -234,7 +234,7 @@ async fn test_budget_exactly_at_limit()
   seed_agent_with_budget( &pool, agent_id, total_budget ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state ).await;
 
   // Request handshake with exact remaining budget
@@ -298,7 +298,7 @@ async fn test_multiple_leases_equal_total_budget()
   seed_agent_with_budget( &pool, agent_id, total_budget ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Create 5 leases of $10 each ($50 total)
   for i in 0..5
@@ -394,7 +394,7 @@ async fn test_tokens_i64_max()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease
@@ -491,7 +491,7 @@ async fn test_lease_expiration_exact_timestamp()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router_handshake = create_budget_router( state.clone() ).await;
 
   // Create lease

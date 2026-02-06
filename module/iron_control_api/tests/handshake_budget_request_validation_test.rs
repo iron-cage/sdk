@@ -44,7 +44,7 @@ async fn test_handshake_with_valid_budget_request()
   let agent_id = 300i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await; // $100
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Request $5 (5,000,000 microdollars) - within limits
   let request_body = json!(
@@ -100,7 +100,7 @@ async fn test_handshake_with_excessive_budget_request()
   let agent_id = 301i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 1_000_000_000 ).await; // $1000
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // Request $101 (101,000,000 microdollars) - exceeds MAX_HANDSHAKE_BUDGET ($100)
   let request_body = json!(
@@ -154,7 +154,7 @@ async fn test_handshake_with_zero_budget_request()
   let agent_id = 302i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   let request_body = json!(
   {
@@ -198,7 +198,7 @@ async fn test_handshake_with_negative_budget_request()
   let agent_id = 303i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   let request_body = json!(
   {
@@ -243,7 +243,7 @@ async fn test_handshake_without_budget_request_uses_default()
   let agent_id = 304i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
 
   // No requested_budget field
   let request_body = json!(

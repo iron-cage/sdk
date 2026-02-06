@@ -61,7 +61,7 @@ async fn test_multiple_simultaneous_handshakes()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Launch 10 concurrent handshake requests
@@ -162,7 +162,7 @@ async fn test_concurrent_usage_reports_on_same_lease()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Create initial lease via handshake
@@ -264,7 +264,7 @@ async fn test_concurrent_report_and_refresh()
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Create initial lease
@@ -374,7 +374,7 @@ async fn test_handshake_with_existing_active_lease()
   seed_agent_with_budget( &pool, agent_id, 50_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Create first lease
@@ -487,7 +487,7 @@ async fn test_toctou_race_insufficient_budget()
   seed_agent_with_budget( &pool, agent_id, 10_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let app = create_budget_router( state ).await;
 
   // Launch 2 concurrent handshake requests (each wants $10.00)

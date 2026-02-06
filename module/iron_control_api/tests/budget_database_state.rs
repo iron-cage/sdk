@@ -99,16 +99,23 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
 }
 
 /// Helper: Generate IC Token for test agent
-fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
+async fn create_ic_token( pool: &sqlx::SqlitePool, agent_id: i64, manager: &IcTokenManager ) -> String
 {
   let claims = IcTokenClaims::new(
     format!( "agent_{}", agent_id ),
     format!( "budget_{}", agent_id ),
     vec![ "llm:call".to_string() ],
-    None, // No expiration
+    None,
   );
-
-  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
+  let token = manager.generate_token( &claims ).expect( "LOUD FAILURE: Should generate IC Token" );
+  let token_hash = iron_control_api::ic_token::sha256_hash( &token );
+  sqlx::query( "UPDATE agents SET ic_token_hash = ? WHERE id = ?" )
+    .bind( &token_hash )
+    .bind( agent_id )
+    .execute( pool )
+    .await
+    .expect( "LOUD FAILURE: Failed to store ic_token_hash" );
+  token
 }
 
 /// Helper: Seed agent with specific budget and provider key
@@ -265,7 +272,7 @@ async fn test_handshake_with_nonexistent_agent()
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Create IC Token for agent that doesnt exist (agent_id = 999)
-  let ic_token = create_ic_token( 999, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 999, &state.ic_token_manager ).await;
 
   // Build handshake request
   let request_body = json!(
@@ -335,7 +342,7 @@ async fn test_handshake_with_zero_agent_budget()
   seed_agent_with_budget( &pool, 114, 0 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 114, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 114, &state.ic_token_manager ).await;
 
   let request_body = json!(
   {
@@ -404,7 +411,7 @@ async fn test_handshake_with_insufficient_budget_for_lease()
   seed_agent_with_budget( &pool, 115, 5_000_000 ).await;
 
   let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 115, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 115, &state.ic_token_manager ).await;
 
   let request_body = json!(
   {
@@ -895,7 +902,7 @@ async fn test_refresh_with_insufficient_agent_budget()
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Generate IC Token for agent 118
-  let ic_token = create_ic_token( 118, &state.ic_token_manager );
+  let ic_token = create_ic_token( &pool, 118, &state.ic_token_manager ).await;
 
   // Create active lease
   let lease_id = "lease_refresh_test";

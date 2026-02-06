@@ -176,7 +176,7 @@ async fn test_refresh_expired_ic_token()
   let state = create_test_budget_state( pool.clone() ).await;
 
   // Create initial lease with valid token
-  let valid_ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
+  let valid_ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
   let router = create_budget_router( state.clone() ).await;
 
   let handshake_response = router
