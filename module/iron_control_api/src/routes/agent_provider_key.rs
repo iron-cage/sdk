@@ -121,7 +121,7 @@ pub async fn get_provider_key(
     }
     Err( e ) =>
     {
-      tracing::warn!( "IC Token validation failed: {:?}", e );
+      tracing::warn!( "IC Token validation failed: {}", e );
       return (
         StatusCode::UNAUTHORIZED,
         Json( serde_json::json!({

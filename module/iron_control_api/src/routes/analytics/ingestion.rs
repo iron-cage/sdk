@@ -43,7 +43,7 @@ pub async fn post_event(
     }
     Err( e ) =>
     {
-      tracing::warn!( "IC Token validation failed: {:?}", e );
+      tracing::warn!( "IC Token validation failed: {}", e );
       return (
         StatusCode::UNAUTHORIZED,
         Json( serde_json::json!({

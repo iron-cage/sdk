@@ -167,7 +167,7 @@ pub async fn handshake(
     }
     Err( e ) =>
     {
-      tracing::warn!( "IC Token validation failed: {:?}", e );
+      tracing::warn!( "IC Token validation failed: {}", e );
       return (
         StatusCode::UNAUTHORIZED,
         Json( serde_json::json!({ "error": "Invalid IC Token" }) ),

@@ -12,11 +12,13 @@
 //! - Contains agent_id, budget_id, permissions
 
 use crate::error::ValidationError;
+use core::fmt::{Display, Formatter, Result as FmtResult};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::time::{SystemTime, UNIX_EPOCH};
+use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 /// Compute SHA-256 hash of a token string (hex-encoded)
@@ -38,6 +40,19 @@ pub enum IcTokenRuntimeError {
     /// Database query failed
     DatabaseError(String),
 }
+
+impl Display for IcTokenRuntimeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::InvalidToken(msg) => write!(f, "Invalid IC Token: {msg}"),
+            Self::InvalidAgentId(msg) => write!(f, "Invalid agent_id: {msg}"),
+            Self::TokenInactive(msg) => write!(f, "IC Token inactive: {msg}"),
+            Self::DatabaseError(msg) => write!(f, "Database error: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for IcTokenRuntimeError {}
 
 /// IC Token JWT claims
 ///
@@ -299,9 +314,14 @@ impl IcTokenManager {
                 "IC Token has been revoked".to_string(),
             )),
             // Hash mismatch — token was rotated via regenerate
-            Some(Some(ref hash)) if *hash != token_hash => Err(IcTokenRuntimeError::TokenInactive(
-                "IC Token has been invalidated".to_string(),
-            )),
+            // Constant-time comparison prevents timing attacks on hash extraction
+            Some(Some(ref hash))
+                if hash.as_bytes().ct_eq(token_hash.as_bytes()).unwrap_u8() == 0 =>
+            {
+                Err(IcTokenRuntimeError::TokenInactive(
+                    "IC Token has been invalidated".to_string(),
+                ))
+            }
             // Hash matches — token is active
             Some(Some(_)) => Ok((agent_id, claims)),
         }
