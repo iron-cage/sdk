@@ -3,7 +3,7 @@
 //! IC Token → IP Token exchange with budget lease creation
 
 use super::state::BudgetState;
-use crate::error::ValidationError;
+use crate::{ error::ValidationError, ic_token };
 use axum::
 {
   extract::State,
@@ -151,29 +151,12 @@ pub async fn handshake(
   }
 
   // Verify IC Token (JWT signature + hash-check against database)
-  let ( agent_id, _claims ) = match state.ic_token_manager
-    .validate_ic_token_runtime( &request.ic_token, &state.db_pool )
-    .await
+  let ( agent_id, _claims ) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager, &request.ic_token, &state.db_pool,
+  ).await
   {
     Ok( result ) => result,
-    Err( crate::ic_token::IcTokenRuntimeError::DatabaseError( e ) ) =>
-    {
-      tracing::error!( "IC Token validation database error: {}", e );
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
-      )
-        .into_response();
-    }
-    Err( e ) =>
-    {
-      tracing::warn!( "IC Token validation failed: {}", e );
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
-      )
-        .into_response();
-    }
+    Err( response ) => return response,
   };
 
   // Helper: create a dev placeholder provider key for agent_1 if missing

@@ -12,12 +12,14 @@
 //! - Contains agent_id, budget_id, permissions
 
 use crate::error::ValidationError;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Json};
 use core::fmt::{Display, Formatter, Result as FmtResult};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
@@ -314,6 +316,62 @@ impl IcTokenManager {
       ),
       // Hash matches — token is active
       Some(Some(_)) => Ok((agent_id, claims)),
+    }
+  }
+}
+
+/// Target duration for all validation responses (success and error).
+/// All paths are padded to this floor so external observers cannot
+/// distinguish error types by response latency.
+const VALIDATION_TIMING_TARGET: Duration = Duration::from_millis(5);
+
+/// Validate IC Token for a runtime endpoint, returning HTTP response on error.
+///
+/// Consolidates the duplicated error handling pattern from budget, analytics,
+/// and agent_provider_key endpoints into a single function.
+///
+/// On failure:
+/// - Logs the error (error! for database, warn! for auth failures)
+/// - Pads elapsed time to `VALIDATION_TIMING_TARGET` to normalize timing
+/// - Returns appropriate HTTP status (500 for database, 401 for auth)
+///
+/// On success: returns `(agent_id, claims)` for the endpoint to use.
+pub async fn validate_ic_token_for_endpoint(
+  manager: &IcTokenManager,
+  token: &str,
+  pool: &SqlitePool,
+) -> Result<(i64, IcTokenClaims), axum::response::Response> {
+  let start = Instant::now();
+  let result = manager.validate_ic_token_runtime(token, pool).await;
+
+  // Pad to target duration so all paths (Ok / DatabaseError / auth error)
+  // take the same wall-clock time from the caller's perspective.
+  let elapsed = start.elapsed();
+  if elapsed < VALIDATION_TIMING_TARGET {
+    tokio::time::sleep(VALIDATION_TIMING_TARGET - elapsed).await;
+  }
+
+  match result {
+    Ok(result) => Ok(result),
+    Err(IcTokenRuntimeError::DatabaseError(e)) => {
+      tracing::error!("IC Token validation database error: {e}");
+      Err(
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(serde_json::json!({ "error": "Database error" })),
+        )
+          .into_response(),
+      )
+    }
+    Err(e) => {
+      tracing::warn!("IC Token validation failed: {e}");
+      Err(
+        (
+          StatusCode::UNAUTHORIZED,
+          Json(serde_json::json!({ "error": "Invalid IC Token" })),
+        )
+          .into_response(),
+      )
     }
   }
 }

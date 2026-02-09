@@ -253,7 +253,7 @@ async fn test_get_provider_key_invalid_token()
     .unwrap();
   let body: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
 
-  assert_eq!( body[ "code" ].as_str().unwrap(), "UNAUTHORIZED" );
+  assert_eq!( body[ "error" ].as_str().unwrap(), "Invalid IC Token" );
 }
 
 #[ tokio::test ]
