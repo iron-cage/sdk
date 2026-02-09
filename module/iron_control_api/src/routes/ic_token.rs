@@ -45,6 +45,16 @@ pub struct IcTokenResponse {
     pub warning: String,
 }
 
+/// Response for IC token regeneration (includes new token + invalidation flag)
+#[derive(Debug, Serialize)]
+pub struct IcTokenRegenerateResponse {
+    pub agent_id: i64,
+    pub ic_token: String,
+    pub created_at: i64,
+    pub old_token_invalidated: bool,
+    pub warning: String,
+}
+
 /// Response for IC token status (does NOT include actual token)
 #[derive(Debug, Serialize)]
 pub struct IcTokenStatusResponse {
@@ -52,7 +62,6 @@ pub struct IcTokenStatusResponse {
     pub has_ic_token: bool,
     pub created_at: Option<i64>,
 }
-
 
 /// Check if user has access to agent (owner or admin)
 async fn check_agent_access(
@@ -67,16 +76,16 @@ async fn check_agent_access(
     }
 
     // Check if user owns the agent
-    let owner_id: Option<String> = sqlx::query_scalar(
-        "SELECT owner_id FROM agents WHERE id = ?"
-    )
-    .bind(agent_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({"error": format!("Database error: {}", e)})),
-    ))?;
+    let owner_id: Option<String> = sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
+        .bind(agent_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
 
     match owner_id {
         None => Err((
@@ -106,17 +115,18 @@ pub async fn generate_ic_token(
     }
 
     // Check if agent already has IC token
-    let existing_hash: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT ic_token_hash FROM agents WHERE id = ?"
-    )
-    .bind(agent_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({"error": format!("Database error: {}", e)})),
-    ))
-    .unwrap_or(None);
+    let existing_hash: Option<Option<String>> =
+        sqlx::query_scalar("SELECT ic_token_hash FROM agents WHERE id = ?")
+            .bind(agent_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+                )
+            })
+            .unwrap_or(None);
 
     if existing_hash.flatten().is_some() {
         return (
@@ -125,15 +135,16 @@ pub async fn generate_ic_token(
                 "error": "Agent already has IC token. Use regenerate endpoint to replace it.",
                 "code": "IC_TOKEN_EXISTS"
             })),
-        ).into_response();
+        )
+            .into_response();
     }
 
     // Generate IC token
     let ic_claims = IcTokenClaims::new(
         format!("agent_{}", agent_id),
-        format!("budget_{}", agent_id),  // Legacy field, kept for compatibility
-        vec!["llm:call".to_string(), "analytics:write".to_string()],
-        None,  // Long-lived, no expiration
+        format!("budget_{}", agent_id), // Legacy field, kept for compatibility
+        vec!["llm:call".to_owned(), "analytics:write".to_owned()],
+        None, // Long-lived, no expiration
     );
 
     let ic_token = match state.ic_token_manager.generate_token(&ic_claims) {
@@ -142,7 +153,8 @@ pub async fn generate_ic_token(
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": format!("Failed to generate IC token: {}", e)})),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
@@ -150,19 +162,19 @@ pub async fn generate_ic_token(
     let token_hash = sha256_hash(&ic_token);
     let created_at = chrono::Utc::now().timestamp();
 
-    if let Err(e) = sqlx::query(
-        "UPDATE agents SET ic_token_hash = ?, ic_token_created_at = ? WHERE id = ?"
-    )
-    .bind(&token_hash)
-    .bind(created_at)
-    .bind(agent_id)
-    .execute(&state.pool)
-    .await
+    if let Err(e) =
+        sqlx::query("UPDATE agents SET ic_token_hash = ?, ic_token_created_at = ? WHERE id = ?")
+            .bind(&token_hash)
+            .bind(created_at)
+            .bind(agent_id)
+            .execute(&state.pool)
+            .await
     {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("Failed to save IC token: {}", e)})),
-        ).into_response();
+        )
+            .into_response();
     }
 
     // Return token (one-time display)
@@ -172,9 +184,10 @@ pub async fn generate_ic_token(
             agent_id,
             ic_token,
             created_at,
-            warning: "Store this token securely. It will not be shown again.".to_string(),
+            warning: "Store this token securely. It will not be shown again.".to_owned(),
         }),
-    ).into_response()
+    )
+        .into_response()
 }
 
 /// GET /api/v1/agents/:id/ic-token
@@ -192,23 +205,25 @@ pub async fn get_ic_token_status(
     }
 
     // Get IC token info
-    let row: Option<(Option<String>, Option<i64>)> = sqlx::query_as(
-        "SELECT ic_token_hash, ic_token_created_at FROM agents WHERE id = ?"
-    )
-    .bind(agent_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({"error": format!("Database error: {}", e)})),
-    ))
-    .unwrap_or(None);
+    let row: Option<(Option<String>, Option<i64>)> =
+        sqlx::query_as("SELECT ic_token_hash, ic_token_created_at FROM agents WHERE id = ?")
+            .bind(agent_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+                )
+            })
+            .unwrap_or(None);
 
     match row {
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "Agent not found", "code": "AGENT_NOT_FOUND"})),
-        ).into_response(),
+        )
+            .into_response(),
         Some((hash, created_at)) => (
             StatusCode::OK,
             Json(IcTokenStatusResponse {
@@ -216,7 +231,8 @@ pub async fn get_ic_token_status(
                 has_ic_token: hash.is_some(),
                 created_at,
             }),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -238,7 +254,7 @@ pub async fn regenerate_ic_token(
     let ic_claims = IcTokenClaims::new(
         format!("agent_{}", agent_id),
         format!("budget_{}", agent_id),
-        vec!["llm:call".to_string(), "analytics:write".to_string()],
+        vec!["llm:call".to_owned(), "analytics:write".to_owned()],
         None,
     );
 
@@ -248,42 +264,74 @@ pub async fn regenerate_ic_token(
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": format!("Failed to generate IC token: {}", e)})),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
-    // Store new hash (invalidates old token)
+    // Store new hash inside IMMEDIATE transaction to prevent concurrent regenerate race condition.
+    // BEGIN IMMEDIATE acquires a write-lock immediately, so a second concurrent regenerate
+    // will block until this transaction completes (instead of both reading stale state).
     let token_hash = sha256_hash(&ic_token);
     let created_at = chrono::Utc::now().timestamp();
 
-    let result = sqlx::query(
-        "UPDATE agents SET ic_token_hash = ?, ic_token_created_at = ? WHERE id = ?"
-    )
-    .bind(&token_hash)
-    .bind(created_at)
-    .bind(agent_id)
-    .execute(&state.pool)
-    .await;
+    let mut tx = match state.pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to begin transaction: {}", e)})),
+            )
+                .into_response();
+        }
+    };
+
+    let result =
+        sqlx::query("UPDATE agents SET ic_token_hash = ?, ic_token_created_at = ? WHERE id = ?")
+            .bind(&token_hash)
+            .bind(created_at)
+            .bind(agent_id)
+            .execute(tx.as_mut())
+            .await;
 
     match result {
-        Ok(r) if r.rows_affected() == 0 => (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "Agent not found", "code": "AGENT_NOT_FOUND"})),
-        ).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to save IC token: {}", e)})),
-        ).into_response(),
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "agent_id": agent_id,
-                "ic_token": ic_token,
-                "created_at": created_at,
-                "old_token_invalidated": true,
-                "warning": "Old IC token is now invalid. Update your agent configuration."
-            })),
-        ).into_response(),
+        Ok(r) if r.rows_affected() == 0 => {
+            // Rollback is automatic on drop, but be explicit
+            let _ = tx.rollback().await;
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Agent not found", "code": "AGENT_NOT_FOUND"})),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            let _ = tx.rollback().await;
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to save IC token: {}", e)})),
+            )
+                .into_response()
+        }
+        Ok(_) => {
+            if let Err(e) = tx.commit().await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Failed to commit transaction: {}", e)})),
+                ).into_response();
+            }
+            (
+                StatusCode::OK,
+                Json(IcTokenRegenerateResponse {
+                    agent_id,
+                    ic_token,
+                    created_at,
+                    old_token_invalidated: true,
+                    warning: "Old IC token is now invalid. Update your agent configuration."
+                        .to_owned(),
+                }),
+            )
+                .into_response()
+        }
     }
 }
 
@@ -303,7 +351,7 @@ pub async fn revoke_ic_token(
 
     // Clear IC token hash
     let result = sqlx::query(
-        "UPDATE agents SET ic_token_hash = NULL, ic_token_created_at = NULL WHERE id = ?"
+        "UPDATE agents SET ic_token_hash = NULL, ic_token_created_at = NULL WHERE id = ?",
     )
     .bind(agent_id)
     .execute(&state.pool)
@@ -313,11 +361,13 @@ pub async fn revoke_ic_token(
         Ok(r) if r.rows_affected() == 0 => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "Agent not found", "code": "AGENT_NOT_FOUND"})),
-        ).into_response(),
+        )
+            .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("Failed to revoke IC token: {}", e)})),
-        ).into_response(),
+        )
+            .into_response(),
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
     }
 }
