@@ -39,7 +39,7 @@ use axum::
 };
 use iron_control_api::
 {
-  ic_token::{ IcTokenClaims, IcTokenManager },
+  ic_token::{ IcTokenClaims, IcTokenManager, IcTokenRateLimiter },
   routes::budget::{ BudgetState, handshake, report_usage, refresh_budget },
 };
 use iron_token_manager::lease_manager::LeaseManager;
@@ -95,6 +95,7 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     db_pool: pool,
     jwt_secret,
     crypto_service: Some( crypto_service ),
+    ic_token_rate_limiter: IcTokenRateLimiter::new(),
   }
 }
 

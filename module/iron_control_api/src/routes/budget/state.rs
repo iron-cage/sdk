@@ -3,7 +3,7 @@
 //! Provides `BudgetState` which holds all managers and dependencies needed
 //! for budget protocol endpoints.
 
-use crate::{ ic_token::IcTokenManager, ip_token::IpTokenCrypto, jwt_auth::JwtSecret, routes::auth::AuthState };
+use crate::{ ic_token::{ IcTokenManager, IcTokenRateLimiter }, ip_token::IpTokenCrypto, jwt_auth::JwtSecret, routes::auth::AuthState };
 use axum::extract::FromRef;
 use iron_secrets::crypto::CryptoService;
 use iron_token_manager::
@@ -29,6 +29,8 @@ pub struct BudgetState
   pub jwt_secret: Arc< JwtSecret >,
   /// Crypto service for decrypting provider keys (Feature 014)
   pub crypto_service: Option< Arc< CryptoService > >,
+  /// Rate limiter for IC Token validation (H2)
+  pub ic_token_rate_limiter: IcTokenRateLimiter,
 }
 
 /// Enable AuthState extraction from BudgetState
@@ -91,6 +93,7 @@ impl BudgetState
       db_pool,
       jwt_secret,
       crypto_service,
+      ic_token_rate_limiter: IcTokenRateLimiter::new(),
     } )
   }
 }

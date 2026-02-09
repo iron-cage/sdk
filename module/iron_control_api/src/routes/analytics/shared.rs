@@ -7,7 +7,7 @@ use chrono::{ DateTime, Datelike, Duration, Utc };
 use serde::{ Deserialize, Serialize };
 use sqlx::{ FromRow, SqlitePool, sqlite::SqlitePoolOptions };
 use std::sync::Arc;
-use crate::ic_token::IcTokenManager;
+use crate::ic_token::{ IcTokenManager, IcTokenRateLimiter };
 
 // ============================================================================
 // Type Aliases (for complex query result types)
@@ -466,6 +466,7 @@ pub struct AnalyticsState
 {
   pub pool: SqlitePool,
   pub ic_token_manager: Arc< IcTokenManager >,
+  pub ic_token_rate_limiter: IcTokenRateLimiter,
 }
 
 impl AnalyticsState
@@ -488,7 +489,7 @@ impl AnalyticsState
 
     let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
 
-    Ok( Self { pool, ic_token_manager } )
+    Ok(Self { pool, ic_token_manager, ic_token_rate_limiter: IcTokenRateLimiter::new() })
   }
 }
 

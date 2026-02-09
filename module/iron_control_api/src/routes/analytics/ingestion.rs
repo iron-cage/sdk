@@ -27,7 +27,7 @@ pub async fn post_event(
 {
   // Verify IC Token and extract agent identity (JWT signature + hash-check against database)
   let ( agent_id, _claims ) = match ic_token::validate_ic_token_for_endpoint(
-    &state.ic_token_manager, &event.ic_token, &state.pool,
+    &state.ic_token_manager, &event.ic_token, &state.pool, &state.ic_token_rate_limiter,
   ).await
   {
     Ok( result ) => result,

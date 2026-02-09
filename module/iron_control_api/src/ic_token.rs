@@ -19,6 +19,8 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
@@ -320,6 +322,79 @@ impl IcTokenManager {
   }
 }
 
+/// Rate limiter configuration for IC Token validation
+const IC_TOKEN_MAX_FAILURES: usize = 20;
+const IC_TOKEN_WINDOW: Duration = Duration::from_secs(60);
+
+/// Per-token-hash rate limiter for IC Token validation endpoints.
+///
+/// Tracks failed validation attempts keyed by a prefix of the token's SHA-256 hash.
+/// After `IC_TOKEN_MAX_FAILURES` failures within `IC_TOKEN_WINDOW`, further attempts
+/// with the same token are rejected with 429 Too Many Requests.
+///
+/// Design: per-token-hash (not per-IP) because:
+/// 1. Runtime endpoints lack IP extractors (ConnectInfo<SocketAddr>)
+/// 2. Per-token targeting is more precise — blocks compromised tokens without
+///    affecting legitimate users behind the same NAT
+/// 3. Matches the threat model: timing attacks require many requests with the same token
+#[derive(Clone)]
+pub struct IcTokenRateLimiter {
+  /// Map from token hash prefix (16 hex chars) to list of failure timestamps
+  failures: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
+}
+
+impl IcTokenRateLimiter {
+  /// Create new rate limiter
+  #[must_use]
+  pub fn new() -> Self {
+    Self {
+      failures: Arc::new(Mutex::new(HashMap::new())),
+    }
+  }
+
+  /// Extract rate-limit key from raw token (first 16 chars of SHA-256 hash).
+  /// Using a prefix saves memory while maintaining sufficient uniqueness.
+  fn token_key(token: &str) -> String {
+    sha256_hash(token)[..16].to_string()
+  }
+
+  /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
+  pub fn check(&self, token: &str) -> Result<(), u64> {
+    let key = Self::token_key(token);
+    let mut map = self.failures.lock().unwrap();
+    let now = Instant::now();
+
+    let entries = map.entry(key).or_default();
+
+    // Evict expired entries
+    entries.retain(|ts| now.duration_since(*ts) < IC_TOKEN_WINDOW);
+
+    if entries.len() >= IC_TOKEN_MAX_FAILURES {
+      let oldest = entries.first().unwrap();
+      let retry_after = IC_TOKEN_WINDOW
+        .saturating_sub(now.duration_since(*oldest))
+        .as_secs()
+        .max(1);
+      return Err(retry_after);
+    }
+
+    Ok(())
+  }
+
+  /// Record a failed validation attempt for the given token.
+  pub fn record_failure(&self, token: &str) {
+    let key = Self::token_key(token);
+    let mut map = self.failures.lock().unwrap();
+    map.entry(key).or_default().push(Instant::now());
+  }
+}
+
+impl Default for IcTokenRateLimiter {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 /// Target duration for all validation responses (success and error).
 /// All paths are padded to this floor so external observers cannot
 /// distinguish error types by response latency.
@@ -330,17 +405,37 @@ const VALIDATION_TIMING_TARGET: Duration = Duration::from_millis(5);
 /// Consolidates the duplicated error handling pattern from budget, analytics,
 /// and agent_provider_key endpoints into a single function.
 ///
+/// Checks:
+/// 1. Rate limit — rejects if token exceeded failure threshold (429)
+/// 2. JWT signature + hash-check against database
+/// 3. Timing padding to `VALIDATION_TIMING_TARGET`
+///
 /// On failure:
+/// - Records failure in rate limiter (except database errors)
 /// - Logs the error (error! for database, warn! for auth failures)
-/// - Pads elapsed time to `VALIDATION_TIMING_TARGET` to normalize timing
-/// - Returns appropriate HTTP status (500 for database, 401 for auth)
+/// - Returns appropriate HTTP status (429/500/401)
 ///
 /// On success: returns `(agent_id, claims)` for the endpoint to use.
 pub async fn validate_ic_token_for_endpoint(
   manager: &IcTokenManager,
   token: &str,
   pool: &SqlitePool,
+  rate_limiter: &IcTokenRateLimiter,
 ) -> Result<(i64, IcTokenClaims), axum::response::Response> {
+  // 1. Check rate limit before doing any work
+  if let Err(retry_after) = rate_limiter.check(token) {
+    tracing::warn!("IC Token rate-limited (retry_after={retry_after}s)");
+    return Err(
+      (
+        StatusCode::TOO_MANY_REQUESTS,
+        [("retry-after", retry_after.to_string())],
+        Json(serde_json::json!({ "error": "Too many failed attempts" })),
+      )
+        .into_response(),
+    );
+  }
+
+  // 2. Validate token with timing padding
   let start = Instant::now();
   let result = manager.validate_ic_token_runtime(token, pool).await;
 
@@ -354,6 +449,7 @@ pub async fn validate_ic_token_for_endpoint(
   match result {
     Ok(result) => Ok(result),
     Err(IcTokenRuntimeError::DatabaseError(e)) => {
+      // Don't count database errors as auth failures — not the client's fault
       tracing::error!("IC Token validation database error: {e}");
       Err(
         (
@@ -364,6 +460,7 @@ pub async fn validate_ic_token_for_endpoint(
       )
     }
     Err(e) => {
+      rate_limiter.record_failure(token);
       tracing::warn!("IC Token validation failed: {e}");
       Err(
         (

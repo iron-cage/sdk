@@ -22,7 +22,7 @@ use axum::{
   Router,
 };
 use iron_control_api::{
-  ic_token::{sha256_hash, IcTokenClaims, IcTokenManager},
+  ic_token::{sha256_hash, IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
   routes::analytics::{post_event, AnalyticsState},
 };
 use sqlx::SqlitePool;
@@ -114,6 +114,7 @@ fn create_analytics_router(pool: SqlitePool, manager: Arc<IcTokenManager>) -> Ro
   let state = AnalyticsState {
     pool,
     ic_token_manager: manager,
+    ic_token_rate_limiter: IcTokenRateLimiter::new(),
   };
   Router::new()
     .route("/api/v1/analytics/events", post(post_event))

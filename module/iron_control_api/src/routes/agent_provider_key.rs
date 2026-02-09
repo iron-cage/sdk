@@ -103,7 +103,7 @@ pub async fn get_provider_key(
 
   // 2-3. Verify IC Token (JWT signature + hash-check against database)
   let ( agent_id, claims ) = match ic_token::validate_ic_token_for_endpoint(
-    &state.ic_token_manager, &request.ic_token, &state.db_pool,
+    &state.ic_token_manager, &request.ic_token, &state.db_pool, &state.ic_token_rate_limiter,
   ).await
   {
     Ok( result ) => result,
