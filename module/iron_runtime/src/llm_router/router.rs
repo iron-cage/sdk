@@ -198,7 +198,8 @@ impl LlmRouter {
 
   /// Get total spent in USD (0.0 if no budget set)
   pub fn total_spent(&self) -> f64 {
-    self.cost_controller
+    self
+      .cost_controller
       .as_ref()
       .map(|c| c.total_spent() as f64 / 1_000_000.0)
       .unwrap_or(0.0)
@@ -217,7 +218,8 @@ impl LlmRouter {
 
   /// Get current budget limit in USD (None if no budget set)
   pub fn get_budget(&self) -> Option<f64> {
-    self.cost_controller
+    self
+      .cost_controller
       .as_ref()
       .map(|c| c.budget_limit() as f64 / 1_000_000.0)
   }
@@ -264,7 +266,7 @@ impl LlmRouter {
     let key_fetcher = Arc::new(if let Some(ref pk) = provider_key {
       KeyFetcher::new_static(pk.clone(), None)
     } else {
-      KeyFetcher::new(server_url.clone(), api_key.clone(), cache_ttl_seconds)
+      KeyFetcher::new(server_url.clone(), api_key.clone(), cache_ttl_seconds, None)
     });
 
     let provider = runtime.block_on(async {

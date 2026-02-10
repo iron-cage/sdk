@@ -8,6 +8,7 @@
 
 use crate::budget::{CostController, Reservation};
 use crate::error::CostError;
+use iron_secrets::ip_token::IpTokenCrypto;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -17,183 +18,189 @@ use tokio::sync::RwLock;
 /// Errors that can occur in budget client operations
 #[derive(Debug)]
 pub enum BudgetClientError {
-    /// HTTP request failed
-    HttpError(reqwest::Error),
-    /// Server returned error
-    ServerError { status: u16, message: String },
-    /// No active lease - call handshake() first
-    NoLease,
-    /// Handshake failed
-    HandshakeFailed(String),
-    /// Budget operation failed
-    BudgetError(CostError),
-    /// JSON parse error
-    JsonError(serde_json::Error),
+  /// HTTP request failed
+  HttpError(reqwest::Error),
+  /// Server returned error
+  ServerError { status: u16, message: String },
+  /// No active lease - call handshake() first
+  NoLease,
+  /// Handshake failed
+  HandshakeFailed(String),
+  /// Budget operation failed
+  BudgetError(CostError),
+  /// JSON parse error
+  JsonError(serde_json::Error),
+  /// IP Token decryption failed
+  IpTokenDecrypt(String),
 }
 
 impl std::fmt::Display for BudgetClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::HttpError(e) => write!(f, "HTTP request failed: {}", e),
-            Self::ServerError { status, message } => {
-                write!(f, "Server returned error: {} - {}", status, message)
-            }
-            Self::NoLease => write!(f, "No active lease - call handshake() first"),
-            Self::HandshakeFailed(msg) => write!(f, "Handshake failed: {}", msg),
-            Self::BudgetError(e) => write!(f, "Budget operation failed: {}", e),
-            Self::JsonError(e) => write!(f, "JSON parse error: {}", e),
-        }
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::HttpError(e) => write!(f, "HTTP request failed: {}", e),
+      Self::ServerError { status, message } => {
+        write!(f, "Server returned error: {} - {}", status, message)
+      }
+      Self::NoLease => write!(f, "No active lease - call handshake() first"),
+      Self::HandshakeFailed(msg) => write!(f, "Handshake failed: {}", msg),
+      Self::BudgetError(e) => write!(f, "Budget operation failed: {}", e),
+      Self::JsonError(e) => write!(f, "JSON parse error: {}", e),
+      Self::IpTokenDecrypt(e) => write!(f, "IP Token decryption failed: {}", e),
     }
+  }
 }
 
 impl std::error::Error for BudgetClientError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::HttpError(e) => Some(e),
-            Self::BudgetError(e) => Some(e),
-            Self::JsonError(e) => Some(e),
-            _ => None,
-        }
+  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    match self {
+      Self::HttpError(e) => Some(e),
+      Self::BudgetError(e) => Some(e),
+      Self::JsonError(e) => Some(e),
+      _ => None,
     }
+  }
 }
 
 impl From<reqwest::Error> for BudgetClientError {
-    fn from(e: reqwest::Error) -> Self {
-        Self::HttpError(e)
-    }
+  fn from(e: reqwest::Error) -> Self {
+    Self::HttpError(e)
+  }
 }
 
 impl From<CostError> for BudgetClientError {
-    fn from(e: CostError) -> Self {
-        Self::BudgetError(e)
-    }
+  fn from(e: CostError) -> Self {
+    Self::BudgetError(e)
+  }
 }
 
 impl From<serde_json::Error> for BudgetClientError {
-    fn from(e: serde_json::Error) -> Self {
-        Self::JsonError(e)
-    }
+  fn from(e: serde_json::Error) -> Self {
+    Self::JsonError(e)
+  }
 }
 
 /// Provider API key information
 #[derive(Debug, Clone)]
 pub struct ProviderKey {
-    /// Provider type: "openai" or "anthropic"
-    pub provider: String,
-    /// The actual API key (decrypted)
-    pub api_key: String,
-    /// Optional custom base URL for the provider
-    pub base_url: Option<String>,
+  /// Provider type: "openai" or "anthropic"
+  pub provider: String,
+  /// The actual API key (decrypted)
+  pub api_key: String,
+  /// Optional custom base URL for the provider
+  pub base_url: Option<String>,
 }
 
 /// Lease state from dashboard
 #[derive(Debug, Clone)]
 struct LeaseState {
-    /// Lease ID from dashboard
-    lease_id: String,
-    /// Budget granted for this lease (microdollars)
-    #[allow(dead_code)]
-    budget_granted: i64,
+  /// Lease ID from dashboard
+  lease_id: String,
+  /// Budget granted for this lease (microdollars)
+  #[allow(dead_code)]
+  budget_granted: i64,
 }
 
 /// Handshake request body
 #[derive(Debug, Serialize)]
 struct HandshakeRequest {
-    ic_token: String,
-    provider: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    provider_key_id: Option<i64>,
+  ic_token: String,
+  provider: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  provider_key_id: Option<i64>,
 }
 
 /// Handshake response from dashboard
 #[derive(Debug, Deserialize)]
 struct HandshakeResponse {
-    ip_token: String,
-    lease_id: String,
-    budget_granted: i64,
-    #[allow(dead_code)]
-    budget_remaining: i64,
-    #[allow(dead_code)]
-    expires_at: Option<i64>,
+  ip_token: String,
+  lease_id: String,
+  budget_granted: i64,
+  #[allow(dead_code)]
+  budget_remaining: i64,
+  #[allow(dead_code)]
+  expires_at: Option<i64>,
 }
 
 /// Usage report request body
 #[derive(Debug, Serialize)]
 struct ReportRequest {
-    lease_id: String,
-    request_id: String,
-    tokens: i64,
-    cost_microdollars: i64,
-    model: String,
-    provider: String,
+  lease_id: String,
+  request_id: String,
+  tokens: i64,
+  cost_microdollars: i64,
+  model: String,
+  provider: String,
 }
 
 /// Usage report response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct ReportResponse {
-    pub success: bool,
-    pub budget_remaining: i64,
+  pub success: bool,
+  pub budget_remaining: i64,
 }
 
 /// Budget refresh request body
 #[derive(Debug, Serialize)]
 struct RefreshRequest {
-    ic_token: String,
-    current_lease_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    requested_budget: Option<i64>,
+  ic_token: String,
+  current_lease_id: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  requested_budget: Option<i64>,
 }
 
 /// Budget refresh response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct RefreshResponse {
-    pub status: String,
-    pub budget_granted: Option<i64>,
-    pub budget_remaining: i64,
-    pub lease_id: Option<String>,
-    pub reason: Option<String>,
+  pub status: String,
+  pub budget_granted: Option<i64>,
+  pub budget_remaining: i64,
+  pub lease_id: Option<String>,
+  pub reason: Option<String>,
 }
 
 /// Budget return request body
 #[derive(Debug, Serialize)]
 struct ReturnRequest {
-    lease_id: String,
+  lease_id: String,
 }
 
 /// Budget return response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct ReturnResponse {
-    pub success: bool,
-    pub returned: i64,
+  pub success: bool,
+  pub returned: i64,
 }
 
 /// Budget client configuration
 pub struct BudgetClientConfig {
-    /// Iron Cage server URL (e.g., "http://localhost:3000")
-    pub server_url: String,
-    /// IC Token for authentication
-    pub ic_token: String,
-    /// Provider to request (openai, anthropic)
-    pub provider: String,
-    /// Optional specific provider key ID
-    pub provider_key_id: Option<i64>,
-    /// Initial budget to request (microdollars)
-    pub initial_budget: i64,
-    /// HTTP request timeout
-    pub timeout: Duration,
+  /// Iron Cage server URL (e.g., "http://localhost:3000")
+  pub server_url: String,
+  /// IC Token for authentication
+  pub ic_token: String,
+  /// Provider to request (openai, anthropic)
+  pub provider: String,
+  /// Optional specific provider key ID
+  pub provider_key_id: Option<i64>,
+  /// Initial budget to request (microdollars)
+  pub initial_budget: i64,
+  /// HTTP request timeout
+  pub timeout: Duration,
+  /// 32-byte IP Token decryption key (required for handshake)
+  pub ip_token_key: Option<[u8; 32]>,
 }
 
 impl Default for BudgetClientConfig {
-    fn default() -> Self {
-        Self {
-            server_url: String::new(),
-            ic_token: String::new(),
-            provider: "openai".to_string(),
-            provider_key_id: None,
-            initial_budget: 10_000_000, // $10 in microdollars
-            timeout: Duration::from_secs(30),
-        }
+  fn default() -> Self {
+    Self {
+      server_url: String::new(),
+      ic_token: String::new(),
+      provider: "openai".to_string(),
+      provider_key_id: None,
+      initial_budget: 10_000_000, // $10 in microdollars
+      timeout: Duration::from_secs(30),
+      ip_token_key: None,
     }
+  }
 }
 
 /// Client for Protocol 005 budget operations.
@@ -205,360 +212,361 @@ impl Default for BudgetClientConfig {
 /// 4. Refresh: Get more budget when low
 /// 5. Return: Return unused on shutdown
 pub struct BudgetClient {
-    /// Configuration
-    config: BudgetClientConfig,
-    /// HTTP client
-    http_client: Client,
-    /// Local cost controller with reservation support
-    cost_controller: CostController,
-    /// Lease state (set after handshake)
-    lease: RwLock<Option<LeaseState>>,
-    /// Provider API key (set after handshake)
-    provider_key: RwLock<Option<ProviderKey>>,
+  /// Configuration
+  config: BudgetClientConfig,
+  /// HTTP client
+  http_client: Client,
+  /// Local cost controller with reservation support
+  cost_controller: CostController,
+  /// Lease state (set after handshake)
+  lease: RwLock<Option<LeaseState>>,
+  /// Provider API key (set after handshake)
+  provider_key: RwLock<Option<ProviderKey>>,
+  /// IP Token crypto for decrypting provider keys in transit
+  ip_token_crypto: Option<IpTokenCrypto>,
 }
 
 impl BudgetClient {
-    /// Create a new budget client (does not perform handshake)
-    pub fn new(config: BudgetClientConfig) -> Result<Self, BudgetClientError> {
-        let http_client = Client::builder()
-            .timeout(config.timeout)
-            .build()?;
+  /// Create a new budget client (does not perform handshake)
+  pub fn new(config: BudgetClientConfig) -> Result<Self, BudgetClientError> {
+    let http_client = Client::builder().timeout(config.timeout).build()?;
 
-        // Start with 0 budget - will be set after handshake
-        let cost_controller = CostController::new(0);
+    // Start with 0 budget - will be set after handshake
+    let cost_controller = CostController::new(0);
 
-        Ok(Self {
-            config,
-            http_client,
-            cost_controller,
-            lease: RwLock::new(None),
-            provider_key: RwLock::new(None),
-        })
+    let ip_token_crypto = config
+      .ip_token_key
+      .map(|key| IpTokenCrypto::new(&key))
+      .transpose()
+      .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?;
+
+    Ok(Self {
+      config,
+      http_client,
+      cost_controller,
+      lease: RwLock::new(None),
+      provider_key: RwLock::new(None),
+      ip_token_crypto,
+    })
+  }
+
+  /// Perform handshake with dashboard to get lease and API key.
+  ///
+  /// Must be called before using the client for requests.
+  pub async fn handshake(&self) -> Result<(), BudgetClientError> {
+    let url = format!("{}/api/budget/handshake", self.config.server_url);
+
+    let request = HandshakeRequest {
+      ic_token: self.config.ic_token.clone(),
+      provider: self.config.provider.clone(),
+      provider_key_id: self.config.provider_key_id,
+    };
+
+    let response = self.http_client.post(&url).json(&request).send().await?;
+
+    if !response.status().is_success() {
+      let status = response.status().as_u16();
+      let message = response.text().await.unwrap_or_default();
+      return Err(BudgetClientError::ServerError { status, message });
     }
 
-    /// Perform handshake with dashboard to get lease and API key.
-    ///
-    /// Must be called before using the client for requests.
-    pub async fn handshake(&self) -> Result<(), BudgetClientError> {
-        let url = format!("{}/api/budget/handshake", self.config.server_url);
+    let data: HandshakeResponse = response.json().await?;
 
-        let request = HandshakeRequest {
-            ic_token: self.config.ic_token.clone(),
-            provider: self.config.provider.clone(),
-            provider_key_id: self.config.provider_key_id,
-        };
+    // Decrypt IP Token to get provider API key
+    let api_key = match &self.ip_token_crypto {
+      Some(crypto) => crypto
+        .decrypt(&data.ip_token)
+        .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?
+        .to_string(),
+      None => data.ip_token,
+    };
 
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await?;
+    let provider_key = ProviderKey {
+      provider: self.config.provider.clone(),
+      api_key,
+      base_url: None,
+    };
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let message = response.text().await.unwrap_or_default();
-            return Err(BudgetClientError::ServerError { status, message });
-        }
+    // Set budget limit from lease
+    self.cost_controller.set_budget(data.budget_granted);
 
-        let data: HandshakeResponse = response.json().await?;
+    // Store lease state
+    {
+      let mut lease_guard = self.lease.write().await;
+      *lease_guard = Some(LeaseState {
+        lease_id: data.lease_id,
+        budget_granted: data.budget_granted,
+      });
+    }
 
-        // Decrypt IP token to get provider API key
-        // For now, treat ip_token as the raw key (dashboard handles encryption)
-        let provider_key = ProviderKey {
-            provider: self.config.provider.clone(),
-            api_key: data.ip_token,
-            base_url: None,
-        };
+    // Store provider key
+    {
+      let mut key_guard = self.provider_key.write().await;
+      *key_guard = Some(provider_key);
+    }
 
-        // Set budget limit from lease
-        self.cost_controller.set_budget(data.budget_granted);
+    Ok(())
+  }
 
-        // Store lease state
+  /// Report usage to dashboard (async, fire-and-forget style).
+  ///
+  /// This is meant to be called after each LLM request completes.
+  /// The report is non-blocking to avoid adding latency.
+  pub async fn report(
+    &self,
+    cost_microdollars: i64,
+    tokens: i64,
+    model: &str,
+    request_id: &str,
+  ) -> Result<ReportResponse, BudgetClientError> {
+    let lease = self.lease.read().await;
+    let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
+
+    let url = format!("{}/api/budget/report", self.config.server_url);
+
+    let request = ReportRequest {
+      lease_id: lease.lease_id.clone(),
+      request_id: request_id.to_string(),
+      tokens,
+      cost_microdollars,
+      model: model.to_string(),
+      provider: self.config.provider.clone(),
+    };
+
+    let response = self.http_client.post(&url).json(&request).send().await?;
+
+    if !response.status().is_success() {
+      let status = response.status().as_u16();
+      let message = response.text().await.unwrap_or_default();
+      return Err(BudgetClientError::ServerError { status, message });
+    }
+
+    let data: ReportResponse = response.json().await?;
+    Ok(data)
+  }
+
+  /// Request more budget when running low (in microdollars).
+  ///
+  /// If approved, updates the local cost controller with new budget.
+  pub async fn refresh(
+    &self,
+    requested_budget: Option<i64>,
+  ) -> Result<RefreshResponse, BudgetClientError> {
+    let lease = self.lease.read().await;
+    let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
+
+    let url = format!("{}/api/budget/refresh", self.config.server_url);
+
+    let request = RefreshRequest {
+      ic_token: self.config.ic_token.clone(),
+      current_lease_id: lease.lease_id.clone(),
+      requested_budget,
+    };
+
+    let response = self.http_client.post(&url).json(&request).send().await?;
+
+    if !response.status().is_success() {
+      let status = response.status().as_u16();
+      let message = response.text().await.unwrap_or_default();
+      return Err(BudgetClientError::ServerError { status, message });
+    }
+
+    let data: RefreshResponse = response.json().await?;
+
+    // If approved, update lease and budget
+    if data.status == "approved" {
+      if let (Some(new_lease_id), Some(new_budget)) = (&data.lease_id, data.budget_granted) {
+        // Update lease state
         {
-            let mut lease_guard = self.lease.write().await;
-            *lease_guard = Some(LeaseState {
-                lease_id: data.lease_id,
-                budget_granted: data.budget_granted,
-            });
+          let mut lease_guard = self.lease.write().await;
+          *lease_guard = Some(LeaseState {
+            lease_id: new_lease_id.clone(),
+            budget_granted: new_budget,
+          });
         }
 
-        // Store provider key
-        {
-            let mut key_guard = self.provider_key.write().await;
-            *key_guard = Some(provider_key);
-        }
-
-        Ok(())
+        // Reset cost controller with new budget
+        // Note: This resets spent to 0 for the new lease
+        self.cost_controller.set_budget(new_budget);
+      }
     }
 
-    /// Report usage to dashboard (async, fire-and-forget style).
-    ///
-    /// This is meant to be called after each LLM request completes.
-    /// The report is non-blocking to avoid adding latency.
-    pub async fn report(
-        &self,
-        cost_microdollars: i64,
-        tokens: i64,
-        model: &str,
-        request_id: &str,
-    ) -> Result<ReportResponse, BudgetClientError> {
-        let lease = self.lease.read().await;
-        let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
+    Ok(data)
+  }
 
-        let url = format!("{}/api/budget/report", self.config.server_url);
+  /// Return unused budget to dashboard on shutdown.
+  ///
+  /// Should be called when the LLM router is stopping.
+  pub async fn return_unused(&self) -> Result<ReturnResponse, BudgetClientError> {
+    let lease = self.lease.read().await;
+    let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
 
-        let request = ReportRequest {
-            lease_id: lease.lease_id.clone(),
-            request_id: request_id.to_string(),
-            tokens,
-            cost_microdollars,
-            model: model.to_string(),
-            provider: self.config.provider.clone(),
-        };
+    let url = format!("{}/api/budget/return", self.config.server_url);
 
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await?;
+    let request = ReturnRequest {
+      lease_id: lease.lease_id.clone(),
+    };
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let message = response.text().await.unwrap_or_default();
-            return Err(BudgetClientError::ServerError { status, message });
-        }
+    let response = self.http_client.post(&url).json(&request).send().await?;
 
-        let data: ReportResponse = response.json().await?;
-        Ok(data)
+    if !response.status().is_success() {
+      let status = response.status().as_u16();
+      let message = response.text().await.unwrap_or_default();
+      return Err(BudgetClientError::ServerError { status, message });
     }
 
-    /// Request more budget when running low (in microdollars).
-    ///
-    /// If approved, updates the local cost controller with new budget.
-    pub async fn refresh(&self, requested_budget: Option<i64>) -> Result<RefreshResponse, BudgetClientError> {
-        let lease = self.lease.read().await;
-        let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
+    let data: ReturnResponse = response.json().await?;
+    Ok(data)
+  }
 
-        let url = format!("{}/api/budget/refresh", self.config.server_url);
+  // =========================================================================
+  // Delegation methods to CostController
+  // =========================================================================
 
-        let request = RefreshRequest {
-            ic_token: self.config.ic_token.clone(),
-            current_lease_id: lease.lease_id.clone(),
-            requested_budget,
-        };
+  /// Reserve budget atomically before an LLM call.
+  ///
+  /// This must be called before making an LLM request to prevent concurrent overspend.
+  pub fn reserve(&self, max_cost_micros: u64) -> Result<Reservation, CostError> {
+    self.cost_controller.reserve(max_cost_micros)
+  }
 
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await?;
+  /// Commit a reservation with actual cost (in microdollars).
+  ///
+  /// Call after an LLM request completes successfully.
+  pub fn commit(&self, reservation: Reservation, actual_cost_micros: u64) {
+    self.cost_controller.commit(reservation, actual_cost_micros);
+  }
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let message = response.text().await.unwrap_or_default();
-            return Err(BudgetClientError::ServerError { status, message });
-        }
+  /// Cancel a reservation without adding cost.
+  ///
+  /// Call if an LLM request fails or is cancelled.
+  pub fn cancel(&self, reservation: Reservation) {
+    self.cost_controller.cancel(reservation);
+  }
 
-        let data: RefreshResponse = response.json().await?;
+  /// Check if budget is available (includes reserved amounts).
+  pub fn check_budget(&self) -> Result<(), CostError> {
+    self.cost_controller.check_budget()
+  }
 
-        // If approved, update lease and budget
-        if data.status == "approved" {
-            if let (Some(new_lease_id), Some(new_budget)) = (&data.lease_id, data.budget_granted) {
-                // Update lease state
-                {
-                    let mut lease_guard = self.lease.write().await;
-                    *lease_guard = Some(LeaseState {
-                        lease_id: new_lease_id.clone(),
-                        budget_granted: new_budget,
-                    });
-                }
+  /// Add spend directly (without reservation), in microdollars.
+  ///
+  /// Use this for cases where reservation is not needed.
+  pub fn add_spend(&self, cost_micros: i64) {
+    self.cost_controller.add_spend(cost_micros);
+  }
 
-                // Reset cost controller with new budget
-                // Note: This resets spent to 0 for the new lease
-                self.cost_controller.set_budget(new_budget);
-            }
-        }
+  // =========================================================================
+  // Getters
+  // =========================================================================
 
-        Ok(data)
-    }
+  /// Get the provider API key (after handshake).
+  pub async fn get_provider_key(&self) -> Option<ProviderKey> {
+    self.provider_key.read().await.clone()
+  }
 
-    /// Return unused budget to dashboard on shutdown.
-    ///
-    /// Should be called when the LLM router is stopping.
-    pub async fn return_unused(&self) -> Result<ReturnResponse, BudgetClientError> {
-        let lease = self.lease.read().await;
-        let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
+  /// Get the current lease ID (after handshake).
+  pub async fn get_lease_id(&self) -> Option<String> {
+    self.lease.read().await.as_ref().map(|l| l.lease_id.clone())
+  }
 
-        let url = format!("{}/api/budget/return", self.config.server_url);
+  /// Get budget status: (spent_microdollars, limit_microdollars).
+  pub fn get_status(&self) -> (i64, i64) {
+    self.cost_controller.get_status()
+  }
 
-        let request = ReturnRequest {
-            lease_id: lease.lease_id.clone(),
-        };
+  /// Get full budget status: (spent_microdollars, reserved_microdollars, limit_microdollars).
+  pub fn get_full_status(&self) -> (i64, i64, i64) {
+    self.cost_controller.get_full_status()
+  }
 
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await?;
+  /// Get available budget in microdollars.
+  pub fn available(&self) -> i64 {
+    self.cost_controller.available()
+  }
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let message = response.text().await.unwrap_or_default();
-            return Err(BudgetClientError::ServerError { status, message });
-        }
+  /// Get total spent in microdollars.
+  pub fn total_spent(&self) -> i64 {
+    self.cost_controller.total_spent()
+  }
 
-        let data: ReturnResponse = response.json().await?;
-        Ok(data)
-    }
+  /// Get budget limit in microdollars.
+  pub fn budget_limit(&self) -> i64 {
+    self.cost_controller.budget_limit()
+  }
 
-    // =========================================================================
-    // Delegation methods to CostController
-    // =========================================================================
+  /// Check if handshake has been completed.
+  pub async fn is_connected(&self) -> bool {
+    self.lease.read().await.is_some()
+  }
 
-    /// Reserve budget atomically before an LLM call.
-    ///
-    /// This must be called before making an LLM request to prevent concurrent overspend.
-    pub fn reserve(&self, max_cost_micros: u64) -> Result<Reservation, CostError> {
-        self.cost_controller.reserve(max_cost_micros)
-    }
-
-
-    /// Commit a reservation with actual cost (in microdollars).
-    ///
-    /// Call after an LLM request completes successfully.
-    pub fn commit(&self, reservation: Reservation, actual_cost_micros: u64) {
-        self.cost_controller.commit(reservation, actual_cost_micros);
-    }
-
-    /// Cancel a reservation without adding cost.
-    ///
-    /// Call if an LLM request fails or is cancelled.
-    pub fn cancel(&self, reservation: Reservation) {
-        self.cost_controller.cancel(reservation);
-    }
-
-    /// Check if budget is available (includes reserved amounts).
-    pub fn check_budget(&self) -> Result<(), CostError> {
-        self.cost_controller.check_budget()
-    }
-
-    /// Add spend directly (without reservation), in microdollars.
-    ///
-    /// Use this for cases where reservation is not needed.
-    pub fn add_spend(&self, cost_micros: i64) {
-        self.cost_controller.add_spend(cost_micros);
-    }
-
-    // =========================================================================
-    // Getters
-    // =========================================================================
-
-    /// Get the provider API key (after handshake).
-    pub async fn get_provider_key(&self) -> Option<ProviderKey> {
-        self.provider_key.read().await.clone()
-    }
-
-    /// Get the current lease ID (after handshake).
-    pub async fn get_lease_id(&self) -> Option<String> {
-        self.lease.read().await.as_ref().map(|l| l.lease_id.clone())
-    }
-
-    /// Get budget status: (spent_microdollars, limit_microdollars).
-    pub fn get_status(&self) -> (i64, i64) {
-        self.cost_controller.get_status()
-    }
-
-    /// Get full budget status: (spent_microdollars, reserved_microdollars, limit_microdollars).
-    pub fn get_full_status(&self) -> (i64, i64, i64) {
-        self.cost_controller.get_full_status()
-    }
-
-    /// Get available budget in microdollars.
-    pub fn available(&self) -> i64 {
-        self.cost_controller.available()
-    }
-
-    /// Get total spent in microdollars.
-    pub fn total_spent(&self) -> i64 {
-        self.cost_controller.total_spent()
-    }
-
-    /// Get budget limit in microdollars.
-    pub fn budget_limit(&self) -> i64 {
-        self.cost_controller.budget_limit()
-    }
-
-    /// Check if handshake has been completed.
-    pub async fn is_connected(&self) -> bool {
-        self.lease.read().await.is_some()
-    }
-
-    /// Get reference to cost controller (for advanced usage).
-    pub fn cost_controller(&self) -> &CostController {
-        &self.cost_controller
-    }
+  /// Get reference to cost controller (for advanced usage).
+  pub fn cost_controller(&self) -> &CostController {
+    &self.cost_controller
+  }
 }
 
 /// Builder for BudgetClient configuration
 pub struct BudgetClientBuilder {
-    config: BudgetClientConfig,
+  config: BudgetClientConfig,
 }
 
 impl BudgetClientBuilder {
-    pub fn new() -> Self {
-        Self {
-            config: BudgetClientConfig::default(),
-        }
+  pub fn new() -> Self {
+    Self {
+      config: BudgetClientConfig::default(),
     }
+  }
 
-    pub fn server_url(mut self, url: impl Into<String>) -> Self {
-        self.config.server_url = url.into();
-        self
-    }
+  pub fn server_url(mut self, url: impl Into<String>) -> Self {
+    self.config.server_url = url.into();
+    self
+  }
 
-    pub fn ic_token(mut self, token: impl Into<String>) -> Self {
-        self.config.ic_token = token.into();
-        self
-    }
+  pub fn ic_token(mut self, token: impl Into<String>) -> Self {
+    self.config.ic_token = token.into();
+    self
+  }
 
-    pub fn provider(mut self, provider: impl Into<String>) -> Self {
-        self.config.provider = provider.into();
-        self
-    }
+  pub fn provider(mut self, provider: impl Into<String>) -> Self {
+    self.config.provider = provider.into();
+    self
+  }
 
-    pub fn provider_key_id(mut self, id: i64) -> Self {
-        self.config.provider_key_id = Some(id);
-        self
-    }
+  pub fn provider_key_id(mut self, id: i64) -> Self {
+    self.config.provider_key_id = Some(id);
+    self
+  }
 
-    pub fn initial_budget(mut self, budget_micros: i64) -> Self {
-        self.config.initial_budget = budget_micros;
-        self
-    }
+  pub fn initial_budget(mut self, budget_micros: i64) -> Self {
+    self.config.initial_budget = budget_micros;
+    self
+  }
 
-    pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.config.timeout = timeout;
-        self
-    }
+  pub fn timeout(mut self, timeout: Duration) -> Self {
+    self.config.timeout = timeout;
+    self
+  }
 
-    pub fn build(self) -> Result<BudgetClient, BudgetClientError> {
-        BudgetClient::new(self.config)
-    }
+  pub fn ip_token_key(mut self, key: [u8; 32]) -> Self {
+    self.config.ip_token_key = Some(key);
+    self
+  }
+
+  pub fn build(self) -> Result<BudgetClient, BudgetClientError> {
+    BudgetClient::new(self.config)
+  }
 }
 
 impl Default for BudgetClientBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 /// Create a static budget client that doesn't connect to dashboard.
 ///
 /// Useful for testing or standalone mode.
 pub fn create_static_client(budget_micros: i64) -> Arc<CostController> {
-    Arc::new(CostController::new(budget_micros))
+  Arc::new(CostController::new(budget_micros))
 }

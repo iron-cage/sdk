@@ -80,17 +80,17 @@ pub async fn run_proxy(
       config.server_url,
       config.ic_token.clone(),
       config.cache_ttl_seconds,
+      None,
     )
   });
 
   let http_client = Client::builder()
-      .timeout(std::time::Duration::from_secs(300)) // 5 min timeout for LLM requests
-      .build()
-      .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
+    .timeout(std::time::Duration::from_secs(300)) // 5 min timeout for LLM requests
+    .build()
+    .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
 
-  let pricing_manager = Arc::new(
-    PricingManager::new().map_err(|e| LlmRouterError::ServerStart(e.to_string()))?
-  );
+  let pricing_manager =
+    Arc::new(PricingManager::new().map_err(|e| LlmRouterError::ServerStart(e.to_string()))?);
 
   let state = ProxyState {
     ic_token: config.ic_token,
@@ -107,24 +107,24 @@ pub async fn run_proxy(
   };
 
   let app = Router::new()
-      .route("/", any(handle_root))
-      .route("/*path", any(handle_proxy))
-      .with_state(state);
+    .route("/", any(handle_root))
+    .route("/*path", any(handle_proxy))
+    .with_state(state);
 
   let addr = std::net::SocketAddr::from(([127, 0, 0, 1], config.port));
   let listener = tokio::net::TcpListener::bind(addr)
-      .await
-      .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
+    .await
+    .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
 
   tracing::info!("LlmRouter proxy listening on http://{}", addr);
 
   axum::serve(listener, app)
-      .with_graceful_shutdown(async {
-        let _ = shutdown_rx.await;
-        tracing::info!("LlmRouter proxy shutting down");
-      })
-      .await
-      .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
+    .with_graceful_shutdown(async {
+      let _ = shutdown_rx.await;
+      tracing::info!("LlmRouter proxy shutting down");
+    })
+    .await
+    .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
 
   Ok(())
 }
@@ -159,7 +159,7 @@ fn create_openai_error_response(
       Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(Body::from("Internal error"))
-        .expect( "INVARIANT: Fallback response with static content and valid StatusCode never fails" )
+        .expect("INVARIANT: Fallback response with static content and valid StatusCode never fails")
     })
 }
 
@@ -173,7 +173,11 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   // Use CostController's check_budget method
   match controller.check_budget() {
     Ok(()) => Ok(()),
-    Err(CostError::BudgetExceeded { spent_microdollars, limit_microdollars, reserved_microdollars }) => {
+    Err(CostError::BudgetExceeded {
+      spent_microdollars,
+      limit_microdollars,
+      reserved_microdollars,
+    }) => {
       let spent_usd = spent_microdollars as f64 / 1_000_000.0;
       let limit_usd = limit_microdollars as f64 / 1_000_000.0;
       let reserved_usd = reserved_microdollars as f64 / 1_000_000.0;
@@ -188,7 +192,10 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
         "budget_exceeded",
       )))
     }
-    Err(CostError::InsufficientBudget { available_microdollars, requested_microdollars }) => {
+    Err(CostError::InsufficientBudget {
+      available_microdollars,
+      requested_microdollars,
+    }) => {
       let available_usd = available_microdollars as f64 / 1_000_000.0;
       let requested_usd = requested_microdollars as f64 / 1_000_000.0;
       Err(Box::new(create_openai_error_response(
@@ -262,16 +269,16 @@ async fn handle_proxy(
   // OpenAI uses: Authorization: Bearer {token}
   // Anthropic uses: x-api-key: {token}
   let auth_header = request
-      .headers()
-      .get(header::AUTHORIZATION)
-      .and_then(|v| v.to_str().ok())
-      .unwrap_or("");
+    .headers()
+    .get(header::AUTHORIZATION)
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("");
 
   let x_api_key = request
-      .headers()
-      .get("x-api-key")
-      .and_then(|v| v.to_str().ok())
-      .unwrap_or("");
+    .headers()
+    .get("x-api-key")
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("");
 
   let expected_bearer = format!("Bearer {}", state.ic_token);
   let is_valid = auth_header == expected_bearer || x_api_key == state.ic_token;
@@ -289,21 +296,24 @@ async fn handle_proxy(
   let method = request.method().clone();
   let orig_path = request.uri().path().to_string();
   let query = request
-      .uri()
-      .query()
-      .map(|q| format!("?{}", q))
-      .unwrap_or_default();
+    .uri()
+    .query()
+    .map(|q| format!("?{}", q))
+    .unwrap_or_default();
 
   let body_bytes = axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024) // 10MB limit
-      .await
-      .map_err(|e| (StatusCode::BAD_REQUEST, format!("Body read error: {}", e)))?;
+    .await
+    .map_err(|e| (StatusCode::BAD_REQUEST, format!("Body read error: {}", e)))?;
 
   // 2.5 Reserve budget for this request (prevents concurrent overspend)
   let reservation: Option<Reservation> = if let Some(ref controller) = state.cost_controller {
     if let Some(max_cost) = state.pricing_manager.estimate_max_cost(&body_bytes) {
       match controller.reserve(max_cost) {
         Ok(res) => Some(res),
-        Err(CostError::InsufficientBudget { available_microdollars, requested_microdollars }) => {
+        Err(CostError::InsufficientBudget {
+          available_microdollars,
+          requested_microdollars,
+        }) => {
           let available_usd = available_microdollars as f64 / 1_000_000.0;
           let requested_usd = requested_microdollars as f64 / 1_000_000.0;
           return Ok(create_openai_error_response(
@@ -331,10 +341,10 @@ async fn handle_proxy(
 
   // 3. Get real API key from Iron Cage server (cached, auto-detected provider)
   let provider_key = state
-      .key_fetcher
-      .get_key()
-      .await
-      .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .key_fetcher
+    .get_key()
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
   // 4. Detect provider from model name in request
   let (clean_path, path_provider) = strip_provider_prefix(&orig_path);
@@ -349,7 +359,7 @@ async fn handle_proxy(
   // 6. Prepare request body (translate if needed)
   let (request_body, request_path) = if needs_translation {
     let translated = translate_openai_to_anthropic(&body_bytes)
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {}", e)))?;
+      .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {}", e)))?;
     (translated, "/v1/messages".to_string())
   } else {
     (body_bytes.to_vec(), clean_path)
@@ -357,26 +367,26 @@ async fn handle_proxy(
 
   // 7. Build target URL
   let base_url = provider_key
-      .base_url
-      .as_deref()
-      .unwrap_or(match target_provider {
-        "anthropic" => "https://api.anthropic.com",
-        _ => "https://api.openai.com",
-      });
+    .base_url
+    .as_deref()
+    .unwrap_or(match target_provider {
+      "anthropic" => "https://api.anthropic.com",
+      _ => "https://api.openai.com",
+    });
 
   let target_url = format!("{}{}{}", base_url, request_path, query);
 
   // 8. Build forwarded request with real API key
   let mut req_builder = state
-      .http_client
-      .request(method, &target_url)
-      .header(header::CONTENT_TYPE, "application/json");
+    .http_client
+    .request(method, &target_url)
+    .header(header::CONTENT_TYPE, "application/json");
 
   // Set provider-specific auth headers
   if target_provider == "anthropic" {
     req_builder = req_builder
-        .header("x-api-key", &provider_key.api_key)
-        .header("anthropic-version", "2023-06-01");
+      .header("x-api-key", &provider_key.api_key)
+      .header("anthropic-version", "2023-06-01");
   } else {
     req_builder = req_builder.header(
       header::AUTHORIZATION,
@@ -386,18 +396,20 @@ async fn handle_proxy(
 
   // 9. Send request to provider
   let provider_response = req_builder
-      .body(request_body)
-      .send()
-      .await
-      .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Forward error: {}", e)))?;
+    .body(request_body)
+    .send()
+    .await
+    .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Forward error: {}", e)))?;
 
   // 10. Read and translate response if needed
   let status = provider_response.status();
   let resp_headers = provider_response.headers().clone();
-  let resp_body = provider_response
-      .bytes()
-      .await
-      .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Response read error: {}", e)))?;
+  let resp_body = provider_response.bytes().await.map_err(|e| {
+    (
+      StatusCode::BAD_GATEWAY,
+      format!("Response read error: {}", e),
+    )
+  })?;
 
   // Translate response back to OpenAI format if we translated the request
   let final_body = if needs_translation && status.is_success() {
@@ -413,7 +425,9 @@ async fn handle_proxy(
 
   // 11. Calculate and log request cost, commit/cancel reservation
   if status.is_success() {
-    if let Some(cost_info) = calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body) {
+    if let Some(cost_info) =
+      calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body)
+    {
       // Commit reservation with actual cost (or add directly if no reservation)
       if let Some(ref controller) = state.cost_controller {
         if let Some(res) = reservation {
@@ -485,8 +499,8 @@ async fn handle_proxy(
   }
 
   response
-      .body(Body::from(final_body))
-      .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .body(Body::from(final_body))
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Cost calculation result
@@ -521,14 +535,14 @@ fn calculate_request_cost(
 
   // OpenAI: prompt_tokens/completion_tokens, Anthropic: input_tokens/output_tokens
   let input_tokens = usage
-      .get("prompt_tokens")
-      .or_else(|| usage.get("input_tokens"))
-      .and_then(|v| v.as_u64())?;
+    .get("prompt_tokens")
+    .or_else(|| usage.get("input_tokens"))
+    .and_then(|v| v.as_u64())?;
 
   let output_tokens = usage
-      .get("completion_tokens")
-      .or_else(|| usage.get("output_tokens"))
-      .and_then(|v| v.as_u64())?;
+    .get("completion_tokens")
+    .or_else(|| usage.get("output_tokens"))
+    .and_then(|v| v.as_u64())?;
 
   // Get pricing and calculate cost in microdollars (integer arithmetic)
   let pricing = pricing_manager.get(model)?;
