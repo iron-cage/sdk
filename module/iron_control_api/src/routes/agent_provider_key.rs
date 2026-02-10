@@ -52,8 +52,8 @@ impl GetProviderKeyRequest
 #[ derive( Debug, Serialize ) ]
 pub struct GetProviderKeyResponse
 {
-  /// Decrypted provider API key
-  pub provider_key: String,
+  /// IP Token — AES-256-GCM encrypted provider API key
+  pub ip_token: String,
   /// Provider type ("openai" or "anthropic")
   pub provider: String,
   /// Optional custom base URL
@@ -278,7 +278,24 @@ pub async fn get_provider_key(
     }
   };
 
-  // 11. Log audit entry (fire and forget)
+  // 11. Encrypt provider key as IP Token for transit security
+  let ip_token = match state.ip_token_crypto.encrypt( &decrypted )
+  {
+    Ok( token ) => token,
+    Err( err ) =>
+    {
+      tracing::error!( "Failed to encrypt IP Token: {}", err );
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json( serde_json::json!({
+          "error": "Internal server error",
+          "code": "INTERNAL_ERROR"
+        }) ),
+      ).into_response();
+    }
+  };
+
+  // 12. Log audit entry (fire and forget)
   let now_ms = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .expect( "LOUD FAILURE: Time went backwards" )
@@ -305,17 +322,17 @@ pub async fn get_provider_key(
     tracing::warn!( "Audit log insert failed: {}", e );
   }
 
-  // 12. Update last_used_at
+  // 13. Update last_used_at
   if let Err( e ) = state.provider_key_storage.update_last_used( provider_key_id ).await
   {
     tracing::warn!( "Failed to update last_used_at: {}", e );
   }
 
-  // 13. Return response
+  // 14. Return response with IP Token (encrypted provider key)
   (
     StatusCode::OK,
     Json( GetProviderKeyResponse {
-      provider_key: decrypted.to_string(),
+      ip_token,
       provider: key_record.metadata.provider.to_string(),
       base_url: key_record.metadata.base_url,
     } ),

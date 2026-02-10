@@ -186,7 +186,15 @@ async fn test_get_provider_key_success()
     .unwrap();
   let body: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
 
-  assert_eq!( body[ "provider_key" ].as_str().unwrap(), "sk-test-openai-key-12345" );
+  // Response now contains IP Token (encrypted), not plaintext provider_key
+  let ip_token_value = body[ "ip_token" ].as_str().expect( "Response must contain ip_token field" );
+  assert!( ip_token_value.starts_with( "AES256:" ), "IP Token must have AES256 prefix" );
+
+  // Decrypt IP Token and verify original provider key
+  let decrypted = state.ip_token_crypto.decrypt( ip_token_value )
+    .expect( "Should decrypt IP Token" );
+  assert_eq!( &*decrypted, "sk-test-openai-key-12345" );
+
   assert_eq!( body[ "provider" ].as_str().unwrap(), "openai" );
 }
 

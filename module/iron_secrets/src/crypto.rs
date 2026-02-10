@@ -174,7 +174,7 @@ impl CryptoService
   ///
   /// # Returns
   ///
-  /// Decrypted plaintext (zeroized on drop)
+  /// Decrypted plaintext (zeroed on drop)
   ///
   /// # Errors
   ///
