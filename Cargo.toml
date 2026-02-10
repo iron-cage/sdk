@@ -209,6 +209,11 @@ version = "0.8"
 version = "0.11"
 features = ["serde", "secrets", "secure", "testing"]
 
+## Hex encoding/decoding
+
+[workspace.dependencies.hex]
+version = "0.4"
+
 ## Cryptography (for token management and secrets)
 
 [workspace.dependencies.sha2]

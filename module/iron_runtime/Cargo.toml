@@ -20,6 +20,7 @@ enabled = [
   "dep:iron_cost",
   "dep:iron_reliability",
   "dep:iron_secrets",
+  "dep:hex",
   "dep:tokio",
   "dep:serde",
   "dep:serde_json",
@@ -65,6 +66,9 @@ axum = { workspace = true, optional = true }
 
 # HTTP client (LlmRouter)
 reqwest = { workspace = true, features = ["json", "blocking"], optional = true }
+
+# Hex decoding (IP_TOKEN_KEY env var)
+hex = { workspace = true, optional = true }
 
 # Logging
 tracing = { workspace = true, optional = true }

@@ -56,6 +56,8 @@ pub struct ProxyConfig {
   pub cost_controller: Option<Arc<CostController>>,
   /// Direct provider API key (bypasses Iron Cage server when set)
   pub provider_key: Option<String>,
+  /// IP Token encryption key for decrypting provider keys in transit (from IP_TOKEN_KEY env var)
+  pub ip_token_key: Option<[u8; 32]>,
   /// Analytics event store
   #[cfg(feature = "analytics")]
   pub event_store: Arc<EventStore>,
@@ -80,7 +82,7 @@ pub async fn run_proxy(
       config.server_url,
       config.ic_token.clone(),
       config.cache_ttl_seconds,
-      None,
+      config.ip_token_key,
     )
   });
 
