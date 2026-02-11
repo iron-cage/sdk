@@ -39,9 +39,9 @@ hash_token() {
   echo -n "$1" | sha256sum | awk '{print $1}'
 }
 
-# Get current time in milliseconds
+# Get current time in milliseconds (portable: macOS + Linux)
 current_time_ms() {
-  date +%s%3N
+  echo $(( $(date +%s) * 1000 ))
 }
 
 # Check if database exists

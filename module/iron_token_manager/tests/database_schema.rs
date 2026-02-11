@@ -411,20 +411,23 @@ async fn test_all_indexes_created()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  // Expected: All migrations create 40 indexes total
+  // Expected: All migrations create 42 indexes total
   // Migration 001: 15 indexes (api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
   // Migration 003: 2 indexes (users, token_blacklist)
-  // Migration 004: 4 indexes (ai_provider_keys, project_key_assignments)
+  // Migration 004: 5 indexes (ai_provider_keys, project_key_assignments)
   // Migration 005: 4 indexes (users enhancements)
   // Migration 006: 4 indexes (user_audit_log)
   // Migration 008: 2 indexes (idx_agents_created_at, idx_api_tokens_agent_id)
   // Migration 009: 3 indexes (budget_leases)
-  // Migration 010: 1 index (agent_budgets)
+  // Migration 010: 1 index (agent_budgets) — LOST: 018 rebuilds table without recreating this index
   // Migration 011: 2 indexes (budget_change_requests)
   // Migration 012: 1 index (budget_modification_history)
   // Migration 013: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
-  // Migration 014: 1 index (idx_agents_owner_id for agents.owner_id)
-  // Migration 018: 1 index (converted budget tables)
-  // Total: 15 + 2 + 4 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 1 + 1 = 41
-  assert_eq!( index_count, 41, "Expected 41 indexes to be created across all migrations" );
+  // Migration 014: 1 index (idx_agents_owner_id)
+  // Migration 016: 1 index (idx_budget_leases_updated)
+  // Migration 018: Rebuilds budget_leases, agent_budgets, usage_limits (net -1: loses idx_agent_budgets_updated)
+  // Migration 019: 1 index (idx_agents_provider_key_id)
+  // Migration 021: 1 index (idx_agents_ic_token_hash)
+  // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 0 + 2 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 42
+  assert_eq!( index_count, 42, "Expected 42 indexes to be created across all migrations" );
 }
