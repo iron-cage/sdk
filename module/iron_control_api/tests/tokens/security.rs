@@ -439,15 +439,14 @@ async fn test_sql_injection_in_project_id()
   );
 }
 
-/// Verify XSS attempt in description is stored as literal
+/// Verify XSS attempt in description is rejected by validation
 ///
 /// # Prevention
-/// Ensures HTML/JavaScript in description is stored as literal text.
-/// Frontend must escape when rendering (not backend's responsibility).
+/// Backend rejects HTML tags in description as defense-in-depth (OWASP A03:2021).
+/// Even if frontend fails to escape, XSS payloads cannot be stored.
 ///
 /// # Pitfall
-/// Backend storing literal strings is correct. Frontend MUST escape
-/// before rendering to prevent XSS.
+/// Validation must reject `<` and `>` characters to prevent stored XSS.
 #[ tokio::test ]
 async fn test_xss_in_description_stored_as_literal()
 {
@@ -472,26 +471,10 @@ async fn test_xss_in_description_stored_as_literal()
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
-  let create_response = router.clone().oneshot( create_request ).await.unwrap();
-  assert_eq!( create_response.status(), StatusCode::CREATED );
-
-  let ( _status, create_body ): ( StatusCode, CreateTokenResponse ) = extract_json_response( create_response ).await;
-  assert_eq!( create_body.description, Some( xss_description.to_string() ) );
-
-  // Verify retrieval returns exact string (unmodified)
-  let get_request = Request::builder()
-    .method( "GET" )
-    .uri( format!( "/api/v1/api-tokens/{}", create_body.id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
-    .body( Body::empty() )
-    .unwrap();
-
-  let get_response = router.oneshot( get_request ).await.unwrap();
-  let ( _status, get_body ): ( StatusCode, TokenListItem ) = extract_json_response( get_response ).await;
-  assert_eq!
-  (
-    get_body.description,
-    Some( xss_description.to_string() ),
-    "XSS string should be returned as-is (frontend must escape)"
+  let create_response = router.oneshot( create_request ).await.unwrap();
+  assert_eq!(
+    create_response.status(),
+    StatusCode::BAD_REQUEST,
+    "HTML tags in description should be rejected (defense-in-depth)"
   );
 }

@@ -35,6 +35,24 @@ members = [
   # Frontend: iron_dashboard (Vue.js)
   # iron_control_schema: Removed (spec-only, no implementation, zero dependents)
 ]
+# Default build set: excludes iron_sdk (requires maturin for PyO3 linking).
+# To build iron_sdk explicitly: `cargo build -p iron_sdk --features pyo3`
+default-members = [
+  "module/iron_types",
+  "module/iron_cost",
+  "module/iron_telemetry",
+  "module/iron_runtime_analytics",
+  "module/iron_runtime_state",
+  "module/iron_test_db",
+  "module/iron_config_loader",
+  "module/iron_safety",
+  "module/iron_reliability",
+  "module/iron_secrets",
+  "module/iron_token_manager",
+  "module/iron_control_api",
+  "module/iron_runtime",
+  "module/iron_cli",
+]
 
 [workspace.package]
 version = "0.2.0"

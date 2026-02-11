@@ -162,7 +162,7 @@ log_info "Rule 4: Checking token user assignments..."
 TOKEN_VIOLATIONS=0
 
 # Check admin token (at least 1 active)
-ADMIN_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='admin' AND is_active=1;")
+ADMIN_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_admin' AND is_active=1;")
 if [ "$ADMIN_TOKEN" -ge 1 ]; then
   log_success "Admin has at least 1 active token ($ADMIN_TOKEN)"
 else
@@ -171,7 +171,7 @@ else
 fi
 
 # Check developer tokens (at least 1 active)
-PM_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='developer' AND is_active=1;")
+PM_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_developer' AND is_active=1;")
 if [ "$PM_TOKEN" -ge 1 ]; then
   log_success "Developer has at least 1 active token ($PM_TOKEN)"
 else
@@ -180,7 +180,7 @@ else
 fi
 
 # Check viewer tokens (at least 1, any state)
-VIEWER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='viewer';")
+VIEWER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_viewer';")
 if [ "$VIEWER_TOKEN" -ge 1 ]; then
   log_success "Viewer has at least 1 token ($VIEWER_TOKEN)"
 else
@@ -190,7 +190,7 @@ fi
 
 # Check tester tokens (optional - only in Rust seed)
 if [ "$TESTER_EXISTS" -eq 1 ]; then
-  TESTER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='tester' AND is_active=1;")
+  TESTER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_tester' AND is_active=1;")
   if [ "$TESTER_TOKEN" -ge 1 ]; then
     log_success "Tester has at least 1 active token ($TESTER_TOKEN) [Rust seed]"
   else
@@ -201,7 +201,7 @@ fi
 
 # Check guest has NO tokens (optional - only in Rust seed)
 if [ "$GUEST_EXISTS" -eq 1 ]; then
-  GUEST_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='guest';")
+  GUEST_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_guest';")
   if [ "$GUEST_TOKEN" -eq 0 ]; then
     log_success "Guest has no tokens (edge case verified) [Rust seed]"
   else
@@ -253,7 +253,7 @@ log_info "Rule 7: Checking usage limit assignments..."
 LIMIT_VIOLATIONS=0
 
 # Check admin limit
-ADMIN_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='admin';")
+ADMIN_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='user_admin';")
 if [ "$ADMIN_LIMIT" -eq 1 ]; then
   log_success "Admin usage limit exists"
 else
@@ -262,7 +262,7 @@ else
 fi
 
 # Check developer limit
-PM_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='developer';")
+PM_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='user_developer';")
 if [ "$PM_LIMIT" -eq 1 ]; then
   log_success "Developer usage limit exists"
 else
@@ -271,7 +271,7 @@ else
 fi
 
 # Check viewer limit
-VIEWER_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='viewer';")
+VIEWER_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='user_viewer';")
 if [ "$VIEWER_LIMIT" -eq 1 ]; then
   log_success "Viewer usage limit exists"
 else

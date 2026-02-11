@@ -181,7 +181,7 @@ fn demo_users() -> Vec< SeedUser >
   vec![
     SeedUser { id: "user_admin", username: "admin", email: "admin@ironcage.ai", role: "admin", is_active: true, days_ago: 0 },
     SeedUser { id: "user_demo", username: "demo", email: "demo@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
-    SeedUser { id: "user_viewer", username: "viewer", email: "viewer@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
+    SeedUser { id: "user_viewer", username: "viewer", email: "viewer@ironcage.ai", role: "user", is_active: false, days_ago: 0 },
     SeedUser { id: "user_tester", username: "tester", email: "tester@ironcage.ai", role: "user", is_active: true, days_ago: 7 },
     SeedUser { id: "user_guest", username: "guest", email: "guest@ironcage.ai", role: "user", is_active: true, days_ago: 0 },
   ]
@@ -192,7 +192,7 @@ fn demo_users() -> Vec< SeedUser >
 /// Creates 5 demo users (only when `ENABLE_DEMO_SEED=true`):
 /// - `admin@ironcage.ai` (admin, active)
 /// - `demo@ironcage.ai` (user, active)
-/// - `viewer@ironcage.ai` (user, active)
+/// - `viewer@ironcage.ai` (user, inactive — for revocation testing)
 /// - `tester@ironcage.ai` (user, active)
 /// - `guest@ironcage.ai` (user, active)
 /// - Password: `IronDemo2025!`
