@@ -45,7 +45,7 @@ impl std::fmt::Debug for KeysState
   }
 }
 
-/// Allow ApiTokenState to be extracted from KeysState
+/// Allow `ApiTokenState` to be extracted from `KeysState`
 impl axum::extract::FromRef< KeysState > for ApiTokenState
 {
   fn from_ref( state: &KeysState ) -> Self

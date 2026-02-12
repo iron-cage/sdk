@@ -1,6 +1,6 @@
 //! API Token authentication middleware
 //!
-//! Authenticates requests using API tokens (iron_xxx format) instead of JWT.
+//! Authenticates requests using API tokens (`iron_xxx` format) instead of JWT.
 //! Used for external API access (key fetching, runtime calls).
 
 use axum::extract::FromRef;
@@ -10,7 +10,7 @@ use iron_token_manager::storage::TokenStorage;
 /// Authenticated API token claims
 ///
 /// Extracted from a valid API token via the `Authorization: Bearer <token>` header.
-/// Unlike JWT authentication, this uses iron_xxx format tokens stored in the database.
+/// Unlike JWT authentication, this uses `iron_xxx` format tokens stored in the database.
 #[ derive( Debug, Clone ) ]
 pub struct ApiTokenAuth
 {

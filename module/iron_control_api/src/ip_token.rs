@@ -5,7 +5,7 @@
 //! IP Tokens are AES-256-GCM encrypted provider API keys that are:
 //! - Never written to disk (memory-only storage)
 //! - Encrypted with runtime session key
-//! - Format: AES256:{IV_base64}:{ciphertext_base64}:{auth_tag_base64}
+//! - Format: `AES256:{IV_base64}:{ciphertext_base64}:{auth_tag_base64}`
 //!
 //! The runtime acts as a secure proxy, decrypting IP Tokens on-demand to make
 //! LLM API calls without exposing provider credentials to the developer.

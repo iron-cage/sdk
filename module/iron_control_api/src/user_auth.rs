@@ -35,7 +35,7 @@ pub struct BlacklistedToken
 /// # Arguments
 ///
 /// * `password` - Plain text password to verify
-/// * `hash` - BCrypt hash to verify against
+/// * `hash` - `BCrypt` hash to verify against
 ///
 /// # Returns
 ///

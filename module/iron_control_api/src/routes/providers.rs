@@ -7,7 +7,7 @@
 //! - PUT /api/providers/:id - Update provider key
 //! - DELETE /api/providers/:id - Delete provider key
 //! - POST /api/providers/:id/balance - Fetch balance from provider API
-//! - POST /api/projects/:project_id/provider - Assign provider key to project
+//! - POST /api/projects/:`project_id`/provider - Assign provider key to project
 
 use axum::{
   extract::{ Path, State },
@@ -25,7 +25,7 @@ use crate::error::ValidationError;
 pub struct ProvidersState
 {
   pub storage: Arc< ProviderKeyStorage >,
-  /// Crypto service - None if IRON_SECRETS_MASTER_KEY not set
+  /// Crypto service - None if `IRON_SECRETS_MASTER_KEY` not set
   pub crypto: Option< Arc< CryptoService > >,
 }
 
@@ -33,7 +33,7 @@ impl ProvidersState
 {
   /// Create new providers state
   ///
-  /// If IRON_SECRETS_MASTER_KEY is not set, the state will be created
+  /// If `IRON_SECRETS_MASTER_KEY` is not set, the state will be created
   /// but crypto operations will be disabled (routes return 503).
   pub async fn new( database_url: &str ) -> Result< Self, Box< dyn std::error::Error > >
   {
@@ -80,7 +80,7 @@ pub struct CreateProviderKeyRequest
 
 impl CreateProviderKeyRequest
 {
-  /// Maximum API key length (DoS protection)
+  /// Maximum API key length (`DoS` protection)
   const MAX_API_KEY_LENGTH: usize = 500;
 
   /// Maximum base URL length
@@ -439,7 +439,7 @@ pub async fn get_provider_key(
 
 /// PUT /api/providers/:id
 ///
-/// Update provider key (description, base_url, is_enabled)
+/// Update provider key (description, `base_url`, `is_enabled`)
 pub async fn update_provider_key(
   State( state ): State< ProvidersState >,
   crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
@@ -571,7 +571,7 @@ pub async fn delete_provider_key(
   }
 }
 
-/// POST /api/projects/:project_id/provider
+/// POST /api/projects/:`project_id`/provider
 ///
 /// Assign provider key to project
 pub async fn assign_provider_to_project(
@@ -613,7 +613,7 @@ pub async fn assign_provider_to_project(
   }
 }
 
-/// DELETE /api/projects/:project_id/provider
+/// DELETE /api/projects/:`project_id`/provider
 ///
 /// Unassign provider key from project
 pub async fn unassign_provider_from_project(

@@ -1,13 +1,13 @@
 //! In-memory rate limiter for login endpoint
 //!
-//! **Authority:** pilot_implementation_gaps.md § GAP-006
+//! **Authority:** `pilot_implementation_gaps.md` § GAP-006
 //!
 //! Implements per-IP rate limiting to prevent brute-force attacks.
 //!
 //! # Configuration
 //!
 //! - **Limit:** 5 attempts per 5 minutes per IP address
-//! - **Storage:** In-memory HashMap (pilot phase)
+//! - **Storage:** In-memory `HashMap` (pilot phase)
 //! - **Cleanup:** Automatic expiration of old entries
 //! - **Response:** 429 Too Many Requests with Retry-After header
 //!
@@ -59,7 +59,7 @@ impl LoginRateLimiter
   ///
   /// Returns:
   /// - Ok(()) if allowed (< 5 attempts in last 5 minutes)
-  /// - Err(retry_after_seconds) if rate limited
+  /// - `Err(retry_after_seconds)` if rate limited
   ///
   /// # Arguments
   ///

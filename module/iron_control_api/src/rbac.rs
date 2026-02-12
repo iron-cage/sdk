@@ -106,7 +106,7 @@ impl FromStr for Permission
   ///
   /// # Arguments
   ///
-  /// * `s` - Permission name (snake_case: "read_agents", "manage_users", etc.)
+  /// * `s` - Permission name (`snake_case`: `read_agents`, `manage_users`, etc.)
   ///
   /// # Errors
   ///

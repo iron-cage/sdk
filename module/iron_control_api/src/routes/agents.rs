@@ -43,7 +43,7 @@ pub struct CreateAgentRequest {
     pub providers: Vec<String>,
     pub provider_key_id: i64,
     pub initial_budget_microdollars: i64,
-    /// Optional owner_id - admins can assign agents to other users.
+    /// Optional `owner_id` - admins can assign agents to other users.
     /// If not provided, defaults to the authenticated user.
     pub owner_id: Option<String>,
 }
@@ -53,7 +53,7 @@ pub struct UpdateAgentRequest {
     pub name: Option<String>,
     pub providers: Option<Vec<String>>,
     pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
-    /// Optional owner_id - only admins can reassign agents to other users.
+    /// Optional `owner_id` - only admins can reassign agents to other users.
     pub owner_id: Option<String>,
 }
 
@@ -565,7 +565,7 @@ pub async fn delete_agent(
 /// PUT /api/v1/agents/:id/budget
 ///
 /// Update an agent's total allocated budget (microdollars).
-/// Recomputes budget_remaining = total_allocated - total_spent.
+/// Recomputes `budget_remaining` = `total_allocated` - `total_spent`.
 pub async fn update_agent_budget(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,

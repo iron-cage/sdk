@@ -30,10 +30,10 @@ pub struct UsageReportRequest
 
 impl UsageReportRequest
 {
-  /// Maximum lease_id length
+  /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
-  /// Maximum request_id length (UUID + prefix)
+  /// Maximum `request_id` length (UUID + prefix)
   const MAX_REQUEST_ID_LENGTH: usize = 100;
 
   /// Maximum model name length
@@ -320,14 +320,14 @@ pub async fn report_usage(
 pub struct BudgetReturnRequest
 {
   pub lease_id: String,
-  /// Amount spent by client (microdollars) - from iron_cost CostController
+  /// Amount spent by client (microdollars) - from `iron_cost` `CostController`
   #[ serde( default ) ]
   pub spent_microdollars: i64,
 }
 
 impl BudgetReturnRequest
 {
-  /// Maximum lease_id length
+  /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Validate budget return request parameters
@@ -378,7 +378,7 @@ pub struct BudgetReturnResponse
 /// # Arguments
 ///
 /// * `state` - Budget protocol state
-/// * `request` - Budget return request with lease_id
+/// * `request` - Budget return request with `lease_id`
 ///
 /// # Returns
 ///

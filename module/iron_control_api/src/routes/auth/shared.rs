@@ -108,10 +108,10 @@ pub struct LoginRequest {
 }
 
 impl LoginRequest {
-  /// Maximum email length for DoS prevention
+  /// Maximum email length for `DoS` prevention
   const MAX_EMAIL_LENGTH: usize = 255;
 
-  /// Maximum password length for DoS prevention
+  /// Maximum password length for `DoS` prevention
   const MAX_PASSWORD_LENGTH: usize = 1000;
 
   /// Validate login request parameters
@@ -174,7 +174,7 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-  /// Create UserInfo from JWT claims and database user
+  /// Create `UserInfo` from JWT claims and database user
   ///
   /// # Arguments
   ///
@@ -189,7 +189,7 @@ impl UserInfo {
     }
   }
 
-  /// Create UserInfo from database user only
+  /// Create `UserInfo` from database user only
   ///
   /// # Arguments
   ///

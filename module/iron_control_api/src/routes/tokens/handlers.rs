@@ -1,13 +1,13 @@
 //! Token management endpoint handlers
 //!
 //! Provides all token lifecycle operations:
-//! - create_token: Create new API token
-//! - list_tokens: List all user tokens
-//! - get_token: Get specific token details
-//! - update_token: Update token provider
-//! - rotate_token: Rotate token (new value)
-//! - revoke_token: Revoke/deactivate token
-//! - validate_token: Public token validation
+//! - `create_token`: Create new API token
+//! - `list_tokens`: List all user tokens
+//! - `get_token`: Get specific token details
+//! - `update_token`: Update token provider
+//! - `rotate_token`: Rotate token (new value)
+//! - `revoke_token`: Revoke/deactivate token
+//! - `validate_token`: Public token validation
 
 use axum::{
   extract::{ Path, State },
@@ -26,11 +26,11 @@ use super::shared::{
 /// # Protocol 014 Compliance
 ///
 /// - **Authentication Required:** User must be authenticated via JWT Bearer token
-/// - **user_id Source:** Extracted from JWT claims (not request body)
+/// - **`user_id` Source:** Extracted from JWT claims (not request body)
 /// - **Request Fields:** `name` (required, 1-100 chars), `description` (optional, max 500 chars)
 /// - **Rate Limiting:** 10 creates/min per user (429 Too Many Requests if exceeded)
 /// - **Token Limit:** Max 10 active tokens per user (429 Too Many Requests if exceeded)
-/// - **Audit Logging:** Logs creation to audit_log (plaintext token excluded for security)
+/// - **Audit Logging:** Logs creation to `audit_log` (plaintext token excluded for security)
 ///
 /// # Backward Compatibility
 ///

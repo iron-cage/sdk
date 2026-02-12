@@ -13,13 +13,13 @@ use crate::ic_token::IcTokenManager;
 // Type Aliases (for complex query result types)
 // ============================================================================
 
-/// Row type for spending by agent: (agent_id, agent_name, spending_micros, request_count, budget)
+/// Row type for spending by agent: (`agent_id`, `agent_name`, `spending_micros`, `request_count`, `budget`)
 pub type SpendingByAgentRow = ( i64, Option< String >, i64, i64, Option< f64 > );
 
-/// Row type for token usage by agent: (agent_id, agent_name, input_tokens, output_tokens, request_count)
+/// Row type for token usage by agent: (`agent_id`, `agent_name`, `input_tokens`, `output_tokens`, `request_count`)
 pub type TokensByAgentRow = ( i64, Option< String >, i64, i64, i64 );
 
-/// Row type for model usage: (model, provider, request_count, spending_micros, input_tokens, output_tokens)
+/// Row type for model usage: (`model`, `provider`, `request_count`, `spending_micros`, `input_tokens`, `output_tokens`)
 pub type ModelUsageRow = ( String, String, i64, i64, i64, i64 );
 
 // ============================================================================
@@ -43,7 +43,7 @@ pub enum Period
 
 impl Period
 {
-  /// Convert period to (start_ms, end_ms) range
+  /// Convert period to (`start_ms`, `end_ms`) range
   pub fn to_range( &self ) -> ( i64, i64 )
   {
     let now = Utc::now();
@@ -473,7 +473,7 @@ impl AnalyticsState
   /// Create new analytics state
   ///
   /// # Arguments
-  /// * `database_url` - SQLite database connection URL
+  /// * `database_url` - `SQLite` database connection URL
   /// * `ic_token_secret` - Secret for verifying IC tokens
   pub async fn new( database_url: &str, ic_token_secret: String ) -> Result< Self, Box< dyn std::error::Error > >
   {

@@ -6,10 +6,10 @@
 //! They contain agent identity, budget allocation, and permissions.
 //!
 //! Key properties:
-//! - Long-lived (expires_at can be null for no auto-expiration)
+//! - Long-lived (`expires_at` can be null for no auto-expiration)
 //! - Signed with HMAC-SHA256
 //! - Issued by "iron-control-panel"
-//! - Contains agent_id, budget_id, permissions
+//! - Contains `agent_id`, `budget_id`, permissions
 
 use jsonwebtoken::{ decode, encode, DecodingKey, EncodingKey, Header, Validation };
 use serde::{ Deserialize, Serialize };
@@ -19,10 +19,10 @@ use crate::error::ValidationError;
 /// IC Token JWT claims
 ///
 /// Per Protocol 005 specification, IC Tokens contain:
-/// - agent_id: Unique agent identifier (format: agent_<id>)
-/// - budget_id: Links to budget allocation
-/// - issued_at: Token creation time (Unix timestamp seconds)
-/// - expires_at: Optional expiration (null for long-lived tokens)
+/// - `agent_id`: Unique agent identifier (format: `agent_<id>`)
+/// - `budget_id`: Links to budget allocation
+/// - `issued_at`: Token creation time (Unix timestamp seconds)
+/// - `expires_at`: Optional expiration (null for long-lived tokens)
 /// - issuer: Must be "iron-control-panel"
 /// - permissions: Array of allowed operations
 #[ derive( Debug, Clone, Serialize, Deserialize, PartialEq ) ]
@@ -64,7 +64,7 @@ impl IcTokenClaims
   ///
   /// # Returns
   ///
-  /// New `IcTokenClaims` with current timestamp as issued_at
+  /// New `IcTokenClaims` with current timestamp as `issued_at`
   #[ must_use ]
   pub fn new(
     agent_id: String,
@@ -92,8 +92,8 @@ impl IcTokenClaims
   ///
   /// Checks:
   /// - Issuer is "iron-control-panel"
-  /// - If expires_at is set, token hasnt expired
-  /// - agent_id format is valid
+  /// - If `expires_at` is set, token hasn't expired
+  /// - `agent_id` format is valid
   ///
   /// # Errors
   ///

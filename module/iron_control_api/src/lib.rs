@@ -20,7 +20,7 @@
 //! 1. **Transport Layer**: Axum web framework with HTTP/1.1, HTTP/2, and WebSocket support
 //! 2. **Authentication Layer**: JWT validation, token auth, and user sessions
 //! 3. **Authorization Layer**: Role-based access control (RBAC)
-//! 4. **Route Layer**: RESTful endpoints organized by resource domain
+//! 4. **Route Layer**: `RESTful` endpoints organized by resource domain
 //! 5. **State Layer**: Shared access to runtime state via `StateManager`
 //!
 //! All layers use async/await with Tokio runtime for concurrent request handling.

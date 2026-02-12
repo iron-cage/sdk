@@ -99,7 +99,7 @@ impl CreateLimitRequest
   ///
   /// # Errors
   ///
-  /// Returns error if any provided field is ≤ 0 or exceeds MAX_SAFE_LIMIT
+  /// Returns error if any provided field is ≤ 0 or exceeds `MAX_SAFE_LIMIT`
   pub fn validate_values( &self ) -> Result< (), ValidationError >
   {
     Self::validate_limit_value( self.max_tokens_per_day, "max_tokens_per_day" )?;
@@ -130,7 +130,7 @@ impl CreateLimitRequest
   ///
   /// - At least one limit must be specified (not all None)
   /// - All specified limits must be positive (> 0)
-  /// - All specified limits must be within safe range (≤ MAX_SAFE_LIMIT)
+  /// - All specified limits must be within safe range (≤ `MAX_SAFE_LIMIT`)
   ///
   /// # Returns
   ///
@@ -142,7 +142,7 @@ impl CreateLimitRequest
   /// Returns descriptive error message for:
   /// - All limits are None (missing required data)
   /// - Any limit is ≤ 0
-  /// - Any limit exceeds MAX_SAFE_LIMIT
+  /// - Any limit exceeds `MAX_SAFE_LIMIT`
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     self.validate_values()?;
@@ -154,7 +154,7 @@ impl CreateLimitRequest
 /// Update limit request body (for PUT /api/limits/:id)
 ///
 /// All fields are optional to support partial updates.
-/// user_id cannot be changed via update endpoint.
+/// `user_id` cannot be changed via update endpoint.
 #[ derive( Debug, Deserialize ) ]
 pub struct UpdateLimitRequest
 {
@@ -165,7 +165,7 @@ pub struct UpdateLimitRequest
 
 impl UpdateLimitRequest
 {
-  /// Maximum safe limit value (same as CreateLimitRequest)
+  /// Maximum safe limit value (same as `CreateLimitRequest`)
   const MAX_SAFE_LIMIT: i64 = CreateLimitRequest::MAX_SAFE_LIMIT;
 
   /// Validate a single limit value
@@ -212,7 +212,7 @@ impl UpdateLimitRequest
   ///
   /// # Errors
   ///
-  /// Returns error if any provided field is ≤ 0 or exceeds MAX_SAFE_LIMIT
+  /// Returns error if any provided field is ≤ 0 or exceeds `MAX_SAFE_LIMIT`
   pub fn validate_values( &self ) -> Result< (), ValidationError >
   {
     Self::validate_limit_value( self.max_tokens_per_day, "max_tokens_per_day" )?;
@@ -243,14 +243,14 @@ impl UpdateLimitRequest
   ///
   /// - At least one field must be provided (not all None)
   /// - All provided fields must be positive (> 0)
-  /// - All provided fields must be within safe range (≤ MAX_SAFE_LIMIT)
+  /// - All provided fields must be within safe range (≤ `MAX_SAFE_LIMIT`)
   ///
   /// # Errors
   ///
   /// Returns error if:
   /// - All fields are None (no fields to update)
   /// - Any provided field is ≤ 0
-  /// - Any provided field exceeds MAX_SAFE_LIMIT
+  /// - Any provided field exceeds `MAX_SAFE_LIMIT`
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     self.validate_values()?;
@@ -278,7 +278,7 @@ pub struct LimitResponse
 ///
 /// # Arguments
 ///
-/// * `state` - Limits state with LimitEnforcer
+/// * `state` - Limits state with `LimitEnforcer`
 /// * `request` - Limit configuration
 ///
 /// # Returns
@@ -358,7 +358,7 @@ pub async fn create_limit(
 ///
 /// # Arguments
 ///
-/// * `state` - Limits state with LimitEnforcer
+/// * `state` - Limits state with `LimitEnforcer`
 ///
 /// # Returns
 ///
@@ -400,7 +400,7 @@ pub async fn list_limits( State( state ): State< LimitsState > ) -> impl IntoRes
 ///
 /// # Arguments
 ///
-/// * `state` - Limits state with LimitEnforcer
+/// * `state` - Limits state with `LimitEnforcer`
 /// * `limit_id` - Limit ID
 ///
 /// # Returns
@@ -445,9 +445,9 @@ pub async fn get_limit(
 ///
 /// # Arguments
 ///
-/// * `state` - Limits state with LimitEnforcer
+/// * `state` - Limits state with `LimitEnforcer`
 /// * `limit_id` - Limit ID
-/// * `request` - Updated limit configuration (user_id is preserved from existing record)
+/// * `request` - Updated limit configuration (`user_id` is preserved from existing record)
 ///
 /// # Returns
 ///
@@ -524,7 +524,7 @@ pub async fn update_limit(
 ///
 /// # Arguments
 ///
-/// * `state` - Limits state with LimitEnforcer
+/// * `state` - Limits state with `LimitEnforcer`
 /// * `limit_id` - Limit ID
 ///
 /// # Returns

@@ -27,7 +27,7 @@ impl BudgetRefreshRequest
   /// Maximum IC Token length
   const MAX_IC_TOKEN_LENGTH: usize = 2000;
 
-  /// Maximum lease_id length
+  /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Maximum budget request (microdollars)

@@ -53,8 +53,8 @@ pub struct BuildInfo
 ///
 /// ## Build Metadata
 ///
-/// - commit: Git SHA from VERGEN_GIT_SHA (build.rs)
-/// - timestamp: Build timestamp from VERGEN_BUILD_TIMESTAMP (build.rs)
+/// - commit: Git SHA from `VERGEN_GIT_SHA` (`build.rs`)
+/// - timestamp: Build timestamp from `VERGEN_BUILD_TIMESTAMP` (`build.rs`)
 /// - environment: Runtime environment from ENVIRONMENT var or "development"
 #[ must_use ]
 pub async fn get_version() -> impl IntoResponse

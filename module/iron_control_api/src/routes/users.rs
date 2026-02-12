@@ -9,7 +9,7 @@
 //! - Change user roles
 //! - Reset passwords
 //!
-//! All endpoints require Admin role (ManageUsers permission).
+//! All endpoints require Admin role (`ManageUsers` permission).
 
 use axum::
 {
@@ -388,7 +388,7 @@ pub async fn create_user(
 
 /// List users with optional filters
 ///
-/// GET /api/v1/users?role=admin&is_active=true&search=john&page=1&page_size=20
+/// `GET /api/v1/users?role=admin&is_active=true&search=john&page=1&page_size=20`
 /// Requires: Admin role
 pub async fn list_users(
   State( state ): State< UserManagementState >,

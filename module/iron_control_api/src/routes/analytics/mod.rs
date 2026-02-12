@@ -1,7 +1,7 @@
 //! Analytics REST API endpoints (Protocol 012)
 //!
 //! Provides endpoints for:
-//! - Event ingestion from LlmRouter
+//! - Event ingestion from `LlmRouter`
 //! - Spending analytics (total, by-agent, by-provider, avg-per-request)
 //! - Budget status monitoring
 //! - Usage statistics (requests, tokens, models)

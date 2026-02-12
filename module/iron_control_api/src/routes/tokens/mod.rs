@@ -20,14 +20,14 @@
 //! # Protocol 014 Compliance
 //!
 //! Token creation follows Protocol 014:
-//! - JWT authentication required (user_id from claims, not request body)
+//! - JWT authentication required (`user_id` from claims, not request body)
 //! - Rate limiting: 10 creates/min per user
 //! - Token limit: Max 10 active tokens per user
 //! - Audit logging for all operations
 //!
 //! # Backward Compatibility
 //!
-//! Supports legacy request format with user_id in request body for existing tests.
+//! Supports legacy request format with `user_id` in request body for existing tests.
 //! Once tests are migrated, legacy support can be removed.
 
 mod shared;

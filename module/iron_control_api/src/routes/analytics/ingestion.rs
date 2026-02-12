@@ -1,6 +1,6 @@
 //! Event ingestion endpoint
 //!
-//! Handles POST /api/v1/analytics/events for receiving analytics events from LlmRouter.
+//! Handles POST /api/v1/analytics/events for receiving analytics events from `LlmRouter`.
 //! Validates IC tokens to authenticate agent identity and prevents event duplication.
 
 use crate::ic_token;
@@ -17,8 +17,8 @@ use super::shared::{
 
 /// POST /api/v1/analytics/events
 ///
-/// Ingest analytics event from LlmRouter.
-/// Requires valid IC Token for authentication - agent_id is derived from token claims.
+/// Ingest analytics event from `LlmRouter`.
+/// Requires valid IC Token for authentication - `agent_id` is derived from token claims.
 /// Returns 202 Accepted for new events, 200 OK for duplicates.
 pub async fn post_event(
   State( state ): State< AnalyticsState >,

@@ -31,7 +31,7 @@ pub struct BudgetState
   pub crypto_service: Option< Arc< CryptoService > >,
 }
 
-/// Enable AuthState extraction from BudgetState
+/// Enable `AuthState` extraction from `BudgetState`
 impl FromRef< BudgetState > for AuthState
 {
   fn from_ref( state: &BudgetState ) -> Self

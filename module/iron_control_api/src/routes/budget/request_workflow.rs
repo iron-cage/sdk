@@ -39,10 +39,10 @@ impl CreateBudgetRequestRequest
   ///
   /// Rationale: Pilot phase restricts individual budget requests to $10K to limit
   /// financial exposure during initial validation. This is significantly below the
-  /// technical limit of ~9.2 quintillion microdollars (i64::MAX) which allows for
+  /// technical limit of ~9.2 quintillion microdollars (`i64::MAX`) which allows for
   /// safe production scaling after pilot phase completes.
   ///
-  /// Technical note: Microdollar conversion (×1,000,000) means i64::MAX supports
+  /// Technical note: Microdollar conversion (×1,000,000) means `i64::MAX` supports
   /// up to ~$9.2 trillion USD before overflow. Current $10K limit leaves substantial
   /// headroom for future production use.
   ///
@@ -165,7 +165,7 @@ pub struct CreateBudgetRequestResponse
 ///
 /// # Returns
 ///
-/// - 201 Created with request_id if successful
+/// - 201 Created with `request_id` if successful
 /// - 400 Bad Request if validation fails
 /// - 403 Forbidden if user doesn't own agent
 /// - 404 Not Found if agent doesnt exist
@@ -414,7 +414,7 @@ pub struct ListBudgetRequestsResponse
 /// # Arguments
 ///
 /// * `state` - Budget protocol state (database, managers)
-/// * `query` - Optional query parameters (agent_id, status)
+/// * `query` - Optional query parameters (`agent_id`, status)
 ///
 /// # Query Parameters
 ///

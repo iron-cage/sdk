@@ -35,7 +35,7 @@ impl TokenState
 
 /// Create token request (Protocol 014 compliant with backward compatibility)
 ///
-/// Per Protocol 014: user_id comes from JWT authentication, not request body
+/// Per Protocol 014: `user_id` comes from JWT authentication, not request body
 ///
 /// # Formats Supported
 ///
@@ -86,10 +86,10 @@ impl CreateTokenRequest
   // Root cause: Validation allowed 500 chars but migration 013 reduced user_id to 255 to match users.id FK target
   // Pitfall: Validation constants must match database CHECK constraints to prevent insertion failures
 
-  /// Maximum user_id length (DoS protection). Must match migration 013 CHECK constraint (255 chars, aligned with users.id).
+  /// Maximum `user_id` length (`DoS` protection). Must match migration 013 CHECK constraint (255 chars, aligned with `users.id`).
   const MAX_USER_ID_LENGTH: usize = 255;
 
-  /// Maximum project_id length (DoS protection). Must match database CHECK constraint.
+  /// Maximum `project_id` length (`DoS` protection). Must match database CHECK constraint.
   const MAX_PROJECT_ID_LENGTH: usize = 500;
 
   /// Maximum name length (Protocol 014: 1-100 chars)
@@ -304,7 +304,7 @@ pub struct UpdateTokenRequest
 
 impl UpdateTokenRequest
 {
-  /// Maximum length of provider (DoS protection)
+  /// Maximum length of `provider` (`DoS` protection)
   const MAX_PROVIDER_LENGTH: usize = 64;
 
   pub fn validate( &self ) -> Result< (), ValidationError >
@@ -315,7 +315,7 @@ impl UpdateTokenRequest
       return Err( ValidationError::MissingField( "provider".to_string() ) );
     }
 
-    // Validate provider length (DoS protection)
+    // Validate provider length (`DoS` protection)
     if self.provider.len() > Self::MAX_PROVIDER_LENGTH
     {
       return Err( ValidationError::TooLong

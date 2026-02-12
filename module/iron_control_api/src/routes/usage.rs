@@ -10,12 +10,12 @@
 //! # Path Parameter Validation
 //!
 //! Path parameters (`:project_id`, `:provider`) are validated before database queries to:
-//! 1. **Prevent DoS attacks** via excessively long strings (project_id max 1000, provider max 100 chars)
-//! 2. **Enforce consistency** with request body validation (e.g., CreateTokenRequest.project_id)
-//! 3. **Provide explicit errors** (400 BAD_REQUEST) instead of generic database failures (500)
+//! 1. **Prevent `DoS` attacks** via excessively long strings (`project_id` max 1000, provider max 100 chars)
+//! 2. **Enforce consistency** with request body validation (e.g., `CreateTokenRequest.project_id`)
+//! 3. **Provide explicit errors** (400 `BAD_REQUEST`) instead of generic database failures (500)
 //! 4. **Defense in depth** - don't rely solely on URL length limits (vary by server: 2KB-8KB)
 //!
-//! See tests/usage/path_validation.rs for comprehensive test coverage and rationale.
+//! See `tests/usage/path_validation.rs` for comprehensive test coverage and rationale.
 
 use axum::{
   extract::{ Path, State },
@@ -27,19 +27,19 @@ use serde::{ Serialize, Deserialize };
 use std::sync::Arc;
 use crate::error::ValidationError;
 
-/// Maximum project_id length for DoS prevention
+/// Maximum `project_id` length for `DoS` prevention
 const MAX_PROJECT_ID_LENGTH: usize = 1000;
 
-/// Maximum provider name length for DoS prevention
+/// Maximum provider name length for `DoS` prevention
 const MAX_PROVIDER_LENGTH: usize = 100;
 
-/// Validate project_id path parameter
+/// Validate `project_id` path parameter
 ///
 /// # Errors
 ///
 /// Returns error if:
-/// - project_id is whitespace-only
-/// - project_id exceeds 1000 characters
+/// - `project_id` is whitespace-only
+/// - `project_id` exceeds 1000 characters
 fn validate_project_id( project_id: &str ) -> Result< (), ValidationError >
 {
   // Validate not whitespace-only

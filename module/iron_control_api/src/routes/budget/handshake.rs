@@ -37,7 +37,7 @@ impl HandshakeRequest
   /// Default budget lease amount (microdollars) for handshake
   const DEFAULT_HANDSHAKE_BUDGET: i64 = 10_000_000; // 10 USD
 
-  /// Maximum budget request (microdollars) for handshake (DoS prevention)
+  /// Maximum budget request (microdollars) for handshake (`DoS` prevention)
   pub const MAX_HANDSHAKE_BUDGET: i64 = 100_000_000; // 100 USD
 
   /// Validate handshake request parameters
@@ -53,7 +53,7 @@ impl HandshakeRequest
       return Err( ValidationError::MissingField( "ic_token".to_string() ) );
     }
 
-    // Validate ic_token length (DoS prevention)
+    // Validate ic_token length (`DoS` prevention)
     if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH
     {
       return Err( ValidationError::TooLong

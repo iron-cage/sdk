@@ -68,23 +68,23 @@ pub struct GetProviderKeyResponse
 /// # Flow
 ///
 /// 1. Validate request
-/// 2. Verify IC Token -> extract agent_id
-/// 3. Query agents table for provider_key_id
-/// 4. If NULL -> 403 NO_PROVIDER_ASSIGNED
-/// 5. Get ai_provider_keys record
+/// 2. Verify IC Token -> extract `agent_id`
+/// 3. Query agents table for `provider_key_id`
+/// 4. If NULL -> 403 `NO_PROVIDER_ASSIGNED`
+/// 5. Get `ai_provider_keys` record
 /// 6. Check key is enabled
-/// 7. Decrypt API key using CryptoService
+/// 7. Decrypt API key using `CryptoService`
 /// 8. Log audit entry
 /// 9. Return decrypted key
 ///
 /// # Returns
 ///
 /// - 200 OK with provider key
-/// - 400 Bad Request if validation fails (INVALID_TOKEN)
-/// - 401 Unauthorized if IC Token invalid (UNAUTHORIZED)
-/// - 403 Forbidden if no provider assigned (NO_PROVIDER_ASSIGNED)
-/// - 404 Not Found if provider key not found (PROVIDER_NOT_FOUND)
-/// - 503 Service Unavailable if crypto not configured (CRYPTO_UNAVAILABLE)
+/// - 400 Bad Request if validation fails (`INVALID_TOKEN`)
+/// - 401 Unauthorized if IC Token invalid (`UNAUTHORIZED`)
+/// - 403 Forbidden if no provider assigned (`NO_PROVIDER_ASSIGNED`)
+/// - 404 Not Found if provider key not found (`PROVIDER_NOT_FOUND`)
+/// - 503 Service Unavailable if crypto not configured (`CRYPTO_UNAVAILABLE`)
 pub async fn get_provider_key(
   State( state ): State< BudgetState >,
   Json( request ): Json< GetProviderKeyRequest >,

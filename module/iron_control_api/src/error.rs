@@ -207,7 +207,7 @@ where
 
 /// Validation error types for request validation
 ///
-/// Replaces `Result<(), String>` with typed error handling per code_design.rulebook.md
+/// Replaces `Result<(), String>` with typed error handling per `code_design.rulebook.md`
 #[ derive( Debug ) ]
 pub enum ValidationError
 {
