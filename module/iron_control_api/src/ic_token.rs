@@ -20,16 +20,14 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 /// Compute SHA-256 hash of a token string (hex-encoded)
 pub fn sha256_hash(token: &str) -> String {
-  let mut hasher = Sha256::new();
-  hasher.update(token.as_bytes());
-  format!("{:x}", hasher.finalize())
+  format!("{:x}", Sha256::digest(token.as_bytes()))
 }
 
 /// Error from IC Token runtime validation (JWT + hash-check)
@@ -359,15 +357,30 @@ impl IcTokenRateLimiter {
   }
 
   /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
+  /// Acquire lock (with poison recovery) and sweep all stale entries.
+  fn lock_and_sweep(&self) -> (MutexGuard<'_, HashMap<String, Vec<Instant>>>, Instant) {
+    let now = Instant::now();
+    let mut map = self.failures.lock().unwrap_or_else(|e| {
+      tracing::error!("IcTokenRateLimiter mutex poisoned, recovering");
+      e.into_inner()
+    });
+
+    map.retain(|_, ts| {
+      ts.retain(|t| now.duration_since(*t) < IC_TOKEN_WINDOW);
+      !ts.is_empty()
+    });
+
+    (map, now)
+  }
+
+  /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
   pub fn check(&self, token: &str) -> Result<(), u64> {
     let key = Self::token_key(token);
-    let mut map = self.failures.lock().unwrap();
-    let now = Instant::now();
+    let (map, now) = self.lock_and_sweep();
 
-    let entries = map.entry(key).or_default();
-
-    // Evict expired entries
-    entries.retain(|ts| now.duration_since(*ts) < IC_TOKEN_WINDOW);
+    let Some(entries) = map.get(&key) else {
+      return Ok(());
+    };
 
     if entries.len() >= IC_TOKEN_MAX_FAILURES {
       let oldest = entries.first().unwrap();
@@ -384,8 +397,8 @@ impl IcTokenRateLimiter {
   /// Record a failed validation attempt for the given token.
   pub fn record_failure(&self, token: &str) {
     let key = Self::token_key(token);
-    let mut map = self.failures.lock().unwrap();
-    map.entry(key).or_default().push(Instant::now());
+    let (mut map, now) = self.lock_and_sweep();
+    map.entry(key).or_default().push(now);
   }
 }
 
