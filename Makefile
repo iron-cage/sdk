@@ -1,9 +1,10 @@
 # Iron Runtime Development Makefile
 # Minimal commands for daily development workflow
 
-.PHONY: help dev api dashboard test clean setup status ports validate build lint-docs lint-python
-.PHONY: db-reset db-reset-seed db-seed db-inspect debug-setup
+.PHONY: help dev api dashboard test test-quick clean setup status ports validate build lint-docs lint-python
+.PHONY: db-reset db-reset-seed db-seed db-admin db-inspect debug-setup
 .PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-sync py-clean
+.PHONY: docker-build docker-up docker-down docker-down-volumes docker-logs docker-logs-backend docker-logs-frontend docker-ps
 .PHONY: secrets-check
 .DEFAULT_GOAL := help
 
