@@ -1,254 +1,222 @@
-# Terraform Deployment
+# Deploy Directory
 
-This directory contains Terraform configurations and tooling for deploying the web application to multiple cloud providers **through a single entry point**: the project’s root `Makefile`.
+This directory contains the infrastructure-as-code and deployment automation for the project using **Kubernetes (k3s)** for container orchestration with **zero-downtime deployments** and **automatic rollback**.
 
-Supported providers:
+## Directory Structure
 
-- Google Cloud Platform (GCP) – GCS, Artifact Registry
-- Hetzner Cloud
-
-You **do not** run `terraform` manually. Instead:
-
-- Terraform is executed **inside a Docker container** built from `Dockerfile`.
-- Terraform state is stored **automatically in Google Cloud Storage (GCS)** via the `gcs` backend.
-- All modules (`gcs`, `gar`, `hetzner`) are orchestrated by **`make -f Makefile.deploy deploy`**.
-
----
-
-## Content:
-
-- [Quick Start: One Command Deploy](#quick-start-one-command-deploy)
-- [Terraform State in GCS](#terraform-state-in-gcs)
-- [Useful Make Targets](#useful-make-targets)
-- [Terraform Module Layout](#terraform-module-layout)
-- [Testing the Redeploy Script](#testing-the-redeploy-script)
-- [CI/CD Deployment with GitHub Actions](#cicd-deployment-with-github-actions)
-- [Summary](#summary)
-
----
-
-## Directory Contents
-
-| File | Responsibility |
-|---|---|
-| `Dockerfile` | Defines the Docker image containing Terraform and cloud CLIs (`gcloud`, `hcloud`) for executing deployments. |
-| `Makefile` | Orchestrates the entire deployment process, providing targets like `deploy`, `clean`, and `z_destroy_all`. |
-| `redeploy.sh` | Contains the script run on the Hetzner instance to pull and restart the application Docker container. |
-| `gcs/` | Contains Terraform configuration for the GCS bucket used for remote state storage. |
-| `gar/` | Contains Terraform configuration for the Google Artifact Registry repository. |
-| `hetzner/` | Contains Terraform configuration for provisioning the Hetzner cloud server and related resources. |
-| `tests/` | Contains Bats tests for the `redeploy.sh` script. |
-
----
-
-## Quick Start: One Command Deploy
-
-1. **Create secrets file**
-
-   In the project root, create:
-
-   ```bash
-   secret/-secret.sh
-   ```
-
-   This file must contain `KEY=value` lines (bash syntax).  
-   It is **not committed** to git; only documentation templates like `readme.md` or `env.example` should be tracked.
-
-2. **Fill in required variables**
-
-   Minimum example for deployment to **HETZNER**:
-
-   ```bash
-   # Cloud provider selection: hetzner
-   CSP="hetzner"
-   SECRET_HETZNER_CLOUD_TOKEN="YOUR_HETZNER_API_TOKEN"
-
-   # Project name (used for tagging & defaults)
-   PROJECT_NAME="project_name"
-
-   # Required secrets
-   SECRET_STATE_ARCHIVE_KEY="change-me-random-string"
-   GOOGLE_SE_CREDS_PATH="secret/gcp-service-account.json"
-   SECRET_RSA_PRIVATE_KEY_PATH="secret/id_rsa"
-   SECRET_RSA_PUBLIC_KEY_PATH="secret/id_rsa.pub"
-
-   # Optional overrides (can be miss)
-   TF_VAR_PROJECT_ID="my-gcp-project-id"
-   TF_VAR_REGION="europe-central2"
-   TF_VAR_ZONE="europe-central2-a"
-   TF_VAR_BUCKET_NAME="my-terraform-state-bucket"  # must be globally unique
-   ```
-   For more detailed description of variables, see [`../secret/readme.md`](../secret/readme.md).
-
-3. **Run deploy**
-
-   From the project root:
-
-   ```bash
-   make -f Makefile.deploy deploy
-   ```
-
-   This will:
-
-   1. Load `secret/-secret.sh` and validate required variables and secret files.
-   2. Build the **application Docker image** from the root `Dockerfile` and tag it for Artifact Registry.
-   3. Build a helper image `deploy-<image-name>` from `deploy/Dockerfile` (with `terraform`, `gcloud`, and `docker`).
-   4. Run that image and execute `make -f Makefile.deploy deploy_in_container` **inside the container**.
-
-   Inside the container, `deploy_in_container` performs:
-
-   1. `lock_check` – checks for active Terraform locks in the GCS bucket.
-   2. `gcp_service` – authenticates `gcloud` using your service account JSON.
-   3. `state_storage_init` – creates the **GCS bucket** for Terraform state if it doesn’t exist yet.
-   4. `check_keys_<CSP>` – validates provider-specific secrets (Hetzner).
-   5. `gcp_docker` – configures Docker to authenticate to Artifact Registry.
-   6. `push_image` – runs `tf_init`, creates the Artifact Registry repo, and pushes the app image.
-   7. `create_<CSP>` – runs `terraform apply` for the chosen provider module (`hetzner`).
-   8. `show_state_info` – prints where the Terraform state files live in GCS.
-
-> For a regular user / developer the workflow is: **configure `secret/-secret.sh` → run `make -f Makefile.deploy deploy` → done.**
-
----
-
-## Terraform State in GCS
-
-Each Terraform module (`deploy/gcs`, `deploy/gar`, `deploy/hetzner`) contains:
-
-```hcl
-terraform {
-  backend "gcs" {}
-}
+```
+deploy/
+├── Dockerfile.deploy      # Container image for running deployments
+├── Makefile.deploy        # Main deployment orchestration (entry point)
+├── cloud-init.yml         # Server initialization script (installs k3s)
+├── redeploy.sh            # Kubernetes deployment script (runs on target server)
+├── gar/                   # Google Artifact Registry Terraform module
+├── hetzner_server_create/ # Hetzner server provisioning Terraform module
+├── k8s/                   # Kubernetes manifests (Kustomize)
+│   ├── deployment.yaml    # Pod deployment with rolling updates
+│   ├── service.yaml       # ClusterIP service
+│   ├── ingress.yaml       # Ingress routing rules
+│   └── kustomization.yaml # Kustomize configuration
+└── service_deploy/        # Service deployment Terraform module
 ```
 
-The Makefile passes backend settings during `terraform init`:
+## Responsibility Table
 
-```make
-terraform -chdir=$(TF_DIR)/$$dir init   -backend-config="bucket=$(TF_VAR_BUCKET_NAME)"   -backend-config="prefix=$$dir"
-```
+| Item | Responsibility |
+|------|----------------|
+| `Dockerfile.deploy` | Define container image with deployment tools (gcloud, terraform, hcloud) |
+| `Makefile.deploy` | Orchestrate deployment targets and manage environment variables |
+| `cloud-init.yml` | Configure server initialization script for k3s installation |
+| `redeploy.sh` | Execute Kubernetes deployment with rollout and rollback logic |
+| `gar/` | Provision Google Artifact Registry repository for Docker images |
+| `hetzner_server_create/` | Provision Hetzner Cloud server with firewall and k3s |
+| `k8s/` | Define Kubernetes manifests for application deployment |
+| `service_deploy/` | Deploy services to server via SSH provisioners |
 
-As a result, after a successful deploy your states are stored in:
+## How It Works
 
-- `gs://<bucket-name>/gar/default.tfstate` – Artifact Registry
-- `gs://<bucket-name>/hetzner/default.tfstate` – Hetzner infrastructure
+### Deployment Flow
 
-The bucket itself is managed by the `gcs` module and created automatically by `state_storage_init` (using `TF_VAR_BUCKET_NAME`, which defaults to `bucket-<repo-name>` if not set).
+1. **`make deploy`** - Builds a deployment container and runs the orchestration
+2. **Build & Push** - Docker images are built and pushed to Google Artifact Registry
+3. **Infrastructure** - Terraform provisions Hetzner server with k3s (if needed)
+4. **Service Deploy** - Kubernetes manifests are applied with rolling updates
 
-> ✅ You never manually manage `terraform.tfstate` files — they live in GCS and are shared-safe.
+### Key Features
 
----
+- **Zero-Downtime Deployments** - Rolling updates with 2 replicas ensure service availability during deployments
+- **Automatic Rollback** - Failed deployments automatically rollback to the previous working version
+- **Health Checks** - Readiness and liveness probes ensure only healthy pods receive traffic
+- **Ingress Routing** - k3s Traefik ingress handles domain-based routing
 
-## Useful Make Targets
+### Deployment Modes
 
-Although **`make -f Makefile.deploy deploy`** is the main entry point, a few other targets are helpful.
+Supported modes (set via `DEPLOYMENT_MODE`):
+- `dev` - Development environment (currently implemented)
+- `staging` - Staging environment (not required for this project)
+- `production` - Production environment (not required for this project)
 
-| Target              | What it does                                                                                  |
-|---------------------|------------------------------------------------------------------------------------------------|
-| `make -f Makefile.deploy deploy`       | Builds app image, builds Terraform Docker image, runs full deployment inside the container.   |
-| `make -f Makefile.deploy clean`        | Cleans local Docker artifacts used for build (`name:<image>` and buildx cache).              |
-| `make -f Makefile.deploy tf_init`      | Runs `terraform init` for all modules (`gar`, `hetzner`) with the GCS backend.  |
-| `make -f Makefile.deploy tf_plan`      | Runs `terraform plan` for all modules using your local Terraform CLI (if installed).         |
-| `make -f Makefile.deploy lock_check`   | Checks for active `.tflock` files in the state bucket for all modules.                        |
-| `make -f Makefile.deploy lock_unlock`  | Force-unlocks Terraform state for all modules by reading lock IDs from GCS.                   |
-| `make -f Makefile.deploy z_destroy_all`| Destroys infrastructure in all modules **from inside the Docker container** (asks for confirm). |
+> **Note:** This project uses `dev` mode only. Staging and production modes are defined for future extensibility but not implemented as separate environments are not required for this project's scope.
 
+## Environment Variables
 
-> ⚠️ `z_destroy_all` is destructive: it removes resources in `hetzner`, `gar` and delete the state bucket. 
+Core variables used by deployment scripts. See [.secret/readme.md](../.secret/readme.md) for complete configuration reference.
 
-Most users will only need:
+| Variable | Values | Description |
+|----------|--------|-------------|
+| `DEPLOYMENT_MODE` | `dev`, `staging`, `production` | Target deployment environment (only `dev` implemented) |
+| `PROJECT_NAME` | string | Service identifier, used for folder naming and Kubernetes namespace |
+| `PROJECT_DOMAIN` | domain string | Domain for ingress routing and TLS certificate |
+| `ARTIFACT_REPO_NAME` | string | Google Artifact Registry repository name, also used as Kubernetes namespace |
+| `GOOGLE_APPLICATION_REGION` | GCP region | Region for GAR and cloud resources |
+| `HOST_SERVER_IP` | IPv4 address | Target server IP (or `None` to create new) |
+| `HOST_SERVER_NAME` | string | Expected hostname for server verification |
+
+## Components
+
+### Makefile.deploy
+
+Main orchestration file that:
+- Reads secrets from `.secret/-secret.sh`
+- Validates required variables
+- Exports Terraform variables (`TF_VAR_*`)
+- Runs deployment targets in sequence
+
+Key targets:
+- `deploy` - Full deployment from host machine
+- `deployment_orchestration` - Runs inside deploy container
+- `build_image` / `push_image` - Docker image management
+- `gc_setup` - Google Cloud authentication and setup
+- `artifact_repo_create` - Creates GAR repository
+- `deploy_dev` / `deploy_staging` / `deploy_production` - Mode-specific deployment
+
+### Dockerfile.deploy
+
+Container with deployment tools:
+- Google Cloud SDK
+- [Terraform 1.14.4](https://releases.hashicorp.com/terraform/1.14.4/)
+- Hetzner CLI (hcloud)
+- Docker CLI
+- Make, jq, curl
+
+### cloud-init.yml
+
+Server initialization script that runs on first boot:
+- Configures SSH (key-only auth)
+- Installs **k3s** (lightweight Kubernetes)
+- Configures registry authentication for Google Artifact Registry
+- Sets up KUBECONFIG for kubectl access
+
+### Terraform Modules
+
+#### gar/
+Creates Google Artifact Registry repository for Docker images.
+
+#### hetzner_server_create/
+Provisions Hetzner Cloud server with:
+- Firewall rules (SSH, HTTP, HTTPS)
+- Static IPv4 address
+- SSH key for access
+- Cloud-init for k3s installation
+
+#### service_deploy/
+Deploys services to the server:
+- Copies `redeploy.sh` and Kubernetes manifests
+- Generates environment secrets from variables
+- Runs `redeploy.sh` to apply Kubernetes resources
+
+### k8s/
+
+Kubernetes manifests managed via Kustomize:
+- **deployment.yaml** - Defines pod replicas, container specs, health probes
+- **service.yaml** - ClusterIP service for internal routing
+- **ingress.yaml** - Domain-based routing via Traefik ingress
+- **kustomization.yaml** - Kustomize configuration for resource aggregation
+
+### redeploy.sh
+
+Runs on the target server to:
+- Create Kubernetes namespace (if needed)
+- Apply secrets from environment file
+- Deploy Kubernetes manifests via `kubectl apply -k`
+- Wait for rollout completion with timeout
+- **Automatic rollback** on deployment failure
+
+## Rollback Procedures
+
+### Automatic Rollback
+
+Triggered automatically if deployment fails health checks within 120s. The `redeploy.sh` script detects rollout failure and executes `kubectl rollout undo` to restore the previous working version.
+
+### Manual Rollback
 
 ```bash
-make -f Makefile.deploy deploy         # create/update infrastructure
-make -f Makefile.deploy z_destroy_all  # tear everything down (if really needed)
-make -f Makefile.deploy clean     # cleans local Docker artifacts used for build (if really needed)
+# SSH to server
+ssh root@${HOST_SERVER_IP}
+
+# Check current revision history
+kubectl rollout history deployment/app -n ${ARTIFACT_REPO_NAME}
+
+# Rollback to previous version
+kubectl rollout undo deployment/app -n ${ARTIFACT_REPO_NAME}
+
+# Verify rollback completed
+kubectl rollout status deployment/app -n ${ARTIFACT_REPO_NAME} --timeout=120s
+
+# Check pod health
+kubectl get pods -n ${ARTIFACT_REPO_NAME} -l app=app
 ```
 
----
+## Required Secrets
 
-## Terraform Module Layout
+Create `.secret/-secret.sh` with:
 
-Each cloud provider (and shared resources) lives under `deploy/`:
+```bash
+# Required
+GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
+GOOGLE_APPLICATION_PROJECT_ID="your-gcp-project"
+SSH_PRIVATE_KEY_PATH="path/to/id_rsa"
+SSH_PUBLIC_KEY_PATH="path/to/id_rsa.pub"
+HOST_SERVER_NAME="server-hostname"
+PROJECT_NAME="project_name"
+PROJECT_DOMAIN="example.com"
+DEPLOYMENT_MODE="dev"
+GOOGLE_ENCRYPTION_KEY="terraform-state-encryption-key"
 
-- `deploy/gcs/` – GCS bucket for Terraform remote state.
-- `deploy/gar/` – Google Artifact Registry repository for Docker images.
-- `deploy/hetzner/` – Hetzner instance + deploy logic.
+# Optional
+GOOGLE_APPLICATION_REGION="europe-central2"
+HOST_SERVER_IP="None"  # Set to IP after first deploy, or "None" to create new server
+HOST_SERVER_LOCATION="hel1"
+HOST_SERVER_IMAGE="ubuntu-24.04"
+HOST_SERVER_TYPE="cx22"
+HETZNER_CLOUD_TOKEN="your-hetzner-token"
+```
 
-You normally **do not run Terraform directly** inside these directories — the Makefile handles:
+## Terraform State
 
-- backend initialization,
-- passing variables,
-- authentication,
-- and running `apply` / `destroy` in the correct order inside the Docker container.
+Remote state (Google Cloud Storage) is used **only by `gar/`** module:
+- Bucket: `bucket-{project-name}`
+- States are encrypted with `GOOGLE_ENCRYPTION_KEY`
+- Prefix: `{mode}/gar/`
 
----
+The other two modules **intentionally do not persist tfstate**:
 
-## Testing the Redeploy Script
+| Module | Reason |
+|--------|--------|
+| `hetzner_server_create/` | Runs once to create the server. The server IP is saved in `HOST_SERVER_IP`, so re-apply is never needed |
+| `service_deploy/` | Acts as an orchestration script, not traditional Terraform. Resources are recreated on every run (`triggers_replace = timestamp()`), so previous state is irrelevant |
 
-The instance-side deployment logic (the `redeploy.sh` script) can be tested with [Bats](https://github.com/bats-core/bats-core).
+See individual module readmes for details.
 
-1. Install Bats:
+## Usage
 
-   ```bash
-   sudo apt-get update && sudo apt-get install -y bats
-   ```
+```bash
+# Full deployment
+make -f deploy/Makefile.deploy deploy
 
-2. Run tests:
+# View configured variables
+make -f deploy/Makefile.deploy all
 
-   ```bash
-   cd deploy
-   bats tests/redeploy.bats
-   ```
-
----
-
-## CI/CD Deployment with GitHub Actions
-
-The same `make -f Makefile.deploy deploy` flow can be executed automatically in CI using **GitHub Actions**. The repository contains a `Deploy CI` workflow that recreates `secret/-secret.sh` from repository secrets and then runs `make -f Makefile.deploy deploy`.
-
-### 1. Configure repository secrets
-
-In the GitHub repository:
-
-1. Open **Settings → Secrets and variables → Actions**.
-2. Create the following **repository secrets** (names must match exactly):
-
-| Secret name                    | Purpose / example value                                                                                           |
-|--------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| `CSP`                          | Cloud provider selector, `hetzner` available |
-| `PROJECT_NAME`                 | Logical project name used for tagging and resource naming (for example `my-project`).                             |
-| `SECRET_GCP_CREDENTIALS`       | Contents of the Google Cloud service account key in JSON format; used by `google-github-actions/auth`. Must be decoded to base64 format `base64 -w 0 service-account.json`  |
-| `GOOGLE_SE_CREDS_PATH`         | Path where the service account JSON will be written during the workflow (for example `secret/gcp-service-account.json`). |
-| `SECRET_STATE_ARCHIVE_KEY`     | Encryption key / passphrase used by the deploy scripts for the state/archive.                                     |
-| `SECRET_RSA_PRIVATE_KEY`       | RSA private key used by Terraform / deploy scripts (for example SSH key for VMs).                                 |
-| `SECRET_RSA_PRIVATE_KEY_PATH`  | Path where the private key file will be created (for example `secret/id_rsa`).                                   |
-| `SECRET_RSA_PUBLIC_KEY`        | Matching RSA public key.                                                                                           |
-| `SECRET_RSA_PUBLIC_KEY_PATH`   | Path where the public key file will be created (for example `secret/id_rsa.pub`).                                |
-| `SECRET_HETZNER_CLOUD_TOKEN`   | API token for Hetzner Cloud (required when `CSP=hetzner`).                                                        |
-| `TF_VAR_PROJECT_ID`            | Project id for deployed resources |
-| `DATABASE_URL`                 | SQLite connection string for pilot mode   |
-| `JWT_SECRET`                   | JWT secret key for signing access and refresh tokens   |
-| `IRON_SECRETS_MASTER_KEY`      | Master key for AES-256-GCM encryption of AI provider API keys   |
-| `OPENAI_API_KEY`               | OPENAI API key for accessing GPT, DALL·E, etc.   |
-| `APOLLO_API_KEY`               | Apollo Studio API key for GraphQL schema publishing and analytics   |
-
-These secrets are written into `secret/-secret.sh` and into key files by the workflow so that `make -f Makefile.deploy deploy` sees the same configuration as in local runs.
-
-### 2. Deploy from CI
-
-The deploy workflow:
-
-- Triggers on pushes to the `master` and `feat/hosting` branches, and can also be started manually via **Actions → Deploy CI → Run workflow**.
-- Authenticates to GCP using `SECRET_GCP_CREDENTIALS`.
-- Creates `secret/-secret.sh` and the key files from the repository secrets.
-- Runs `make -f Makefile.deploy deploy`, which builds the image, pushes it, and applies Terraform.
-
-Once the secrets above are configured, no additional manual steps are required: pushing to the configured branches will automatically run the same deployment pipeline that you can run locally.
-
----
-
-## Summary
-
-- Configure everything in **`secret/-secret.sh`**.
-- Use a **single command**: `make -f Makefile.deploy deploy`.
-- Terraform always runs in a **Docker container** built from `deploy/Dockerfile`.
-- Terraform state is stored **automatically in GCS** via the `gcs` backend.
-- The same flow works locally and in CI, and supports **Hetzner** from one place.
+# Show state storage info
+make -f deploy/Makefile.deploy show_state_info
+```

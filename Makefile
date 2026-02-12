@@ -252,3 +252,12 @@ docker-logs-frontend: ## View frontend nginx logs only
 
 docker-ps: ## Show status of Control Panel services
 	docker compose ps
+
+# =====================================================================================================
+# Deployment
+
+## Deploys using tools from the container
+.PHONY: deploy
+deploy:
+	@echo "[START] Redirect to <./deployment/Makefile.deploy>"
+	@$(MAKE) --no-print-directory -f ./deploy/Makefile.deploy deploy

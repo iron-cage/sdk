@@ -6,7 +6,8 @@ on:
 
 jobs:
   deploy-tests:
-    runs-on: iron_cage_sdk
+    name: Run deploy/tests/redeploy.sh
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
 
     steps:
     - name: Checkout code
@@ -14,15 +15,27 @@ jobs:
 
     - name: Set up Bats testing framework
       run: |
-        sudo apt-get update
-        sudo apt-get install -y bats
+        if ! command -v bats >/dev/null 2>&1; then
+          sudo apt-get update
+          sudo apt-get install -y bats
+        fi
+
+    - name: Install k3s (cluster for tests)
+      run: |
+        if ! command -v kubectl >/dev/null 2>&1; then
+          curl -sfL https://get.k3s.io | sudo sh -
+        fi
+        sudo chmod 644 /etc/rancher/k3s/k3s.yaml || true
+        echo "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> $GITHUB_ENV
+        kubectl get nodes
 
     - name: Run Bats tests
       run: |
         bats deploy/tests/redeploy.bats
 
   terraform-validate-gar:
-    runs-on: iron_cage_sdk
+    name: Validate deploy/gar
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
 
     defaults:
       run:
@@ -38,35 +51,58 @@ jobs:
           --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}:/workspace \
           -w /workspace/deploy/gar \
-          hashicorp/terraform:1.7.4 \
+          hashicorp/terraform:1.14.4 \
           init -backend=false -input=false
 
         docker run --rm \
           --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}:/workspace \
           -w /workspace/deploy/gar \
-          hashicorp/terraform:1.7.4 \
+          hashicorp/terraform:1.14.4 \
           validate
 
   terraform-validate-hetzner:
-    name: Validate deploy/hetzner
-    runs-on: iron_cage_sdk
+    name: Validate deploy/hetzner_server_create
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Run Terraform validate in Docker
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/hetzner \
-            hashicorp/terraform:1.7.4 \
-            init -backend=false -input=false
+    - name: Run Terraform validate in Docker
+      run: |
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace/deploy/hetzner_server_create \
+          hashicorp/terraform:1.14.4 \
+          init -backend=false -input=false
 
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/hetzner \
-            hashicorp/terraform:1.7.4 \
-            validate
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace/deploy/hetzner_server_create \
+          hashicorp/terraform:1.14.4 \
+          validate
+
+  terraform-validate-service-deploy:
+    name: Validate deploy/service_deploy
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Terraform validate in Docker
+      run: |
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace/deploy/service_deploy \
+          hashicorp/terraform:1.14.4 \
+          init -backend=false -input=false
+
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace/deploy/service_deploy \
+          hashicorp/terraform:1.14.4 \
+          validate
