@@ -78,7 +78,7 @@ pub async fn list_agents(
     let mut agents = if user.0.role == "admin" {
         // Admin sees all agents
         sqlx::query_as::<_, Agent>(
-            r#"
+            r"
             SELECT
                 id,
                 name,
@@ -88,7 +88,7 @@ pub async fn list_agents(
                 provider_key_id
             FROM agents
             ORDER BY created_at DESC
-            "#
+            "
         )
         .fetch_all(&pool)
         .await
@@ -101,7 +101,7 @@ pub async fn list_agents(
     } else {
         // Regular users only see agents they own
         sqlx::query_as::<_, Agent>(
-            r#"
+            r"
             SELECT
                 id,
                 name,
@@ -112,7 +112,7 @@ pub async fn list_agents(
             FROM agents
             WHERE owner_id = ?
             ORDER BY created_at DESC
-            "#
+            "
         )
         .bind(&user.0.sub)
         .fetch_all(&pool)
@@ -142,7 +142,7 @@ pub async fn get_agent(
     user: AuthenticatedUser,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
     let mut agent = sqlx::query_as::<_, Agent>(
-        r#"
+        r"
         SELECT
             id,
             name,
@@ -152,7 +152,7 @@ pub async fn get_agent(
             provider_key_id
         FROM agents
         WHERE id = ?
-        "#
+        "
     )
     .bind(id)
     .fetch_optional(&pool)
@@ -204,7 +204,7 @@ pub async fn create_agent(
 
     // Validate provider key exists and fetch provider name
     let provider_row = sqlx::query(
-        r#"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1"#
+        r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1"
     )
     .bind(req.provider_key_id)
     .fetch_optional(&pool)
@@ -273,10 +273,10 @@ pub async fn create_agent(
     };
 
     let result = sqlx::query(
-        r#"
+        r"
         INSERT INTO agents (name, providers, created_at, owner_id, provider_key_id)
         VALUES (?, ?, ?, ?, ?)
-        "#
+        "
     )
     .bind(&req.name)
     .bind(&providers_json)
@@ -296,11 +296,11 @@ pub async fn create_agent(
 
     // Create required initial agent budget
     sqlx::query(
-        r#"
+        r"
         INSERT INTO agent_budgets
           (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
         VALUES (?, ?, 0, ?, ?, ?)
-        "#
+        "
     )
     .bind(agent_id)
     .bind(req.initial_budget_microdollars)
@@ -399,7 +399,7 @@ pub async fn update_agent(
     if let Some(provider_key_id_opt) = req.provider_key_id {
         if let Some(key_id) = provider_key_id_opt {
             let provider_row = sqlx::query(
-                r#"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1"#
+                r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1"
             )
             .bind(key_id)
             .fetch_optional(&pool)
@@ -500,7 +500,7 @@ pub async fn update_agent(
 
     // Fetch updated agent
     let mut agent = sqlx::query_as::<_, Agent>(
-        r#"
+        r"
         SELECT
             id,
             name,
@@ -510,7 +510,7 @@ pub async fn update_agent(
             provider_key_id
         FROM agents
         WHERE id = ?
-        "#
+        "
     )
     .bind(id)
     .fetch_one(&pool)
@@ -620,7 +620,7 @@ pub async fn update_agent_budget(
 
     // Upsert budget row
     sqlx::query(
-        r#"
+        r"
         INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(agent_id) DO UPDATE SET
@@ -628,7 +628,7 @@ pub async fn update_agent_budget(
           total_spent = agent_budgets.total_spent,
           budget_remaining = excluded.total_allocated - agent_budgets.total_spent,
           updated_at = excluded.updated_at
-        "#
+        "
     )
     .bind(id)
     .bind(req.total_allocated_microdollars)
@@ -697,7 +697,7 @@ pub async fn get_agent_tokens(
     let rows = if user.0.role == "admin" {
         // Admin sees all tokens for this agent
         sqlx::query(
-            r#"
+            r"
             SELECT 
                 id,
                 user_id,
@@ -709,7 +709,7 @@ pub async fn get_agent_tokens(
             FROM api_tokens
             WHERE agent_id = ?
             ORDER BY created_at DESC
-            "#
+            "
         )
         .bind(id)
         .fetch_all(&pool)
@@ -723,7 +723,7 @@ pub async fn get_agent_tokens(
     } else {
         // Regular users only see their own tokens for this agent
         sqlx::query(
-            r#"
+            r"
             SELECT 
                 id,
                 user_id,
@@ -735,7 +735,7 @@ pub async fn get_agent_tokens(
             FROM api_tokens
             WHERE agent_id = ? AND user_id = ?
             ORDER BY created_at DESC
-            "#
+            "
         )
         .bind(id)
         .bind(&user.0.sub)

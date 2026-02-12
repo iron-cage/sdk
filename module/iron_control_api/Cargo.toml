@@ -10,6 +10,9 @@ readme = "readme.md"
 keywords = ["api", "rest", "control-plane", "agent-management"]
 categories = ["web-programming::http-server"]
 
+[lints]
+workspace = true
+
 [features]
 default = ["enabled"]
 enabled = [

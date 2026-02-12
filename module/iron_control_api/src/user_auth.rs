@@ -67,11 +67,11 @@ pub async fn get_user_by_email(
 ) -> Result< Option< User >, sqlx::Error >
 {
   let user = sqlx::query_as::<_, User>(
-    r#"
+    r"
     SELECT id, email, username, password_hash, role, name, is_active
     FROM users
     WHERE email = ? AND is_active = 1
-    "#
+    "
   )
   .bind( email )
   .fetch_optional( pool )
@@ -102,11 +102,11 @@ pub async fn get_user_by_id(
 ) -> Result< Option< User >, sqlx::Error >
 {
   let user = sqlx::query_as::<_, User>(
-    r#"
+    r"
     SELECT id, username, password_hash, role, email, name, is_active
     FROM users
     WHERE id = ?
-    "#
+    "
   )
   .bind( id )
   .fetch_optional( pool )
@@ -181,9 +181,9 @@ pub async fn add_token_to_blacklist(
   let expires_at = expires_at.timestamp();
 
   sqlx::query(
-    r#"
+    r"
     INSERT INTO token_blacklist (jti, user_id, blacklisted_at, expires_at) VALUES (?, ?, ?, ?)
-    "#
+    "
   )
   .bind( token )
   .bind( user_id )
@@ -217,9 +217,9 @@ pub async fn get_blacklisted_token(
 ) -> Result< Option< BlacklistedToken >, sqlx::Error >
 {
   let blacklisted = sqlx::query_as(
-    r#"
+    r"
     SELECT jti, user_id, blacklisted_at, expires_at FROM token_blacklist WHERE jti = ?
-    "#
+    "
   )
   .bind( token )
   .fetch_optional( pool )

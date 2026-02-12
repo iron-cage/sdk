@@ -4,16 +4,17 @@
 //! - GET /api/v1/analytics/budget/status
 
 use axum::{
-  extract::{ Query, State },
+  extract::{Query, State},
   http::StatusCode,
-  response::{ IntoResponse, Json },
+  response::{IntoResponse, Json},
 };
 use chrono::Utc;
-use crate::jwt_auth::AuthenticatedUser;
+
 use super::shared::{
-  BudgetStatusQuery, AnalyticsState, AgentBudgetRow,
-  BudgetStatusResponse, BudgetStatus, BudgetSummary, Pagination,
+  AgentBudgetRow, AnalyticsState, BudgetStatus, BudgetStatusQuery, BudgetStatusResponse,
+  BudgetSummary, Pagination,
 };
+use crate::jwt_auth::AuthenticatedUser;
 
 /// GET /api/v1/analytics/budget/status
 ///
@@ -21,16 +22,15 @@ use super::shared::{
 /// Admins see all agents; regular users see only their owned agents.
 pub async fn get_budget_status(
   user: AuthenticatedUser,
-  State( state ): State< AnalyticsState >,
-  Query( params ): Query< BudgetStatusQuery >,
-) -> impl IntoResponse
-{
-  let offset = ( params.page - 1 ) * params.per_page;
+  State(state): State<AnalyticsState>,
+  Query(params): Query<BudgetStatusQuery>,
+) -> impl IntoResponse {
+  let offset = (params.page - 1) * params.per_page;
   let is_admin = user.0.role == "admin";
 
   // Query budget status from agent_budgets table
   let mut query = String::from(
-    r#"SELECT
+    r"SELECT
          a.id as agent_id,
          a.name as agent_name,
          COALESCE(ab.total_allocated, 0.0) as total_allocated,
@@ -38,56 +38,50 @@ pub async fn get_budget_status(
          COALESCE(ab.budget_remaining, 0.0) as budget_remaining
        FROM agents a
        LEFT JOIN agent_budgets ab ON a.id = ab.agent_id
-       WHERE 1=1"#
+       WHERE 1=1",
   );
 
   // Filter by owner for non-admins
-  if !is_admin
-  {
-    query.push_str( " AND a.owner_id = ?" );
+  if !is_admin {
+    query.push_str(" AND a.owner_id = ?");
   }
 
-  if params.agent_id.is_some()
-  {
-    query.push_str( " AND a.id = ?" );
+  if params.agent_id.is_some() {
+    query.push_str(" AND a.id = ?");
   }
 
-  query.push_str( " ORDER BY total_spent DESC LIMIT ? OFFSET ?" );
+  query.push_str(" ORDER BY total_spent DESC LIMIT ? OFFSET ?");
 
-  let mut q = sqlx::query_as::< _, AgentBudgetRow >( &query );
+  let mut q = sqlx::query_as::<_, AgentBudgetRow>(&query);
 
   // Bind owner_id for non-admins
-  if !is_admin
-  {
-    q = q.bind( &user.0.sub );
+  if !is_admin {
+    q = q.bind(&user.0.sub);
   }
 
-  if let Some( agent_id ) = params.agent_id
-  {
-    q = q.bind( agent_id );
+  if let Some(agent_id) = params.agent_id {
+    q = q.bind(agent_id);
   }
-  q = q.bind( params.per_page as i64 ).bind( offset as i64 );
+  q = q.bind(params.per_page as i64).bind(offset as i64);
 
-  let rows = q.fetch_all( &state.pool ).await;
+  let rows = q.fetch_all(&state.pool).await;
 
   // Query total count (filtered by owner for non-admins)
   let total_count: i64 = if is_admin {
-    sqlx::query_scalar( "SELECT COUNT(*) FROM agents" )
-      .fetch_one( &state.pool )
+    sqlx::query_scalar("SELECT COUNT(*) FROM agents")
+      .fetch_one(&state.pool)
       .await
-      .unwrap_or( 0 )
+      .unwrap_or(0)
   } else {
-    sqlx::query_scalar( "SELECT COUNT(*) FROM agents WHERE owner_id = ?" )
-      .bind( &user.0.sub )
-      .fetch_one( &state.pool )
+    sqlx::query_scalar("SELECT COUNT(*) FROM agents WHERE owner_id = ?")
+      .bind(&user.0.sub)
+      .fetch_one(&state.pool)
       .await
-      .unwrap_or( 0 )
+      .unwrap_or(0)
   };
 
-  match rows
-  {
-    Ok( rows ) =>
-    {
+  match rows {
+    Ok(rows) => {
       let mut summary = BudgetSummary {
         total_agents: rows.len() as u32,
         active: 0,
@@ -98,95 +92,93 @@ pub async fn get_budget_status(
         low: 0,
       };
 
-      let mut data: Vec< BudgetStatus > = rows.iter().filter_map( |row| {
-        let total_allocated_f = row.total_allocated as f64;
-        let total_spent_f = row.total_spent as f64;
-        let percent_used = if row.total_allocated > 0
-        {
-          ( total_spent_f / total_allocated_f ) * 100.0
-        }
-        else
-        {
-          0.0
-        };
+      let mut data: Vec<BudgetStatus> = rows
+        .iter()
+        .filter_map(|row| {
+          let total_allocated_f = row.total_allocated as f64;
+          let total_spent_f = row.total_spent as f64;
+          let percent_used = if row.total_allocated > 0 {
+            (total_spent_f / total_allocated_f) * 100.0
+          } else {
+            0.0
+          };
 
-        // Apply threshold filter
-        if let Some( threshold ) = params.threshold
-        {
-          if percent_used <= threshold as f64
-          {
-            return None;
+          // Apply threshold filter
+          if let Some(threshold) = params.threshold {
+            if percent_used <= threshold as f64 {
+              return None;
+            }
           }
-        }
 
-        let ( status, risk_level ) = if percent_used >= 100.0
-        {
-          summary.exhausted += 1;
-          ( "exhausted", "exhausted" )
-        }
-        else if percent_used >= 95.0
-        {
-          summary.critical += 1;
-          summary.active += 1;
-          ( "active", "critical" )
-        }
-        else if percent_used >= 80.0
-        {
-          summary.high += 1;
-          summary.active += 1;
-          ( "active", "high" )
-        }
-        else if percent_used >= 50.0
-        {
-          summary.medium += 1;
-          summary.active += 1;
-          ( "active", "medium" )
-        }
-        else
-        {
-          summary.low += 1;
-          summary.active += 1;
-          ( "active", "low" )
-        };
+          let (status, risk_level) = if percent_used >= 100.0 {
+            summary.exhausted += 1;
+            ("exhausted", "exhausted")
+          } else if percent_used >= 95.0 {
+            summary.critical += 1;
+            summary.active += 1;
+            ("active", "critical")
+          } else if percent_used >= 80.0 {
+            summary.high += 1;
+            summary.active += 1;
+            ("active", "high")
+          } else if percent_used >= 50.0 {
+            summary.medium += 1;
+            summary.active += 1;
+            ("active", "medium")
+          } else {
+            summary.low += 1;
+            summary.active += 1;
+            ("active", "low")
+          };
 
-        // Apply status filter
-        if let Some( ref status_filter ) = params.status
-        {
-          if status != status_filter
-          {
-            return None;
+          // Apply status filter
+          if let Some(ref status_filter) = params.status {
+            if status != status_filter {
+              return None;
+            }
           }
-        }
 
-        Some( BudgetStatus {
-          agent_id: row.agent_id,
-          agent_name: row.agent_name.clone(),
-          budget: row.total_allocated as f64,
-          spent: row.total_spent as f64,
-          remaining: row.budget_remaining as f64,
-          percent_used,
-          status: status.to_string(),
-          risk_level: risk_level.to_string(),
+          Some(BudgetStatus {
+            agent_id: row.agent_id,
+            agent_name: row.agent_name.clone(),
+            budget: row.total_allocated as f64,
+            spent: row.total_spent as f64,
+            remaining: row.budget_remaining as f64,
+            percent_used,
+            status: status.to_string(),
+            risk_level: risk_level.to_string(),
+          })
         })
-      }).collect();
+        .collect();
 
       // Sort by percent_used descending
-      data.sort_by( |a, b| b.percent_used.partial_cmp( &a.percent_used ).unwrap_or( std::cmp::Ordering::Equal ) );
+      data.sort_by(|a, b| {
+        b.percent_used
+          .partial_cmp(&a.percent_used)
+          .unwrap_or(std::cmp::Ordering::Equal)
+      });
 
-      ( StatusCode::OK, Json( BudgetStatusResponse {
-        data,
-        summary,
-        pagination: Pagination::new( params.page, params.per_page, total_count as u32 ),
-        calculated_at: Utc::now().to_rfc3339(),
-      }) ).into_response()
+      (
+        StatusCode::OK,
+        Json(BudgetStatusResponse {
+          data,
+          summary,
+          pagination: Pagination::new(params.page, params.per_page, total_count as u32),
+          calculated_at: Utc::now().to_rfc3339(),
+        }),
+      )
+        .into_response()
     }
-    Err( e ) =>
-    {
-      tracing::error!( "Failed to query budget status: {}", e );
-      ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "DATABASE_ERROR",
-        "message": "Failed to query budget status"
-      }) ) ).into_response()
+    Err(e) => {
+      tracing::error!("Failed to query budget status: {}", e);
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "DATABASE_ERROR",
+          "message": "Failed to query budget status"
+        })),
+      )
+        .into_response()
     }
   }
 }

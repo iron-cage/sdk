@@ -3,6 +3,7 @@
 //! Handles POST /api/v1/analytics/events for receiving analytics events from LlmRouter.
 //! Validates IC tokens to authenticate agent identity and prevents event duplication.
 
+use crate::ic_token;
 use axum::{
   extract::{ Query, State },
   http::StatusCode,
