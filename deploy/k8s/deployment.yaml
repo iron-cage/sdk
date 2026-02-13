@@ -1,7 +1,10 @@
+# =========================
+# Frontend Deployment
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app
+  name: frontend
 spec:
   replicas: 2
 
@@ -13,19 +16,19 @@ spec:
 
   selector:
     matchLabels:
-      app: app
+      app: frontend
 
   template:
     metadata:
       labels:
-        app: app
+        app: frontend
 
     spec:
       imagePullSecrets:
         - name: gar-auth
 
       containers:
-        - name: app
+        - name: frontend
           image: ${tag}_front:${version}
           imagePullPolicy: Always
           envFrom:
@@ -59,13 +62,96 @@ spec:
 
 ---
 
-# PDB 
-apiVersion: policy/v1
-kind: PodDisruptionBudget
+# =========================
+# Backend Deployment
+
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: app-pdb
+  name: backend
 spec:
-  minAvailable: 1
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
   selector:
     matchLabels:
-      app: app
+      app: backend
+
+  template:
+    metadata:
+      labels:
+        app: backend
+
+    spec:
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command:
+            - sh
+            - -c
+            - mkdir -p /data && chown -R 1000:1000 /data
+          volumeMounts:
+            - name: sqlite
+              mountPath: /data
+
+      imagePullSecrets:
+        - name: gar-auth
+
+      containers:
+        - name: backend
+          image: ${tag}_back:${version}
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: app-env
+
+          ports:
+            - containerPort: ${port_back}
+
+          volumeMounts:
+            - name: sqlite
+              mountPath: /data
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: ${port_back}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: ${port_back}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+      volumes:
+        - name: sqlite
+          persistentVolumeClaim:
+            claimName: sqlite-pvc
+
+---
+
+# =========================
+# SQLite PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sqlite-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

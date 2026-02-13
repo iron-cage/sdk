@@ -61,6 +61,16 @@ variable "PROJECT_CERT_EMAIL" {
   }
 }
 
+variable "SERVER_PORT" {
+  description = "Port for backend container"
+  type        = number
+
+  validation {
+    condition     = var.SERVER_PORT >= 3000 && var.SERVER_PORT <= 65535
+    error_message = "SERVER_PORT must be between 3000 and 65535."
+  }
+}
+
 # =================================================================================================
 # Host
 
