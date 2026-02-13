@@ -16,6 +16,17 @@ pub struct TokenState
   pub generator: Arc< TokenGenerator >,
 }
 
+impl core::fmt::Debug for TokenState
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "TokenState" )
+      .field( "storage", &"<TokenStorage>" )
+      .field( "generator", &"<TokenGenerator>" )
+      .finish()
+  }
+}
+
 impl TokenState
 {
   /// Create new token state

@@ -31,6 +31,24 @@ pub struct BudgetState
   pub crypto_service: Option< Arc< CryptoService > >,
 }
 
+impl core::fmt::Debug for BudgetState
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "BudgetState" )
+      .field( "ic_token_manager", &"<IcTokenManager>" )
+      .field( "ip_token_crypto", &"<IpTokenCrypto>" )
+      .field( "lease_manager", &"<LeaseManager>" )
+      .field( "agent_budget_manager", &"<AgentBudgetManager>" )
+      .field( "provider_key_storage", &"<ProviderKeyStorage>" )
+      .field( "provider_key_crypto", &"<CryptoService>" )
+      .field( "db_pool", &"<SqlitePool>" )
+      .field( "jwt_secret", &"<JwtSecret>" )
+      .field( "crypto_service", &self.crypto_service.as_ref().map( |_| "<CryptoService>" ) )
+      .finish()
+  }
+}
+
 /// Enable `AuthState` extraction from `BudgetState`
 impl FromRef< BudgetState > for AuthState
 {

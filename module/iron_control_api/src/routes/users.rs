@@ -39,6 +39,17 @@ pub struct UserManagementState
   pub permission_checker: Arc< PermissionChecker >,
 }
 
+impl core::fmt::Debug for UserManagementState
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "UserManagementState" )
+      .field( "db_pool", &"<SqlitePool>" )
+      .field( "permission_checker", &"<PermissionChecker>" )
+      .finish()
+  }
+}
+
 impl UserManagementState
 {
   pub fn new( db_pool: Pool< Sqlite >, permission_checker: Arc< PermissionChecker > ) -> Self

@@ -38,9 +38,9 @@ pub struct IpTokenCrypto
   cipher : Aes256Gcm,
 }
 
-impl std::fmt::Debug for IpTokenCrypto
+impl core::fmt::Debug for IpTokenCrypto
 {
-  fn fmt( &self, f : &mut std::fmt::Formatter< '_ > ) -> std::fmt::Result
+  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
     f.debug_struct( "IpTokenCrypto" )
       .field( "cipher", &"<redacted>" )

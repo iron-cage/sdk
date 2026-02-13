@@ -26,6 +26,16 @@ pub struct LimitsState
   pub enforcer: Arc< LimitEnforcer >,
 }
 
+impl core::fmt::Debug for LimitsState
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "LimitsState" )
+      .field( "enforcer", &"<LimitEnforcer>" )
+      .finish()
+  }
+}
+
 impl LimitsState
 {
   /// Create new limits state

@@ -17,7 +17,7 @@ use serde::Serialize;
 ///
 /// All API errors return this structure to ensure consistent error handling
 /// in frontend applications.
-#[ derive( Serialize ) ]
+#[ derive( Debug, Serialize ) ]
 pub struct ErrorResponse
 {
   pub error: String,
@@ -94,6 +94,7 @@ impl IntoResponse for ErrorResponse
 /// **Pitfall:**
 /// Axum's built-in extractors have default rejection responses. Always wrap extractors
 /// or implement custom rejection handling for consistent API error responses.
+#[ derive( Debug ) ]
 pub struct JsonPath< T >( pub T );
 
 #[ async_trait::async_trait ]
@@ -153,6 +154,7 @@ where
 /// **Pitfall:**
 /// Axum returns 422 for JSON parsing errors by default. For consistent client error handling,
 /// wrap JSON extractors to return 400 instead.
+#[ derive( Debug ) ]
 pub struct JsonBody< T >( pub T );
 
 #[ async_trait::async_trait ]

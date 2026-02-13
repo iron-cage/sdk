@@ -16,6 +16,16 @@ pub struct AuthState {
   pub rate_limiting_enabled: bool,
 }
 
+impl core::fmt::Debug for AuthState {
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result {
+    f.debug_struct( "AuthState" )
+      .field( "jwt_secret", &"<JwtSecret>" )
+      .field( "db_pool", &"<SqlitePool>" )
+      .field( "rate_limiting_enabled", &self.rate_limiting_enabled )
+      .finish()
+  }
+}
+
 impl AuthState {
   /// Create new auth state
   ///

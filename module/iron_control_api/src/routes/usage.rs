@@ -96,6 +96,16 @@ pub struct UsageState
   pub tracker: Arc< UsageTracker >,
 }
 
+impl core::fmt::Debug for UsageState
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "UsageState" )
+      .field( "tracker", &"<UsageTracker>" )
+      .finish()
+  }
+}
+
 impl UsageState
 {
   /// Create new usage state

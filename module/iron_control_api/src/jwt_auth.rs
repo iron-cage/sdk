@@ -54,6 +54,16 @@ pub struct JwtSecret
   secret: String,
 }
 
+impl core::fmt::Debug for JwtSecret
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "JwtSecret" )
+      .field( "secret", &"<redacted>" )
+      .finish()
+  }
+}
+
 impl JwtSecret
 {
   /// Create new JWT secret manager
@@ -246,6 +256,7 @@ impl JwtSecret
 /// - Invalid signatures are rejected (HMAC-SHA256 verification)
 /// - Missing `Authorization` header returns 401 Unauthorized
 /// - Malformed headers (not "Bearer <token>") return 401 Unauthorized
+#[ derive( Debug ) ]
 pub struct AuthenticatedUser( pub AccessTokenClaims );
 
 #[ axum::async_trait ]

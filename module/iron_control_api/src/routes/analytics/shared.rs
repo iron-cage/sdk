@@ -461,7 +461,7 @@ pub struct AnalyticsEventWithAgent
 // ============================================================================
 
 /// Analytics state containing database pool and IC token manager
-#[derive( Clone )]
+#[derive( Debug, Clone )]
 pub struct AnalyticsState
 {
   pub pool: SqlitePool,

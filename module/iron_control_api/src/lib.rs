@@ -231,11 +231,32 @@ mod implementation
     pub state_manager: Arc<iron_runtime_state::StateManager>,
   }
 
+  impl core::fmt::Debug for ApiState
+  {
+    fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+    {
+      f.debug_struct( "ApiState" )
+        .field( "state_manager", &"<StateManager>" )
+        .finish()
+    }
+  }
+
   /// API server
   pub struct ApiServer
   {
     state: ApiState,
     addr: SocketAddr,
+  }
+
+  impl core::fmt::Debug for ApiServer
+  {
+    fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+    {
+      f.debug_struct( "ApiServer" )
+        .field( "state", &self.state )
+        .field( "addr", &self.addr )
+        .finish()
+    }
   }
 
   impl ApiServer

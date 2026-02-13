@@ -31,7 +31,7 @@ use crate::ic_token::{IcTokenClaims, IcTokenManager};
 use crate::jwt_auth::AuthenticatedUser;
 
 /// IC Token route state
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct IcTokenState {
     pub pool: SqlitePool,
     pub ic_token_manager: Arc<IcTokenManager>,

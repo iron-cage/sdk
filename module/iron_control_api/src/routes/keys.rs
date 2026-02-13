@@ -32,9 +32,9 @@ pub struct KeysState
   pub rate_limiter: RateLimiter,
 }
 
-impl std::fmt::Debug for KeysState
+impl core::fmt::Debug for KeysState
 {
-  fn fmt( &self, f: &mut std::fmt::Formatter< '_ > ) -> std::fmt::Result
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
     f.debug_struct( "KeysState" )
       .field( "token_storage", &"<TokenStorage>" )

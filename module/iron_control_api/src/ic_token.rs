@@ -144,6 +144,16 @@ pub struct IcTokenManager
   secret: String,
 }
 
+impl core::fmt::Debug for IcTokenManager
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "IcTokenManager" )
+      .field( "secret", &"<redacted>" )
+      .finish()
+  }
+}
+
 impl IcTokenManager
 {
   /// Create new IC Token manager

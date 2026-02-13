@@ -29,6 +29,17 @@ pub struct ProvidersState
   pub crypto: Option< Arc< CryptoService > >,
 }
 
+impl core::fmt::Debug for ProvidersState
+{
+  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
+  {
+    f.debug_struct( "ProvidersState" )
+      .field( "storage", &"<ProviderKeyStorage>" )
+      .field( "crypto", &self.crypto.as_ref().map( |_| "<CryptoService>" ) )
+      .finish()
+  }
+}
+
 impl ProvidersState
 {
   /// Create new providers state

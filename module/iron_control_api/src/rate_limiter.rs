@@ -38,7 +38,7 @@ struct AttemptRecord
 ///
 /// Tracks login attempts per IP address using a sliding window approach.
 /// Thread-safe using Arc<Mutex<>> for concurrent access.
-#[ derive( Clone ) ]
+#[ derive( Debug, Clone ) ]
 pub struct LoginRateLimiter
 {
   attempts: Arc< Mutex< HashMap< IpAddr, Vec< AttemptRecord > > > >,
