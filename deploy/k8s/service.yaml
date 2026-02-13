@@ -1,12 +1,31 @@
+# =========================
+# Frontend Service
+
 apiVersion: v1
 kind: Service
 metadata:
-  name: app
+  name: frontend
 spec:
   type: ClusterIP
   selector:
-    app: app
+    app: frontend
 
   ports:
     - port: 80
       targetPort: 80
+
+---
+
+# =========================
+# Backend Service
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: ${port_back}
+      targetPort: ${port_back}
