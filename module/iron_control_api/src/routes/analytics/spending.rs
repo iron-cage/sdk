@@ -78,7 +78,7 @@ pub async fn get_spending_total(
           currency: "USD".to_string(),
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
@@ -246,7 +246,7 @@ pub async fn get_spending_by_agent(
           pagination: Pagination::new(page.page, page.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )
@@ -355,7 +355,7 @@ pub async fn get_spending_by_provider(
           data,
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )
@@ -447,7 +447,7 @@ pub async fn get_spending_avg(
           max_cost_per_request: max_usd,
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,

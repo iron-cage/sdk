@@ -85,7 +85,7 @@ pub async fn get_usage_requests(
           success_rate,
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
@@ -274,7 +274,7 @@ pub async fn get_usage_tokens(
           pagination: Pagination::new(page.page, page.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )
@@ -412,7 +412,7 @@ pub async fn get_usage_models(
           pagination: Pagination::new(page.page, page.per_page, u32::try_from(totals.0).unwrap_or(u32::MAX)),
           period: format!("{:?}", params.period)
             .to_lowercase()
-            .replace("_", "-"),
+            .replace('_', "-"),
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )

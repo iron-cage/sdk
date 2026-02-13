@@ -102,6 +102,7 @@ impl BudgetRefreshRequest
   }
 
   /// Get requested budget or default
+  #[must_use]
   pub fn get_requested_budget( &self ) -> i64
   {
     self.requested_budget.unwrap_or( Self::DEFAULT_REFRESH_BUDGET )

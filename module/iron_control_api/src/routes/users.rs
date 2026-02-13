@@ -55,6 +55,7 @@ impl core::fmt::Debug for UserManagementState
 impl UserManagementState
 {
   /// Creates a new user management state.
+  #[must_use]
   pub fn new( db_pool: Pool< Sqlite >, permission_checker: Arc< PermissionChecker > ) -> Self
   {
     Self {

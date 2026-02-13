@@ -199,6 +199,7 @@ impl UserInfo {
   ///
   /// * `claims` - JWT access token claims
   /// * `user` - Database user record
+  #[must_use]
   pub fn from_claims_and_user(claims: &crate::jwt_auth::AccessTokenClaims, user: &crate::user_auth::User) -> Self {
     Self {
       id: user.id.to_string(),
@@ -213,6 +214,7 @@ impl UserInfo {
   /// # Arguments
   ///
   /// * `user` - Database user record
+  #[must_use]
   pub fn from_user(user: &crate::user_auth::User) -> Self {
     Self {
       id: user.id.to_string(),

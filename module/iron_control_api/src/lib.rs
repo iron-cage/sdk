@@ -263,6 +263,7 @@ mod implementation
   impl ApiServer
   {
     /// Create new API server
+    #[must_use]
     pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self
     {
       let addr = SocketAddr::from(([127, 0, 0, 1], port));

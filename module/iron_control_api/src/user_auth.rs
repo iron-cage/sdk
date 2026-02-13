@@ -51,6 +51,7 @@ pub struct BlacklistedToken
 /// # Returns
 ///
 /// `true` if password matches hash, `false` otherwise
+#[must_use]
 pub fn verify_password( password: &str, hash: &str ) -> bool
 {
  bcrypt::verify( password, hash ).unwrap_or( false )

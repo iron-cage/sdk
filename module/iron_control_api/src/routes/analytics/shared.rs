@@ -51,6 +51,7 @@ pub enum Period
 impl Period
 {
   /// Convert period to (`start_ms`, `end_ms`) range
+  #[must_use]
   pub fn to_range( &self ) -> ( i64, i64 )
   {
     let now = Utc::now();
@@ -241,6 +242,7 @@ pub struct Pagination
 impl Pagination
 {
   /// Create pagination from page, size, and total count
+  #[must_use]
   pub fn new( page: u32, per_page: u32, total: u32 ) -> Self
   {
     let total_pages = ( total + per_page - 1 ) / per_page;

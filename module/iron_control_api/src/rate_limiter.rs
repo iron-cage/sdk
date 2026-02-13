@@ -47,6 +47,7 @@ pub struct LoginRateLimiter
 impl LoginRateLimiter
 {
   /// Create new rate limiter
+  #[must_use]
   pub fn new() -> Self
   {
     Self

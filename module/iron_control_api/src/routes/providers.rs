@@ -78,6 +78,7 @@ impl ProvidersState
   }
 
   /// Check if crypto is available
+  #[must_use]
   pub fn is_enabled( &self ) -> bool
   {
     self.crypto.is_some()
