@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [ "master" ]
 
+env:
+  TERRAFORM_VERSION: "1.14.4"
+
 jobs:
   deploy-tests:
     name: Run deploy/tests/redeploy.sh
@@ -33,14 +36,13 @@ jobs:
       run: |
         bats deploy/tests/redeploy.bats
 
-  terraform-validate-gar:
-    name: Validate deploy/gar
+  terraform-validate:
+    name: Validate deploy/${{ matrix.module }}
     runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
-
-    defaults:
-      run:
-        working-directory: ./deploy/gar
-
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [gar, hetzner_server_create, service_deploy]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -50,59 +52,13 @@ jobs:
         docker run --rm \
           --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/gar \
-          hashicorp/terraform:1.14.4 \
+          -w /workspace/deploy/${{ matrix.module }} \
+          hashicorp/terraform:${{ env.TERRAFORM_VERSION }} \
           init -backend=false -input=false
 
         docker run --rm \
           --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/gar \
-          hashicorp/terraform:1.14.4 \
-          validate
-
-  terraform-validate-hetzner:
-    name: Validate deploy/hetzner_server_create
-    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Run Terraform validate in Docker
-      run: |
-        docker run --rm \
-          --user "$(id -u):$(id -g)" \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/hetzner_server_create \
-          hashicorp/terraform:1.14.4 \
-          init -backend=false -input=false
-
-        docker run --rm \
-          --user "$(id -u):$(id -g)" \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/hetzner_server_create \
-          hashicorp/terraform:1.14.4 \
-          validate
-
-  terraform-validate-service-deploy:
-    name: Validate deploy/service_deploy
-    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Run Terraform validate in Docker
-      run: |
-        docker run --rm \
-          --user "$(id -u):$(id -g)" \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/service_deploy \
-          hashicorp/terraform:1.14.4 \
-          init -backend=false -input=false
-
-        docker run --rm \
-          --user "$(id -u):$(id -g)" \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/service_deploy \
-          hashicorp/terraform:1.14.4 \
+          -w /workspace/deploy/${{ matrix.module }} \
+          hashicorp/terraform:${{ env.TERRAFORM_VERSION }} \
           validate
