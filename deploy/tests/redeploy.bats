@@ -22,7 +22,6 @@ setup() {
 DUMMY=1
 EOF
 
-  # minimal deployment
   # ---------- cluster issuer stub ----------
   cat > "$BASE/k8s/cluster-issuer.yaml" <<EOF
 apiVersion: v1
@@ -31,30 +30,57 @@ metadata:
   name: dummy-issuer
 EOF
 
-  # ---------- deployment ----------
-  cat > "$BASE/k8s/deployment.yaml" <<EOF
+  # ---------- backend deployment ----------
+  cat > "$BASE/k8s/backend.yaml" <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app
+  name: backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: app
+      app: backend
   template:
     metadata:
       labels:
-        app: app
+        app: backend
     spec:
       containers:
-        - name: app
+        - name: backend
           image: nginx
+          ports:
+            - containerPort: 8080
 EOF
 
+  # ---------- frontend deployment ----------
+  cat > "$BASE/k8s/frontend.yaml" <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: nginx
+          ports:
+            - containerPort: 80
+EOF
+
+  # ---------- kustomization ----------
   cat > "$BASE/k8s/kustomization.yaml" <<EOF
 resources:
-  - deployment.yaml
+  - backend.yaml
+  - frontend.yaml
   - cluster-issuer.yaml
 EOF
 
@@ -82,37 +108,54 @@ run_deploy() {
 }
 
 # -------------------------------------------------
-@test "applies k8s manifests" {
+@test "applies backend and frontend deployments" {
   run -0 run_deploy
-  run -0 kubectl get deployment app -n "$ARTIFACT_REPO_NAME"
+  run -0 kubectl get deployment backend -n "$ARTIFACT_REPO_NAME"
+  run -0 kubectl get deployment frontend -n "$ARTIFACT_REPO_NAME"
 }
 
 # -------------------------------------------------
-@test "rollout completes successfully" {
+@test "backend and frontend rollouts complete" {
   run -0 run_deploy
-  run -0 kubectl wait --for=condition=available deployment/app -n "$ARTIFACT_REPO_NAME" --timeout=30s
+  run -0 kubectl rollout status deployment/backend -n "$ARTIFACT_REPO_NAME" --timeout=30s
+  run -0 kubectl rollout status deployment/frontend -n "$ARTIFACT_REPO_NAME" --timeout=30s
 }
 
 # -------------------------------------------------
-@test "rollback happens on bad image" {
+@test "rollback happens on bad backend image" {
+  run -0 run_deploy
 
-  cat > "$BASE/k8s/deployment.yaml" <<EOF
+  run kubectl get deployment backend -n "$ARTIFACT_REPO_NAME" \
+    -o jsonpath='{.spec.template.spec.containers[0].image}'
+  previous_image="$output"
+
+  # break backend image
+  cat > "$BASE/k8s/backend.yaml" <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: certificates.cert-manager.io
+  name: backend
 spec:
-  group: cert-manager.io
-  names:
-    plural: certificates
-    singular: certificate
-    kind: Certificate
-  scope: Namespaced
-  versions:
-    - name: v1
-      served: true
-      storage: true
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: definitely-not-existing-image:fail
 EOF
 
-  export FAKE_SA_JSON='{"type":"service_account"}'
+  run run_deploy
+  [ "$status" -ne 0 ]
+
+  run -0 kubectl rollout status deployment/backend -n "$ARTIFACT_REPO_NAME"
+
+  run kubectl get deployment backend -n "$ARTIFACT_REPO_NAME" \
+    -o jsonpath='{.spec.template.spec.containers[0].image}'
+  [ "$output" = "$previous_image" ]
 }
