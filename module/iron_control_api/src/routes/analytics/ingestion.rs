@@ -1,6 +1,6 @@
 //! Event ingestion endpoint
 //!
-//! Handles POST /api/v1/analytics/events for receiving analytics events from LlmRouter.
+//! Handles POST /api/v1/analytics/events for receiving analytics events from `LlmRouter`.
 //! Validates IC tokens to authenticate agent identity and prevents event duplication.
 
 use super::shared::{
@@ -17,8 +17,8 @@ use chrono::Utc;
 
 /// POST /api/v1/analytics/events
 ///
-/// Ingest analytics event from LlmRouter.
-/// Requires valid IC Token for authentication - agent_id is derived from token claims.
+/// Ingest analytics event from `LlmRouter`.
+/// Requires valid IC Token for authentication - `agent_id` is derived from token claims.
 /// Returns 202 Accepted for new events, 200 OK for duplicates.
 pub async fn post_event(
   State(state): State<AnalyticsState>,
@@ -79,11 +79,11 @@ pub async fn post_event(
 
   // INSERT OR IGNORE for deduplication (agent_id from verified token)
   let result = sqlx::query(
-    r#"INSERT OR IGNORE INTO analytics_events
+    r"INSERT OR IGNORE INTO analytics_events
        (event_id, timestamp_ms, event_type, model, provider,
         input_tokens, output_tokens, cost_micros,
         agent_id, provider_id, error_code, error_message, received_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&event.event_id)
   .bind(event.timestamp_ms)
@@ -169,7 +169,7 @@ pub async fn list_events(
   };
 
   let total = match count_result {
-    Ok(c) => c as u32,
+    Ok(c) => u32::try_from(c).unwrap_or(u32::MAX),
     Err(e) => {
       tracing::error!("Failed to count events: {}", e);
       return (
@@ -185,7 +185,7 @@ pub async fn list_events(
 
   // Build data query with agent join
   let query = if params.agent_id.is_some() {
-    r#"SELECT
+    r"SELECT
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
          COALESCE(a.name, 'Unknown') as agent_name,
@@ -194,9 +194,9 @@ pub async fn list_events(
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ? AND e.agent_id = ?
        ORDER BY e.timestamp_ms DESC
-       LIMIT ? OFFSET ?"#
+       LIMIT ? OFFSET ?"
   } else {
-    r#"SELECT
+    r"SELECT
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
          COALESCE(a.name, 'Unknown') as agent_name,
@@ -205,7 +205,7 @@ pub async fn list_events(
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
        ORDER BY e.timestamp_ms DESC
-       LIMIT ? OFFSET ?"#
+       LIMIT ? OFFSET ?"
   };
 
   let data: Vec<AnalyticsEventWithAgent> = match if let Some(agent_id) = params.agent_id {
@@ -213,16 +213,16 @@ pub async fn list_events(
       .bind(start_ms)
       .bind(end_ms)
       .bind(agent_id)
-      .bind(params.per_page as i64)
-      .bind(offset as i64)
+      .bind(i64::from(params.per_page))
+      .bind(i64::from(offset))
       .fetch_all(&state.pool)
       .await
   } else {
     sqlx::query_as(query)
       .bind(start_ms)
       .bind(end_ms)
-      .bind(params.per_page as i64)
-      .bind(offset as i64)
+      .bind(i64::from(params.per_page))
+      .bind(i64::from(offset))
       .fetch_all(&state.pool)
       .await
   } {

@@ -9,7 +9,7 @@
 //! Violation indicates budget accounting corruption.
 //!
 //! # Authority
-//! test_organization.rulebook.md § Budget Accounting Correctness
+//! `test_organization.rulebook.md` § Budget Accounting Correctness
 //!
 //! ## Test Matrix
 //!
@@ -51,13 +51,13 @@ use tower::ServiceExt;
 /// Manual Test Gap #20: Budget invariant after handshake
 ///
 /// # Corner Case
-/// POST /api/budget/handshake succeeds → verify total_allocated = total_spent + budget_remaining
+/// POST /api/budget/handshake succeeds → verify `total_allocated` = `total_spent` + `budget_remaining`
 ///
 /// # Expected Behavior
 /// After handshake:
-/// - Lease created with budget_granted
-/// - Agent budget_remaining decreased by budget_granted
-/// - Invariant maintained: total_allocated = total_spent + budget_remaining
+/// - Lease created with `budget_granted`
+/// - Agent `budget_remaining` decreased by `budget_granted`
+/// - Invariant maintained: `total_allocated` = `total_spent` + `budget_remaining`
 ///
 /// # Risk
 /// HIGH - Budget accounting corruption
@@ -112,16 +112,13 @@ async fn test_budget_invariant_after_handshake() {
   assert_eq!(
     total_allocated,
     total_spent + budget_remaining,
-    "LOUD FAILURE: Budget invariant violated after handshake. total_allocated={}, total_spent={}, budget_remaining={}",
-    total_allocated, total_spent, budget_remaining
+    "LOUD FAILURE: Budget invariant violated after handshake. total_allocated={total_allocated}, total_spent={total_spent}, budget_remaining={budget_remaining}"
   );
 
   // Verify budget_remaining decreased (lease was created)
   assert!(
     budget_remaining < initial_budget,
-    "LOUD FAILURE: budget_remaining should decrease after handshake. Initial: {}, Current: {}",
-    initial_budget,
-    budget_remaining
+    "LOUD FAILURE: budget_remaining should decrease after handshake. Initial: {initial_budget}, Current: {budget_remaining}"
   );
 }
 
@@ -143,14 +140,14 @@ async fn test_budget_invariant_after_handshake() {
 /// Manual Test Gap #22: Budget invariant after report
 ///
 /// # Corner Case
-/// POST /api/budget/report succeeds → verify total_allocated = total_spent + budget_remaining
+/// POST /api/budget/report succeeds → verify `total_allocated` = `total_spent` + `budget_remaining`
 ///
 /// # Expected Behavior
 /// After usage report:
-/// - Lease budget_spent increased by cost_microdollars
-/// - Agent total_spent increased by cost_microdollars
-/// - Agent budget_remaining unchanged (spent from lease, not from remaining)
-/// - Invariant maintained: total_allocated = total_spent + budget_remaining
+/// - Lease `budget_spent` increased by `cost_microdollars`
+/// - Agent `total_spent` increased by `cost_microdollars`
+/// - Agent `budget_remaining` unchanged (spent from lease, not from remaining)
+/// - Invariant maintained: `total_allocated` = `total_spent` + `budget_remaining`
 ///
 /// # Risk
 /// HIGH - Budget accounting corruption
@@ -241,8 +238,7 @@ async fn test_budget_invariant_after_report() {
   assert_eq!(
     total_allocated,
     total_spent + budget_remaining,
-    "LOUD FAILURE: Budget invariant violated after report. total_allocated={}, total_spent={}, budget_remaining={}",
-    total_allocated, total_spent, budget_remaining
+    "LOUD FAILURE: Budget invariant violated after report. total_allocated={total_allocated}, total_spent={total_spent}, budget_remaining={budget_remaining}"
   );
 
   // Verify total_spent = budget_granted + cost_microdollars
@@ -267,15 +263,15 @@ async fn test_budget_invariant_after_report() {
 /// Manual Test Gap #30: Budget invariant after refresh
 ///
 /// # Corner Case
-/// POST /api/budget/refresh succeeds → verify total_allocated = total_spent + budget_remaining
+/// POST /api/budget/refresh succeeds → verify `total_allocated` = `total_spent` + `budget_remaining`
 ///
 /// # Expected Behavior
 /// After budget refresh:
-/// - New lease created with requested_budget
+/// - New lease created with `requested_budget`
 /// - Old lease expired
-/// - Agent total_spent increased by requested_budget (commitment tracking)
-/// - Agent budget_remaining decreased by requested_budget
-/// - Invariant maintained: total_allocated = total_spent + budget_remaining
+/// - Agent `total_spent` increased by `requested_budget` (commitment tracking)
+/// - Agent `budget_remaining` decreased by `requested_budget`
+/// - Invariant maintained: `total_allocated` = `total_spent` + `budget_remaining`
 ///
 /// # Risk
 /// HIGH - Budget accounting corruption
@@ -338,7 +334,7 @@ async fn test_budget_invariant_after_refresh() {
         .method("POST")
         .uri("/api/budget/refresh")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
@@ -367,8 +363,7 @@ async fn test_budget_invariant_after_refresh() {
   assert_eq!(
     total_allocated,
     total_spent + budget_remaining,
-    "LOUD FAILURE: Budget invariant violated after refresh. total_allocated={}, total_spent={}, budget_remaining={}",
-    total_allocated, total_spent, budget_remaining
+    "LOUD FAILURE: Budget invariant violated after refresh. total_allocated={total_allocated}, total_spent={total_spent}, budget_remaining={budget_remaining}"
   );
 
   // Verify total_spent = initial_grant + requested_budget (both leases committed)
@@ -391,7 +386,6 @@ async fn test_budget_invariant_after_refresh() {
   // Verify total_allocated unchanged (no new budget added, just reallocated)
   assert_eq!(
     total_allocated, initial_budget,
-    "LOUD FAILURE: total_allocated should remain unchanged. Expected: {}, Actual: {}",
-    initial_budget, total_allocated
+    "LOUD FAILURE: total_allocated should remain unchanged. Expected: {initial_budget}, Actual: {total_allocated}"
   );
 }

@@ -18,12 +18,12 @@
 //! ## E4: Missing Required Fields
 //! | Endpoint | Missing Field | Expected Response |
 //! |----------|---------------|-------------------|
-//! | /handshake | ic_token | 400/422 validation error |
+//! | /handshake | `ic_token` | 400/422 validation error |
 //! | /handshake | provider | 400/422 validation error |
-//! | /report | lease_id | 400/422 validation error |
-//! | /report | cost_microdollars | 400/422 validation error |
-//! | /refresh | ic_token | 400/422 validation error |
-//! | /refresh | current_lease_id | 400/422 validation error |
+//! | /report | `lease_id` | 400/422 validation error |
+//! | /report | `cost_microdollars` | 400/422 validation error |
+//! | /refresh | `ic_token` | 400/422 validation error |
+//! | /refresh | `current_lease_id` | 400/422 validation error |
 //!
 //! ## E8: Long String Handling
 //! | Test Case | Scenario | Expected Response |
@@ -171,14 +171,14 @@ async fn test_empty_request_body() {
   );
 }
 
-/// E4.1: Missing ic_token in handshake
+/// E4.1: Missing `ic_token` in handshake
 ///
 /// # Security Risk
 /// Missing authentication could allow unauthorized budget access
 ///
 /// # Expected Behavior
 /// - 400/422 validation error
-/// - Error message: "ic_token required" or similar
+/// - Error message: "`ic_token` required" or similar
 #[tokio::test]
 async fn test_handshake_missing_ic_token() {
   let pool = setup_test_db().await;
@@ -260,14 +260,14 @@ async fn test_handshake_missing_provider() {
   );
 }
 
-/// E4.3: Missing lease_id in report
+/// E4.3: Missing `lease_id` in report
 ///
 /// # Security Risk
-/// Missing lease_id could cause budget to be charged incorrectly
+/// Missing `lease_id` could cause budget to be charged incorrectly
 ///
 /// # Expected Behavior
 /// - 400/422 validation error
-/// - Error message: "lease_id required" or similar
+/// - Error message: "`lease_id` required" or similar
 #[tokio::test]
 async fn test_report_missing_lease_id() {
   let pool = setup_test_db().await;
@@ -308,14 +308,14 @@ async fn test_report_missing_lease_id() {
   );
 }
 
-/// E4.4: Missing cost_microdollars in report
+/// E4.4: Missing `cost_microdollars` in report
 ///
 /// # Security Risk
 /// Missing cost could allow free usage
 ///
 /// # Expected Behavior
 /// - 400/422 validation error
-/// - Error message: "cost_microdollars required" or similar
+/// - Error message: "`cost_microdollars` required" or similar
 #[tokio::test]
 async fn test_report_missing_cost() {
   let pool = setup_test_db().await;
@@ -383,14 +383,14 @@ async fn test_report_missing_cost() {
   );
 }
 
-/// E4.5: Missing ic_token in refresh
+/// E4.5: Missing `ic_token` in refresh
 ///
 /// # Security Risk
 /// Missing authentication could allow unauthorized lease refresh
 ///
 /// # Expected Behavior
 /// - 400/422 validation error
-/// - Error message: "ic_token required" or similar
+/// - Error message: "`ic_token` required" or similar
 #[tokio::test]
 async fn test_refresh_missing_ic_token() {
   let pool = setup_test_db().await;
@@ -408,7 +408,7 @@ async fn test_refresh_missing_ic_token() {
       Request::builder()
         .method("POST")
         .uri("/api/budget/refresh")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
@@ -431,14 +431,14 @@ async fn test_refresh_missing_ic_token() {
   );
 }
 
-/// E4.6: Missing current_lease_id in refresh
+/// E4.6: Missing `current_lease_id` in refresh
 ///
 /// # Security Risk
 /// Missing lease ID could cause incorrect lease expiration
 ///
 /// # Expected Behavior
 /// - 400/422 validation error
-/// - Error message: "current_lease_id required" or similar
+/// - Error message: "`current_lease_id` required" or similar
 #[tokio::test]
 async fn test_refresh_missing_current_lease_id() {
   let pool = setup_test_db().await;
@@ -457,7 +457,7 @@ async fn test_refresh_missing_current_lease_id() {
       Request::builder()
         .method("POST")
         .uri("/api/budget/refresh")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
@@ -480,14 +480,14 @@ async fn test_refresh_missing_current_lease_id() {
   );
 }
 
-/// E8.1: Oversized ic_token (> 2000 chars)
+/// E8.1: Oversized `ic_token` (> 2000 chars)
 ///
 /// # Security Risk
-/// Extremely long tokens could cause buffer overflows or DoS attacks
+/// Extremely long tokens could cause buffer overflows or `DoS` attacks
 ///
 /// # Expected Behavior
 /// - 400/422 validation error
-/// - Error message: "ic_token too long" or similar
+/// - Error message: "`ic_token` too long" or similar
 #[tokio::test]
 async fn test_oversized_ic_token() {
   let pool = setup_test_db().await;
@@ -528,10 +528,10 @@ async fn test_oversized_ic_token() {
   );
 }
 
-/// E8.2: Oversized lease_id (> 100 chars)
+/// E8.2: Oversized `lease_id` (> 100 chars)
 ///
 /// # Security Risk
-/// Long IDs could cause database issues or DoS attacks
+/// Long IDs could cause database issues or `DoS` attacks
 ///
 /// # Expected Behavior
 /// - 400/422 validation error OR 404 Not Found (ID doesn't exist)

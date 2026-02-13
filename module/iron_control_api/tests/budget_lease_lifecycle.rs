@@ -252,7 +252,7 @@ async fn test_report_on_revoked_lease() {
 
 /// L5: Test multiple reports on same lease
 ///
-/// Verifies that multiple usage reports correctly accumulate budget_spent
+/// Verifies that multiple usage reports correctly accumulate `budget_spent`
 /// and enforce lease budget limit.
 #[tokio::test]
 async fn test_multiple_reports_same_lease() {
@@ -324,8 +324,7 @@ async fn test_multiple_reports_same_lease() {
     assert_eq!(
       report_response.status(),
       StatusCode::OK,
-      "LOUD FAILURE: Report {} should succeed",
-      i
+      "LOUD FAILURE: Report {i} should succeed",
     );
   }
 
@@ -604,7 +603,7 @@ async fn test_lease_renewal_workflow() {
         .method("POST")
         .uri("/api/budget/refresh")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .body(Body::from(
           json!(
         {
@@ -749,7 +748,6 @@ async fn test_lease_renewal_workflow() {
   let error_msg = old_report_json["error"].as_str().unwrap();
   assert!(
     error_msg.contains("expired") || error_msg.contains("revoked"),
-    "LOUD FAILURE: Old lease should be expired or revoked. Got error: {}",
-    error_msg
+    "LOUD FAILURE: Old lease should be expired or revoked. Got error: {error_msg}"
   );
 }

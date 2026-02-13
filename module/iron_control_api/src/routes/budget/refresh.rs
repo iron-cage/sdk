@@ -15,8 +15,11 @@ use uuid::Uuid;
 /// Budget refresh request (Step 3: Request More Budget)
 #[derive(Debug, Deserialize)]
 pub struct BudgetRefreshRequest {
+  /// IC Token for authentication
   pub ic_token: String,
+  /// Current active lease identifier
   pub current_lease_id: String,
+  /// Optional requested budget amount in microdollars
   pub requested_budget: Option<i64>,
 }
 
@@ -24,7 +27,7 @@ impl BudgetRefreshRequest {
   /// Maximum IC Token length
   const MAX_IC_TOKEN_LENGTH: usize = 2000;
 
-  /// Maximum lease_id length
+  /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Maximum budget request (microdollars)
@@ -86,6 +89,7 @@ impl BudgetRefreshRequest {
   }
 
   /// Get requested budget or default
+  #[must_use] 
   pub fn get_requested_budget(&self) -> i64 {
     self
       .requested_budget
@@ -96,10 +100,15 @@ impl BudgetRefreshRequest {
 /// Budget refresh response (approved)
 #[derive(Debug, Serialize)]
 pub struct BudgetRefreshResponse {
+  /// Status of refresh request ("approved" or "denied")
   pub status: String,
+  /// Budget amount granted in microdollars (if approved)
   pub budget_granted: Option<i64>,
+  /// Total remaining budget in microdollars
   pub budget_remaining: i64,
+  /// New lease identifier (if approved)
   pub lease_id: Option<String>,
+  /// Reason for denial (if denied)
   pub reason: Option<String>,
 }
 

@@ -6,10 +6,10 @@
 //! They contain agent identity, budget allocation, and permissions.
 //!
 //! Key properties:
-//! - Long-lived (expires_at can be null for no auto-expiration)
+//! - Long-lived (`expires_at` can be null for no auto-expiration)
 //! - Signed with HMAC-SHA256
 //! - Issued by "iron-control-panel"
-//! - Contains agent_id, budget_id, permissions
+//! - Contains `agent_id`, `budget_id`, permissions
 
 use crate::error::ValidationError;
 use axum::http::StatusCode;
@@ -21,11 +21,13 @@ use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use core::time::Duration;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 /// Compute SHA-256 hash of a token string (hex-encoded)
+#[must_use] 
 pub fn sha256_hash(token: &str) -> String {
   format!("{:x}", Sha256::digest(token.as_bytes()))
 }
@@ -35,7 +37,7 @@ pub fn sha256_hash(token: &str) -> String {
 pub enum IcTokenRuntimeError {
   /// JWT signature invalid, claims invalid, or expired
   InvalidToken(String),
-  /// agent_id format invalid (not agent_<positive_number>)
+  /// `agent_id` format invalid (not agent_<`positive_number`>)
   InvalidAgentId(String),
   /// Agent not found, token revoked (hash NULL), or token rotated (hash mismatch)
   TokenInactive(String),
@@ -61,10 +63,10 @@ impl std::error::Error for IcTokenRuntimeError {}
 /// Per Protocol 005 specification, IC Tokens contain:
 /// - jti: Unique token identifier (UUID v4) — guarantees uniqueness even when
 ///   two tokens are issued in the same second with identical claims
-/// - agent_id: Unique agent identifier (format: agent_<id>)
-/// - budget_id: Links to budget allocation
-/// - issued_at: Token creation time (Unix timestamp seconds)
-/// - expires_at: Optional expiration (null for long-lived tokens)
+/// - `agent_id`: Unique agent identifier (format: agent_<id>)
+/// - `budget_id`: Links to budget allocation
+/// - `issued_at`: Token creation time (Unix timestamp seconds)
+/// - `expires_at`: Optional expiration (null for long-lived tokens)
 /// - issuer: Must be "iron-control-panel"
 /// - permissions: Array of allowed operations
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -93,7 +95,7 @@ pub struct IcTokenClaims {
   #[serde(rename = "iss")]
   pub issuer: String,
 
-  /// Allowed operations (e.g., ["llm:call", "data:read"])
+  /// Allowed operations (e.g., `llm:call`, `data:read`)
   pub permissions: Vec<String>,
 }
 
@@ -109,7 +111,11 @@ impl IcTokenClaims {
   ///
   /// # Returns
   ///
-  /// New `IcTokenClaims` with current timestamp as issued_at
+  /// New `IcTokenClaims` with current timestamp as `issued_at`
+  ///
+  /// # Panics
+  ///
+  /// May panic if system time goes backwards (which should never happen in practice).
   #[must_use]
   pub fn new(
     agent_id: String,
@@ -137,12 +143,16 @@ impl IcTokenClaims {
   ///
   /// Checks:
   /// - Issuer is "iron-control-panel"
-  /// - If expires_at is set, token hasn't expired
-  /// - agent_id format is valid
+  /// - If `expires_at` is set, token hasn't expired
+  /// - `agent_id` format is valid
   ///
   /// # Errors
   ///
   /// Returns error if validation fails
+  ///
+  /// # Panics
+  ///
+  /// May panic if system time goes backwards (which should never happen in practice).
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Check issuer
     if self.issuer != "iron-control-panel" {
@@ -177,6 +187,7 @@ impl IcTokenClaims {
 }
 
 /// IC Token manager for generating and validating IC Tokens
+#[derive(Debug)]
 pub struct IcTokenManager {
   secret: String,
 }
@@ -261,6 +272,16 @@ impl IcTokenManager {
   /// # Returns
   ///
   /// `(agent_id, claims)` on success, `IcTokenRuntimeError` on failure
+  ///
+  /// # Errors
+  ///
+  /// Returns error if:
+  /// - JWT signature invalid
+  /// - Token expired
+  /// - Agent ID format invalid
+  /// - Agent not found
+  /// - Token revoked or rotated
+  /// - Database query fails
   pub async fn validate_ic_token_runtime(
     &self,
     token: &str,
@@ -331,11 +352,11 @@ const IC_TOKEN_WINDOW: Duration = Duration::from_secs(60);
 /// with the same token are rejected with 429 Too Many Requests.
 ///
 /// Design: per-token-hash (not per-IP) because:
-/// 1. Runtime endpoints lack IP extractors (ConnectInfo<SocketAddr>)
+/// 1. Runtime endpoints lack IP extractors (`ConnectInfo`<SocketAddr>)
 /// 2. Per-token targeting is more precise — blocks compromised tokens without
 ///    affecting legitimate users behind the same NAT
 /// 3. Matches the threat model: timing attacks require many requests with the same token
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IcTokenRateLimiter {
   /// Map from token hash prefix (16 hex chars) to list of failure timestamps
   failures: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
@@ -374,6 +395,15 @@ impl IcTokenRateLimiter {
   }
 
   /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
+  ///
+  /// # Errors
+  ///
+  /// Returns `Err(retry_after_secs)` if token has exceeded failure threshold
+  ///
+  /// # Panics
+  ///
+  /// May panic if the failure list is unexpectedly empty, which should never happen
+  /// as empty lists are filtered during sweep.
   pub fn check(&self, token: &str) -> Result<(), u64> {
     let key = Self::token_key(token);
     let (map, now) = self.lock_and_sweep();
@@ -416,7 +446,7 @@ const VALIDATION_TIMING_TARGET: Duration = Duration::from_millis(5);
 /// Validate IC Token for a runtime endpoint, returning HTTP response on error.
 ///
 /// Consolidates the duplicated error handling pattern from budget, analytics,
-/// and agent_provider_key endpoints into a single function.
+/// and `agent_provider_key` endpoints into a single function.
 ///
 /// Checks:
 /// 1. Rate limit — rejects if token exceeded failure threshold (429)
@@ -429,6 +459,19 @@ const VALIDATION_TIMING_TARGET: Duration = Duration::from_millis(5);
 /// - Returns appropriate HTTP status (429/500/401)
 ///
 /// On success: returns `(agent_id, claims)` for the endpoint to use.
+///
+/// # Errors
+///
+/// Returns HTTP response error if:
+/// - Token is rate-limited (429)
+/// - JWT validation fails (401)
+/// - Agent not found or token revoked (401)
+/// - Database query fails (500)
+///
+/// # Panics
+///
+/// May panic if `VALIDATION_TIMING_TARGET` duration arithmetic overflows,
+/// which should never happen as the target is a small constant.
 pub async fn validate_ic_token_for_endpoint(
   manager: &IcTokenManager,
   token: &str,
@@ -456,7 +499,7 @@ pub async fn validate_ic_token_for_endpoint(
   // take the same wall-clock time from the caller's perspective.
   let elapsed = start.elapsed();
   if elapsed < VALIDATION_TIMING_TARGET {
-    tokio::time::sleep(VALIDATION_TIMING_TARGET - elapsed).await;
+    tokio::time::sleep(VALIDATION_TIMING_TARGET.checked_sub(elapsed).unwrap()).await;
   }
 
   match result {

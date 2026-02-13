@@ -53,12 +53,18 @@ fn test_no_hardcoded_server_port() {
     "Hardcoded port forbidden (must use SERVER_PORT env var)",
   );
 
-  // Must have env var parsing
-  assert_source_contains(
-    &source,
-    "std::env::var( \"SERVER_PORT\" )",
-    source_path,
-    "SERVER_PORT environment variable parsing required",
+  // Must have env var parsing (with or without formatting spaces)
+  let has_env_var = source.contains("std::env::var(\"SERVER_PORT\")")
+    || source.contains("std::env::var( \"SERVER_PORT\" )");
+
+  assert!(
+    has_env_var,
+    "FAIL: Required pattern 'std::env::var(\"SERVER_PORT\")' missing in {source_path}\n\
+     Reason: SERVER_PORT environment variable parsing required\n\
+     \n\
+     Expected: This pattern must exist in source code.\n\
+     \n\
+     Fix: Add the required implementation."
   );
 
   // Must have production enforcement (panic/expect if missing)

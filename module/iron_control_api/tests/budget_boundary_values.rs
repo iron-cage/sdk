@@ -30,10 +30,10 @@ use common::budget::{
 use serde_json::json;
 use tower::ServiceExt;
 
-/// B1: Maximum i64 value for cost_microdollars
+/// B1: Maximum i64 value for `cost_microdollars`
 ///
 /// # Corner Case
-/// POST /api/budget/report with cost_microdollars = i64::MAX
+/// POST /api/budget/report with `cost_microdollars` = `i64::MAX`
 ///
 /// # Expected Behavior
 /// - Request handled safely (either accepted with overflow protection or rejected with validation error)
@@ -131,7 +131,7 @@ async fn test_cost_i64_max() {
 /// B2: Zero cost for cached responses
 ///
 /// # Corner Case
-/// POST /api/budget/report with cost_microdollars = 0
+/// POST /api/budget/report with `cost_microdollars` = 0
 ///
 /// # Expected Behavior
 /// - Request accepted (200 OK) - zero cost is valid for cached responses
@@ -396,7 +396,7 @@ async fn test_multiple_leases_equal_total_budget() {
 /// B3: Maximum i64 value for tokens field
 ///
 /// # Corner Case
-/// POST /api/budget/report with tokens = i64::MAX
+/// POST /api/budget/report with tokens = `i64::MAX`
 ///
 /// # Expected Behavior
 /// - Request handled safely (either accepted or rejected with validation error)
@@ -497,13 +497,13 @@ async fn test_tokens_i64_max() {
 /// B6: Lease expiration edge case - expires exactly at current timestamp
 ///
 /// # Corner Case
-/// Lease expires_at equals current_timestamp (millisecond precision)
+/// Lease `expires_at` equals `current_timestamp` (millisecond precision)
 ///
 /// # Expected Behavior
 /// Implementation-defined:
-/// - Option A: expires_at < now (strict) → expired
-/// - Option B: expires_at <= now (inclusive) → expired
-/// - Option C: expires_at == now (edge case) → still valid
+/// - Option A: `expires_at` < now (strict) → expired
+/// - Option B: `expires_at` <= now (inclusive) → expired
+/// - Option C: `expires_at` == now (edge case) → still valid
 ///
 /// Test documents actual behavior for consistency
 ///

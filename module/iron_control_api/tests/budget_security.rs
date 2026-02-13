@@ -115,7 +115,7 @@ async fn test_sql_injection_in_provider_name() {
 /// Test 13: Authorization enforcement - IC Token from different agent
 ///
 /// # Corner Case
-/// IC Token contains agent_id=123, but refresh request is for lease owned by agent_id=456
+/// IC Token contains `agent_id=123`, but refresh request is for lease owned by `agent_id=456`
 ///
 /// # Expected Behavior
 /// HTTP 403 Forbidden "Unauthorized - lease belongs to different agent"
@@ -173,7 +173,7 @@ async fn test_ic_token_authorization_enforcement() {
     .method("POST")
     .uri("/api/budget/refresh")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", access_token))
+    .header("authorization", format!("Bearer {access_token}"))
     .body(Body::from(
       json!({
         "ic_token": ic_token_agent_2,
@@ -333,7 +333,7 @@ async fn test_ic_token_invalid_signature() {
 /// Test 16: Provider key mismatch
 ///
 /// # Corner Case
-/// Request openai provider using anthropic provider_key_id
+/// Request openai provider using anthropic `provider_key_id`
 ///
 /// # Expected Behavior
 /// HTTP 400/403 Provider key mismatch error
@@ -397,7 +397,7 @@ async fn test_provider_key_mismatch() {
 /// Test 17: Disabled provider key access
 ///
 /// # Corner Case
-/// Request with provider_key_id where is_enabled=0
+/// Request with `provider_key_id` where `is_enabled=0`
 ///
 /// # Expected Behavior
 /// HTTP 403 Forbidden "Provider key is disabled"
@@ -431,7 +431,7 @@ async fn test_disabled_provider_key_access() {
     "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
   )
   .bind(agent_id)
-  .bind(format!("test_agent_{}", agent_id))
+  .bind(format!("test_agent_{agent_id}"))
   .bind(serde_json::to_string(&vec!["openai"]).unwrap())
   .bind(now_ms)
   .bind("test_user")
@@ -725,7 +725,7 @@ async fn test_sql_injection_in_reason_field() {
     .method("POST")
     .uri("/api/budget/refresh")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", access_token))
+    .header("authorization", format!("Bearer {access_token}"))
     .body(Body::from(
       json!({
         "ic_token": ic_token,
@@ -773,7 +773,7 @@ async fn test_sql_injection_in_reason_field() {
 ///
 /// # Why Not Caught
 /// - No security test for refresh on revoked lease existed (until now)
-/// - Refresh was implemented by copying parts of report_usage validation but not all checks
+/// - Refresh was implemented by copying parts of `report_usage` validation but not all checks
 /// - Corner case list included this scenario but it wasn't tested until manual testing phase
 /// - Automated tests only covered happy path refresh scenarios
 ///
@@ -795,7 +795,7 @@ async fn test_sql_injection_in_reason_field() {
 ///     .into_response();
 /// }
 /// ```
-/// Placed immediately after authorization check and before budget checks, matching report_usage pattern.
+/// Placed immediately after authorization check and before budget checks, matching `report_usage` pattern.
 ///
 /// # Prevention
 /// - Create validation checklists for resource operations: (1) existence, (2) authorization,
@@ -866,7 +866,7 @@ async fn test_refresh_on_revoked_lease() {
     .method("POST")
     .uri("/api/budget/refresh")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", access_token))
+    .header("authorization", format!("Bearer {access_token}"))
     .body(Body::from(
       json!({
         "ic_token": ic_token,
@@ -1055,10 +1055,10 @@ async fn test_handshake_after_revocation() {
   );
 }
 
-/// E5: SQL injection in lease_id parameter
+/// E5: SQL injection in `lease_id` parameter
 ///
 /// # Corner Case
-/// Malicious lease_id attempting SQL injection
+/// Malicious `lease_id` attempting SQL injection
 ///
 /// # Expected Behavior
 /// - Request rejected (404 Not Found) OR SQL injection prevented (200 OK with no damage)

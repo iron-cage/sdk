@@ -1,16 +1,16 @@
-//! Unit tests for ic_token module: sha256_hash and validate_ic_token_runtime
+//! Unit tests for `ic_token` module: `sha256_hash` and `validate_ic_token_runtime`
 //!
 //! # Coverage
 //!
-//! ## sha256_hash (M2)
+//! ## `sha256_hash` (M2)
 //! - Deterministic output for same input
 //! - Output format: 64 hex characters
 //!
-//! ## validate_ic_token_runtime error branches (M6)
-//! - InvalidToken: malformed JWT
-//! - InvalidAgentId: missing prefix, non-numeric, negative
-//! - TokenInactive: agent not found, token revoked (NULL hash), token rotated (hash mismatch)
-//! - DatabaseError: closed connection pool (H4)
+//! ## `validate_ic_token_runtime` error branches (M6)
+//! - `InvalidToken`: malformed JWT
+//! - `InvalidAgentId`: missing prefix, non-numeric, negative
+//! - `TokenInactive`: agent not found, token revoked (NULL hash), token rotated (hash mismatch)
+//! - `DatabaseError`: closed connection pool (H4)
 //! - Success: valid token with matching hash
 //!
 //! # Authority
@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 // Helpers
 
-/// Minimal agents table — columns needed by validate_ic_token_runtime + required NOT NULL columns
+/// Minimal agents table — columns needed by `validate_ic_token_runtime` + required NOT NULL columns
 async fn setup_minimal_db() -> SqlitePool {
   let pool = SqlitePool::connect("sqlite::memory:")
     .await
@@ -54,7 +54,7 @@ async fn insert_agent(pool: &SqlitePool, agent_id: i64, ic_token_hash: Option<&s
     ",
   )
   .bind(agent_id)
-  .bind(format!("agent_{}", agent_id))
+  .bind(format!("agent_{agent_id}"))
   .bind(ic_token_hash)
   .execute(pool)
   .await
@@ -67,8 +67,8 @@ fn test_manager() -> IcTokenManager {
 
 fn create_token_for_agent(manager: &IcTokenManager, agent_id: i64) -> String {
   let claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -77,7 +77,7 @@ fn create_token_for_agent(manager: &IcTokenManager, agent_id: i64) -> String {
     .expect("LOUD FAILURE: Should generate token")
 }
 
-/// Create token with custom agent_id string (for invalid format tests)
+/// Create token with custom `agent_id` string (for invalid format tests)
 fn create_token_with_agent_id(manager: &IcTokenManager, agent_id: &str) -> String {
   let claims = IcTokenClaims {
     token_id: Uuid::new_v4(),
@@ -120,8 +120,7 @@ fn test_sha256_hash_format() {
   );
   assert!(
     hash.chars().all(|c| c.is_ascii_hexdigit()),
-    "LOUD FAILURE: SHA-256 hex digest must contain only hex characters, got: {}",
-    hash
+    "LOUD FAILURE: SHA-256 hex digest must contain only hex characters, got: {hash}"
   );
 }
 
@@ -138,8 +137,7 @@ async fn test_validate_runtime_invalid_jwt() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::InvalidToken(_))),
-    "LOUD FAILURE: Invalid JWT must return InvalidToken, got: {:?}",
-    result
+    "LOUD FAILURE: Invalid JWT must return InvalidToken, got: {result:?}"
   );
 }
 
@@ -161,8 +159,7 @@ async fn test_validate_runtime_invalid_agent_id_prefix_caught_by_verify() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::InvalidToken(_))),
-    "LOUD FAILURE: agent_id without 'agent_' prefix is caught by verify_token as InvalidToken, got: {:?}",
-    result
+    "LOUD FAILURE: agent_id without 'agent_' prefix is caught by verify_token as InvalidToken, got: {result:?}"
   );
 }
 
@@ -176,8 +173,7 @@ async fn test_validate_runtime_invalid_agent_id_non_numeric() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::InvalidAgentId(_))),
-    "LOUD FAILURE: Non-numeric agent_id must return InvalidAgentId, got: {:?}",
-    result
+    "LOUD FAILURE: Non-numeric agent_id must return InvalidAgentId, got: {result:?}"
   );
 }
 
@@ -191,8 +187,7 @@ async fn test_validate_runtime_invalid_agent_id_negative() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::InvalidAgentId(_))),
-    "LOUD FAILURE: Negative agent_id must return InvalidAgentId, got: {:?}",
-    result
+    "LOUD FAILURE: Negative agent_id must return InvalidAgentId, got: {result:?}"
   );
 }
 
@@ -209,8 +204,7 @@ async fn test_validate_runtime_agent_not_found() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::TokenInactive(_))),
-    "LOUD FAILURE: Missing agent must return TokenInactive, got: {:?}",
-    result
+    "LOUD FAILURE: Missing agent must return TokenInactive, got: {result:?}"
   );
 }
 
@@ -227,8 +221,7 @@ async fn test_validate_runtime_token_revoked() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::TokenInactive(_))),
-    "LOUD FAILURE: Revoked token (NULL hash) must return TokenInactive, got: {:?}",
-    result
+    "LOUD FAILURE: Revoked token (NULL hash) must return TokenInactive, got: {result:?}"
   );
 }
 
@@ -250,8 +243,7 @@ async fn test_validate_runtime_token_rotated() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::TokenInactive(_))),
-    "LOUD FAILURE: Rotated token (hash mismatch) must return TokenInactive, got: {:?}",
-    result
+    "LOUD FAILURE: Rotated token (hash mismatch) must return TokenInactive, got: {result:?}"
   );
 }
 
@@ -271,8 +263,7 @@ async fn test_validate_runtime_database_error() {
 
   assert!(
     matches!(result, Err(IcTokenRuntimeError::DatabaseError(_))),
-    "LOUD FAILURE: Closed database pool must return DatabaseError, got: {:?}",
-    result
+    "LOUD FAILURE: Closed database pool must return DatabaseError, got: {result:?}"
   );
 }
 
@@ -291,15 +282,13 @@ async fn test_validate_runtime_success() {
 
   assert!(
     result.is_ok(),
-    "LOUD FAILURE: Valid token with matching hash must succeed, got: {:?}",
-    result
+    "LOUD FAILURE: Valid token with matching hash must succeed, got: {result:?}"
   );
 
   let (agent_id, claims) = result.unwrap();
   assert_eq!(
     agent_id, 42,
-    "LOUD FAILURE: Returned agent_id must match, expected 42, got {}",
-    agent_id
+    "LOUD FAILURE: Returned agent_id must match, expected 42, got {agent_id}"
   );
   assert_eq!(
     claims.agent_id, "agent_42",

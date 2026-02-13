@@ -64,7 +64,7 @@ mod common;
 async fn test_approve_budget_request_tracks_real_approver() {
   // Setup: Create test database and state
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   // Setup: Create agent with budget
   let agent_id = 300i64;
@@ -103,7 +103,7 @@ async fn test_approve_budget_request_tracks_real_approver() {
   );
 
   // Execute: Call approve endpoint with JWT authentication
-  let app = common::budget::create_budget_router(state.clone());
+  let app = common::budget::create_budget_router(state.clone()).await;
 
   let request = Request::builder()
     .method("PATCH")
@@ -172,7 +172,7 @@ async fn test_approve_budget_request_tracks_real_approver() {
 #[tokio::test]
 async fn test_approve_budget_request_requires_authentication() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 301i64;
   common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
@@ -198,7 +198,7 @@ async fn test_approve_budget_request_requires_authentication() {
   .unwrap();
 
   // Call approve WITHOUT authentication
-  let app = common::budget::create_budget_router(state);
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("PATCH")

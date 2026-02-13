@@ -1,12 +1,12 @@
 //! Integration tests for Agent Provider Key endpoint (Feature 014)
 //!
 //! Tests cover:
-//! - Success: Agent with provider_key_id retrieves decrypted key
-//! - 400 INVALID_TOKEN: Empty or malformed IC token
+//! - Success: Agent with `provider_key_id` retrieves decrypted key
+//! - 400 `INVALID_TOKEN`: Empty or malformed IC token
 //! - 401 UNAUTHORIZED: Invalid IC token signature
-//! - 403 NO_PROVIDER_ASSIGNED: Agent has no provider_key_id
-//! - 404 INVALID_TOKEN: Agent not found
-//! - 503 CRYPTO_UNAVAILABLE: CryptoService not configured
+//! - 403 `NO_PROVIDER_ASSIGNED`: Agent has no `provider_key_id`
+//! - 404 `INVALID_TOKEN`: Agent not found
+//! - 503 `CRYPTO_UNAVAILABLE`: `CryptoService` not configured
 //!
 //! ## Test Matrix
 //!
@@ -36,6 +36,7 @@ use serde_json::json;
 use tower::ServiceExt;
 
 /// Create router for agent provider key endpoint
+#[allow(clippy::unused_async)]
 async fn create_provider_key_router(
   state: iron_control_api::routes::budget::BudgetState,
 ) -> Router {
@@ -46,9 +47,9 @@ async fn create_provider_key_router(
 
 /// Seed agent with properly encrypted provider key
 ///
-/// Creates test data that can actually be decrypted by the test CryptoService:
+/// Creates test data that can actually be decrypted by the test `CryptoService`:
 /// - Test user
-/// - Agent with provider_key_id pointing to the key
+/// - Agent with `provider_key_id` pointing to the key
 /// - Encrypted provider key using the test crypto service
 async fn seed_agent_with_encrypted_key(
   pool: &sqlx::SqlitePool,
@@ -59,7 +60,7 @@ async fn seed_agent_with_encrypted_key(
 ) {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
-  // Create test user if doesn't exist
+  // Create test user if it doesn't exist
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -104,7 +105,7 @@ async fn seed_agent_with_encrypted_key(
     "INSERT INTO agents (id, name, providers, created_at, owner_id, provider_key_id) VALUES (?, ?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
+  .bind( format!( "test_agent_{agent_id}") )
   .bind( serde_json::to_string( &vec![ provider ] ).unwrap() )
   .bind( now_ms )
   .bind( "test_user" )
@@ -118,7 +119,7 @@ async fn seed_agent_with_encrypted_key(
 async fn seed_agent_without_provider_key(pool: &sqlx::SqlitePool, agent_id: i64) {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
-  // Create test user if doesn't exist
+  // Create test user if it doesn't exist
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -139,7 +140,7 @@ async fn seed_agent_without_provider_key(pool: &sqlx::SqlitePool, agent_id: i64)
     "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
   )
   .bind(agent_id)
-  .bind(format!("test_agent_{}", agent_id))
+  .bind(format!("test_agent_{agent_id}"))
   .bind(serde_json::to_string(&vec!["openai"]).unwrap())
   .bind(now_ms)
   .bind("test_user")
@@ -367,7 +368,7 @@ async fn test_get_provider_key_crypto_unavailable() {
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 103000i64 )
+  .bind( 103_000_i64 )
   .bind( "openai" )
   .bind( "fake_encrypted_data" )
   .bind( "fake_nonce" )
@@ -387,7 +388,7 @@ async fn test_get_provider_key_crypto_unavailable() {
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
-  .bind( 103000i64 )
+  .bind( 103_000_i64 )
   .execute( &pool )
   .await
   .unwrap();
@@ -461,7 +462,7 @@ async fn test_get_provider_key_disabled_key() {
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 104000i64 )
+  .bind( 104_000_i64 )
   .bind( "openai" )
   .bind( ciphertext_b64 )
   .bind( nonce_b64 )
@@ -481,7 +482,7 @@ async fn test_get_provider_key_disabled_key() {
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
-  .bind( 104000i64 )
+  .bind( 104_000_i64 )
   .execute( &pool )
   .await
   .unwrap();

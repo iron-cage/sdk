@@ -33,36 +33,50 @@ use crate::{
 };
 
 /// IC Token route state
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IcTokenState {
+  /// `SQLite` database connection pool
   pub pool: SqlitePool,
+  /// IC token manager for JWT operations
   pub ic_token_manager: Arc<IcTokenManager>,
 }
 
 /// Response for IC token generation (includes actual token - shown only once)
 #[derive(Debug, Serialize)]
 pub struct IcTokenResponse {
+  /// Agent database ID
   pub agent_id: i64,
+  /// Generated IC token (JWT) - shown only once
   pub ic_token: String,
+  /// Creation timestamp in milliseconds
   pub created_at: i64,
+  /// Warning message about token security
   pub warning: String,
 }
 
 /// Response for IC token regeneration (includes new token + invalidation flag)
 #[derive(Debug, Serialize)]
 pub struct IcTokenRegenerateResponse {
+  /// Agent database ID
   pub agent_id: i64,
+  /// New generated IC token (JWT) - shown only once
   pub ic_token: String,
+  /// Creation timestamp in milliseconds
   pub created_at: i64,
+  /// Whether old token was invalidated
   pub old_token_invalidated: bool,
+  /// Warning message about token security
   pub warning: String,
 }
 
 /// Response for IC token status (does NOT include actual token)
 #[derive(Debug, Serialize)]
 pub struct IcTokenStatusResponse {
+  /// Agent database ID
   pub agent_id: i64,
+  /// Whether agent has an active IC token
   pub has_ic_token: bool,
+  /// Token creation timestamp in milliseconds (if exists)
   pub created_at: Option<i64>,
 }
 
@@ -93,6 +107,14 @@ async fn check_agent_access(
 ///
 /// Generate a new IC token for an agent.
 /// Returns 409 Conflict if agent already has an IC token.
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Agent not found
+/// - User lacks permission
+/// - Agent already has IC token
+/// - Database operation fails
 pub async fn generate_ic_token(
   State(state): State<IcTokenState>,
   Path(agent_id): Path<i64>,
@@ -115,8 +137,8 @@ pub async fn generate_ic_token(
 
   // Generate IC token
   let ic_claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id), // Legacy field, kept for compatibility
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"), // Legacy field, kept for compatibility
     vec!["llm:call".to_owned(), "analytics:write".to_owned()],
     None, // Long-lived, no expiration
   );
@@ -124,7 +146,7 @@ pub async fn generate_ic_token(
   let ic_token = state
     .ic_token_manager
     .generate_token(&ic_claims)
-    .map_err(|e| ApiError::Internal(format!("Failed to generate IC token: {}", e)))?;
+    .map_err(|e| ApiError::Internal(format!("Failed to generate IC token: {e}")))?;
 
   // Store hash in database
   let token_hash = sha256_hash(&ic_token);
@@ -152,6 +174,13 @@ pub async fn generate_ic_token(
 ///
 /// Get IC token status for an agent.
 /// Does NOT return the actual token (security).
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Agent not found
+/// - User lacks permission
+/// - Database operation fails
 pub async fn get_ic_token_status(
   State(state): State<IcTokenState>,
   Path(agent_id): Path<i64>,
@@ -178,6 +207,14 @@ pub async fn get_ic_token_status(
 ///
 /// Regenerate IC token for an agent.
 /// Invalidates the old token immediately.
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Agent not found
+/// - User lacks permission
+/// - Token generation fails
+/// - Database operation fails
 pub async fn regenerate_ic_token(
   State(state): State<IcTokenState>,
   Path(agent_id): Path<i64>,
@@ -187,8 +224,8 @@ pub async fn regenerate_ic_token(
 
   // Generate new IC token
   let ic_claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_owned(), "analytics:write".to_owned()],
     None,
   );
@@ -196,7 +233,7 @@ pub async fn regenerate_ic_token(
   let ic_token = state
     .ic_token_manager
     .generate_token(&ic_claims)
-    .map_err(|e| ApiError::Internal(format!("Failed to generate IC token: {}", e)))?;
+    .map_err(|e| ApiError::Internal(format!("Failed to generate IC token: {e}")))?;
 
   // Store new hash inside IMMEDIATE transaction to prevent concurrent regenerate race condition.
   // BEGIN IMMEDIATE acquires a write-lock immediately, so a second concurrent regenerate
@@ -240,6 +277,13 @@ pub async fn regenerate_ic_token(
 ///
 /// Revoke IC token for an agent.
 /// Agent will not be able to authenticate until a new token is generated.
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Agent not found
+/// - User lacks permission
+/// - Database operation fails
 pub async fn revoke_ic_token(
   State(state): State<IcTokenState>,
   Path(agent_id): Path<i64>,

@@ -129,9 +129,9 @@ fn bug_reproducer_issue_003_documentation_exists() {
   for file in &required_files {
     let file_path = docs_dir.join(file);
     if file_path.exists() {
-      existing_files.push(file.to_string());
+      existing_files.push(file.to_owned());
     } else {
-      missing_files.push(file.to_string());
+      missing_files.push(file.to_owned());
     }
   }
 
@@ -140,11 +140,11 @@ fn bug_reproducer_issue_003_documentation_exists() {
   println!("Expected directory: {}", docs_dir.display());
   println!("\nExisting files ({}):", existing_files.len());
   for file in &existing_files {
-    println!("  ✓ {}", file);
+    println!("  ✓ {file}");
   }
   println!("\nMissing files ({}):", missing_files.len());
   for file in &missing_files {
-    println!("  ✗ {}", file);
+    println!("  ✗ {file}");
   }
   println!("========================================\n");
 
@@ -207,17 +207,15 @@ fn bug_reproducer_issue_003_git_hook_exists() {
   let hook_path = repo_root.join(".git/hooks/pre-commit");
 
   // Check if hook exists
-  if !hook_path.exists() {
-    panic!(
-      "BUG REPRODUCER: Pre-commit hook missing.\n\
-       Expected: {}\n\
-       \n\
-       Pre-commit hook prevents accidental rollback during development.\n\
-       Without it, developers can commit code that removes Protocol 005\n\
-       enforcement without immediate detection.",
-      hook_path.display()
-    );
-  }
+  assert!(hook_path.exists(),
+    "BUG REPRODUCER: Pre-commit hook missing.\n\
+     Expected: {}\n\
+     \n\
+     Pre-commit hook prevents accidental rollback during development.\n\
+     Without it, developers can commit code that removes Protocol 005\n\
+     enforcement without immediate detection.",
+    hook_path.display()
+  );
 
   // Check hook size (must be >= 100 bytes for real enforcement logic)
   let metadata = std::fs::metadata(&hook_path).unwrap();
@@ -225,7 +223,7 @@ fn bug_reproducer_issue_003_git_hook_exists() {
 
   println!("\n=== PRE-COMMIT HOOK STATUS ===");
   println!("Path: {}", hook_path.display());
-  println!("Size: {} bytes", size);
+  println!("Size: {size} bytes");
   println!("Required: >= 100 bytes");
   println!(
     "Status: {}",
@@ -240,7 +238,7 @@ fn bug_reproducer_issue_003_git_hook_exists() {
   // CRITICAL ASSERTION: Hook must have real content
   assert!(
     size >= 100,
-    "BUG REPRODUCER: Pre-commit hook is stub ({} bytes, need >= 100).\n\
+    "BUG REPRODUCER: Pre-commit hook is stub ({size} bytes, need >= 100).\n\
      \n\
      Current hook does not contain enforcement logic. It cannot prevent\n\
      accidental rollback of Protocol 005 code.\n\
@@ -250,8 +248,7 @@ fn bug_reproducer_issue_003_git_hook_exists() {
      - Agent token enforcement present\n\
      - Migration metrics pass\n\
      \n\
-     Stub hooks provide ZERO protection against rollback.",
-    size
+     Stub hooks provide ZERO protection against rollback."
   );
 
   // TODO: Add content validation
@@ -315,16 +312,16 @@ fn bug_reproducer_issue_003_migration_state_metrics() {
   let new_percentage = (new_pattern_count as f64 / total_patterns as f64) * 100.0;
 
   println!("\n=== MIGRATION STATE METRICS ===");
-  println!("Total patterns: {}", total_patterns);
-  println!("Completed: {} ({:.0}%)", new_pattern_count, new_percentage);
-  println!("Incomplete: {} ({:.0}%)", old_pattern_count, old_percentage);
+  println!("Total patterns: {total_patterns}");
+  println!("Completed: {new_pattern_count} ({new_percentage:.0}%)");
+  println!("Incomplete: {old_pattern_count} ({old_percentage:.0}%)");
   println!("\nCompleted patterns:");
   for pattern in &completed_patterns {
-    println!("  ✓ {}", pattern);
+    println!("  ✓ {pattern}");
   }
   println!("\nIncomplete patterns:");
   for pattern in &incomplete_patterns {
-    println!("  ✗ {}", pattern);
+    println!("  ✗ {pattern}");
   }
   println!("=================================\n");
 
@@ -348,8 +345,7 @@ fn bug_reproducer_issue_003_migration_state_metrics() {
   assert_eq!(
     new_pattern_count, total_patterns,
     "BUG REPRODUCER: Migration not 100% complete.\n\
-     Completed {}/{} patterns ({:.0}%), expected 100%.",
-    new_pattern_count, total_patterns, new_percentage
+     Completed {new_pattern_count}/{total_patterns} patterns ({new_percentage:.0}%), expected 100%."
   );
 }
 
@@ -412,16 +408,16 @@ fn bug_reproducer_issue_003_enforcement_coverage() {
   let coverage_percentage = (active_count as f64 / required_total as f64) * 100.0;
 
   println!("\n=== ENFORCEMENT COVERAGE STATUS ===");
-  println!("Required mechanisms: {}", required_total);
-  println!("Active: {} ({:.0}%)", active_count, coverage_percentage);
-  println!("Inactive: {}", inactive_count);
+  println!("Required mechanisms: {required_total}");
+  println!("Active: {active_count} ({coverage_percentage:.0}%)");
+  println!("Inactive: {inactive_count}");
   println!("\nActive mechanisms:");
   for mechanism in &active_mechanisms {
-    println!("  ✓ {}", mechanism);
+    println!("  ✓ {mechanism}");
   }
   println!("\nInactive mechanisms:");
   for mechanism in &inactive_mechanisms {
-    println!("  ✗ {}", mechanism);
+    println!("  ✗ {mechanism}");
   }
   println!("====================================\n");
 
@@ -447,10 +443,8 @@ fn bug_reproducer_issue_003_enforcement_coverage() {
   assert!(
     current_total >= required_total,
     "BUG REPRODUCER: Mechanism count mismatch.\n\
-     Tracking {} mechanisms, but spec requires {}.\n\
-     Need to identify remaining mechanisms.",
-    current_total,
-    required_total
+     Tracking {current_total} mechanisms, but spec requires {required_total}.\n\
+     Need to identify remaining mechanisms."
   );
 }
 
@@ -500,15 +494,13 @@ fn bug_reproducer_issue_003_script_validates_working_directory() {
 
   let script_path = repo_root.join("dev/-dev1/-default_topic/-phase1_verify.sh");
 
-  if !script_path.exists() {
-    panic!(
-      "BUG REPRODUCER: Verification script not found.\n\
-       Expected: {}\n\
-       \n\
-       Cannot verify working directory validation if script doesn't exist.",
-      script_path.display()
-    );
-  }
+  assert!(script_path.exists(),
+    "BUG REPRODUCER: Verification script not found.\n\
+     Expected: {}\n\
+     \n\
+     Cannot verify working directory validation if script doesn't exist.",
+    script_path.display()
+  );
 
   // Read script content
   let script_content = std::fs::read_to_string(&script_path).expect("Failed to read script");

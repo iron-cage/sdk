@@ -1,12 +1,12 @@
 //! Budget refresh endpoint corner case tests
 //!
 //! Tests refresh-specific corner cases for Protocol 005:
-//! - NULL additional_budget field validation
-//! - Float overflow conditions (f64::MAX, Infinity)
+//! - NULL `additional_budget` field validation
+//! - Float overflow conditions (`f64::MAX`, Infinity)
 //! - Non-finite value handling (NaN)
 //!
 //! # Authority
-//! test_organization.rulebook.md § Comprehensive Corner Case Coverage
+//! `test_organization.rulebook.md` § Comprehensive Corner Case Coverage
 //!
 //! # Test Matrix
 //!
@@ -30,10 +30,10 @@ use common::budget::{
 use serde_json::json;
 use tower::ServiceExt;
 
-/// Manual Test Gap #25: Refresh - NULL requested_budget field
+/// Manual Test Gap #25: Refresh - NULL `requested_budget` field
 ///
 /// # Corner Case
-/// POST /api/budget/refresh with requested_budget=null
+/// POST /api/budget/refresh with `requested_budget=null`
 ///
 /// # Expected Behavior
 /// Request succeeds with default budget (NULL is valid - uses default)
@@ -87,7 +87,7 @@ async fn test_refresh_null_additional_budget() {
         .method("POST")
         .uri("/api/budget/refresh")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
@@ -95,17 +95,17 @@ async fn test_refresh_null_additional_budget() {
     .unwrap();
 
   // NULL requested_budget is valid - should succeed with default
-  assert!(
-    response.status() == StatusCode::OK,
+  assert_eq!(
+    response.status(), StatusCode::OK,
     "NULL requested_budget should succeed with default budget, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #26: Refresh - Float overflow requested_budget (f64::MAX)
+/// Manual Test Gap #26: Refresh - Float overflow `requested_budget` (`f64::MAX`)
 ///
 /// # Corner Case
-/// POST /api/budget/refresh with requested_budget=f64::MAX
+/// POST /api/budget/refresh with `requested_budget=f64::MAX`
 ///
 /// # Expected Behavior
 /// 400 Bad Request or 422 Unprocessable Entity (JSON deserialization fails for i64)
@@ -157,7 +157,7 @@ async fn test_refresh_float_overflow_f64_max() {
         .method("POST")
         .uri("/api/budget/refresh")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
@@ -172,16 +172,16 @@ async fn test_refresh_float_overflow_f64_max() {
   );
 }
 
-/// Manual Test Gap #26 (variant): Refresh - Float overflow requested_budget (Infinity)
+/// Manual Test Gap #26 (variant): Refresh - Float overflow `requested_budget` (Infinity)
 ///
 /// # Corner Case
-/// POST /api/budget/refresh with requested_budget=Infinity
+/// POST /api/budget/refresh with `requested_budget=Infinity`
 ///
 /// # Expected Behavior
-/// 200 OK with default budget (f64::INFINITY serializes to JSON null, which is valid for Option<i64>)
+/// 200 OK with default budget (`f64::INFINITY` serializes to JSON null, which is valid for Option<i64>)
 ///
 /// # Note
-/// JSON doesn't support Infinity, so serde_json serializes it as null. This is valid for Option<i64>
+/// JSON doesn't support Infinity, so `serde_json` serializes it as null. This is valid for Option<i64>
 /// and triggers default budget behavior. This is acceptable - clients sending Infinity get default budget.
 #[tokio::test]
 async fn test_refresh_float_overflow_infinity() {
@@ -229,7 +229,7 @@ async fn test_refresh_float_overflow_infinity() {
         .method("POST")
         .uri("/api/budget/refresh")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
@@ -237,23 +237,23 @@ async fn test_refresh_float_overflow_infinity() {
     .unwrap();
 
   // Infinity becomes null, which is valid for Option<i64> - should succeed with default budget
-  assert!(
-    response.status() == StatusCode::OK,
+  assert_eq!(
+    response.status(), StatusCode::OK,
     "Infinity requested_budget (becomes null) should succeed with default budget, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #27: Refresh - NaN requested_budget
+/// Manual Test Gap #27: Refresh - NaN `requested_budget`
 ///
 /// # Corner Case
-/// POST /api/budget/refresh with requested_budget=NaN
+/// POST /api/budget/refresh with `requested_budget=NaN`
 ///
 /// # Expected Behavior
-/// 200 OK with default budget (f64::NAN serializes to JSON null, which is valid for Option<i64>)
+/// 200 OK with default budget (`f64::NAN` serializes to JSON null, which is valid for Option<i64>)
 ///
 /// # Note
-/// JSON doesn't support NaN, so serde_json serializes it as null. This is valid for Option<i64>
+/// JSON doesn't support NaN, so `serde_json` serializes it as null. This is valid for Option<i64>
 /// and triggers default budget behavior. This is acceptable - clients sending NaN get default budget.
 #[tokio::test]
 async fn test_refresh_nan_additional_budget() {
@@ -301,7 +301,7 @@ async fn test_refresh_nan_additional_budget() {
         .method("POST")
         .uri("/api/budget/refresh")
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", access_token))
+        .header("authorization", format!("Bearer {access_token}"))
         .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
@@ -309,8 +309,8 @@ async fn test_refresh_nan_additional_budget() {
     .unwrap();
 
   // NaN becomes null, which is valid for Option<i64> - should succeed with default budget
-  assert!(
-    response.status() == StatusCode::OK,
+  assert_eq!(
+    response.status(), StatusCode::OK,
     "NaN requested_budget (becomes null) should succeed with default budget, got: {}",
     response.status()
   );

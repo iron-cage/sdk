@@ -55,7 +55,8 @@ async fn setup_test_db() -> SqlitePool {
   pool
 }
 
-/// Helper: Create test BudgetState
+/// Helper: Create test `BudgetState`
+#[allow(clippy::unused_async)]
 async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
@@ -98,8 +99,8 @@ async fn create_ic_token(
   manager: &IcTokenManager,
 ) -> String {
   let claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -119,8 +120,8 @@ async fn create_ic_token(
 /// Helper: Seed agent with specific budget and provider key
 ///
 /// # Fix(issue-database-state-unique-001)
-/// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
-/// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
+/// Root cause: Hardcoded `agent_id=1` and `provider_key` id=1 conflicted with migration 017 seeded data
+/// Pitfall: Always use unique IDs for test data; use `agent_id` > 100 and `provider_key` id = `agent_id` * 1000 to avoid conflicts
 async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdollars: i64) {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
@@ -145,7 +146,7 @@ async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdo
     "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
   )
   .bind(agent_id)
-  .bind(format!("test_agent_{}", agent_id))
+  .bind(format!("test_agent_{agent_id}"))
   .bind(serde_json::to_string(&vec!["openai"]).unwrap())
   .bind(now_ms)
   .bind("test_user")
@@ -170,7 +171,7 @@ async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdo
   // Insert into ai_provider_keys (actual table name from migration 004)
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
   // Create real encrypted provider key for testing
-  let test_provider_key = format!("sk-test_key_for_agent_{}", agent_id);
+  let test_provider_key = format!("sk-test_key_for_agent_{agent_id}");
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
   let crypto_service = iron_secrets::crypto::CryptoService::new(&provider_key_master)
     .expect("LOUD FAILURE: Should create crypto service");
@@ -216,7 +217,7 @@ async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdo
 ///
 /// # Corner Case
 ///
-/// IC Token contains agent_id that doesnt exist in database
+/// IC Token contains `agent_id` that doesnt exist in database
 ///
 /// # Expected Behavior
 ///
@@ -254,7 +255,7 @@ async fn test_handshake_with_nonexistent_agent() {
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 999000i64 )
+  .bind( 999_000_i64 )
   .bind( "openai" )
   .bind( "encrypted_test_key_base64" )
   .bind( "test_nonce_base64" )
@@ -275,7 +276,7 @@ async fn test_handshake_with_nonexistent_agent() {
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 999000
+    "provider_key_id": 999_000
   } );
 
   let app = Router::new()
@@ -305,8 +306,7 @@ async fn test_handshake_with_nonexistent_agent() {
 
   assert!(
     body_str.contains("Invalid IC Token"),
-    "Error message should be generic to prevent agent enumeration: {}",
-    body_str
+    "Error message should be generic to prevent agent enumeration: {body_str}"
   );
 }
 
@@ -318,7 +318,7 @@ async fn test_handshake_with_nonexistent_agent() {
 ///
 /// # Corner Case
 ///
-/// Agent exists in database but budget.remaining_micros = 0
+/// Agent exists in database but `budget.remaining_micros` = 0
 ///
 /// # Expected Behavior
 ///
@@ -345,7 +345,7 @@ async fn test_handshake_with_zero_agent_budget() {
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 114000
+    "provider_key_id": 114_000
   } );
 
   let app = Router::new()
@@ -375,8 +375,7 @@ async fn test_handshake_with_zero_agent_budget() {
 
   assert!(
     body_str.contains("Budget limit exceeded"),
-    "Error message should indicate budget limit exceeded: {}",
-    body_str
+    "Error message should indicate budget limit exceeded: {body_str}"
   );
 }
 
@@ -393,7 +392,7 @@ async fn test_handshake_with_zero_agent_budget() {
 /// # Expected Behavior
 ///
 /// - HTTP 200 OK with granted budget = $5.00
-/// - Implementation grants min(default_lease, remaining_budget) to allow partial leases
+/// - Implementation grants `min(default_lease, remaining_budget)` to allow partial leases
 ///
 /// # Root Cause Prevention
 ///
@@ -415,7 +414,7 @@ async fn test_handshake_with_insufficient_budget_for_lease() {
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 115000
+    "provider_key_id": 115_000
   } );
 
   let app = Router::new()
@@ -447,8 +446,7 @@ async fn test_handshake_with_insufficient_budget_for_lease() {
   let granted = response_json["budget_granted"].as_i64().unwrap();
   assert_eq!(
     granted, 5_000_000,
-    "Should grant partial lease of $5, got {} microdollars",
-    granted
+    "Should grant partial lease of $5, got {granted} microdollars"
   );
 }
 
@@ -516,8 +514,7 @@ async fn test_report_usage_with_nonexistent_lease() {
 
   assert!(
     body_str.contains("Lease not found") || body_str.contains("not found"),
-    "Error message should indicate lease not found: {}",
-    body_str
+    "Error message should indicate lease not found: {body_str}"
   );
 }
 
@@ -529,7 +526,7 @@ async fn test_report_usage_with_nonexistent_lease() {
 ///
 /// # Corner Case
 ///
-/// Lease exists but expires_at < current_time
+/// Lease exists but `expires_at` < `current_time`
 ///
 /// # Expected Behavior
 ///
@@ -606,8 +603,7 @@ async fn test_report_usage_on_expired_lease() {
 
   assert!(
     body_str.contains("expired") || body_str.contains("Lease expired"),
-    "Error message should indicate lease expired: {}",
-    body_str
+    "Error message should indicate lease expired: {body_str}"
   );
 }
 
@@ -689,7 +685,7 @@ async fn test_report_usage_on_expired_lease() {
 ///
 /// # Corner Case
 ///
-/// Lease budget_granted = $1.00, budget_spent = $0.90, usage report cost = $0.50
+/// Lease `budget_granted` = $1.00, `budget_spent` = $0.90, usage report cost = $0.50
 /// Remaining = $0.10, but trying to spend $0.50
 ///
 /// # Expected Behavior
@@ -702,13 +698,13 @@ async fn test_report_usage_on_expired_lease() {
 /// **Why This Test Exists**: This is the PRIMARY budget enforcement mechanism.
 /// Without this check, agents could exceed lease budgets indefinitely.
 ///
-/// **Prevention**: Lease budget check MUST occur BEFORE updating budget_spent.
+/// **Prevention**: Lease budget check MUST occur BEFORE updating `budget_spent`.
 ///
 /// # Bug Reproducer
 ///
 /// This test exposes a CRITICAL bug: `report_usage` endpoint (budget.rs:612-624)
 /// does NOT check if lease has sufficient remaining budget before recording usage.
-/// It blindly calls `record_usage()` which just adds to budget_spent unconditionally.
+/// It blindly calls `record_usage()` which just adds to `budget_spent` unconditionally.
 #[tokio::test]
 async fn test_report_usage_exceeding_lease_budget() {
   let pool = setup_test_db().await;
@@ -771,8 +767,7 @@ async fn test_report_usage_exceeding_lease_budget() {
 
   assert!(
     body_str.contains("Insufficient") || body_str.contains("budget"),
-    "Error message should indicate insufficient budget: {}",
-    body_str
+    "Error message should indicate insufficient budget: {body_str}"
   );
 }
 
@@ -883,7 +878,7 @@ async fn test_report_usage_exceeding_lease_budget() {
 ///
 /// # Expected Behavior
 ///
-/// - HTTP 200 OK with status="denied" and reason="insufficient_budget"
+/// - HTTP 200 OK with status="denied" and `reason="insufficient_budget"`
 /// - Prevents lease refresh when agent cannot afford it
 ///
 /// # Root Cause Prevention
@@ -938,7 +933,7 @@ async fn test_refresh_with_insufficient_agent_budget() {
     .method("POST")
     .uri("/api/budget/refresh")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", access_token))
+    .header("authorization", format!("Bearer {access_token}"))
     .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 

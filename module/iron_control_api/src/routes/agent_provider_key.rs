@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Provider key request
 #[derive(Debug, Deserialize)]
 pub struct GetProviderKeyRequest {
+  /// IC Token for authentication
   pub ic_token: String,
 }
 
@@ -24,6 +25,12 @@ impl GetProviderKeyRequest {
   const MAX_IC_TOKEN_LENGTH: usize = 2000;
 
   /// Validate request parameters
+  ///
+  /// # Errors
+  ///
+  /// Returns `ValidationError` if:
+  /// - `ic_token` is empty
+  /// - `ic_token` exceeds maximum length
   pub fn validate(&self) -> Result<(), ValidationError> {
     if self.ic_token.trim().is_empty() {
       return Err(ValidationError::MissingField("ic_token".to_string()));
@@ -59,23 +66,27 @@ pub struct GetProviderKeyResponse {
 /// # Flow
 ///
 /// 1. Validate request
-/// 2. Verify IC Token -> extract agent_id
-/// 3. Query agents table for provider_key_id
-/// 4. If NULL -> 403 NO_PROVIDER_ASSIGNED
-/// 5. Get ai_provider_keys record
+/// 2. Verify IC Token -> extract `agent_id`
+/// 3. Query agents table for `provider_key_id`
+/// 4. If NULL -> 403 `NO_PROVIDER_ASSIGNED`
+/// 5. Get `ai_provider_keys` record
 /// 6. Check key is enabled
-/// 7. Decrypt API key using CryptoService
+/// 7. Decrypt API key using `CryptoService`
 /// 8. Log audit entry
 /// 9. Return decrypted key
 ///
 /// # Returns
 ///
 /// - 200 OK with provider key
-/// - 400 Bad Request if validation fails (INVALID_TOKEN)
+/// - 400 Bad Request if validation fails (`INVALID_TOKEN`)
 /// - 401 Unauthorized if IC Token invalid (UNAUTHORIZED)
-/// - 403 Forbidden if no provider assigned (NO_PROVIDER_ASSIGNED)
-/// - 404 Not Found if provider key not found (PROVIDER_NOT_FOUND)
-/// - 503 Service Unavailable if crypto not configured (CRYPTO_UNAVAILABLE)
+/// - 403 Forbidden if no provider assigned (`NO_PROVIDER_ASSIGNED`)
+/// - 404 Not Found if provider key not found (`PROVIDER_NOT_FOUND`)
+/// - 503 Service Unavailable if crypto not configured (`CRYPTO_UNAVAILABLE`)
+///
+/// # Panics
+///
+/// May panic if system time goes backwards (which should never happen in practice).
 pub async fn get_provider_key(
   State(state): State<BudgetState>,
   Json(request): Json<GetProviderKeyRequest>,
@@ -137,18 +148,15 @@ pub async fn get_provider_key(
     };
 
   // 5. Check if agent has provider assigned
-  let provider_key_id = match provider_key_id {
-    Some(id) => id,
-    None => {
-      return (
-        StatusCode::FORBIDDEN,
-        Json(serde_json::json!({
-          "error": "Agent has no provider assigned",
-          "code": "NO_PROVIDER_ASSIGNED"
-        })),
-      )
-        .into_response();
-    }
+  let Some(provider_key_id) = provider_key_id else {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": "Agent has no provider assigned",
+        "code": "NO_PROVIDER_ASSIGNED"
+      })),
+    )
+      .into_response();
   };
 
   // 6. Get provider key record (includes encrypted data)
@@ -184,19 +192,16 @@ pub async fn get_provider_key(
   }
 
   // 8. Get crypto service
-  let crypto = match &state.crypto_service {
-    Some(c) => c,
-    None => {
-      tracing::error!("CryptoService not configured");
-      return (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(serde_json::json!({
-          "error": "Crypto service unavailable",
-          "code": "CRYPTO_UNAVAILABLE"
-        })),
-      )
-        .into_response();
-    }
+  let Some(crypto) = &state.crypto_service else {
+    tracing::error!("CryptoService not configured");
+    return (
+      StatusCode::SERVICE_UNAVAILABLE,
+      Json(serde_json::json!({
+        "error": "Crypto service unavailable",
+        "code": "CRYPTO_UNAVAILABLE"
+      })),
+    )
+      .into_response();
   };
 
   // 9. Reconstruct encrypted secret from base64
@@ -234,10 +239,13 @@ pub async fn get_provider_key(
   };
 
   // 11. Log audit entry (fire and forget)
-  let now_ms = std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH)
-    .expect("LOUD FAILURE: Time went backwards")
-    .as_millis() as i64;
+  let now_ms = i64::try_from(
+    std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
+      .as_millis(),
+  )
+  .unwrap_or(i64::MAX);
 
   let changes = serde_json::json!({
     "agent_id": agent_id,

@@ -19,15 +19,23 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 
 /// Budget protocol shared state
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BudgetState {
+  /// IC token manager for authentication
   pub ic_token_manager: Arc<IcTokenManager>,
+  /// Crypto service for IP token encryption
   pub ip_token_crypto: Arc<IpTokenCrypto>,
+  /// Manager for budget leases
   pub lease_manager: Arc<LeaseManager>,
+  /// Manager for agent budgets
   pub agent_budget_manager: Arc<AgentBudgetManager>,
+  /// Storage for provider API keys
   pub provider_key_storage: Arc<ProviderKeyStorage>,
+  /// Crypto service for provider key encryption/decryption
   pub provider_key_crypto: Arc<CryptoService>,
+  /// `SQLite` database connection pool
   pub db_pool: SqlitePool,
+  /// JWT secret for access token verification
   pub jwt_secret: Arc<JwtSecret>,
   /// Crypto service for decrypting provider keys (Feature 014)
   pub crypto_service: Option<Arc<CryptoService>>,
@@ -35,7 +43,7 @@ pub struct BudgetState {
   pub ic_token_rate_limiter: IcTokenRateLimiter,
 }
 
-/// Enable AuthState extraction from BudgetState
+/// Enable `AuthState` extraction from `BudgetState`
 impl FromRef<BudgetState> for AuthState {
   fn from_ref(state: &BudgetState) -> Self {
     AuthState {

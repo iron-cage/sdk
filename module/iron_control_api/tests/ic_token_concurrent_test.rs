@@ -47,7 +47,7 @@ async fn insert_agent(pool: &SqlitePool, agent_id: i64, token_hash: &str) {
     "INSERT INTO agents (id, name, providers, created_at, ic_token_hash) VALUES (?, ?, '[]', 0, ?)",
   )
   .bind(agent_id)
-  .bind(format!("agent_{}", agent_id))
+  .bind(format!("agent_{agent_id}"))
   .bind(token_hash)
   .execute(pool)
   .await
@@ -60,8 +60,8 @@ fn manager() -> IcTokenManager {
 
 fn generate_token(mgr: &IcTokenManager, agent_id: i64) -> String {
   let claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -153,15 +153,15 @@ async fn test_concurrent_validation_during_regenerate() {
   assert_eq!(val_results.len(), 10, "All 10 validations should complete");
 
   // After regenerate: `Token A` must be rejected, `Token B` must be accepted
-  let token_a_after = mgr.validate_ic_token_runtime(&token_a, &pool).await;
+  let old_token_result = mgr.validate_ic_token_runtime(&token_a, &pool).await;
   assert!(
-    token_a_after.is_err(),
+    old_token_result.is_err(),
     "Token A must be rejected after regenerate"
   );
 
-  let token_b_after = mgr.validate_ic_token_runtime(&token_b, &pool).await;
+  let new_token_result = mgr.validate_ic_token_runtime(&token_b, &pool).await;
   assert!(
-    token_b_after.is_ok(),
+    new_token_result.is_ok(),
     "Token B must be accepted after regenerate"
   );
 }

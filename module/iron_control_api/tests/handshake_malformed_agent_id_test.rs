@@ -1,17 +1,17 @@
-//! Authorization Bypass Fix - Malformed agent_id Validation
+//! Authorization Bypass Fix - Malformed `agent_id` Validation
 //!
 //! # Security Context
 //!
-//! **Vulnerability:** Authorization bypass via malformed agent_id
+//! **Vulnerability:** Authorization bypass via malformed `agent_id`
 //! **Severity:** CRITICAL
 //! **CVE:** Internal (not publicly disclosed)
 //! **Location:** `routes/budget/handshake.rs:143`
 //!
 //! ## Vulnerability Details
 //!
-//! The Budget Control API handshake endpoint parses agent_id from IC Tokens.
-//! When parsing fails (malformed agent_id), the code used `.unwrap_or(1)`,
-//! defaulting to agent_id=1. This allowed attackers to bypass authorization:
+//! The Budget Control API handshake endpoint parses `agent_id` from IC Tokens.
+//! When parsing fails (malformed `agent_id`), the code used `.unwrap_or(1)`,
+//! defaulting to `agent_id=1`. This allowed attackers to bypass authorization:
 //!
 //! ```rust
 //! // VULNERABLE CODE (before fix):
@@ -28,14 +28,14 @@
 //! 1. Create IC Token with `agent_id = "agent_INVALID"` (non-numeric)
 //! 2. Send handshake request with this IC Token
 //! 3. Parsing fails → defaults to `agent_id=1`
-//! 4. Attacker now uses agent_id=1's budget (authorization bypass)
+//! 4. Attacker now uses `agent_id=1`'s budget (authorization bypass)
 //!
 //! ### Impact
 //!
 //! - Unauthorized budget access
-//! - Budget exhaustion for victim agent_id=1
+//! - Budget exhaustion for victim `agent_id=1`
 //! - Billing fraud
-//! - No audit trail (requests logged under wrong agent_id)
+//! - No audit trail (requests logged under wrong `agent_id`)
 //!
 //! ## Fix Applied
 //!
@@ -58,8 +58,8 @@
 //!
 //! ## Test Strategy
 //!
-//! These tests verify that malformed agent_id inputs are rejected with
-//! 400 Bad Request, NOT defaulted to agent_id=1.
+//! These tests verify that malformed `agent_id` inputs are rejected with
+//! 400 Bad Request, NOT defaulted to `agent_id=1`.
 //!
 //! ### Test Matrix
 //!
@@ -82,10 +82,10 @@ use tower::ServiceExt;
 
 mod common;
 
-/// Test helper: Create IC Token with custom agent_id (including malformed)
+/// Test helper: Create IC Token with custom `agent_id` (including malformed)
 ///
-/// Unlike the standard `create_ic_token` helper which uses numeric agent_id,
-/// this helper allows creating IC Tokens with malformed agent_id strings
+/// Unlike the standard `create_ic_token` helper which uses numeric `agent_id`,
+/// this helper allows creating IC Tokens with malformed `agent_id` strings
 /// (alphabetic, special chars, etc.) for security testing.
 fn create_ic_token_with_agent_id(
   agent_id_value: &str,
@@ -93,7 +93,7 @@ fn create_ic_token_with_agent_id(
 ) -> String {
   let claims = IcTokenClaims::new(
     agent_id_value.to_string(), // Allows malformed values (agent_INVALID, etc.)
-    format!("budget_{}", agent_id_value),
+    format!("budget_{agent_id_value}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -103,10 +103,10 @@ fn create_ic_token_with_agent_id(
     .expect("LOUD FAILURE: Should generate IC Token")
 }
 
-/// **Test 1:** Malformed agent_id (alphabetic characters) must be rejected
+/// **Test 1:** Malformed `agent_id` (alphabetic characters) must be rejected
 ///
-/// **Attack Vector:** agent_id="agent_INVALID" (parse fails)
-/// **Expected:** 400 Bad Request (NOT default to agent_id=1)
+/// **Attack Vector:** `agent_id="agent_INVALID"` (parse fails)
+/// **Expected:** 400 Bad Request (NOT default to `agent_id=1`)
 ///
 /// This is the primary attack vector from the vulnerability analysis.
 #[tokio::test]
@@ -153,14 +153,13 @@ async fn test_malformed_agent_id_alphabetic() {
 
   assert!(
     body_text.contains("Invalid IC Token"),
-    "Error message should be generic 'Invalid IC Token': {}",
-    body_text
+    "Error message should be generic 'Invalid IC Token': {body_text}"
   );
 }
 
-/// **Test 2:** Malformed agent_id (special characters) must be rejected
+/// **Test 2:** Malformed `agent_id` (special characters) must be rejected
 ///
-/// **Attack Vector:** agent_id="agent_!!!@@@###" (parse fails)
+/// **Attack Vector:** `agent_id="agent_!!!@@@###"` (parse fails)
 /// **Expected:** 400 Bad Request
 #[tokio::test]
 async fn test_malformed_agent_id_special_chars() {
@@ -189,9 +188,9 @@ async fn test_malformed_agent_id_special_chars() {
   );
 }
 
-/// **Test 3:** Integer overflow agent_id must be rejected
+/// **Test 3:** Integer overflow `agent_id` must be rejected
 ///
-/// **Attack Vector:** agent_id="agent_99999999999999999999" (overflow i64)
+/// **Attack Vector:** `agent_id="agent_99999999999999999999"` (overflow i64)
 /// **Expected:** 400 Bad Request
 #[tokio::test]
 async fn test_malformed_agent_id_overflow() {
@@ -223,9 +222,9 @@ async fn test_malformed_agent_id_overflow() {
   );
 }
 
-/// **Test 4:** Negative agent_id must be rejected
+/// **Test 4:** Negative `agent_id` must be rejected
 ///
-/// **Attack Vector:** agent_id="agent_-1" (parses as -1)
+/// **Attack Vector:** `agent_id="agent_-1"` (parses as -1)
 /// **Expected:** 400 Bad Request (database IDs must be positive)
 #[tokio::test]
 async fn test_malformed_agent_id_negative() {
@@ -260,14 +259,13 @@ async fn test_malformed_agent_id_negative() {
 
   assert!(
     body_text.contains("Invalid IC Token"),
-    "Error message should be generic 'Invalid IC Token': {}",
-    body_text
+    "Error message should be generic 'Invalid IC Token': {body_text}"
   );
 }
 
-/// **Test 5:** Zero agent_id must be rejected
+/// **Test 5:** Zero `agent_id` must be rejected
 ///
-/// **Attack Vector:** agent_id="agent_0" (parses as 0)
+/// **Attack Vector:** `agent_id="agent_0"` (parses as 0)
 /// **Expected:** 400 Bad Request (database IDs start at 1)
 #[tokio::test]
 async fn test_malformed_agent_id_zero() {
@@ -296,12 +294,12 @@ async fn test_malformed_agent_id_zero() {
   );
 }
 
-/// **Test 6:** Valid agent_id must be accepted (positive control)
+/// **Test 6:** Valid `agent_id` must be accepted (positive control)
 ///
-/// **Valid Input:** agent_id="agent_42" (parses as 42)
+/// **Valid Input:** `agent_id="agent_42"` (parses as 42)
 /// **Expected:** NOT 400 (either 200 success or 403 forbidden if no budget)
 ///
-/// This test verifies that the fix doesn't break valid agent_id inputs.
+/// This test verifies that the fix doesn't break valid `agent_id` inputs.
 #[tokio::test]
 async fn test_valid_agent_id() {
   let pool = common::budget::setup_test_db().await;
@@ -348,7 +346,7 @@ async fn test_valid_agent_id() {
 //
 // **Pitfall:** Never use fallback values for security-critical parsing. Always
 // reject invalid input with explicit error responses. Using `.unwrap_or()` for
-// authorization data is a critical anti-pattern:
+// authorization data is a critical antipattern:
 // 1. Silently accepts malformed input (no audit trail)
 // 2. Creates authorization bypass when fallback is privileged
 // 3. Billing fraud (requests billed to wrong agent)

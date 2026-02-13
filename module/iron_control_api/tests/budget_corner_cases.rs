@@ -3,30 +3,30 @@
 //! These tests cover corner cases not yet in automated test suite, identified
 //! during manual testing workflow. Tests focus on:
 //! - Whitespace-only inputs (empty string variants)
-//! - Exact boundary violations (off-by-one DoS prevention)
-//! - Malformed JWT segments
+//! - Exact boundary violations (off-by-one `DoS` prevention)
+//! - Malformed `JWT` segments
 //! - Negative numeric values
 //! - Extreme float values
 //! - Error message security (no sensitive data leaks)
 //!
 //! # Authority
-//! test_organization.rulebook.md § Comprehensive Corner Case Coverage
+//! `test_organization.rulebook.md` § Comprehensive Corner Case Coverage
 //!
 //! ## Test Matrix
 //!
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
-//! | `test_handshake_whitespace_only_ic_token` | Whitespace-only IC token validation | POST /api/budget/handshake with ic_token="   \t\n  " | 400 Bad Request, error mentions "empty" | ✅ |
-//! | `test_handshake_whitespace_only_provider` | Whitespace-only provider validation | POST /api/budget/handshake with provider="   " | 400 Bad Request | ✅ |
-//! | `test_handshake_ic_token_over_max_length` | IC token DoS protection | POST /api/budget/handshake with ic_token >10KB | 400 Bad Request (length limit) | ✅ |
-//! | `test_handshake_provider_over_max_length` | Provider DoS protection | POST /api/budget/handshake with provider >1KB | 400 Bad Request (length limit) | ✅ |
-//! | `test_handshake_malformed_jwt_missing_segments` | Malformed JWT handling | POST /api/budget/handshake with ic_token="invalid.jwt" | 400 Bad Request (JWT validation) | ✅ |
-//! | `test_report_usage_negative_tokens` | Negative token value validation | POST /api/budget/report with tokens=-100 | 400 Bad Request | ✅ |
-//! | `test_report_usage_negative_cost` | Negative cost value validation | POST /api/budget/report with cost_microdollars=-5_000_000 | 400 Bad Request | ✅ |
+//! | `test_handshake_whitespace_only_ic_token` | Whitespace-only `IC` token validation | `POST /api/budget/handshake with ic_token="   \t\n  " | 400 Bad Request, error mentions "empty" | ✅ |
+//! | `test_handshake_whitespace_only_provider` | Whitespace-only provider validation | `POST /api/budget/handshake with provider="   " | 400 Bad Request | ✅ |
+//! | `test_handshake_ic_token_over_max_length` | `IC` token `DoS` protection | `POST /api/budget/handshake with `ic_token` >10KB | 400 Bad Request (length limit) | ✅ |
+//! | `test_handshake_provider_over_max_length` | Provider `DoS` protection | `POST /api/budget/handshake with provider >1KB | 400 Bad Request (length limit) | ✅ |
+//! | `test_handshake_malformed_jwt_missing_segments` | Malformed `JWT` handling | `POST /api/budget/handshake with ic_token="invalid.jwt" | 400 Bad Request (`JWT` validation) | ✅ |
+//! | `test_report_usage_negative_tokens` | Negative token value validation | `POST /api/budget/report with tokens=-100 | 400 Bad Request | ✅ |
+//! | `test_report_usage_negative_cost` | Negative cost value validation | `POST /api/budget/report with cost_microdollars=-5_000_000 | 400 Bad Request | ✅ |
 //! | `test_error_messages_no_sensitive_data_leak` | Error message security | Invalid handshake request | Error message contains no sensitive data (tokens, keys) | ✅ |
-//! | `test_report_usage_zero_cost_cached_response` | Zero cost cached response | POST /api/budget/report with cost_microdollars=0 | 200 OK (cached responses valid) | ✅ |
-//! | `test_database_foreign_key_constraint_agent` | FK constraint enforcement | Create lease for nonexistent agent_id | Database error (FK violation) | ✅ |
-//! | `test_database_not_null_constraint` | NOT NULL constraint enforcement | Insert lease with NULL required field | Database error (NOT NULL violation) | ✅ |
+//! | `test_report_usage_zero_cost_cached_response` | Zero cost cached response | `POST /api/budget/report with cost_microdollars=0 | 200 OK (cached responses valid) | ✅ |
+//! | `test_database_foreign_key_constraint_agent` | FK constraint enforcement | Create lease for nonexistent `agent_id` | Database error (FK violation) | ✅ |
+//! | `test_database_not_null_constraint` | NOT `NULL` constraint enforcement | Insert lease with `NULL` required field | Database error (NOT `NULL` violation) | ✅ |
 
 mod common;
 
@@ -44,13 +44,13 @@ use sqlx::Row;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-/// Test: Whitespace-only ic_token input
+/// Test: Whitespace-only `ic_token` input
 ///
 /// # Corner Case
-/// ic_token field contains only whitespace characters (spaces, tabs, newlines)
+/// `ic_token` field contains only whitespace characters (spaces, tabs, newlines)
 ///
 /// # Expected Behavior
-/// HTTP 400 Bad Request with validation error "ic_token cannot be empty"
+/// HTTP 400 Bad Request with validation error "`ic_token` cannot be empty"
 ///
 /// # Priority
 /// HIGH - Input validation completeness
@@ -81,7 +81,7 @@ async fn test_handshake_whitespace_only_ic_token() {
   assert_eq!(
     response.status(),
     StatusCode::BAD_REQUEST,
-    "Whitespace-only ic_token should be rejected"
+    "Whitespace-only `ic_token` should be rejected"
   );
 
   let body = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -133,16 +133,16 @@ async fn test_handshake_whitespace_only_provider() {
   );
 }
 
-/// Test: ic_token exactly at 2001 chars (over max boundary)
+/// Test: `ic_token` exactly at 2001 chars (over max boundary)
 ///
 /// # Corner Case
-/// ic_token exactly 2001 characters (1 over MAX_IC_TOKEN_LENGTH = 2000)
+/// `ic_token` exactly 2001 characters (1 over `MAX_IC_TOKEN_LENGTH` = 2000)
 ///
 /// # Expected Behavior
-/// HTTP 400 Bad Request "ic_token too long"
+/// HTTP 400 Bad Request "`ic_token` too long"
 ///
 /// # Priority
-/// HIGH - DoS prevention boundary
+/// HIGH - `DoS` prevention boundary
 #[tokio::test]
 async fn test_handshake_ic_token_over_max_length() {
   let pool = setup_test_db().await;
@@ -151,7 +151,7 @@ async fn test_handshake_ic_token_over_max_length() {
   let state = create_test_budget_state(pool).await;
   let app = create_budget_router(state).await;
 
-  // Create ic_token of exactly 2001 characters
+  // Create `ic_token` of exactly 2001 characters
   let oversized_token = "a".repeat(2001);
 
   let request = Request::builder()
@@ -172,7 +172,7 @@ async fn test_handshake_ic_token_over_max_length() {
   assert_eq!(
     response.status(),
     StatusCode::BAD_REQUEST,
-    "ic_token over 2000 chars should be rejected"
+    "`ic_token` over 2000 chars should be rejected"
   );
 
   let body = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -182,14 +182,14 @@ async fn test_handshake_ic_token_over_max_length() {
 
   assert!(
     error_data["error"].as_str().unwrap().contains("too long"),
-    "Error should mention ic_token too long"
+    "Error should mention `ic_token` too long"
   );
 }
 
 /// Test: provider name exactly at 51 chars (over max boundary)
 ///
 /// # Corner Case
-/// provider exactly 51 characters (1 over MAX_PROVIDER_LENGTH = 50)
+/// provider exactly 51 characters (1 over `MAX_PROVIDER_LENGTH` = 50)
 ///
 /// # Expected Behavior
 /// HTTP 400 Bad Request "provider too long"
@@ -227,13 +227,13 @@ async fn test_handshake_provider_over_max_length() {
   );
 }
 
-/// Test: Malformed JWT with missing segments
+/// Test: Malformed `JWT` with missing segments
 ///
 /// # Corner Case
-/// ic_token contains malformed JWT (only 2 segments instead of 3)
+/// `ic_token` contains malformed `JWT` (only 2 segments instead of 3)
 ///
 /// # Expected Behavior
-/// HTTP 401 Unauthorized "Invalid IC Token"
+/// HTTP 401 Unauthorized "Invalid `IC` Token"
 #[tokio::test]
 async fn test_handshake_malformed_jwt_missing_segments() {
   let pool = setup_test_db().await;
@@ -242,7 +242,7 @@ async fn test_handshake_malformed_jwt_missing_segments() {
   let state = create_test_budget_state(pool).await;
   let app = create_budget_router(state).await;
 
-  // Malformed JWT with only 2 segments (missing signature)
+  // Malformed `JWT` with only 2 segments (missing signature)
   let malformed_jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0";
 
   let request = Request::builder()
@@ -263,7 +263,7 @@ async fn test_handshake_malformed_jwt_missing_segments() {
   assert_eq!(
     response.status(),
     StatusCode::UNAUTHORIZED,
-    "Malformed JWT should return 401 Unauthorized"
+    "Malformed `JWT` should return 401 Unauthorized"
   );
 }
 
@@ -357,13 +357,13 @@ async fn test_report_usage_negative_tokens() {
   );
 }
 
-/// Test: Negative cost_microdollars value in usage report
+/// Test: Negative `cost_microdollars` value in usage report
 ///
 /// # Corner Case
-/// cost_microdollars field is negative (-5_000_000)
+/// `cost_microdollars` field is negative (-`5_000_000`)
 ///
 /// # Expected Behavior
-/// HTTP 400 Bad Request "cost_microdollars cannot be negative"
+/// HTTP 400 Bad Request "`cost_microdollars` cannot be negative"
 #[tokio::test]
 async fn test_report_usage_negative_cost() {
   let pool = setup_test_db().await;
@@ -448,7 +448,7 @@ async fn test_report_usage_negative_cost() {
 /// When authentication fails, error should not leak whether agent exists
 ///
 /// # Expected Behavior
-/// Generic "Invalid IC Token" error, not "Agent not found" or "Budget insufficient"
+/// Generic "Invalid `IC` Token" error, not "Agent not found" or "Budget insufficient"
 ///
 /// # Priority
 /// HIGH - Security (information disclosure prevention)
@@ -458,7 +458,7 @@ async fn test_error_messages_no_sensitive_data_leak() {
   // Don't seed any agent (agent doesn't exist)
 
   let state = create_test_budget_state(pool.clone()).await;
-  // Create IC Token for non-existent agent 999
+  // Create `IC` Token for non-existent agent 999
   let ic_token = create_ic_token(&pool, 999, &state.ic_token_manager).await;
 
   let app = create_budget_router(state).await;
@@ -488,15 +488,14 @@ async fn test_error_messages_no_sensitive_data_leak() {
   // Error should be generic, not leak existence information
   assert!(
     !error_msg.contains("agent") || !error_msg.contains("not found"),
-    "Error should not leak agent existence: {}",
-    error_msg
+    "Error should not leak agent existence: {error_msg}"
   );
 }
 
 /// Test: Zero-cost usage reports (cached responses, free tier)
 ///
 /// # Corner Case
-/// Report usage with tokens > 0 but cost_microdollars = 0 (cached response, free tier)
+/// Report usage with tokens > 0 but `cost_microdollars` = 0 (cached response, free tier)
 ///
 /// # Expected Behavior
 /// Accepted (HTTP 200), budget accounting handles $0.00 correctly
@@ -603,7 +602,7 @@ async fn test_database_foreign_key_constraint_agent() {
   .bind( 10.0 )
   .bind( 0.0 )
   .bind( chrono::Utc::now().timestamp_millis() )
-  .bind( chrono::Utc::now().timestamp_millis() + 3600000 )
+  .bind( chrono::Utc::now().timestamp_millis() + 3_600_000 )
   .execute( &pool )
   .await;
 
@@ -616,25 +615,24 @@ async fn test_database_foreign_key_constraint_agent() {
     let error_msg = e.to_string().to_lowercase();
     assert!(
       error_msg.contains("foreign") || error_msg.contains("constraint"),
-      "Error should mention foreign key constraint, got: {}",
-      e
+      "Error should mention foreign key constraint, got: {e}"
     );
   }
 }
 
-/// Test: Database NOT NULL constraint enforcement
+/// Test: Database NOT `NULL` constraint enforcement
 ///
 /// # Corner Case
-/// Attempt to insert NULL into NOT NULL column (budget_granted)
+/// Attempt to insert `NULL` into NOT `NULL` column (`budget_granted`)
 ///
 /// # Expected Behavior
-/// Database rejects with NOT NULL constraint violation
+/// Database rejects with NOT `NULL` constraint violation
 #[tokio::test]
 async fn test_database_not_null_constraint() {
   let pool = setup_test_db().await;
   seed_agent_with_budget(&pool, 105, 100_000_000).await;
 
-  // Attempt to insert NULL into budget_granted (NOT NULL column)
+  // Attempt to insert `NULL` into budget_granted (NOT `NULL` column)
   let result = sqlx::query(
     "INSERT INTO budget_leases (id, agent_id, budget_id, budget_granted, budget_spent, created_at, expires_at)
      VALUES (?, ?, ?, NULL, ?, ?, ?)"
@@ -642,32 +640,31 @@ async fn test_database_not_null_constraint() {
   .bind( "lease_test_002" )
   .bind( 1i64 )
   .bind( 1i64 )
-  // budget_granted = NULL (should fail)
+  // budget_granted = `NULL` (should fail)
   .bind( 0.0 )
   .bind( chrono::Utc::now().timestamp_millis() )
-  .bind( chrono::Utc::now().timestamp_millis() + 3600000 )
+  .bind( chrono::Utc::now().timestamp_millis() + 3_600_000 )
   .execute( &pool )
   .await;
 
   assert!(
     result.is_err(),
-    "NOT NULL constraint should prevent NULL in budget_granted"
+    "NOT `NULL` constraint should prevent `NULL` in budget_granted"
   );
 
   if let Err(e) = result {
     let error_msg = e.to_string().to_lowercase();
     assert!(
       error_msg.contains("null") || error_msg.contains("not null"),
-      "Error should mention NOT NULL constraint, got: {}",
-      e
+      "Error should mention NOT `NULL` constraint, got: {e}"
     );
   }
 }
 
-/// Manual Test Gap #2: IC Token with future-dated iat claim
+/// Manual Test Gap #2: `IC` Token with future-dated `iat` claim
 ///
 /// # Corner Case
-/// IC Token with `iat` (issued at) timestamp in the future
+/// `IC` Token with `iat` (issued at) timestamp in the future
 ///
 /// # Expected Behavior
 /// Should reject with 400/401 OR accept with logged warning (document actual behavior)
@@ -682,7 +679,7 @@ async fn test_handshake_future_dated_ic_token() {
   let state = create_test_budget_state(pool).await;
   let router = create_budget_router(state.clone()).await;
 
-  // Create IC Token with future iat (1 hour in the future)
+  // Create `IC` Token with future `iat` (1 hour in the future)
   let future_timestamp = std::time::SystemTime::now()
     .duration_since(std::time::UNIX_EPOCH)
     .unwrap()
@@ -704,11 +701,11 @@ async fn test_handshake_future_dated_ic_token() {
     .generate_token(&future_claims)
     .expect("LOUD FAILURE: Should generate future-dated token");
 
-  // Test handshake with future-dated IC Token
+  // Test handshake with future-dated `IC` Token
   let request_body = json!({
     "ic_token": future_token,
     "provider": "openai",
-    "provider_key_id": 201000,
+    "provider_key_id": 201_000,
     "requested_budget_usd": 10.0,
   });
 
@@ -727,29 +724,25 @@ async fn test_handshake_future_dated_ic_token() {
 
   // Document actual behavior
   let status = response.status();
-  println!(
-    "Manual Test Gap #2: Future-dated IC Token behavior: {}",
-    status
-  );
+  println!("Manual Test Gap #2: Future-dated `IC` Token behavior: {status}");
 
-  // Current implementation accepts future-dated tokens (no iat validation)
+  // Current implementation accepts future-dated tokens (no `iat` validation)
   // This test documents the behavior - may need security review
   assert!(
     status == StatusCode::OK
       || status == StatusCode::UNAUTHORIZED
       || status == StatusCode::BAD_REQUEST,
-    "Should either accept (200) or reject (400/401) future-dated tokens, got: {}",
-    status
+    "Should either accept (200) or reject (400/401) future-dated tokens, got: {status}"
   );
 }
 
-/// Manual Test Gap #10: NULL ic_token field
+/// Manual Test Gap #10: `NULL` `ic_token` field
 ///
 /// # Corner Case
-/// JSON request with {"ic_token": null, "provider": "openai"}
+/// JSON request with {"`ic_token"`: null, "provider": "openai"}
 ///
 /// # Expected Behavior
-/// 400 Bad Request "ic_token is required"
+/// 400 Bad Request "`ic_token` is required"
 ///
 /// # Risk
 /// MEDIUM - Null pointer dereference potential
@@ -782,15 +775,15 @@ async fn test_handshake_null_ic_token_field() {
   assert!(
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL ic_token should be rejected with 400 or 422, got: {}",
+    "`NULL` `ic_token` should be rejected with 400 or 422, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #11: NULL provider field
+/// Manual Test Gap #11: `NULL` provider field
 ///
 /// # Corner Case
-/// JSON request with {"ic_token": "<valid>", "provider": null}
+/// JSON request with {"`ic_token"`: "<valid>", "provider": null}
 ///
 /// # Expected Behavior
 /// 400 Bad Request "provider is required"
@@ -810,7 +803,7 @@ async fn test_handshake_null_provider_field() {
   let request_body = json!({
     "ic_token": ic_token,
     "provider": null,
-    "provider_key_id": 202000,
+    "provider_key_id": 202_000,
     "requested_budget_usd": 10.0,
   });
 
@@ -829,28 +822,28 @@ async fn test_handshake_null_provider_field() {
   assert!(
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL provider should be rejected with 400 or 422, got: {}",
+    "`NULL` provider should be rejected with 400 or 422, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #12: Missing IC Token agent_id claim
+/// Manual Test Gap #12: Missing `IC` Token `agent_id` claim
 ///
 /// # Corner Case
-/// Valid JWT structure but missing agent_id in payload
+/// Valid `JWT` structure but missing `agent_id` in payload
 ///
 /// # Expected Behavior
-/// 400 Bad Request or 401 Unauthorized "Missing required claim: agent_id"
+/// 400 Bad Request or 401 Unauthorized "Missing required claim: `agent_id`"
 ///
 /// # Risk
-/// HIGH - Could cause crashes if agent_id not validated
+/// HIGH - Could cause crashes if `agent_id` not validated
 #[tokio::test]
 async fn test_handshake_missing_agent_id_claim() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool).await;
   let router = create_budget_router(state.clone()).await;
 
-  // Create JWT with only budget_id and permissions (no agent_id)
+  // Create `JWT` with only `budget_id` and permissions (no agent_id)
   use jsonwebtoken::{encode, EncodingKey, Header};
   use serde::{Deserialize, Serialize};
 
@@ -903,18 +896,18 @@ async fn test_handshake_missing_agent_id_claim() {
 
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNAUTHORIZED,
-    "Missing agent_id claim should be rejected with 400 or 401, got: {}",
+    "Missing `agent_id` claim should be rejected with 400 or 401, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #13: Missing IC Token budget_id claim
+/// Manual Test Gap #13: Missing `IC` Token `budget_id` claim
 ///
 /// # Corner Case
-/// Valid JWT structure but missing budget_id in payload
+/// Valid `JWT` structure but missing `budget_id` in payload
 ///
 /// # Expected Behavior
-/// 400 Bad Request or 401 Unauthorized "Missing required claim: budget_id"
+/// 400 Bad Request or 401 Unauthorized "Missing required claim: `budget_id`"
 ///
 /// # Risk
 /// MEDIUM - Budget tracking could fail
@@ -924,7 +917,7 @@ async fn test_handshake_missing_budget_id_claim() {
   let state = create_test_budget_state(pool).await;
   let router = create_budget_router(state.clone()).await;
 
-  // Create JWT with only agent_id and permissions (no budget_id)
+  // Create `JWT` with only `agent_id` and permissions (no budget_id)
   use jsonwebtoken::{encode, EncodingKey, Header};
   use serde::{Deserialize, Serialize};
 
@@ -977,15 +970,15 @@ async fn test_handshake_missing_budget_id_claim() {
 
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNAUTHORIZED,
-    "Missing budget_id claim should be rejected with 400 or 401, got: {}",
+    "Missing `budget_id` claim should be rejected with 400 or 401, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #8: Integer overflow in cost_microdollars
+/// Manual Test Gap #8: Integer overflow in `cost_microdollars`
 ///
 /// # Corner Case
-/// cost_microdollars = i64::MAX
+/// `cost_microdollars` = `i64::MAX`
 ///
 /// # Expected Behavior
 /// 400 Bad Request - reject overflow values
@@ -1005,7 +998,7 @@ async fn test_report_usage_non_finite_cost() {
   let handshake_request = json!({
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 205000,
+    "provider_key_id": 205_000,
     "requested_budget_usd": 10.0,
   });
 
@@ -1031,7 +1024,7 @@ async fn test_report_usage_non_finite_cost() {
   let handshake_result: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
   let lease_id = handshake_result["lease_id"].as_str().unwrap();
 
-  // Test 1: Overflow (i64::MAX microdollars)
+  // Test 1: Overflow (`i64::MAX` microdollars)
   let router_report_inf = create_budget_router(state.clone()).await;
   let report_infinity = json!({
     "lease_id": lease_id,
@@ -1058,13 +1051,13 @@ async fn test_report_usage_non_finite_cost() {
   );
 }
 
-/// Manual Test Gap #15: NULL lease_id field
+/// Manual Test Gap #15: `NULL` `lease_id` field
 ///
 /// # Corner Case
-/// JSON request with {"lease_id": null, "cost_microdollars": 5_000_000}
+/// JSON request with {"`lease_id"`: null, "`cost_microdollars"`: `5_000_000`}
 ///
 /// # Expected Behavior
-/// 400 Bad Request "lease_id is required"
+/// 400 Bad Request "`lease_id` is required"
 ///
 /// # Risk
 /// MEDIUM - Null pointer dereference potential
@@ -1095,18 +1088,18 @@ async fn test_report_usage_null_lease_id() {
   assert!(
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL lease_id should be rejected with 400 or 422, got: {}",
+    "`NULL` `lease_id` should be rejected with 400 or 422, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #16: NULL cost_microdollars field
+/// Manual Test Gap #16: `NULL` `cost_microdollars` field
 ///
 /// # Corner Case
-/// JSON request with {"lease_id": "<valid>", "cost_microdollars": null}
+/// JSON request with {"`lease_id"`: "<valid>", "`cost_microdollars"`: null}
 ///
 /// # Expected Behavior
-/// 400 Bad Request "cost_microdollars is required"
+/// 400 Bad Request "`cost_microdollars` is required"
 ///
 /// # Risk
 /// MEDIUM - Budget accounting corruption
@@ -1137,7 +1130,7 @@ async fn test_report_usage_null_cost_microdollars() {
   assert!(
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL cost_microdollars should be rejected with 400 or 422, got: {}",
+    "`NULL` `cost_microdollars` should be rejected with 400 or 422, got: {}",
     response.status()
   );
 }
@@ -1145,8 +1138,8 @@ async fn test_report_usage_null_cost_microdollars() {
 /// Manual Test Gap #5: Cost exactly equals remaining budget
 ///
 /// # Corner Case
-/// Lease has budget_granted=10.0, budget_spent=9.5 (remaining=0.5)
-/// Report usage with cost_usd=0.5 (exactly equals remaining)
+/// Lease has `budget_granted=10.0, ``budget_spent=9.5` (remaining=0.5)
+/// Report usage with `cost_usd=0.5 (exactly equals remaining)
 ///
 /// # Expected Behavior
 /// 200 OK, budget exhausted exactly to 0.0, no off-by-one errors
@@ -1219,18 +1212,17 @@ async fn test_cost_exactly_equals_remaining_budget() {
   assert_eq!(budget_spent, 10_000_000, "Budget spent should be $10");
   assert_eq!(
     budget_remaining, 0,
-    "Budget remaining should be exactly 0, got: {}",
-    budget_remaining
+    "Budget remaining should be exactly 0, got: {budget_remaining}"
   );
 }
 
-/// Manual Test Gap #14: Invalid agent_id format (zero)
+/// Manual Test Gap #14: Invalid `agent_id` format (zero)
 ///
 /// # Corner Case
-/// IC Token with agent_id=0
+/// `IC` Token with `agent_id=0`
 ///
 /// # Expected Behavior
-/// 400 Bad Request "agent_id must be positive"
+/// 400 Bad Request "`agent_id` must be positive"
 ///
 /// # Risk
 /// MEDIUM - Invalid database lookups
@@ -1239,7 +1231,7 @@ async fn test_handshake_invalid_agent_id_zero() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool).await;
 
-  // Create IC Token with agent_id=0 (invalid)
+  // Create `IC` Token with `agent_id=0 (invalid)
   let zero_claims = IcTokenClaims {
     token_id: Uuid::new_v4(),
     agent_id: "0".to_string(), // Invalid: zero agent_id
@@ -1282,18 +1274,18 @@ async fn test_handshake_invalid_agent_id_zero() {
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY
       || response.status() == StatusCode::UNAUTHORIZED,
-    "Zero agent_id should be rejected with 400/422/401, got: {}",
+    "Zero `agent_id` should be rejected with 400/422/401, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #14 (variant): Invalid agent_id format (negative)
+/// Manual Test Gap #14 (variant): Invalid `agent_id` format (negative)
 ///
 /// # Corner Case
-/// IC Token with agent_id=-1
+/// `IC` Token with `agent_id=-1`
 ///
 /// # Expected Behavior
-/// 400 Bad Request "agent_id must be positive"
+/// 400 Bad Request "`agent_id` must be positive"
 ///
 /// # Risk
 /// MEDIUM - Invalid database lookups
@@ -1302,7 +1294,7 @@ async fn test_handshake_invalid_agent_id_negative() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool).await;
 
-  // Create IC Token with agent_id=-1 (invalid)
+  // Create `IC` Token with `agent_id=-1 (invalid)
   let negative_claims = IcTokenClaims {
     token_id: Uuid::new_v4(),
     agent_id: "-1".to_string(), // Invalid: negative agent_id
@@ -1345,18 +1337,18 @@ async fn test_handshake_invalid_agent_id_negative() {
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY
       || response.status() == StatusCode::UNAUTHORIZED,
-    "Negative agent_id should be rejected with 400/422/401, got: {}",
+    "Negative `agent_id` should be rejected with 400/422/401, got: {}",
     response.status()
   );
 }
 
-/// Manual Test Gap #17: Integer overflow in tokens_used
+/// Manual Test Gap #17: Integer overflow in `tokens_used`
 ///
 /// # Corner Case
-/// Report usage with tokens_used > i64::MAX
+/// Report usage with `tokens_used` > `i64::MAX`
 ///
 /// # Expected Behavior
-/// 400 Bad Request OR value clamped to i64::MAX
+/// 400 Bad Request OR value clamped to `i64::MAX`
 ///
 /// # Risk
 /// LOW - Token accounting corruption
@@ -1376,12 +1368,12 @@ async fn test_report_usage_integer_overflow_tokens() {
 
   let router = create_budget_router(state).await;
 
-  // Attempt to report with tokens_used > i64::MAX
-  // Note: JSON can represent numbers larger than i64::MAX, but Rust deserialization should reject them
+  // Attempt to report with `tokens_used` > `i64::MAX`
+  // Note: JSON can represent numbers larger than `i64::MAX`, but Rust deserialization should reject them
   let request_body = json!({
     "lease_id": lease_id,
     "cost_microdollars": 1_000_000,
-    "tokens_used": 9_223_372_036_854_775_808_u64,  // i64::MAX + 1
+    "tokens_used": 9_223_372_036_854_775_808_u64,  // `i64::MAX` + 1
     "model": "gpt-4",
     "provider": "openai",
   });
@@ -1404,35 +1396,35 @@ async fn test_report_usage_integer_overflow_tokens() {
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY
       || response.status() == StatusCode::OK,
-    "Overflow tokens_used should be rejected or clamped, got: {}",
+    "Overflow `tokens_used` should be rejected or clamped, got: {}",
     response.status()
   );
 }
 
-// xxx: Manual Test Gap #24: Idempotency - duplicate event_id in report - DEFERRED
+// xxx: Manual Test Gap #24: Idempotency - duplicate `event_id` in report - DEFERRED
 //
 // Test implementation COMPLETE and WORKING. Test correctly detects that idempotency
-// is NOT yet implemented in POST /api/budget/report endpoint.
+// is NOT yet implemented in `POST /api/budget/report endpoint.
 //
-// Current behavior: Second report with same event_id DOUBLE-CHARGES budget (fails test)
-// Expected behavior: Second report with same event_id should be idempotent (no double-charge)
+// Current behavior: Second report with same `event_id` DOUBLE-CHARGES budget (fails test)
+// Expected behavior: Second report with same `event_id` should be idempotent (no double-charge)
 //
 // Defer until idempotency support is implemented in report endpoint.
-// When implemented, change #[ignore] to #[tokio::test]
+// When implemented, change #\[ignore = "Deferred until idempotency support is implemented"\] to #[tokio::test]
 //
-/// Manual Test Gap #24: Idempotency - duplicate event_id in report
+/// Manual Test Gap #24: Idempotency - duplicate `event_id` in report
 ///
 /// # Corner Case
-/// POST /api/budget/report with same event_id twice
+/// `POST /api/budget/report` with same `event_id` twice
 ///
 /// # Expected Behavior
 /// First report: Succeeds, budget charged
-/// Second report (same event_id): Idempotent - returns 200 OK but does NOT double-charge budget
+/// Second report (same `event_id)`: Idempotent - returns 200 OK but does NOT double-charge budget
 ///
 /// # Risk
 /// HIGH - Budget double-charging from duplicate events
 #[tokio::test]
-#[ignore]
+#[ignore = "Deferred until idempotency support is implemented"]
 async fn test_idempotency_duplicate_event_id() {
   let pool = setup_test_db().await;
   let agent_id = 132i64;
@@ -1485,7 +1477,7 @@ async fn test_idempotency_duplicate_event_id() {
   );
 
   // Get budget after first report
-  let budget_after_first = sqlx::query("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+  let budget_after_first = sqlx::query("SELECT total_spent FROM agent_budgets WHERE `agent_id` = ?")
     .bind(agent_id)
     .fetch_one(&pool)
     .await
@@ -1495,11 +1487,10 @@ async fn test_idempotency_duplicate_event_id() {
 
   assert_eq!(
     total_spent_after_first, cost_microdollars,
-    "LOUD FAILURE: total_spent after first report should equal cost. Expected: {}, Actual: {}",
-    cost_microdollars, total_spent_after_first
+    "LOUD FAILURE: total_spent after first report should equal cost. Expected: {cost_microdollars}, Actual: {total_spent_after_first}",
   );
 
-  // Second report with SAME event_id (should be idempotent)
+  // Second report with SAME `event_id` (should be idempotent)
   let response2 = router
     .oneshot(
       Request::builder()
@@ -1515,11 +1506,11 @@ async fn test_idempotency_duplicate_event_id() {
   assert_eq!(
     response2.status(),
     StatusCode::OK,
-    "LOUD FAILURE: Duplicate event_id report should return 200 OK (idempotent)"
+    "LOUD FAILURE: Duplicate `event_id` report should return 200 OK (idempotent)"
   );
 
   // Get budget after second report
-  let budget_after_second = sqlx::query("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+  let budget_after_second = sqlx::query("SELECT total_spent FROM agent_budgets WHERE `agent_id` = ?")
     .bind(agent_id)
     .fetch_one(&pool)
     .await
@@ -1530,7 +1521,6 @@ async fn test_idempotency_duplicate_event_id() {
   // CRITICAL: Budget should NOT be double-charged
   assert_eq!(
     total_spent_after_second, cost_microdollars,
-    "LOUD FAILURE: Idempotency violation - budget was double-charged! Expected: {}, Actual: {}",
-    cost_microdollars, total_spent_after_second
+    "LOUD FAILURE: Idempotency violation - budget was double-charged! Expected: {cost_microdollars}, Actual: {total_spent_after_second}"
   );
 }

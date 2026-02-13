@@ -60,16 +60,16 @@ async fn create_test_router() -> (Router, TestAppState) {
   (router, app_state)
 }
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user(app_state: &TestAppState, user_id: &str) -> String {
   app_state
     .auth
     .jwt_secret
     .generate_access_token(
       user_id,
-      &format!("{}@test.com", user_id),
+      &format!("{user_id}@test.com"),
       "user",
-      &format!("token_{}", user_id),
+      &format!("token_{user_id}"),
     )
     .expect("LOUD FAILURE: Failed to generate JWT token")
 }
@@ -95,7 +95,7 @@ async fn test_token_plaintext_only_on_creation() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(
       serde_json::to_string(&json!({
         "user_id": "test-user",
@@ -128,7 +128,7 @@ async fn test_token_plaintext_only_on_creation() {
   let get_request = Request::builder()
     .method("GET")
     .uri(format!("/api/v1/api-tokens/{}", create_body.id))
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -145,7 +145,7 @@ async fn test_token_plaintext_only_on_creation() {
 ///
 /// # Prevention
 /// Validates that after token creation, plaintext value is never exposed
-/// through API. Only metadata (id, user_id, project_id) should be returned.
+/// through API. Only metadata (id, `user_id`, `project_id`) should be returned.
 ///
 /// # Pitfall
 /// Accidentally including token field in GET response would expose all
@@ -162,7 +162,7 @@ async fn test_get_token_never_returns_plaintext() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(
       serde_json::to_string(&json!({
         "user_id": "test-user",
@@ -181,8 +181,8 @@ async fn test_get_token_never_returns_plaintext() {
   // GET token by ID with authentication
   let get_request = Request::builder()
     .method("GET")
-    .uri(format!("/api/v1/api-tokens/{}", token_id))
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .uri(format!("/api/v1/api-tokens/{token_id}"))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -218,7 +218,7 @@ async fn test_get_token_negative_id_returns_404() {
   let request = Request::builder()
     .method("GET")
     .uri("/api/v1/api-tokens/-1")
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -239,7 +239,7 @@ async fn test_get_token_zero_id_returns_404() {
   let request = Request::builder()
     .method("GET")
     .uri("/api/v1/api-tokens/0")
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -258,7 +258,7 @@ async fn test_get_token_very_large_id_handles_gracefully() {
   let request = Request::builder()
     .method("GET")
     .uri(format!("/api/v1/api-tokens/{}", i64::MAX))
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -268,10 +268,10 @@ async fn test_get_token_very_large_id_handles_gracefully() {
   assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-/// Verify Unicode in user_id is handled correctly
+/// Verify Unicode in `user_id` is handled correctly
 ///
 /// # Prevention
-/// Ensures UTF-8 strings in user_id work correctly (create, store, retrieve).
+/// Ensures UTF-8 strings in `user_id` work correctly (create, store, retrieve).
 ///
 /// # Pitfall
 /// UTF-8 handling bugs might truncate or corrupt Unicode characters.
@@ -292,7 +292,7 @@ async fn test_unicode_in_user_id() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
@@ -307,7 +307,7 @@ async fn test_unicode_in_user_id() {
   let get_request = Request::builder()
     .method("GET")
     .uri(format!("/api/v1/api-tokens/{}", create_body.id))
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -319,7 +319,7 @@ async fn test_unicode_in_user_id() {
   );
 }
 
-/// Verify SQL injection in user_id is safely escaped
+/// Verify SQL injection in `user_id` is safely escaped
 ///
 /// # Prevention
 /// Ensures parameterized queries prevent SQL injection attacks.
@@ -347,7 +347,7 @@ async fn test_sql_injection_in_user_id() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
@@ -368,7 +368,7 @@ async fn test_sql_injection_in_user_id() {
   let get_request = Request::builder()
     .method("GET")
     .uri(format!("/api/v1/api-tokens/{}", create_body.id))
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -380,10 +380,10 @@ async fn test_sql_injection_in_user_id() {
   );
 }
 
-/// Verify SQL injection in project_id is safely escaped
+/// Verify SQL injection in `project_id` is safely escaped
 ///
 /// # Prevention
-/// Ensures parameterized queries prevent SQL injection through project_id.
+/// Ensures parameterized queries prevent SQL injection through `project_id`.
 /// Malicious SQL is stored as literal string, not executed.
 ///
 /// # Pitfall
@@ -408,7 +408,7 @@ async fn test_sql_injection_in_project_id() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
@@ -430,7 +430,7 @@ async fn test_sql_injection_in_project_id() {
   let get_request = Request::builder()
     .method("GET")
     .uri(format!("/api/v1/api-tokens/{}", create_body.id))
-    .header("Authorization", format!("Bearer {}", jwt_token))
+    .header("Authorization", format!("Bearer {jwt_token}"))
     .body(Body::empty())
     .unwrap();
 
@@ -446,7 +446,7 @@ async fn test_sql_injection_in_project_id() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(
       serde_json::to_string(&json!({
         "user_id": "user_2",
@@ -491,7 +491,7 @@ async fn test_xss_in_description_stored_as_literal() {
     .method("POST")
     .uri("/api/v1/api-tokens")
     .header("content-type", "application/json")
-    .header("authorization", format!("Bearer {}", jwt_token))
+    .header("authorization", format!("Bearer {jwt_token}"))
     .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 

@@ -29,7 +29,7 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use tower::ServiceExt;
 
-/// Create in-memory database with agents + analytics_events tables
+/// Create in-memory database with agents + `analytics_events` tables
 async fn setup_analytics_db() -> SqlitePool {
   let pool = SqlitePool::connect("sqlite::memory:")
     .await
@@ -80,7 +80,7 @@ async fn setup_analytics_db() -> SqlitePool {
 async fn seed_agent(pool: &SqlitePool, agent_id: i64) {
   sqlx::query("INSERT INTO agents (id, name, providers, created_at) VALUES (?, ?, '[]', 0)")
     .bind(agent_id)
-    .bind(format!("test_agent_{}", agent_id))
+    .bind(format!("test_agent_{agent_id}"))
     .execute(pool)
     .await
     .expect("LOUD FAILURE: Should insert agent");
@@ -89,8 +89,8 @@ async fn seed_agent(pool: &SqlitePool, agent_id: i64) {
 /// Generate IC token and store its hash in agents table
 async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager) -> String {
   let claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -180,8 +180,8 @@ async fn test_analytics_ingestion_with_rotated_token() {
 
   // Step 2: Regenerate — generate Token B and overwrite hash
   let claims_b = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -247,7 +247,6 @@ async fn test_analytics_ingestion_with_rotated_token() {
 
   assert_eq!(
     event_count, 2,
-    "LOUD FAILURE: Only 2 events should be stored (before rotation + after new token). Got {}",
-    event_count
+    "LOUD FAILURE: Only 2 events should be stored (before rotation + after new token). Got {event_count}"
   );
 }

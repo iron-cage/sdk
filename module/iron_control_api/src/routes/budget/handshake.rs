@@ -18,9 +18,13 @@ use uuid::Uuid;
 /// Budget handshake request (Step 1: Token Exchange)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HandshakeRequest {
+  /// IC Token for authentication
   pub ic_token: String,
+  /// Provider name (e.g., "openai", "anthropic")
   pub provider: String,
+  /// Optional provider key ID to use
   pub provider_key_id: Option<i64>,
+  /// Optional requested budget in microdollars
   pub requested_budget: Option<i64>,
 }
 
@@ -34,7 +38,7 @@ impl HandshakeRequest {
   /// Default budget lease amount (microdollars) for handshake
   const DEFAULT_HANDSHAKE_BUDGET: i64 = 10_000_000; // 10 USD
 
-  /// Maximum budget request (microdollars) for handshake (DoS prevention)
+  /// Maximum budget request (microdollars) for handshake (`DoS` prevention)
   pub const MAX_HANDSHAKE_BUDGET: i64 = 100_000_000; // 100 USD
 
   /// Validate handshake request parameters
@@ -97,10 +101,15 @@ impl HandshakeRequest {
 /// Budget handshake response
 #[derive(Debug, Serialize)]
 pub struct HandshakeResponse {
+  /// Encrypted IP Token containing provider credentials
   pub ip_token: String,
+  /// Unique lease identifier
   pub lease_id: String,
+  /// Budget granted for this lease in microdollars
   pub budget_granted: i64,
+  /// Remaining budget for agent in microdollars
   pub budget_remaining: i64,
+  /// Optional lease expiration timestamp in milliseconds
   pub expires_at: Option<i64>,
 }
 
@@ -205,16 +214,13 @@ pub async fn handshake(
       }
     };
 
-  let owner_id = match owner_id {
-    Some(id) => id,
-    None => {
-      // Security: Use generic error to prevent agent enumeration attacks
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(serde_json::json!({ "error": "Invalid IC Token" })),
-      )
-        .into_response();
-    }
+  let Some(owner_id) = owner_id else {
+    // Security: Use generic error to prevent agent enumeration attacks
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json(serde_json::json!({ "error": "Invalid IC Token" })),
+    )
+      .into_response();
   };
 
   let owner_for_key = if owner_id.trim().is_empty() {
@@ -255,10 +261,9 @@ pub async fn handshake(
       Some((limit_max_opt, current_cost_opt)) => {
         let current_cost = current_cost_opt.unwrap_or(0);
         match limit_max_opt {
-          None => 0,    // No max_cost configured - block
-          Some(0) => 0, // Explicit zero limit - block
           Some(limit_max) if limit_max > current_cost => limit_max - current_cost,
-          Some(_) => 0, // Limit exhausted - block
+          // No max_cost configured, explicit zero limit, or limit exhausted - all block
+          None | Some(0 | _) => 0,
         }
       }
     };
@@ -443,7 +448,7 @@ pub async fn handshake(
   };
 
   // Get provider key record (encrypted)
-  let _key_record = match state.provider_key_storage.get_key(key_id).await {
+  let key_record = match state.provider_key_storage.get_key(key_id).await {
     Ok(record) => record,
     Err(TokenError::Database(sqlx::Error::RowNotFound)) => {
       return (
@@ -463,7 +468,7 @@ pub async fn handshake(
   };
 
   // Validate provider key matches requested provider
-  if _key_record.metadata.provider != provider_type {
+  if key_record.metadata.provider != provider_type {
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "Provider key does not match requested provider" })),
@@ -472,7 +477,7 @@ pub async fn handshake(
   }
 
   // Validate provider key is enabled
-  if !_key_record.metadata.is_enabled {
+  if !key_record.metadata.is_enabled {
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "Provider key is disabled" })),
@@ -481,19 +486,16 @@ pub async fn handshake(
   }
 
   // Decrypt provider API key from database
-  let encrypted_secret = match iron_secrets::crypto::EncryptedSecret::from_base64(
-    &_key_record.encrypted_api_key,
-    &_key_record.encryption_nonce,
-  ) {
-    Ok(secret) => secret,
-    Err(_) => {
-      tracing::error!("Failed to decode provider key base64");
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({ "error": "Key storage error" })),
-      )
-        .into_response();
-    }
+  let Ok(encrypted_secret) = iron_secrets::crypto::EncryptedSecret::from_base64(
+    &key_record.encrypted_api_key,
+    &key_record.encryption_nonce,
+  ) else {
+    tracing::error!("Failed to decode provider key base64");
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({ "error": "Key storage error" })),
+    )
+      .into_response();
   };
 
   let provider_key = match state.provider_key_crypto.decrypt(&encrypted_secret) {
@@ -509,15 +511,12 @@ pub async fn handshake(
   };
 
   // Encrypt provider API key into IP Token
-  let ip_token = match state.ip_token_crypto.encrypt(&provider_key) {
-    Ok(token) => token,
-    Err(_) => {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({ "error": "Failed to encrypt IP Token" })),
-      )
-        .into_response();
-    }
+  let Ok(ip_token) = state.ip_token_crypto.encrypt(&provider_key) else {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({ "error": "Failed to encrypt IP Token" })),
+    )
+      .into_response();
   };
 
   // Create budget lease
@@ -570,8 +569,7 @@ pub async fn handshake(
     .await
     .ok()
     .flatten()
-    .map(|b| b.budget_remaining)
-    .unwrap_or(0);
+    .map_or(0, |b| b.budget_remaining);
 
   // Return successful handshake response
   (

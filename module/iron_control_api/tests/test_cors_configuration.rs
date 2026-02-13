@@ -47,12 +47,18 @@ fn test_no_hardcoded_cors_origins() {
     "Hardcoded origin vector forbidden (must use ALLOWED_ORIGINS env var)",
   );
 
-  // Must have env var parsing
-  assert_source_contains(
-    &source,
-    "std::env::var( \"ALLOWED_ORIGINS\" )",
-    source_path,
-    "ALLOWED_ORIGINS environment variable parsing required",
+  // Must have env var parsing (with or without formatting spaces)
+  let has_env_var = source.contains("std::env::var(\"ALLOWED_ORIGINS\")")
+    || source.contains("std::env::var( \"ALLOWED_ORIGINS\" )");
+
+  assert!(
+    has_env_var,
+    "FAIL: Required pattern 'std::env::var(\"ALLOWED_ORIGINS\")' missing in {source_path}\n\
+     Reason: ALLOWED_ORIGINS environment variable parsing required\n\
+     \n\
+     Expected: This pattern must exist in source code.\n\
+     \n\
+     Fix: Add the required implementation."
   );
 
   // Must have production enforcement (panic/expect if missing)

@@ -1,14 +1,14 @@
 //! Budget test infrastructure for Protocol 005 testing.
 //!
 //! Provides shared utilities for budget corner case, security, and concurrency tests:
-//! - In-memory database setup with token_manager migrations
-//! - BudgetState builder
+//! - In-memory database setup with `token_manager` migrations
+//! - `BudgetState` builder
 //! - Agent/budget seeding
 //! - IC Token generation
 //! - Budget router creation
 //!
 //! # Authority
-//! organizational_principles.rulebook.md § Anti-Duplication Principle
+//! `organizational_principles.rulebook.md` § Anti-Duplication Principle
 
 use axum::Router;
 use iron_control_api::{
@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// Helper: Create test database with all migrations
 ///
-/// Creates in-memory SQLite database and applies all token_manager migrations
+/// Creates in-memory `SQLite` database and applies all `token_manager` migrations
 /// required for Protocol 005 budget testing.
 #[allow(dead_code)]
 pub async fn setup_test_db() -> SqlitePool {
@@ -32,9 +32,9 @@ pub async fn setup_test_db() -> SqlitePool {
   pool
 }
 
-/// Helper: Create test BudgetState
+/// Helper: Create test `BudgetState`
 ///
-/// Builds BudgetState with all required managers for budget endpoint testing:
+/// Builds `BudgetState` with all required managers for budget endpoint testing:
 /// - IC Token manager (JWT generation/validation)
 /// - IP Token crypto (lease encryption)
 /// - Provider key crypto (provider key decryption)
@@ -43,6 +43,7 @@ pub async fn setup_test_db() -> SqlitePool {
 /// - Provider key storage (API key management)
 /// - JWT secret (user authentication)
 #[allow(dead_code)]
+#[allow(clippy::unused_async)]
 pub async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
@@ -82,6 +83,7 @@ pub async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
 ///
 /// Use this for testing crypto unavailable scenarios.
 #[allow(dead_code)]
+#[allow(clippy::unused_async)]
 pub async fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
@@ -123,8 +125,8 @@ pub async fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState
 #[allow(dead_code)]
 pub async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager) -> String {
   let claims = IcTokenClaims::new(
-    format!("agent_{}", agent_id),
-    format!("budget_{}", agent_id),
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
     vec!["llm:call".to_string()],
     None,
   );
@@ -148,15 +150,15 @@ pub async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcToken
 /// Helper: Seed agent with budget and provider key
 ///
 /// Creates test data for budget testing:
-/// - Test user (required for owner_id foreign key)
+/// - Test user (required for `owner_id` foreign key)
 /// - Agent record
 /// - Agent budget allocation
 /// - Provider API key
 /// - Usage limits
 ///
 /// # Fix(issue-concurrency-001)
-/// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
-/// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
+/// Root cause: Hardcoded `agent_id=1` and `provider_key` id=1 conflicted with migration 017 seeded data
+/// Pitfall: Always use unique IDs for test data; use `agent_id` > 100 and `provider_key` id = `agent_id` * 1000 to avoid conflicts
 #[allow(dead_code)]
 pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdollars: i64) {
   let now_ms = chrono::Utc::now().timestamp_millis();
@@ -182,7 +184,7 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
     "INSERT OR IGNORE INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
+  .bind( format!( "test_agent_{agent_id}" ) )
   .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
   .bind( now_ms )
   .bind( "test_user" )
@@ -207,7 +209,7 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
   // Insert provider key
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
   // Create real encrypted provider key for testing
-  let test_provider_key = format!("sk-test_key_for_agent_{}", agent_id);
+  let test_provider_key = format!("sk-test_key_for_agent_{agent_id}");
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
   let crypto_service = iron_secrets::crypto::CryptoService::new(&provider_key_master)
     .expect("LOUD FAILURE: Should create crypto service");
@@ -249,6 +251,7 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
 ///
 /// Builds Axum router with all budget endpoints mounted for testing.
 #[allow(dead_code)]
+#[allow(clippy::unused_async)]
 pub async fn create_budget_router(state: BudgetState) -> Router {
   use iron_control_api::routes::budget::request_workflow::{
     approve_budget_request, reject_budget_request,

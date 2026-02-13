@@ -205,7 +205,7 @@ async fn test_non_latin_characters() {
 ///
 /// # Security Risk
 /// HIGH - Zero-width characters (U+200B) can create homograph attacks
-/// Example: "lease_​123" looks identical to "lease_123" but is different
+/// Example: `"lease_​123"` looks identical to `"lease_123"` but is different
 ///
 /// # Expected Behavior
 /// - Normalize (strip zero-width chars) OR
