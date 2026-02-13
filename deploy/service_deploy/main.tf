@@ -18,6 +18,7 @@ resource "terraform_data" "redeploy_sh" {
     user        = "root"
     private_key = data.local_sensitive_file.ssh_private_key.content
     host        = var.HOST_SERVER_IP
+    timeout     = "1m"
   }
 
   # Cloud-init wait
@@ -49,6 +50,7 @@ resource "terraform_data" "redeploy_sh" {
     content = templatefile("${path.module}/../k8s/deployment.yaml", {
       tag     = "${var.TAG}"
       version = "${var.VERSION}"
+      port_back = "${var.SERVER_PORT}"
     })
     destination = "/opt/services/${var.PROJECT_NAME}_${var.DEPLOYMENT_MODE}/k8s/deployment.yaml"
   } 
@@ -56,7 +58,8 @@ resource "terraform_data" "redeploy_sh" {
   # k8s ingress
   provisioner "file" {
     content = templatefile("${path.module}/../k8s/ingress.yaml", {
-      project_domain = var.PROJECT_DOMAIN
+      project_domain = "${var.PROJECT_DOMAIN}"
+      port_back = "${var.SERVER_PORT}"
     })
 
     destination = "/opt/services/${var.PROJECT_NAME}_${var.DEPLOYMENT_MODE}/k8s/ingress.yaml"
@@ -70,14 +73,16 @@ resource "terraform_data" "redeploy_sh" {
 
   # k8s service
   provisioner "file" {
-    source      = "${path.module}/../k8s/service.yaml"
+    content = templatefile("${path.module}/../k8s/service.yaml", {
+       port_back = "${var.SERVER_PORT}"
+    })
     destination = "/opt/services/${var.PROJECT_NAME}_${var.DEPLOYMENT_MODE}/k8s/service.yaml"
   }
 
   # cluster-issuer.yaml
   provisioner "file" {
     content = templatefile("${path.module}/../k8s/cluster-issuer.yaml", {
-      project_cert_email = var.PROJECT_CERT_EMAIL
+      project_cert_email = "${var.PROJECT_CERT_EMAIL}"
     })
 
     destination = "/opt/services/${var.PROJECT_NAME}_${var.DEPLOYMENT_MODE}/k8s/cluster-issuer.yaml"

@@ -1,24 +1,57 @@
 # -------------------------------------------------------------------------------------------------------------
 #  Required Parameters
 
-# KEYS
-# Google Cloud
-SECRET_STATE_ARCHIVE_KEY="<To generate use: openssl rand -hex 32>"
-# Path to the service account credentials
-GOOGLE_SE_CREDS_PATH="secret/service_account.json"
 
-# SSH keys
-SECRET_RSA_PRIVATE_KEY_PATH="secret/<ssh_key_name>"
-SECRET_RSA_PUBLIC_KEY_PATH="secret/<ssh_key_name>.pub"
+# GOOGLE CREDS
+## Path to the service account credentials
+GOOGLE_APPLICATION_CREDENTIALS=".secret/-service_account.json"
+## Project id for deployed resources
+GOOGLE_APPLICATION_PROJECT_ID="<your-gcp-project-id>"
+GOOGLE_APPLICATION_REGION="europe-central2"
+## Encryption key for state/backups
+## Generate with: openssl rand -base64 32
+GOOGLE_ENCRYPTION_KEY="<generated-encryption-key>"
 
-# Specifies where to deploy the project. Possible values: `hetzner`
-CSP="hetzner"
-# Hetzner API Token
-SECRET_HETZNER_CLOUD_TOKEN="<Get it from: https://console.hetzner.cloud → Security → API Tokens>"
 
-# Project variables
-# Default project name (Should not consists "-" or spaces) / `iron_site`
-PROJECT_NAME="iron_cage_sdk"
+# SSH KEYS
+## Generate with: ssh-keygen -t ed25519 -f .secret/-iron_site -C "deploy_key"
+SSH_PRIVATE_KEY_PATH=".secret/-iron_site"
+SSH_PUBLIC_KEY_PATH=".secret/-iron_site.pub"
+
+# HOST SERVER
+## Set after server is created, or use existing server
+HOST_SERVER_NAME="<your-server-hostname>"
+HOST_SERVER_IP="<your-server-ip>"
+
+
+# HETZNER
+## Get from https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/
+HETZNER_CLOUD_TOKEN="<your-hetzner-api-token>"
+
+
+# ======== DEPLOYMENT CONFIG ========
+## Deployment mode: dev | staging | production
+DEPLOYMENT_MODE="dev"
+
+
+# ======== PROJECT CONFIG ========
+## Project name (no hyphens or spaces)
+PROJECT_NAME="my_project"
+## Project domain for ingress routing
+PROJECT_DOMAIN="example.com"
+## Project cert email
+PROJECT_CERT_EMAIL="example@email.com"
+
+
+# ======== HETZNER SERVER CONFIG ========
+## Server location: fsn1 | nbg1 | hel1 | ash | hil
+HOST_SERVER_LOCATION="hel1"
+## Server image
+HOST_SERVER_IMAGE="ubuntu-24.04"
+## Server type
+HOST_SERVER_TYPE="cx33"
+## Semicolon-separated list of allowed SSH IP/CIDR ranges
+ALLOWED_SSH_IPS="0.0.0.0/0;::/0"
 
 # =============================================================================
 # Iron Runtime Server Secrets
@@ -52,23 +85,3 @@ ENABLE_DEMO_SEED="true"
 OPENAI_API_KEY="<Get it from: https://platform.openai.com/account/api-keys>"
 # Apollo API key for lead data scraping
 APOLLO_API_KEY="<Get it from: https://developer.apollo.io/keys>"
-
-## -------------------------------------------------------------------------------------------------------------
-##  Optional Parameters
-
-# Google cloud region
-TF_VAR_REGION="us-central1"
-# Project id for deployed resources | Can be set in secret/-secret.sh
-TF_VAR_PROJECT_ID="The project id of the google cloud .json: exists in service_account.json -> project_id "
-# Artifact Repository name for pushing the Docker images | Should not have "_"
-TF_VAR_REPO_NAME=
-# Pushed image name | Can have "_"
-TF_VAR_IMAGE_NAME=
-# Helper var for tagging local image
-TAG=
-# Zone location for the resource
-TF_VAR_ZONE=
-# Cloud Storage bucket name | Should not have "_"
-TF_VAR_BUCKET_NAME=
-# Base terraform directory
-TF_DIR=

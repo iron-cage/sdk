@@ -115,7 +115,17 @@ PROJECT_ENV_VARS := \
 	PROJECT_NAME \
 	PROJECT_DOMAIN \
 	TAG \
-	VERSION
+	VERSION \
+	RUST_LOG \
+	DATABASE_URL \
+	JWT_SECRET \
+	IRON_SECRETS_MASTER_KEY \
+	IP_TOKEN_KEY \
+	IC_TOKEN_SECRET \
+	ALLOWED_ORIGINS \
+	SERVER_PORT \
+	IRON_DEPLOYMNET_MODE \
+	ENABLE_DEMO_SEED
 
 # !!!!!! NEW PROJECT VARS ADD HERE
 
@@ -130,6 +140,7 @@ TF_EXPORT_VARS := \
 	ARTIFACT_REPO_NAME \
 	BUCKET_NAME \
 	GOOGLE_APPLICATION_CREDENTIALS \
+	SERVER_PORT \
 	VERSION \
 	TAG
 
@@ -177,7 +188,15 @@ build_image: ## Builds uarust_conf_site image
 
 	docker build .\
 		-f ./Dockerfile.frontend \
+		--build-arg VITE_API_URL="/api" \
+		--build-arg SERVER_PORT=$(SERVER_PORT) \
+		--build-arg CSP="/api" \
 		-t $(TAG)_front:$(VERSION)
+
+	docker build .\
+		-f ./Dockerfile.backend \
+		--build-arg SERVER_PORT=$(SERVER_PORT) \
+		-t $(TAG)_back:$(VERSION)
 
 	@echo "[INFO]: Images built successfuly" 
 
@@ -185,7 +204,7 @@ build_image: ## Builds uarust_conf_site image
 push_image: ## Builds and pushes local docker image to the private repository via gar
 	@echo "[INFO]: Start to push images to $(TAG)"
 	@docker push $(TAG)_front:$(VERSION)
-# 	docker push $(TAG)_back
+	@docker push $(TAG)_back:$(VERSION)
 
 # ============================================================================================================================
 # Google_APPLICATION setup
