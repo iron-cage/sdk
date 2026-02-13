@@ -20,8 +20,7 @@ use std::path::Path;
 /// Test: Attack taxonomy file exists and is readable
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_exists()
-{
+fn test_attack_taxonomy_exists() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
 
   assert!(
@@ -29,13 +28,9 @@ fn test_attack_taxonomy_exists()
     "Attack taxonomy not found at: {taxonomy_path:?}"
   );
 
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
-  assert!(
-    !content.is_empty(),
-    "Attack taxonomy is empty"
-  );
+  assert!(!content.is_empty(), "Attack taxonomy is empty");
 }
 
 /// Test: Attack taxonomy documents P0 payloads (65 total)
@@ -49,11 +44,9 @@ fn test_attack_taxonomy_exists()
 /// - Out-of-band injection
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_contains_p0_payloads()
-{
+fn test_attack_taxonomy_contains_p0_payloads() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Check for P0 section
   assert!(
@@ -77,11 +70,9 @@ fn test_attack_taxonomy_contains_p0_payloads()
 /// Test: Attack taxonomy documents P1 payloads (38 total)
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_contains_p1_payloads()
-{
+fn test_attack_taxonomy_contains_p1_payloads() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Check for P1 section
   assert!(
@@ -107,11 +98,9 @@ fn test_attack_taxonomy_contains_p1_payloads()
 /// - Stacked queries
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_categorizes_by_type()
-{
+fn test_attack_taxonomy_categorizes_by_type() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Check for category headers (markdown)
   let category_count = content.matches("##").count();
@@ -125,11 +114,9 @@ fn test_attack_taxonomy_categorizes_by_type()
 /// Test: Attack taxonomy provides example payloads
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_provides_examples()
-{
+fn test_attack_taxonomy_provides_examples() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Check for code blocks or examples
   assert!(
@@ -141,18 +128,16 @@ fn test_attack_taxonomy_provides_examples()
 /// Test: Attack taxonomy maps to OWASP classifications
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_references_owasp()
-{
+fn test_attack_taxonomy_references_owasp() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Check for security references
   assert!(
-    content.contains("OWASP") ||
-    content.contains("SQL Injection") ||
-    content.contains("CWE") ||
-    content.contains("security"),
+    content.contains("OWASP")
+      || content.contains("SQL Injection")
+      || content.contains("CWE")
+      || content.contains("security"),
     "Taxonomy should reference security standards"
   );
 }
@@ -160,18 +145,16 @@ fn test_attack_taxonomy_references_owasp()
 /// Test: Attack taxonomy specifies testing methodology
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_attack_taxonomy_specifies_methodology()
-{
+fn test_attack_taxonomy_specifies_methodology() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Check for methodology keywords
   assert!(
-    content.contains("test") ||
-    content.contains("verify") ||
-    content.contains("validate") ||
-    content.contains("expect"),
+    content.contains("test")
+      || content.contains("verify")
+      || content.contains("validate")
+      || content.contains("expect"),
     "Taxonomy should specify how to test each attack vector"
   );
 }

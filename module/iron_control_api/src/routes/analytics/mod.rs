@@ -19,56 +19,26 @@
 //! - `budget`: Budget status endpoint (1 handler)
 //! - `usage`: Usage statistics endpoints (3 handlers)
 
-mod shared;
-mod ingestion;
-mod spending;
 mod budget;
+mod ingestion;
+mod shared;
+mod spending;
 mod usage;
 
 // Re-export all public types and handlers
 pub use shared::{
-  AnalyticsState,
-  Period,
-  AnalyticsQuery,
-  PaginationQuery,
-  BudgetStatusQuery,
-  AnalyticsEventRequest,
-  EventResponse,
-  Filters,
-  Pagination,
-  SpendingTotalResponse,
-  AgentSpending,
-  SpendingByAgentResponse,
-  SpendingSummary,
-  ProviderSpending,
-  SpendingByProviderResponse,
-  ProviderSpendingSummary,
-  AvgCostResponse,
-  BudgetStatus,
-  BudgetSummary,
-  BudgetStatusResponse,
-  RequestUsageResponse,
-  AgentTokenUsage,
+  AgentSpending, AgentTokenUsage, AnalyticsEventRequest, AnalyticsEventWithAgent, AnalyticsQuery,
+  AnalyticsState, AvgCostResponse, BudgetStatus, BudgetStatusQuery, BudgetStatusResponse,
+  BudgetSummary, EventResponse, EventsListQuery, EventsListResponse, Filters, ModelUsage,
+  ModelUsageResponse, ModelUsageSummary, Pagination, PaginationQuery, Period, ProviderSpending,
+  ProviderSpendingSummary, RequestUsageResponse, SpendingByAgentResponse,
+  SpendingByProviderResponse, SpendingSummary, SpendingTotalResponse, TokenUsageResponse,
   TokenUsageSummary,
-  TokenUsageResponse,
-  ModelUsage,
-  ModelUsageSummary,
-  ModelUsageResponse,
-  EventsListQuery,
-  EventsListResponse,
-  AnalyticsEventWithAgent,
 };
 
-pub use ingestion::{ post_event, list_events };
-pub use spending::{
-  get_spending_total,
-  get_spending_by_agent,
-  get_spending_by_provider,
-  get_spending_avg,
-};
 pub use budget::get_budget_status;
-pub use usage::{
-  get_usage_requests,
-  get_usage_tokens,
-  get_usage_models,
+pub use ingestion::{list_events, post_event};
+pub use spending::{
+  get_spending_avg, get_spending_by_agent, get_spending_by_provider, get_spending_total,
 };
+pub use usage::{get_usage_models, get_usage_requests, get_usage_tokens};

@@ -36,28 +36,31 @@
 //! 3. Check error message is descriptive (mentions field name and constraint)
 
 use crate::common::extract_response;
-use iron_control_api::routes::usage::UsageState;
-use axum::{ Router, routing::get, http::{ Request, StatusCode } };
 use axum::body::Body;
+use axum::{
+  http::{Request, StatusCode},
+  routing::get,
+  Router,
+};
+use iron_control_api::routes::usage::UsageState;
 use tower::ServiceExt;
 
 /// Create test router with usage routes.
-async fn create_test_router() -> Router
-{
-  let usage_state = UsageState::new( "sqlite::memory:" )
+async fn create_test_router() -> Router {
+  let usage_state = UsageState::new("sqlite::memory:")
     .await
-    .expect( "LOUD FAILURE: Failed to create usage state with in-memory database" );
+    .expect("LOUD FAILURE: Failed to create usage state with in-memory database");
 
   Router::new()
     .route(
       "/api/usage/by-project/:project_id",
-      get( iron_control_api::routes::usage::get_usage_by_project )
+      get(iron_control_api::routes::usage::get_usage_by_project),
     )
     .route(
       "/api/usage/by-provider/:provider",
-      get( iron_control_api::routes::usage::get_usage_by_provider )
+      get(iron_control_api::routes::usage::get_usage_by_provider),
     )
-    .with_state( usage_state )
+    .with_state(usage_state)
 }
 
 // ========================================
@@ -67,19 +70,18 @@ async fn create_test_router() -> Router
 /// Test whitespace-only `project_id` is rejected.
 ///
 /// WHY: Whitespace-only IDs are invalid - should return 400, not pass to database.
-#[ tokio::test ]
-async fn test_by_project_whitespace_only_rejected()
-{
+#[tokio::test]
+async fn test_by_project_whitespace_only_rejected() {
   let router = create_test_router().await;
 
   // URL-encoded spaces: %20
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-project/%20%20%20" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-project/%20%20%20")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -87,9 +89,9 @@ async fn test_by_project_whitespace_only_rejected()
     "LOUD FAILURE: Whitespace-only project_id must return 400 BAD_REQUEST"
   );
 
-  let ( _, body ) = extract_response( response ).await;
+  let (_, body) = extract_response(response).await;
   assert!(
-    body.contains( "project_id" ) && ( body.contains( "empty" ) || body.contains( "whitespace" ) ),
+    body.contains("project_id") && (body.contains("empty") || body.contains("whitespace")),
     "LOUD FAILURE: Error message must mention project_id and describe issue. Got: {body}"
   );
 }
@@ -98,22 +100,21 @@ async fn test_by_project_whitespace_only_rejected()
 ///
 /// WHY: Long strings in SQL queries can cause memory exhaustion and slow queries.
 /// Limit: 1000 chars (generous, typical UUIDs are 36 chars).
-#[ tokio::test ]
-async fn test_by_project_too_long_rejected()
-{
+#[tokio::test]
+async fn test_by_project_too_long_rejected() {
   let router = create_test_router().await;
 
   // Create 1001-character project_id (exceeds limit)
-  let long_id = "a".repeat( 1001 );
-  let uri = format!( "/api/usage/by-project/{long_id}" );
+  let long_id = "a".repeat(1001);
+  let uri = format!("/api/usage/by-project/{long_id}");
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( &uri )
-    .body( Body::empty() )
+    .method("GET")
+    .uri(&uri)
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -121,9 +122,9 @@ async fn test_by_project_too_long_rejected()
     "LOUD FAILURE: project_id exceeding 1000 chars must return 400 BAD_REQUEST for denial-of-service prevention"
   );
 
-  let ( _, body ) = extract_response( response ).await;
+  let (_, body) = extract_response(response).await;
   assert!(
-    body.contains( "project_id" ) && ( body.contains( "too long" ) || body.contains( "1000" ) ),
+    body.contains("project_id") && (body.contains("too long") || body.contains("1000")),
     "LOUD FAILURE: Error message must mention project_id length limit. Got: {body}"
   );
 }
@@ -131,18 +132,17 @@ async fn test_by_project_too_long_rejected()
 /// Test valid `project_id` is accepted (baseline).
 ///
 /// WHY: Ensure validation doesn't break valid requests.
-#[ tokio::test ]
-async fn test_by_project_valid_id_accepted()
-{
+#[tokio::test]
+async fn test_by_project_valid_id_accepted() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-project/proj-12345" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-project/proj-12345")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // Should return 200 OK (with zero usage for non-existent project, but validation passed)
   assert_eq!(
@@ -159,18 +159,17 @@ async fn test_by_project_valid_id_accepted()
 /// Test whitespace-only provider is rejected.
 ///
 /// WHY: Whitespace-only provider names are invalid.
-#[ tokio::test ]
-async fn test_by_provider_whitespace_only_rejected()
-{
+#[tokio::test]
+async fn test_by_provider_whitespace_only_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-provider/%20" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-provider/%20")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -178,9 +177,9 @@ async fn test_by_provider_whitespace_only_rejected()
     "LOUD FAILURE: Whitespace-only provider must return 400 BAD_REQUEST"
   );
 
-  let ( _, body ) = extract_response( response ).await;
+  let (_, body) = extract_response(response).await;
   assert!(
-    body.contains( "provider" ) && ( body.contains( "empty" ) || body.contains( "whitespace" ) ),
+    body.contains("provider") && (body.contains("empty") || body.contains("whitespace")),
     "LOUD FAILURE: Error message must mention provider and describe issue. Got: {body}"
   );
 }
@@ -189,21 +188,20 @@ async fn test_by_provider_whitespace_only_rejected()
 ///
 /// WHY: Prevent memory exhaustion from malicious long strings.
 /// Limit: 100 chars (known providers are ~10 chars, 100 is generous).
-#[ tokio::test ]
-async fn test_by_provider_too_long_rejected()
-{
+#[tokio::test]
+async fn test_by_provider_too_long_rejected() {
   let router = create_test_router().await;
 
-  let long_provider = "a".repeat( 101 );
-  let uri = format!( "/api/usage/by-provider/{long_provider}" );
+  let long_provider = "a".repeat(101);
+  let uri = format!("/api/usage/by-provider/{long_provider}");
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( &uri )
-    .body( Body::empty() )
+    .method("GET")
+    .uri(&uri)
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -211,9 +209,9 @@ async fn test_by_provider_too_long_rejected()
     "LOUD FAILURE: provider exceeding 100 chars must return 400 BAD_REQUEST for denial-of-service prevention"
   );
 
-  let ( _, body ) = extract_response( response ).await;
+  let (_, body) = extract_response(response).await;
   assert!(
-    body.contains( "provider" ) && ( body.contains( "too long" ) || body.contains( "100" ) ),
+    body.contains("provider") && (body.contains("too long") || body.contains("100")),
     "LOUD FAILURE: Error message must mention provider length limit. Got: {body}"
   );
 }
@@ -221,18 +219,17 @@ async fn test_by_provider_too_long_rejected()
 /// Test valid provider is accepted (baseline).
 ///
 /// WHY: Ensure validation doesn't break valid requests.
-#[ tokio::test ]
-async fn test_by_provider_valid_name_accepted()
-{
+#[tokio::test]
+async fn test_by_provider_valid_name_accepted() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-provider/openai" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-provider/openai")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),

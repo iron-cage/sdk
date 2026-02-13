@@ -27,24 +27,27 @@
 //! 4. Verify `api_tokens` table schema matches production
 
 use crate::common::extract_response;
-use iron_control_api::routes::usage::UsageState;
-use axum::{ Router, routing::get, http::{ Request, StatusCode } };
 use axum::body::Body;
+use axum::{
+  http::{Request, StatusCode},
+  routing::get,
+  Router,
+};
+use iron_control_api::routes::usage::UsageState;
 use tower::ServiceExt;
 
 /// Create test router with by-project route.
-async fn create_test_router() -> Router
-{
-  let usage_state = UsageState::new( "sqlite::memory:" )
+async fn create_test_router() -> Router {
+  let usage_state = UsageState::new("sqlite::memory:")
     .await
-    .expect( "LOUD FAILURE: Failed to create usage state with in-memory database" );
+    .expect("LOUD FAILURE: Failed to create usage state with in-memory database");
 
   Router::new()
     .route(
       "/api/usage/by-project/:project_id",
-      get( iron_control_api::routes::usage::get_usage_by_project )
+      get(iron_control_api::routes::usage::get_usage_by_project),
     )
-    .with_state( usage_state )
+    .with_state(usage_state)
 }
 
 /// Test unknown `project_id` returns 200 OK with zero usage.
@@ -52,18 +55,17 @@ async fn create_test_router() -> Router
 /// WHY: SQL query uses COALESCE which returns 0 for NULL values.
 /// Non-existent `project_id` returns valid result (all zeros), not database error.
 /// This is correct behavior - unknown project is valid query, not error condition.
-#[ tokio::test ]
-async fn test_by_project_unknown_project_returns_zeros()
-{
+#[tokio::test]
+async fn test_by_project_unknown_project_returns_zeros() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-project/nonexistent_project" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-project/nonexistent_project")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -71,19 +73,21 @@ async fn test_by_project_unknown_project_returns_zeros()
     "LOUD FAILURE: Unknown project_id returns 200 OK with zero usage, not error"
   );
 
-  let ( status, body ) = extract_response( response ).await;
-  assert_eq!( status, StatusCode::OK );
+  let (status, body) = extract_response(response).await;
+  assert_eq!(status, StatusCode::OK);
 
   // Verify response is valid JSON with zero values
-  let json: serde_json::Value = serde_json::from_str( &body )
-    .expect( "LOUD FAILURE: Response must be valid JSON" );
+  let json: serde_json::Value =
+    serde_json::from_str(&body).expect("LOUD FAILURE: Response must be valid JSON");
 
   assert_eq!(
-    json[ "total_tokens" ].as_i64().unwrap(), 0,
+    json["total_tokens"].as_i64().unwrap(),
+    0,
     "LOUD FAILURE: Unknown project must have zero tokens"
   );
   assert_eq!(
-    json[ "total_requests" ].as_i64().unwrap(), 0,
+    json["total_requests"].as_i64().unwrap(),
+    0,
     "LOUD FAILURE: Unknown project must have zero requests"
   );
 }
@@ -91,18 +95,17 @@ async fn test_by_project_unknown_project_returns_zeros()
 /// Test URL path parameter extraction.
 ///
 /// WHY: Axum Path extractor must correctly extract `project_id` from URL.
-#[ tokio::test ]
-async fn test_by_project_path_parameter_extraction()
-{
+#[tokio::test]
+async fn test_by_project_path_parameter_extraction() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-project/test-project-123" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-project/test-project-123")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // Should return 200 OK (with zeros for non-existent project), proving path extraction worked
   assert_eq!(
@@ -115,19 +118,18 @@ async fn test_by_project_path_parameter_extraction()
 /// Test special characters in `project_id` (URL encoding).
 ///
 /// WHY: Project IDs might contain hyphens, underscores, or encoded characters.
-#[ tokio::test ]
-async fn test_by_project_special_characters_in_id()
-{
+#[tokio::test]
+async fn test_by_project_special_characters_in_id() {
   let router = create_test_router().await;
 
   // Test with URL-encoded space (%20)
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-project/project%20with%20spaces" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-project/project%20with%20spaces")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // Should return 200 OK (proving URL decoding and query worked)
   assert_eq!(
@@ -138,18 +140,17 @@ async fn test_by_project_special_characters_in_id()
 }
 
 /// Test POST method rejected (GET-only endpoint).
-#[ tokio::test ]
-async fn test_by_project_rejects_post_method()
-{
+#[tokio::test]
+async fn test_by_project_rejects_post_method() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/usage/by-project/test-project" )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/usage/by-project/test-project")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -159,26 +160,27 @@ async fn test_by_project_rejects_post_method()
 }
 
 /// Test Content-Type is application/json for error responses.
-#[ tokio::test ]
-async fn test_by_project_error_content_type_is_json()
-{
+#[tokio::test]
+async fn test_by_project_error_content_type_is_json() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/by-project/nonexistent" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/by-project/nonexistent")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
-  let content_type = response.headers().get( "content-type" )
-    .expect( "LOUD FAILURE: Error response must include Content-Type header" )
+  let content_type = response
+    .headers()
+    .get("content-type")
+    .expect("LOUD FAILURE: Error response must include Content-Type header")
     .to_str()
-    .expect( "LOUD FAILURE: Content-Type must be valid UTF-8" );
+    .expect("LOUD FAILURE: Content-Type must be valid UTF-8");
 
   assert!(
-    content_type.contains( "application/json" ),
+    content_type.contains("application/json"),
     "LOUD FAILURE: Error response Content-Type must be application/json, got: {content_type}"
   );
 }

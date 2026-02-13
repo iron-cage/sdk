@@ -30,18 +30,13 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  create_ic_token,
-  seed_agent_with_budget,
-  create_budget_router,
 };
 use iron_control_api::ic_token::IcTokenClaims;
 use serde_json::json;
@@ -58,40 +53,43 @@ use tower::ServiceExt;
 ///
 /// # Priority
 /// HIGH - Input validation completeness
-#[ tokio::test ]
-async fn test_handshake_whitespace_only_ic_token()
-{
+#[tokio::test]
+async fn test_handshake_whitespace_only_ic_token() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 106, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 106, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let app = create_budget_router(state);
 
   // Whitespace-only ic_token
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": "   \t\n  ",
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::BAD_REQUEST,
+    response.status(),
+    StatusCode::BAD_REQUEST,
     "Whitespace-only ic_token should be rejected"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_data : serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
   assert!(
-    error_data[ "error" ].as_str().unwrap().contains( "empty" ),
+    error_data["error"].as_str().unwrap().contains("empty"),
     "Error should mention empty ic_token"
   );
 }
@@ -103,32 +101,33 @@ async fn test_handshake_whitespace_only_ic_token()
 ///
 /// # Expected Behavior
 /// HTTP 400 Bad Request with validation error
-#[ tokio::test ]
-async fn test_handshake_whitespace_only_provider()
-{
+#[tokio::test]
+async fn test_handshake_whitespace_only_provider() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 107, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 107, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let ic_token = create_ic_token(1, &state.ic_token_manager);
+  let app = create_budget_router(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "  \t  "
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::BAD_REQUEST,
+    response.status(),
+    StatusCode::BAD_REQUEST,
     "Whitespace-only provider should be rejected"
   );
 }
@@ -143,42 +142,45 @@ async fn test_handshake_whitespace_only_provider()
 ///
 /// # Priority
 /// HIGH - `DoS` prevention boundary
-#[ tokio::test ]
-async fn test_handshake_ic_token_over_max_length()
-{
+#[tokio::test]
+async fn test_handshake_ic_token_over_max_length() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 108, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 108, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let app = create_budget_router(state);
 
   // Create ic_token of exactly 2001 characters
-  let oversized_token = "a".repeat( 2001 );
+  let oversized_token = "a".repeat(2001);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": oversized_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::BAD_REQUEST,
+    response.status(),
+    StatusCode::BAD_REQUEST,
     "ic_token over 2000 chars should be rejected"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_data : serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
   assert!(
-    error_data[ "error" ].as_str().unwrap().contains( "too long" ),
+    error_data["error"].as_str().unwrap().contains("too long"),
     "Error should mention ic_token too long"
   );
 }
@@ -190,35 +192,36 @@ async fn test_handshake_ic_token_over_max_length()
 ///
 /// # Expected Behavior
 /// HTTP 400 Bad Request "provider too long"
-#[ tokio::test ]
-async fn test_handshake_provider_over_max_length()
-{
+#[tokio::test]
+async fn test_handshake_provider_over_max_length() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 109, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 109, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let ic_token = create_ic_token(1, &state.ic_token_manager);
+  let app = create_budget_router(state);
 
   // Provider name of exactly 51 characters
-  let oversized_provider = "a".repeat( 51 );
+  let oversized_provider = "a".repeat(51);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": oversized_provider
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::BAD_REQUEST,
+    response.status(),
+    StatusCode::BAD_REQUEST,
     "provider over 50 chars should be rejected"
   );
 }
@@ -230,34 +233,35 @@ async fn test_handshake_provider_over_max_length()
 ///
 /// # Expected Behavior
 /// HTTP 401 Unauthorized "Invalid IC Token"
-#[ tokio::test ]
-async fn test_handshake_malformed_jwt_missing_segments()
-{
+#[tokio::test]
+async fn test_handshake_malformed_jwt_missing_segments() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 110, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 110, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let app = create_budget_router(state);
 
   // Malformed JWT with only 2 segments (missing signature)
   let malformed_jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0";
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": malformed_jwt,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::UNAUTHORIZED,
+    response.status(),
+    StatusCode::UNAUTHORIZED,
     "Malformed JWT should return 401 Unauthorized"
   );
 }
@@ -269,41 +273,43 @@ async fn test_handshake_malformed_jwt_missing_segments()
 ///
 /// # Expected Behavior
 /// HTTP 400 Bad Request "tokens cannot be negative"
-#[ tokio::test ]
-async fn test_report_usage_negative_tokens()
-{
+#[tokio::test]
+async fn test_report_usage_negative_tokens() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 111, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 111, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(1, &state.ic_token_manager);
 
   // Create lease first
-  let app1 = create_budget_router( state.clone() );
+  let app1 = create_budget_router(state.clone());
   let handshake_req = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_resp = app1.oneshot( handshake_req ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_resp.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap();
+  let handshake_resp = app1.oneshot(handshake_req).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap();
 
   // Report usage with negative tokens
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_req = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "lease_id": lease_id,
         "request_id": "req_test_001",
@@ -311,25 +317,42 @@ async fn test_report_usage_negative_tokens()
         "cost_microdollars": 5_000_000,
         "model": "gpt-4",
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app2.oneshot( report_req ).await.unwrap();
+  let response = app2.oneshot(report_req).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::BAD_REQUEST,
+    response.status(),
+    StatusCode::BAD_REQUEST,
     "Negative tokens should be rejected"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_data : serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
   assert!(
-    error_data[ "error" ].as_str().unwrap().to_lowercase().contains( "negative" ) ||
-    error_data[ "error" ].as_str().unwrap().to_lowercase().contains( "invalid" ) ||
-    error_data[ "error" ].as_str().unwrap().to_lowercase().contains( "positive" ),
-    "Error should mention negative/positive tokens, got: {}", error_data[ "error" ]
+    error_data["error"]
+      .as_str()
+      .unwrap()
+      .to_lowercase()
+      .contains("negative")
+      || error_data["error"]
+        .as_str()
+        .unwrap()
+        .to_lowercase()
+        .contains("invalid")
+      || error_data["error"]
+        .as_str()
+        .unwrap()
+        .to_lowercase()
+        .contains("positive"),
+    "Error should mention negative/positive tokens, got: {}",
+    error_data["error"]
   );
 }
 
@@ -340,41 +363,43 @@ async fn test_report_usage_negative_tokens()
 ///
 /// # Expected Behavior
 /// HTTP 400 Bad Request "`cost_microdollars` cannot be negative"
-#[ tokio::test ]
-async fn test_report_usage_negative_cost()
-{
+#[tokio::test]
+async fn test_report_usage_negative_cost() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 112, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 112, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(1, &state.ic_token_manager);
 
   // Create lease first
-  let app1 = create_budget_router( state.clone() );
+  let app1 = create_budget_router(state.clone());
   let handshake_req = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_resp = app1.oneshot( handshake_req ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_resp.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap();
+  let handshake_resp = app1.oneshot(handshake_req).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap();
 
   // Report usage with negative cost
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_req = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "lease_id": lease_id,
         "request_id": "req_test_001",
@@ -382,24 +407,37 @@ async fn test_report_usage_negative_cost()
         "cost_microdollars": -5_000_000,  // NEGATIVE VALUE
         "model": "gpt-4",
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app2.oneshot( report_req ).await.unwrap();
+  let response = app2.oneshot(report_req).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::BAD_REQUEST,
+    response.status(),
+    StatusCode::BAD_REQUEST,
     "Negative cost_usd should be rejected"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_data : serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
   assert!(
-    error_data[ "error" ].as_str().unwrap().to_lowercase().contains( "negative" ) ||
-    error_data[ "error" ].as_str().unwrap().to_lowercase().contains( "invalid" ),
-    "Error should mention negative cost, got: {}", error_data[ "error" ]
+    error_data["error"]
+      .as_str()
+      .unwrap()
+      .to_lowercase()
+      .contains("negative")
+      || error_data["error"]
+        .as_str()
+        .unwrap()
+        .to_lowercase()
+        .contains("invalid"),
+    "Error should mention negative cost, got: {}",
+    error_data["error"]
   );
 }
 
@@ -413,40 +451,42 @@ async fn test_report_usage_negative_cost()
 ///
 /// # Priority
 /// HIGH - Security (information disclosure prevention)
-#[ tokio::test ]
-async fn test_error_messages_no_sensitive_data_leak()
-{
+#[tokio::test]
+async fn test_error_messages_no_sensitive_data_leak() {
   let pool = setup_test_db().await;
   // Don't seed any agent (agent doesn't exist)
 
-  let state = create_test_budget_state( pool );
+  let state = create_test_budget_state(pool);
   // Create IC Token for non-existent agent 999
-  let ic_token = create_ic_token( 999, &state.ic_token_manager );
+  let ic_token = create_ic_token(999, &state.ic_token_manager);
 
-  let app = create_budget_router( state );
+  let app = create_budget_router(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Should return 404 or 400, NOT leak "agent doesn't exist"
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_data : serde_json::Value = serde_json::from_slice( &body ).unwrap();
-  let error_msg = error_data[ "error" ].as_str().unwrap().to_lowercase();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+  let error_msg = error_data["error"].as_str().unwrap().to_lowercase();
 
   // Error should be generic, not leak existence information
   assert!(
-    !error_msg.contains( "agent" ) || !error_msg.contains( "not found" ),
+    !error_msg.contains("agent") || !error_msg.contains("not found"),
     "Error should not leak agent existence: {error_msg}"
   );
 }
@@ -461,43 +501,45 @@ async fn test_error_messages_no_sensitive_data_leak()
 ///
 /// # Priority
 /// MEDIUM - Edge case from specification
-#[ tokio::test ]
-async fn test_report_usage_zero_cost_cached_response()
-{
+#[tokio::test]
+async fn test_report_usage_zero_cost_cached_response() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 113, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 113, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( 1, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(1, &state.ic_token_manager);
 
   // Create lease first
-  let app1 = create_budget_router( state.clone() );
+  let app1 = create_budget_router(state.clone());
   let handshake_req = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_resp = app1.oneshot( handshake_req ).await.unwrap();
-  assert_eq!( handshake_resp.status(), StatusCode::OK );
+  let handshake_resp = app1.oneshot(handshake_req).await.unwrap();
+  assert_eq!(handshake_resp.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_resp.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap();
 
   // Report usage with zero cost (cached response)
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_req = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "lease_id": lease_id,
         "request_id": "req_cached_001",
@@ -505,28 +547,32 @@ async fn test_report_usage_zero_cost_cached_response()
         "cost_microdollars": 0,      // ZERO COST
         "model": "gpt-4",
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app2.oneshot( report_req ).await.unwrap();
+  let response = app2.oneshot(report_req).await.unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "Zero-cost usage should be accepted (cached responses, free tier)"
   );
 
   // Verify lease budget didn't change
-  let lease_check : ( i64, i64 ) = sqlx::query_as(
-    "SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?"
-  )
-  .bind( lease_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let lease_check: (i64, i64) =
+    sqlx::query_as("SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?")
+      .bind(lease_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
-  assert!( lease_check.0 > 0, "Granted should be positive" );
-  assert_eq!( lease_check.1, 0, "Spent should remain 0 for zero-cost request" );
+  assert!(lease_check.0 > 0, "Granted should be positive");
+  assert_eq!(
+    lease_check.1, 0,
+    "Spent should remain 0 for zero-cost request"
+  );
 }
 
 /// Test: Database foreign key constraint enforcement
@@ -539,9 +585,8 @@ async fn test_report_usage_zero_cost_cached_response()
 ///
 /// # Priority
 /// HIGH - Data integrity enforcement
-#[ tokio::test ]
-async fn test_database_foreign_key_constraint_agent()
-{
+#[tokio::test]
+async fn test_database_foreign_key_constraint_agent() {
   let pool = setup_test_db().await;
   // Don't seed any agent
 
@@ -565,11 +610,10 @@ async fn test_database_foreign_key_constraint_agent()
     "Foreign key constraint should prevent lease creation for non-existent agent"
   );
 
-  if let Err( e ) = result
-  {
+  if let Err(e) = result {
     let error_msg = e.to_string().to_lowercase();
     assert!(
-      error_msg.contains( "foreign" ) || error_msg.contains( "constraint" ),
+      error_msg.contains("foreign") || error_msg.contains("constraint"),
       "Error should mention foreign key constraint, got: {e}"
     );
   }
@@ -582,11 +626,10 @@ async fn test_database_foreign_key_constraint_agent()
 ///
 /// # Expected Behavior
 /// Database rejects with NOT NULL constraint violation
-#[ tokio::test ]
-async fn test_database_not_null_constraint()
-{
+#[tokio::test]
+async fn test_database_not_null_constraint() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 105, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 105, 100_000_000).await;
 
   // Attempt to insert NULL into budget_granted (NOT NULL column)
   let result = sqlx::query(
@@ -608,11 +651,10 @@ async fn test_database_not_null_constraint()
     "NOT NULL constraint should prevent NULL in budget_granted"
   );
 
-  if let Err( e ) = result
-  {
+  if let Err(e) = result {
     let error_msg = e.to_string().to_lowercase();
     assert!(
-      error_msg.contains( "null" ) || error_msg.contains( "not null" ),
+      error_msg.contains("null") || error_msg.contains("not null"),
       "Error should mention NOT NULL constraint, got: {e}"
     );
   }
@@ -628,32 +670,33 @@ async fn test_database_not_null_constraint()
 ///
 /// # Risk
 /// MEDIUM - Clock skew exploitation
-#[ tokio::test ]
-async fn test_handshake_future_dated_ic_token()
-{
+#[tokio::test]
+async fn test_handshake_future_dated_ic_token() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 201, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 201, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state.clone() );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state.clone());
 
   // Create IC Token with future iat (1 hour in the future)
   let future_timestamp = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
+    .duration_since(std::time::UNIX_EPOCH)
     .unwrap()
-    .as_secs() + 3600;
+    .as_secs()
+    + 3600;
 
-  let future_claims = IcTokenClaims
-  {
+  let future_claims = IcTokenClaims {
     agent_id: "agent_201".to_string(),
     budget_id: "budget_201".to_string(),
     issued_at: future_timestamp,
     expires_at: None,
     issuer: "iron-control-panel".to_string(),
-    permissions: vec![ "llm:call".to_string() ],
+    permissions: vec!["llm:call".to_string()],
   };
 
-  let future_token = state.ic_token_manager.generate_token( &future_claims )
+  let future_token = state
+    .ic_token_manager
+    .generate_token(&future_claims)
     .expect("LOUD FAILURE: Should generate future-dated token");
 
   // Test handshake with future-dated IC Token
@@ -668,23 +711,25 @@ async fn test_handshake_future_dated_ic_token()
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   // Document actual behavior
   let status = response.status();
-  println!( "Manual Test Gap #2: Future-dated IC Token behavior: {status}");
+  println!("Manual Test Gap #2: Future-dated IC Token behavior: {status}");
 
   // Current implementation accepts future-dated tokens (no iat validation)
   // This test documents the behavior - may need security review
   assert!(
-    status == StatusCode::OK || status == StatusCode::UNAUTHORIZED || status == StatusCode::BAD_REQUEST,
+    status == StatusCode::OK
+      || status == StatusCode::UNAUTHORIZED
+      || status == StatusCode::BAD_REQUEST,
     "Should either accept (200) or reject (400/401) future-dated tokens, got: {status}"
   );
 }
@@ -699,12 +744,11 @@ async fn test_handshake_future_dated_ic_token()
 ///
 /// # Risk
 /// MEDIUM - Null pointer dereference potential
-#[ tokio::test ]
-async fn test_handshake_null_ic_token_field()
-{
+#[tokio::test]
+async fn test_handshake_null_ic_token_field() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state);
 
   // Craft request with null ic_token
   let request_body = json!({
@@ -717,18 +761,20 @@ async fn test_handshake_null_ic_token_field()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
-    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL ic_token should be rejected with 400 or 422, got: {}", response.status()
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "NULL ic_token should be rejected with 400 or 422, got: {}",
+    response.status()
   );
 }
 
@@ -742,15 +788,14 @@ async fn test_handshake_null_ic_token_field()
 ///
 /// # Risk
 /// MEDIUM - Null pointer dereference potential
-#[ tokio::test ]
-async fn test_handshake_null_provider_field()
-{
+#[tokio::test]
+async fn test_handshake_null_provider_field() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 202, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 202, 100_000_000).await;
 
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state.clone() );
-  let ic_token = create_ic_token( 202, &state.ic_token_manager );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state.clone());
+  let ic_token = create_ic_token(202, &state.ic_token_manager);
 
   // Craft request with null provider
   let request_body = json!({
@@ -763,18 +808,20 @@ async fn test_handshake_null_provider_field()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
-    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL provider should be rejected with 400 or 422, got: {}", response.status()
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "NULL provider should be rejected with 400 or 422, got: {}",
+    response.status()
   );
 }
 
@@ -788,44 +835,42 @@ async fn test_handshake_null_provider_field()
 ///
 /// # Risk
 /// HIGH - Could cause crashes if `agent_id` not validated
-#[ tokio::test ]
-async fn test_handshake_missing_agent_id_claim()
-{
+#[tokio::test]
+async fn test_handshake_missing_agent_id_claim() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state.clone() );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state.clone());
 
   // Create JWT with only budget_id and permissions (no agent_id)
-  use jsonwebtoken::{ encode, EncodingKey, Header };
-  use serde::{ Serialize, Deserialize };
+  use jsonwebtoken::{encode, EncodingKey, Header};
+  use serde::{Deserialize, Serialize};
 
-  #[ derive( Serialize, Deserialize ) ]
-  struct PartialClaims
-  {
+  #[derive(Serialize, Deserialize)]
+  struct PartialClaims {
     budget_id: String,
-    #[ serde( rename = "iat" ) ]
+    #[serde(rename = "iat")]
     issued_at: u64,
-    #[ serde( rename = "iss" ) ]
+    #[serde(rename = "iss")]
     issuer: String,
-    permissions: Vec< String >,
+    permissions: Vec<String>,
   }
 
-  let partial_claims = PartialClaims
-  {
+  let partial_claims = PartialClaims {
     budget_id: "budget_203".to_string(),
     issued_at: std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .unwrap()
       .as_secs(),
     issuer: "iron-control-panel".to_string(),
-    permissions: vec![ "llm:call".to_string() ],
+    permissions: vec!["llm:call".to_string()],
   };
 
   let token_missing_agent_id = encode(
     &Header::default(),
     &partial_claims,
-    &EncodingKey::from_secret( b"test_secret_key_12345" )
-  ).unwrap();
+    &EncodingKey::from_secret(b"test_secret_key_12345"),
+  )
+  .unwrap();
 
   // Test handshake with token missing agent_id
   let request_body = json!({
@@ -838,18 +883,19 @@ async fn test_handshake_missing_agent_id_claim()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNAUTHORIZED,
-    "Missing agent_id claim should be rejected with 400 or 401, got: {}", response.status()
+    "Missing agent_id claim should be rejected with 400 or 401, got: {}",
+    response.status()
   );
 }
 
@@ -863,44 +909,42 @@ async fn test_handshake_missing_agent_id_claim()
 ///
 /// # Risk
 /// MEDIUM - Budget tracking could fail
-#[ tokio::test ]
-async fn test_handshake_missing_budget_id_claim()
-{
+#[tokio::test]
+async fn test_handshake_missing_budget_id_claim() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state.clone() );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state.clone());
 
   // Create JWT with only agent_id and permissions (no budget_id)
-  use jsonwebtoken::{ encode, EncodingKey, Header };
-  use serde::{ Serialize, Deserialize };
+  use jsonwebtoken::{encode, EncodingKey, Header};
+  use serde::{Deserialize, Serialize};
 
-  #[ derive( Serialize, Deserialize ) ]
-  struct PartialClaims
-  {
+  #[derive(Serialize, Deserialize)]
+  struct PartialClaims {
     agent_id: String,
-    #[ serde( rename = "iat" ) ]
+    #[serde(rename = "iat")]
     issued_at: u64,
-    #[ serde( rename = "iss" ) ]
+    #[serde(rename = "iss")]
     issuer: String,
-    permissions: Vec< String >,
+    permissions: Vec<String>,
   }
 
-  let partial_claims = PartialClaims
-  {
+  let partial_claims = PartialClaims {
     agent_id: "agent_204".to_string(),
     issued_at: std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .unwrap()
       .as_secs(),
     issuer: "iron-control-panel".to_string(),
-    permissions: vec![ "llm:call".to_string() ],
+    permissions: vec!["llm:call".to_string()],
   };
 
   let token_missing_budget_id = encode(
     &Header::default(),
     &partial_claims,
-    &EncodingKey::from_secret( b"test_secret_key_12345" )
-  ).unwrap();
+    &EncodingKey::from_secret(b"test_secret_key_12345"),
+  )
+  .unwrap();
 
   // Test handshake with token missing budget_id
   let request_body = json!({
@@ -913,18 +957,19 @@ async fn test_handshake_missing_budget_id_claim()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNAUTHORIZED,
-    "Missing budget_id claim should be rejected with 400 or 401, got: {}", response.status()
+    "Missing budget_id claim should be rejected with 400 or 401, got: {}",
+    response.status()
   );
 }
 
@@ -938,15 +983,14 @@ async fn test_handshake_missing_budget_id_claim()
 ///
 /// # Risk
 /// MEDIUM - Budget accounting corruption
-#[ tokio::test ]
-async fn test_report_usage_non_finite_cost()
-{
+#[tokio::test]
+async fn test_report_usage_non_finite_cost() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 205, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 205, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let router_handshake = create_budget_router( state.clone() );
-  let ic_token = create_ic_token( 205, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let router_handshake = create_budget_router(state.clone());
+  let ic_token = create_ic_token(205, &state.ic_token_manager);
 
   // Create lease
   let handshake_request = json!({
@@ -959,23 +1003,27 @@ async fn test_report_usage_non_finite_cost()
   let handshake_response = router_handshake
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &handshake_request ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          serde_json::to_string(&handshake_request).unwrap(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_result : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_result[ "lease_id" ].as_str().unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_result: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_result["lease_id"].as_str().unwrap();
 
   // Test 1: Overflow (i64::MAX microdollars)
-  let router_report_inf = create_budget_router( state.clone() );
+  let router_report_inf = create_budget_router(state.clone());
   let report_infinity = json!({
     "lease_id": lease_id,
     "cost_microdollars": i64::MAX,
@@ -984,18 +1032,20 @@ async fn test_report_usage_non_finite_cost()
   let response_inf = router_report_inf
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &report_infinity ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&report_infinity).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
-    response_inf.status() == StatusCode::BAD_REQUEST || response_inf.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "Overflow cost should be rejected with 400 or 422, got: {}", response_inf.status()
+    response_inf.status() == StatusCode::BAD_REQUEST
+      || response_inf.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "Overflow cost should be rejected with 400 or 422, got: {}",
+    response_inf.status()
   );
 }
 
@@ -1009,12 +1059,11 @@ async fn test_report_usage_non_finite_cost()
 ///
 /// # Risk
 /// MEDIUM - Null pointer dereference potential
-#[ tokio::test ]
-async fn test_report_usage_null_lease_id()
-{
+#[tokio::test]
+async fn test_report_usage_null_lease_id() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state);
 
   // Craft request with null lease_id
   let request_body = json!({
@@ -1025,18 +1074,20 @@ async fn test_report_usage_null_lease_id()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
-    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL lease_id should be rejected with 400 or 422, got: {}", response.status()
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "NULL lease_id should be rejected with 400 or 422, got: {}",
+    response.status()
   );
 }
 
@@ -1050,12 +1101,11 @@ async fn test_report_usage_null_lease_id()
 ///
 /// # Risk
 /// MEDIUM - Budget accounting corruption
-#[ tokio::test ]
-async fn test_report_usage_null_cost_microdollars()
-{
+#[tokio::test]
+async fn test_report_usage_null_cost_microdollars() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
-  let router = create_budget_router( state );
+  let state = create_test_budget_state(pool);
+  let router = create_budget_router(state);
 
   // Craft request with null cost_microdollars
   let request_body = json!({
@@ -1066,18 +1116,20 @@ async fn test_report_usage_null_cost_microdollars()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
-    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "NULL cost_microdollars should be rejected with 400 or 422, got: {}", response.status()
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "NULL cost_microdollars should be rejected with 400 or 422, got: {}",
+    response.status()
   );
 }
 
@@ -1092,30 +1144,29 @@ async fn test_report_usage_null_cost_microdollars()
 ///
 /// # Risk
 /// MEDIUM - Off-by-one errors in budget enforcement
-#[ tokio::test ]
-async fn test_cost_exactly_equals_remaining_budget()
-{
+#[tokio::test]
+async fn test_cost_exactly_equals_remaining_budget() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 120, 100_000_000 ).await;
-  let state = create_test_budget_state( pool.clone() );
+  seed_agent_with_budget(&pool, 120, 100_000_000).await;
+  let state = create_test_budget_state(pool.clone());
 
   // Create lease with $10.00 budget
   let lease_id = "lease_exact_boundary_test";
   state
     .lease_manager
-    .create_lease( lease_id, 120, 120, 10_000_000, None )
+    .create_lease(lease_id, 120, 120, 10_000_000, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 
   // Record $9.50 usage (leaving exactly $0.50 remaining)
   state
     .lease_manager
-    .record_usage( lease_id, 9_500_000 )
+    .record_usage(lease_id, 9_500_000)
     .await
     .expect("LOUD FAILURE: Should record partial usage");
 
   // Report exactly $0.50 usage (exactly equals remaining)
-  let router = create_budget_router( state.clone() );
+  let router = create_budget_router(state.clone());
   let request_body = json!({
     "lease_id": lease_id,
     "request_id": "req_boundary_test",
@@ -1128,11 +1179,11 @@ async fn test_cost_exactly_equals_remaining_budget()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -1145,19 +1196,18 @@ async fn test_cost_exactly_equals_remaining_budget()
   );
 
   // Verify: Budget exhausted to exactly 0
-  let lease_record = sqlx::query(
-    "SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?"
-  )
-  .bind( lease_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should fetch lease record");
+  let lease_record =
+    sqlx::query("SELECT budget_granted, budget_spent FROM budget_leases WHERE id = ?")
+      .bind(lease_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should fetch lease record");
 
   let budget_granted: i64 = lease_record.get("budget_granted");
   let budget_spent: i64 = lease_record.get("budget_spent");
   let budget_remaining = budget_granted - budget_spent;
 
-  assert_eq!( budget_spent, 10_000_000, "Budget spent should be $10" );
+  assert_eq!(budget_spent, 10_000_000, "Budget spent should be $10");
   assert_eq!(
     budget_remaining, 0,
     "Budget remaining should be exactly 0, got: {budget_remaining}"
@@ -1174,30 +1224,30 @@ async fn test_cost_exactly_equals_remaining_budget()
 ///
 /// # Risk
 /// MEDIUM - Invalid database lookups
-#[ tokio::test ]
-async fn test_handshake_invalid_agent_id_zero()
-{
+#[tokio::test]
+async fn test_handshake_invalid_agent_id_zero() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
+  let state = create_test_budget_state(pool);
 
   // Create IC Token with agent_id=0 (invalid)
-  let zero_claims = IcTokenClaims
-  {
-    agent_id: "0".to_string(),  // Invalid: zero agent_id
+  let zero_claims = IcTokenClaims {
+    agent_id: "0".to_string(), // Invalid: zero agent_id
     budget_id: "budget_0".to_string(),
     issued_at: std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .unwrap()
       .as_secs(),
     expires_at: None,
     issuer: "iron-control-panel".to_string(),
-    permissions: vec![ "llm:call".to_string() ],
+    permissions: vec!["llm:call".to_string()],
   };
 
-  let ic_token = state.ic_token_manager.generate_token( &zero_claims )
+  let ic_token = state
+    .ic_token_manager
+    .generate_token(&zero_claims)
     .expect("LOUD FAILURE: Should generate token");
 
-  let router = create_budget_router( state );
+  let router = create_budget_router(state);
   let request_body = json!({
     "ic_token": ic_token,
     "provider": "openai",
@@ -1208,11 +1258,11 @@ async fn test_handshake_invalid_agent_id_zero()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -1221,7 +1271,8 @@ async fn test_handshake_invalid_agent_id_zero()
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY
       || response.status() == StatusCode::UNAUTHORIZED,
-    "Zero agent_id should be rejected with 400/422/401, got: {}", response.status()
+    "Zero agent_id should be rejected with 400/422/401, got: {}",
+    response.status()
   );
 }
 
@@ -1235,30 +1286,30 @@ async fn test_handshake_invalid_agent_id_zero()
 ///
 /// # Risk
 /// MEDIUM - Invalid database lookups
-#[ tokio::test ]
-async fn test_handshake_invalid_agent_id_negative()
-{
+#[tokio::test]
+async fn test_handshake_invalid_agent_id_negative() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool );
+  let state = create_test_budget_state(pool);
 
   // Create IC Token with agent_id=-1 (invalid)
-  let negative_claims = IcTokenClaims
-  {
-    agent_id: "-1".to_string(),  // Invalid: negative agent_id
+  let negative_claims = IcTokenClaims {
+    agent_id: "-1".to_string(), // Invalid: negative agent_id
     budget_id: "budget_-1".to_string(),
     issued_at: std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .unwrap()
       .as_secs(),
     expires_at: None,
     issuer: "iron-control-panel".to_string(),
-    permissions: vec![ "llm:call".to_string() ],
+    permissions: vec!["llm:call".to_string()],
   };
 
-  let ic_token = state.ic_token_manager.generate_token( &negative_claims )
+  let ic_token = state
+    .ic_token_manager
+    .generate_token(&negative_claims)
     .expect("LOUD FAILURE: Should generate token");
 
-  let router = create_budget_router( state );
+  let router = create_budget_router(state);
   let request_body = json!({
     "ic_token": ic_token,
     "provider": "openai",
@@ -1269,11 +1320,11 @@ async fn test_handshake_invalid_agent_id_negative()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -1282,7 +1333,8 @@ async fn test_handshake_invalid_agent_id_negative()
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY
       || response.status() == StatusCode::UNAUTHORIZED,
-    "Negative agent_id should be rejected with 400/422/401, got: {}", response.status()
+    "Negative agent_id should be rejected with 400/422/401, got: {}",
+    response.status()
   );
 }
 
@@ -1296,22 +1348,21 @@ async fn test_handshake_invalid_agent_id_negative()
 ///
 /// # Risk
 /// LOW - Token accounting corruption
-#[ tokio::test ]
-async fn test_report_usage_integer_overflow_tokens()
-{
+#[tokio::test]
+async fn test_report_usage_integer_overflow_tokens() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 121, 100_000_000 ).await;
-  let state = create_test_budget_state( pool );
+  seed_agent_with_budget(&pool, 121, 100_000_000).await;
+  let state = create_test_budget_state(pool);
 
   // Create lease
   let lease_id = "lease_tokens_overflow_test";
   state
     .lease_manager
-    .create_lease( lease_id, 121, 121, 10_000_000, None )
+    .create_lease(lease_id, 121, 121, 10_000_000, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 
-  let router = create_budget_router( state );
+  let router = create_budget_router(state);
 
   // Attempt to report with tokens_used > i64::MAX
   // Note: JSON can represent numbers larger than i64::MAX, but Rust deserialization should reject them
@@ -1326,11 +1377,11 @@ async fn test_report_usage_integer_overflow_tokens()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -1341,7 +1392,8 @@ async fn test_report_usage_integer_overflow_tokens()
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNPROCESSABLE_ENTITY
       || response.status() == StatusCode::OK,
-    "Overflow tokens_used should be rejected or clamped, got: {}", response.status()
+    "Overflow tokens_used should be rejected or clamped, got: {}",
+    response.status()
   );
 }
 
@@ -1367,31 +1419,30 @@ async fn test_report_usage_integer_overflow_tokens()
 ///
 /// # Risk
 /// HIGH - Budget double-charging from duplicate events
-#[ tokio::test ]
-#[ ignore = "No reason"]
-async fn test_idempotency_duplicate_event_id()
-{
+#[tokio::test]
+#[ignore = "No reason"]
+async fn test_idempotency_duplicate_event_id() {
   let pool = setup_test_db().await;
   let agent_id = 132i64;
-  let initial_budget = 100_000_000i64;  // $100 USD
-  seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
+  let initial_budget = 100_000_000i64; // $100 USD
+  seed_agent_with_budget(&pool, agent_id, initial_budget).await;
 
-  let state = create_test_budget_state( pool.clone() );
+  let state = create_test_budget_state(pool.clone());
 
   // Create lease manually
   let lease_id = "lease_idempotency_test";
-  let budget_granted = 10_000_000i64;  // $10 USD
+  let budget_granted = 10_000_000i64; // $10 USD
   state
     .lease_manager
-    .create_lease( lease_id, agent_id, agent_id, budget_granted, None )
+    .create_lease(lease_id, agent_id, agent_id, budget_granted, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 
-  let router = create_budget_router( state );
+  let router = create_budget_router(state);
 
   // First report with event_id
   let event_id = "event_unique_12345";
-  let cost_microdollars = 2_000_000i64;  // $2 USD
+  let cost_microdollars = 2_000_000i64; // $2 USD
   let request_body = json!({
     "lease_id": lease_id,
     "request_id": "req_idempotency_test",
@@ -1406,28 +1457,29 @@ async fn test_idempotency_duplicate_event_id()
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "LOUD FAILURE: First report should succeed"
   );
 
   // Get budget after first report
-  let budget_after_first = sqlx::query( "SELECT total_spent FROM agent_budgets WHERE agent_id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
+  let budget_after_first = sqlx::query("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+    .bind(agent_id)
+    .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Should fetch agent budget");
 
-  let total_spent_after_first : i64 = budget_after_first.get( "total_spent" );
+  let total_spent_after_first: i64 = budget_after_first.get("total_spent");
 
   assert_eq!(
     total_spent_after_first, cost_microdollars,
@@ -1438,28 +1490,29 @@ async fn test_idempotency_duplicate_event_id()
   let response2 = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert_eq!(
-    response2.status(), StatusCode::OK,
+    response2.status(),
+    StatusCode::OK,
     "LOUD FAILURE: Duplicate event_id report should return 200 OK (idempotent)"
   );
 
   // Get budget after second report
-  let budget_after_second = sqlx::query( "SELECT total_spent FROM agent_budgets WHERE agent_id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
+  let budget_after_second = sqlx::query("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+    .bind(agent_id)
+    .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Should fetch agent budget");
 
-  let total_spent_after_second : i64 = budget_after_second.get( "total_spent" );
+  let total_spent_after_second: i64 = budget_after_second.get("total_spent");
 
   // CRITICAL: Budget should NOT be double-charged
   assert_eq!(

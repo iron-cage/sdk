@@ -40,19 +40,14 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
 use base64::Engine;
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  create_ic_token,
-  seed_agent_with_budget,
-  create_budget_router,
 };
 use serde_json::json;
 use tower::ServiceExt;
@@ -67,50 +62,54 @@ use tower::ServiceExt;
 ///
 /// # Priority
 /// CRITICAL - Security vulnerability prevention
-#[ tokio::test ]
-async fn test_sql_injection_in_provider_name()
-{
+#[tokio::test]
+async fn test_sql_injection_in_provider_name() {
   let pool = setup_test_db().await;
-  let agent_id = 201;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 201; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
+  let app = create_budget_router(state);
 
   // Attempt SQL injection via provider field
   let malicious_provider = "openai'; DROP TABLE agents; --";
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": malicious_provider
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Should return validation error (400) not execute SQL
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::NOT_FOUND,
-    "SQL injection should be prevented, got status: {}", response.status()
+    "SQL injection should be prevented, got status: {}",
+    response.status()
   );
 
   // Verify agents table still exists (injection failed)
-  let agent_count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM agents" )
-    .fetch_one( &pool )
+  let agent_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agents")
+    .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: agents table should still exist");
 
   // Expect 2 agents: migration 017 seeds agent_id=1, test seeds agent_id=201
-  assert_eq!( agent_count, 2, "agents table should be intact (SQL injection prevented)" );
+  assert_eq!(
+    agent_count, 2,
+    "agents table should be intact (SQL injection prevented)"
+  );
 }
 
 /// Test 13: Authorization enforcement - IC Token from different agent
@@ -123,68 +122,73 @@ async fn test_sql_injection_in_provider_name()
 ///
 /// # Priority
 /// CRITICAL - Authorization bypass prevention
-#[ tokio::test ]
-async fn test_ic_token_authorization_enforcement()
-{
+#[tokio::test]
+async fn test_ic_token_authorization_enforcement() {
   let pool = setup_test_db().await;
-  let agent_1 = 202;  // Use ID > 100 to avoid migration 017 conflict
-  let agent_2 = 203;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_1 = 202; // Use ID > 100 to avoid migration 017 conflict
+  let agent_2 = 203; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed both agents with budgets
-  seed_agent_with_budget( &pool, agent_1, 100_000_000 ).await;
-  seed_agent_with_budget( &pool, agent_2, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_1, 100_000_000).await;
+  seed_agent_with_budget(&pool, agent_2, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
+  let state = create_test_budget_state(pool.clone());
 
   // Create IC Token for agent 1
-  let ic_token_agent_1 = create_ic_token( agent_1, &state.ic_token_manager );
+  let ic_token_agent_1 = create_ic_token(agent_1, &state.ic_token_manager);
 
   // Create lease for agent 1
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token_agent_1.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Attempt to refresh agent 1's lease using agent 2's IC Token (authorization violation)
-  let ic_token_agent_2 = create_ic_token( agent_2, &state.ic_token_manager );
+  let ic_token_agent_2 = create_ic_token(agent_2, &state.ic_token_manager);
 
   // Create JWT token for authenticated request (GAP-003)
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let refresh_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/refresh" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {access_token}" ) )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/refresh")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {access_token}"))
+    .body(Body::from(
       json!({
         "ic_token": ic_token_agent_2,
         "current_lease_id": lease_id
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let refresh_response = app2.oneshot( refresh_request ).await.unwrap();
+  let refresh_response = app2.oneshot(refresh_request).await.unwrap();
 
   // Should return 403 Forbidden (authorization violation)
   assert_eq!(
-    refresh_response.status(), StatusCode::FORBIDDEN,
+    refresh_response.status(),
+    StatusCode::FORBIDDEN,
     "Should reject refresh from different agent's IC Token"
   );
 }
@@ -199,59 +203,64 @@ async fn test_ic_token_authorization_enforcement()
 ///
 /// # Priority
 /// MEDIUM - Cryptographic security property
-#[ tokio::test ]
-async fn test_ip_token_replay_prevention()
-{
+#[tokio::test]
+async fn test_ip_token_replay_prevention() {
   let pool = setup_test_db().await;
-  let agent_id = 204;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 204; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with sufficient budget for multiple handshakes
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Perform first handshake
-  let app1 = create_budget_router( state.clone() );
+  let app1 = create_budget_router(state.clone());
   let request1 = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response1 = app1.oneshot( request1 ).await.unwrap();
-  assert_eq!( response1.status(), StatusCode::OK );
+  let response1 = app1.oneshot(request1).await.unwrap();
+  assert_eq!(response1.status(), StatusCode::OK);
 
-  let body1 = axum::body::to_bytes( response1.into_body(), usize::MAX ).await.unwrap();
-  let data1 : serde_json::Value = serde_json::from_slice( &body1 ).unwrap();
-  let ip_token_1 = data1[ "ip_token" ].as_str().unwrap();
+  let body1 = axum::body::to_bytes(response1.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let data1: serde_json::Value = serde_json::from_slice(&body1).unwrap();
+  let ip_token_1 = data1["ip_token"].as_str().unwrap();
 
   // Perform second handshake with same IC Token
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let request2 = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response2 = app2.oneshot( request2 ).await.unwrap();
-  assert_eq!( response2.status(), StatusCode::OK );
+  let response2 = app2.oneshot(request2).await.unwrap();
+  assert_eq!(response2.status(), StatusCode::OK);
 
-  let body2 = axum::body::to_bytes( response2.into_body(), usize::MAX ).await.unwrap();
-  let data2 : serde_json::Value = serde_json::from_slice( &body2 ).unwrap();
-  let ip_token_2 = data2[ "ip_token" ].as_str().unwrap();
+  let body2 = axum::body::to_bytes(response2.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let data2: serde_json::Value = serde_json::from_slice(&body2).unwrap();
+  let ip_token_2 = data2["ip_token"].as_str().unwrap();
 
   // IP Tokens should be different (unique nonce per encryption)
   assert_ne!(
@@ -270,53 +279,54 @@ async fn test_ip_token_replay_prevention()
 ///
 /// # Priority
 /// CRITICAL - Authentication bypass prevention
-#[ tokio::test ]
-async fn test_ic_token_invalid_signature()
-{
+#[tokio::test]
+async fn test_ic_token_invalid_signature() {
   let pool = setup_test_db().await;
-  let agent_id = 205;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 205; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
+  let state = create_test_budget_state(pool.clone());
 
   // Create valid IC Token
-  let valid_ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let valid_ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Tamper with token by modifying payload (change agent_id claim)
   // JWT format: header.payload.signature
-  let parts : Vec<&str> = valid_ic_token.split( '.' ).collect();
-  assert_eq!( parts.len(), 3, "JWT should have 3 parts" );
+  let parts: Vec<&str> = valid_ic_token.split('.').collect();
+  assert_eq!(parts.len(), 3, "JWT should have 3 parts");
 
   // Create tampered token: modify payload (decode, change, encode), keep original signature
   let tampered_payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
-    .encode( b"{\"agent_id\":\"agent_999\",\"budget_id\":\"budget_999\"}" );
-  let tampered_token = format!( "{}.{}.{}", parts[ 0 ], tampered_payload, parts[ 2 ] );
+    .encode(b"{\"agent_id\":\"agent_999\",\"budget_id\":\"budget_999\"}");
+  let tampered_token = format!("{}.{}.{}", parts[0], tampered_payload, parts[2]);
 
-  let app = create_budget_router( state );
+  let app = create_budget_router(state);
 
   // Attempt handshake with tampered IC Token
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": tampered_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Should return authentication error (400/401/403)
   assert!(
     response.status() == StatusCode::BAD_REQUEST
       || response.status() == StatusCode::UNAUTHORIZED
       || response.status() == StatusCode::FORBIDDEN,
-    "Tampered IC Token should be rejected, got status: {}", response.status()
+    "Tampered IC Token should be rejected, got status: {}",
+    response.status()
   );
 }
 
@@ -330,15 +340,14 @@ async fn test_ic_token_invalid_signature()
 ///
 /// # Priority
 /// CRITICAL - Authorization, prevents credential leakage across providers
-#[ tokio::test ]
-async fn test_provider_key_mismatch()
-{
+#[tokio::test]
+async fn test_provider_key_mismatch() {
   let pool = setup_test_db().await;
-  let agent_id = 206;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 206; // Use ID > 100 to avoid migration 017 conflict
   let now_ms = chrono::Utc::now().timestamp_millis();
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
   // Insert additional provider key for anthropic (ID = agent_id * 1000 + 1)
   sqlx::query(
@@ -356,30 +365,32 @@ async fn test_provider_key_mismatch()
   .await
   .unwrap();
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
+  let app = create_budget_router(state);
 
   // Attempt handshake: request openai provider with anthropic provider_key_id
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai",
         "provider_key_id": agent_id * 1000 + 1  // anthropic key ID
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Should return validation error (400/403)
   assert!(
     response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::FORBIDDEN,
-    "Provider key mismatch should be rejected, got status: {}", response.status()
+    "Provider key mismatch should be rejected, got status: {}",
+    response.status()
   );
 }
 
@@ -393,39 +404,38 @@ async fn test_provider_key_mismatch()
 ///
 /// # Priority
 /// HIGH - Access control enforcement
-#[ tokio::test ]
-async fn test_disabled_provider_key_access()
-{
+#[tokio::test]
+async fn test_disabled_provider_key_access() {
   let pool = setup_test_db().await;
-  let agent_id = 207;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 207; // Use ID > 100 to avoid migration 017 conflict
   let now_ms = chrono::Utc::now().timestamp_millis();
 
   // Create test user
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
+     VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-  .bind( "test_user" )
-  .bind( "test_username" )
-  .bind( "$2b$12$test_password_hash" )
-  .bind( "test@example.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( &pool )
+  .bind("test_user")
+  .bind("test_username")
+  .bind("$2b$12$test_password_hash")
+  .bind("test@example.com")
+  .bind("admin")
+  .bind(1)
+  .bind(now_ms)
+  .execute(&pool)
   .await
   .unwrap();
 
   // Insert agent
   sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
   )
-  .bind( agent_id )
-  .bind( format!( "test_agent_{agent_id}" ) )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( &pool )
+  .bind(agent_id)
+  .bind(format!("test_agent_{agent_id}"))
+  .bind(serde_json::to_string(&vec!["openai"]).unwrap())
+  .bind(now_ms)
+  .bind("test_user")
+  .execute(&pool)
   .await
   .unwrap();
 
@@ -459,29 +469,31 @@ async fn test_disabled_provider_key_access()
   .await
   .unwrap();
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
+  let app = create_budget_router(state);
 
   // Attempt handshake with disabled provider key
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai",
         "provider_key_id": agent_id * 1000
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Should return 403 Forbidden
   assert_eq!(
-    response.status(), StatusCode::FORBIDDEN,
+    response.status(),
+    StatusCode::FORBIDDEN,
     "Disabled provider key should be rejected"
   );
 }
@@ -496,53 +508,55 @@ async fn test_disabled_provider_key_access()
 ///
 /// # Priority
 /// HIGH - Enforcement of lease lifecycle
-#[ tokio::test ]
-async fn test_revoked_lease_usage_reporting()
-{
+#[tokio::test]
+async fn test_revoked_lease_usage_reporting() {
   let pool = setup_test_db().await;
-  let agent_id = 208;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 208; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Revoke the lease (set lease_status = 'revoked')
-  sqlx::query( "UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?" )
-    .bind( &lease_id )
-    .execute( &pool )
+  sqlx::query("UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?")
+    .bind(&lease_id)
+    .execute(&pool)
     .await
     .unwrap();
 
   // Attempt to report usage on revoked lease
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "lease_id": lease_id,
         "request_id": "req_test_001",
@@ -550,15 +564,17 @@ async fn test_revoked_lease_usage_reporting()
         "cost_microdollars": 50_000,
         "model": "gpt-4",
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let report_response = app2.oneshot( report_request ).await.unwrap();
+  let report_response = app2.oneshot(report_request).await.unwrap();
 
   // Should return 403 Forbidden
   assert_eq!(
-    report_response.status(), StatusCode::FORBIDDEN,
+    report_response.status(),
+    StatusCode::FORBIDDEN,
     "Revoked lease should reject usage reporting"
   );
 }
@@ -573,48 +589,50 @@ async fn test_revoked_lease_usage_reporting()
 ///
 /// # Priority
 /// CRITICAL - Security vulnerability prevention
-#[ tokio::test ]
-async fn test_sql_injection_in_model_name()
-{
+#[tokio::test]
+async fn test_sql_injection_in_model_name() {
   let pool = setup_test_db().await;
-  let agent_id = 209;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 209; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Attempt SQL injection via model field
   let malicious_model = "gpt-4'; DROP TABLE budget_leases; --";
 
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "lease_id": lease_id,
         "request_id": "req_test_sql_injection",
@@ -622,23 +640,25 @@ async fn test_sql_injection_in_model_name()
         "cost_microdollars": 50_000,
         "model": malicious_model,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let report_response = app2.oneshot( report_request ).await.unwrap();
+  let report_response = app2.oneshot(report_request).await.unwrap();
 
   // Should accept (200) or reject with validation error (400/422), NOT execute SQL
   assert!(
     report_response.status() == StatusCode::OK
       || report_response.status() == StatusCode::BAD_REQUEST
       || report_response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "SQL injection should be prevented, got status: {}", report_response.status()
+    "SQL injection should be prevented, got status: {}",
+    report_response.status()
   );
 
   // Verify budget_leases table still exists (injection failed)
-  let lease_count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM budget_leases" )
-    .fetch_one( &pool )
+  let lease_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM budget_leases")
+    .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: budget_leases table should still exist");
 
@@ -658,71 +678,77 @@ async fn test_sql_injection_in_model_name()
 ///
 /// # Priority
 /// CRITICAL - Security vulnerability prevention
-#[ tokio::test ]
-async fn test_sql_injection_in_reason_field()
-{
+#[tokio::test]
+async fn test_sql_injection_in_reason_field() {
   let pool = setup_test_db().await;
-  let agent_id = 210;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 210; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Attempt SQL injection via reason field
   let malicious_reason = "Need more'; DROP TABLE agents; --";
 
   // Create JWT token for authenticated request (GAP-003)
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let refresh_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/refresh" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {access_token}" ) )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/refresh")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {access_token}"))
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "current_lease_id": lease_id,
         "reason": malicious_reason
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let refresh_response = app2.oneshot( refresh_request ).await.unwrap();
+  let refresh_response = app2.oneshot(refresh_request).await.unwrap();
 
   // Should accept (200) or reject with validation error (400), NOT execute SQL
   assert!(
-    refresh_response.status() == StatusCode::OK || refresh_response.status() == StatusCode::BAD_REQUEST,
-    "SQL injection should be prevented, got status: {}", refresh_response.status()
+    refresh_response.status() == StatusCode::OK
+      || refresh_response.status() == StatusCode::BAD_REQUEST,
+    "SQL injection should be prevented, got status: {}",
+    refresh_response.status()
   );
 
   // Verify agents table still exists (injection failed)
-  let agent_count : i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM agents" )
-    .fetch_one( &pool )
+  let agent_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agents")
+    .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: agents table should still exist");
 
@@ -788,70 +814,76 @@ async fn test_sql_injection_in_reason_field()
 ///
 /// # Priority
 /// HIGH - Security enforcement of lease lifecycle
-#[ tokio::test ]
-async fn test_refresh_on_revoked_lease()
-{
+#[tokio::test]
+async fn test_refresh_on_revoked_lease() {
   let pool = setup_test_db().await;
-  let agent_id = 211;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 211; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Revoke the lease (set lease_status = 'revoked')
-  sqlx::query( "UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?" )
-    .bind( &lease_id )
-    .execute( &pool )
+  sqlx::query("UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?")
+    .bind(&lease_id)
+    .execute(&pool)
     .await
     .unwrap();
 
   // Create JWT token for authenticated request (GAP-003)
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   // Attempt to refresh on revoked lease
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let refresh_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/refresh" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {access_token}" ) )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/refresh")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {access_token}"))
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "current_lease_id": lease_id
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let refresh_response = app2.oneshot( refresh_request ).await.unwrap();
+  let refresh_response = app2.oneshot(refresh_request).await.unwrap();
 
   // Should return 403 Forbidden or 400 Bad Request (lease not active)
   assert!(
-    refresh_response.status() == StatusCode::FORBIDDEN || refresh_response.status() == StatusCode::BAD_REQUEST,
-    "Revoked lease should reject refresh, got status: {}", refresh_response.status()
+    refresh_response.status() == StatusCode::FORBIDDEN
+      || refresh_response.status() == StatusCode::BAD_REQUEST,
+    "Revoked lease should reject refresh, got status: {}",
+    refresh_response.status()
   );
 }
 
@@ -866,65 +898,69 @@ async fn test_refresh_on_revoked_lease()
 ///
 /// # Priority
 /// MEDIUM - Lease lifecycle enforcement
-#[ tokio::test ]
-async fn test_return_on_revoked_lease()
-{
+#[tokio::test]
+async fn test_return_on_revoked_lease() {
   let pool = setup_test_db().await;
-  let agent_id = 212;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 212; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Revoke the lease (set lease_status = 'revoked')
-  sqlx::query( "UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?" )
-    .bind( &lease_id )
-    .execute( &pool )
+  sqlx::query("UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?")
+    .bind(&lease_id)
+    .execute(&pool)
     .await
     .unwrap();
 
   // Attempt to return budget on revoked lease
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let return_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/return" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/return")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "lease_id": lease_id,
         "spent_usd": 5.0
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let return_response = app2.oneshot( return_request ).await.unwrap();
+  let return_response = app2.oneshot(return_request).await.unwrap();
 
   // Should return 400 Bad Request "Lease is not active"
   assert_eq!(
-    return_response.status(), StatusCode::BAD_REQUEST,
+    return_response.status(),
+    StatusCode::BAD_REQUEST,
     "Revoked lease should reject return operation"
   );
 }
@@ -940,71 +976,77 @@ async fn test_return_on_revoked_lease()
 ///
 /// # Priority
 /// MEDIUM - Verify revocation doesn't block future operations
-#[ tokio::test ]
-async fn test_handshake_after_revocation()
-{
+#[tokio::test]
+async fn test_handshake_after_revocation() {
   let pool = setup_test_db().await;
-  let agent_id = 213;  // Use ID > 100 to avoid migration 017 conflict
+  let agent_id = 213; // Use ID > 100 to avoid migration 017 conflict
 
   // Seed agent with sufficient budget for 2 leases
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create first lease via handshake
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let first_lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let first_lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Revoke the first lease
-  sqlx::query( "UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?" )
-    .bind( &first_lease_id )
-    .execute( &pool )
+  sqlx::query("UPDATE budget_leases SET lease_status = 'revoked' WHERE id = ?")
+    .bind(&first_lease_id)
+    .execute(&pool)
     .await
     .unwrap();
 
   // Attempt new handshake after revocation (should succeed)
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let handshake_request_2 = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response_2 = app2.oneshot( handshake_request_2 ).await.unwrap();
+  let handshake_response_2 = app2.oneshot(handshake_request_2).await.unwrap();
 
   // Should succeed (200 OK) - revocation is per-lease, not per-agent
   assert_eq!(
-    handshake_response_2.status(), StatusCode::OK,
+    handshake_response_2.status(),
+    StatusCode::OK,
     "Should allow new handshake after previous lease revoked"
   );
 
-  let body_bytes_2 = axum::body::to_bytes( handshake_response_2.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data_2 : serde_json::Value = serde_json::from_slice( &body_bytes_2 ).unwrap();
-  let second_lease_id = handshake_data_2[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes_2 = axum::body::to_bytes(handshake_response_2.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data_2: serde_json::Value = serde_json::from_slice(&body_bytes_2).unwrap();
+  let second_lease_id = handshake_data_2["lease_id"].as_str().unwrap().to_string();
 
   // Verify new lease is different from revoked lease
   assert_ne!(
@@ -1025,55 +1067,60 @@ async fn test_handshake_after_revocation()
 ///
 /// # Risk
 /// HIGH - SQL injection could compromise entire database
-#[ tokio::test ]
-async fn test_sql_injection_in_lease_id()
-{
+#[tokio::test]
+async fn test_sql_injection_in_lease_id() {
   let pool = setup_test_db().await;
   let agent_id = 220;
 
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create valid lease first
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_response = app
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
   // Attempt SQL injection via lease_id
   let malicious_lease_id = "lease_123'; DROP TABLE budget_leases; --";
 
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_response = app2
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": malicious_lease_id,
-          "request_id": "req_sql_injection_test",
-          "tokens": 1000,
-          "cost_microdollars": 5_000_000,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": malicious_lease_id,
+            "request_id": "req_sql_injection_test",
+            "tokens": 1000,
+            "cost_microdollars": 5_000_000,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -1087,8 +1134,8 @@ async fn test_sql_injection_in_lease_id()
   );
 
   // Verify budget_leases table still exists (injection prevented)
-  let lease_count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM budget_leases" )
-    .fetch_one( &pool )
+  let lease_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM budget_leases")
+    .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: budget_leases table should still exist");
 
@@ -1110,59 +1157,66 @@ async fn test_sql_injection_in_lease_id()
 ///
 /// # Risk
 /// MEDIUM - XSS could compromise clients retrieving stored data
-#[ tokio::test ]
-async fn test_xss_in_model_parameter()
-{
+#[tokio::test]
+async fn test_xss_in_model_parameter() {
   let pool = setup_test_db().await;
   let agent_id = 221;
 
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() );
-  let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone());
+  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
 
   // Create lease
-  let app = create_budget_router( state.clone() );
+  let app = create_budget_router(state.clone());
   let handshake_response = app
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
   let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Attempt XSS via model parameter
   let malicious_model = "<script>alert('XSS')</script>";
 
-  let app2 = create_budget_router( state );
+  let app2 = create_budget_router(state);
   let report_response = app2
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_xss_test",
-          "tokens": 1000,
-          "cost_microdollars": 5_000_000,
-          "model": malicious_model,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_xss_test",
+            "tokens": 1000,
+            "cost_microdollars": 5_000_000,
+            "model": malicious_model,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -1179,17 +1233,15 @@ async fn test_xss_in_model_parameter()
   // If accepted, verify data is stored (backend APIs typically don't execute JS, but should sanitize)
   // The key security concern is that the data is stored safely without causing issues
   // when retrieved by other systems
-  if report_response.status() == StatusCode::OK
-  {
+  if report_response.status() == StatusCode::OK {
     // Verify the usage was recorded
-    let usage_count: i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM llm_usage_events WHERE lease_id = ? AND model = ?"
-    )
-    .bind( &lease_id )
-    .bind( malicious_model )
-    .fetch_one( &pool )
-    .await
-    .unwrap_or( 0 );
+    let usage_count: i64 =
+      sqlx::query_scalar("SELECT COUNT(*) FROM llm_usage_events WHERE lease_id = ? AND model = ?")
+        .bind(&lease_id)
+        .bind(malicious_model)
+        .fetch_one(&pool)
+        .await
+        .unwrap_or(0);
 
     // Either sanitized (count = 0) or stored as-is (count = 1)
     // Both are acceptable as long as retrieval is safe

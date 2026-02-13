@@ -271,7 +271,11 @@ pub async fn get_usage_tokens(
             total_output_tokens: totals.1,
             total_tokens: totals.0 + totals.1,
           },
-          pagination: Pagination::new(page.page, page.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
+          pagination: Pagination::new(
+            page.page,
+            page.per_page,
+            u32::try_from(total_count).unwrap_or(u32::MAX),
+          ),
           period: format!("{:?}", params.period)
             .to_lowercase()
             .replace('_', "-"),
@@ -409,7 +413,11 @@ pub async fn get_usage_models(
             total_requests: totals.1,
             total_spend: totals.2 as f64 / 1_000_000.0,
           },
-          pagination: Pagination::new(page.page, page.per_page, u32::try_from(totals.0).unwrap_or(u32::MAX)),
+          pagination: Pagination::new(
+            page.page,
+            page.per_page,
+            u32::try_from(totals.0).unwrap_or(u32::MAX),
+          ),
           period: format!("{:?}", params.period)
             .to_lowercase()
             .replace('_', "-"),

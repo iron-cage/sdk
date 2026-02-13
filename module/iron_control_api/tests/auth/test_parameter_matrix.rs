@@ -24,8 +24,7 @@ use std::path::Path;
 /// and contain parameter-to-payload mappings for SQL injection testing.
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_parameter_matrix_exists()
-{
+fn test_parameter_matrix_exists() {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
 
   assert!(
@@ -33,13 +32,9 @@ fn test_parameter_matrix_exists()
     "Parameter matrix not found at: {matrix_path:?}"
   );
 
-  let content = fs::read_to_string(matrix_path)
-    .expect("Failed to read parameter matrix");
+  let content = fs::read_to_string(matrix_path).expect("Failed to read parameter matrix");
 
-  assert!(
-    !content.is_empty(),
-    "Parameter matrix is empty"
-  );
+  assert!(!content.is_empty(), "Parameter matrix is empty");
 }
 
 /// Test: Parameter matrix documents all 5 parameters from endpoint catalog
@@ -55,11 +50,9 @@ fn test_parameter_matrix_exists()
 /// - Authorization header (validate endpoint)
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_parameter_matrix_contains_all_parameters()
-{
+fn test_parameter_matrix_contains_all_parameters() {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
-  let content = fs::read_to_string(matrix_path)
-    .expect("Failed to read parameter matrix");
+  let content = fs::read_to_string(matrix_path).expect("Failed to read parameter matrix");
 
   // P0 parameters
   assert!(
@@ -87,11 +80,9 @@ fn test_parameter_matrix_contains_all_parameters()
 /// - P2: 15 payloads per parameter
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_parameter_matrix_specifies_payload_counts()
-{
+fn test_parameter_matrix_specifies_payload_counts() {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
-  let content = fs::read_to_string(matrix_path)
-    .expect("Failed to read parameter matrix");
+  let content = fs::read_to_string(matrix_path).expect("Failed to read parameter matrix");
 
   // Check for payload count documentation
   assert!(
@@ -111,19 +102,12 @@ fn test_parameter_matrix_specifies_payload_counts()
 /// Each parameter should be mapped to its endpoint(s)
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_parameter_matrix_maps_parameters_to_endpoints()
-{
+fn test_parameter_matrix_maps_parameters_to_endpoints() {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
-  let content = fs::read_to_string(matrix_path)
-    .expect("Failed to read parameter matrix");
+  let content = fs::read_to_string(matrix_path).expect("Failed to read parameter matrix");
 
   // Check endpoint references
-  let endpoints = [
-    "login",
-    "logout",
-    "refresh",
-    "validate",
-  ];
+  let endpoints = ["login", "logout", "refresh", "validate"];
 
   let mut found_endpoints = 0;
   for endpoint in &endpoints {
@@ -146,18 +130,16 @@ fn test_parameter_matrix_maps_parameters_to_endpoints()
 /// - Total: 244 tests
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_parameter_matrix_calculates_test_totals()
-{
+fn test_parameter_matrix_calculates_test_totals() {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
-  let content = fs::read_to_string(matrix_path)
-    .expect("Failed to read parameter matrix");
+  let content = fs::read_to_string(matrix_path).expect("Failed to read parameter matrix");
 
   // Check for total count or calculations
   assert!(
-    content.contains("244") ||
-    content.contains("130") ||
-    content.contains("114") ||
-    (content.contains("Total") && content.contains("test")),
+    content.contains("244")
+      || content.contains("130")
+      || content.contains("114")
+      || (content.contains("Total") && content.contains("test")),
     "Matrix should document total test counts"
   );
 }

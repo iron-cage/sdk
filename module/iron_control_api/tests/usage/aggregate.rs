@@ -26,41 +26,46 @@
 //! 3. Check error handler returns HTTP 500 (not silent failure with `vec![]`)
 //! 4. Verify in-memory database schema matches production schema
 
-use crate::common::{ extract_json_response, extract_response };
-use iron_control_api::routes::usage::{ UsageState, AggregateUsageResponse };
-use axum::{ Router, routing::get, http::{ Request, StatusCode } };
+use crate::common::{extract_json_response, extract_response};
 use axum::body::Body;
-use tower::ServiceExt;
+use axum::{
+  http::{Request, StatusCode},
+  routing::get,
+  Router,
+};
+use iron_control_api::routes::usage::{AggregateUsageResponse, UsageState};
 use serde_json::Value;
+use tower::ServiceExt;
 
 /// Create test router with usage aggregate route.
-async fn create_test_router() -> Router
-{
-  let usage_state = UsageState::new( "sqlite::memory:" )
+async fn create_test_router() -> Router {
+  let usage_state = UsageState::new("sqlite::memory:")
     .await
-    .expect( "LOUD FAILURE: Failed to create usage state with in-memory database" );
+    .expect("LOUD FAILURE: Failed to create usage state with in-memory database");
 
   Router::new()
-    .route( "/api/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
-    .with_state( usage_state )
+    .route(
+      "/api/usage/aggregate",
+      get(iron_control_api::routes::usage::get_aggregate_usage),
+    )
+    .with_state(usage_state)
 }
 
 /// Test empty database returns 200 OK with zero totals.
 ///
 /// WHY: Empty database is valid state (new installation), not an error.
 /// Endpoint must return 200 with zeros, not 404 or 500.
-#[ tokio::test ]
-async fn test_aggregate_empty_database_returns_zeros()
-{
+#[tokio::test]
+async fn test_aggregate_empty_database_returns_zeros() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/aggregate" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/aggregate")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -68,8 +73,8 @@ async fn test_aggregate_empty_database_returns_zeros()
     "LOUD FAILURE: Empty database must return 200 OK, not error status"
   );
 
-  let ( status, body ): ( StatusCode, AggregateUsageResponse ) = extract_json_response( response ).await;
-  assert_eq!( status, StatusCode::OK );
+  let (status, body): (StatusCode, AggregateUsageResponse) = extract_json_response(response).await;
+  assert_eq!(status, StatusCode::OK);
   assert_eq!(
     body.total_tokens, 0,
     "LOUD FAILURE: Empty database must have zero total_tokens"
@@ -83,7 +88,8 @@ async fn test_aggregate_empty_database_returns_zeros()
     "LOUD FAILURE: Empty database must have zero total_cost_cents"
   );
   assert_eq!(
-    body.providers.len(), 0,
+    body.providers.len(),
+    0,
     "LOUD FAILURE: Empty database must have empty providers array"
   );
 }
@@ -91,46 +97,44 @@ async fn test_aggregate_empty_database_returns_zeros()
 /// Test response structure matches specification.
 ///
 /// WHY: Frontend depends on exact field names and types.
-#[ tokio::test ]
-async fn test_aggregate_response_structure()
-{
+#[tokio::test]
+async fn test_aggregate_response_structure() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/aggregate" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/aggregate")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
-  let ( status, body ) = extract_response( response ).await;
-  assert_eq!( status, StatusCode::OK );
+  let (status, body) = extract_response(response).await;
+  assert_eq!(status, StatusCode::OK);
 
   // Parse as JSON to verify structure
-  let json: Value = serde_json::from_str( &body )
-    .expect( "LOUD FAILURE: Response must be valid JSON" );
+  let json: Value = serde_json::from_str(&body).expect("LOUD FAILURE: Response must be valid JSON");
 
   assert!(
-    json.get( "total_tokens" ).is_some(),
+    json.get("total_tokens").is_some(),
     "LOUD FAILURE: Response must include 'total_tokens' field"
   );
   assert!(
-    json.get( "total_requests" ).is_some(),
+    json.get("total_requests").is_some(),
     "LOUD FAILURE: Response must include 'total_requests' field"
   );
   assert!(
-    json.get( "total_cost_cents" ).is_some(),
+    json.get("total_cost_cents").is_some(),
     "LOUD FAILURE: Response must include 'total_cost_cents' field"
   );
   assert!(
-    json.get( "providers" ).is_some(),
+    json.get("providers").is_some(),
     "LOUD FAILURE: Response must include 'providers' array"
   );
 
   // Verify providers is an array
   assert!(
-    json[ "providers" ].is_array(),
+    json["providers"].is_array(),
     "LOUD FAILURE: 'providers' must be an array"
   );
 }
@@ -138,26 +142,27 @@ async fn test_aggregate_response_structure()
 /// Test `Content-Type` header is `application/json`.
 ///
 /// WHY: Frontend expects JSON, not plain text.
-#[ tokio::test ]
-async fn test_aggregate_content_type_is_json()
-{
+#[tokio::test]
+async fn test_aggregate_content_type_is_json() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/usage/aggregate" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/usage/aggregate")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
-  let content_type = response.headers().get( "content-type" )
-    .expect( "LOUD FAILURE: Response must include Content-Type header" )
+  let content_type = response
+    .headers()
+    .get("content-type")
+    .expect("LOUD FAILURE: Response must include Content-Type header")
     .to_str()
-    .expect( "LOUD FAILURE: Content-Type must be valid UTF-8" );
+    .expect("LOUD FAILURE: Content-Type must be valid UTF-8");
 
   assert!(
-    content_type.contains( "application/json" ),
+    content_type.contains("application/json"),
     "LOUD FAILURE: Content-Type must be application/json, got: {content_type}"
   );
 }
@@ -165,18 +170,17 @@ async fn test_aggregate_content_type_is_json()
 /// Test HTTP method validation (POST should fail).
 ///
 /// WHY: Spec defines GET only. POST should return 405 Method Not Allowed.
-#[ tokio::test ]
-async fn test_aggregate_rejects_post_method()
-{
+#[tokio::test]
+async fn test_aggregate_rejects_post_method() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/usage/aggregate" )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/usage/aggregate")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),

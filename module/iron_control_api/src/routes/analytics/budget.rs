@@ -163,7 +163,11 @@ pub async fn get_budget_status(
         Json(BudgetStatusResponse {
           data,
           summary,
-          pagination: Pagination::new(params.page, params.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
+          pagination: Pagination::new(
+            params.page,
+            params.per_page,
+            u32::try_from(total_count).unwrap_or(u32::MAX),
+          ),
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )

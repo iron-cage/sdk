@@ -27,25 +27,24 @@ use common::source_analysis::*;
 /// - Can't use same binary across environments
 /// - Create security risk (forgotten dev origins in production)
 // test_kind: negative_acceptance
-#[ test ]
-fn test_no_hardcoded_cors_origins()
-{
+#[test]
+fn test_no_hardcoded_cors_origins() {
   let source_path = "src/bin/iron_control_api_server.rs";
-  let source = read_source_file( source_path );
+  let source = read_source_file(source_path);
 
   // NEGATIVE ACCEPTANCE: No hardcoded CORS origin arrays
   assert_source_not_contains(
     &source,
     "allow_origin([",
     source_path,
-    "Hardcoded CORS array forbidden (must use ALLOWED_ORIGINS env var)"
+    "Hardcoded CORS array forbidden (must use ALLOWED_ORIGINS env var)",
   );
 
   assert_source_not_contains(
     &source,
     "vec![\"http://localhost",
     source_path,
-    "Hardcoded origin vector forbidden (must use ALLOWED_ORIGINS env var)"
+    "Hardcoded origin vector forbidden (must use ALLOWED_ORIGINS env var)",
   );
 
   // Must have env var parsing
@@ -53,13 +52,11 @@ fn test_no_hardcoded_cors_origins()
     &source,
     "std::env::var( \"ALLOWED_ORIGINS\" )",
     source_path,
-    "ALLOWED_ORIGINS environment variable parsing required"
+    "ALLOWED_ORIGINS environment variable parsing required",
   );
 
   // Must have production enforcement (panic/expect if missing)
-  let has_enforcement =
-    source.contains( "expect(" ) &&
-    source.contains( "ALLOWED_ORIGINS" );
+  let has_enforcement = source.contains("expect(") && source.contains("ALLOWED_ORIGINS");
 
   assert!(
     has_enforcement,
@@ -75,43 +72,35 @@ fn test_no_hardcoded_cors_origins()
 /// configuration. Server must REQUIRE `ALLOWED_ORIGINS` explicitly.
 /// `unwrap_or_else` with panic!() is acceptable for error handling.
 // test_kind: negative_acceptance
-#[ test ]
-fn test_no_cors_fallback()
-{
-  let source = read_source_file( "src/bin/iron_control_api_server.rs" );
+#[test]
+fn test_no_cors_fallback() {
+  let source = read_source_file("src/bin/iron_control_api_server.rs");
 
   // Check for ALLOWED_ORIGINS with unwrap_or providing a fallback value
   // (unwrap_or_else with panic!() is OK for validation)
-  let has_cors_fallback =
-    source.contains( "ALLOWED_ORIGINS" ) &&
-    {
-      // Find ALLOWED_ORIGINS line and check nearby lines for unwrap_or
-      let lines: Vec<&str> = source.lines().collect();
-      let mut found_fallback = false;
-      for ( i, line ) in lines.iter().enumerate()
-      {
-        if line.contains( "ALLOWED_ORIGINS" )
-        {
-          // Check this line and next 5 lines for unwrap_or (but not unwrap_or_else with panic)
-          for j in 0..6
-          {
-            if i + j < lines.len()
+  let has_cors_fallback = source.contains("ALLOWED_ORIGINS") && {
+    // Find ALLOWED_ORIGINS line and check nearby lines for unwrap_or
+    let lines: Vec<&str> = source.lines().collect();
+    let mut found_fallback = false;
+    for (i, line) in lines.iter().enumerate() {
+      if line.contains("ALLOWED_ORIGINS") {
+        // Check this line and next 5 lines for unwrap_or (but not unwrap_or_else with panic)
+        for j in 0..6 {
+          if i + j < lines.len() {
+            let check_line = lines[i + j];
+            // Detect unwrap_or that provides a fallback (not panic)
+            if check_line.contains(".unwrap_or(")
+              || (check_line.contains(".unwrap_or_else") && !check_line.contains("panic!"))
             {
-              let check_line = lines[ i + j ];
-              // Detect unwrap_or that provides a fallback (not panic)
-              if check_line.contains( ".unwrap_or(" ) ||
-                 ( check_line.contains( ".unwrap_or_else" ) &&
-                   !check_line.contains( "panic!" ) )
-              {
-                found_fallback = true;
-                break;
-              }
+              found_fallback = true;
+              break;
             }
           }
         }
       }
-      found_fallback
-    };
+    }
+    found_fallback
+  };
 
   assert!(
     !has_cors_fallback,
@@ -132,13 +121,12 @@ fn test_no_cors_fallback()
 /// 3. Make OPTIONS request with allowed origin
 /// 4. Verify CORS headers present
 // test_kind: integration
-#[ tokio::test ]
-async fn test_cors_respects_allowed_origins_env()
-{
+#[tokio::test]
+async fn test_cors_respects_allowed_origins_env() {
   // Set environment variable for test
   std::env::set_var(
     "ALLOWED_ORIGINS",
-    "https://ironcage.ai,https://app.ironcage.ai"
+    "https://ironcage.ai,https://app.ironcage.ai",
   );
 
   // TODO: Requires test server creation utilities
@@ -160,15 +148,14 @@ async fn test_cors_respects_allowed_origins_env()
   // );
 
   // Clean up
-  std::env::remove_var( "ALLOWED_ORIGINS" );
+  std::env::remove_var("ALLOWED_ORIGINS");
 }
 
 /// Integration test: Verify disallowed origins rejected.
 // test_kind: integration
-#[ tokio::test ]
-async fn test_cors_blocks_disallowed_origins()
-{
-  std::env::set_var( "ALLOWED_ORIGINS", "https://ironcage.ai" );
+#[tokio::test]
+async fn test_cors_blocks_disallowed_origins() {
+  std::env::set_var("ALLOWED_ORIGINS", "https://ironcage.ai");
 
   // TODO: Test server utilities
   //
@@ -186,5 +173,5 @@ async fn test_cors_blocks_disallowed_origins()
   //   "FAIL: Disallowed origin not blocked"
   // );
 
-  std::env::remove_var( "ALLOWED_ORIGINS" );
+  std::env::remove_var("ALLOWED_ORIGINS");
 }

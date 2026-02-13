@@ -8,18 +8,17 @@
 //! - `seed_test_user()` - Create test user with specified credentials
 //! - `create_auth_router()` - Create Axum router with auth endpoints
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
-use axum::
-{
-  Router,
-  routing::post,
-  extract::{ Request, ConnectInfo },
-  middleware::{ self, Next },
+use axum::{
+  extract::{ConnectInfo, Request},
+  middleware::{self, Next},
   response::Response,
+  routing::post,
+  Router,
 };
-use iron_control_api::routes::auth::{ login, logout, refresh, validate, AuthState };
+use iron_control_api::routes::auth::{login, logout, refresh, validate, AuthState};
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use std::net::{ SocketAddr, IpAddr, Ipv4Addr };
 
 /// Setup in-memory `SQLite` database with auth schema for testing
 ///
@@ -30,13 +29,12 @@ use std::net::{ SocketAddr, IpAddr, Ipv4Addr };
 ///
 /// Uses real database (not mocked) to catch integration issues
 #[allow(dead_code)]
-pub async fn setup_auth_test_db() -> SqlitePool
-{
+pub async fn setup_auth_test_db() -> SqlitePool {
   let pool = SqlitePoolOptions::new()
-    .max_connections( 5 )
-    .connect( "sqlite::memory:?cache=shared" )
+    .max_connections(5)
+    .connect("sqlite::memory:?cache=shared")
     .await
-    .expect( "LOUD FAILURE: Failed to create in-memory database for auth tests" );
+    .expect("LOUD FAILURE: Failed to create in-memory database for auth tests");
 
   // Apply schema (same as common::TEST_SCHEMA)
   let schema = r"
@@ -88,10 +86,10 @@ pub async fn setup_auth_test_db() -> SqlitePool
     );
   ";
 
-  sqlx::raw_sql( schema )
-    .execute( &pool )
+  sqlx::raw_sql(schema)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to apply auth schema" );
+    .expect("LOUD FAILURE: Failed to apply auth schema");
 
   pool
 }
@@ -115,20 +113,20 @@ pub async fn seed_test_user(
   email: &str,
   password: &str,
   role: &str,
-  is_active: bool
-) -> String
-{
-  let password_hash = bcrypt::hash( password, 4 )
-    .expect( "LOUD FAILURE: Failed to hash test password" );
+  is_active: bool,
+) -> String {
+  let password_hash =
+    bcrypt::hash(password, 4).expect("LOUD FAILURE: Failed to hash test password");
 
   let now = i64::try_from(
     std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .expect("LOUD FAILURE: Time went backwards")
-      .as_secs()
-  ).unwrap_or(i64::MAX);
+      .as_secs(),
+  )
+  .unwrap_or(i64::MAX);
 
-  let user_id = format!( "user_{}", uuid::Uuid::new_v4() );
+  let user_id = format!("user_{}", uuid::Uuid::new_v4());
 
   // Extract username from email (before @ sign)
   let username = email.split('@').next().unwrap_or(email).replace('.', "_");
@@ -173,20 +171,20 @@ pub async fn seed_test_user_with_name(
   password: &str,
   role: &str,
   is_active: bool,
-  name: &str
-) -> String
-{
-  let password_hash = bcrypt::hash( password, 4 )
-    .expect( "LOUD FAILURE: Failed to hash test password" );
+  name: &str,
+) -> String {
+  let password_hash =
+    bcrypt::hash(password, 4).expect("LOUD FAILURE: Failed to hash test password");
 
   let now = i64::try_from(
     std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .expect("LOUD FAILURE: Time went backwards")
-      .as_secs()
-  ).unwrap_or(i64::MAX);
+      .as_secs(),
+  )
+  .unwrap_or(i64::MAX);
 
-  let user_id = format!( "user_{}", uuid::Uuid::new_v4() );
+  let user_id = format!("user_{}", uuid::Uuid::new_v4());
 
   // Extract username from email (before @ sign)
   let username = email.split('@').next().unwrap_or(email).replace('.', "_");
@@ -223,40 +221,30 @@ pub async fn seed_test_user_with_name(
 ///   (This allows testing IP-based rate limiting with different IPs)
 ///
 /// **Note:** x-test-client-ip is ONLY for testing. Production uses real TCP `ConnectInfo`.
-async fn inject_connect_info( mut request: Request, next: Next ) -> Response
-{
+async fn inject_connect_info(mut request: Request, next: Next) -> Response {
   // Check for custom test IP header
-  let ip = if let Some( test_ip ) = request.headers().get( "x-test-client-ip" )
-  {
-    if let Ok( ip_str ) = test_ip.to_str()
-    {
-      if let Ok( parsed_ip ) = ip_str.parse::<IpAddr>()
-      {
+  let ip = if let Some(test_ip) = request.headers().get("x-test-client-ip") {
+    if let Ok(ip_str) = test_ip.to_str() {
+      if let Ok(parsed_ip) = ip_str.parse::<IpAddr>() {
         parsed_ip
+      } else {
+        IpAddr::V4(Ipv4Addr::LOCALHOST)
       }
-      else
-      {
-        IpAddr::V4( Ipv4Addr::LOCALHOST )
-      }
+    } else {
+      IpAddr::V4(Ipv4Addr::LOCALHOST)
     }
-    else
-    {
-      IpAddr::V4( Ipv4Addr::LOCALHOST )
-    }
-  }
-  else
-  {
-    IpAddr::V4( Ipv4Addr::LOCALHOST )
+  } else {
+    IpAddr::V4(Ipv4Addr::LOCALHOST)
   };
 
   // Create fake test socket address
-  let addr = SocketAddr::new( ip, 54321 );
+  let addr = SocketAddr::new(ip, 54321);
 
   // Insert ConnectInfo extension
-  request.extensions_mut().insert( ConnectInfo( addr ) );
+  request.extensions_mut().insert(ConnectInfo(addr));
 
   // Continue to next middleware/handler
-  next.run( request ).await
+  next.run(request).await
 }
 
 /// Create Axum router with auth endpoints for testing
@@ -273,38 +261,34 @@ async fn inject_connect_info( mut request: Request, next: Next ) -> Response
 /// - POST /api/v1/auth/refresh
 /// - POST /api/v1/auth/validate
 #[allow(dead_code)]
-pub fn create_auth_router( pool: SqlitePool ) -> Router
-{
-  create_auth_router_internal( pool, false )
+pub fn create_auth_router(pool: SqlitePool) -> Router {
+  create_auth_router_internal(pool, false)
 }
 
 /// Create auth router with rate limiting enabled for rate limit tests
 #[allow(dead_code)]
-pub fn create_auth_router_with_rate_limiting( pool: SqlitePool ) -> Router
-{
-  create_auth_router_internal( pool, true )
+pub fn create_auth_router_with_rate_limiting(pool: SqlitePool) -> Router {
+  create_auth_router_internal(pool, true)
 }
 
 /// Internal function to create auth router with configurable rate limiting
-fn create_auth_router_internal( pool: SqlitePool, rate_limiting_enabled: bool ) -> Router
-{
-  let auth_state = AuthState
-  {
-    jwt_secret: Arc::new( iron_control_api::jwt_auth::JwtSecret::new(
-      "test_jwt_secret_for_authentication_tests_only".to_string()
-    ) ),
+fn create_auth_router_internal(pool: SqlitePool, rate_limiting_enabled: bool) -> Router {
+  let auth_state = AuthState {
+    jwt_secret: Arc::new(iron_control_api::jwt_auth::JwtSecret::new(
+      "test_jwt_secret_for_authentication_tests_only".to_string(),
+    )),
     db_pool: pool,
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
     rate_limiting_enabled,
   };
 
   Router::new()
-    .route( "/api/v1/auth/login", post( login ) )
-    .route( "/api/v1/auth/logout", post( logout ) )
-    .route( "/api/v1/auth/refresh", post( refresh ) )
-    .route( "/api/v1/auth/validate", post( validate ) )
-    .with_state( auth_state )
-    .layer( middleware::from_fn( inject_connect_info ) )
+    .route("/api/v1/auth/login", post(login))
+    .route("/api/v1/auth/logout", post(logout))
+    .route("/api/v1/auth/refresh", post(refresh))
+    .route("/api/v1/auth/validate", post(validate))
+    .with_state(auth_state)
+    .layer(middleware::from_fn(inject_connect_info))
 }
 
 /// Combined test state (mimics `AppState` pattern from main server)
@@ -312,26 +296,21 @@ fn create_auth_router_internal( pool: SqlitePool, rate_limiting_enabled: bool ) 
 /// Allows `AuthenticatedUser` extractor to access `AuthState` even when
 /// routes use `UserManagementState` (via `FromRef` trait).
 #[derive(Clone)]
-struct TestAppState
-{
+struct TestAppState {
   auth: AuthState,
   users: iron_control_api::routes::users::UserManagementState,
 }
 
 /// Enable `AuthenticatedUser` extractor to access `AuthState` from `TestAppState`
-impl axum::extract::FromRef< TestAppState > for AuthState
-{
-  fn from_ref( state: &TestAppState ) -> Self
-  {
+impl axum::extract::FromRef<TestAppState> for AuthState {
+  fn from_ref(state: &TestAppState) -> Self {
     state.auth.clone()
   }
 }
 
 /// Enable user routes to access `UserManagementState` from `TestAppState`
-impl axum::extract::FromRef< TestAppState > for iron_control_api::routes::users::UserManagementState
-{
-  fn from_ref( state: &TestAppState ) -> Self
-  {
+impl axum::extract::FromRef<TestAppState> for iron_control_api::routes::users::UserManagementState {
+  fn from_ref(state: &TestAppState) -> Self {
     state.users.clone()
   }
 }
@@ -351,18 +330,16 @@ impl axum::extract::FromRef< TestAppState > for iron_control_api::routes::users:
 /// - POST /api/v1/auth/validate
 /// - POST /api/v1/users (create user - requires admin)
 #[allow(dead_code)]
-pub fn create_full_router( pool: &SqlitePool ) -> Router
-{
-  use iron_control_api::routes::users::{ create_user, UserManagementState };
+pub fn create_full_router(pool: &SqlitePool) -> Router {
   use iron_control_api::rbac::PermissionChecker;
+  use iron_control_api::routes::users::{create_user, UserManagementState};
 
   // Create auth state
-  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new(
-    "test_jwt_secret_for_authentication_tests_only".to_string()
-  ) );
+  let jwt_secret = Arc::new(iron_control_api::jwt_auth::JwtSecret::new(
+    "test_jwt_secret_for_authentication_tests_only".to_string(),
+  ));
 
-  let auth_state = AuthState
-  {
+  let auth_state = AuthState {
     jwt_secret: jwt_secret.clone(),
     db_pool: pool.clone(),
     rate_limiter: iron_control_api::rate_limiter::LoginRateLimiter::new(),
@@ -370,28 +347,26 @@ pub fn create_full_router( pool: &SqlitePool ) -> Router
   };
 
   // Create user management state
-  let permission_checker = Arc::new( PermissionChecker::new() );
+  let permission_checker = Arc::new(PermissionChecker::new());
 
-  let user_state = UserManagementState
-  {
+  let user_state = UserManagementState {
     db_pool: pool.clone(),
     permission_checker,
   };
 
   // Create combined state (allows AuthenticatedUser extractor to work on user routes)
-  let app_state = TestAppState
-  {
+  let app_state = TestAppState {
     auth: auth_state,
     users: user_state,
   };
 
   // Create router with combined state
   Router::new()
-    .route( "/api/v1/auth/login", post( login ) )
-    .route( "/api/v1/auth/logout", post( logout ) )
-    .route( "/api/v1/auth/refresh", post( refresh ) )
-    .route( "/api/v1/auth/validate", post( validate ) )
-    .route( "/api/v1/users", post( create_user ) )
-    .with_state( app_state )
-    .layer( middleware::from_fn( inject_connect_info ) )
+    .route("/api/v1/auth/login", post(login))
+    .route("/api/v1/auth/logout", post(logout))
+    .route("/api/v1/auth/refresh", post(refresh))
+    .route("/api/v1/auth/validate", post(validate))
+    .route("/api/v1/users", post(create_user))
+    .with_state(app_state)
+    .layer(middleware::from_fn(inject_connect_info))
 }

@@ -18,23 +18,22 @@
 //! | `test_jwt_token_infrastructure` | Verify JWT token generation | Create AuthState, generate access+refresh tokens, verify them | Tokens valid and verifiable | ✅ |
 //! | `test_fixtures_infrastructure` | Verify test fixtures | Use valid_login_request + invalid_login_request_missing_username fixtures | Fixtures validate correctly | ✅ |
 
-use crate::common::{ create_test_user, verify_password };
+use crate::common::fixtures::{invalid_login_request_missing_username, valid_login_request};
 use crate::common::test_db;
-use crate::common::fixtures::{ valid_login_request, invalid_login_request_missing_username };
 use crate::common::test_state::create_test_auth_state;
+use crate::common::{create_test_user, verify_password};
 
 /// Test infrastructure verification.
 ///
 /// This is a minimal test to verify the test infrastructure works correctly.
-#[ tokio::test ]
-async fn test_infrastructure_verification()
-{
+#[tokio::test]
+async fn test_infrastructure_verification() {
   // Create in-memory database
   let db = test_db::create_test_db().await;
   let pool = db.pool();
 
   // Create test user
-  let ( user_id, password_hash ) = create_test_user( pool, "testuser" ).await;
+  let (user_id, password_hash) = create_test_user(pool, "testuser").await;
 
   // Verify user ID is positive
   assert!(
@@ -50,48 +49,44 @@ async fn test_infrastructure_verification()
 
   // Verify password verification works
   assert!(
-    verify_password( "test_password", &password_hash ),
+    verify_password("test_password", &password_hash),
     "LOUD FAILURE: Password verification should succeed for correct password"
   );
 
   assert!(
-    !verify_password( "wrong_password", &password_hash ),
+    !verify_password("wrong_password", &password_hash),
     "LOUD FAILURE: Password verification should fail for incorrect password"
   );
 
   // Query user from database
-  let fetched_user: ( String, String, String ) = sqlx::query_as(
-    "SELECT id, username, password_hash FROM users WHERE id = ?"
-  )
-  .bind( &user_id )
-  .fetch_one( pool )
-  .await
-  .expect( "LOUD FAILURE: Should fetch created user from database" );
+  let fetched_user: (String, String, String) =
+    sqlx::query_as("SELECT id, username, password_hash FROM users WHERE id = ?")
+      .bind(&user_id)
+      .fetch_one(pool)
+      .await
+      .expect("LOUD FAILURE: Should fetch created user from database");
 
   assert_eq!(
-    fetched_user.0,
-    user_id,
+    fetched_user.0, user_id,
     "LOUD FAILURE: Fetched user ID should match created user ID"
   );
 
   assert_eq!(
-    fetched_user.1,
-    "test_user",
+    fetched_user.1, "test_user",
     "LOUD FAILURE: Fetched username should match"
   );
 }
 
 /// Test JWT token generation and verification.
-#[ tokio::test ]
-async fn test_jwt_token_infrastructure()
-{
+#[tokio::test]
+async fn test_jwt_token_infrastructure() {
   let auth_state = create_test_auth_state().await;
 
   // Generate access token
   let access_token = auth_state
     .jwt_secret
-    .generate_access_token( "user_123", "user@mail.com", "user", "token_id_001" )
-    .expect( "LOUD FAILURE: Should generate access token" );
+    .generate_access_token("user_123", "user@mail.com", "user", "token_id_001")
+    .expect("LOUD FAILURE: Should generate access token");
 
   assert!(
     !access_token.is_empty(),
@@ -101,38 +96,34 @@ async fn test_jwt_token_infrastructure()
   // Verify access token
   let claims = auth_state
     .jwt_secret
-    .verify_access_token( &access_token )
-    .expect( "LOUD FAILURE: Should verify access token" );
+    .verify_access_token(&access_token)
+    .expect("LOUD FAILURE: Should verify access token");
 
   assert_eq!(
-    claims.sub,
-    "user_123",
+    claims.sub, "user_123",
     "LOUD FAILURE: Token subject should match user ID"
   );
 
   assert_eq!(
-    claims.email,
-    "user@mail.com",
+    claims.email, "user@mail.com",
     "LOUD FAILURE: Token email should match user email"
   );
 
   assert_eq!(
-    claims.role,
-    "user",
+    claims.role, "user",
     "LOUD FAILURE: Token role should match user role"
   );
 
   assert_eq!(
-    claims.jti,
-    "token_id_001",
+    claims.jti, "token_id_001",
     "LOUD FAILURE: Token JTI should match"
   );
 
   // Generate refresh token
   let refresh_token = auth_state
     .jwt_secret
-    .generate_refresh_token( "user_123", "user@mail.com", "user", "token_id_001" )
-    .expect( "LOUD FAILURE: Should generate refresh token" );
+    .generate_refresh_token("user_123", "user@mail.com", "user", "token_id_001")
+    .expect("LOUD FAILURE: Should generate refresh token");
 
   assert!(
     !refresh_token.is_empty(),
@@ -142,61 +133,54 @@ async fn test_jwt_token_infrastructure()
   // Verify refresh token
   let refresh_claims = auth_state
     .jwt_secret
-    .verify_refresh_token( &refresh_token )
-    .expect( "LOUD FAILURE: Should verify refresh token" );
+    .verify_refresh_token(&refresh_token)
+    .expect("LOUD FAILURE: Should verify refresh token");
 
   assert_eq!(
-    refresh_claims.sub,
-    "user_123",
+    refresh_claims.sub, "user_123",
     "LOUD FAILURE: Refresh token subject should match user ID"
   );
 
   assert_eq!(
-    refresh_claims.jti,
-    "token_id_001",
+    refresh_claims.jti, "token_id_001",
     "LOUD FAILURE: Refresh token JTI should match"
   );
 
   assert_eq!(
-    refresh_claims.email,
-    "user@mail.com",
+    refresh_claims.email, "user@mail.com",
     "LOUD FAILURE: Refresh token email should match user email"
   );
 
   assert_eq!(
-    refresh_claims.role,
-    "user",
+    refresh_claims.role, "user",
     "LOUD FAILURE: Refresh token role should match user role"
   );
 }
 
 /// Test fixtures work correctly.
-#[ test ]
-fn test_fixtures_infrastructure()
-{
-  let valid_request = valid_login_request( "testuser", "password123" );
+#[test]
+fn test_fixtures_infrastructure() {
+  let valid_request = valid_login_request("testuser", "password123");
 
   assert_eq!(
-    valid_request[ "username" ],
-    "testuser",
+    valid_request["username"], "testuser",
     "LOUD FAILURE: Valid request should have correct username"
   );
 
   assert_eq!(
-    valid_request[ "password" ],
-    "password123",
+    valid_request["password"], "password123",
     "LOUD FAILURE: Valid request should have correct password"
   );
 
   let invalid_request = invalid_login_request_missing_username();
 
   assert!(
-    invalid_request.get( "username" ).is_none(),
+    invalid_request.get("username").is_none(),
     "LOUD FAILURE: Invalid request should be missing username field"
   );
 
   assert!(
-    invalid_request.get( "password" ).is_some(),
+    invalid_request.get("password").is_some(),
     "LOUD FAILURE: Invalid request should still have password field"
   );
 }

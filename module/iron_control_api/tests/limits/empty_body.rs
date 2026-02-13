@@ -22,38 +22,46 @@
 //! 2. **API Contract**: At least one field required for limits
 //! 3. **Business Logic**: Empty updates/creates make no sense
 
-use iron_control_api::routes::limits::LimitsState;
-use axum::{ Router, routing::{ post, put }, http::{ Request, StatusCode } };
 use axum::body::Body;
+use axum::{
+  http::{Request, StatusCode},
+  routing::{post, put},
+  Router,
+};
+use iron_control_api::routes::limits::LimitsState;
 use tower::ServiceExt;
 
 /// Create test router with limit routes.
-async fn create_test_router() -> Router
-{
-  let limit_state = LimitsState::new( "sqlite::memory:" )
+async fn create_test_router() -> Router {
+  let limit_state = LimitsState::new("sqlite::memory:")
     .await
-    .expect( "LOUD FAILURE: Failed to create limit state" );
+    .expect("LOUD FAILURE: Failed to create limit state");
 
   Router::new()
-    .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits/:id", put( iron_control_api::routes::limits::update_limit ) )
-    .with_state( limit_state )
+    .route(
+      "/api/limits",
+      post(iron_control_api::routes::limits::create_limit),
+    )
+    .route(
+      "/api/limits/:id",
+      put(iron_control_api::routes::limits::update_limit),
+    )
+    .with_state(limit_state)
 }
 
-#[ tokio::test ]
-async fn test_create_limit_with_empty_json()
-{
+#[tokio::test]
+async fn test_create_limit_with_empty_json() {
   let router = create_test_router().await;
 
   // WHY: Empty JSON has all fields as None, violating "all-None rejected" rule
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/limits" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( "{}" ) )
+    .method("POST")
+    .uri("/api/limits")
+    .header("content-type", "application/json")
+    .body(Body::from("{}"))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // WHY: 422 Unprocessable Entity is semantically correct for validation errors
   // (well-formed JSON but semantically invalid - all fields None)
@@ -64,20 +72,19 @@ async fn test_create_limit_with_empty_json()
   );
 }
 
-#[ tokio::test ]
-async fn test_update_limit_with_empty_json()
-{
+#[tokio::test]
+async fn test_update_limit_with_empty_json() {
   let router = create_test_router().await;
 
   // WHY: Empty JSON for update means no fields to update (all-None rejected)
   let request = Request::builder()
-    .method( "PUT" )
-    .uri( "/api/limits/1" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( "{}" ) )
+    .method("PUT")
+    .uri("/api/limits/1")
+    .header("content-type", "application/json")
+    .body(Body::from("{}"))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // WHY: 422 Unprocessable Entity is semantically correct for validation errors
   assert_eq!(

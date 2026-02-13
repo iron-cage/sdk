@@ -53,16 +53,16 @@ use std::fs;
 /// let source = read_source_file("src/middleware/mod.rs");
 /// assert!(!source.contains("old_middleware"));
 /// ```
-pub fn read_source_file( path: &str ) -> String
-{
-  fs::read_to_string( path )
-    .unwrap_or_else( |_| panic!(
+pub fn read_source_file(path: &str) -> String {
+  fs::read_to_string(path).unwrap_or_else(|_| {
+    panic!(
       "LOUD FAILURE: Failed to read source file: {path}\n\
        This may indicate:\n\
        - File moved or deleted\n\
        - Incorrect path (check from crate root)\n\
        - Permissions issue"
-    ) )
+    )
+  })
 }
 
 /// Assert source does NOT contain pattern.
@@ -94,15 +94,9 @@ pub fn read_source_file( path: &str ) -> String
 ///   "Hardcoded CORS arrays forbidden (must use env var)"
 /// );
 /// ```
-pub fn assert_source_not_contains(
-  source: &str,
-  pattern: &str,
-  file_path: &str,
-  message: &str,
-)
-{
+pub fn assert_source_not_contains(source: &str, pattern: &str, file_path: &str, message: &str) {
   assert!(
-    !source.contains( pattern ),
+    !source.contains(pattern),
     "FAIL: Pattern '{pattern}' found in {file_path}\n\
      Reason: {message}\n\
      \n\
@@ -141,15 +135,9 @@ pub fn assert_source_not_contains(
 ///   "ALLOWED_ORIGINS environment variable parsing required"
 /// );
 /// ```
-pub fn assert_source_contains(
-  source: &str,
-  pattern: &str,
-  file_path: &str,
-  message: &str,
-)
-{
+pub fn assert_source_contains(source: &str, pattern: &str, file_path: &str, message: &str) {
   assert!(
-    source.contains( pattern ),
+    source.contains(pattern),
     "FAIL: Required pattern '{pattern}' missing in {file_path}\n\
      Reason: {message}\n\
      \n\
@@ -183,10 +171,9 @@ pub fn assert_source_contains(
 ///   "Backward compatibility middleware must be deleted completely"
 /// );
 /// ```
-pub fn assert_file_not_exists( file_path: &str, message: &str )
-{
+pub fn assert_file_not_exists(file_path: &str, message: &str) {
   assert!(
-    !std::path::Path::new( file_path ).exists(),
+    !std::path::Path::new(file_path).exists(),
     "FAIL: File '{file_path}' still exists\n\
      Reason: {message}\n\
      \n\
@@ -222,10 +209,9 @@ pub fn assert_file_not_exists( file_path: &str, message: &str )
 ///   "Production configuration must exist"
 /// );
 /// ```
-pub fn assert_file_exists( file_path: &str, message: &str )
-{
+pub fn assert_file_exists(file_path: &str, message: &str) {
   assert!(
-    std::path::Path::new( file_path ).exists(),
+    std::path::Path::new(file_path).exists(),
     "FAIL: Required file '{file_path}' missing\n\
      Reason: {message}\n\
      \n\
@@ -235,111 +221,68 @@ pub fn assert_file_exists( file_path: &str, message: &str )
   );
 }
 
-#[ cfg( test ) ]
-mod tests
-{
+#[cfg(test)]
+mod tests {
   use super::*;
 
-  #[ test ]
-  fn test_read_source_file_success()
-  {
+  #[test]
+  fn test_read_source_file_success() {
     // Read this test file itself
-    let source = read_source_file( "tests/common/source_analysis.rs" );
-    assert!( source.contains( "test_read_source_file_success" ) );
+    let source = read_source_file("tests/common/source_analysis.rs");
+    assert!(source.contains("test_read_source_file_success"));
   }
 
-  #[ test ]
-  #[ should_panic( expected = "LOUD FAILURE" ) ]
-  fn test_read_source_file_missing()
-  {
-    let _ = read_source_file( "nonexistent_file.rs" );
+  #[test]
+  #[should_panic(expected = "LOUD FAILURE")]
+  fn test_read_source_file_missing() {
+    let _ = read_source_file("nonexistent_file.rs");
   }
 
-  #[ test ]
-  fn test_assert_source_not_contains_pass()
-  {
+  #[test]
+  fn test_assert_source_not_contains_pass() {
     let source = "fn main() {}";
-    assert_source_not_contains(
-      source,
-      "evil_code",
-      "test.rs",
-      "Evil code forbidden"
-    );
+    assert_source_not_contains(source, "evil_code", "test.rs", "Evil code forbidden");
   }
 
-  #[ test ]
-  #[ should_panic( expected = "FAIL" ) ]
-  fn test_assert_source_not_contains_fail()
-  {
+  #[test]
+  #[should_panic(expected = "FAIL")]
+  fn test_assert_source_not_contains_fail() {
     let source = "fn main() { evil_code(); }";
-    assert_source_not_contains(
-      source,
-      "evil_code",
-      "test.rs",
-      "Evil code forbidden"
-    );
+    assert_source_not_contains(source, "evil_code", "test.rs", "Evil code forbidden");
   }
 
-  #[ test ]
-  fn test_assert_source_contains_pass()
-  {
+  #[test]
+  fn test_assert_source_contains_pass() {
     let source = "fn main() { good_code(); }";
-    assert_source_contains(
-      source,
-      "good_code",
-      "test.rs",
-      "Good code required"
-    );
+    assert_source_contains(source, "good_code", "test.rs", "Good code required");
   }
 
-  #[ test ]
-  #[ should_panic( expected = "FAIL" ) ]
-  fn test_assert_source_contains_fail()
-  {
+  #[test]
+  #[should_panic(expected = "FAIL")]
+  fn test_assert_source_contains_fail() {
     let source = "fn main() {}";
-    assert_source_contains(
-      source,
-      "missing_code",
-      "test.rs",
-      "Missing code required"
-    );
+    assert_source_contains(source, "missing_code", "test.rs", "Missing code required");
   }
 
-  #[ test ]
-  fn test_assert_file_exists_pass()
-  {
-    assert_file_exists(
-      "tests/common/source_analysis.rs",
-      "Test file must exist"
-    );
+  #[test]
+  fn test_assert_file_exists_pass() {
+    assert_file_exists("tests/common/source_analysis.rs", "Test file must exist");
   }
 
-  #[ test ]
-  #[ should_panic( expected = "FAIL" ) ]
-  fn test_assert_file_exists_fail()
-  {
-    assert_file_exists(
-      "nonexistent_file.rs",
-      "File must exist"
-    );
+  #[test]
+  #[should_panic(expected = "FAIL")]
+  fn test_assert_file_exists_fail() {
+    assert_file_exists("nonexistent_file.rs", "File must exist");
   }
 
-  #[ test ]
-  fn test_assert_file_not_exists_pass()
-  {
-    assert_file_not_exists(
-      "nonexistent_file.rs",
-      "File must not exist"
-    );
+  #[test]
+  fn test_assert_file_not_exists_pass() {
+    assert_file_not_exists("nonexistent_file.rs", "File must not exist");
   }
 
-  #[ test ]
-  #[ should_panic( expected = "FAIL" ) ]
-  fn test_assert_file_not_exists_fail()
-  {
-    assert_file_not_exists(
-      "tests/common/source_analysis.rs",
-      "File must not exist"
-    );
+  #[test]
+  #[should_panic(expected = "FAIL")]
+  fn test_assert_file_not_exists_fail() {
+    assert_file_not_exists("tests/common/source_analysis.rs", "File must not exist");
   }
 }

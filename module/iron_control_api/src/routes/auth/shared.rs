@@ -20,12 +20,12 @@ pub struct AuthState {
 }
 
 impl core::fmt::Debug for AuthState {
-  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result {
-    f.debug_struct( "AuthState" )
-      .field( "jwt_secret", &"<JwtSecret>" )
-      .field( "db_pool", &"<SqlitePool>" )
-      .field( "rate_limiter", &"<LoginRateLimiter>" )
-      .field( "rate_limiting_enabled", &self.rate_limiting_enabled )
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("AuthState")
+      .field("jwt_secret", &"<JwtSecret>")
+      .field("db_pool", &"<SqlitePool>")
+      .field("rate_limiter", &"<LoginRateLimiter>")
+      .field("rate_limiting_enabled", &self.rate_limiting_enabled)
       .finish()
   }
 }
@@ -42,7 +42,11 @@ impl AuthState {
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new(jwt_secret_key: String, database_url: &str, rate_limiting_enabled: bool) -> Result<Self, sqlx::Error> {
+  pub async fn new(
+    jwt_secret_key: String,
+    database_url: &str,
+    rate_limiting_enabled: bool,
+  ) -> Result<Self, sqlx::Error> {
     let db_pool = SqlitePool::connect(database_url).await?;
 
     // Run migration 003 (users table) if not already applied
@@ -53,8 +57,7 @@ impl AuthState {
     .await?;
 
     if migration_003_completed == 0 {
-      let migration_003 =
-        include_str!("../../../migrations/003_create_users_table.sql");
+      let migration_003 = include_str!("../../../migrations/003_create_users_table.sql");
       sqlx::raw_sql(migration_003).execute(&db_pool).await?;
     }
 
@@ -66,8 +69,7 @@ impl AuthState {
     .await?;
 
     if migration_006_completed == 0 {
-      let migration_006 =
-        include_str!("../../../migrations/006_create_user_audit_log.sql");
+      let migration_006 = include_str!("../../../migrations/006_create_user_audit_log.sql");
       sqlx::raw_sql(migration_006).execute(&db_pool).await?;
     }
 
@@ -79,8 +81,7 @@ impl AuthState {
     .await?;
 
     if migration_007_completed == 0 {
-      let migration_007 =
-        include_str!("../../../migrations/007_create_blacklist_table.sql");
+      let migration_007 = include_str!("../../../migrations/007_create_blacklist_table.sql");
       sqlx::raw_sql(migration_007).execute(&db_pool).await?;
     }
 
@@ -92,8 +93,7 @@ impl AuthState {
     .await?;
 
     if migration_020_completed == 0 {
-      let migration_020 =
-        include_str!("../../../migrations/020_add_account_lockout_fields.sql");
+      let migration_020 = include_str!("../../../migrations/020_add_account_lockout_fields.sql");
       sqlx::raw_sql(migration_020).execute(&db_pool).await?;
     }
 
@@ -181,7 +181,7 @@ impl LoginRequest {
 ///   "name": "John Doe"
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize )]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserInfo {
   /// Unique user identifier
   pub id: String,
@@ -201,12 +201,15 @@ impl UserInfo {
   /// * `claims` - JWT access token claims
   /// * `user` - Database user record
   #[must_use]
-  pub fn from_claims_and_user(claims: &crate::jwt_auth::AccessTokenClaims, user: &crate::user_auth::User) -> Self {
+  pub fn from_claims_and_user(
+    claims: &crate::jwt_auth::AccessTokenClaims,
+    user: &crate::user_auth::User,
+  ) -> Self {
     Self {
       id: user.id.clone(),
       email: user.username.clone(),
       role: claims.role.clone(),
-      name: user.name.clone().unwrap_or_else( || user.username.clone() ),
+      name: user.name.clone().unwrap_or_else(|| user.username.clone()),
     }
   }
 
@@ -221,11 +224,10 @@ impl UserInfo {
       id: user.id.clone(),
       email: user.email.clone(),
       role: user.role.clone(),
-      name: user.name.clone().unwrap_or_else( || user.username.clone() ),
+      name: user.name.clone().unwrap_or_else(|| user.username.clone()),
     }
   }
 }
-
 
 /// Login response body
 ///
@@ -240,7 +242,7 @@ impl UserInfo {
 ///   "user": { ... }
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize )]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
   /// JWT access token
   pub user_token: String,

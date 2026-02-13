@@ -25,13 +25,11 @@
 use iron_control_api::routes::tokens::CreateTokenRequest;
 
 /// Test valid request with only `user_id`.
-#[ tokio::test ]
-async fn test_valid_minimal_request()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_valid_minimal_request() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "user_test".to_string() ),
+    user_id: Some("user_test".to_string()),
     project_id: None,
     description: None,
     agent_id: None,
@@ -47,15 +45,13 @@ async fn test_valid_minimal_request()
 }
 
 /// Test valid request with all fields.
-#[ tokio::test ]
-async fn test_valid_complete_request()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_valid_complete_request() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "user_test".to_string() ),
-    project_id: Some( "project_abc".to_string() ),
-    description: Some( "Production API key".to_string() ),
+    user_id: Some("user_test".to_string()),
+    project_id: Some("project_abc".to_string()),
+    description: Some("Production API key".to_string()),
     agent_id: None,
     provider: None,
   };
@@ -69,13 +65,11 @@ async fn test_valid_complete_request()
 }
 
 /// Test empty `user_id` rejected.
-#[ tokio::test ]
-async fn test_empty_user_id_rejected()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_empty_user_id_rejected() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( String::new() ),
+    user_id: Some(String::new()),
     project_id: None,
     description: None,
     agent_id: None,
@@ -90,20 +84,18 @@ async fn test_empty_user_id_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "user_id" ) && ( err_msg.contains( "empty" ) || err_msg.contains( "required" ) ),
+    err_msg.contains("user_id") && (err_msg.contains("empty") || err_msg.contains("required")),
     "LOUD FAILURE: Error message must indicate user_id is empty/required. Got: {err_msg}"
   );
 }
 
 /// Test empty `project_id` rejected.
-#[ tokio::test ]
-async fn test_empty_project_id_rejected()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_empty_project_id_rejected() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "user_test".to_string() ),
-    project_id: Some( String::new() ),
+    user_id: Some("user_test".to_string()),
+    project_id: Some(String::new()),
     description: None,
     agent_id: None,
     provider: None,
@@ -117,22 +109,20 @@ async fn test_empty_project_id_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "project_id" ) && err_msg.contains( "empty" ),
+    err_msg.contains("project_id") && err_msg.contains("empty"),
     "LOUD FAILURE: Error message must indicate project_id cannot be empty. Got: {err_msg}"
   );
 }
 
 /// Test description too long rejected.
-#[ tokio::test ]
-async fn test_description_too_long_rejected()
-{
-  let long_description = "a".repeat( 501 );
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_description_too_long_rejected() {
+  let long_description = "a".repeat(501);
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "user_test".to_string() ),
+    user_id: Some("user_test".to_string()),
     project_id: None,
-    description: Some( long_description ),
+    description: Some(long_description),
     agent_id: None,
     provider: None,
   };
@@ -145,22 +135,20 @@ async fn test_description_too_long_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "description" ) && ( err_msg.contains( "long" ) || err_msg.contains( "500" ) ),
+    err_msg.contains("description") && (err_msg.contains("long") || err_msg.contains("500")),
     "LOUD FAILURE: Error message must indicate description too long. Got: {err_msg}"
   );
 }
 
 /// Test description exactly 500 chars accepted.
-#[ tokio::test ]
-async fn test_description_max_length_accepted()
-{
-  let max_description = "a".repeat( 500 );
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_description_max_length_accepted() {
+  let max_description = "a".repeat(500);
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "user_test".to_string() ),
+    user_id: Some("user_test".to_string()),
     project_id: None,
-    description: Some( max_description ),
+    description: Some(max_description),
     agent_id: None,
     provider: None,
   };
@@ -174,13 +162,11 @@ async fn test_description_max_length_accepted()
 }
 
 /// Test single char `user_id` accepted.
-#[ tokio::test ]
-async fn test_single_char_user_id_accepted()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_single_char_user_id_accepted() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "a".to_string() ),
+    user_id: Some("a".to_string()),
     project_id: None,
     description: None,
     agent_id: None,
@@ -196,13 +182,11 @@ async fn test_single_char_user_id_accepted()
 }
 
 /// Test whitespace-only `user_id` rejected.
-#[ tokio::test ]
-async fn test_whitespace_user_id_rejected()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_whitespace_user_id_rejected() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "   ".to_string() ),
+    user_id: Some("   ".to_string()),
     project_id: None,
     description: None,
     agent_id: None,
@@ -217,20 +201,18 @@ async fn test_whitespace_user_id_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "user_id" ) && ( err_msg.contains( "empty" ) || err_msg.contains( "whitespace" ) ),
+    err_msg.contains("user_id") && (err_msg.contains("empty") || err_msg.contains("whitespace")),
     "LOUD FAILURE: Error message must indicate user_id is empty/whitespace. Got: {err_msg}"
   );
 }
 
 /// Test whitespace-only `project_id` rejected.
-#[ tokio::test ]
-async fn test_whitespace_project_id_rejected()
-{
-  let request = CreateTokenRequest
-  {
+#[tokio::test]
+async fn test_whitespace_project_id_rejected() {
+  let request = CreateTokenRequest {
     name: None,
-    user_id: Some( "user_test".to_string() ),
-    project_id: Some( "   ".to_string() ),
+    user_id: Some("user_test".to_string()),
+    project_id: Some("   ".to_string()),
     description: None,
     agent_id: None,
     provider: None,
@@ -244,7 +226,7 @@ async fn test_whitespace_project_id_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "project_id" ) && ( err_msg.contains( "empty" ) || err_msg.contains( "whitespace" ) ),
+    err_msg.contains("project_id") && (err_msg.contains("empty") || err_msg.contains("whitespace")),
     "LOUD FAILURE: Error message must indicate project_id is empty/whitespace. Got: {err_msg}"
   );
 }

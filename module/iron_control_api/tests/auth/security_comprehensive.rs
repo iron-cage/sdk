@@ -52,17 +52,16 @@
 //! - Session timeout enforcement
 
 use super::common;
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use base64::{ Engine as _, engine::general_purpose::URL_SAFE_NO_PAD };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use core::time::Duration;
 use serde_json::json;
 use sqlx::SqlitePool;
-use tower::ServiceExt;
-use core::time::Duration;
 use std::time::Instant;
+use tower::ServiceExt;
 
 // ============================================================================
 // Phase 1: Brute Force Protection Tests (4 tests)
@@ -94,33 +93,44 @@ use std::time::Instant;
 /// # Implementation Status
 ///
 /// IMPLEMENTED in `src/rate_limiter.rs`
-#[ tokio::test ]
-async fn test_ip_based_rate_limiting()
-{
+#[tokio::test]
+async fn test_ip_based_rate_limiting() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
   // Seed valid user for comparison
-  common::auth::seed_test_user( &pool, "valid@example.com", "valid_password_123", "user", true ).await;
+  common::auth::seed_test_user(
+    &pool,
+    "valid@example.com",
+    "valid_password_123",
+    "user",
+    true,
+  )
+  .await;
 
   // Use rate limiting enabled router for this test
-  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() );
+  let router = common::auth::create_auth_router_with_rate_limiting(pool.clone());
 
   // Phase 1: Establish baseline (valid login from different IP should succeed)
   // Use different IP to not interfere with rate limit count for IP A
   let valid_request_baseline = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-test-client-ip", "10.0.0.1" )  // Different IP for baseline
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-test-client-ip", "10.0.0.1") // Different IP for baseline
+    .body(Body::from(
       json!({
         "email": "valid@example.com",
         "password": "valid_password_123"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.clone().oneshot( valid_request_baseline ).await.unwrap();
+  let response = router
+    .clone()
+    .oneshot(valid_request_baseline)
+    .await
+    .unwrap();
   assert_eq!(
     response.status(),
     StatusCode::OK,
@@ -128,22 +138,22 @@ async fn test_ip_based_rate_limiting()
   );
 
   // Phase 2: Brute force attempt from IP A (5 failed attempts)
-  for attempt in 1..=5
-  {
+  for attempt in 1..=5 {
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .header( "x-test-client-ip", "192.168.1.100" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .header("x-test-client-ip", "192.168.1.100")
+      .body(Body::from(
         json!({
           "email": format!( "attacker{attempt}@malicious.com" ),
           "password": "wrong_password"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
     assert_eq!(
       response.status(),
       StatusCode::UNAUTHORIZED,
@@ -153,19 +163,20 @@ async fn test_ip_based_rate_limiting()
 
   // Phase 3: Verify 6th attempt from IP A is rate-limited
   let request_6th = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-test-client-ip", "192.168.1.100" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-test-client-ip", "192.168.1.100")
+    .body(Body::from(
       json!({
         "email": "attacker6@malicious.com",
         "password": "wrong_password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.clone().oneshot( request_6th ).await.unwrap();
+  let response = router.clone().oneshot(request_6th).await.unwrap();
   assert_eq!(
     response.status(),
     StatusCode::TOO_MANY_REQUESTS,
@@ -173,35 +184,38 @@ async fn test_ip_based_rate_limiting()
   );
 
   // Verify error response includes retry_after
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_response: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_response: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert_eq!(
-    error_response[ "error" ][ "code" ].as_str().unwrap(),
+    error_response["error"]["code"].as_str().unwrap(),
     "RATE_LIMIT_EXCEEDED",
     "Error code should indicate rate limit"
   );
 
   assert!(
-    error_response[ "error" ][ "details" ][ "retry_after" ].is_number(),
+    error_response["error"]["details"]["retry_after"].is_number(),
     "Response should include retry_after seconds"
   );
 
   // Phase 4: Verify different IP B is not affected
   let request_ip_b = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-test-client-ip", "192.168.1.101" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-test-client-ip", "192.168.1.101")
+    .body(Body::from(
       json!({
         "email": "valid@example.com",
         "password": "valid_password_123"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.oneshot( request_ip_b ).await.unwrap();
+  let response = router.oneshot(request_ip_b).await.unwrap();
   assert_eq!(
     response.status(),
     StatusCode::OK,
@@ -234,37 +248,36 @@ async fn test_ip_based_rate_limiting()
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Current rate limiting is global, not username-specific.
 /// Need to implement per-username rate limiting with 15 attempts/5min window.
-#[ tokio::test ]
-#[ ignore = "Requires username-based rate limiting implementation" ]
-async fn test_username_based_rate_limiting()
-{
+#[tokio::test]
+#[ignore = "Requires username-based rate limiting implementation"]
+async fn test_username_based_rate_limiting() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
   // Seed two test users
-  common::auth::seed_test_user( &pool, "user_a@example.com", "password_a", "user", true ).await;
-  common::auth::seed_test_user( &pool, "user_b@example.com", "password_b", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user_a@example.com", "password_a", "user", true).await;
+  common::auth::seed_test_user(&pool, "user_b@example.com", "password_b", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Attempt 15 failed logins for user A from different IPs
-  for attempt in 1..=15
-  {
-    let ip = format!( "192.168.1.{attempt}" );
+  for attempt in 1..=15 {
+    let ip = format!("192.168.1.{attempt}");
 
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .header( "x-forwarded-for", &ip )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .header("x-forwarded-for", &ip)
+      .body(Body::from(
         json!({
           "email": "user_a@example.com",
           "password": "wrong_password"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
     assert_eq!(
       response.status(),
       StatusCode::UNAUTHORIZED,
@@ -274,19 +287,20 @@ async fn test_username_based_rate_limiting()
 
   // Phase 2: Verify 16th attempt for user A is rate-limited
   let request_16th = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-forwarded-for", "192.168.1.16" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-forwarded-for", "192.168.1.16")
+    .body(Body::from(
       json!({
         "email": "user_a@example.com",
         "password": "wrong_password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.clone().oneshot( request_16th ).await.unwrap();
+  let response = router.clone().oneshot(request_16th).await.unwrap();
   assert_eq!(
     response.status(),
     StatusCode::TOO_MANY_REQUESTS,
@@ -295,19 +309,20 @@ async fn test_username_based_rate_limiting()
 
   // Phase 3: Verify different user B is not affected
   let request_user_b = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-forwarded-for", "192.168.1.1" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-forwarded-for", "192.168.1.1")
+    .body(Body::from(
       json!({
         "email": "user_b@example.com",
         "password": "password_b"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.oneshot( request_user_b ).await.unwrap();
+  let response = router.oneshot(request_user_b).await.unwrap();
   assert_eq!(
     response.status(),
     StatusCode::OK,
@@ -339,46 +354,50 @@ async fn test_username_based_rate_limiting()
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Requires both username-based rate limiting and account lockout.
-#[ tokio::test ]
-#[ ignore = "Requires distributed attack prevention implementation" ]
-async fn test_distributed_attack_prevention()
-{
+#[tokio::test]
+#[ignore = "Requires distributed attack prevention implementation"]
+async fn test_distributed_attack_prevention() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "target@example.com", "correct_password", "user", true ).await;
+  common::auth::seed_test_user(
+    &pool,
+    "target@example.com",
+    "correct_password",
+    "user",
+    true,
+  )
+  .await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Simulate distributed attack (20 IPs, 3 attempts each = 60 total)
   let mut successful_401_count = 0;
   let mut rate_limited_count = 0;
 
-  for ip_num in 1..=20
-  {
-    for attempt in 1..=3
-    {
-      let ip = format!( "10.0.{ip_num}.{attempt}" );
+  for ip_num in 1..=20 {
+    for attempt in 1..=3 {
+      let ip = format!("10.0.{ip_num}.{attempt}");
 
       let request = Request::builder()
-        .method( "POST" )
-        .uri( "/api/v1/auth/login" )
-        .header( "content-type", "application/json" )
-        .header( "x-forwarded-for", &ip )
-        .body( Body::from(
+        .method("POST")
+        .uri("/api/v1/auth/login")
+        .header("content-type", "application/json")
+        .header("x-forwarded-for", &ip)
+        .body(Body::from(
           json!({
             "email": "target@example.com",
             "password": "wrong_password"
-          }).to_string()
+          })
+          .to_string(),
         ))
         .unwrap();
 
-      let response = router.clone().oneshot( request ).await.unwrap();
+      let response = router.clone().oneshot(request).await.unwrap();
 
-      match response.status()
-      {
+      match response.status() {
         StatusCode::UNAUTHORIZED => successful_401_count += 1,
         StatusCode::TOO_MANY_REQUESTS | StatusCode::LOCKED => rate_limited_count += 1,
-        other => panic!( "Unexpected status code: {other}" ),
+        other => panic!("Unexpected status code: {other}"),
       }
     }
   }
@@ -396,19 +415,20 @@ async fn test_distributed_attack_prevention()
 
   // Phase 3: Verify account lockout persists across different IPs
   let fresh_ip_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-forwarded-for", "172.16.0.1" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-forwarded-for", "172.16.0.1")
+    .body(Body::from(
       json!({
         "email": "target@example.com",
         "password": "correct_password"  // Even correct password should be blocked
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.oneshot( fresh_ip_request ).await.unwrap();
+  let response = router.oneshot(fresh_ip_request).await.unwrap();
   assert!(
     response.status() == StatusCode::TOO_MANY_REQUESTS || response.status() == StatusCode::LOCKED,
     "Account lockout should persist even from new IP with correct password"
@@ -440,52 +460,52 @@ async fn test_distributed_attack_prevention()
 ///
 /// **Authority:** Protocol 007 Security Considerations (line 158)
 /// "Account lockout after 10 failed attempts (manual unlock by admin)"
-#[ tokio::test ]
-async fn test_account_lockout_duration()
-{
+#[tokio::test]
+async fn test_account_lockout_duration() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "correct_password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "correct_password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Trigger account lockout (10 failed attempts per Protocol 007)
   // Use different IPs to bypass IP-based rate limiting (5 attempts/5min per IP)
-  for attempt in 1..=10
-  {
-    let test_ip = format!( "10.0.0.{attempt}" );
+  for attempt in 1..=10 {
+    let test_ip = format!("10.0.0.{attempt}");
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .header( "x-test-client-ip", &test_ip )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .header("x-test-client-ip", &test_ip)
+      .body(Body::from(
         json!({
           "email": "user@example.com",
           "password": "wrong_password"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let _response = router.clone().oneshot( request ).await.unwrap();
+    let _response = router.clone().oneshot(request).await.unwrap();
   }
 
   // Phase 2: Verify lockout enforced (even with correct password)
   // Use fresh IP to bypass IP-based rate limiting
   let locked_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .header( "x-test-client-ip", "10.0.0.100" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .header("x-test-client-ip", "10.0.0.100")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "correct_password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response = router.clone().oneshot( locked_request ).await.unwrap();
+  let response = router.clone().oneshot(locked_request).await.unwrap();
   assert_eq!(
     response.status(),
     StatusCode::FORBIDDEN,
@@ -493,15 +513,19 @@ async fn test_account_lockout_duration()
   );
 
   // Phase 3: Verify lockout includes retry_after timestamp
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let error_response: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let error_response: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert!(
-    error_response[ "error" ][ "details" ][ "retry_after" ].is_number(),
+    error_response["error"]["details"]["retry_after"].is_number(),
     "Lockout response should include retry_after timestamp"
   );
 
-  let retry_after = error_response[ "error" ][ "details" ][ "retry_after" ].as_i64().unwrap();
+  let retry_after = error_response["error"]["details"]["retry_after"]
+    .as_i64()
+    .unwrap();
   assert!(
     (900..=1800).contains(&retry_after),
     "Retry after should be 15-30 minutes (900-1800 seconds), got {retry_after}"
@@ -546,79 +570,89 @@ async fn test_account_lockout_duration()
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Need to verify bcrypt `verify_password` uses constant-time comparison.
 /// May need timing analysis to confirm no early returns.
-#[ tokio::test ]
-#[ ignore = "Requires constant-time password verification analysis" ]
-async fn test_constant_time_password_verification()
-{
+#[tokio::test]
+#[ignore = "Requires constant-time password verification analysis"]
+async fn test_constant_time_password_verification() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "correct_password_123", "user", true ).await;
+  common::auth::seed_test_user(
+    &pool,
+    "user@example.com",
+    "correct_password_123",
+    "user",
+    true,
+  )
+  .await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Measure timing for non-existent user
   let start = Instant::now();
-  for _ in 0..100
-  {
+  for _ in 0..100 {
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .body(Body::from(
         json!({
           "email": "nonexistent@example.com",
           "password": "any_password"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let _response = router.clone().oneshot( request ).await.unwrap();
+    let _response = router.clone().oneshot(request).await.unwrap();
   }
   let nonexistent_user_time = start.elapsed().as_millis() / 100;
 
   // Phase 2: Measure timing for existing user with wrong password
   let start = Instant::now();
-  for _ in 0..100
-  {
+  for _ in 0..100 {
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .body(Body::from(
         json!({
           "email": "user@example.com",
           "password": "wrong_password_123"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let _response = router.clone().oneshot( request ).await.unwrap();
+    let _response = router.clone().oneshot(request).await.unwrap();
   }
   let wrong_password_time = start.elapsed().as_millis() / 100;
 
   // Phase 3: Measure timing for existing user with correct password
   let start = Instant::now();
-  for _ in 0..100
-  {
+  for _ in 0..100 {
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .body(Body::from(
         json!({
           "email": "user@example.com",
           "password": "correct_password_123"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let _response = router.clone().oneshot( request ).await.unwrap();
+    let _response = router.clone().oneshot(request).await.unwrap();
   }
   let correct_password_time = start.elapsed().as_millis() / 100;
 
   // Phase 4: Verify timing variance <5ms
-  let max_time = nonexistent_user_time.max( wrong_password_time ).max( correct_password_time );
-  let min_time = nonexistent_user_time.min( wrong_password_time ).min( correct_password_time );
+  let max_time = nonexistent_user_time
+    .max(wrong_password_time)
+    .max(correct_password_time);
+  let min_time = nonexistent_user_time
+    .min(wrong_password_time)
+    .min(correct_password_time);
   let variance = max_time - min_time;
 
   assert!(
@@ -653,57 +687,59 @@ async fn test_constant_time_password_verification()
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Requires comprehensive timing analysis with statistical rigor.
-#[ tokio::test ]
-#[ ignore = "Requires comprehensive timing variance analysis" ]
-async fn test_timing_variance_measurement()
-{
+#[tokio::test]
+#[ignore = "Requires comprehensive timing variance analysis"]
+async fn test_timing_variance_measurement() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "correct_password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "correct_password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   let mut timings: Vec<u128> = Vec::new();
 
   // Run 1000 attempts (mix of valid/invalid)
-  for i in 0..1000
-  {
-    let ( email, password ) = match i % 4
-    {
-      0 => ( "user@example.com", "correct_password" ),      // Valid
-      1 => ( "user@example.com", "wrong_password" ),        // Invalid password
-      2 => ( "nonexistent@example.com", "any_password" ),   // Invalid user
-      _ => ( "user@example.com", "completely_wrong" ),      // Invalid password (different)
+  for i in 0..1000 {
+    let (email, password) = match i % 4 {
+      0 => ("user@example.com", "correct_password"), // Valid
+      1 => ("user@example.com", "wrong_password"),   // Invalid password
+      2 => ("nonexistent@example.com", "any_password"), // Invalid user
+      _ => ("user@example.com", "completely_wrong"), // Invalid password (different)
     };
 
     let start = Instant::now();
 
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .body(Body::from(
         json!({
           "email": email,
           "password": password
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let _response = router.clone().oneshot( request ).await.unwrap();
+    let _response = router.clone().oneshot(request).await.unwrap();
 
     let elapsed = start.elapsed().as_micros();
-    timings.push( elapsed );
+    timings.push(elapsed);
   }
 
   // Calculate statistics
   timings.sort_unstable();
 
-  let min = timings[ 0 ];
-  let max = timings[ timings.len() - 1 ];
-  let median = timings[ timings.len() / 2 ];
-  #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
-  let p99 = timings[ ( timings.len() as f64 * 0.99 ) as usize ];
+  let min = timings[0];
+  let max = timings[timings.len() - 1];
+  let median = timings[timings.len() / 2];
+  #[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+  )]
+  let p99 = timings[(timings.len() as f64 * 0.99) as usize];
 
   let variance_us = max - min;
   let variance_in_ms = variance_us / 1000;
@@ -742,66 +778,74 @@ async fn test_timing_variance_measurement()
 ///
 /// **Authority:** Protocol 007 JWT Validation (line 257-269)
 /// JWT signature verification enforced by `jsonwebtoken` library.
-#[ tokio::test ]
-async fn test_jwt_signature_tampering()
-{
+#[tokio::test]
+async fn test_jwt_signature_tampering() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Get valid JWT token
   let login_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let login_response = router.clone().oneshot( login_request ).await.unwrap();
-  assert_eq!( login_response.status(), StatusCode::OK );
+  let login_response = router.clone().oneshot(login_request).await.unwrap();
+  assert_eq!(login_response.status(), StatusCode::OK);
 
-  let login_body = axum::body::to_bytes( login_response.into_body(), usize::MAX ).await.unwrap();
-  let login_data: serde_json::Value = serde_json::from_slice( &login_body ).unwrap();
-  let valid_token = login_data[ "user_token" ].as_str().unwrap();
+  let login_body = axum::body::to_bytes(login_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let login_data: serde_json::Value = serde_json::from_slice(&login_body).unwrap();
+  let valid_token = login_data["user_token"].as_str().unwrap();
 
   // Phase 2: Tamper with payload (change role from "user" to "admin")
-  let parts: Vec<&str> = valid_token.split( '.' ).collect();
-  assert_eq!( parts.len(), 3, "JWT should have 3 parts (header.payload.signature)" );
+  let parts: Vec<&str> = valid_token.split('.').collect();
+  assert_eq!(
+    parts.len(),
+    3,
+    "JWT should have 3 parts (header.payload.signature)"
+  );
 
   // Decode payload
-  let payload_bytes = URL_SAFE_NO_PAD.decode( parts[ 1 ] )
-    .expect( "Failed to decode JWT payload" );
-  let mut payload: serde_json::Value = serde_json::from_slice( &payload_bytes )
-    .expect( "Failed to parse JWT payload" );
+  let payload_bytes = URL_SAFE_NO_PAD
+    .decode(parts[1])
+    .expect("Failed to decode JWT payload");
+  let mut payload: serde_json::Value =
+    serde_json::from_slice(&payload_bytes).expect("Failed to parse JWT payload");
 
   // Tamper: change role to admin
-  payload[ "role" ] = json!( "admin" );
+  payload["role"] = json!("admin");
 
   // Re-encode tampered payload (without re-signing!)
-  let tampered_payload = URL_SAFE_NO_PAD.encode( serde_json::to_string( &payload ).unwrap().as_bytes() );
+  let tampered_payload =
+    URL_SAFE_NO_PAD.encode(serde_json::to_string(&payload).unwrap().as_bytes());
 
   // Reconstruct JWT with tampered payload but original signature
-  let header_part = parts[ 0 ];
-  let sig_part = parts[ 2 ];
-  let tampered_token = format!( "{header_part}.{tampered_payload}.{sig_part}" );
+  let header_part = parts[0];
+  let sig_part = parts[2];
+  let tampered_token = format!("{header_part}.{tampered_payload}.{sig_part}");
 
   // Phase 3: Verify tampered token rejected
   let protected_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/validate" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {tampered_token}" ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/validate")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {tampered_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( protected_request ).await.unwrap();
+  let response = router.oneshot(protected_request).await.unwrap();
   // Per Protocol 007 line 264: Validate returns 200 OK even for invalid tokens
   assert_eq!(
     response.status(),
@@ -810,16 +854,18 @@ async fn test_jwt_signature_tampering()
   );
 
   // Verify response indicates token is invalid (signature verification failed)
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let validate_response: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let validate_response: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert!(
-    !validate_response[ "valid" ].as_bool().unwrap(),
+    !validate_response["valid"].as_bool().unwrap(),
     "Tampered token should have valid: false"
   );
 
   assert_eq!(
-    validate_response[ "reason" ].as_str().unwrap(),
+    validate_response["reason"].as_str().unwrap(),
     "TOKEN_EXPIRED",
     "Reason should indicate token invalid (signature verification failed)"
   );
@@ -849,11 +895,10 @@ async fn test_jwt_signature_tampering()
 ///
 /// **Authority:** Protocol 007 JWT Validation (line 257-269)
 /// `jsonwebtoken` library rejects "none" algorithm by default.
-#[ tokio::test ]
-async fn test_jwt_algorithm_substitution()
-{
+#[tokio::test]
+async fn test_jwt_algorithm_substitution() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Craft JWT with algorithm "none"
   let header = json!({
@@ -868,23 +913,23 @@ async fn test_jwt_algorithm_substitution()
     "exp": i64::try_from( std::time::SystemTime::now().duration_since( std::time::UNIX_EPOCH ).unwrap().as_secs() + 3600 ).unwrap_or( i64::MAX )
   });
 
-  let header_b64 = URL_SAFE_NO_PAD.encode( serde_json::to_string( &header ).unwrap().as_bytes() );
+  let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_string(&header).unwrap().as_bytes());
 
-  let payload_b64 = URL_SAFE_NO_PAD.encode( serde_json::to_string( &payload ).unwrap().as_bytes() );
+  let payload_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_string(&payload).unwrap().as_bytes());
 
   // Algorithm "none" tokens have empty signature
-  let none_token = format!( "{header_b64}.{payload_b64}." );
+  let none_token = format!("{header_b64}.{payload_b64}.");
 
   // Phase 2: Verify token rejected
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/validate" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {none_token}" ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/validate")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {none_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
   // Per Protocol 007 line 264: Validate returns 200 OK even for invalid tokens
   assert_eq!(
     response.status(),
@@ -893,16 +938,18 @@ async fn test_jwt_algorithm_substitution()
   );
 
   // Verify response indicates token is invalid (algorithm "none" rejected)
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let validate_response: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let validate_response: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert!(
-    !validate_response[ "valid" ].as_bool().unwrap(),
+    !validate_response["valid"].as_bool().unwrap(),
     "Token with algorithm 'none' should have valid: false"
   );
 
   assert_eq!(
-    validate_response[ "reason" ].as_str().unwrap(),
+    validate_response["reason"].as_str().unwrap(),
     "TOKEN_EXPIRED",
     "Reason should indicate token invalid (algorithm 'none' rejected)"
   );
@@ -933,10 +980,9 @@ async fn test_jwt_algorithm_substitution()
 /// REQUIRES VERIFICATION
 /// Current implementation uses `HS256` (symmetric). Need to verify
 /// algorithm enforcement if migrating to `RS256` (asymmetric).
-#[ tokio::test ]
-#[ ignore = "Requires JWT key confusion attack prevention test" ]
-async fn test_jwt_key_confusion_attack()
-{
+#[tokio::test]
+#[ignore = "Requires JWT key confusion attack prevention test"]
+async fn test_jwt_key_confusion_attack() {
   // NOTE: This test is primarily relevant for RS256 (asymmetric) JWT.
   // Current implementation uses HS256 (symmetric), so key confusion not applicable.
   //
@@ -950,7 +996,7 @@ async fn test_jwt_key_confusion_attack()
   // - Re-sign with HS256 using public key as secret
   // - Verify system rejects (algorithm mismatch)
 
-  panic!( "Test not implemented - HS256 symmetric signing used, key confusion not applicable" );
+  panic!("Test not implemented - HS256 symmetric signing used, key confusion not applicable");
 }
 
 /// Test JWT expiration enforcement (<1s accuracy)
@@ -978,50 +1024,52 @@ async fn test_jwt_key_confusion_attack()
 ///
 /// ✅ ENABLED
 /// JWT validation enforces exp claim (`jsonwebtoken` library validates automatically).
-#[ tokio::test ]
-async fn test_jwt_expiration_enforcement()
-{
-  use jsonwebtoken::{ encode, Header, EncodingKey };
+#[tokio::test]
+async fn test_jwt_expiration_enforcement() {
   use iron_control_api::jwt_auth::AccessTokenClaims;
+  use jsonwebtoken::{encode, EncodingKey, Header};
 
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  let user_id = common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  let user_id =
+    common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Create an already-expired JWT token manually
   let jwt_secret = "test_jwt_secret_for_authentication_tests_only";
   let now = chrono::Utc::now().timestamp();
   let past_timestamp = now - 3600; // Expired 1 hour ago
 
-  let expired_claims = AccessTokenClaims
-  {
+  let expired_claims = AccessTokenClaims {
     sub: user_id,
     role: "user".to_string(),
     email: "user@example.com".to_string(),
     iat: past_timestamp - 3600, // Issued 2 hours ago
     exp: past_timestamp,        // Expired 1 hour ago
-    jti: { let id = uuid::Uuid::new_v4(); format!( "expired_test_{id}" ) },
+    jti: {
+      let id = uuid::Uuid::new_v4();
+      format!("expired_test_{id}")
+    },
   };
 
   let expired_token = encode(
     &Header::default(),
     &expired_claims,
-    &EncodingKey::from_secret( jwt_secret.as_ref() ),
+    &EncodingKey::from_secret(jwt_secret.as_ref()),
   )
-  .expect( "Failed to encode expired token" );
+  .expect("Failed to encode expired token");
 
   // Phase 2: Attempt to use expired token with validate endpoint
   let expired_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/validate" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {expired_token}" ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/validate")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {expired_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.clone().oneshot( expired_request ).await.unwrap();
+  let response = router.clone().oneshot(expired_request).await.unwrap();
 
   // Per Protocol 007 line 264: Validate returns 200 OK even for invalid tokens
   assert_eq!(
@@ -1031,17 +1079,19 @@ async fn test_jwt_expiration_enforcement()
   );
 
   // Phase 3: Verify response indicates token is invalid/expired
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let validate_response: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let validate_response: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert!(
-    !validate_response[ "valid" ].as_bool().unwrap(),
+    !validate_response["valid"].as_bool().unwrap(),
     "Expired token should have valid: false"
   );
 
   // Reason might be "INVALID_TOKEN" or similar (not necessarily "EXPIRED")
   assert!(
-    validate_response[ "reason" ].is_string(),
+    validate_response["reason"].is_string(),
     "Response should include reason for invalid token"
   );
 }
@@ -1071,45 +1121,47 @@ async fn test_jwt_expiration_enforcement()
 ///
 /// **Authority:** Protocol 007 Logout implementation (line 177-182)
 /// Token blacklist table exists, verifying enforcement.
-#[ tokio::test ]
-async fn test_jwt_blacklist_verification()
-{
+#[tokio::test]
+async fn test_jwt_blacklist_verification() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Login to get valid token
   let login_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let login_response = router.clone().oneshot( login_request ).await.unwrap();
-  assert_eq!( login_response.status(), StatusCode::OK );
+  let login_response = router.clone().oneshot(login_request).await.unwrap();
+  assert_eq!(login_response.status(), StatusCode::OK);
 
-  let login_body = axum::body::to_bytes( login_response.into_body(), usize::MAX ).await.unwrap();
-  let login_data: serde_json::Value = serde_json::from_slice( &login_body ).unwrap();
-  let user_token = login_data[ "user_token" ].as_str().unwrap().to_string();
+  let login_body = axum::body::to_bytes(login_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let login_data: serde_json::Value = serde_json::from_slice(&login_body).unwrap();
+  let user_token = login_data["user_token"].as_str().unwrap().to_string();
 
   // Phase 2: Use token successfully (verify it works before logout)
   let valid_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/validate" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {user_token}" ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/validate")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {user_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.clone().oneshot( valid_request ).await.unwrap();
+  let response = router.clone().oneshot(valid_request).await.unwrap();
   assert_eq!(
     response.status(),
     StatusCode::OK,
@@ -1118,14 +1170,14 @@ async fn test_jwt_blacklist_verification()
 
   // Phase 3: Logout (adds jti to blacklist)
   let logout_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/logout" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {user_token}" ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/logout")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {user_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let logout_response = router.clone().oneshot( logout_request ).await.unwrap();
+  let logout_response = router.clone().oneshot(logout_request).await.unwrap();
   assert_eq!(
     logout_response.status(),
     StatusCode::NO_CONTENT,
@@ -1134,14 +1186,14 @@ async fn test_jwt_blacklist_verification()
 
   // Phase 4: Attempt to use same token again (should be blacklisted)
   let blacklisted_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/validate" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {user_token}" ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/validate")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {user_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( blacklisted_request ).await.unwrap();
+  let response = router.oneshot(blacklisted_request).await.unwrap();
   // Per Protocol 007 line 264: Validate returns 200 OK even for invalid tokens
   assert_eq!(
     response.status(),
@@ -1150,22 +1202,24 @@ async fn test_jwt_blacklist_verification()
   );
 
   // Phase 5: Verify response indicates token is blacklisted
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let validate_response: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let validate_response: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert!(
-    !validate_response[ "valid" ].as_bool().unwrap(),
+    !validate_response["valid"].as_bool().unwrap(),
     "Blacklisted token should have valid: false"
   );
 
   assert_eq!(
-    validate_response[ "reason" ].as_str().unwrap(),
+    validate_response["reason"].as_str().unwrap(),
     "TOKEN_REVOKED",
     "Reason should indicate token was revoked"
   );
 
   assert!(
-    validate_response[ "revoked_at" ].is_string(),
+    validate_response["revoked_at"].is_string(),
     "Response should include revoked_at timestamp"
   );
 }
@@ -1198,63 +1252,68 @@ async fn test_jwt_blacklist_verification()
 ///
 /// **Authority:** Protocol 007 JWT User Token Format (line 142-151)
 /// JWT-based auth with unique `JTI` per login (session fixation prevention).
-#[ tokio::test ]
+#[tokio::test]
 #[allow(clippy::similar_names)]
-async fn test_session_fixation_prevention()
-{
+async fn test_session_fixation_prevention() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: First login - get initial JTI
   let login_request_1 = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let login_response_1 = router.clone().oneshot( login_request_1 ).await.unwrap();
-  let login_body_1 = axum::body::to_bytes( login_response_1.into_body(), usize::MAX ).await.unwrap();
-  let login_data_1: serde_json::Value = serde_json::from_slice( &login_body_1 ).unwrap();
-  let token_1 = login_data_1[ "user_token" ].as_str().unwrap();
+  let login_response_1 = router.clone().oneshot(login_request_1).await.unwrap();
+  let login_body_1 = axum::body::to_bytes(login_response_1.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let login_data_1: serde_json::Value = serde_json::from_slice(&login_body_1).unwrap();
+  let token_1 = login_data_1["user_token"].as_str().unwrap();
 
   // Extract JTI from first token
-  let parts_1: Vec<&str> = token_1.split( '.' ).collect();
-  let payload_bytes_1 = URL_SAFE_NO_PAD.decode( parts_1[ 1 ] ).unwrap();
-  let payload_1: serde_json::Value = serde_json::from_slice( &payload_bytes_1 ).unwrap();
-  let jti_1 = payload_1[ "jti" ].as_str().unwrap();
+  let parts_1: Vec<&str> = token_1.split('.').collect();
+  let payload_bytes_1 = URL_SAFE_NO_PAD.decode(parts_1[1]).unwrap();
+  let payload_1: serde_json::Value = serde_json::from_slice(&payload_bytes_1).unwrap();
+  let jti_1 = payload_1["jti"].as_str().unwrap();
 
   // Phase 2: Second login (same user) - get new JTI
   let login_request_2 = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let login_response_2 = router.clone().oneshot( login_request_2 ).await.unwrap();
-  let login_body_2 = axum::body::to_bytes( login_response_2.into_body(), usize::MAX ).await.unwrap();
-  let login_data_2: serde_json::Value = serde_json::from_slice( &login_body_2 ).unwrap();
-  let token_2 = login_data_2[ "user_token" ].as_str().unwrap();
+  let login_response_2 = router.clone().oneshot(login_request_2).await.unwrap();
+  let login_body_2 = axum::body::to_bytes(login_response_2.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let login_data_2: serde_json::Value = serde_json::from_slice(&login_body_2).unwrap();
+  let token_2 = login_data_2["user_token"].as_str().unwrap();
 
   // Extract JTI from second token
-  let parts_2: Vec<&str> = token_2.split( '.' ).collect();
-  let payload_bytes_2 = URL_SAFE_NO_PAD.decode( parts_2[ 1 ] ).unwrap();
-  let payload_2: serde_json::Value = serde_json::from_slice( &payload_bytes_2 ).unwrap();
-  let jti_2 = payload_2[ "jti" ].as_str().unwrap();
+  let parts_2: Vec<&str> = token_2.split('.').collect();
+  let payload_bytes_2 = URL_SAFE_NO_PAD.decode(parts_2[1]).unwrap();
+  let payload_2: serde_json::Value = serde_json::from_slice(&payload_bytes_2).unwrap();
+  let jti_2 = payload_2["jti"].as_str().unwrap();
 
   // Phase 3: Verify JTI changed (session fixation prevention)
   assert_ne!(
@@ -1291,62 +1350,64 @@ async fn test_session_fixation_prevention()
 ///
 /// **Authority:** Protocol 007 JWT User Token Format (line 142-151)
 /// `JTI` uniqueness and blacklist persistence verified.
-#[ tokio::test ]
-async fn test_session_regeneration()
-{
+#[tokio::test]
+async fn test_session_regeneration() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Login → Logout → Login
   let mut jtis = Vec::new();
 
-  for _ in 0..3
-  {
+  for _ in 0..3 {
     // Login
     let login_request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .body(Body::from(
         json!({
           "email": "user@example.com",
           "password": "password"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let login_response = router.clone().oneshot( login_request ).await.unwrap();
-    let login_body = axum::body::to_bytes( login_response.into_body(), usize::MAX ).await.unwrap();
-    let login_data: serde_json::Value = serde_json::from_slice( &login_body ).unwrap();
-    let token = login_data[ "user_token" ].as_str().unwrap();
+    let login_response = router.clone().oneshot(login_request).await.unwrap();
+    let login_body = axum::body::to_bytes(login_response.into_body(), usize::MAX)
+      .await
+      .unwrap();
+    let login_data: serde_json::Value = serde_json::from_slice(&login_body).unwrap();
+    let token = login_data["user_token"].as_str().unwrap();
 
     // Extract JTI
-    let parts: Vec<&str> = token.split( '.' ).collect();
-    let payload_bytes = URL_SAFE_NO_PAD.decode( parts[ 1 ] ).unwrap();
-    let payload: serde_json::Value = serde_json::from_slice( &payload_bytes ).unwrap();
-    let jti = payload[ "jti" ].as_str().unwrap().to_string();
+    let parts: Vec<&str> = token.split('.').collect();
+    let payload_bytes = URL_SAFE_NO_PAD.decode(parts[1]).unwrap();
+    let payload: serde_json::Value = serde_json::from_slice(&payload_bytes).unwrap();
+    let jti = payload["jti"].as_str().unwrap().to_string();
 
-    jtis.push( jti.clone() );
+    jtis.push(jti.clone());
 
     // Logout (blacklist JTI)
     let logout_request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/logout" )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {token}" ) )
-      .body( Body::empty() )
+      .method("POST")
+      .uri("/api/v1/auth/logout")
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {token}"))
+      .body(Body::empty())
       .unwrap();
 
-    let _logout_response = router.clone().oneshot( logout_request ).await.unwrap();
+    let _logout_response = router.clone().oneshot(logout_request).await.unwrap();
   }
 
   // Phase 2: Verify all JTIs unique
   let unique_jtis: std::collections::HashSet<_> = jtis.iter().collect();
   assert_eq!(
-    unique_jtis.len(), jtis.len(),
+    unique_jtis.len(),
+    jtis.len(),
     "All JTIs should be unique across login sessions"
   );
 }
@@ -1377,55 +1438,56 @@ async fn test_session_regeneration()
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Need to track active sessions per user and enforce 3-session limit.
-#[ tokio::test ]
-#[ ignore = "Requires concurrent session limit implementation" ]
-async fn test_concurrent_session_limit()
-{
+#[tokio::test]
+#[ignore = "Requires concurrent session limit implementation"]
+async fn test_concurrent_session_limit() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   let mut tokens = Vec::new();
 
   // Phase 1: Create 4 sessions (exceeds limit of 3)
-  for device in 1..=4
-  {
+  for device in 1..=4 {
     let login_request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/login" )
-      .header( "content-type", "application/json" )
-      .header( "user-agent", format!( "Device-{device}" ) )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/v1/auth/login")
+      .header("content-type", "application/json")
+      .header("user-agent", format!("Device-{device}"))
+      .body(Body::from(
         json!({
           "email": "user@example.com",
           "password": "password"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    let login_response = router.clone().oneshot( login_request ).await.unwrap();
-    let login_body = axum::body::to_bytes( login_response.into_body(), usize::MAX ).await.unwrap();
-    let login_data: serde_json::Value = serde_json::from_slice( &login_body ).unwrap();
-    let token = login_data[ "user_token" ].as_str().unwrap().to_string();
+    let login_response = router.clone().oneshot(login_request).await.unwrap();
+    let login_body = axum::body::to_bytes(login_response.into_body(), usize::MAX)
+      .await
+      .unwrap();
+    let login_data: serde_json::Value = serde_json::from_slice(&login_body).unwrap();
+    let token = login_data["user_token"].as_str().unwrap().to_string();
 
-    tokens.push( token );
+    tokens.push(token);
 
     // Small delay to ensure timestamp ordering
-    tokio::time::sleep( Duration::from_millis( 100 ) ).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
   }
 
   // Phase 2: Verify session 1 (oldest) invalidated
   let validate_request_1 = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/validate" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", tokens[ 0 ] ) )
-    .body( Body::empty() )
+    .method("POST")
+    .uri("/api/v1/auth/validate")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {}", tokens[0]))
+    .body(Body::empty())
     .unwrap();
 
-  let response_1 = router.clone().oneshot( validate_request_1 ).await.unwrap();
+  let response_1 = router.clone().oneshot(validate_request_1).await.unwrap();
   assert_eq!(
     response_1.status(),
     StatusCode::UNAUTHORIZED,
@@ -1433,21 +1495,21 @@ async fn test_concurrent_session_limit()
   );
 
   // Phase 3: Verify sessions 2, 3, 4 remain valid
-  for (idx, token) in tokens.iter().enumerate().skip(1).take(3)
-  {
+  for (idx, token) in tokens.iter().enumerate().skip(1).take(3) {
     let validate_request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/auth/validate" )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {token}" ) )
-      .body( Body::empty() )
+      .method("POST")
+      .uri("/api/v1/auth/validate")
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {token}"))
+      .body(Body::empty())
       .unwrap();
 
-    let response = router.clone().oneshot( validate_request ).await.unwrap();
+    let response = router.clone().oneshot(validate_request).await.unwrap();
     assert_eq!(
       response.status(),
       StatusCode::OK,
-      "Session {} should remain valid", idx + 1
+      "Session {} should remain valid",
+      idx + 1
     );
   }
 }
@@ -1479,10 +1541,9 @@ async fn test_concurrent_session_limit()
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// JWT exp provides absolute timeout. Need separate idle timeout tracking.
-#[ tokio::test ]
-#[ ignore = "Requires session timeout implementation" ]
-async fn test_session_timeout()
-{
+#[tokio::test]
+#[ignore = "Requires session timeout implementation"]
+async fn test_session_timeout() {
   // NOTE: This test cannot run in real-time (would take 12+ hours)
   // Implementation should:
   // 1. JWT exp field enforces absolute timeout (12 hours from issue)
@@ -1494,5 +1555,5 @@ async fn test_session_timeout()
   // - Mock time to fast-forward
   // - Or use shorter timeouts for testing (30s idle, 5min absolute)
 
-  panic!( "Test requires time mocking or test-specific timeout configuration" );
+  panic!("Test requires time mocking or test-specific timeout configuration");
 }

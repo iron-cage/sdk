@@ -2,14 +2,16 @@
 //!
 //! Phase 4 Day 29: REST API Endpoints - Health Check
 
-use axum::{ http::StatusCode, response::{ IntoResponse, Json } };
+use axum::{
+  http::StatusCode,
+  response::{IntoResponse, Json},
+};
 use chrono::Utc;
-use serde::{ Serialize };
+use serde::Serialize;
 
 /// Health check response
-#[ derive( Debug, Serialize ) ]
-pub struct HealthResponse
-{
+#[derive(Debug, Serialize)]
+pub struct HealthResponse {
   /// Service health status
   pub status: String,
   /// Response Unix timestamp
@@ -23,16 +25,16 @@ pub struct HealthResponse
 /// # Returns
 ///
 /// Always returns 200 OK with service status
-#[ must_use ]
-#[ allow( clippy::unused_async ) ]
-pub async fn health_check() -> impl IntoResponse
-{
+#[must_use]
+#[allow(clippy::unused_async)]
+pub async fn health_check() -> impl IntoResponse {
   let now = Utc::now().timestamp();
 
-  ( StatusCode::OK, Json( HealthResponse
-  {
-    status: "healthy".to_string(),
-    timestamp: now,
-  } ) )
+  (
+    StatusCode::OK,
+    Json(HealthResponse {
+      status: "healthy".to_string(),
+      timestamp: now,
+    }),
+  )
 }
-

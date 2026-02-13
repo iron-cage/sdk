@@ -14,14 +14,13 @@
 
 #![cfg(test)]
 
-use core::time::Duration;
 use crate::common::sql_injection_helpers::*;
+use core::time::Duration;
 
 /// Test: `verify_response_secure()` detects SQL keywords in response
 #[test]
 #[should_panic(expected = "SQL keyword")]
-fn test_verify_response_secure_detects_sql_keywords()
-{
+fn test_verify_response_secure_detects_sql_keywords() {
   let mut response = TestResponse::new();
   response.set_status(401);
   response.set_body("Error: SQL syntax error near 'SELECT'");
@@ -33,8 +32,7 @@ fn test_verify_response_secure_detects_sql_keywords()
 /// Test: `verify_response_secure()` detects schema leakage
 #[test]
 #[should_panic(expected = "table name")]
-fn test_verify_response_secure_detects_schema_leakage()
-{
+fn test_verify_response_secure_detects_schema_leakage() {
   let mut response = TestResponse::new();
   response.set_status(401);
   response.set_body("Error in users table");
@@ -45,8 +43,7 @@ fn test_verify_response_secure_detects_schema_leakage()
 
 /// Test: `verify_response_secure()` passes for secure response
 #[test]
-fn test_verify_response_secure_passes_for_safe_response()
-{
+fn test_verify_response_secure_passes_for_safe_response() {
   let mut response = TestResponse::new();
   response.set_status(401);
   response.set_body("Authentication failed");
@@ -57,8 +54,7 @@ fn test_verify_response_secure_passes_for_safe_response()
 
 /// Test: `verify_authentication_failed()` checks 401 status
 #[test]
-fn test_verify_authentication_failed_checks_status()
-{
+fn test_verify_authentication_failed_checks_status() {
   let mut response = TestResponse::new();
   response.set_status(401);
   response.set_body("Authentication failed");
@@ -70,8 +66,7 @@ fn test_verify_authentication_failed_checks_status()
 /// Test: `verify_no_sql_leakage()` detects SQL keywords
 #[test]
 #[should_panic(expected = "SQL keyword")]
-fn test_verify_no_sql_leakage_detects_keywords()
-{
+fn test_verify_no_sql_leakage_detects_keywords() {
   let mut response = TestResponse::new();
   response.set_status(401);
   response.set_body("Error: SELECT failed");
@@ -83,8 +78,7 @@ fn test_verify_no_sql_leakage_detects_keywords()
 /// Test: `verify_no_timing_attack()` detects slow responses
 #[test]
 #[should_panic(expected = "timing attack")]
-fn test_verify_no_timing_attack_detects_delays()
-{
+fn test_verify_no_timing_attack_detects_delays() {
   let slow_response = Duration::from_secs(5);
 
   // Should panic - response too slow (5 seconds)
@@ -93,8 +87,7 @@ fn test_verify_no_timing_attack_detects_delays()
 
 /// Test: `verify_no_timing_attack()` passes for fast responses
 #[test]
-fn test_verify_no_timing_attack_passes_for_fast_response()
-{
+fn test_verify_no_timing_attack_passes_for_fast_response() {
   let fast_response = Duration::from_millis(100);
 
   // Should pass - response under 1 second
@@ -103,8 +96,7 @@ fn test_verify_no_timing_attack_passes_for_fast_response()
 
 /// Test: `send_login_request()` sends request with email and password
 #[test]
-fn test_send_login_request_integration()
-{
+fn test_send_login_request_integration() {
   let response = send_login_request("test@example.com", "password123");
 
   // Should return a TestResponse
@@ -114,8 +106,7 @@ fn test_send_login_request_integration()
 
 /// Test: `send_logout_request()` sends request with token
 #[test]
-fn test_send_logout_request_integration()
-{
+fn test_send_logout_request_integration() {
   let response = send_logout_request("Bearer some_token");
 
   // Should return a TestResponse

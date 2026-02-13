@@ -29,8 +29,7 @@ use std::path::Path;
 /// 3. Verify file is not empty
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_endpoint_catalog_exists()
-{
+fn test_endpoint_catalog_exists() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
 
   assert!(
@@ -38,13 +37,9 @@ fn test_endpoint_catalog_exists()
     "Endpoint catalog not found at: {catalog_path:?}"
   );
 
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
-  assert!(
-    !content.is_empty(),
-    "Endpoint catalog is empty"
-  );
+  assert!(!content.is_empty(), "Endpoint catalog is empty");
 }
 
 /// Test: Endpoint catalog contains all 4 auth endpoints
@@ -62,11 +57,9 @@ fn test_endpoint_catalog_exists()
 /// 4. Verify endpoint paths are correct
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_endpoint_catalog_contains_all_auth_endpoints()
-{
+fn test_endpoint_catalog_contains_all_auth_endpoints() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
   // Define expected endpoints with HTTP methods
   let expected_endpoints = [
@@ -106,20 +99,17 @@ fn test_endpoint_catalog_contains_all_auth_endpoints()
 /// Verify catalog contains parameter documentation for login endpoint
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_endpoint_catalog_documents_parameters()
-{
+fn test_endpoint_catalog_documents_parameters() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
   // Login endpoint should have documented parameters
   assert!(
-    content.contains("login") && (
-      content.contains("email") ||
-      content.contains("username") ||
-      content.contains("password") ||
-      content.contains("Parameters")
-    ),
+    content.contains("login")
+      && (content.contains("email")
+        || content.contains("username")
+        || content.contains("password")
+        || content.contains("Parameters")),
     "Catalog should document parameters for endpoints"
   );
 }
@@ -130,20 +120,15 @@ fn test_endpoint_catalog_documents_parameters()
 /// Verify the catalog uses markdown formatting for readability
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_endpoint_catalog_is_markdown()
-{
+fn test_endpoint_catalog_is_markdown() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
   // Check for markdown elements
-  let has_markdown = content.contains('#') ||
-                     content.contains('|') ||
-                     content.contains('*') ||
-                     content.contains('-');
+  let has_markdown = content.contains('#')
+    || content.contains('|')
+    || content.contains('*')
+    || content.contains('-');
 
-  assert!(
-    has_markdown,
-    "Catalog should use markdown formatting"
-  );
+  assert!(has_markdown, "Catalog should use markdown formatting");
 }

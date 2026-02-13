@@ -27,31 +27,49 @@
 //! );
 //! ```
 
-use iron_control_api::routes::tokens::CreateTokenResponse;
-use axum::{ Router, routing::{ post, delete }, http::{ Request, StatusCode } };
 use axum::body::Body;
-use tower::ServiceExt;
+use axum::{
+  http::{Request, StatusCode},
+  routing::{delete, post},
+  Router,
+};
+use iron_control_api::routes::tokens::CreateTokenResponse;
 use serde_json::json;
+use tower::ServiceExt;
 
 /// Helper: Generate JWT token for a given `user_id`
-fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
-{
-  app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
-    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+fn generate_jwt_for_user(
+  app_state: &crate::common::test_state::TestAppState,
+  user_id: &str,
+) -> String {
+  app_state
+    .auth
+    .jwt_secret
+    .generate_access_token(
+      user_id,
+      &format!("{user_id}@test.com"),
+      "user",
+      &format!("token_{user_id}"),
+    )
+    .expect("LOUD FAILURE: Failed to generate JWT token")
 }
 
 /// Create test router with token routes
-async fn create_test_router() -> ( Router, crate::common::test_state::TestAppState )
-{
+async fn create_test_router() -> (Router, crate::common::test_state::TestAppState) {
   let app_state = crate::common::test_state::TestAppState::new().await;
 
   let router = Router::new()
-    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( app_state.clone() );
+    .route(
+      "/api/v1/api-tokens",
+      post(iron_control_api::routes::tokens::create_token),
+    )
+    .route(
+      "/api/v1/api-tokens/:id",
+      delete(iron_control_api::routes::tokens::revoke_token),
+    )
+    .with_state(app_state.clone());
 
-  ( router, app_state )
+  (router, app_state)
 }
 
 /// Test that creating a token logs the creation to `audit_log`
@@ -61,14 +79,13 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 /// action='created', `entity_type='token'`, and the user who created it.
 ///
 /// CRITICAL: Audit log must NOT contain plaintext token value (security requirement).
-#[ tokio::test ]
-async fn test_create_token_logs_creation()
-{
-  let ( router, app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_create_token_logs_creation() {
+  let (router, app_state) = create_test_router().await;
   let user_id = "user_audit_test";
 
   // Generate JWT token for authenticated request
-  let jwt_token = generate_jwt_for_user( &app_state, user_id );
+  let jwt_token = generate_jwt_for_user(&app_state, user_id);
 
   let request_body = json!({
     "name": "Test Audit Token",
@@ -76,14 +93,14 @@ async fn test_create_token_logs_creation()
   });
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
   let status = response.status();
 
   assert_eq!(
@@ -93,27 +110,30 @@ async fn test_create_token_logs_creation()
   );
 
   // Extract created token ID from response
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body: CreateTokenResponse = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body: CreateTokenResponse = serde_json::from_slice(&body_bytes).unwrap();
   let token_id = body.id;
 
   // Verify audit log entry was created
-  let audit_log_entry: Option< ( i64, String, i64, String, String, String, i64 ) > = sqlx::query_as(
+  let audit_log_entry: Option<(i64, String, i64, String, String, String, i64)> = sqlx::query_as(
     "SELECT id, entity_type, entity_id, action, actor_user_id, changes, logged_at
      FROM audit_log
-     WHERE entity_type = 'token' AND entity_id = ? AND action = 'created'"
+     WHERE entity_type = 'token' AND entity_id = ? AND action = 'created'",
   )
-  .bind( token_id )
-  .fetch_optional( app_state.tokens.storage.pool() )
+  .bind(token_id)
+  .fetch_optional(app_state.tokens.storage.pool())
   .await
-  .expect( "LOUD FAILURE: Failed to query audit_log table" );
+  .expect("LOUD FAILURE: Failed to query audit_log table");
 
   assert!(
     audit_log_entry.is_some(),
     "LOUD FAILURE: Audit log entry must exist for token creation (token_id={token_id})"
   );
 
-  let ( _audit_id, entity_type, entity_id, action, actor_user_id, changes, logged_at ) = audit_log_entry.unwrap();
+  let (_audit_id, entity_type, entity_id, action, actor_user_id, changes, logged_at) =
+    audit_log_entry.unwrap();
 
   // Verify audit log fields
   assert_eq!(
@@ -146,16 +166,16 @@ async fn test_create_token_logs_creation()
   // CRITICAL: Verify changes JSON does NOT contain plaintext token
   // Security requirement: Never log plaintext tokens
   assert!(
-    !changes.contains( &body.token ),
+    !changes.contains(&body.token),
     "LOUD FAILURE: Audit log must NOT contain plaintext token value (security violation)"
   );
 
   // Verify changes JSON contains token metadata (but not plaintext value)
-  let changes_json: serde_json::Value = serde_json::from_str( &changes )
-    .expect( "LOUD FAILURE: changes field must be valid JSON" );
+  let changes_json: serde_json::Value =
+    serde_json::from_str(&changes).expect("LOUD FAILURE: changes field must be valid JSON");
 
   assert!(
-    changes_json.get( "name" ).is_some(),
+    changes_json.get("name").is_some(),
     "LOUD FAILURE: Audit log changes must include token name"
   );
 }
@@ -165,14 +185,13 @@ async fn test_create_token_logs_creation()
 /// WHY: Protocol 014 requires audit logging for all token lifecycle events.
 /// Token revocation must be logged with action='revoked', `entity_type='token'`,
 /// and the user who revoked it.
-#[ tokio::test ]
-async fn test_revoke_token_logs_revocation()
-{
-  let ( router, app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_revoke_token_logs_revocation() {
+  let (router, app_state) = create_test_router().await;
   let user_id = "user_revoke_audit";
 
   // Generate JWT token for authenticated request
-  let jwt_token = generate_jwt_for_user( &app_state, user_id );
+  let jwt_token = generate_jwt_for_user(&app_state, user_id);
 
   // First, create a token to revoke
   let request_body = json!({
@@ -181,29 +200,31 @@ async fn test_revoke_token_logs_revocation()
   });
 
   let create_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let create_response = router.clone().oneshot( create_request ).await.unwrap();
-  assert_eq!( create_response.status(), StatusCode::CREATED );
+  let create_response = router.clone().oneshot(create_request).await.unwrap();
+  assert_eq!(create_response.status(), StatusCode::CREATED);
 
-  let body_bytes = axum::body::to_bytes( create_response.into_body(), usize::MAX ).await.unwrap();
-  let body: CreateTokenResponse = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(create_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body: CreateTokenResponse = serde_json::from_slice(&body_bytes).unwrap();
   let token_id = body.id;
 
   // Now revoke the token
   let revoke_request = Request::builder()
-    .method( "DELETE" )
-    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( Body::empty() )
+    .method("DELETE")
+    .uri(format!("/api/v1/api-tokens/{token_id}"))
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let revoke_response = router.oneshot( revoke_request ).await.unwrap();
+  let revoke_response = router.oneshot(revoke_request).await.unwrap();
 
   assert_eq!(
     revoke_response.status(),
@@ -212,22 +233,22 @@ async fn test_revoke_token_logs_revocation()
   );
 
   // Verify audit log entry was created for revocation
-  let audit_log_entry: Option< ( String, i64, String, String ) > = sqlx::query_as(
+  let audit_log_entry: Option<(String, i64, String, String)> = sqlx::query_as(
     "SELECT entity_type, entity_id, action, actor_user_id
      FROM audit_log
-     WHERE entity_type = 'token' AND entity_id = ? AND action = 'revoked'"
+     WHERE entity_type = 'token' AND entity_id = ? AND action = 'revoked'",
   )
-  .bind( token_id )
-  .fetch_optional( app_state.tokens.storage.pool() )
+  .bind(token_id)
+  .fetch_optional(app_state.tokens.storage.pool())
   .await
-  .expect( "LOUD FAILURE: Failed to query audit_log table" );
+  .expect("LOUD FAILURE: Failed to query audit_log table");
 
   assert!(
     audit_log_entry.is_some(),
     "LOUD FAILURE: Audit log entry must exist for token revocation (token_id={token_id})"
   );
 
-  let ( entity_type, entity_id, action, actor_user_id ) = audit_log_entry.unwrap();
+  let (entity_type, entity_id, action, actor_user_id) = audit_log_entry.unwrap();
 
   assert_eq!(
     entity_type, "token",

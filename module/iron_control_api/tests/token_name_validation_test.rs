@@ -89,15 +89,14 @@
 //! When supporting multiple formats (Protocol 014 + legacy), be explicit about
 //! which fields are required for each format and validate accordingly.
 
-#[ cfg( feature = "enabled" ) ]
-#[ tokio::test ]
-async fn bug_reproducer_token_creation_requires_name()
-{
+#[cfg(feature = "enabled")]
+#[tokio::test]
+async fn bug_reproducer_token_creation_requires_name() {
   use iron_control_api::routes::tokens::CreateTokenRequest;
 
   // Test 1: Truly empty body should fail validation
-  let empty_request = serde_json::from_str::<CreateTokenRequest>( "{}" )
-    .expect( "Should deserialize empty object" );
+  let empty_request =
+    serde_json::from_str::<CreateTokenRequest>("{}").expect("Should deserialize empty object");
 
   let result = empty_request.validate();
   assert!(
@@ -107,8 +106,9 @@ async fn bug_reproducer_token_creation_requires_name()
 
   // Test 2: Request with at least one field should pass (legacy format)
   let legacy_request = serde_json::from_str::<CreateTokenRequest>(
-    r#"{"user_id":"test-user","project_id":"test-project"}"#
-  ).expect( "Should deserialize legacy request" );
+    r#"{"user_id":"test-user","project_id":"test-project"}"#,
+  )
+  .expect("Should deserialize legacy request");
 
   let result = legacy_request.validate();
   assert!(
@@ -117,9 +117,8 @@ async fn bug_reproducer_token_creation_requires_name()
   );
 
   // Test 3: Request with only description should pass (legacy compatibility)
-  let desc_only_request = serde_json::from_str::<CreateTokenRequest>(
-    r#"{"description":"test"}"#
-  ).expect( "Should deserialize description-only request" );
+  let desc_only_request = serde_json::from_str::<CreateTokenRequest>(r#"{"description":"test"}"#)
+    .expect("Should deserialize description-only request");
 
   let result = desc_only_request.validate();
   assert!(
@@ -128,9 +127,8 @@ async fn bug_reproducer_token_creation_requires_name()
   );
 
   // Test 4: Valid Protocol 014 request with name should pass
-  let valid_request = serde_json::from_str::<CreateTokenRequest>(
-    r#"{"name":"test-token"}"#
-  ).expect( "Should deserialize valid request" );
+  let valid_request = serde_json::from_str::<CreateTokenRequest>(r#"{"name":"test-token"}"#)
+    .expect("Should deserialize valid request");
 
   let result = valid_request.validate();
   assert!(

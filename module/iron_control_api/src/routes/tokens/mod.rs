@@ -30,27 +30,16 @@
 //! Supports legacy request format with `user_id` in request body for existing tests.
 //! Once tests are migrated, legacy support can be removed.
 
-mod shared;
 mod handlers;
+mod shared;
 
 // Re-export shared types and state
 pub use shared::{
-  TokenState,
-  CreateTokenRequest,
-  UpdateTokenRequest,
-  ValidateTokenRequest,
-  CreateTokenResponse,
-  TokenListItem,
-  ValidateTokenResponse,
+  CreateTokenRequest, CreateTokenResponse, TokenListItem, TokenState, UpdateTokenRequest,
+  ValidateTokenRequest, ValidateTokenResponse,
 };
 
 // Re-export all handler functions
 pub use handlers::{
-  create_token,
-  list_tokens,
-  get_token,
-  update_token,
-  rotate_token,
-  revoke_token,
-  validate_token,
+  create_token, get_token, list_tokens, revoke_token, rotate_token, update_token, validate_token,
 };

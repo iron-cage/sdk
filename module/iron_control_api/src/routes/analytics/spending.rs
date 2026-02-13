@@ -243,7 +243,11 @@ pub async fn get_spending_by_agent(
             total_budget,
             total_agents: u32::try_from(total_count).unwrap_or(u32::MAX),
           },
-          pagination: Pagination::new(page.page, page.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
+          pagination: Pagination::new(
+            page.page,
+            page.per_page,
+            u32::try_from(total_count).unwrap_or(u32::MAX),
+          ),
           period: format!("{:?}", params.period)
             .to_lowercase()
             .replace('_', "-"),

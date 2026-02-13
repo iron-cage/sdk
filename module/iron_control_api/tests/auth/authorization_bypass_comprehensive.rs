@@ -40,10 +40,9 @@
 //! - RBAC permission matrix enforcement
 
 use super::common;
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -79,60 +78,69 @@ use tower::ServiceExt;
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Need admin-only endpoints and role enforcement middleware.
-#[ tokio::test ]
-#[ ignore = "Requires admin endpoint implementation and role enforcement" ]
-async fn test_vertical_privilege_escalation_user_to_admin()
-{
+#[tokio::test]
+#[ignore = "Requires admin endpoint implementation and role enforcement"]
+async fn test_vertical_privilege_escalation_user_to_admin() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
   // Create regular user (role: "user")
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
   // Create admin user for comparison (role: "admin")
-  common::auth::seed_test_user( &pool, "admin@example.com", "admin_password", "admin", true ).await;
+  common::auth::seed_test_user(&pool, "admin@example.com", "admin_password", "admin", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Phase 1: Login as regular user
   let user_login = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let user_response = router.clone().oneshot( user_login ).await.unwrap();
-  assert_eq!( user_response.status(), StatusCode::OK );
+  let user_response = router.clone().oneshot(user_login).await.unwrap();
+  assert_eq!(user_response.status(), StatusCode::OK);
 
-  let user_body = axum::body::to_bytes( user_response.into_body(), usize::MAX ).await.unwrap();
-  let user_data: serde_json::Value = serde_json::from_slice( &user_body ).unwrap();
-  let user_token = user_data[ "user_token" ].as_str().unwrap();
+  let user_body = axum::body::to_bytes(user_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let user_data: serde_json::Value = serde_json::from_slice(&user_body).unwrap();
+  let user_token = user_data["user_token"].as_str().unwrap();
 
   // Phase 2: Attempt admin-only operations as regular user
   let admin_operations = [
-    ( "POST", "/api/v1/admin/users", json!({ "username": "newuser", "role": "admin" }) ),
-    ( "PUT", "/api/v1/admin/users/user_123/role", json!({ "role": "admin" }) ),
-    ( "DELETE", "/api/v1/admin/users/user_123", json!({}) ),
-    ( "GET", "/api/v1/admin/users", json!({}) ),
-    ( "GET", "/api/v1/admin/audit-log", json!({}) ),
+    (
+      "POST",
+      "/api/v1/admin/users",
+      json!({ "username": "newuser", "role": "admin" }),
+    ),
+    (
+      "PUT",
+      "/api/v1/admin/users/user_123/role",
+      json!({ "role": "admin" }),
+    ),
+    ("DELETE", "/api/v1/admin/users/user_123", json!({})),
+    ("GET", "/api/v1/admin/users", json!({})),
+    ("GET", "/api/v1/admin/audit-log", json!({})),
   ];
 
-  for ( method, uri, body ) in &admin_operations
-  {
+  for (method, uri, body) in &admin_operations {
     let request = Request::builder()
-      .method( *method )
-      .uri( *uri )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {user_token}" ) )
-      .body( Body::from( body.to_string() ) )
+      .method(*method)
+      .uri(*uri)
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {user_token}"))
+      .body(Body::from(body.to_string()))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     assert_eq!(
       response.status(),
@@ -141,43 +149,48 @@ async fn test_vertical_privilege_escalation_user_to_admin()
     );
 
     // Verify error response indicates insufficient permissions
-    let error_body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-    let error_data: serde_json::Value = serde_json::from_slice( &error_body ).unwrap();
+    let error_body = axum::body::to_bytes(response.into_body(), usize::MAX)
+      .await
+      .unwrap();
+    let error_data: serde_json::Value = serde_json::from_slice(&error_body).unwrap();
 
-    let error_code = error_data[ "error" ][ "code" ].as_str().unwrap();
+    let error_code = error_data["error"]["code"].as_str().unwrap();
     assert!(
-      error_code.contains( "FORBIDDEN" ) || error_code.contains( "INSUFFICIENT_PERMISSIONS" ),
+      error_code.contains("FORBIDDEN") || error_code.contains("INSUFFICIENT_PERMISSIONS"),
       "Error code should indicate forbidden access, got: {error_code}"
     );
   }
 
   // Phase 3: Verify admin can access admin endpoints (for comparison)
   let admin_login = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "admin@example.com",
         "password": "admin_password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let admin_response = router.clone().oneshot( admin_login ).await.unwrap();
-  let admin_body = axum::body::to_bytes( admin_response.into_body(), usize::MAX ).await.unwrap();
-  let admin_data: serde_json::Value = serde_json::from_slice( &admin_body ).unwrap();
-  let admin_token = admin_data[ "user_token" ].as_str().unwrap();
+  let admin_response = router.clone().oneshot(admin_login).await.unwrap();
+  let admin_body = axum::body::to_bytes(admin_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let admin_data: serde_json::Value = serde_json::from_slice(&admin_body).unwrap();
+  let admin_token = admin_data["user_token"].as_str().unwrap();
 
   let admin_request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/v1/admin/users" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {admin_token}" ) )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/v1/admin/users")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {admin_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let admin_access = router.oneshot( admin_request ).await.unwrap();
+  let admin_access = router.oneshot(admin_request).await.unwrap();
   assert_eq!(
     admin_access.status(),
     StatusCode::OK,
@@ -214,97 +227,108 @@ async fn test_vertical_privilege_escalation_user_to_admin()
 /// ⚠️ REQUIRES VERIFICATION
 /// Existing `authorization_checks.rs` tests some scenarios.
 /// Need comprehensive coverage across ALL endpoints.
-#[ tokio::test ]
-#[ ignore = "Requires comprehensive horizontal privilege escalation prevention" ]
-async fn test_horizontal_privilege_escalation_user_to_user()
-{
+#[tokio::test]
+#[ignore = "Requires comprehensive horizontal privilege escalation prevention"]
+async fn test_horizontal_privilege_escalation_user_to_user() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
   // Create user A and user B
-  common::auth::seed_test_user( &pool, "user_a@example.com", "password_a", "user", true ).await;
-  common::auth::seed_test_user( &pool, "user_b@example.com", "password_b", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user_a@example.com", "password_a", "user", true).await;
+  common::auth::seed_test_user(&pool, "user_b@example.com", "password_b", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Login as user A
   let login_a = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user_a@example.com",
         "password": "password_a"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response_a = router.clone().oneshot( login_a ).await.unwrap();
-  let body_a = axum::body::to_bytes( response_a.into_body(), usize::MAX ).await.unwrap();
-  let data_a: serde_json::Value = serde_json::from_slice( &body_a ).unwrap();
-  let token_a = data_a[ "user_token" ].as_str().unwrap();
+  let response_a = router.clone().oneshot(login_a).await.unwrap();
+  let body_a = axum::body::to_bytes(response_a.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let data_a: serde_json::Value = serde_json::from_slice(&body_a).unwrap();
+  let token_a = data_a["user_token"].as_str().unwrap();
 
   // Login as user B
   let login_b = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user_b@example.com",
         "password": "password_b"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let response_b = router.clone().oneshot( login_b ).await.unwrap();
-  let body_b = axum::body::to_bytes( response_b.into_body(), usize::MAX ).await.unwrap();
-  let data_b: serde_json::Value = serde_json::from_slice( &body_b ).unwrap();
-  let token_b = data_b[ "user_token" ].as_str().unwrap();
+  let response_b = router.clone().oneshot(login_b).await.unwrap();
+  let body_b = axum::body::to_bytes(response_b.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let data_b: serde_json::Value = serde_json::from_slice(&body_b).unwrap();
+  let token_b = data_b["user_token"].as_str().unwrap();
 
   // User A creates resource (hypothetical agent creation)
   let create_agent = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/agents" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {token_a}" ) )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/agents")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {token_a}"))
+    .body(Body::from(
       json!({
         "name": "User A's Agent",
         "providers": ["openai"]
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let create_response = router.clone().oneshot( create_agent ).await.unwrap();
+  let create_response = router.clone().oneshot(create_agent).await.unwrap();
   assert_eq!(
     create_response.status(),
     StatusCode::CREATED,
     "User A should be able to create agent"
   );
 
-  let create_body = axum::body::to_bytes( create_response.into_body(), usize::MAX ).await.unwrap();
-  let create_data: serde_json::Value = serde_json::from_slice( &create_body ).unwrap();
-  let agent_id = create_data[ "agent_id" ].as_i64().unwrap();
+  let create_body = axum::body::to_bytes(create_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let create_data: serde_json::Value = serde_json::from_slice(&create_body).unwrap();
+  let agent_id = create_data["agent_id"].as_i64().unwrap();
 
   // User B attempts to access user A's agent (horizontal escalation)
   let access_attempts = [
-    ( "GET", format!( "/api/v1/agents/{agent_id}" ), json!({}) ),
-    ( "PUT", format!( "/api/v1/agents/{agent_id}" ), json!({ "name": "Hijacked Agent" }) ),
-    ( "DELETE", format!( "/api/v1/agents/{agent_id}" ), json!({}) ),
+    ("GET", format!("/api/v1/agents/{agent_id}"), json!({})),
+    (
+      "PUT",
+      format!("/api/v1/agents/{agent_id}"),
+      json!({ "name": "Hijacked Agent" }),
+    ),
+    ("DELETE", format!("/api/v1/agents/{agent_id}"), json!({})),
   ];
 
-  for ( method, uri, body ) in &access_attempts
-  {
+  for (method, uri, body) in &access_attempts {
     let request = Request::builder()
-      .method( *method )
-      .uri( uri.as_str() )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {token_b}" ) )
-      .body( Body::from( body.to_string() ) )
+      .method(*method)
+      .uri(uri.as_str())
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {token_b}"))
+      .body(Body::from(body.to_string()))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     assert_eq!(
       response.status(),
@@ -315,14 +339,14 @@ async fn test_horizontal_privilege_escalation_user_to_user()
 
   // Verify user A can still access their own agent
   let user_a_access = Request::builder()
-    .method( "GET" )
-    .uri( format!( "/api/v1/agents/{agent_id}" ) )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {token_a}" ) )
-    .body( Body::empty() )
+    .method("GET")
+    .uri(format!("/api/v1/agents/{agent_id}"))
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {token_a}"))
+    .body(Body::empty())
     .unwrap();
 
-  let user_a_response = router.oneshot( user_a_access ).await.unwrap();
+  let user_a_response = router.oneshot(user_a_access).await.unwrap();
   assert_eq!(
     user_a_response.status(),
     StatusCode::OK,
@@ -359,79 +383,76 @@ async fn test_horizontal_privilege_escalation_user_to_user()
 ///
 /// ⚠️ REQUIRES VERIFICATION
 /// Need to audit all endpoints for IDOR vulnerabilities.
-#[ tokio::test ]
-#[ ignore = "Requires IDOR vulnerability prevention verification" ]
-async fn test_idor_vulnerabilities()
-{
+#[tokio::test]
+#[ignore = "Requires IDOR vulnerability prevention verification"]
+async fn test_idor_vulnerabilities() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
   // Create 10 users (simulating sequential IDs)
   let mut user_ids = Vec::new();
 
-  for i in 1..=10
-  {
-    let email = format!( "user{i}@example.com" );
-    let password = format!( "password_{i}" );
+  for i in 1..=10 {
+    let email = format!("user{i}@example.com");
+    let password = format!("password_{i}");
 
-    common::auth::seed_test_user( &pool, &email, &password, "user", true ).await;
+    common::auth::seed_test_user(&pool, &email, &password, "user", true).await;
 
     // Get user ID (may be sequential or UUID)
-    let user_id = sqlx::query_scalar::<_, String>(
-      "SELECT id FROM users WHERE email = ?"
-    )
-    .bind( &email )
-    .fetch_one( &pool )
-    .await
-    .unwrap();
+    let user_id = sqlx::query_scalar::<_, String>("SELECT id FROM users WHERE email = ?")
+      .bind(&email)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
-    user_ids.push( user_id );
+    user_ids.push(user_id);
   }
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Login as user 5
   let login_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user5@example.com",
         "password": "password_5"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let login_response = router.clone().oneshot( login_request ).await.unwrap();
-  let login_body = axum::body::to_bytes( login_response.into_body(), usize::MAX ).await.unwrap();
-  let login_data: serde_json::Value = serde_json::from_slice( &login_body ).unwrap();
-  let user_5_token = login_data[ "user_token" ].as_str().unwrap();
+  let login_response = router.clone().oneshot(login_request).await.unwrap();
+  let login_body = axum::body::to_bytes(login_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let login_data: serde_json::Value = serde_json::from_slice(&login_body).unwrap();
+  let user_5_token = login_data["user_token"].as_str().unwrap();
 
   // Phase 1: Attempt to enumerate all users via IDOR
   let mut successful_enumeration = 0;
   let mut forbidden_count = 0;
 
-  for ( idx, target_user_id ) in user_ids.iter().enumerate()
-  {
+  for (idx, target_user_id) in user_ids.iter().enumerate() {
     let request = Request::builder()
-      .method( "GET" )
-      .uri( format!( "/api/v1/users/{target_user_id}" ) )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {user_5_token}" ) )
-      .body( Body::empty() )
+      .method("GET")
+      .uri(format!("/api/v1/users/{target_user_id}"))
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {user_5_token}"))
+      .body(Body::empty())
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
-    match response.status()
-    {
+    match response.status() {
       StatusCode::OK => {
         // Should only work for user 5's own ID
-        assert_eq!( idx, 4, "User 5 should only access their own profile" );
+        assert_eq!(idx, 4, "User 5 should only access their own profile");
         successful_enumeration += 1;
-      },
+      }
       StatusCode::FORBIDDEN => forbidden_count += 1,
-      other => panic!( "Unexpected status code for IDOR test: {other}" ),
+      other => panic!("Unexpected status code for IDOR test: {other}"),
     }
   }
 
@@ -447,7 +468,7 @@ async fn test_idor_vulnerabilities()
 
   // Phase 2: Verify UUID vs sequential ID
   // Check if user IDs are UUIDs (36 chars with hyphens) or sequential (short integers)
-  let is_uuid = user_ids[ 0 ].len() >= 36 && user_ids[ 0 ].contains( '-' );
+  let is_uuid = user_ids[0].len() >= 36 && user_ids[0].contains('-');
 
   assert!(
     is_uuid,
@@ -482,52 +503,53 @@ async fn test_idor_vulnerabilities()
 ///
 /// ⚠️ REQUIRES VERIFICATION
 /// Need to verify role field protection in profile update endpoints.
-#[ tokio::test ]
-#[ ignore = "Requires role modification prevention verification" ]
-async fn test_role_modification_prevention()
-{
+#[tokio::test]
+#[ignore = "Requires role modification prevention verification"]
+async fn test_role_modification_prevention() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
 
-  let router = common::auth::create_auth_router( pool.clone() );
+  let router = common::auth::create_auth_router(pool.clone());
 
   // Login as user
   let login_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/v1/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "email": "user@example.com",
         "password": "password"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let login_response = router.clone().oneshot( login_request ).await.unwrap();
-  let login_body = axum::body::to_bytes( login_response.into_body(), usize::MAX ).await.unwrap();
-  let login_data: serde_json::Value = serde_json::from_slice( &login_body ).unwrap();
-  let user_token = login_data[ "user_token" ].as_str().unwrap();
+  let login_response = router.clone().oneshot(login_request).await.unwrap();
+  let login_body = axum::body::to_bytes(login_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let login_data: serde_json::Value = serde_json::from_slice(&login_body).unwrap();
+  let user_token = login_data["user_token"].as_str().unwrap();
 
   // Phase 1: Attempt to modify own role via profile update
   let role_modification_attempts = [
-    ( "PUT", "/api/v1/users/me", json!({ "role": "admin" }) ),
-    ( "PUT", "/api/v1/profile", json!({ "role": "admin" }) ),
-    ( "PATCH", "/api/v1/users/me", json!({ "role": "admin" }) ),
+    ("PUT", "/api/v1/users/me", json!({ "role": "admin" })),
+    ("PUT", "/api/v1/profile", json!({ "role": "admin" })),
+    ("PATCH", "/api/v1/users/me", json!({ "role": "admin" })),
   ];
 
-  for ( method, uri, body ) in &role_modification_attempts
-  {
+  for (method, uri, body) in &role_modification_attempts {
     let request = Request::builder()
-      .method( *method )
-      .uri( *uri )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {user_token}" ) )
-      .body( Body::from( body.to_string() ) )
+      .method(*method)
+      .uri(*uri)
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {user_token}"))
+      .body(Body::from(body.to_string()))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     // Should either:
     // 1. Return 403 Forbidden (role modification not allowed)
@@ -541,15 +563,12 @@ async fn test_role_modification_prevention()
     );
 
     // If 200 OK, verify role was NOT actually changed
-    if response.status() == StatusCode::OK
-    {
-      let current_role = sqlx::query_scalar::<_, String>(
-        "SELECT role FROM users WHERE email = ?"
-      )
-      .bind( "user@example.com" )
-      .fetch_one( &pool )
-      .await
-      .unwrap();
+    if response.status() == StatusCode::OK {
+      let current_role = sqlx::query_scalar::<_, String>("SELECT role FROM users WHERE email = ?")
+        .bind("user@example.com")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
       assert_eq!(
         current_role, "user",
@@ -560,21 +579,23 @@ async fn test_role_modification_prevention()
 
   // Phase 2: Verify role field is read-only for users
   let get_profile = Request::builder()
-    .method( "GET" )
-    .uri( "/api/v1/users/me" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {user_token}" ) )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/v1/users/me")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {user_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let profile_response = router.oneshot( get_profile ).await.unwrap();
-  assert_eq!( profile_response.status(), StatusCode::OK );
+  let profile_response = router.oneshot(get_profile).await.unwrap();
+  assert_eq!(profile_response.status(), StatusCode::OK);
 
-  let profile_body = axum::body::to_bytes( profile_response.into_body(), usize::MAX ).await.unwrap();
-  let profile_data: serde_json::Value = serde_json::from_slice( &profile_body ).unwrap();
+  let profile_body = axum::body::to_bytes(profile_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let profile_data: serde_json::Value = serde_json::from_slice(&profile_body).unwrap();
 
   assert_eq!(
-    profile_data[ "role" ].as_str().unwrap(),
+    profile_data["role"].as_str().unwrap(),
     "user",
     "Role should remain 'user' after all modification attempts"
   );
@@ -608,34 +629,66 @@ async fn test_role_modification_prevention()
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
 /// Need RBAC permission system with 25 defined permissions.
-#[ tokio::test ]
-#[ ignore = "Requires RBAC permission matrix implementation" ]
-async fn test_rbac_permission_matrix_enforcement()
-{
+#[tokio::test]
+#[ignore = "Requires RBAC permission matrix implementation"]
+async fn test_rbac_permission_matrix_enforcement() {
   // Define 25 RBAC permissions
   let permissions = vec![
-    "user:create", "user:read", "user:update", "user:delete",
-    "agent:create", "agent:read", "agent:update", "agent:delete",
-    "budget:create", "budget:read", "budget:update", "budget:delete",
-    "token:create", "token:read", "token:update", "token:delete",
-    "audit:read", "audit:export",
-    "settings:read", "settings:update",
-    "admin:users", "admin:roles", "admin:permissions",
-    "system:health", "system:metrics",
+    "user:create",
+    "user:read",
+    "user:update",
+    "user:delete",
+    "agent:create",
+    "agent:read",
+    "agent:update",
+    "agent:delete",
+    "budget:create",
+    "budget:read",
+    "budget:update",
+    "budget:delete",
+    "token:create",
+    "token:read",
+    "token:update",
+    "token:delete",
+    "audit:read",
+    "audit:export",
+    "settings:read",
+    "settings:update",
+    "admin:users",
+    "admin:roles",
+    "admin:permissions",
+    "system:health",
+    "system:metrics",
   ];
 
-  assert_eq!( permissions.len(), 25, "Should have 25 RBAC permissions defined" );
+  assert_eq!(
+    permissions.len(),
+    25,
+    "Should have 25 RBAC permissions defined"
+  );
 
   // Define role→permission mappings
   let admin_permissions: std::collections::HashSet<_> = permissions.iter().copied().collect();
 
   let user_permissions: std::collections::HashSet<_> = vec![
-    "agent:create", "agent:read", "agent:update", "agent:delete",
-    "budget:create", "budget:read", "budget:update", "budget:delete",
-    "token:create", "token:read", "token:update", "token:delete",
-    "user:read", "user:update",  // Own profile only
+    "agent:create",
+    "agent:read",
+    "agent:update",
+    "agent:delete",
+    "budget:create",
+    "budget:read",
+    "budget:update",
+    "budget:delete",
+    "token:create",
+    "token:read",
+    "token:update",
+    "token:delete",
+    "user:read",
+    "user:update", // Own profile only
     "system:health",
-  ].into_iter().collect();
+  ]
+  .into_iter()
+  .collect();
 
   let viewer_permissions: std::collections::HashSet<_> = vec![
     "agent:read",
@@ -643,20 +696,34 @@ async fn test_rbac_permission_matrix_enforcement()
     "token:read",
     "user:read",
     "system:health",
-  ].into_iter().collect();
+  ]
+  .into_iter()
+  .collect();
 
-  assert_eq!( admin_permissions.len(), 25, "Admin should have all 25 permissions" );
-  assert_eq!( user_permissions.len(), 15, "User should have 15 permissions" );
-  assert_eq!( viewer_permissions.len(), 5, "Viewer should have 5 permissions" );
+  assert_eq!(
+    admin_permissions.len(),
+    25,
+    "Admin should have all 25 permissions"
+  );
+  assert_eq!(
+    user_permissions.len(),
+    15,
+    "User should have 15 permissions"
+  );
+  assert_eq!(
+    viewer_permissions.len(),
+    5,
+    "Viewer should have 5 permissions"
+  );
 
   // Verify permission hierarchy
   assert!(
-    viewer_permissions.is_subset( &user_permissions ),
+    viewer_permissions.is_subset(&user_permissions),
     "Viewer permissions should be subset of User permissions"
   );
 
   assert!(
-    user_permissions.is_subset( &admin_permissions ),
+    user_permissions.is_subset(&admin_permissions),
     "User permissions should be subset of Admin permissions"
   );
 
@@ -667,5 +734,5 @@ async fn test_rbac_permission_matrix_enforcement()
   // 4. Verify 200 OK for granted permissions
   // 5. Test all 25 permissions × 3 roles = 75 test cases
 
-  panic!( "Test requires RBAC permission system implementation" );
+  panic!("Test requires RBAC permission system implementation");
 }

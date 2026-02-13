@@ -67,55 +67,56 @@
 //! handler signature → middleware layers → server startup → listener config.
 //! Missing any piece causes runtime failures.
 
-#[ cfg( feature = "enabled" ) ]
-#[ tokio::test ]
-async fn bug_reproducer_login_requires_connect_info()
-{
-  use std::net::SocketAddr;
+#[cfg(feature = "enabled")]
+#[tokio::test]
+async fn bug_reproducer_login_requires_connect_info() {
+  use axum::{routing::post, Router};
   use iron_control_api::routes::auth::AuthState;
-  use axum::{ Router, routing::post };
+  use std::net::SocketAddr;
 
   // Create in-memory database for testing (same pattern as common/auth.rs)
   let database_url = "sqlite::memory:?cache=shared";
 
   // Initialize auth state (rate limiting disabled for tests)
-  let auth_state = AuthState::new( "test-secret".to_string(), database_url, false )
+  let auth_state = AuthState::new("test-secret".to_string(), database_url, false)
     .await
-    .expect( "Failed to initialize auth state" );
+    .expect("Failed to initialize auth state");
 
   // Build router WITHOUT ConnectInfo (reproduces bug)
   let app_without_connect_info = Router::new()
-    .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
-    .with_state( auth_state.clone() );
+    .route(
+      "/api/v1/auth/login",
+      post(iron_control_api::routes::auth::login),
+    )
+    .with_state(auth_state.clone());
 
   // Start server WITHOUT into_make_service_with_connect_info (BROKEN)
-  let listener = tokio::net::TcpListener::bind( "127.0.0.1:0" )
+  let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
     .await
-    .expect( "Failed to bind port" );
-  let addr = listener.local_addr().expect( "Failed to get local addr" );
+    .expect("Failed to bind port");
+  let addr = listener.local_addr().expect("Failed to get local addr");
 
-  tokio::spawn( async move
-  {
+  tokio::spawn(async move {
     // BUG REPRODUCTION: Using plain serve without ConnectInfo
-    axum::serve( listener, app_without_connect_info )
+    axum::serve(listener, app_without_connect_info)
       .await
-      .expect( "Server failed" );
-  } );
+      .expect("Server failed");
+  });
 
   // Wait for server to start
-  tokio::time::sleep( tokio::time::Duration::from_millis( 100 ) ).await;
+  tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
   // Attempt login request
   let client = reqwest::Client::new();
   let response = client
-    .post( format!( "http://{addr}/api/v1/auth/login" ) )
-    .json( &serde_json::json!({
+    .post(format!("http://{addr}/api/v1/auth/login"))
+    .json(&serde_json::json!({
       "email": "admin@admin.com",
       "password": "testpass"
-    }) )
+    }))
     .send()
     .await
-    .expect( "Request failed" );
+    .expect("Request failed");
 
   // Should fail with 500 due to missing ConnectInfo
   assert_eq!(
@@ -124,45 +125,47 @@ async fn bug_reproducer_login_requires_connect_info()
     "Expected 500 Internal Server Error due to missing ConnectInfo"
   );
 
-  let body = response.text().await.expect( "Failed to read body" );
+  let body = response.text().await.expect("Failed to read body");
   assert!(
-    body.contains( "ConnectInfo" ),
+    body.contains("ConnectInfo"),
     "Error message should mention missing ConnectInfo extension"
   );
 
   // Now test WITH ConnectInfo (shows fix works)
   let app_with_connect_info = Router::new()
-    .route( "/api/v1/auth/login", post( iron_control_api::routes::auth::login ) )
-    .with_state( auth_state );
+    .route(
+      "/api/v1/auth/login",
+      post(iron_control_api::routes::auth::login),
+    )
+    .with_state(auth_state);
 
-  let listener2 = tokio::net::TcpListener::bind( "127.0.0.1:0" )
+  let listener2 = tokio::net::TcpListener::bind("127.0.0.1:0")
     .await
-    .expect( "Failed to bind port" );
-  let addr2 = listener2.local_addr().expect( "Failed to get local addr" );
+    .expect("Failed to bind port");
+  let addr2 = listener2.local_addr().expect("Failed to get local addr");
 
-  tokio::spawn( async move
-  {
+  tokio::spawn(async move {
     // FIX: Using into_make_service_with_connect_info
     axum::serve(
       listener2,
-      app_with_connect_info.into_make_service_with_connect_info::<SocketAddr>()
+      app_with_connect_info.into_make_service_with_connect_info::<SocketAddr>(),
     )
-      .await
-      .expect( "Server failed" );
-  } );
+    .await
+    .expect("Server failed");
+  });
 
-  tokio::time::sleep( tokio::time::Duration::from_millis( 100 ) ).await;
+  tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
   // Attempt login request with fixed server
   let response2 = client
-    .post( format!( "http://{addr2}/api/v1/auth/login" ) )
-    .json( &serde_json::json!({
+    .post(format!("http://{addr2}/api/v1/auth/login"))
+    .json(&serde_json::json!({
       "email": "admin@admin.com",
       "password": "testpass"
-    }) )
+    }))
     .send()
     .await
-    .expect( "Request failed" );
+    .expect("Request failed");
 
   // Should succeed (or fail with 401 if credentials wrong, but NOT 500)
   assert_ne!(

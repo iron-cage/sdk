@@ -20,8 +20,7 @@ use std::path::Path;
 /// Test: Generator can read parameter matrix
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_generator_reads_parameter_matrix()
-{
+fn test_generator_reads_parameter_matrix() {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
 
   // Parameter matrix must exist for generator to work
@@ -30,8 +29,7 @@ fn test_generator_reads_parameter_matrix()
     "Parameter matrix required for test generation"
   );
 
-  let content = fs::read_to_string(matrix_path)
-    .expect("Failed to read parameter matrix");
+  let content = fs::read_to_string(matrix_path).expect("Failed to read parameter matrix");
 
   // Must contain parameter information
   assert!(content.contains("email") || content.contains("password"));
@@ -41,8 +39,7 @@ fn test_generator_reads_parameter_matrix()
 /// Test: Generator can read attack taxonomy
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_generator_reads_attack_taxonomy()
-{
+fn test_generator_reads_attack_taxonomy() {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
 
   // Taxonomy must exist for generator to work
@@ -51,8 +48,7 @@ fn test_generator_reads_attack_taxonomy()
     "Attack taxonomy required for test generation"
   );
 
-  let content = fs::read_to_string(taxonomy_path)
-    .expect("Failed to read attack taxonomy");
+  let content = fs::read_to_string(taxonomy_path).expect("Failed to read attack taxonomy");
 
   // Must contain payload information
   assert!(content.contains("payload") || content.contains("Payload"));
@@ -62,8 +58,7 @@ fn test_generator_reads_attack_taxonomy()
 /// Test: Generator calculates correct test count
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_generator_calculates_test_count()
-{
+fn test_generator_calculates_test_count() {
   // Based on parameter matrix:
   // P0: 2 params × 65 payloads = 130 tests
   // P1: 3 params × 38 payloads = 114 tests
@@ -80,8 +75,7 @@ fn test_generator_calculates_test_count()
 /// Test: Generator creates output directory structure
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_generator_creates_directory_structure()
-{
+fn test_generator_creates_directory_structure() {
   let _output_dir = Path::new("tests/auth/-generated_skeletons");
 
   // Generator should create output directory
@@ -93,8 +87,7 @@ fn test_generator_creates_directory_structure()
 /// Test: Generated skeleton files have correct structure
 #[test]
 #[ignore = "TODO: Test not yet implemented"]
-fn test_generated_skeletons_have_correct_structure()
-{
+fn test_generated_skeletons_have_correct_structure() {
   // This test verifies AFTER generator runs that skeletons have:
   // 1. File header with TDD phase marker
   // 2. Test function with correct naming

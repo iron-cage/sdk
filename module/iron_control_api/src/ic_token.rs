@@ -11,10 +11,10 @@
 //! - Issued by "iron-control-panel"
 //! - Contains `agent_id`, `budget_id`, permissions
 
-use jsonwebtoken::{ decode, encode, DecodingKey, EncodingKey, Header, Validation };
-use serde::{ Deserialize, Serialize };
-use std::time::{ SystemTime, UNIX_EPOCH };
 use crate::error::ValidationError;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// IC Token JWT claims
 ///
@@ -25,9 +25,8 @@ use crate::error::ValidationError;
 /// - `expires_at`: Optional expiration (null for long-lived tokens)
 /// - issuer: Must be "iron-control-panel"
 /// - permissions: Array of allowed operations
-#[ derive( Debug, Clone, Serialize, Deserialize, PartialEq ) ]
-pub struct IcTokenClaims
-{
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IcTokenClaims {
   /// Agent identifier (format: agent_<id>)
   pub agent_id: String,
 
@@ -35,24 +34,23 @@ pub struct IcTokenClaims
   pub budget_id: String,
 
   /// Token creation time (Unix timestamp, seconds)
-  #[ serde( rename = "iat" ) ]
+  #[serde(rename = "iat")]
   pub issued_at: u64,
 
   /// Optional expiration time (Unix timestamp, seconds)
   /// null = long-lived, no auto-expiration
-  #[ serde( rename = "exp", skip_serializing_if = "Option::is_none" ) ]
-  pub expires_at: Option< u64 >,
+  #[serde(rename = "exp", skip_serializing_if = "Option::is_none")]
+  pub expires_at: Option<u64>,
 
   /// Token issuer (must be "iron-control-panel")
-  #[ serde( rename = "iss" ) ]
+  #[serde(rename = "iss")]
   pub issuer: String,
 
   /// Allowed operations (e.g., `["llm:call", "data:read"]`)
-  pub permissions: Vec< String >,
+  pub permissions: Vec<String>,
 }
 
-impl IcTokenClaims
-{
+impl IcTokenClaims {
   /// Create new IC Token claims
   ///
   /// # Arguments
@@ -69,17 +67,16 @@ impl IcTokenClaims
   /// # Panics
   ///
   /// Panics if the system clock is before the Unix epoch.
-  #[ must_use ]
+  #[must_use]
   pub fn new(
     agent_id: String,
     budget_id: String,
-    permissions: Vec< String >,
-    expires_at: Option< u64 >,
-  ) -> Self
-  {
+    permissions: Vec<String>,
+    expires_at: Option<u64>,
+  ) -> Self {
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_secs();
 
     Self {
@@ -106,72 +103,60 @@ impl IcTokenClaims
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), ValidationError >
-  {
+  pub fn validate(&self) -> Result<(), ValidationError> {
     // Check issuer
-    if self.issuer != "iron-control-panel"
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.issuer != "iron-control-panel" {
+      return Err(ValidationError::InvalidValue {
         field: "issuer".to_string(),
-        reason: format!( "expected 'iron-control-panel', got '{}'", self.issuer ),
-      } );
+        reason: format!("expected 'iron-control-panel', got '{}'", self.issuer),
+      });
     }
 
     // Check expiration
-    if let Some( exp ) = self.expires_at
-    {
+    if let Some(exp) = self.expires_at {
       let now = SystemTime::now()
-        .duration_since( UNIX_EPOCH )
-        .expect( "LOUD FAILURE: Time went backwards" )
+        .duration_since(UNIX_EPOCH)
+        .expect("LOUD FAILURE: Time went backwards")
         .as_secs();
 
-      if now > exp
-      {
-        return Err( ValidationError::Custom( "Token expired".to_string() ) );
+      if now > exp {
+        return Err(ValidationError::Custom("Token expired".to_string()));
       }
     }
 
     // Check agent_id format (basic validation)
-    if !self.agent_id.starts_with( "agent_" )
-    {
-      return Err( ValidationError::InvalidFormat
-      {
+    if !self.agent_id.starts_with("agent_") {
+      return Err(ValidationError::InvalidFormat {
         field: "agent_id".to_string(),
         expected: "must start with 'agent_'".to_string(),
-      } );
+      });
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
 /// IC Token manager for generating and validating IC Tokens
-pub struct IcTokenManager
-{
+pub struct IcTokenManager {
   secret: String,
 }
 
-impl core::fmt::Debug for IcTokenManager
-{
-  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    f.debug_struct( "IcTokenManager" )
-      .field( "secret", &"<redacted>" )
+impl core::fmt::Debug for IcTokenManager {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("IcTokenManager")
+      .field("secret", &"<redacted>")
       .finish()
   }
 }
 
-impl IcTokenManager
-{
+impl IcTokenManager {
   /// Create new IC Token manager
   ///
   /// # Arguments
   ///
   /// * `secret` - Secret key for signing JWTs (should be from environment)
-  #[ must_use ]
-  pub fn new( secret: String ) -> Self
-  {
+  #[must_use]
+  pub fn new(secret: String) -> Self {
     Self { secret }
   }
 
@@ -184,9 +169,15 @@ impl IcTokenManager
   /// # Errors
   ///
   /// Returns error if JWT encoding fails
-  pub fn generate_token( &self, claims: &IcTokenClaims ) -> Result< String, jsonwebtoken::errors::Error >
-  {
-    encode( &Header::default(), claims, &EncodingKey::from_secret( self.secret.as_bytes() ) )
+  pub fn generate_token(
+    &self,
+    claims: &IcTokenClaims,
+  ) -> Result<String, jsonwebtoken::errors::Error> {
+    encode(
+      &Header::default(),
+      claims,
+      &EncodingKey::from_secret(self.secret.as_bytes()),
+    )
   }
 
   /// Verify and decode IC Token JWT
@@ -198,8 +189,7 @@ impl IcTokenManager
   /// # Errors
   ///
   /// Returns error if token is invalid, expired, or signature verification fails
-  pub fn verify_token( &self, token: &str ) -> Result< IcTokenClaims, String >
-  {
+  pub fn verify_token(&self, token: &str) -> Result<IcTokenClaims, String> {
     // Create custom validation that doesnt require exp claim
     // IC Tokens can have expires_at=null for long-lived tokens
     let mut validation = Validation::default();
@@ -207,17 +197,16 @@ impl IcTokenManager
     validation.validate_exp = false; // Manual expiration check in validate()
 
     // Decode JWT
-    let token_data = decode::< IcTokenClaims >(
+    let token_data = decode::<IcTokenClaims>(
       token,
-      &DecodingKey::from_secret( self.secret.as_bytes() ),
+      &DecodingKey::from_secret(self.secret.as_bytes()),
       &validation,
     )
-    .map_err( |e| format!( "JWT decode error: {e}" ) )?;
+    .map_err(|e| format!("JWT decode error: {e}"))?;
 
     // Validate claims
-    token_data.claims.validate().map_err( |e| e.to_string() )?;
+    token_data.claims.validate().map_err(|e| e.to_string())?;
 
-    Ok( token_data.claims )
+    Ok(token_data.claims)
   }
 }
-

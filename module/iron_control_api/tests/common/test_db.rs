@@ -20,7 +20,7 @@
 //! duplicated test database infrastructure. See `module/iron_test_db/tests/
 //! migration_verification.rs` for full migration rationale.
 
-use iron_test_db::{ TestDatabase, TestDatabaseBuilder };
+use iron_test_db::{TestDatabase, TestDatabaseBuilder};
 
 /// Authentication schema for `iron_control_api` tests
 ///
@@ -105,24 +105,23 @@ CREATE TABLE IF NOT EXISTS user_audit_log
 ///   .expect("Query failed");
 /// # }
 /// ```
-pub async fn create_test_db() -> TestDatabase
-{
+pub async fn create_test_db() -> TestDatabase {
   let db = TestDatabaseBuilder::new()
     .in_memory()
-    .pool_size( 5 )
+    .pool_size(5)
     .build()
     .await
-    .expect( "LOUD FAILURE: Failed to create test database" );
+    .expect("LOUD FAILURE: Failed to create test database");
 
-  iron_token_manager::migrations::apply_all_migrations( db.pool() )
+  iron_token_manager::migrations::apply_all_migrations(db.pool())
     .await
-    .expect( "LOUD FAILURE: Failed to apply migrations" );
+    .expect("LOUD FAILURE: Failed to apply migrations");
 
   // Apply authentication-specific schema on top of migrations
-  sqlx::raw_sql( AUTH_SCHEMA )
-    .execute( db.pool() )
+  sqlx::raw_sql(AUTH_SCHEMA)
+    .execute(db.pool())
     .await
-    .expect( "LOUD FAILURE: Failed to apply authentication schema" );
+    .expect("LOUD FAILURE: Failed to apply authentication schema");
 
   db
 }

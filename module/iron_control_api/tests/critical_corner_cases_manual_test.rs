@@ -37,7 +37,7 @@
 //! - Prevention
 //! - Pitfall
 
-#[ path = "common/mod.rs" ]
+#[path = "common/mod.rs"]
 mod common;
 
 use common::test_db;
@@ -52,8 +52,7 @@ use common::test_db;
 /// **Expected:** `SUM()` either handles gracefully or returns clear error
 /// **Risk:** Integer overflow could cause silent data corruption or wrong totals
 #[tokio::test]
-async fn test_analytics_sum_near_max_i64()
-{
+async fn test_analytics_sum_near_max_i64() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -62,37 +61,34 @@ async fn test_analytics_sum_near_max_i64()
     "CREATE TABLE IF NOT EXISTS analytics_events (
       id INTEGER PRIMARY KEY,
       cost_cents INTEGER NOT NULL CHECK(cost_cents >= 0)
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create analytics table" );
+  .expect("LOUD FAILURE: Failed to create analytics table");
 
   // Insert records with values that would overflow if summed
   let max_i64 = i64::MAX;
   let half_max = max_i64 / 2;
 
-  sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?), (?)" )
-    .bind( half_max )
-    .bind( half_max )
-    .execute( &pool )
+  sqlx::query("INSERT INTO analytics_events (cost_cents) VALUES (?), (?)")
+    .bind(half_max)
+    .bind(half_max)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to insert test data" );
+    .expect("LOUD FAILURE: Failed to insert test data");
 
   // Attempt to sum - this should either:
   // 1. Return correct sum (if using larger type internally)
   // 2. Return error (if overflow detected)
   // 3. Return wrong value (BUG - silent overflow)
-  let result: Result<(Option<i64>,), sqlx::Error> = sqlx::query_as(
-    "SELECT SUM(cost_cents) FROM analytics_events"
-  )
-  .fetch_one( &pool )
-  .await;
+  let result: Result<(Option<i64>,), sqlx::Error> =
+    sqlx::query_as("SELECT SUM(cost_cents) FROM analytics_events")
+      .fetch_one(&pool)
+      .await;
 
-  match result
-  {
-    Ok( (Some( sum ),) ) =>
-    {
+  match result {
+    Ok((Some(sum),)) => {
       // If we got a sum, it should be mathematically correct
       // max_i64 - 2 because we're adding (max/2 + max/2) and max is odd
       let expected = max_i64 - 1;
@@ -101,15 +97,15 @@ async fn test_analytics_sum_near_max_i64()
         "LOUD FAILURE: SUM overflow detected! Expected {expected}, got {sum}. \
          This indicates silent integer overflow in analytics aggregation."
       );
-    },
-    Ok( (None,) ) =>
-    {
-      panic!( "LOUD FAILURE: SUM returned NULL for non-empty table. Expected sum or overflow error." );
-    },
-    Err( e ) =>
-    {
+    }
+    Ok((None,)) => {
+      panic!(
+        "LOUD FAILURE: SUM returned NULL for non-empty table. Expected sum or overflow error."
+      );
+    }
+    Err(e) => {
       // Overflow error is acceptable if clearly reported
-      eprintln!( "Note: Database correctly rejected overflow with error: {e}" );
+      eprintln!("Note: Database correctly rejected overflow with error: {e}");
       // This is OK - database detected overflow and failed safely
     }
   }
@@ -122,8 +118,7 @@ async fn test_analytics_sum_near_max_i64()
 /// **Expected:** CHECK constraint violation
 /// **Risk:** Negative costs could corrupt financial calculations
 #[tokio::test]
-async fn test_analytics_negative_cost_rejected()
-{
+async fn test_analytics_negative_cost_rejected() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -131,16 +126,16 @@ async fn test_analytics_negative_cost_rejected()
     "CREATE TABLE IF NOT EXISTS analytics_events (
       id INTEGER PRIMARY KEY,
       cost_cents INTEGER NOT NULL CHECK(cost_cents >= 0)
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create table" );
+  .expect("LOUD FAILURE: Failed to create table");
 
   // Attempt to insert negative cost - should FAIL
-  let result = sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?)" )
-    .bind( -100_i64 )
-    .execute( &pool )
+  let result = sqlx::query("INSERT INTO analytics_events (cost_cents) VALUES (?)")
+    .bind(-100_i64)
+    .execute(&pool)
     .await;
 
   assert!(
@@ -150,11 +145,10 @@ async fn test_analytics_negative_cost_rejected()
   );
 
   // Verify error is CHECK constraint violation
-  if let Err( e ) = result
-  {
+  if let Err(e) = result {
     let error_msg = e.to_string().to_lowercase();
     assert!(
-      error_msg.contains( "check" ) || error_msg.contains( "constraint" ),
+      error_msg.contains("check") || error_msg.contains("constraint"),
       "LOUD FAILURE: Expected CHECK constraint error, got: {e}"
     );
   }
@@ -167,8 +161,7 @@ async fn test_analytics_negative_cost_rejected()
 /// **Expected:** `SUM` returns NULL or 0 (both acceptable, must be documented)
 /// **Risk:** Incorrect handling could cause NULL pointer errors in API
 #[tokio::test]
-async fn test_analytics_sum_empty_dataset()
-{
+async fn test_analytics_sum_empty_dataset() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -176,17 +169,17 @@ async fn test_analytics_sum_empty_dataset()
     "CREATE TABLE IF NOT EXISTS analytics_events (
       id INTEGER PRIMARY KEY,
       cost_cents INTEGER NOT NULL
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create table" );
+  .expect("LOUD FAILURE: Failed to create table");
 
   // Query SUM on empty table
-  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_cents) FROM analytics_events" )
-    .fetch_one( &pool )
+  let result: (Option<i64>,) = sqlx::query_as("SELECT SUM(cost_cents) FROM analytics_events")
+    .fetch_one(&pool)
     .await
-    .expect( "LOUD FAILURE: Query failed on empty table" );
+    .expect("LOUD FAILURE: Query failed on empty table");
 
   // SUM of empty set is NULL in SQL (not 0!)
   assert_eq!(
@@ -197,12 +190,11 @@ async fn test_analytics_sum_empty_dataset()
   );
 
   // Demonstrate correct handling with COALESCE
-  let safe_result: (i64,) = sqlx::query_as(
-    "SELECT COALESCE(SUM(cost_cents), 0) FROM analytics_events"
-  )
-  .fetch_one( &pool )
-  .await
-  .expect( "LOUD FAILURE: COALESCE query failed" );
+  let safe_result: (i64,) =
+    sqlx::query_as("SELECT COALESCE(SUM(cost_cents), 0) FROM analytics_events")
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: COALESCE query failed");
 
   assert_eq!(
     safe_result.0, 0,
@@ -217,8 +209,7 @@ async fn test_analytics_sum_empty_dataset()
 /// **Expected:** Returns that record's value
 /// **Risk:** Off-by-one errors in aggregation logic
 #[tokio::test]
-async fn test_analytics_sum_single_record()
-{
+async fn test_analytics_sum_single_record() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -226,27 +217,27 @@ async fn test_analytics_sum_single_record()
     "CREATE TABLE IF NOT EXISTS analytics_events (
       id INTEGER PRIMARY KEY,
       cost_cents INTEGER NOT NULL
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create table" );
+  .expect("LOUD FAILURE: Failed to create table");
 
   let single_value = 12345_i64;
-  sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?)" )
-    .bind( single_value )
-    .execute( &pool )
+  sqlx::query("INSERT INTO analytics_events (cost_cents) VALUES (?)")
+    .bind(single_value)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to insert record" );
+    .expect("LOUD FAILURE: Failed to insert record");
 
-  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_cents) FROM analytics_events" )
-    .fetch_one( &pool )
+  let result: (Option<i64>,) = sqlx::query_as("SELECT SUM(cost_cents) FROM analytics_events")
+    .fetch_one(&pool)
     .await
-    .expect( "LOUD FAILURE: Query failed" );
+    .expect("LOUD FAILURE: Query failed");
 
   assert_eq!(
     result.0,
-    Some( single_value ),
+    Some(single_value),
     "LOUD FAILURE: SUM of single record should return that value"
   );
 }
@@ -279,8 +270,7 @@ async fn test_analytics_sum_single_record()
 /// but `SQLx` cannot fetch REAL columns as `i64`, causing type mismatch.
 /// Always bind integer values to INTEGER columns.
 #[tokio::test]
-async fn test_analytics_fractional_cents_handling()
-{
+async fn test_analytics_fractional_cents_handling() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -288,29 +278,30 @@ async fn test_analytics_fractional_cents_handling()
     "CREATE TABLE IF NOT EXISTS analytics_events (
       id INTEGER PRIMARY KEY,
       cost_cents INTEGER NOT NULL
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create table" );
+  .expect("LOUD FAILURE: Failed to create table");
 
   // Insert integer value (system uses integer cents only)
   let cost_value = 100_i64;
-  sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?)" )
-    .bind( cost_value )
-    .execute( &pool )
+  sqlx::query("INSERT INTO analytics_events (cost_cents) VALUES (?)")
+    .bind(cost_value)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to insert integer value" );
+    .expect("LOUD FAILURE: Failed to insert integer value");
 
   // Verify stored value is exact integer
-  let stored_value: (i64,) = sqlx::query_as( "SELECT cost_cents FROM analytics_events" )
-    .fetch_one( &pool )
+  let stored_value: (i64,) = sqlx::query_as("SELECT cost_cents FROM analytics_events")
+    .fetch_one(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to fetch value" );
+    .expect("LOUD FAILURE: Failed to fetch value");
 
   assert_eq!(
     stored_value.0, cost_value,
-    "LOUD FAILURE: Expected exact integer storage, got {}", stored_value.0
+    "LOUD FAILURE: Expected exact integer storage, got {}",
+    stored_value.0
   );
 }
 
@@ -352,8 +343,7 @@ async fn test_analytics_fractional_cents_handling()
 /// then all try to upgrade to write locks on UPDATE, causing deadlocks. Without retry logic,
 /// only first 2-3 transactions succeed. Production uses BEGIN IMMEDIATE or retry logic.
 #[tokio::test]
-async fn test_budget_concurrent_spending_no_overspend()
-{
+async fn test_budget_concurrent_spending_no_overspend() {
   // This test is CRITICAL for financial accuracy
   // If it fails, users could exceed their budgets
 
@@ -366,26 +356,24 @@ async fn test_budget_concurrent_spending_no_overspend()
       total_cents INTEGER NOT NULL,
       spent_cents INTEGER NOT NULL DEFAULT 0,
       CHECK(spent_cents <= total_cents)
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create budgets table" );
+  .expect("LOUD FAILURE: Failed to create budgets table");
 
   // Create budget: $50 total
-  sqlx::query( "INSERT INTO budgets (id, total_cents) VALUES (1, 5000)" )
-    .execute( &pool )
+  sqlx::query("INSERT INTO budgets (id, total_cents) VALUES (1, 5000)")
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to create budget" );
+    .expect("LOUD FAILURE: Failed to create budget");
 
   // Launch 10 concurrent tasks each trying to spend $10
   let mut handles = vec![];
 
-  for i in 0..10
-  {
+  for i in 0..10 {
     let pool_clone = pool.clone();
-    let handle = tokio::spawn( async move
-    {
+    let handle = tokio::spawn(async move {
       // Each task tries to spend $10
       let spend_amount = 1000_i64;
 
@@ -393,69 +381,69 @@ async fn test_budget_concurrent_spending_no_overspend()
       let mut tx = pool_clone.begin().await.ok()?;
 
       // Check current spent amount
-      let current: (i64,) = sqlx::query_as( "SELECT spent_cents FROM budgets WHERE id = 1" )
-        .fetch_one( &mut *tx )
+      let current: (i64,) = sqlx::query_as("SELECT spent_cents FROM budgets WHERE id = 1")
+        .fetch_one(&mut *tx)
         .await
         .ok()?;
 
       let new_spent = current.0 + spend_amount;
 
       // Check if it would exceed budget
-      let total: (i64,) = sqlx::query_as( "SELECT total_cents FROM budgets WHERE id = 1" )
-        .fetch_one( &mut *tx )
+      let total: (i64,) = sqlx::query_as("SELECT total_cents FROM budgets WHERE id = 1")
+        .fetch_one(&mut *tx)
         .await
         .ok()?;
 
-      if new_spent > total.0
-      {
+      if new_spent > total.0 {
         // Would exceed budget - rollback
         tx.rollback().await.ok()?;
         return None;
       }
 
       // Update spent amount
-      sqlx::query( "UPDATE budgets SET spent_cents = ? WHERE id = 1" )
-        .bind( new_spent )
-        .execute( &mut *tx )
+      sqlx::query("UPDATE budgets SET spent_cents = ? WHERE id = 1")
+        .bind(new_spent)
+        .execute(&mut *tx)
         .await
         .ok()?;
 
       tx.commit().await.ok()?;
-      Some( i )
+      Some(i)
     });
 
-    handles.push( handle );
+    handles.push(handle);
   }
 
   // Wait for all tasks
   let mut successes = Vec::new();
-  for handle in handles
-  {
-    if let Ok( Some( id ) ) = handle.await
-    {
-      successes.push( id );
+  for handle in handles {
+    if let Ok(Some(id)) = handle.await {
+      successes.push(id);
     }
   }
 
   // Verify final budget state
-  let final_spent: (i64,) = sqlx::query_as( "SELECT spent_cents FROM budgets WHERE id = 1" )
-    .fetch_one( &pool )
+  let final_spent: (i64,) = sqlx::query_as("SELECT spent_cents FROM budgets WHERE id = 1")
+    .fetch_one(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to query final spent amount" );
+    .expect("LOUD FAILURE: Failed to query final spent amount");
 
   // CRITICAL ASSERTION: Total spent must not exceed budget
   assert!(
     final_spent.0 <= 5000,
     "LOUD FAILURE: Budget overspend detected! Spent {} cents from 5000 cent budget. \
-     This is a CRITICAL financial bug - race condition allowed overspending.", final_spent.0
+     This is a CRITICAL financial bug - race condition allowed overspending.",
+    final_spent.0
   );
 
   // Verify spent amount matches successful transaction count
-  let expected_spent = i64::try_from( successes.len() ).expect( "success count fits i64" ) * 1000;
+  let expected_spent = i64::try_from(successes.len()).expect("success count fits i64") * 1000;
   assert_eq!(
-    final_spent.0, expected_spent,
+    final_spent.0,
+    expected_spent,
     "LOUD FAILURE: Spent amount {} doesn't match transaction count {} x $10 = {expected_spent}",
-    final_spent.0, successes.len()
+    final_spent.0,
+    successes.len()
   );
 
   // Accept 1-5 successful transactions (raw SQLite deadlock behavior without retry logic)
@@ -464,7 +452,8 @@ async fn test_budget_concurrent_spending_no_overspend()
   assert!(
     !successes.is_empty() && successes.len() <= 5,
     "LOUD FAILURE: Expected 1-5 successful transactions (raw SQLite behavior), got {}. \
-     If consistently 0, investigate excessive deadlocks. If >5, budget constraint violated!", successes.len()
+     If consistently 0, investigate excessive deadlocks. If >5, budget constraint violated!",
+    successes.len()
   );
 }
 
@@ -479,8 +468,7 @@ async fn test_budget_concurrent_spending_no_overspend()
 /// **Expected:** Agent deleted, usage data preserved OR cascaded (document which)
 /// **Risk:** Orphaned data or data loss depending on FK constraints
 #[tokio::test]
-async fn test_delete_agent_with_usage_data()
-{
+async fn test_delete_agent_with_usage_data() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -489,11 +477,11 @@ async fn test_delete_agent_with_usage_data()
     "CREATE TABLE IF NOT EXISTS agents (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create agents table" );
+  .expect("LOUD FAILURE: Failed to create agents table");
 
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS analytics_events (
@@ -501,44 +489,46 @@ async fn test_delete_agent_with_usage_data()
       agent_id INTEGER NOT NULL,
       cost_cents INTEGER NOT NULL,
       FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create analytics table" );
+  .expect("LOUD FAILURE: Failed to create analytics table");
 
   // Create agent and usage data
   let now = chrono::Utc::now().timestamp_millis();
-  sqlx::query( "INSERT INTO agents (id, name, providers, created_at) VALUES (100, 'test-agent', '[]', ?)" )
-    .bind( now )
-    .execute( &pool )
-    .await
-    .expect( "LOUD FAILURE: Failed to create agent" );
+  sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at) VALUES (100, 'test-agent', '[]', ?)",
+  )
+  .bind(now)
+  .execute(&pool)
+  .await
+  .expect("LOUD FAILURE: Failed to create agent");
 
-  sqlx::query( "INSERT INTO analytics_events (agent_id, cost_cents) VALUES (100, 100)" )
-    .execute( &pool )
+  sqlx::query("INSERT INTO analytics_events (agent_id, cost_cents) VALUES (100, 100)")
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to create usage data" );
+    .expect("LOUD FAILURE: Failed to create usage data");
 
   // Delete agent
-  sqlx::query( "DELETE FROM agents WHERE id = 100" )
-    .execute( &pool )
+  sqlx::query("DELETE FROM agents WHERE id = 100")
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Failed to delete agent" );
+    .expect("LOUD FAILURE: Failed to delete agent");
 
   // Check if usage data was cascaded or orphaned
-  let remaining_events: (i64,) = sqlx::query_as(
-    "SELECT COUNT(*) FROM analytics_events WHERE agent_id = 100"
-  )
-  .fetch_one( &pool )
-  .await
-  .expect( "LOUD FAILURE: Failed to count events" );
+  let remaining_events: (i64,) =
+    sqlx::query_as("SELECT COUNT(*) FROM analytics_events WHERE agent_id = 100")
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Failed to count events");
 
   // With ON DELETE CASCADE, events should be deleted
   assert_eq!(
     remaining_events.0, 0,
     "LOUD FAILURE: Expected CASCADE delete of analytics_events, but {} records remain. \
-     Check FK constraint is ON DELETE CASCADE.", remaining_events.0
+     Check FK constraint is ON DELETE CASCADE.",
+    remaining_events.0
   );
 }
 
@@ -553,8 +543,7 @@ async fn test_delete_agent_with_usage_data()
 /// **Expected:** Rejected with clear error before hitting database
 /// **Risk:** Unbounded strings cause memory exhaustion (`DoS`)
 #[tokio::test]
-async fn test_dos_protection_oversized_user_id()
-{
+async fn test_dos_protection_oversized_user_id() {
   // This test verifies API-level validation BEFORE database
   // Actual API implementation should reject this at Axum handler level
 
@@ -565,18 +554,18 @@ async fn test_dos_protection_oversized_user_id()
     "CREATE TABLE IF NOT EXISTS api_tokens (
       id INTEGER PRIMARY KEY,
       user_id TEXT NOT NULL CHECK(LENGTH(user_id) > 0 AND LENGTH(user_id) <= 500)
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create table" );
+  .expect("LOUD FAILURE: Failed to create table");
 
   // Generate 501-character string
-  let oversized_user_id = "a".repeat( 501 );
+  let oversized_user_id = "a".repeat(501);
 
-  let result = sqlx::query( "INSERT INTO api_tokens (user_id) VALUES (?)" )
-    .bind( &oversized_user_id )
-    .execute( &pool )
+  let result = sqlx::query("INSERT INTO api_tokens (user_id) VALUES (?)")
+    .bind(&oversized_user_id)
+    .execute(&pool)
     .await;
 
   assert!(
@@ -592,8 +581,7 @@ async fn test_dos_protection_oversized_user_id()
 /// **Expected:** Rejected (security issue with C string APIs)
 /// **Risk:** NULL bytes can truncate strings in C libraries, bypassing validation
 #[tokio::test]
-async fn test_null_byte_injection_rejected()
-{
+async fn test_null_byte_injection_rejected() {
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
@@ -601,26 +589,25 @@ async fn test_null_byte_injection_rejected()
     "CREATE TABLE IF NOT EXISTS api_tokens (
       id INTEGER PRIMARY KEY,
       user_id TEXT NOT NULL
-    )"
+    )",
   )
-  .execute( &pool )
+  .execute(&pool)
   .await
-  .expect( "LOUD FAILURE: Failed to create table" );
+  .expect("LOUD FAILURE: Failed to create table");
 
   // String with embedded NULL byte
   let malicious_user_id = "test\0user";
 
   // In Rust, this will be stored as-is (Rust strings can contain \0)
   // But API validation should reject it BEFORE reaching database
-  let result = sqlx::query( "INSERT INTO api_tokens (user_id) VALUES (?)" )
-    .bind( malicious_user_id )
-    .execute( &pool )
+  let result = sqlx::query("INSERT INTO api_tokens (user_id) VALUES (?)")
+    .bind(malicious_user_id)
+    .execute(&pool)
     .await;
 
   // Note: Database layer won't reject this (it's valid UTF-8)
   // API layer MUST reject it in validation middleware
-  if result.is_ok()
-  {
+  if result.is_ok() {
     eprintln!(
       "WARNING: Database accepted NULL byte in user_id. \
        API validation MUST reject this at handler level."

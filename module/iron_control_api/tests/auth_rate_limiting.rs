@@ -49,7 +49,10 @@ async fn create_auth_router() -> Router {
   let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
 
   Router::new()
-    .route("/api/v1/auth/login", axum::routing::post(iron_control_api::routes::auth::login))
+    .route(
+      "/api/v1/auth/login",
+      axum::routing::post(iron_control_api::routes::auth::login),
+    )
     .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state(app_state.auth)
 }
@@ -285,4 +288,3 @@ async fn test_rate_limit_response_format() {
 //   // 1. IP1 exhausts 5 attempts → blocked
 //   // 2. IP2 makes request → allowed (independent counter)
 // }
-

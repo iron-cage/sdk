@@ -38,7 +38,10 @@
 //! - Call approve endpoint with JWT
 //! - Verify `approver_id` in database matches JWT `user_id` (not "system-admin")
 
-use axum::{ body::Body, http::{ Request, StatusCode } };
+use axum::{
+  body::Body,
+  http::{Request, StatusCode},
+};
 use serde_json::Value;
 use tower::ServiceExt;
 
@@ -58,15 +61,14 @@ mod common;
 /// - Approver ID should match JWT `user_id` claim
 /// - Audit trail must record actual approver, not placeholder
 #[tokio::test]
-async fn test_approve_budget_request_tracks_real_approver()
-{
+async fn test_approve_budget_request_tracks_real_approver() {
   // Setup: Create test database and state
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() );
+  let state = common::budget::create_test_budget_state(pool.clone());
 
   // Setup: Create agent with budget
   let agent_id = 300i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
   // Setup: Create pending budget request
   let request_id = "req_test_approver_001";
@@ -97,21 +99,21 @@ async fn test_approve_budget_request_tracks_real_approver()
     approving_user_id,
     approving_user_email,
     "admin",
-    "test_jwt_secret" // Must match create_test_budget_state jwt_secret
+    "test_jwt_secret", // Must match create_test_budget_state jwt_secret
   );
 
   // Execute: Call approve endpoint with JWT authentication
-  let app = common::budget::create_budget_router( state.clone() );
+  let app = common::budget::create_budget_router(state.clone());
 
   let request = Request::builder()
-    .method( "PATCH" )
-    .uri( format!( "/api/v1/budget/requests/{request_id}/approve" ) )
-    .header( "authorization", format!( "Bearer {access_token}" ) )
-    .header( "content-type", "application/json" )
-    .body( Body::empty() )
+    .method("PATCH")
+    .uri(format!("/api/v1/budget/requests/{request_id}/approve"))
+    .header("authorization", format!("Bearer {access_token}"))
+    .header("content-type", "application/json")
+    .body(Body::empty())
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Verify: Approval should succeed
   assert_eq!(
@@ -121,39 +123,39 @@ async fn test_approve_budget_request_tracks_real_approver()
   );
 
   // Verify: Parse response body
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body : Value = serde_json::from_slice( &body_bytes )
-    .expect( "LOUD FAILURE: Response should be valid JSON" );
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body: Value =
+    serde_json::from_slice(&body_bytes).expect("LOUD FAILURE: Response should be valid JSON");
 
   assert_eq!(
-    body[ "status" ].as_str(),
-    Some( "approved" ),
+    body["status"].as_str(),
+    Some("approved"),
     "Budget request should be approved"
   );
 
   // Verify: Query budget_modification_history for modifier_id (approver)
-  let history_record : ( String, ) = sqlx::query_as(
+  let history_record: (String,) = sqlx::query_as(
     "SELECT modifier_id FROM budget_modification_history
      WHERE agent_id = ? AND modification_type = 'increase'
-     ORDER BY created_at DESC LIMIT 1"
+     ORDER BY created_at DESC LIMIT 1",
   )
-  .bind( agent_id )
-  .fetch_one( &pool )
+  .bind(agent_id)
+  .fetch_one(&pool)
   .await
-  .expect( "LOUD FAILURE: Should find budget modification history record" );
+  .expect("LOUD FAILURE: Should find budget modification history record");
 
   let stored_modifier_id = history_record.0;
 
   // CRITICAL ASSERTION: Modifier ID must match JWT user_id, NOT hardcoded placeholder
   assert_eq!(
-    stored_modifier_id,
-    approving_user_id,
+    stored_modifier_id, approving_user_id,
     "Modifier ID (approver) in audit trail should match JWT user_id (not hardcoded placeholder)"
   );
 
   assert_ne!(
-    stored_modifier_id,
-    "system-admin",
+    stored_modifier_id, "system-admin",
     "Modifier ID should NOT be the hardcoded placeholder 'system-admin'"
   );
 }
@@ -168,13 +170,12 @@ async fn test_approve_budget_request_tracks_real_approver()
 /// **Expected Behavior:**
 /// - Cannot approve without authentication
 #[tokio::test]
-async fn test_approve_budget_request_requires_authentication()
-{
+async fn test_approve_budget_request_requires_authentication() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() );
+  let state = common::budget::create_test_budget_state(pool.clone());
 
   let agent_id = 301i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
   // Create pending budget request
   let request_id = "req_test_auth_required_001";
@@ -197,17 +198,17 @@ async fn test_approve_budget_request_requires_authentication()
   .unwrap();
 
   // Call approve WITHOUT authentication
-  let app = common::budget::create_budget_router( state );
+  let app = common::budget::create_budget_router(state);
 
   let request = Request::builder()
-    .method( "PATCH" )
-    .uri( format!( "/api/v1/budget/requests/{request_id}/approve" ) )
-    .header( "content-type", "application/json" )
+    .method("PATCH")
+    .uri(format!("/api/v1/budget/requests/{request_id}/approve"))
+    .header("content-type", "application/json")
     // NO Authorization header
-    .body( Body::empty() )
+    .body(Body::empty())
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Verify: Should reject with 401 Unauthorized
   assert_eq!(

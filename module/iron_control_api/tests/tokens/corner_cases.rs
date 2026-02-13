@@ -35,36 +35,53 @@
 //! | `test_create_token_missing_content_type` | HTTP: Missing `Content-Type` | POST without `Content-Type` header | 415 Unsupported Media Type | Pass |
 //! | `test_database_constraints_enforce_length_limits` | Database: Length constraints | Insert oversized data via DB | `SQLite` constraint violation | Pass |
 
-use axum::http::{ StatusCode, header };
-use axum::{ Router, routing::{ post, delete } };
-use tower::ServiceExt;
 use crate::common::corner_cases;
 use crate::common::test_state::TestAppState;
+use axum::http::{header, StatusCode};
+use axum::{
+  routing::{delete, post},
+  Router,
+};
 use serde_json::json;
+use tower::ServiceExt;
 
 /// Helper: Generate JWT token for a given `user_id`
-fn generate_jwt_for_user( app_state: &TestAppState, user_id: &str ) -> String
-{
-  app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
-    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+fn generate_jwt_for_user(app_state: &TestAppState, user_id: &str) -> String {
+  app_state
+    .auth
+    .jwt_secret
+    .generate_access_token(
+      user_id,
+      &format!("{user_id}@test.com"),
+      "user",
+      &format!("token_{user_id}"),
+    )
+    .expect("LOUD FAILURE: Failed to generate JWT token")
 }
 
 /// Create test router with token routes and return both router and state.
-async fn create_test_router_with_state() -> ( Router, TestAppState )
-{
+async fn create_test_router_with_state() -> (Router, TestAppState) {
   // Create test application state with auth + token support
   let app_state = TestAppState::new().await;
 
   let router = Router::new()
-    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
+    .route(
+      "/api/v1/api-tokens",
+      post(iron_control_api::routes::tokens::create_token),
+    )
     // Note: get_token now requires authentication
     // .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .with_state( app_state.clone() );
+    .route(
+      "/api/v1/api-tokens/:id/rotate",
+      post(iron_control_api::routes::tokens::rotate_token),
+    )
+    .route(
+      "/api/v1/api-tokens/:id",
+      delete(iron_control_api::routes::tokens::revoke_token),
+    )
+    .with_state(app_state.clone());
 
-  ( router, app_state )
+  (router, app_state)
 }
 
 /// Reproduces `DoS` attack via unlimited `user_id` string causing memory exhaustion (issue-001).
@@ -95,25 +112,27 @@ async fn create_test_router_with_state() -> ( Router, TestAppState )
 /// for magic numbers to enable runtime configuration without code changes.
 // test_kind: bug_reproducer(issue-001)
 #[tokio::test]
-async fn test_create_token_very_long_user_id_rejected()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_very_long_user_id_rejected() {
+  let (router, state) = create_test_router_with_state().await;
 
-  let very_long_user_id = corner_cases::long_string( 10_000 );
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let very_long_user_id = corner_cases::long_string(10_000);
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
 
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": very_long_user_id,
-      "project_id": "project_123"
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": very_long_user_id,
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -150,25 +169,27 @@ async fn test_create_token_very_long_user_id_rejected()
 /// Apply defense-in-depth: validate ALL external inputs regardless of optionality.
 // test_kind: bug_reproducer(issue-001)
 #[tokio::test]
-async fn test_create_token_very_long_project_id_rejected()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_very_long_project_id_rejected() {
+  let (router, state) = create_test_router_with_state().await;
 
-  let very_long_project_id = corner_cases::long_string( 10_000 );
-  let jwt_token = generate_jwt_for_user( &state, "user_123" );
+  let very_long_project_id = corner_cases::long_string(10_000);
+  let jwt_token = generate_jwt_for_user(&state, "user_123");
 
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": "user_123",
-      "project_id": very_long_project_id
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": "user_123",
+        "project_id": very_long_project_id
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -206,26 +227,28 @@ async fn test_create_token_very_long_project_id_rejected()
 /// in API specification for client-side validation.
 // test_kind: bug_reproducer(issue-001)
 #[tokio::test]
-async fn test_create_token_very_long_description_rejected()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_very_long_description_rejected() {
+  let (router, state) = create_test_router_with_state().await;
 
-  let very_long_description = corner_cases::long_string( 100_000 );
-  let jwt_token = generate_jwt_for_user( &state, "user_123" );
+  let very_long_description = corner_cases::long_string(100_000);
+  let jwt_token = generate_jwt_for_user(&state, "user_123");
 
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": "user_123",
-      "project_id": "project_123",
-      "description": very_long_description
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": "user_123",
+        "project_id": "project_123",
+        "description": very_long_description
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -265,25 +288,26 @@ async fn test_create_token_very_long_description_rejected()
 /// Test with OWASP command injection payloads to verify hardening.
 // test_kind: bug_reproducer(issue-003a)
 #[tokio::test]
-async fn test_create_token_command_injection_user_id_safe()
-{
-  let ( router, state ) = create_test_router_with_state().await;
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+async fn test_create_token_command_injection_user_id_safe() {
+  let (router, state) = create_test_router_with_state().await;
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
 
-  for command_injection in corner_cases::COMMAND_INJECTION
-  {
+  for command_injection in corner_cases::COMMAND_INJECTION {
     let request = axum::http::Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/api-tokens" )
-      .header( header::CONTENT_TYPE, "application/json" )
-      .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-      .body( axum::body::Body::from( json!({
-        "user_id": command_injection,
-        "project_id": "project_123"
-      }).to_string() ) )
+      .method("POST")
+      .uri("/api/v1/api-tokens")
+      .header(header::CONTENT_TYPE, "application/json")
+      .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+      .body(axum::body::Body::from(
+        json!({
+          "user_id": command_injection,
+          "project_id": "project_123"
+        })
+        .to_string(),
+      ))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     // Should either accept (store as literal) or reject with 400 (never execute)
     assert!(
@@ -324,25 +348,26 @@ async fn test_create_token_command_injection_user_id_safe()
 /// selective based on "importance" perception. Attackers exploit ANY weak input vector.
 // test_kind: bug_reproducer(issue-003b)
 #[tokio::test]
-async fn test_create_token_command_injection_project_id_safe()
-{
-  let ( router, state ) = create_test_router_with_state().await;
-  let jwt_token = generate_jwt_for_user( &state, "user_123" );
+async fn test_create_token_command_injection_project_id_safe() {
+  let (router, state) = create_test_router_with_state().await;
+  let jwt_token = generate_jwt_for_user(&state, "user_123");
 
-  for command_injection in corner_cases::COMMAND_INJECTION
-  {
+  for command_injection in corner_cases::COMMAND_INJECTION {
     let request = axum::http::Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/api-tokens" )
-      .header( header::CONTENT_TYPE, "application/json" )
-      .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-      .body( axum::body::Body::from( json!({
-        "user_id": "user_123",
-        "project_id": command_injection
-      }).to_string() ) )
+      .method("POST")
+      .uri("/api/v1/api-tokens")
+      .header(header::CONTENT_TYPE, "application/json")
+      .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+      .body(axum::body::Body::from(
+        json!({
+          "user_id": "user_123",
+          "project_id": command_injection
+        })
+        .to_string(),
+      ))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     assert!(
       response.status() == StatusCode::CREATED || response.status() == StatusCode::BAD_REQUEST,
@@ -383,25 +408,26 @@ async fn test_create_token_command_injection_project_id_safe()
 /// and `starts_with()` checks. Test with OWASP path traversal payloads.
 // test_kind: bug_reproducer(issue-003c)
 #[tokio::test]
-async fn test_create_token_path_traversal_project_id_safe()
-{
-  let ( router, state ) = create_test_router_with_state().await;
-  let jwt_token = generate_jwt_for_user( &state, "user_123" );
+async fn test_create_token_path_traversal_project_id_safe() {
+  let (router, state) = create_test_router_with_state().await;
+  let jwt_token = generate_jwt_for_user(&state, "user_123");
 
-  for path_traversal in corner_cases::PATH_TRAVERSAL
-  {
+  for path_traversal in corner_cases::PATH_TRAVERSAL {
     let request = axum::http::Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/api-tokens" )
-      .header( header::CONTENT_TYPE, "application/json" )
-      .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-      .body( axum::body::Body::from( json!({
-        "user_id": "user_123",
-        "project_id": path_traversal
-      }).to_string() ) )
+      .method("POST")
+      .uri("/api/v1/api-tokens")
+      .header(header::CONTENT_TYPE, "application/json")
+      .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+      .body(axum::body::Body::from(
+        json!({
+          "user_id": "user_123",
+          "project_id": path_traversal
+        })
+        .to_string(),
+      ))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     assert!(
       response.status() == StatusCode::CREATED || response.status() == StatusCode::BAD_REQUEST,
@@ -439,25 +465,27 @@ async fn test_create_token_path_traversal_project_id_safe()
 /// (`SQLite`, `PostgreSQL`), or logging systems. Use explicit validation, not implicit trust.
 // test_kind: bug_reproducer(issue-002)
 #[tokio::test]
-async fn test_create_token_null_byte_user_id_safe()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_null_byte_user_id_safe() {
+  let (router, state) = create_test_router_with_state().await;
 
   let null_byte_user = "user\x00admin";
 
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": null_byte_user,
-      "project_id": "project_123"
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": null_byte_user,
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // NULL byte should be rejected (C string termination attack prevention)
   assert_eq!(
@@ -497,25 +525,27 @@ async fn test_create_token_null_byte_user_id_safe()
 /// optionality. Treat optional fields as equally dangerous.
 // test_kind: bug_reproducer(issue-002)
 #[tokio::test]
-async fn test_create_token_null_byte_project_id_safe()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_null_byte_project_id_safe() {
+  let (router, state) = create_test_router_with_state().await;
 
   let null_byte_project = "proj\x00malicious";
 
-  let jwt_token = generate_jwt_for_user( &state, "user_123" );
+  let jwt_token = generate_jwt_for_user(&state, "user_123");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": "user_123",
-      "project_id": null_byte_project
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": "user_123",
+        "project_id": null_byte_project
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -526,25 +556,27 @@ async fn test_create_token_null_byte_project_id_safe()
 
 /// P0-3: NULL byte at start of `user_id` should be rejected (boundary condition for issue-002).
 #[tokio::test]
-async fn test_create_token_null_byte_at_start()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_null_byte_at_start() {
+  let (router, state) = create_test_router_with_state().await;
 
   let null_byte_start = "\x00userid_attack";
 
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": null_byte_start,
-      "project_id": "project_123"
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": null_byte_start,
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -555,25 +587,27 @@ async fn test_create_token_null_byte_at_start()
 
 /// P0-4: NULL byte at end of `user_id` should be rejected (boundary condition for issue-002).
 #[tokio::test]
-async fn test_create_token_null_byte_at_end()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_null_byte_at_end() {
+  let (router, state) = create_test_router_with_state().await;
 
   let null_byte_end = "userid_attack\x00";
 
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": null_byte_end,
-      "project_id": "project_123"
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": null_byte_end,
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -584,25 +618,27 @@ async fn test_create_token_null_byte_at_end()
 
 /// P0-5: Multiple NULL bytes in `user_id` should be rejected (complex attack for issue-002).
 #[tokio::test]
-async fn test_create_token_multiple_null_bytes()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_multiple_null_bytes() {
+  let (router, state) = create_test_router_with_state().await;
 
   let multiple_nulls = "u\x00s\x00e\x00r";
 
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": multiple_nulls,
-      "project_id": "project_123"
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": multiple_nulls,
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -617,26 +653,28 @@ async fn test_create_token_multiple_null_bytes()
 /// like `\n` (newline). Ensures validation is precise and only rejects actual NULL bytes (`\x00`),
 /// not string representations of escape sequences.
 #[tokio::test]
-async fn test_create_token_newline_char_accepted()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_newline_char_accepted() {
+  let (router, state) = create_test_router_with_state().await;
 
   // Note: This is a literal newline character in the string, not a NULL byte
   let with_newline = "user\nid_with_newline";
 
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( json!({
-      "user_id": with_newline,
-      "project_id": "project_123"
-    }).to_string() ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": with_newline,
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // Newline should be ACCEPTED (not a NULL byte, false positive check)
   // This test verifies we're only rejecting \x00, not other control characters
@@ -678,23 +716,29 @@ async fn test_create_token_newline_char_accepted()
 /// Use irreversible hashing (bcrypt, argon2) for secrets, never encryption (reversible).
 // test_kind: bug_reproducer(issue-003d)
 #[tokio::test]
-async fn test_create_token_plaintext_never_stored_in_database()
-{
-  let ( _router, state ) = create_test_router_with_state().await;
+async fn test_create_token_plaintext_never_stored_in_database() {
+  let (_router, state) = create_test_router_with_state().await;
 
   // Create token via API
   let plaintext_token = state.tokens.generator.generate();
   let token_id = state
     .tokens
     .storage
-    .create_token( &plaintext_token, "user_plaintext_test", None, None, None, None )
+    .create_token(
+      &plaintext_token,
+      "user_plaintext_test",
+      None,
+      None,
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Token creation should succeed");
 
   // Query database directly to verify token_hash column
-  let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
-    .bind( token_id )
-    .fetch_one( state.tokens.storage.pool() )
+  let row: (String,) = sqlx::query_as("SELECT token_hash FROM api_tokens WHERE id = ?")
+    .bind(token_id)
+    .fetch_one(state.tokens.storage.pool())
     .await
     .expect("LOUD FAILURE: Database query should succeed");
 
@@ -702,16 +746,12 @@ async fn test_create_token_plaintext_never_stored_in_database()
 
   // Verify plaintext NOT stored
   assert_ne!(
-    stored_hash,
-    plaintext_token,
+    stored_hash, plaintext_token,
     "SECURITY VIOLATION: Token plaintext found in database! Only hash should be stored."
   );
 
   // Verify hash is present (not empty/null)
-  assert!(
-    !stored_hash.is_empty(),
-    "Hash column should not be empty"
-  );
+  assert!(!stored_hash.is_empty(), "Hash column should not be empty");
 
   // Verify hash looks like SHA-256 format (64 hex characters)
   assert_eq!(
@@ -721,11 +761,11 @@ async fn test_create_token_plaintext_never_stored_in_database()
     stored_hash.len()
   );
 
-  let is_hex = stored_hash.chars().all( |c| c.is_ascii_hexdigit() );
+  let is_hex = stored_hash.chars().all(|c| c.is_ascii_hexdigit());
   assert!(
     is_hex,
     "Hash should be hex-encoded SHA-256, got non-hex characters: {}",
-    &stored_hash[ 0..core::cmp::min( 20, stored_hash.len() ) ]
+    &stored_hash[0..core::cmp::min(20, stored_hash.len())]
   );
 }
 
@@ -760,23 +800,22 @@ async fn test_create_token_plaintext_never_stored_in_database()
 /// architecture and provides no security benefit (256-bit entropy >> brute-force threshold).
 // test_kind: bug_reproducer(issue-003e)
 #[tokio::test]
-async fn test_create_token_uses_sha256_hash()
-{
-  let ( _router, state ) = create_test_router_with_state().await;
+async fn test_create_token_uses_sha256_hash() {
+  let (_router, state) = create_test_router_with_state().await;
 
   // Create token via API (256-bit cryptographically random value)
   let plaintext_token = state.tokens.generator.generate();
   let token_id = state
     .tokens
     .storage
-    .create_token( &plaintext_token, "user_sha256_test", None, None, None, None )
+    .create_token(&plaintext_token, "user_sha256_test", None, None, None, None)
     .await
     .expect("LOUD FAILURE: Token creation should succeed");
 
   // Query database directly to verify hash algorithm
-  let row: ( String, ) = sqlx::query_as( "SELECT token_hash FROM api_tokens WHERE id = ?" )
-    .bind( token_id )
-    .fetch_one( state.tokens.storage.pool() )
+  let row: (String,) = sqlx::query_as("SELECT token_hash FROM api_tokens WHERE id = ?")
+    .bind(token_id)
+    .fetch_one(state.tokens.storage.pool())
     .await
     .expect("LOUD FAILURE: Database query should succeed");
 
@@ -792,60 +831,60 @@ async fn test_create_token_uses_sha256_hash()
   );
 
   // Verify hex encoding
-  let is_hex = stored_hash.chars().all( |c| c.is_ascii_hexdigit() );
+  let is_hex = stored_hash.chars().all(|c| c.is_ascii_hexdigit());
   assert!(
     is_hex,
     "Hash should be hex-encoded SHA-256, got non-hex characters"
   );
 
   // Verify deterministic hashing (same input produces same hash)
-  let expected_hash = state.tokens.generator.hash_token( &plaintext_token );
+  let expected_hash = state.tokens.generator.hash_token(&plaintext_token);
   assert_eq!(
-    stored_hash,
-    expected_hash,
+    stored_hash, expected_hash,
     "SHA-256 hash should be deterministic (same input → same output)"
   );
 }
 
 /// P0-11: State - Token generation produces unique tokens (no collisions).
 #[tokio::test]
-async fn test_create_token_unique_generation()
-{
+async fn test_create_token_unique_generation() {
   use std::collections::HashSet;
 
   // Generate 100 tokens and verify all unique
   let mut tokens = HashSet::new();
 
-  for i in 0..100
-  {
-    let ( router, state ) = create_test_router_with_state().await;
-    let jwt_token = generate_jwt_for_user( &state, &format!( "user_{i}" ) );
+  for i in 0..100 {
+    let (router, state) = create_test_router_with_state().await;
+    let jwt_token = generate_jwt_for_user(&state, &format!("user_{i}"));
 
     let request = axum::http::Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/api-tokens" )
-      .header( header::CONTENT_TYPE, "application/json" )
-      .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-      .body( axum::body::Body::from( json!({
-        "user_id": format!( "user_{i}" ),
-        "project_id": format!( "project_{i}" )
-      }).to_string() ) )
+      .method("POST")
+      .uri("/api/v1/api-tokens")
+      .header(header::CONTENT_TYPE, "application/json")
+      .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+      .body(axum::body::Body::from(
+        json!({
+          "user_id": format!( "user_{i}" ),
+          "project_id": format!( "project_{i}" )
+        })
+        .to_string(),
+      ))
       .unwrap();
 
-    let response = router.oneshot( request ).await.unwrap();
-    assert_eq!( response.status(), StatusCode::CREATED );
+    let response = router.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
 
-    let body_bytes = http_body_util::BodyExt::collect( response.into_body() )
+    let body_bytes = http_body_util::BodyExt::collect(response.into_body())
       .await
       .unwrap()
       .to_bytes();
-    let body_str = String::from_utf8( body_bytes.to_vec() ).unwrap();
-    let create_response: serde_json::Value = serde_json::from_str( &body_str ).unwrap();
+    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
+    let create_response: serde_json::Value = serde_json::from_str(&body_str).unwrap();
 
-    let token = create_response[ "token" ].as_str().unwrap().to_string();
+    let token = create_response["token"].as_str().unwrap().to_string();
 
     assert!(
-      tokens.insert( token.clone() ),
+      tokens.insert(token.clone()),
       "Token collision detected! Duplicate token generated: {token}"
     );
   }
@@ -860,71 +899,67 @@ async fn test_create_token_unique_generation()
 
 /// P0-12: Concurrency - 10 concurrent token creates should not cause race conditions
 #[tokio::test]
-async fn test_create_token_concurrent_requests()
-{
+async fn test_create_token_concurrent_requests() {
   use tokio::task::JoinSet;
 
   let mut join_set = JoinSet::new();
 
   // Spawn 10 concurrent requests
-  for i in 0..10
-  {
-    join_set.spawn( async move {
-      let ( router, state ) = create_test_router_with_state().await;
-      let jwt_token = generate_jwt_for_user( &state, &format!( "concurrent_user_{i}" ) );
+  for i in 0..10 {
+    join_set.spawn(async move {
+      let (router, state) = create_test_router_with_state().await;
+      let jwt_token = generate_jwt_for_user(&state, &format!("concurrent_user_{i}"));
 
       let request = axum::http::Request::builder()
-        .method( "POST" )
-        .uri( "/api/v1/api-tokens" )
-        .header( header::CONTENT_TYPE, "application/json" )
-        .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-        .body( axum::body::Body::from( json!({
-          "user_id": format!( "concurrent_user_{i}" ),
-          "project_id": format!( "concurrent_project_{i}" )
-        }).to_string() ) )
+        .method("POST")
+        .uri("/api/v1/api-tokens")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+        .body(axum::body::Body::from(
+          json!({
+            "user_id": format!( "concurrent_user_{i}" ),
+            "project_id": format!( "concurrent_project_{i}" )
+          })
+          .to_string(),
+        ))
         .unwrap();
 
-      let response = router.oneshot( request ).await.unwrap();
+      let response = router.oneshot(request).await.unwrap();
       response.status()
-    } );
+    });
   }
 
   // Collect all responses
   let mut success_count = 0;
-  while let Some( result ) = join_set.join_next().await
-  {
+  while let Some(result) = join_set.join_next().await {
     let status = result.expect("LOUD FAILURE: Task should not panic");
-    if status == StatusCode::CREATED
-    {
+    if status == StatusCode::CREATED {
       success_count += 1;
     }
   }
 
   assert_eq!(
-    success_count,
-    10,
+    success_count, 10,
     "All 10 concurrent requests should succeed without race conditions"
   );
 }
 
 /// P0-13: HTTP - Malformed JSON should return 400 with JSON error
 #[tokio::test]
-async fn test_create_token_malformed_json_rejected()
-{
-  let ( router, state ) = create_test_router_with_state().await;
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+async fn test_create_token_malformed_json_rejected() {
+  let (router, state) = create_test_router_with_state().await;
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
 
-  for malformed_json in corner_cases::INVALID_JSON
-  {
+  for malformed_json in corner_cases::INVALID_JSON {
     let request = axum::http::Request::builder()
-      .method( "POST" )
-      .uri( "/api/v1/api-tokens" )
-      .header( header::CONTENT_TYPE, "application/json" )
-      .header( header::AUTHORIZATION, format!( "Bearer {jwt_token}" ) )
-      .body( axum::body::Body::from( (*malformed_json).to_string() ) )
+      .method("POST")
+      .uri("/api/v1/api-tokens")
+      .header(header::CONTENT_TYPE, "application/json")
+      .header(header::AUTHORIZATION, format!("Bearer {jwt_token}"))
+      .body(axum::body::Body::from((*malformed_json).to_string()))
       .unwrap();
 
-    let response = router.clone().oneshot( request ).await.unwrap();
+    let response = router.clone().oneshot(request).await.unwrap();
 
     assert_eq!(
       response.status(),
@@ -936,20 +971,19 @@ async fn test_create_token_malformed_json_rejected()
 
 /// P0-14: HTTP - Empty body should return 400 with JSON error
 #[tokio::test]
-async fn test_create_token_empty_body_rejected()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_empty_body_rejected() {
+  let (router, state) = create_test_router_with_state().await;
 
-  let jwt_token = generate_jwt_for_user( &state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&state, "test_user");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( header::CONTENT_TYPE, "application/json" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
-    .body( axum::body::Body::from( "" ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header(header::CONTENT_TYPE, "application/json")
+    .header("authorization", format!("Bearer {jwt_token}"))
+    .body(axum::body::Body::from(""))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -960,29 +994,31 @@ async fn test_create_token_empty_body_rejected()
 
 /// P0-15: HTTP - Missing `Content-Type` header should be handled
 #[tokio::test]
-async fn test_create_token_missing_content_type()
-{
-  let ( router, state ) = create_test_router_with_state().await;
+async fn test_create_token_missing_content_type() {
+  let (router, state) = create_test_router_with_state().await;
 
-  let jwt_token = generate_jwt_for_user( &state, "user_123" );
+  let jwt_token = generate_jwt_for_user(&state, "user_123");
   let request = axum::http::Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens" )
-    .header( "authorization", format!( "Bearer {jwt_token}" ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens")
+    .header("authorization", format!("Bearer {jwt_token}"))
     // No Content-Type header
-    .body( axum::body::Body::from( json!({
-      "user_id": "user_123",
-      "project_id": "project_123"
-    }).to_string() ) )
+    .body(axum::body::Body::from(
+      json!({
+        "user_id": "user_123",
+        "project_id": "project_123"
+      })
+      .to_string(),
+    ))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // Should either accept (Axum may be lenient) or reject with 400
   assert!(
-    response.status() == StatusCode::CREATED ||
-    response.status() == StatusCode::BAD_REQUEST ||
-    response.status() == StatusCode::UNSUPPORTED_MEDIA_TYPE,
+    response.status() == StatusCode::CREATED
+      || response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNSUPPORTED_MEDIA_TYPE,
     "Missing Content-Type should be handled gracefully, got: {}",
     response.status()
   );
@@ -1023,25 +1059,24 @@ async fn test_create_token_missing_content_type()
 /// not just that migrations ran successfully.
 // test_kind: infrastructure(issue-001f)
 #[tokio::test]
-async fn test_database_constraints_enforce_length_limits()
-{
-  let ( _router, state ) = create_test_router_with_state().await;
+async fn test_database_constraints_enforce_length_limits() {
+  let (_router, state) = create_test_router_with_state().await;
 
   // Test 1: Verify constraint rejects user_id > 255 chars
   // Note: user_id max is 255 to match users.id constraint (FK target)
-  let too_long_user_id = "A".repeat( 256 );
+  let too_long_user_id = "A".repeat(256);
   let valid_hash = "valid_hash_12345";
 
   let result = sqlx::query(
     "INSERT INTO api_tokens (user_id, project_id, token_hash, is_active, created_at)
-     VALUES (?, ?, ?, 1, ?)"
+     VALUES (?, ?, ?, 1, ?)",
   )
-    .bind( &too_long_user_id )
-    .bind( "project_123" )
-    .bind( valid_hash )
-    .bind( 1_234_567_890 )
-    .execute( state.tokens.storage.pool() )
-    .await;
+  .bind(&too_long_user_id)
+  .bind("project_123")
+  .bind(valid_hash)
+  .bind(1_234_567_890)
+  .execute(state.tokens.storage.pool())
+  .await;
 
   assert!(
     result.is_err(),
@@ -1050,22 +1085,21 @@ async fn test_database_constraints_enforce_length_limits()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.to_lowercase().contains( "check" ) ||
-    error_msg.to_lowercase().contains( "constraint" ),
+    error_msg.to_lowercase().contains("check") || error_msg.to_lowercase().contains("constraint"),
     "Error should mention CHECK constraint violation, got: {error_msg}"
   );
 
   // Test 2: Verify constraint rejects empty user_id
   let result = sqlx::query(
     "INSERT INTO api_tokens (user_id, project_id, token_hash, is_active, created_at)
-     VALUES (?, ?, ?, 1, ?)"
+     VALUES (?, ?, ?, 1, ?)",
   )
-    .bind( "" )
-    .bind( "project_123" )
-    .bind( "different_hash_67890" )
-    .bind( 1_234_567_890 )
-    .execute( state.tokens.storage.pool() )
-    .await;
+  .bind("")
+  .bind("project_123")
+  .bind("different_hash_67890")
+  .bind(1_234_567_890)
+  .execute(state.tokens.storage.pool())
+  .await;
 
   assert!(
     result.is_err(),
@@ -1073,18 +1107,18 @@ async fn test_database_constraints_enforce_length_limits()
   );
 
   // Test 3: Verify constraint rejects project_id > 500 chars (when not NULL)
-  let too_long_project_id = "B".repeat( 501 );
+  let too_long_project_id = "B".repeat(501);
 
   let result = sqlx::query(
     "INSERT INTO api_tokens (user_id, project_id, token_hash, is_active, created_at)
-     VALUES (?, ?, ?, 1, ?)"
+     VALUES (?, ?, ?, 1, ?)",
   )
-    .bind( "user_valid" )
-    .bind( &too_long_project_id )
-    .bind( "yet_another_hash_11111" )
-    .bind( 1_234_567_890 )
-    .execute( state.tokens.storage.pool() )
-    .await;
+  .bind("user_valid")
+  .bind(&too_long_project_id)
+  .bind("yet_another_hash_11111")
+  .bind(1_234_567_890)
+  .execute(state.tokens.storage.pool())
+  .await;
 
   assert!(
     result.is_err(),
@@ -1094,13 +1128,13 @@ async fn test_database_constraints_enforce_length_limits()
   // Test 4: Verify constraint allows NULL project_id (nullable field)
   let result = sqlx::query(
     "INSERT INTO api_tokens (user_id, project_id, token_hash, is_active, created_at)
-     VALUES (?, NULL, ?, 1, ?)"
+     VALUES (?, NULL, ?, 1, ?)",
   )
-    .bind( "user_null_project" )
-    .bind( "hash_for_null_project" )
-    .bind( 1_234_567_890 )
-    .execute( state.tokens.storage.pool() )
-    .await;
+  .bind("user_null_project")
+  .bind("hash_for_null_project")
+  .bind(1_234_567_890)
+  .execute(state.tokens.storage.pool())
+  .await;
 
   assert!(
     result.is_ok(),
@@ -1109,19 +1143,19 @@ async fn test_database_constraints_enforce_length_limits()
   );
 
   // Test 5: Verify constraint allows valid lengths (boundary test)
-  let max_length_user_id = "C".repeat( 255 );  // Exactly 255 chars (matches users.id max)
-  let max_length_project_id = "D".repeat( 500 );  // Exactly 500 chars
+  let max_length_user_id = "C".repeat(255); // Exactly 255 chars (matches users.id max)
+  let max_length_project_id = "D".repeat(500); // Exactly 500 chars
 
   let result = sqlx::query(
     "INSERT INTO api_tokens (user_id, project_id, token_hash, is_active, created_at)
-     VALUES (?, ?, ?, 1, ?)"
+     VALUES (?, ?, ?, 1, ?)",
   )
-    .bind( &max_length_user_id )
-    .bind( &max_length_project_id )
-    .bind( "hash_max_length_test" )
-    .bind( 1_234_567_890 )
-    .execute( state.tokens.storage.pool() )
-    .await;
+  .bind(&max_length_user_id)
+  .bind(&max_length_project_id)
+  .bind("hash_max_length_test")
+  .bind(1_234_567_890)
+  .execute(state.tokens.storage.pool())
+  .await;
 
   assert!(
     result.is_ok(),

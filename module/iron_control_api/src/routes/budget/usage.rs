@@ -4,22 +4,20 @@
 
 use super::state::BudgetState;
 use crate::error::ValidationError;
-use axum::
-{
+use axum::{
   extract::State,
   http::StatusCode,
-  response::{ IntoResponse, Json },
+  response::{IntoResponse, Json},
 };
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Protocol 005: Usage Reporting (Step 2)
 // ============================================================================
 
 /// Usage report request (Step 2: Cost Tracking)
-#[ derive( Debug, Deserialize ) ]
-pub struct UsageReportRequest
-{
+#[derive(Debug, Deserialize)]
+pub struct UsageReportRequest {
   /// Budget lease identifier
   pub lease_id: String,
   /// Unique LLM request identifier
@@ -34,8 +32,7 @@ pub struct UsageReportRequest
   pub provider: String,
 }
 
-impl UsageReportRequest
-{
+impl UsageReportRequest {
   /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
@@ -53,96 +50,78 @@ impl UsageReportRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), ValidationError >
-  {
+  pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate lease_id
-    if self.lease_id.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "lease_id".to_string() ) );
+    if self.lease_id.trim().is_empty() {
+      return Err(ValidationError::MissingField("lease_id".to_string()));
     }
 
-    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "lease_id".to_string(),
         max_length: Self::MAX_LEASE_ID_LENGTH,
-      } );
+      });
     }
 
     // Validate request_id
-    if self.request_id.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "request_id".to_string() ) );
+    if self.request_id.trim().is_empty() {
+      return Err(ValidationError::MissingField("request_id".to_string()));
     }
 
-    if self.request_id.len() > Self::MAX_REQUEST_ID_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if self.request_id.len() > Self::MAX_REQUEST_ID_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "request_id".to_string(),
         max_length: Self::MAX_REQUEST_ID_LENGTH,
-      } );
+      });
     }
 
     // Validate tokens is positive
-    if self.tokens <= 0
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.tokens <= 0 {
+      return Err(ValidationError::InvalidValue {
         field: "tokens".to_string(),
         reason: "must be positive".to_string(),
-      } );
+      });
     }
 
     // Validate cost_microdollars is non-negative
-    if self.cost_microdollars < 0
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.cost_microdollars < 0 {
+      return Err(ValidationError::InvalidValue {
         field: "cost_microdollars".to_string(),
         reason: "cannot be negative".to_string(),
-      } );
+      });
     }
 
     // Validate model
-    if self.model.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "model".to_string() ) );
+    if self.model.trim().is_empty() {
+      return Err(ValidationError::MissingField("model".to_string()));
     }
 
-    if self.model.len() > Self::MAX_MODEL_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if self.model.len() > Self::MAX_MODEL_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "model".to_string(),
         max_length: Self::MAX_MODEL_LENGTH,
-      } );
+      });
     }
 
     // Validate provider
-    if self.provider.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "provider".to_string() ) );
+    if self.provider.trim().is_empty() {
+      return Err(ValidationError::MissingField("provider".to_string()));
     }
 
-    if self.provider.len() > Self::MAX_PROVIDER_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if self.provider.len() > Self::MAX_PROVIDER_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "provider".to_string(),
         max_length: Self::MAX_PROVIDER_LENGTH,
-      } );
+      });
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
 /// Usage report response
-#[ derive( Debug, Serialize ) ]
-pub struct UsageReportResponse
-{
+#[derive(Debug, Serialize)]
+pub struct UsageReportResponse {
   /// Whether usage was recorded successfully
   pub success: bool,
   /// Remaining agent budget in microdollars
@@ -165,37 +144,36 @@ pub struct UsageReportResponse
 /// - 404 Not Found if lease doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn report_usage(
-  State( state ): State< BudgetState >,
-  Json( request ): Json< UsageReportRequest >,
-) -> impl IntoResponse
-{
+  State(state): State<BudgetState>,
+  Json(request): Json<UsageReportRequest>,
+) -> impl IntoResponse {
   // Validate request
-  if let Err( validation_error ) = request.validate()
-  {
-    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+  if let Err(validation_error) = request.validate() {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(serde_json::json!(
     {
       "error": validation_error.to_string()
-    } ) ) ).into_response();
+    } )),
+    )
+      .into_response();
   }
 
   // Get lease
-  let lease = match state.lease_manager.get_lease( &request.lease_id ).await
-  {
-    Ok( Some( lease ) ) => lease,
-    Ok( None ) =>
-    {
+  let lease = match state.lease_manager.get_lease(&request.lease_id).await {
+    Ok(Some(lease)) => lease,
+    Ok(None) => {
       return (
         StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Lease not found" }) ),
+        Json(serde_json::json!({ "error": "Lease not found" })),
       )
         .into_response();
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error fetching lease: {}", err );
+    Err(err) => {
+      tracing::error!("Database error fetching lease: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Lease service unavailable" }) ),
+        Json(serde_json::json!({ "error": "Lease service unavailable" })),
       )
         .into_response();
     }
@@ -214,34 +192,30 @@ pub async fn report_usage(
   // (expiry, revocation status, enabled flag) before usage.
   //
   // Check if lease has expired
-  if let Some( expires_at ) = lease.expires_at
-  {
+  if let Some(expires_at) = lease.expires_at {
     let now_ms = chrono::Utc::now().timestamp_millis();
-    if expires_at < now_ms
-    {
+    if expires_at < now_ms {
       return (
         StatusCode::FORBIDDEN,
-        Json( serde_json::json!({ "error": "Lease expired" }) ),
+        Json(serde_json::json!({ "error": "Lease expired" })),
       )
         .into_response();
     }
   }
 
   // Check if lease has been revoked or expired
-  if lease.lease_status == "revoked"
-  {
+  if lease.lease_status == "revoked" {
     return (
       StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Lease has been revoked" }) ),
+      Json(serde_json::json!({ "error": "Lease has been revoked" })),
     )
       .into_response();
   }
 
-  if lease.lease_status == "expired"
-  {
+  if lease.lease_status == "expired" {
     return (
       StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Lease expired" }) ),
+      Json(serde_json::json!({ "error": "Lease expired" })),
     )
       .into_response();
   }
@@ -264,39 +238,38 @@ pub async fn report_usage(
   //
   // Check if lease has sufficient remaining budget
   let lease_remaining = lease.budget_granted - lease.budget_spent;
-  if lease_remaining < request.cost_microdollars
-  {
+  if lease_remaining < request.cost_microdollars {
     return (
       StatusCode::FORBIDDEN,
-      Json( serde_json::json!({ "error": "Insufficient lease budget" }) ),
+      Json(serde_json::json!({ "error": "Insufficient lease budget" })),
     )
       .into_response();
   }
 
   // Record usage in lease
-  if let Err( err ) = state
+  if let Err(err) = state
     .lease_manager
-    .record_usage( &request.lease_id, request.cost_microdollars )
+    .record_usage(&request.lease_id, request.cost_microdollars)
     .await
   {
-    tracing::error!( "Database error recording lease usage: {}", err );
+    tracing::error!("Database error recording lease usage: {}", err);
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to record usage" }) ),
+      Json(serde_json::json!({ "error": "Failed to record usage" })),
     )
       .into_response();
   }
 
   // Record usage in agent budget
-  if let Err( err ) = state
+  if let Err(err) = state
     .agent_budget_manager
-    .record_spending( lease.agent_id, request.cost_microdollars )
+    .record_spending(lease.agent_id, request.cost_microdollars)
     .await
   {
-    tracing::error!( "Database error recording agent spending: {}", err );
+    tracing::error!("Database error recording agent spending: {}", err);
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to update agent budget" }) ),
+      Json(serde_json::json!({ "error": "Failed to update agent budget" })),
     )
       .into_response();
   }
@@ -304,18 +277,20 @@ pub async fn report_usage(
   // Get updated budget
   let budget_remaining = match state
     .agent_budget_manager
-    .get_budget_status( lease.agent_id )
+    .get_budget_status(lease.agent_id)
     .await
   {
-    Ok( Some( budget ) ) => budget.budget_remaining,
+    Ok(Some(budget)) => budget.budget_remaining,
     _ => 0,
   };
 
-  ( StatusCode::OK, Json( UsageReportResponse
-  {
-    success: true,
-    budget_remaining,
-  } ) )
+  (
+    StatusCode::OK,
+    Json(UsageReportResponse {
+      success: true,
+      budget_remaining,
+    }),
+  )
     .into_response()
 }
 
@@ -324,18 +299,16 @@ pub async fn report_usage(
 // ============================================================================
 
 /// Budget return request (Step 4: Return Unused Budget)
-#[ derive( Debug, Deserialize ) ]
-pub struct BudgetReturnRequest
-{
+#[derive(Debug, Deserialize)]
+pub struct BudgetReturnRequest {
   /// Budget lease identifier to close
   pub lease_id: String,
   /// Amount spent by client (microdollars) - from `iron_cost` `CostController`
-  #[ serde( default ) ]
+  #[serde(default)]
   pub spent_microdollars: i64,
 }
 
-impl BudgetReturnRequest
-{
+impl BudgetReturnRequest {
   /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
@@ -345,39 +318,32 @@ impl BudgetReturnRequest
   ///
   /// Returns [`ValidationError`] if `lease_id` is empty or too long,
   /// or if `spent_microdollars` is negative.
-  pub fn validate( &self ) -> Result< (), ValidationError >
-  {
-    if self.lease_id.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "lease_id".to_string() ) );
+  pub fn validate(&self) -> Result<(), ValidationError> {
+    if self.lease_id.trim().is_empty() {
+      return Err(ValidationError::MissingField("lease_id".to_string()));
     }
 
-    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if self.lease_id.len() > Self::MAX_LEASE_ID_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "lease_id".to_string(),
         max_length: Self::MAX_LEASE_ID_LENGTH,
-      } );
+      });
     }
 
-    if self.spent_microdollars < 0
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.spent_microdollars < 0 {
+      return Err(ValidationError::InvalidValue {
         field: "spent_microdollars".to_string(),
         reason: "cannot be negative".to_string(),
-      } );
+      });
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
 /// Budget return response
-#[ derive( Debug, Serialize ) ]
-pub struct BudgetReturnResponse
-{
+#[derive(Debug, Serialize)]
+pub struct BudgetReturnResponse {
   /// Whether return was processed successfully
   pub success: bool,
   /// Amount returned in microdollars
@@ -403,65 +369,62 @@ pub struct BudgetReturnResponse
 /// - 404 Not Found if lease doesn't exist
 /// - 500 Internal Server Error if database fails
 pub async fn return_budget(
-  State( state ): State< BudgetState >,
-  Json( request ): Json< BudgetReturnRequest >,
-) -> impl IntoResponse
-{
+  State(state): State<BudgetState>,
+  Json(request): Json<BudgetReturnRequest>,
+) -> impl IntoResponse {
   // Validate request
-  if let Err( validation_error ) = request.validate()
-  {
-    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+  if let Err(validation_error) = request.validate() {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(serde_json::json!(
     {
       "error": validation_error.to_string()
-    } ) ) ).into_response();
+    } )),
+    )
+      .into_response();
   }
 
   // Get lease to find agent_id
-  let lease = match state.lease_manager.get_lease( &request.lease_id ).await
-  {
-    Ok( Some( lease ) ) => lease,
-    Ok( None ) =>
-    {
+  let lease = match state.lease_manager.get_lease(&request.lease_id).await {
+    Ok(Some(lease)) => lease,
+    Ok(None) => {
       return (
         StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Lease not found" }) ),
+        Json(serde_json::json!({ "error": "Lease not found" })),
       )
         .into_response();
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error fetching lease: {}", err );
+    Err(err) => {
+      tracing::error!("Database error fetching lease: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Lease service unavailable" }) ),
+        Json(serde_json::json!({ "error": "Lease service unavailable" })),
       )
         .into_response();
     }
   };
 
   // Check if lease is already closed
-  if lease.lease_status != "active"
-  {
+  if lease.lease_status != "active" {
     return (
       StatusCode::BAD_REQUEST,
-      Json( serde_json::json!({ "error": "Lease is not active" }) ),
+      Json(serde_json::json!({ "error": "Lease is not active" })),
     )
       .into_response();
   }
 
   // Close the lease
-  if let Err( err ) = state.lease_manager.close_lease( &request.lease_id ).await
-  {
-    tracing::error!( "Database error closing lease: {}", err );
+  if let Err(err) = state.lease_manager.close_lease(&request.lease_id).await {
+    tracing::error!("Database error closing lease: {}", err);
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to close lease" }) ),
+      Json(serde_json::json!({ "error": "Failed to close lease" })),
     )
       .into_response();
   }
 
   // Calculate returned: granted - spent (capped at 0)
-  let returned = ( lease.budget_granted - request.spent_microdollars ).max( 0 );
+  let returned = (lease.budget_granted - request.spent_microdollars).max(0);
 
   // Fix(issue-budget-007): Restore returned budget to agent_budgets
   //
@@ -473,18 +436,15 @@ pub async fn return_budget(
   // update the same state. Missing return logic causes permanent "budget leak".
   //
   // Restore the returned budget to agent_budgets
-  if returned > 0
-  {
-    if let Err( err ) = state
+  if returned > 0 {
+    if let Err(err) = state
       .agent_budget_manager
-      .restore_reserved_budget( lease.agent_id, returned )
+      .restore_reserved_budget(lease.agent_id, returned)
       .await
     {
-      tracing::error!( "Database error restoring agent budget: {}", err );
+      tracing::error!("Database error restoring agent budget: {}", err);
       // Continue - lease is closed, log the error but don't fail the return
-    }
-    else
-    {
+    } else {
       tracing::info!(
         lease_id = %request.lease_id,
         agent_id = lease.agent_id,
@@ -495,27 +455,23 @@ pub async fn return_budget(
   }
 
   // Credit the returned amount back to usage_limits
-  if returned > 0
-  {
+  if returned > 0 {
     // Get agent's owner_id to find the usage_limits record
-    let owner_id: Option< String > = match sqlx::query_scalar(
-      "SELECT owner_id FROM agents WHERE id = ?"
-    )
-    .bind( lease.agent_id )
-    .fetch_optional( &state.db_pool )
-    .await
-    {
-      Ok( owner ) => owner,
-      Err( err ) =>
+    let owner_id: Option<String> =
+      match sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
+        .bind(lease.agent_id)
+        .fetch_optional(&state.db_pool)
+        .await
       {
-        tracing::error!( "Database error fetching agent owner: {}", err );
-        // Still return success since lease was closed
-        None
-      }
-    };
+        Ok(owner) => owner,
+        Err(err) => {
+          tracing::error!("Database error fetching agent owner: {}", err);
+          // Still return success since lease was closed
+          None
+        }
+      };
 
-    if let Some( owner_id ) = owner_id
-    {
+    if let Some(owner_id) = owner_id {
       // Credit the returned amount back to usage_limits
       // Both are now in microdollars - no conversion needed
       if let Err( err ) = sqlx::query(
@@ -539,9 +495,7 @@ pub async fn return_budget(
           "Budget returned and credited to usage_limits"
         );
       }
-    }
-    else
-    {
+    } else {
       tracing::warn!(
         lease_id = %request.lease_id,
         agent_id = lease.agent_id,
@@ -552,10 +506,12 @@ pub async fn return_budget(
   }
 
   // Return success response
-  ( StatusCode::OK, Json( BudgetReturnResponse
-  {
-    success: true,
-    returned,
-  } ) )
+  (
+    StatusCode::OK,
+    Json(BudgetReturnResponse {
+      success: true,
+      returned,
+    }),
+  )
     .into_response()
 }

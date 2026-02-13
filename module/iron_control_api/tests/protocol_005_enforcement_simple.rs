@@ -30,10 +30,9 @@
 use sqlx::SqlitePool;
 
 /// Helper to create test database with all migrations applied
-async fn setup_test_db() -> SqlitePool
-{
-  let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-  iron_token_manager::migrations::apply_all_migrations( &pool )
+async fn setup_test_db() -> SqlitePool {
+  let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+  iron_token_manager::migrations::apply_all_migrations(&pool)
     .await
     .expect("LOUD FAILURE: Failed to apply migrations");
   pool
@@ -44,23 +43,22 @@ async fn setup_test_db() -> SqlitePool
 /// This test verifies that the database schema enforces the agent-budget
 /// relationship at the database level. Without these constraints, orphaned
 /// leases could bypass budget tracking.
-#[ tokio::test ]
-async fn test_database_constraints_enforce_agent_budget_relationship()
-{
+#[tokio::test]
+async fn test_database_constraints_enforce_agent_budget_relationship() {
   let pool = setup_test_db().await;
 
   // Query foreign key constraints on budget_leases table
-  let foreign_keys: Vec< ( String, String, String ) > = sqlx::query_as(
-    "SELECT \"from\", \"table\", \"to\" FROM pragma_foreign_key_list('budget_leases')"
+  let foreign_keys: Vec<(String, String, String)> = sqlx::query_as(
+    "SELECT \"from\", \"table\", \"to\" FROM pragma_foreign_key_list('budget_leases')",
   )
-  .fetch_all( &pool )
+  .fetch_all(&pool)
   .await
   .unwrap();
 
   // Assert: agent_id foreign key exists
-  let has_agent_fk = foreign_keys.iter().any( |( from, table, _to )| {
-    from == "agent_id" && table == "agents"
-  } );
+  let has_agent_fk = foreign_keys
+    .iter()
+    .any(|(from, table, _to)| from == "agent_id" && table == "agents");
   assert!(
     has_agent_fk,
     "budget_leases MUST have foreign key on agent_id → agents(id). \
@@ -68,9 +66,9 @@ async fn test_database_constraints_enforce_agent_budget_relationship()
   );
 
   // Assert: budget_id foreign key exists
-  let has_budget_fk = foreign_keys.iter().any( |( from, table, _to )| {
-    from == "budget_id" && table == "agent_budgets"
-  } );
+  let has_budget_fk = foreign_keys
+    .iter()
+    .any(|(from, table, _to)| from == "budget_id" && table == "agent_budgets");
   assert!(
     has_budget_fk,
     "budget_leases MUST have foreign key on budget_id → agent_budgets(agent_id). \
@@ -89,18 +87,16 @@ async fn test_database_constraints_enforce_agent_budget_relationship()
 ///
 /// This test verifies that the `api_tokens` table schema includes the `agent_id`
 /// column, which is required for the `/api/keys` enforcement check.
-#[ tokio::test ]
-async fn test_api_tokens_table_has_agent_id_column()
-{
+#[tokio::test]
+async fn test_api_tokens_table_has_agent_id_column() {
   let pool = setup_test_db().await;
 
   // Query table schema
-  let columns: Vec< ( String, ) > = sqlx::query_as(
-    "SELECT name FROM pragma_table_info('api_tokens') WHERE name = 'agent_id'"
-  )
-  .fetch_all( &pool )
-  .await
-  .unwrap();
+  let columns: Vec<(String,)> =
+    sqlx::query_as("SELECT name FROM pragma_table_info('api_tokens') WHERE name = 'agent_id'")
+      .fetch_all(&pool)
+      .await
+      .unwrap();
 
   // Assert: agent_id column exists
   assert_eq!(
@@ -115,34 +111,34 @@ async fn test_api_tokens_table_has_agent_id_column()
 /// This test verifies that we can distinguish agent tokens from user tokens
 /// by checking the `agent_id` field. This is the mechanism used by `/api/keys`
 /// to enforce Protocol 005.
-#[ tokio::test ]
-async fn test_agent_tokens_are_distinguishable_from_user_tokens()
-{
+#[tokio::test]
+async fn test_agent_tokens_are_distinguishable_from_user_tokens() {
   let pool = setup_test_db().await;
 
   // Create test user
   let now_ms = i64::try_from(
     std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
+      .duration_since(std::time::UNIX_EPOCH)
       .unwrap()
-      .as_millis()
-  ).expect( "timestamp fits i64" );
+      .as_millis(),
+  )
+  .expect("timestamp fits i64");
 
-  let password_hash = bcrypt::hash( "test_password", bcrypt::DEFAULT_COST ).unwrap();
+  let password_hash = bcrypt::hash("test_password", bcrypt::DEFAULT_COST).unwrap();
   let user_id = "test_user_id";
 
   sqlx::query(
     "INSERT INTO users ( id, username, password_hash, role, email, is_active, created_at )
-     VALUES ( $1, $2, $3, $4, $5, $6, $7 )"
+     VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
   )
-  .bind( user_id )
-  .bind( "test_user" )
-  .bind( &password_hash )
-  .bind( "developer" )
-  .bind( "test@example.com" )
-  .bind( true )
-  .bind( now_ms )
-  .execute( &pool )
+  .bind(user_id)
+  .bind("test_user")
+  .bind(&password_hash)
+  .bind("developer")
+  .bind("test@example.com")
+  .bind(true)
+  .bind(now_ms)
+  .execute(&pool)
   .await
   .unwrap();
 
@@ -150,13 +146,13 @@ async fn test_agent_tokens_are_distinguishable_from_user_tokens()
   let agent_id = sqlx::query_scalar::<_, i64>(
     "INSERT INTO agents ( name, providers, created_at, owner_id )
      VALUES ( $1, $2, $3, $4 )
-     RETURNING id"
+     RETURNING id",
   )
-  .bind( "test_agent" )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( user_id )
-  .fetch_one( &pool )
+  .bind("test_agent")
+  .bind(serde_json::to_string(&vec!["openai"]).unwrap())
+  .bind(now_ms)
+  .bind(user_id)
+  .fetch_one(&pool)
   .await
   .unwrap();
 
@@ -164,14 +160,14 @@ async fn test_agent_tokens_are_distinguishable_from_user_tokens()
   let user_token_id = sqlx::query_scalar::<_, i64>(
     "INSERT INTO api_tokens ( token_hash, user_id, is_active, created_at, agent_id )
      VALUES ( $1, $2, $3, $4, $5 )
-     RETURNING id"
+     RETURNING id",
   )
-  .bind( "hash_user_token" )
-  .bind( user_id )
-  .bind( true )
-  .bind( now_ms )
-  .bind( Option::< i64 >::None )  // ← User token (no agent)
-  .fetch_one( &pool )
+  .bind("hash_user_token")
+  .bind(user_id)
+  .bind(true)
+  .bind(now_ms)
+  .bind(Option::<i64>::None) // ← User token (no agent)
+  .fetch_one(&pool)
   .await
   .unwrap();
 
@@ -179,34 +175,32 @@ async fn test_agent_tokens_are_distinguishable_from_user_tokens()
   let agent_token_id = sqlx::query_scalar::<_, i64>(
     "INSERT INTO api_tokens ( token_hash, user_id, is_active, created_at, agent_id )
      VALUES ( $1, $2, $3, $4, $5 )
-     RETURNING id"
+     RETURNING id",
   )
-  .bind( "hash_agent_token" )
-  .bind( user_id )
-  .bind( true )
-  .bind( now_ms )
-  .bind( Some( agent_id ) )  // ← Agent token
-  .fetch_one( &pool )
+  .bind("hash_agent_token")
+  .bind(user_id)
+  .bind(true)
+  .bind(now_ms)
+  .bind(Some(agent_id)) // ← Agent token
+  .fetch_one(&pool)
   .await
   .unwrap();
 
   // Query user token
-  let user_agent_id: Option< i64 > = sqlx::query_scalar(
-    "SELECT agent_id FROM api_tokens WHERE id = ?"
-  )
-  .bind( user_token_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let user_agent_id: Option<i64> =
+    sqlx::query_scalar("SELECT agent_id FROM api_tokens WHERE id = ?")
+      .bind(user_token_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   // Query agent token
-  let agent_agent_id: Option< i64 > = sqlx::query_scalar(
-    "SELECT agent_id FROM api_tokens WHERE id = ?"
-  )
-  .bind( agent_token_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let agent_agent_id: Option<i64> =
+    sqlx::query_scalar("SELECT agent_id FROM api_tokens WHERE id = ?")
+      .bind(agent_token_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   // Assert: User token has NULL agent_id
   assert!(
@@ -237,9 +231,8 @@ async fn test_agent_tokens_are_distinguishable_from_user_tokens()
 /// 3. `/api/keys` endpoint code checks `agent_id` (verified in `keys.rs`:103-136)
 ///
 /// Together, these ensure Protocol 005 is the ONLY path for agent credentials.
-#[ test ]
-fn test_enforcement_summary()
-{
+#[test]
+fn test_enforcement_summary() {
   // This test documents the multi-layer enforcement strategy:
   //
   // Layer 1: Database Schema

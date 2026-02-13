@@ -2,47 +2,42 @@
 //!
 //! Contains token state, request/response types, and validation logic.
 
+use crate::error::ValidationError;
 use iron_token_manager::storage::TokenStorage;
 use iron_token_manager::token_generator::TokenGenerator;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use crate::error::ValidationError;
 
 /// Token management state
-#[ derive( Clone ) ]
-pub struct TokenState
-{
+#[derive(Clone)]
+pub struct TokenState {
   /// Shared token storage backend
-  pub storage: Arc< TokenStorage >,
+  pub storage: Arc<TokenStorage>,
   /// Shared token generator instance
-  pub generator: Arc< TokenGenerator >,
+  pub generator: Arc<TokenGenerator>,
 }
 
-impl core::fmt::Debug for TokenState
-{
-  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    f.debug_struct( "TokenState" )
-      .field( "storage", &"<TokenStorage>" )
-      .field( "generator", &"<TokenGenerator>" )
+impl core::fmt::Debug for TokenState {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("TokenState")
+      .field("storage", &"<TokenStorage>")
+      .field("generator", &"<TokenGenerator>")
       .finish()
   }
 }
 
-impl TokenState
-{
+impl TokenState {
   /// Create new token state
   ///
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new( database_url: &str ) -> Result< Self, Box< dyn std::error::Error > >
-  {
-    let storage = TokenStorage::new( database_url ).await?;
-    Ok( Self {
-      storage: Arc::new( storage ),
-      generator: Arc::new( TokenGenerator::new() ),
-    } )
+  pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    let storage = TokenStorage::new(database_url).await?;
+    Ok(Self {
+      storage: Arc::new(storage),
+      generator: Arc::new(TokenGenerator::new()),
+    })
   }
 }
 
@@ -61,42 +56,40 @@ impl TokenState
 /// - `user_id`: in request body
 /// - `project_id`: optional
 /// - `description`: optional (used as token name in database)
-#[ derive( Debug, Deserialize ) ]
-pub struct CreateTokenRequest
-{
+#[derive(Debug, Deserialize)]
+pub struct CreateTokenRequest {
   /// Token name (Protocol 014)
   // Protocol 014 field - optional for backward compatibility with legacy tests
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  #[ serde( default ) ]
-  pub name: Option< String >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(default)]
+  pub name: Option<String>,
 
   /// Optional token description
-  pub description: Option< String >,
+  pub description: Option<String>,
 
   /// Legacy user identifier
   // Legacy fields kept for backward compatibility with existing tests
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  #[ serde( default ) ]
-  pub user_id: Option< String >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(default)]
+  pub user_id: Option<String>,
 
   /// Optional project identifier
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  #[ serde( default ) ]
-  pub project_id: Option< String >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(default)]
+  pub project_id: Option<String>,
 
   /// Optional agent identifier
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  #[ serde( default ) ]
-  pub agent_id: Option< i64 >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(default)]
+  pub agent_id: Option<i64>,
 
   /// Optional provider name
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  #[ serde( default ) ]
-  pub provider: Option< String >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(default)]
+  pub provider: Option<String>,
 }
 
-impl CreateTokenRequest
-{
+impl CreateTokenRequest {
   // Fix(issue-001): Prevent DoS via unlimited string validation
   // Root cause: Accepted unbounded external input without resource limits
   // Pitfall: Always validate input length before processing to prevent resource exhaustion
@@ -127,25 +120,20 @@ impl CreateTokenRequest
   /// # Errors
   ///
   /// Returns [`ValidationError`] if any field fails length, format, or presence checks.
-  pub fn validate( &self ) -> Result< (), ValidationError >
-  {
+  pub fn validate(&self) -> Result<(), ValidationError> {
     // Protocol 014 validation: If `name` is provided, validate it
-    if let Some( ref name ) = self.name
-    {
+    if let Some(ref name) = self.name {
       // Validate name is not empty (Protocol 014 requirement)
-      if name.trim().is_empty()
-      {
-        return Err( ValidationError::MissingField( "name".to_string() ) );
+      if name.trim().is_empty() {
+        return Err(ValidationError::MissingField("name".to_string()));
       }
 
       // Validate name length (Protocol 014: 1-100 chars)
-      if name.len() > Self::MAX_NAME_LENGTH
-      {
-        return Err( ValidationError::TooLong
-        {
+      if name.len() > Self::MAX_NAME_LENGTH {
+        return Err(ValidationError::TooLong {
           field: "name".to_string(),
           max_length: Self::MAX_NAME_LENGTH,
-        } );
+        });
       }
 
       // Fix(issue-002): Prevent NULL byte injection causing C string termination attacks
@@ -153,13 +141,11 @@ impl CreateTokenRequest
       // Pitfall: Always validate against control characters when interacting with C libraries or databases using C drivers
 
       // Validate name doesnt contain NULL bytes
-      if name.contains( '\0' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if name.contains('\0') {
+        return Err(ValidationError::InvalidCharacter {
           field: "name".to_string(),
           character: "NULL".to_string(),
-        } );
+        });
       }
 
       // Fix(issue-xss-stored-vulnerability): Prevent Stored XSS in name field
@@ -167,13 +153,11 @@ impl CreateTokenRequest
       // Pitfall: Never trust frontend to escape user input - validate at API boundary (secure by default, defense in depth)
 
       // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
-      if name.contains( '<' ) || name.contains( '>' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if name.contains('<') || name.contains('>') {
+        return Err(ValidationError::InvalidCharacter {
           field: "name".to_string(),
           character: "HTML tags".to_string(),
-        } );
+        });
       }
     }
 
@@ -182,111 +166,88 @@ impl CreateTokenRequest
     // Pitfall: Never trust frontend to escape user input - validate at API boundary (secure by default, defense in depth)
 
     // Validate description if provided (Protocol 014: max 500 chars)
-    if let Some( ref description ) = self.description
-    {
-      if description.len() > Self::MAX_DESCRIPTION_LENGTH
-      {
-        return Err( ValidationError::TooLong
-        {
+    if let Some(ref description) = self.description {
+      if description.len() > Self::MAX_DESCRIPTION_LENGTH {
+        return Err(ValidationError::TooLong {
           field: "description".to_string(),
           max_length: Self::MAX_DESCRIPTION_LENGTH,
-        } );
+        });
       }
 
       // Validate description doesnt contain NULL bytes
-      if description.contains( '\0' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if description.contains('\0') {
+        return Err(ValidationError::InvalidCharacter {
           field: "description".to_string(),
           character: "NULL".to_string(),
-        } );
+        });
       }
 
       // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
       // This is a defense-in-depth measure: even if frontend fails to escape, XSS cannot execute
-      if description.contains( '<' ) || description.contains( '>' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if description.contains('<') || description.contains('>') {
+        return Err(ValidationError::InvalidCharacter {
           field: "description".to_string(),
           character: "HTML tags".to_string(),
-        } );
+        });
       }
     }
 
     // Legacy validation for backward compatibility with existing tests
     // These validations apply when legacy format is used (no `name` field)
 
-    if let Some( ref user_id ) = self.user_id
-    {
-      if user_id.trim().is_empty()
-      {
-        return Err( ValidationError::MissingField( "user_id".to_string() ) );
+    if let Some(ref user_id) = self.user_id {
+      if user_id.trim().is_empty() {
+        return Err(ValidationError::MissingField("user_id".to_string()));
       }
 
-      if user_id.len() > Self::MAX_USER_ID_LENGTH
-      {
-        return Err( ValidationError::TooLong
-        {
+      if user_id.len() > Self::MAX_USER_ID_LENGTH {
+        return Err(ValidationError::TooLong {
           field: "user_id".to_string(),
           max_length: Self::MAX_USER_ID_LENGTH,
-        } );
+        });
       }
 
-      if user_id.contains( '\0' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if user_id.contains('\0') {
+        return Err(ValidationError::InvalidCharacter {
           field: "user_id".to_string(),
           character: "NULL".to_string(),
-        } );
+        });
       }
 
       // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
-      if user_id.contains( '<' ) || user_id.contains( '>' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if user_id.contains('<') || user_id.contains('>') {
+        return Err(ValidationError::InvalidCharacter {
           field: "user_id".to_string(),
           character: "HTML tags".to_string(),
-        } );
+        });
       }
     }
 
-    if let Some( ref project_id ) = self.project_id
-    {
-      if project_id.trim().is_empty()
-      {
-        return Err( ValidationError::MissingField( "project_id".to_string() ) );
+    if let Some(ref project_id) = self.project_id {
+      if project_id.trim().is_empty() {
+        return Err(ValidationError::MissingField("project_id".to_string()));
       }
 
-      if project_id.len() > Self::MAX_PROJECT_ID_LENGTH
-      {
-        return Err( ValidationError::TooLong
-        {
+      if project_id.len() > Self::MAX_PROJECT_ID_LENGTH {
+        return Err(ValidationError::TooLong {
           field: "project_id".to_string(),
           max_length: Self::MAX_PROJECT_ID_LENGTH,
-        } );
+        });
       }
 
-      if project_id.contains( '\0' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if project_id.contains('\0') {
+        return Err(ValidationError::InvalidCharacter {
           field: "project_id".to_string(),
           character: "NULL".to_string(),
-        } );
+        });
       }
 
       // Reject HTML tags to prevent Stored XSS (OWASP A03:2021)
-      if project_id.contains( '<' ) || project_id.contains( '>' )
-      {
-        return Err( ValidationError::InvalidCharacter
-        {
+      if project_id.contains('<') || project_id.contains('>') {
+        return Err(ValidationError::InvalidCharacter {
           field: "project_id".to_string(),
           character: "HTML tags".to_string(),
-        } );
+        });
       }
     }
 
@@ -307,27 +268,24 @@ impl CreateTokenRequest
       || self.agent_id.is_some()
       || self.provider.is_some();
 
-    if !has_any_field
-    {
+    if !has_any_field {
       return Err( ValidationError::MissingField(
         "at least one field required (name, description, user_id, project_id, agent_id, or provider)".to_string()
       ) );
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
 /// Update token request
-#[ derive( Debug, Serialize, Deserialize ) ]
-pub struct UpdateTokenRequest
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTokenRequest {
   /// Provider name to set
   pub provider: String,
 }
 
-impl UpdateTokenRequest
-{
+impl UpdateTokenRequest {
   /// Maximum length of `provider` (`DoS` protection)
   const MAX_PROVIDER_LENGTH: usize = 64;
 
@@ -337,67 +295,58 @@ impl UpdateTokenRequest
   ///
   /// Returns [`ValidationError::MissingField`] if `provider` is empty,
   /// or [`ValidationError::TooLong`] if it exceeds the maximum length.
-  pub fn validate( &self ) -> Result< (), ValidationError >
-  {
+  pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate provider if provided
-    if self.provider.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "provider".to_string() ) );
+    if self.provider.trim().is_empty() {
+      return Err(ValidationError::MissingField("provider".to_string()));
     }
 
     // Validate provider length (`DoS` protection)
-    if self.provider.len() > Self::MAX_PROVIDER_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if self.provider.len() > Self::MAX_PROVIDER_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "provider".to_string(),
         max_length: Self::MAX_PROVIDER_LENGTH,
-      } );
+      });
     }
 
     // Validate provider doesnt contain NULL bytes
-    if self.provider.contains( '\0' )
-    {
-      return Err( ValidationError::InvalidCharacter
-      {
+    if self.provider.contains('\0') {
+      return Err(ValidationError::InvalidCharacter {
         field: "provider".to_string(),
         character: "NULL".to_string(),
-      } );
+      });
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
 /// Validate token request (Deliverable 1.6)
-#[ derive( Debug, Deserialize ) ]
-pub struct ValidateTokenRequest
-{
+#[derive(Debug, Deserialize)]
+pub struct ValidateTokenRequest {
   /// Token string to validate
   pub token: String,
 }
 
 /// Validate token response (Deliverable 1.6)
-#[ derive( Debug, Serialize ) ]
-pub struct ValidateTokenResponse
-{
+#[derive(Debug, Serialize)]
+pub struct ValidateTokenResponse {
   /// Whether the token is valid
   pub valid: bool,
   /// Owner user identifier if valid
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  pub user_id: Option< String >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub user_id: Option<String>,
   /// Associated project identifier if valid
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  pub project_id: Option< String >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub project_id: Option<String>,
   /// Token database identifier if valid
-  #[ serde( skip_serializing_if = "Option::is_none" ) ]
-  pub token_id: Option< i64 >,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub token_id: Option<i64>,
 }
 
 /// Create token response
-#[ derive( Debug, Serialize, Deserialize ) ]
-pub struct CreateTokenResponse
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTokenResponse {
   /// Token database identifier
   pub id: i64,
   /// Generated token string
@@ -405,37 +354,36 @@ pub struct CreateTokenResponse
   /// Owner user identifier
   pub user_id: String,
   /// Associated project identifier
-  pub project_id: Option< String >,
+  pub project_id: Option<String>,
   /// Optional token description
-  pub description: Option< String >,
+  pub description: Option<String>,
   /// Associated agent identifier
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option<i64>,
   /// Token provider name
-  pub provider: Option< String >,
+  pub provider: Option<String>,
   /// Creation timestamp (Unix epoch)
   pub created_at: i64,
 }
 
 /// Token list item
-#[ derive( Debug, Serialize, Deserialize ) ]
-pub struct TokenListItem
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TokenListItem {
   /// Token database identifier
   pub id: i64,
   /// Owner user identifier
   pub user_id: String,
   /// Associated project identifier
-  pub project_id: Option< String >,
+  pub project_id: Option<String>,
   /// Optional token description
-  pub description: Option< String >,
+  pub description: Option<String>,
   /// Associated agent identifier
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option<i64>,
   /// Token provider name
-  pub provider: Option< String >,
+  pub provider: Option<String>,
   /// Creation timestamp (Unix epoch)
   pub created_at: i64,
   /// Last usage timestamp if used
-  pub last_used_at: Option< i64 >,
+  pub last_used_at: Option<i64>,
   /// Whether the token is active
   pub is_active: bool,
 }

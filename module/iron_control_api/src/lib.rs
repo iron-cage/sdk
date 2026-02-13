@@ -211,8 +211,7 @@ pub mod ip_token;
 pub mod rate_limiter;
 
 #[cfg(feature = "enabled")]
-mod implementation
-{
+mod implementation {
   use axum::{
     extract::{Path, State, WebSocketUpgrade},
     http::StatusCode,
@@ -226,46 +225,38 @@ mod implementation
 
   /// API server state
   #[derive(Clone)]
-  pub struct ApiState
-  {
+  pub struct ApiState {
     /// Shared runtime state manager
     pub state_manager: Arc<iron_runtime_state::StateManager>,
   }
 
-  impl core::fmt::Debug for ApiState
-  {
-    fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-    {
-      f.debug_struct( "ApiState" )
-        .field( "state_manager", &"<StateManager>" )
+  impl core::fmt::Debug for ApiState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+      f.debug_struct("ApiState")
+        .field("state_manager", &"<StateManager>")
         .finish()
     }
   }
 
   /// API server
-  pub struct ApiServer
-  {
+  pub struct ApiServer {
     state: ApiState,
     addr: SocketAddr,
   }
 
-  impl core::fmt::Debug for ApiServer
-  {
-    fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-    {
-      f.debug_struct( "ApiServer" )
-        .field( "state", &self.state )
-        .field( "addr", &self.addr )
+  impl core::fmt::Debug for ApiServer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+      f.debug_struct("ApiServer")
+        .field("state", &self.state)
+        .field("addr", &self.addr)
         .finish()
     }
   }
 
-  impl ApiServer
-  {
+  impl ApiServer {
     /// Create new API server
     #[must_use]
-    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self
-    {
+    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self {
       let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
       Self {
@@ -280,8 +271,7 @@ mod implementation
     ///
     /// Returns an error if the TCP listener fails to bind or the server
     /// encounters a fatal runtime error.
-    pub async fn start(self) -> Result<(), anyhow::Error>
-    {
+    pub async fn start(self) -> Result<(), anyhow::Error> {
       let app = Router::new()
         .route("/api/agents/:id/status", get(get_agent_status))
         .route("/api/agents/:id/stop", post(stop_agent))
@@ -301,8 +291,7 @@ mod implementation
 
   /// Agent status response
   #[derive(Debug, Serialize, Deserialize)]
-  struct AgentStatusResponse
-  {
+  struct AgentStatusResponse {
     agent_id: String,
     status: String,
   }
@@ -311,10 +300,8 @@ mod implementation
   async fn get_agent_status(
     State(state): State<ApiState>,
     Path(agent_id): Path<String>,
-  ) -> impl IntoResponse
-  {
-    match state.state_manager.get_agent_state(&agent_id)
-    {
+  ) -> impl IntoResponse {
+    match state.state_manager.get_agent_state(&agent_id) {
       Some(agent_state) => {
         let response = AgentStatusResponse {
           agent_id: agent_state.agent_id.to_string(),
@@ -336,17 +323,13 @@ mod implementation
   async fn stop_agent(
     State(state): State<ApiState>,
     Path(agent_id): Path<String>,
-  ) -> impl IntoResponse
-  {
-    if let Some(mut agent_state) = state.state_manager.get_agent_state(&agent_id)
-    {
+  ) -> impl IntoResponse {
+    if let Some(mut agent_state) = state.state_manager.get_agent_state(&agent_id) {
       agent_state.status = iron_runtime_state::AgentStatus::Stopped;
       state.state_manager.save_agent_state(agent_state);
 
       (StatusCode::OK, Json(serde_json::json!({ "success": true })))
-    }
-    else
-    {
+    } else {
       (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({ "error": "Agent not found" })),
@@ -358,10 +341,8 @@ mod implementation
   async fn get_agent_metrics(
     State(state): State<ApiState>,
     Path(agent_id): Path<String>,
-  ) -> impl IntoResponse
-  {
-    match state.state_manager.get_agent_state(&agent_id)
-    {
+  ) -> impl IntoResponse {
+    match state.state_manager.get_agent_state(&agent_id) {
       Some(agent_state) => {
         let metrics = serde_json::json!({
           "agent_id": agent_state.agent_id.to_string(),
@@ -380,8 +361,10 @@ mod implementation
   }
 
   /// WebSocket handler
-  async fn websocket_handler(ws: WebSocketUpgrade, State(_state): State<ApiState>) -> impl IntoResponse
-  {
+  async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    State(_state): State<ApiState>,
+  ) -> impl IntoResponse {
     ws.on_upgrade(|_socket| async {
       tracing::info!("WebSocket connection established");
     })
@@ -392,26 +375,21 @@ mod implementation
 pub use implementation::*;
 
 #[cfg(not(feature = "enabled"))]
-mod stub
-{
+mod stub {
   use std::{net::SocketAddr, sync::Arc};
 
   #[derive(Clone)]
-  pub struct ApiState
-  {
+  pub struct ApiState {
     pub state_manager: Arc<iron_runtime_state::StateManager>,
   }
 
-  pub struct ApiServer
-  {
+  pub struct ApiServer {
     state: ApiState,
     addr: SocketAddr,
   }
 
-  impl ApiServer
-  {
-    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self
-    {
+  impl ApiServer {
+    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self {
       let addr = SocketAddr::from(([127, 0, 0, 1], port));
       Self {
         state: ApiState { state_manager },
@@ -419,8 +397,7 @@ mod stub
       }
     }
 
-    pub async fn start(self) -> Result<(), anyhow::Error>
-    {
+    pub async fn start(self) -> Result<(), anyhow::Error> {
       tracing::info!("Stub API server would listen on {}", self.addr);
       Ok(())
     }

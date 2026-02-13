@@ -21,14 +21,12 @@
 use iron_control_api::routes::limits::CreateLimitRequest;
 
 /// Test valid single limit (tokens).
-#[ tokio::test ]
-async fn test_valid_single_limit_tokens()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_valid_single_limit_tokens() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1_000_000 ),
+    max_tokens_per_day: Some(1_000_000),
     max_requests_per_minute: None,
     max_cost_per_month_microdollars: None,
   };
@@ -42,15 +40,13 @@ async fn test_valid_single_limit_tokens()
 }
 
 /// Test valid single limit (requests).
-#[ tokio::test ]
-async fn test_valid_single_limit_requests()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_valid_single_limit_requests() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
-    max_requests_per_minute: Some( 60 ),
+    max_requests_per_minute: Some(60),
     max_cost_per_month_microdollars: None,
   };
 
@@ -63,16 +59,14 @@ async fn test_valid_single_limit_requests()
 }
 
 /// Test valid single limit (cost).
-#[ tokio::test ]
-async fn test_valid_single_limit_cost()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_valid_single_limit_cost() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
-    project_id: Some( "project_123".to_string() ),
+    project_id: Some("project_123".to_string()),
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_microdollars: Some( 500_000 ),
+    max_cost_per_month_microdollars: Some(500_000),
   };
 
   let result = request.validate();
@@ -84,16 +78,14 @@ async fn test_valid_single_limit_cost()
 }
 
 /// Test valid multiple limits.
-#[ tokio::test ]
-async fn test_valid_multiple_limits()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_valid_multiple_limits() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1_000_000 ),
-    max_requests_per_minute: Some( 100 ),
-    max_cost_per_month_microdollars: Some( 500_000 ),
+    max_tokens_per_day: Some(1_000_000),
+    max_requests_per_minute: Some(100),
+    max_cost_per_month_microdollars: Some(500_000),
   };
 
   let result = request.validate();
@@ -105,11 +97,9 @@ async fn test_valid_multiple_limits()
 }
 
 /// Test all None rejected (at least one limit required).
-#[ tokio::test ]
-async fn test_all_none_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_all_none_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
@@ -125,20 +115,18 @@ async fn test_all_none_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "at least one" ) || err_msg.contains( "required" ),
+    err_msg.contains("at least one") || err_msg.contains("required"),
     "LOUD FAILURE: Error message must indicate at least one limit is required. Got: {err_msg}"
   );
 }
 
 /// Test zero `tokens_per_day` rejected.
-#[ tokio::test ]
-async fn test_zero_tokens_per_day_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_zero_tokens_per_day_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 0 ),
+    max_tokens_per_day: Some(0),
     max_requests_per_minute: None,
     max_cost_per_month_microdollars: None,
   };
@@ -151,20 +139,18 @@ async fn test_zero_tokens_per_day_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "positive" ) || err_msg.contains( "greater than" ) || err_msg.contains( "must be" ),
+    err_msg.contains("positive") || err_msg.contains("greater than") || err_msg.contains("must be"),
     "LOUD FAILURE: Error message must indicate value must be positive. Got: {err_msg}"
   );
 }
 
 /// Test negative `tokens_per_day` rejected.
-#[ tokio::test ]
-async fn test_negative_tokens_per_day_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_negative_tokens_per_day_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( -100 ),
+    max_tokens_per_day: Some(-100),
     max_requests_per_minute: None,
     max_cost_per_month_microdollars: None,
   };
@@ -177,15 +163,13 @@ async fn test_negative_tokens_per_day_rejected()
 }
 
 /// Test zero `requests_per_minute` rejected.
-#[ tokio::test ]
-async fn test_zero_requests_per_minute_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_zero_requests_per_minute_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
-    max_requests_per_minute: Some( 0 ),
+    max_requests_per_minute: Some(0),
     max_cost_per_month_microdollars: None,
   };
 
@@ -197,15 +181,13 @@ async fn test_zero_requests_per_minute_rejected()
 }
 
 /// Test negative `requests_per_minute` rejected.
-#[ tokio::test ]
-async fn test_negative_requests_per_minute_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_negative_requests_per_minute_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
-    max_requests_per_minute: Some( -10 ),
+    max_requests_per_minute: Some(-10),
     max_cost_per_month_microdollars: None,
   };
 
@@ -217,16 +199,14 @@ async fn test_negative_requests_per_minute_rejected()
 }
 
 /// Test zero `cost_per_month_cents` rejected.
-#[ tokio::test ]
-async fn test_zero_cost_per_month_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_zero_cost_per_month_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_microdollars: Some( 0 ),
+    max_cost_per_month_microdollars: Some(0),
   };
 
   let result = request.validate();
@@ -237,16 +217,14 @@ async fn test_zero_cost_per_month_rejected()
 }
 
 /// Test negative `cost_per_month_cents` rejected.
-#[ tokio::test ]
-async fn test_negative_cost_per_month_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_negative_cost_per_month_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_microdollars: Some( -500 ),
+    max_cost_per_month_microdollars: Some(-500),
   };
 
   let result = request.validate();
@@ -257,14 +235,12 @@ async fn test_negative_cost_per_month_rejected()
 }
 
 /// Test overflow `tokens_per_day` rejected.
-#[ tokio::test ]
-async fn test_overflow_tokens_per_day_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_overflow_tokens_per_day_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( i64::MAX ),
+    max_tokens_per_day: Some(i64::MAX),
     max_requests_per_minute: None,
     max_cost_per_month_microdollars: None,
   };
@@ -277,21 +253,19 @@ async fn test_overflow_tokens_per_day_rejected()
 
   let err_msg = result.unwrap_err().to_string();
   assert!(
-    err_msg.contains( "too large" ) || err_msg.contains( "maximum" ) || err_msg.contains( "overflow" ),
+    err_msg.contains("too large") || err_msg.contains("maximum") || err_msg.contains("overflow"),
     "LOUD FAILURE: Error must mention value is too large. Got: {err_msg}"
   );
 }
 
 /// Test overflow `requests_per_minute` rejected.
-#[ tokio::test ]
-async fn test_overflow_requests_per_minute_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_overflow_requests_per_minute_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
-    max_requests_per_minute: Some( i64::MAX ),
+    max_requests_per_minute: Some(i64::MAX),
     max_cost_per_month_microdollars: None,
   };
 
@@ -303,16 +277,14 @@ async fn test_overflow_requests_per_minute_rejected()
 }
 
 /// Test overflow `cost_per_month_cents` rejected.
-#[ tokio::test ]
-async fn test_overflow_cost_per_month_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_overflow_cost_per_month_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_microdollars: Some( i64::MAX ),
+    max_cost_per_month_microdollars: Some(i64::MAX),
   };
 
   let result = request.validate();
@@ -323,15 +295,13 @@ async fn test_overflow_cost_per_month_rejected()
 }
 
 /// Test mixed valid and invalid (one positive, one negative) rejected.
-#[ tokio::test ]
-async fn test_mixed_valid_invalid_rejected()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_mixed_valid_invalid_rejected() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1_000_000 ),  // Valid
-    max_requests_per_minute: Some( -10 ), // Invalid
+    max_tokens_per_day: Some(1_000_000), // Valid
+    max_requests_per_minute: Some(-10),  // Invalid
     max_cost_per_month_microdollars: None,
   };
 
@@ -343,16 +313,14 @@ async fn test_mixed_valid_invalid_rejected()
 }
 
 /// Test boundary value 1 accepted (minimum valid).
-#[ tokio::test ]
-async fn test_boundary_value_one_accepted()
-{
-  let request = CreateLimitRequest
-  {
+#[tokio::test]
+async fn test_boundary_value_one_accepted() {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1 ),
-    max_requests_per_minute: Some( 1 ),
-    max_cost_per_month_microdollars: Some( 1 ),
+    max_tokens_per_day: Some(1),
+    max_requests_per_minute: Some(1),
+    max_cost_per_month_microdollars: Some(1),
   };
 
   let result = request.validate();
@@ -364,16 +332,14 @@ async fn test_boundary_value_one_accepted()
 }
 
 /// Test `MAX_SAFE_LIMIT` accepted (maximum safe value).
-#[ tokio::test ]
-async fn test_max_safe_limit_accepted()
-{
+#[tokio::test]
+async fn test_max_safe_limit_accepted() {
   const MAX_SAFE: i64 = i64::MAX / 2;
 
-  let request = CreateLimitRequest
-  {
+  let request = CreateLimitRequest {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( MAX_SAFE ),
+    max_tokens_per_day: Some(MAX_SAFE),
     max_requests_per_minute: None,
     max_cost_per_month_microdollars: None,
   };
