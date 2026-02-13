@@ -21,9 +21,13 @@ use uuid::Uuid;
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct CreateBudgetRequestRequest
 {
+  /// Target agent database ID
   pub agent_id: i64,
+  /// User ID of the requester
   pub requester_id: String,
+  /// Requested budget amount in USD
   pub requested_budget_usd: f64,
+  /// Reason for budget change
   pub justification: String,
 }
 
@@ -148,8 +152,11 @@ impl CreateBudgetRequestRequest
 #[ derive( Debug, Serialize ) ]
 pub struct CreateBudgetRequestResponse
 {
+  /// Unique budget request identifier
   pub request_id: String,
+  /// Request status (e.g. "pending")
   pub status: String,
+  /// Creation timestamp in milliseconds
   pub created_at: i64,
 }
 
@@ -313,14 +320,23 @@ pub async fn create_budget_request(
 #[ derive( Debug, Serialize ) ]
 pub struct GetBudgetRequestResponse
 {
+  /// Unique budget request identifier
   pub id: String,
+  /// Target agent database ID
   pub agent_id: i64,
+  /// User ID of the requester
   pub requester_id: String,
+  /// Current budget in USD
   pub current_budget_usd: f64,
+  /// Requested budget in USD
   pub requested_budget_usd: f64,
+  /// Reason for budget change
   pub justification: String,
+  /// Request status string
   pub status: String,
+  /// Creation timestamp in milliseconds
   pub created_at: i64,
+  /// Last update timestamp in milliseconds
   pub updated_at: i64,
 }
 
@@ -396,7 +412,9 @@ pub async fn get_budget_request(
 #[ derive( Debug, Deserialize ) ]
 pub struct ListBudgetRequestsQuery
 {
+  /// Filter by agent database ID
   pub agent_id: Option< i64 >,
+  /// Filter by request status
   pub status: Option< String >,
 }
 
@@ -404,6 +422,7 @@ pub struct ListBudgetRequestsQuery
 #[ derive( Debug, Serialize ) ]
 pub struct ListBudgetRequestsResponse
 {
+  /// List of budget change requests
   pub requests: Vec< GetBudgetRequestResponse >,
 }
 
@@ -588,8 +607,11 @@ pub async fn list_budget_requests(
 #[ derive( Debug, Serialize ) ]
 pub struct ApproveBudgetRequestResponse
 {
+  /// Unique budget request identifier
   pub request_id: String,
+  /// Updated status ("approved")
   pub status: String,
+  /// Approval timestamp in milliseconds
   pub updated_at: i64,
 }
 
@@ -702,8 +724,11 @@ pub async fn approve_budget_request(
 #[ derive( Debug, Serialize ) ]
 pub struct RejectBudgetRequestResponse
 {
+  /// Unique budget request identifier
   pub request_id: String,
+  /// Updated status ("rejected")
   pub status: String,
+  /// Rejection timestamp in milliseconds
   pub updated_at: i64,
 }
 

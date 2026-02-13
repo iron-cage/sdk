@@ -25,10 +25,15 @@ use serde::{ Serialize, Deserialize };
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct VersionResponse
 {
+  /// Current API version
   pub current_version: String,
+  /// List of supported API versions
   pub supported_versions: Vec< String >,
+  /// List of deprecated API versions
   pub deprecated_versions: Vec< String >,
+  /// Endpoint for latest API version
   pub latest_endpoint: String,
+  /// Build metadata
   pub build: BuildInfo,
 }
 
@@ -36,8 +41,11 @@ pub struct VersionResponse
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct BuildInfo
 {
+  /// Git commit SHA
   pub commit: String,
+  /// Build timestamp
   pub timestamp: String,
+  /// Runtime environment name
   pub environment: String,
 }
 

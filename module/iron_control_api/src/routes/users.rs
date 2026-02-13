@@ -35,7 +35,9 @@ use std::str::FromStr;
 #[ derive( Clone ) ]
 pub struct UserManagementState
 {
+  /// Database connection pool.
   pub db_pool: Pool< Sqlite >,
+  /// RBAC permission checker.
   pub permission_checker: Arc< PermissionChecker >,
 }
 
@@ -52,6 +54,7 @@ impl core::fmt::Debug for UserManagementState
 
 impl UserManagementState
 {
+  /// Creates a new user management state.
   pub fn new( db_pool: Pool< Sqlite >, permission_checker: Arc< PermissionChecker > ) -> Self
   {
     Self {
@@ -80,9 +83,13 @@ async fn get_admin_id( pool: &Pool< Sqlite >, username: &str ) -> Result< i64, s
 #[ derive( Debug, Deserialize, Serialize ) ]
 pub struct CreateUserRequest
 {
+  /// Username for the new user.
   pub username: String,
+  /// Password for the new user.
   pub password: String,
+  /// Email address of the new user.
   pub email: String,
+  /// Role to assign to the new user.
   pub role: String,
 }
 
@@ -93,6 +100,7 @@ impl CreateUserRequest
   const MAX_EMAIL_LENGTH: usize = 255;
   const MIN_PASSWORD_LENGTH: usize = 8;
 
+  /// Validates all request fields.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Username validation
@@ -168,11 +176,17 @@ impl CreateUserRequest
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct CreateUserResponse
 {
+  /// Unique user identifier.
   pub id: String,
+  /// Username of the created user.
   pub username: String,
+  /// Email address, if provided.
   pub email: Option< String >,
+  /// Assigned role.
   pub role: String,
+  /// Whether the account is active.
   pub is_active: bool,
+  /// Unix timestamp of account creation.
   pub created_at: i64,
 }
 
@@ -195,10 +209,15 @@ impl From< User > for CreateUserResponse
 #[ derive( Debug, Deserialize ) ]
 pub struct ListUsersQuery
 {
+  /// Filter by role name.
   pub role: Option< String >,
+  /// Filter by active status.
   pub is_active: Option< bool >,
+  /// Search term for username or email.
   pub search: Option< String >,
+  /// Page number (1-indexed).
   pub page: Option< u32 >,
+  /// Number of results per page.
   pub page_size: Option< u32 >,
 }
 
@@ -206,9 +225,13 @@ pub struct ListUsersQuery
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct ListUsersResponse
 {
+  /// List of user records.
   pub users: Vec< UserResponse >,
+  /// Total number of matching users.
   pub total: i64,
+  /// Current page number.
   pub page: u32,
+  /// Number of results per page.
   pub page_size: u32,
 }
 
@@ -216,14 +239,23 @@ pub struct ListUsersResponse
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct UserResponse
 {
+  /// Unique user identifier.
   pub id: String,
+  /// Username of the user.
   pub username: String,
+  /// Email address, if provided.
   pub email: Option< String >,
+  /// Assigned role.
   pub role: String,
+  /// Whether the account is active.
   pub is_active: bool,
+  /// Unix timestamp of account creation.
   pub created_at: i64,
+  /// Unix timestamp of last login, if any.
   pub last_login: Option< i64 >,
+  /// Unix timestamp of suspension, if any.
   pub suspended_at: Option< i64 >,
+  /// Unix timestamp of deletion, if any.
   pub deleted_at: Option< i64 >,
 }
 
@@ -249,6 +281,7 @@ impl From< User > for UserResponse
 #[ derive( Debug, Deserialize ) ]
 pub struct SuspendUserRequest
 {
+  /// Optional suspension reason.
   pub reason: Option< String >,
 }
 
@@ -256,6 +289,7 @@ impl SuspendUserRequest
 {
   const MAX_REASON_LENGTH: usize = 1000;
 
+  /// Validates the suspension reason length.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if let Some( ref reason ) = self.reason
@@ -277,11 +311,13 @@ impl SuspendUserRequest
 #[ derive( Debug, Deserialize ) ]
 pub struct ChangeRoleRequest
 {
+  /// New role to assign.
   pub role: String,
 }
 
 impl ChangeRoleRequest
 {
+  /// Validates the role value.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     let valid_roles = [ "viewer", "user", "admin" ];
@@ -301,7 +337,9 @@ impl ChangeRoleRequest
 #[ derive( Debug, Deserialize ) ]
 pub struct ResetPasswordRequest
 {
+  /// New password to set.
   pub new_password: String,
+  /// Force user to change password on next login.
   pub force_change: Option< bool >,
 }
 
@@ -310,6 +348,7 @@ impl ResetPasswordRequest
   const MAX_PASSWORD_LENGTH: usize = 1000;
   const MIN_PASSWORD_LENGTH: usize = 8;
 
+  /// Validates the new password length.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.new_password.len() < Self::MIN_PASSWORD_LENGTH

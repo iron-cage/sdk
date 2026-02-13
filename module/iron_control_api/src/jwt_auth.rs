@@ -20,9 +20,9 @@ pub struct AccessTokenClaims
   pub sub: String,
   /// User Role
   pub role: String,
-  /// Issued at (Unix timestamp)
   /// User email
   pub email: String,
+  /// Issued at (Unix timestamp)
   pub iat: i64,
   /// Expiration time (Unix timestamp)
   pub exp: i64,

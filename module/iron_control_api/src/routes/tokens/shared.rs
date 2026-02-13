@@ -12,7 +12,9 @@ use crate::error::ValidationError;
 #[ derive( Clone ) ]
 pub struct TokenState
 {
+  /// Shared token storage backend
   pub storage: Arc< TokenStorage >,
+  /// Shared token generator instance
   pub generator: Arc< TokenGenerator >,
 }
 
@@ -62,26 +64,32 @@ impl TokenState
 #[ derive( Debug, Deserialize ) ]
 pub struct CreateTokenRequest
 {
+  /// Token name (Protocol 014)
   // Protocol 014 field - optional for backward compatibility with legacy tests
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
   pub name: Option< String >,
 
+  /// Optional token description
   pub description: Option< String >,
 
+  /// Legacy user identifier
   // Legacy fields kept for backward compatibility with existing tests
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
   pub user_id: Option< String >,
 
+  /// Optional project identifier
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
   pub project_id: Option< String >,
 
+  /// Optional agent identifier
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
   pub agent_id: Option< i64 >,
 
+  /// Optional provider name
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   #[ serde( default ) ]
   pub provider: Option< String >,
@@ -310,6 +318,7 @@ impl CreateTokenRequest
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct UpdateTokenRequest
 {
+  /// Provider name to set
   pub provider: String,
 }
 
@@ -318,6 +327,7 @@ impl UpdateTokenRequest
   /// Maximum length of `provider` (`DoS` protection)
   const MAX_PROVIDER_LENGTH: usize = 64;
 
+  /// Validate the update token request fields
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate provider if provided
@@ -354,6 +364,7 @@ impl UpdateTokenRequest
 #[ derive( Debug, Deserialize ) ]
 pub struct ValidateTokenRequest
 {
+  /// Token string to validate
   pub token: String,
 }
 
@@ -361,11 +372,15 @@ pub struct ValidateTokenRequest
 #[ derive( Debug, Serialize ) ]
 pub struct ValidateTokenResponse
 {
+  /// Whether the token is valid
   pub valid: bool,
+  /// Owner user identifier if valid
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   pub user_id: Option< String >,
+  /// Associated project identifier if valid
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   pub project_id: Option< String >,
+  /// Token database identifier if valid
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   pub token_id: Option< i64 >,
 }
@@ -374,13 +389,21 @@ pub struct ValidateTokenResponse
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct CreateTokenResponse
 {
+  /// Token database identifier
   pub id: i64,
+  /// Generated token string
   pub token: String,
+  /// Owner user identifier
   pub user_id: String,
+  /// Associated project identifier
   pub project_id: Option< String >,
+  /// Optional token description
   pub description: Option< String >,
+  /// Associated agent identifier
   pub agent_id: Option< i64 >,
+  /// Token provider name
   pub provider: Option< String >,
+  /// Creation timestamp (Unix epoch)
   pub created_at: i64,
 }
 
@@ -388,13 +411,22 @@ pub struct CreateTokenResponse
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct TokenListItem
 {
+  /// Token database identifier
   pub id: i64,
+  /// Owner user identifier
   pub user_id: String,
+  /// Associated project identifier
   pub project_id: Option< String >,
+  /// Optional token description
   pub description: Option< String >,
+  /// Associated agent identifier
   pub agent_id: Option< i64 >,
+  /// Token provider name
   pub provider: Option< String >,
+  /// Creation timestamp (Unix epoch)
   pub created_at: i64,
+  /// Last usage timestamp if used
   pub last_used_at: Option< i64 >,
+  /// Whether the token is active
   pub is_active: bool,
 }

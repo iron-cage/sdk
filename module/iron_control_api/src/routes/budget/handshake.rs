@@ -20,9 +20,13 @@ use uuid::Uuid;
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct HandshakeRequest
 {
+  /// JWT token for agent authentication
   pub ic_token: String,
+  /// AI provider name (e.g. "openai")
   pub provider: String,
+  /// Optional specific provider key ID
   pub provider_key_id: Option< i64 >,
+  /// Optional budget amount in microdollars
   pub requested_budget: Option< i64 >,
 }
 
@@ -113,10 +117,15 @@ impl HandshakeRequest
 #[ derive( Debug, Serialize ) ]
 pub struct HandshakeResponse
 {
+  /// Encrypted provider API key token
   pub ip_token: String,
+  /// Unique budget lease identifier
   pub lease_id: String,
+  /// Budget granted in microdollars
   pub budget_granted: i64,
+  /// Remaining agent budget in microdollars
   pub budget_remaining: i64,
+  /// Optional lease expiration timestamp (ms)
   pub expires_at: Option< i64 >,
 }
 

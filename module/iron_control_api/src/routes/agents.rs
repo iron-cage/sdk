@@ -24,49 +24,73 @@ use sqlx::{Row, SqlitePool};
 
 use crate::jwt_auth::AuthenticatedUser;
 
+/// Agent record from the database
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Agent {
+    /// Unique agent identifier
     pub id: i64,
+    /// Agent display name
     pub name: String,
+    /// List of enabled LLM providers
     #[sqlx(skip)]
     pub providers: Vec<String>,
+    /// JSON-serialized providers from database
     #[serde(skip)]
     providers_json: Option<String>,
+    /// Unix timestamp of creation
     pub created_at: i64,
+    /// Owner user identifier
     pub owner_id: String,
+    /// Associated provider key identifier
     pub provider_key_id: Option<i64>,
 }
 
+/// Request body for creating a new agent
 #[derive(Debug, Deserialize)]
 pub struct CreateAgentRequest {
+    /// Agent display name
     pub name: String,
+    /// List of enabled LLM providers
     pub providers: Vec<String>,
+    /// Associated provider key identifier
     pub provider_key_id: i64,
+    /// Initial budget in microdollars
     pub initial_budget_microdollars: i64,
     /// Optional `owner_id` - admins can assign agents to other users.
     /// If not provided, defaults to the authenticated user.
     pub owner_id: Option<String>,
 }
 
+/// Request body for updating an agent
 #[derive(Debug, Deserialize)]
 pub struct UpdateAgentRequest {
+    /// New agent display name
     pub name: Option<String>,
+    /// New list of enabled LLM providers
     pub providers: Option<Vec<String>>,
+    /// New provider key; nested Option to allow clearing
     pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
     /// Optional `owner_id` - only admins can reassign agents to other users.
     pub owner_id: Option<String>,
 }
 
+/// Request body for updating an agent budget
 #[derive(Debug, Deserialize)]
 pub struct UpdateAgentBudgetRequest {
+    /// New total allocated budget in microdollars
     pub total_allocated_microdollars: i64,
 }
 
+/// Response body for agent budget information
 #[derive(Debug, Serialize)]
 pub struct AgentBudgetResponse {
+    /// Agent identifier
     pub agent_id: i64,
+    /// Total allocated budget in microdollars
     pub total_allocated: i64,
+    /// Total spent amount in microdollars
     pub total_spent: i64,
+    /// Remaining budget in microdollars
     pub budget_remaining: i64,
 }
 
@@ -651,12 +675,19 @@ pub async fn update_agent_budget(
 /// Token list item for agent tokens endpoint
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct AgentTokenItem {
+    /// Unique token identifier
     pub id: i64,
+    /// Owner user identifier
     pub user_id: String,
+    /// LLM provider name
     pub provider: Option<String>,
+    /// Token display name
     pub name: Option<String>,
+    /// Unix timestamp of creation
     pub created_at: i64,
+    /// Unix timestamp of last usage
     pub last_used_at: Option<i64>,
+    /// Whether the token is active
     pub is_active: bool,
 }
 

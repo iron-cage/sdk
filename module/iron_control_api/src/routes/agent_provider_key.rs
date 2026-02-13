@@ -19,6 +19,7 @@ use serde::{ Deserialize, Serialize };
 #[ derive( Debug, Deserialize ) ]
 pub struct GetProviderKeyRequest
 {
+  /// IC authentication token
   pub ic_token: String,
 }
 

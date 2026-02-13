@@ -20,9 +20,12 @@ use serde::Serialize;
 #[ derive( Debug, Serialize ) ]
 pub struct ErrorResponse
 {
+  /// Human-readable error description
   pub error: String,
+  /// Machine-readable error code
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   pub code: Option< String >,
+  /// Additional error details
   #[ serde( skip_serializing_if = "Option::is_none" ) ]
   pub details: Option< String >,
 }
@@ -218,31 +221,41 @@ pub enum ValidationError
   /// Invalid field value
   InvalidValue
   {
+    /// Field name that failed validation
     field: String,
+    /// Why the value is invalid
     reason: String,
   },
   /// Field value too long
   TooLong
   {
+    /// Field name that exceeded length
     field: String,
+    /// Maximum allowed length
     max_length: usize,
   },
   /// Field value too short
   TooShort
   {
+    /// Field name that is too short
     field: String,
+    /// Minimum required length
     min_length: usize,
   },
   /// Invalid format
   InvalidFormat
   {
+    /// Field name with wrong format
     field: String,
+    /// Expected format description
     expected: String,
   },
   /// Contains invalid character
   InvalidCharacter
   {
+    /// Field name with invalid character
     field: String,
+    /// The invalid character found
     character: String,
   },
   /// Custom validation error

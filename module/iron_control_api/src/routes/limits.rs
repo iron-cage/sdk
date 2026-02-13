@@ -23,6 +23,7 @@ use std::sync::Arc;
 #[ derive( Clone ) ]
 pub struct LimitsState
 {
+  /// Shared limit enforcer instance
   pub enforcer: Arc< LimitEnforcer >,
 }
 
@@ -54,10 +55,15 @@ impl LimitsState
 #[ derive( Debug, Deserialize ) ]
 pub struct CreateLimitRequest
 {
+  /// Owner user identifier
   pub user_id: String,
+  /// Optional project scope
   pub project_id: Option< String >,
+  /// Daily token consumption limit
   pub max_tokens_per_day: Option< i64 >,
+  /// Per-minute request rate limit
   pub max_requests_per_minute: Option< i64 >,
+  /// Monthly cost cap in microdollars
   pub max_cost_per_month_microdollars: Option< i64 >,
 }
 
@@ -168,8 +174,11 @@ impl CreateLimitRequest
 #[ derive( Debug, Deserialize ) ]
 pub struct UpdateLimitRequest
 {
+  /// Updated daily token limit
   pub max_tokens_per_day: Option< i64 >,
+  /// Updated per-minute request limit
   pub max_requests_per_minute: Option< i64 >,
+  /// Updated monthly cost cap in microdollars
   pub max_cost_per_month_microdollars: Option< i64 >,
 }
 
@@ -273,12 +282,19 @@ impl UpdateLimitRequest
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct LimitResponse
 {
+  /// Limit record identifier
   pub id: i64,
+  /// Owner user identifier
   pub user_id: String,
+  /// Optional project scope
   pub project_id: Option< String >,
+  /// Daily token consumption limit
   pub max_tokens_per_day: Option< i64 >,
+  /// Per-minute request rate limit
   pub max_requests_per_minute: Option< i64 >,
+  /// Monthly cost cap in microdollars
   pub max_cost_per_month_microdollars: Option< i64 >,
+  /// Unix timestamp of creation
   pub created_at: i64,
 }
 

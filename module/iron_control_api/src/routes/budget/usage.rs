@@ -20,11 +20,17 @@ use serde::{ Deserialize, Serialize };
 #[ derive( Debug, Deserialize ) ]
 pub struct UsageReportRequest
 {
+  /// Budget lease identifier
   pub lease_id: String,
+  /// Unique LLM request identifier
   pub request_id: String,
+  /// Number of tokens consumed
   pub tokens: i64,
+  /// Cost of request in microdollars
   pub cost_microdollars: i64,
+  /// LLM model name used
   pub model: String,
+  /// AI provider name
   pub provider: String,
 }
 
@@ -137,7 +143,9 @@ impl UsageReportRequest
 #[ derive( Debug, Serialize ) ]
 pub struct UsageReportResponse
 {
+  /// Whether usage was recorded successfully
   pub success: bool,
+  /// Remaining agent budget in microdollars
   pub budget_remaining: i64,
 }
 
@@ -319,6 +327,7 @@ pub async fn report_usage(
 #[ derive( Debug, Deserialize ) ]
 pub struct BudgetReturnRequest
 {
+  /// Budget lease identifier to close
   pub lease_id: String,
   /// Amount spent by client (microdollars) - from `iron_cost` `CostController`
   #[ serde( default ) ]
@@ -364,7 +373,9 @@ impl BudgetReturnRequest
 #[ derive( Debug, Serialize ) ]
 pub struct BudgetReturnResponse
 {
+  /// Whether return was processed successfully
   pub success: bool,
+  /// Amount returned in microdollars
   pub returned: i64,
 }
 

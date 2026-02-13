@@ -31,12 +31,19 @@ pub type ModelUsageRow = ( String, String, i64, i64, i64, i64 );
 #[serde( rename_all = "kebab-case" )]
 pub enum Period
 {
+  /// Current day from midnight
   Today,
+  /// Previous day
   Yesterday,
+  /// Rolling last 7 days
   Last7Days,
+  /// Rolling last 30 days
   Last30Days,
+  /// Current calendar month
   ThisMonth,
+  /// Previous calendar month
   LastMonth,
+  /// All recorded history
   #[default]
   AllTime,
 }
@@ -106,9 +113,12 @@ impl Period
 #[derive( Debug, Clone, Default, Deserialize )]
 pub struct AnalyticsQuery
 {
+  /// Time period filter
   #[serde( default )]
   pub period: Period,
+  /// Optional agent ID filter
   pub agent_id: Option< i64 >,
+  /// Optional provider ID filter
   pub provider_id: Option< String >,
 }
 
@@ -116,8 +126,10 @@ pub struct AnalyticsQuery
 #[derive( Debug, Clone, Deserialize )]
 pub struct PaginationQuery
 {
+  /// Page number (starts at 1)
   #[serde( default = "default_page" )]
   pub page: u32,
+  /// Items per page
   #[serde( default = "default_per_page" )]
   pub per_page: u32,
 }
@@ -137,11 +149,16 @@ impl Default for PaginationQuery
 #[derive( Debug, Clone, Default, Deserialize )]
 pub struct BudgetStatusQuery
 {
+  /// Budget usage threshold percentage
   pub threshold: Option< u32 >,
+  /// Filter by budget status
   pub status: Option< String >,
+  /// Optional agent ID filter
   pub agent_id: Option< i64 >,
+  /// Page number (starts at 1)
   #[serde( default = "default_page" )]
   pub page: u32,
+  /// Items per page
   #[serde( default = "default_per_page" )]
   pub per_page: u32,
 }
@@ -156,22 +173,33 @@ pub struct AnalyticsEventRequest
 {
   /// IC Token for authentication (required) - proves agent identity
   pub ic_token: String,
+  /// Unique event identifier
   pub event_id: String,
+  /// Event timestamp in milliseconds
   pub timestamp_ms: i64,
+  /// Type of analytics event
   pub event_type: String,
+  /// Model name used in request
   pub model: String,
+  /// Provider name (e.g. OpenAI, Anthropic)
   pub provider: String,
+  /// Number of input tokens consumed
   #[serde( default )]
   pub input_tokens: Option< i64 >,
+  /// Number of output tokens generated
   #[serde( default )]
   pub output_tokens: Option< i64 >,
+  /// Cost in microdollars
   #[serde( default )]
   pub cost_micros: Option< i64 >,
   // agent_id is derived from ic_token claims, not provided by caller
+  /// Optional provider identifier
   #[serde( default )]
   pub provider_id: Option< String >,
+  /// Error code if request failed
   #[serde( default )]
   pub error_code: Option< String >,
+  /// Error description if request failed
   #[serde( default )]
   pub error_message: Option< String >,
 }
@@ -180,7 +208,9 @@ pub struct AnalyticsEventRequest
 #[derive( Debug, Serialize )]
 pub struct EventResponse
 {
+  /// Recorded event identifier
   pub event_id: String,
+  /// Ingestion result status
   pub status: String,
 }
 
@@ -188,7 +218,9 @@ pub struct EventResponse
 #[derive( Debug, Clone, Serialize )]
 pub struct Filters
 {
+  /// Applied agent ID filter
   pub agent_id: Option< i64 >,
+  /// Applied provider ID filter
   pub provider_id: Option< String >,
 }
 
@@ -196,14 +228,19 @@ pub struct Filters
 #[derive( Debug, Clone, Serialize )]
 pub struct Pagination
 {
+  /// Current page number
   pub page: u32,
+  /// Items per page
   pub per_page: u32,
+  /// Total number of items
   pub total: u32,
+  /// Total number of pages
   pub total_pages: u32,
 }
 
 impl Pagination
 {
+  /// Create pagination from page, size, and total count
   pub fn new( page: u32, per_page: u32, total: u32 ) -> Self
   {
     let total_pages = ( total + per_page - 1 ) / per_page;
@@ -215,10 +252,15 @@ impl Pagination
 #[derive( Debug, Serialize )]
 pub struct SpendingTotalResponse
 {
+  /// Total spending amount
   pub total_spend: f64,
+  /// Currency code (e.g. USD)
   pub currency: String,
+  /// Queried time period
   pub period: String,
+  /// Applied query filters
   pub filters: Filters,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -226,11 +268,17 @@ pub struct SpendingTotalResponse
 #[derive( Debug, Serialize )]
 pub struct AgentSpending
 {
+  /// Agent identifier
   pub agent_id: i64,
+  /// Agent display name
   pub agent_name: String,
+  /// Total spending amount
   pub spending: f64,
+  /// Allocated budget amount
   pub budget: f64,
+  /// Budget usage percentage
   pub percent_used: f64,
+  /// Total number of requests
   pub request_count: i64,
 }
 
@@ -238,10 +286,15 @@ pub struct AgentSpending
 #[derive( Debug, Serialize )]
 pub struct SpendingByAgentResponse
 {
+  /// Per-agent spending records
   pub data: Vec< AgentSpending >,
+  /// Aggregated spending summary
   pub summary: SpendingSummary,
+  /// Pagination metadata
   pub pagination: Pagination,
+  /// Queried time period
   pub period: String,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -249,8 +302,11 @@ pub struct SpendingByAgentResponse
 #[derive( Debug, Serialize )]
 pub struct SpendingSummary
 {
+  /// Total spending across all agents
   pub total_spend: f64,
+  /// Total budget across all agents
   pub total_budget: f64,
+  /// Number of agents
   pub total_agents: u32,
 }
 
@@ -258,10 +314,15 @@ pub struct SpendingSummary
 #[derive( Debug, Serialize )]
 pub struct ProviderSpending
 {
+  /// Provider name
   pub provider: String,
+  /// Total spending for provider
   pub spending: f64,
+  /// Number of requests to provider
   pub request_count: i64,
+  /// Average cost per request
   pub avg_cost_per_request: f64,
+  /// Number of agents using provider
   pub agent_count: i64,
 }
 
@@ -269,9 +330,13 @@ pub struct ProviderSpending
 #[derive( Debug, Serialize )]
 pub struct SpendingByProviderResponse
 {
+  /// Per-provider spending records
   pub data: Vec< ProviderSpending >,
+  /// Aggregated provider spending summary
   pub summary: ProviderSpendingSummary,
+  /// Queried time period
   pub period: String,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -279,8 +344,11 @@ pub struct SpendingByProviderResponse
 #[derive( Debug, Serialize )]
 pub struct ProviderSpendingSummary
 {
+  /// Total spending across all providers
   pub total_spend: f64,
+  /// Total request count across providers
   pub total_requests: i64,
+  /// Number of distinct providers
   pub providers_count: u32,
 }
 
@@ -288,13 +356,21 @@ pub struct ProviderSpendingSummary
 #[derive( Debug, Serialize )]
 pub struct AvgCostResponse
 {
+  /// Average cost per request
   pub average_cost_per_request: f64,
+  /// Total number of requests
   pub total_requests: i64,
+  /// Total spending amount
   pub total_spend: f64,
+  /// Minimum single-request cost
   pub min_cost_per_request: f64,
+  /// Maximum single-request cost
   pub max_cost_per_request: f64,
+  /// Queried time period
   pub period: String,
+  /// Applied query filters
   pub filters: Filters,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -302,13 +378,21 @@ pub struct AvgCostResponse
 #[derive( Debug, Serialize )]
 pub struct BudgetStatus
 {
+  /// Agent identifier
   pub agent_id: i64,
+  /// Agent display name
   pub agent_name: String,
+  /// Allocated budget amount
   pub budget: f64,
+  /// Amount already spent
   pub spent: f64,
+  /// Remaining budget amount
   pub remaining: f64,
+  /// Budget usage percentage
   pub percent_used: f64,
+  /// Current budget status label
   pub status: String,
+  /// Risk level classification
   pub risk_level: String,
 }
 
@@ -316,12 +400,19 @@ pub struct BudgetStatus
 #[derive( Debug, Serialize )]
 pub struct BudgetSummary
 {
+  /// Total number of agents
   pub total_agents: u32,
+  /// Agents with active budget
   pub active: u32,
+  /// Agents with exhausted budget
   pub exhausted: u32,
+  /// Agents at critical usage level
   pub critical: u32,
+  /// Agents at high usage level
   pub high: u32,
+  /// Agents at medium usage level
   pub medium: u32,
+  /// Agents at low usage level
   pub low: u32,
 }
 
@@ -329,9 +420,13 @@ pub struct BudgetSummary
 #[derive( Debug, Serialize )]
 pub struct BudgetStatusResponse
 {
+  /// Per-agent budget status records
   pub data: Vec< BudgetStatus >,
+  /// Aggregated budget summary
   pub summary: BudgetSummary,
+  /// Pagination metadata
   pub pagination: Pagination,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -339,12 +434,19 @@ pub struct BudgetStatusResponse
 #[derive( Debug, Serialize )]
 pub struct RequestUsageResponse
 {
+  /// Total number of requests
   pub total_requests: i64,
+  /// Count of successful requests
   pub successful_requests: i64,
+  /// Count of failed requests
   pub failed_requests: i64,
+  /// Success rate as percentage
   pub success_rate: f64,
+  /// Queried time period
   pub period: String,
+  /// Applied query filters
   pub filters: Filters,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -352,12 +454,19 @@ pub struct RequestUsageResponse
 #[derive( Debug, Serialize )]
 pub struct AgentTokenUsage
 {
+  /// Agent identifier
   pub agent_id: i64,
+  /// Agent display name
   pub agent_name: String,
+  /// Total input tokens consumed
   pub input_tokens: i64,
+  /// Total output tokens generated
   pub output_tokens: i64,
+  /// Combined input and output tokens
   pub total_tokens: i64,
+  /// Total number of requests
   pub request_count: i64,
+  /// Average tokens per request
   pub avg_tokens_per_request: i64,
 }
 
@@ -365,8 +474,11 @@ pub struct AgentTokenUsage
 #[derive( Debug, Serialize )]
 pub struct TokenUsageSummary
 {
+  /// Total input tokens across all agents
   pub total_input_tokens: i64,
+  /// Total output tokens across all agents
   pub total_output_tokens: i64,
+  /// Combined total tokens
   pub total_tokens: i64,
 }
 
@@ -374,10 +486,15 @@ pub struct TokenUsageSummary
 #[derive( Debug, Serialize )]
 pub struct TokenUsageResponse
 {
+  /// Per-agent token usage records
   pub data: Vec< AgentTokenUsage >,
+  /// Aggregated token usage summary
   pub summary: TokenUsageSummary,
+  /// Pagination metadata
   pub pagination: Pagination,
+  /// Queried time period
   pub period: String,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -385,11 +502,17 @@ pub struct TokenUsageResponse
 #[derive( Debug, Serialize )]
 pub struct ModelUsage
 {
+  /// Model name
   pub model: String,
+  /// Provider name
   pub provider: String,
+  /// Number of requests using this model
   pub request_count: i64,
+  /// Total spending for this model
   pub spending: f64,
+  /// Total input tokens for this model
   pub input_tokens: i64,
+  /// Total output tokens for this model
   pub output_tokens: i64,
 }
 
@@ -397,8 +520,11 @@ pub struct ModelUsage
 #[derive( Debug, Serialize )]
 pub struct ModelUsageSummary
 {
+  /// Number of distinct models used
   pub unique_models: u32,
+  /// Total request count across models
   pub total_requests: i64,
+  /// Total spending across models
   pub total_spend: f64,
 }
 
@@ -406,10 +532,15 @@ pub struct ModelUsageSummary
 #[derive( Debug, Serialize )]
 pub struct ModelUsageResponse
 {
+  /// Per-model usage records
   pub data: Vec< ModelUsage >,
+  /// Aggregated model usage summary
   pub summary: ModelUsageSummary,
+  /// Pagination metadata
   pub pagination: Pagination,
+  /// Queried time period
   pub period: String,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -417,11 +548,15 @@ pub struct ModelUsageResponse
 #[derive( Debug, Clone, Default, Deserialize )]
 pub struct EventsListQuery
 {
+  /// Time period filter
   #[serde( default )]
   pub period: Period,
+  /// Optional agent ID filter
   pub agent_id: Option< i64 >,
+  /// Page number (starts at 1)
   #[serde( default = "default_page" )]
   pub page: u32,
+  /// Events per page
   #[serde( default = "default_events_per_page" )]
   pub per_page: u32,
 }
@@ -432,9 +567,13 @@ fn default_events_per_page() -> u32 { 10 }
 #[derive( Debug, Serialize )]
 pub struct EventsListResponse
 {
+  /// List of analytics events
   pub data: Vec< AnalyticsEventWithAgent >,
+  /// Pagination metadata
   pub pagination: Pagination,
+  /// Queried time period
   pub period: String,
+  /// Response calculation timestamp
   pub calculated_at: String,
 }
 
@@ -442,17 +581,29 @@ pub struct EventsListResponse
 #[derive( Debug, Serialize, FromRow )]
 pub struct AnalyticsEventWithAgent
 {
+  /// Unique event identifier
   pub event_id: String,
+  /// Event timestamp in milliseconds
   pub timestamp_ms: i64,
+  /// Type of analytics event
   pub event_type: String,
+  /// Model name used in request
   pub model: String,
+  /// Provider name
   pub provider: String,
+  /// Number of input tokens consumed
   pub input_tokens: i64,
+  /// Number of output tokens generated
   pub output_tokens: i64,
+  /// Cost in microdollars
   pub cost_micros: i64,
+  /// Agent identifier
   pub agent_id: i64,
+  /// Agent display name
   pub agent_name: String,
+  /// Error code if request failed
   pub error_code: Option< String >,
+  /// Error description if request failed
   pub error_message: Option< String >,
 }
 
@@ -464,7 +615,9 @@ pub struct AnalyticsEventWithAgent
 #[derive( Debug, Clone )]
 pub struct AnalyticsState
 {
+  /// SQLite connection pool
   pub pool: SqlitePool,
+  /// Shared IC token manager
   pub ic_token_manager: Arc< IcTokenManager >,
 }
 
@@ -496,12 +649,18 @@ impl AnalyticsState
 // Database Row Types
 // ============================================================================
 
+/// Database row for agent budget data
 #[derive( Debug, FromRow )]
 pub struct AgentBudgetRow
 {
+  /// Agent identifier
   pub agent_id: i64,
+  /// Agent display name
   pub agent_name: String,
+  /// Total allocated budget in microdollars
   pub total_allocated: i64,
+  /// Total spent in microdollars
   pub total_spent: i64,
+  /// Remaining budget in microdollars
   pub budget_remaining: i64,
 }

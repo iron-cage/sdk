@@ -93,6 +93,7 @@ fn validate_provider( provider: &str ) -> Result< (), ValidationError >
 #[ derive( Clone ) ]
 pub struct UsageState
 {
+  /// Shared usage tracker instance
   pub tracker: Arc< UsageTracker >,
 }
 
@@ -124,9 +125,13 @@ impl UsageState
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct AggregateUsageResponse
 {
+  /// Total tokens consumed
   pub total_tokens: i64,
+  /// Total number of requests made
   pub total_requests: i64,
+  /// Total cost in cents
   pub total_cost_cents: i64,
+  /// Per-provider usage breakdown
   pub providers: Vec< ProviderStats >,
 }
 
@@ -134,9 +139,13 @@ pub struct AggregateUsageResponse
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct ProviderStats
 {
+  /// Provider name identifier
   pub provider: String,
+  /// Tokens consumed by this provider
   pub tokens: i64,
+  /// Request count for this provider
   pub requests: i64,
+  /// Cost in cents for this provider
   pub cost_cents: i64,
 }
 

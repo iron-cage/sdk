@@ -24,6 +24,7 @@ use crate::error::ValidationError;
 #[ derive( Clone ) ]
 pub struct ProvidersState
 {
+  /// Shared provider key storage instance
   pub storage: Arc< ProviderKeyStorage >,
   /// Crypto service - None if `IRON_SECRETS_MASTER_KEY` not set
   pub crypto: Option< Arc< CryptoService > >,
@@ -83,9 +84,13 @@ impl ProvidersState
 #[ derive( Debug, Deserialize ) ]
 pub struct CreateProviderKeyRequest
 {
+  /// Provider type (e.g., "openai", "anthropic")
   pub provider: String,
+  /// Plaintext API key to encrypt
   pub api_key: String,
+  /// Optional custom base URL
   pub base_url: Option< String >,
+  /// Optional human-readable description
   pub description: Option< String >,
 }
 
@@ -189,8 +194,11 @@ impl CreateProviderKeyRequest
 #[ derive( Debug, Deserialize ) ]
 pub struct UpdateProviderKeyRequest
 {
+  /// Updated base URL override
   pub base_url: Option< String >,
+  /// Updated human-readable description
   pub description: Option< String >,
+  /// Enable or disable this key
   pub is_enabled: Option< bool >,
 }
 
@@ -198,13 +206,21 @@ pub struct UpdateProviderKeyRequest
 #[ derive( Debug, Serialize, Deserialize ) ]
 pub struct ProviderKeyResponse
 {
+  /// Provider key record identifier
   pub id: i64,
+  /// Provider type name
   pub provider: String,
+  /// Optional custom base URL
   pub base_url: Option< String >,
+  /// Human-readable description
   pub description: Option< String >,
+  /// Whether key is currently active
   pub is_enabled: bool,
+  /// Unix timestamp of creation
   pub created_at: i64,
+  /// Unix timestamp of last usage
   pub last_used_at: Option< i64 >,
+  /// Redacted API key for display
   pub masked_key: String,
   /// Projects this key is assigned to
   pub assigned_projects: Vec< String >,
@@ -214,6 +230,7 @@ pub struct ProviderKeyResponse
 #[ derive( Debug, Deserialize ) ]
 pub struct AssignProviderRequest
 {
+  /// ID of provider key to assign
   pub provider_key_id: i64,
 }
 

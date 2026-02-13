@@ -228,6 +228,7 @@ mod implementation
   #[derive(Clone)]
   pub struct ApiState
   {
+    /// Shared runtime state manager
     pub state_manager: Arc<iron_runtime_state::StateManager>,
   }
 

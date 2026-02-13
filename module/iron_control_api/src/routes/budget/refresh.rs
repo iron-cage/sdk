@@ -17,8 +17,11 @@ use uuid::Uuid;
 #[ derive( Debug, Deserialize ) ]
 pub struct BudgetRefreshRequest
 {
+  /// JWT token for agent authentication
   pub ic_token: String,
+  /// Active lease ID to refresh
   pub current_lease_id: String,
+  /// Optional budget amount in microdollars
   pub requested_budget: Option< i64 >,
 }
 
@@ -109,10 +112,15 @@ impl BudgetRefreshRequest
 #[ derive( Debug, Serialize ) ]
 pub struct BudgetRefreshResponse
 {
+  /// Approval status ("approved" or "denied")
   pub status: String,
+  /// Budget granted in microdollars if approved
   pub budget_granted: Option< i64 >,
+  /// Remaining agent budget in microdollars
   pub budget_remaining: i64,
+  /// New lease ID if approved
   pub lease_id: Option< String >,
+  /// Denial reason if rejected
   pub reason: Option< String >,
 }
 

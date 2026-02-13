@@ -9,7 +9,9 @@ use serde::{ Serialize };
 #[ derive( Debug, Serialize ) ]
 pub struct HealthResponse
 {
+  /// Service health status
   pub status: String,
+  /// Response Unix timestamp
   pub timestamp: i64,
 }
 

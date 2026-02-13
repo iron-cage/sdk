@@ -19,13 +19,21 @@ use std::sync::Arc;
 #[ derive( Clone ) ]
 pub struct BudgetState
 {
+  /// IC Token manager for JWT signing/verification
   pub ic_token_manager: Arc< IcTokenManager >,
+  /// IP Token encryption service
   pub ip_token_crypto: Arc< IpTokenCrypto >,
+  /// Budget lease lifecycle manager
   pub lease_manager: Arc< LeaseManager >,
+  /// Agent budget allocation manager
   pub agent_budget_manager: Arc< AgentBudgetManager >,
+  /// Provider API key storage
   pub provider_key_storage: Arc< ProviderKeyStorage >,
+  /// Crypto service for provider key encryption
   pub provider_key_crypto: Arc< CryptoService >,
+  /// SQLite database connection pool
   pub db_pool: SqlitePool,
+  /// JWT secret for access token auth
   pub jwt_secret: Arc< JwtSecret >,
   /// Crypto service for decrypting provider keys (Feature 014)
   pub crypto_service: Option< Arc< CryptoService > >,

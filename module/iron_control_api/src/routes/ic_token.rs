@@ -33,24 +33,33 @@ use crate::jwt_auth::AuthenticatedUser;
 /// IC Token route state
 #[derive(Debug, Clone)]
 pub struct IcTokenState {
+    /// SQLite database connection pool
     pub pool: SqlitePool,
+    /// Shared IC token manager instance
     pub ic_token_manager: Arc<IcTokenManager>,
 }
 
 /// Response for IC token generation (includes actual token - shown only once)
 #[derive(Debug, Serialize)]
 pub struct IcTokenResponse {
+    /// Associated agent identifier
     pub agent_id: i64,
+    /// Generated token (shown only once)
     pub ic_token: String,
+    /// Unix timestamp of creation
     pub created_at: i64,
+    /// Security warning for the user
     pub warning: String,
 }
 
 /// Response for IC token status (does NOT include actual token)
 #[derive(Debug, Serialize)]
 pub struct IcTokenStatusResponse {
+    /// Associated agent identifier
     pub agent_id: i64,
+    /// Whether agent has an active token
     pub has_ic_token: bool,
+    /// Token creation timestamp, if exists
     pub created_at: Option<i64>,
 }
 

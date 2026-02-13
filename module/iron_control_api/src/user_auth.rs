@@ -11,12 +11,19 @@ use sqlx::{ Pool, Sqlite, FromRow };
 #[ derive( Debug, Clone, FromRow ) ]
 pub struct User
 {
+  /// Unique user identifier
   pub id: String,
+  /// Login username
   pub username: String,
+  /// BCrypt password hash
   pub password_hash: String,
+  /// RBAC role name
   pub role: String,
+  /// User email address
   pub email: String,
+  /// Optional display name
   pub name: Option< String >,
+  /// Whether account is active
   pub is_active: bool,
 }
 
@@ -24,9 +31,13 @@ pub struct User
 #[ derive( Debug, Clone, FromRow ) ]
 pub struct BlacklistedToken
 {
+  /// Token unique identifier
   pub jti: String,
+  /// Owner user ID
   pub user_id: String,
+  /// When token was blacklisted (Unix timestamp)
   pub blacklisted_at: i64,
+  /// Token expiration time (Unix timestamp)
   pub expires_at: i64,
 }
 

@@ -235,7 +235,9 @@ pub mod middleware
   #[ derive( Debug, Clone ) ]
   pub struct UserContext
   {
+    /// Authenticated user identifier
     pub user_id: String,
+    /// User assigned RBAC role
     pub role: Role,
   }
 
