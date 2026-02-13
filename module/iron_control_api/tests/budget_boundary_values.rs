@@ -19,18 +19,13 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  create_ic_token,
-  seed_agent_with_budget,
-  create_budget_router,
 };
 use serde_json::json;
 use tower::ServiceExt;
@@ -47,56 +42,65 @@ use tower::ServiceExt;
 ///
 /// # Risk
 /// HIGH - Integer overflow could corrupt budget accounting
-#[ tokio::test ]
-async fn test_cost_i64_max()
-{
+#[tokio::test]
+async fn test_cost_i64_max() {
   let pool = setup_test_db().await;
   let agent_id = 400i64;
-  seed_agent_with_budget( &pool, agent_id, i64::MAX ).await;
+  seed_agent_with_budget(&pool, agent_id, i64::MAX).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create lease
   let handshake_response = router
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Should have lease_id");
 
   // Attempt to report with i64::MAX cost
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_i64_max_test",
-          "tokens": 1000,
-          "cost_microdollars": i64::MAX,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_i64_max_test",
+            "tokens": 1000,
+            "cost_microdollars": i64::MAX,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -112,12 +116,11 @@ async fn test_cost_i64_max()
   );
 
   // Verify budget accounting is still consistent (no overflow)
-  let budget_status: Result< i64, _ > = sqlx::query_scalar(
-    "SELECT total_spent FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await;
+  let budget_status: Result<i64, _> =
+    sqlx::query_scalar("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await;
 
   assert!(
     budget_status.is_ok(),
@@ -137,56 +140,65 @@ async fn test_cost_i64_max()
 ///
 /// # Risk
 /// LOW - Zero cost is a valid business case (cached LLM responses)
-#[ tokio::test ]
-async fn test_cost_zero()
-{
+#[tokio::test]
+async fn test_cost_zero() {
   let pool = setup_test_db().await;
   let agent_id = 401i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create lease
   let handshake_response = router
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Should have lease_id");
 
   // Report zero cost (cached response)
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_zero_cost_test",
-          "tokens": 1000,
-          "cost_microdollars": 0,
-          "model": "gpt-4-cached",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_zero_cost_test",
+            "tokens": 1000,
+            "cost_microdollars": 0,
+            "model": "gpt-4-cached",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -199,13 +211,12 @@ async fn test_cost_zero()
   );
 
   // Verify lease budget_spent increased by 0
-  let lease_budget_spent: i64 = sqlx::query_scalar(
-    "SELECT budget_spent FROM budget_leases WHERE id = ?"
-  )
-  .bind( lease_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query lease budget");
+  let lease_budget_spent: i64 =
+    sqlx::query_scalar("SELECT budget_spent FROM budget_leases WHERE id = ?")
+      .bind(lease_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query lease budget");
 
   assert_eq!(
     lease_budget_spent, 0,
@@ -225,31 +236,33 @@ async fn test_cost_zero()
 ///
 /// # Risk
 /// MEDIUM - Off-by-one errors could reject valid edge case
-#[ tokio::test ]
-async fn test_budget_exactly_at_limit()
-{
+#[tokio::test]
+async fn test_budget_exactly_at_limit() {
   let pool = setup_test_db().await;
   let agent_id = 402i64;
   let total_budget = 50_000_000i64; // $50 USD
-  seed_agent_with_budget( &pool, agent_id, total_budget ).await;
+  seed_agent_with_budget(&pool, agent_id, total_budget).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Request handshake with exact remaining budget
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai",
-          "requested_budget": total_budget
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai",
+            "requested_budget": total_budget
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -262,13 +275,12 @@ async fn test_budget_exactly_at_limit()
   );
 
   // Verify budget_remaining = 0
-  let budget_remaining: i64 = sqlx::query_scalar(
-    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query budget");
+  let budget_remaining: i64 =
+    sqlx::query_scalar("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query budget");
 
   assert_eq!(
     budget_remaining, 0,
@@ -288,34 +300,35 @@ async fn test_budget_exactly_at_limit()
 ///
 /// # Risk
 /// HIGH - Race conditions or accounting errors could allow budget overrun
-#[ tokio::test ]
-async fn test_multiple_leases_equal_total_budget()
-{
+#[tokio::test]
+async fn test_multiple_leases_equal_total_budget() {
   let pool = setup_test_db().await;
   let agent_id = 403i64;
   let total_budget = 50_000_000i64; // $50 USD
-  let lease_size = 10_000_000i64;   // $10 USD per lease
-  seed_agent_with_budget( &pool, agent_id, total_budget ).await;
+  let lease_size = 10_000_000i64; // $10 USD per lease
+  seed_agent_with_budget(&pool, agent_id, total_budget).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Create 5 leases of $10 each ($50 total)
-  for i in 0..5
-  {
-    let router = create_budget_router( state.clone() ).await;
+  for i in 0..5 {
+    let router = create_budget_router(state.clone()).await;
     let response = router
       .oneshot(
         Request::builder()
-          .method( "POST" )
-          .uri( "/api/budget/handshake" )
-          .header( "content-type", "application/json" )
-          .body( Body::from( json!({
-            "ic_token": ic_token.clone(),
-            "provider": "openai",
-            "requested_budget": lease_size
-          }).to_string() ) )
-          .unwrap()
+          .method("POST")
+          .uri("/api/budget/handshake")
+          .header("content-type", "application/json")
+          .body(Body::from(
+            json!({
+              "ic_token": ic_token.clone(),
+              "provider": "openai",
+              "requested_budget": lease_size
+            })
+            .to_string(),
+          ))
+          .unwrap(),
       )
       .await
       .unwrap();
@@ -323,18 +336,18 @@ async fn test_multiple_leases_equal_total_budget()
     assert_eq!(
       response.status(),
       StatusCode::OK,
-      "LOUD FAILURE: Lease {} should succeed (budget available)", i + 1
+      "LOUD FAILURE: Lease {} should succeed (budget available)",
+      i + 1
     );
   }
 
   // Verify budget fully allocated
-  let budget_remaining: i64 = sqlx::query_scalar(
-    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query budget");
+  let budget_remaining: i64 =
+    sqlx::query_scalar("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query budget");
 
   assert_eq!(
     budget_remaining, 0,
@@ -342,19 +355,22 @@ async fn test_multiple_leases_equal_total_budget()
   );
 
   // Attempt 6th lease (should fail - insufficient budget)
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router(state).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai",
-          "requested_budget": lease_size
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai",
+            "requested_budget": lease_size
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -365,11 +381,14 @@ async fn test_multiple_leases_equal_total_budget()
     "LOUD FAILURE: 6th lease should be rejected (insufficient budget)"
   );
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let response_json: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let response_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
   assert_eq!(
-    response_json["error"].as_str().unwrap(), "Budget limit exceeded",
+    response_json["error"].as_str().unwrap(),
+    "Budget limit exceeded",
     "LOUD FAILURE: 6th lease should be denied due to insufficient budget"
   );
 }
@@ -386,56 +405,65 @@ async fn test_multiple_leases_equal_total_budget()
 ///
 /// # Risk
 /// MEDIUM - Large token counts shouldn't cause overflow but should be validated
-#[ tokio::test ]
-async fn test_tokens_i64_max()
-{
+#[tokio::test]
+async fn test_tokens_i64_max() {
   let pool = setup_test_db().await;
   let agent_id = 404i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router_handshake = create_budget_router( state.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease
   let handshake_response = router_handshake
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Should have lease_id");
 
   // Attempt to report with i64::MAX tokens
-  let router_report = create_budget_router( state ).await;
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_tokens_max_test",
-          "tokens": i64::MAX,
-          "cost_microdollars": 5_000_000,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_tokens_max_test",
+            "tokens": i64::MAX,
+            "cost_microdollars": 5_000_000,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -451,15 +479,13 @@ async fn test_tokens_i64_max()
   );
 
   // If accepted, verify lease budget was updated (no overflow)
-  if response.status() == StatusCode::OK
-  {
-    let lease_budget: i64 = sqlx::query_scalar(
-      "SELECT budget_spent FROM budget_leases WHERE id = ?"
-    )
-    .bind( lease_id )
-    .fetch_one( &pool )
-    .await
-    .expect("LOUD FAILURE: Should query lease budget");
+  if response.status() == StatusCode::OK {
+    let lease_budget: i64 =
+      sqlx::query_scalar("SELECT budget_spent FROM budget_leases WHERE id = ?")
+        .bind(lease_id)
+        .fetch_one(&pool)
+        .await
+        .expect("LOUD FAILURE: Should query lease budget");
 
     assert!(
       lease_budget >= 0,
@@ -483,63 +509,70 @@ async fn test_tokens_i64_max()
 ///
 /// # Risk
 /// MEDIUM - Edge case could cause inconsistent behavior across requests
-#[ tokio::test ]
-async fn test_lease_expiration_exact_timestamp()
-{
+#[tokio::test]
+async fn test_lease_expiration_exact_timestamp() {
   let pool = setup_test_db().await;
   let agent_id = 405i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router_handshake = create_budget_router( state.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease
   let handshake_response = router_handshake
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_json: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
   let lease_id = handshake_json["lease_id"].as_str().unwrap();
 
   // Set lease expiration to current timestamp (edge case)
   let now_ms = chrono::Utc::now().timestamp_millis();
-  sqlx::query( "UPDATE budget_leases SET expires_at = ? WHERE id = ?" )
-    .bind( now_ms )
-    .bind( lease_id )
-    .execute( &pool )
+  sqlx::query("UPDATE budget_leases SET expires_at = ? WHERE id = ?")
+    .bind(now_ms)
+    .bind(lease_id)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Should update lease expiration to current timestamp" );
+    .expect("LOUD FAILURE: Should update lease expiration to current timestamp");
 
   // Attempt to report usage at exact expiration time
-  let router_report = create_budget_router( state ).await;
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_edge_timestamp_test",
-          "tokens": 1000,
-          "cost_microdollars": 5_000_000,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_edge_timestamp_test",
+            "tokens": 1000,
+            "cost_microdollars": 5_000_000,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -547,8 +580,7 @@ async fn test_lease_expiration_exact_timestamp()
   // Document behavior: Either 200 (still valid) or 403 (expired at exact match)
   // Both are acceptable - test documents which behavior is implemented
   assert!(
-    response.status() == StatusCode::OK
-      || response.status() == StatusCode::FORBIDDEN,
+    response.status() == StatusCode::OK || response.status() == StatusCode::FORBIDDEN,
     "LOUD FAILURE: Lease at exact expiration timestamp should be handled consistently (got {})",
     response.status()
   );

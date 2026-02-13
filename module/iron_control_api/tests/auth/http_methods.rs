@@ -27,41 +27,44 @@
 //! **Precondition Violations:** Not applicable
 
 use crate::common::test_state::create_test_auth_state;
-use iron_control_api::routes::auth;
-use axum::{ Router, routing::post, http::{ Request, StatusCode }, extract::ConnectInfo };
 use axum::body::Body;
+use axum::{
+  extract::ConnectInfo,
+  http::{Request, StatusCode},
+  routing::post,
+  Router,
+};
+use iron_control_api::routes::auth;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower::ServiceExt;
 
 /// Create test router with auth routes.
-async fn create_test_router() -> Router
-{
+async fn create_test_router() -> Router {
   let auth_state = create_test_auth_state().await;
-  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
 
   Router::new()
-    .route( "/api/auth/login", post( auth::login ) )
-    .route( "/api/auth/refresh", post( auth::refresh ) )
-    .route( "/api/auth/logout", post( auth::logout ) )
+    .route("/api/auth/login", post(auth::login))
+    .route("/api/auth/refresh", post(auth::refresh))
+    .route("/api/auth/logout", post(auth::logout))
     .layer(axum::Extension(ConnectInfo(test_addr)))
-    .with_state( auth_state )
+    .with_state(auth_state)
 }
 
 /// Test POST /api/auth/login with GET method → 405 Method Not Allowed.
 ///
 /// WHY: Login is a mutating operation (creates session), GET should be rejected.
-#[ tokio::test ]
-async fn test_login_get_method_rejected()
-{
+#[tokio::test]
+async fn test_login_get_method_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/auth/login" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/auth/login")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -73,18 +76,17 @@ async fn test_login_get_method_rejected()
 /// Test POST /api/auth/refresh with GET method → 405 Method Not Allowed.
 ///
 /// WHY: Token refresh is a mutating operation, GET should be rejected.
-#[ tokio::test ]
-async fn test_refresh_get_method_rejected()
-{
+#[tokio::test]
+async fn test_refresh_get_method_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/auth/refresh" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/auth/refresh")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -96,18 +98,17 @@ async fn test_refresh_get_method_rejected()
 /// Test POST /api/auth/logout with GET method → 405 Method Not Allowed.
 ///
 /// WHY: Logout is a mutating operation (invalidates session), GET should be rejected.
-#[ tokio::test ]
-async fn test_logout_get_method_rejected()
-{
+#[tokio::test]
+async fn test_logout_get_method_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/auth/logout" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/auth/logout")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -119,19 +120,18 @@ async fn test_logout_get_method_rejected()
 /// Test POST /api/auth/login with PUT method → 405 Method Not Allowed.
 ///
 /// WHY: Login uses POST, not PUT (not an update operation).
-#[ tokio::test ]
-async fn test_login_put_method_rejected()
-{
+#[tokio::test]
+async fn test_login_put_method_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "PUT" )
-    .uri( "/api/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( r#"{"username":"user","password":"pass"}"# ) )
+    .method("PUT")
+    .uri("/api/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(r#"{"username":"user","password":"pass"}"#))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),

@@ -21,18 +21,13 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  create_ic_token,
-  seed_agent_with_budget,
-  create_budget_router,
 };
 use serde_json::json;
 use sqlx::Row;
@@ -66,17 +61,16 @@ use tower::ServiceExt;
 ///
 /// # Risk
 /// HIGH - Budget accounting corruption
-#[ tokio::test ]
-async fn test_budget_invariant_after_handshake()
-{
+#[tokio::test]
+async fn test_budget_invariant_after_handshake() {
   let pool = setup_test_db().await;
   let agent_id = 130i64;
-  let initial_budget = 100_000_000i64;  // $100 USD
-  seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
+  let initial_budget = 100_000_000i64; // $100 USD
+  seed_agent_with_budget(&pool, agent_id, initial_budget).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Perform handshake
   let request_body = json!({
@@ -87,30 +81,33 @@ async fn test_budget_invariant_after_handshake()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "LOUD FAILURE: Handshake should succeed"
   );
 
   // Verify budget invariant: total_allocated = total_spent + budget_remaining
-  let budget = sqlx::query( "SELECT total_allocated, total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
-    .await
-    .expect("LOUD FAILURE: Should fetch agent budget");
+  let budget = sqlx::query(
+    "SELECT total_allocated, total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?",
+  )
+  .bind(agent_id)
+  .fetch_one(&pool)
+  .await
+  .expect("LOUD FAILURE: Should fetch agent budget");
 
-  let total_allocated : i64 = budget.get( "total_allocated" );
-  let total_spent : i64 = budget.get( "total_spent" );
-  let budget_remaining : i64 = budget.get( "budget_remaining" );
+  let total_allocated: i64 = budget.get("total_allocated");
+  let total_spent: i64 = budget.get("total_spent");
+  let budget_remaining: i64 = budget.get("budget_remaining");
 
   assert_eq!(
     total_allocated,
@@ -123,7 +120,8 @@ async fn test_budget_invariant_after_handshake()
   assert!(
     budget_remaining < initial_budget,
     "LOUD FAILURE: budget_remaining should decrease after handshake. Initial: {}, Current: {}",
-    initial_budget, budget_remaining
+    initial_budget,
+    budget_remaining
   );
 }
 
@@ -156,41 +154,50 @@ async fn test_budget_invariant_after_handshake()
 ///
 /// # Risk
 /// HIGH - Budget accounting corruption
-#[ tokio::test ]
-async fn test_budget_invariant_after_report()
-{
+#[tokio::test]
+async fn test_budget_invariant_after_report() {
   let pool = setup_test_db().await;
   let agent_id = 131i64;
-  let initial_budget = 100_000_000i64;  // $100 USD
-  seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
+  let initial_budget = 100_000_000i64; // $100 USD
+  seed_agent_with_budget(&pool, agent_id, initial_budget).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state.clone()).await;
 
   // Create lease through handshake (reserves budget properly)
-  let budget_granted = 10_000_000i64;  // $10 USD
+  let budget_granted = 10_000_000i64; // $10 USD
   let handshake_response = router
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({ "ic_token": ic_token, "provider": "openai" }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({ "ic_token": ic_token, "provider": "openai" }).to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK, "LOUD FAILURE: Handshake should succeed" );
+  assert_eq!(
+    handshake_response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: Handshake should succeed"
+  );
 
-  let handshake_body = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_json: serde_json::Value = serde_json::from_slice( &handshake_body ).unwrap();
-  let lease_id = handshake_json["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+  let handshake_body = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice(&handshake_body).unwrap();
+  let lease_id = handshake_json["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Should have lease_id");
 
   // Report usage
-  let cost_microdollars = 2_000_000i64;  // $2 USD
+  let cost_microdollars = 2_000_000i64; // $2 USD
   let request_body = json!({
     "lease_id": lease_id,
     "request_id": "req_invariant_test",
@@ -203,30 +210,33 @@ async fn test_budget_invariant_after_report()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "LOUD FAILURE: Report usage should succeed"
   );
 
   // Verify budget invariant: total_allocated = total_spent + budget_remaining
-  let budget = sqlx::query( "SELECT total_allocated, total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
-    .await
-    .expect("LOUD FAILURE: Should fetch agent budget");
+  let budget = sqlx::query(
+    "SELECT total_allocated, total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?",
+  )
+  .bind(agent_id)
+  .fetch_one(&pool)
+  .await
+  .expect("LOUD FAILURE: Should fetch agent budget");
 
-  let total_allocated : i64 = budget.get( "total_allocated" );
-  let total_spent : i64 = budget.get( "total_spent" );
-  let budget_remaining : i64 = budget.get( "budget_remaining" );
+  let total_allocated: i64 = budget.get("total_allocated");
+  let total_spent: i64 = budget.get("total_spent");
+  let budget_remaining: i64 = budget.get("budget_remaining");
 
   assert_eq!(
     total_allocated,
@@ -249,7 +259,8 @@ async fn test_budget_invariant_after_report()
     budget_remaining,
     initial_budget - budget_granted - cost_microdollars,
     "LOUD FAILURE: budget_remaining incorrect. Expected: {}, Actual: {}",
-    initial_budget - budget_granted - cost_microdollars, budget_remaining
+    initial_budget - budget_granted - cost_microdollars,
+    budget_remaining
   );
 }
 
@@ -268,42 +279,52 @@ async fn test_budget_invariant_after_report()
 ///
 /// # Risk
 /// HIGH - Budget accounting corruption
-#[ tokio::test ]
-async fn test_budget_invariant_after_refresh()
-{
+#[tokio::test]
+async fn test_budget_invariant_after_refresh() {
   let pool = setup_test_db().await;
   let agent_id = 126i64;
-  let initial_budget = 100_000_000i64;  // $100 USD
-  seed_agent_with_budget( &pool, agent_id, initial_budget ).await;
+  let initial_budget = 100_000_000i64; // $100 USD
+  seed_agent_with_budget(&pool, agent_id, initial_budget).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state.clone()).await;
 
   // Create initial lease through handshake
-  let initial_grant = 10_000_000i64;  // $10 USD
+  let initial_grant = 10_000_000i64; // $10 USD
   let handshake_response = router
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({ "ic_token": ic_token.clone(), "provider": "openai" }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({ "ic_token": ic_token.clone(), "provider": "openai" }).to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( handshake_response.status(), StatusCode::OK, "LOUD FAILURE: Handshake should succeed" );
+  assert_eq!(
+    handshake_response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: Handshake should succeed"
+  );
 
-  let handshake_body = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_json: serde_json::Value = serde_json::from_slice( &handshake_body ).unwrap();
-  let current_lease_id = handshake_json["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+  let handshake_body = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice(&handshake_body).unwrap();
+  let current_lease_id = handshake_json["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Should have lease_id");
 
   // Refresh budget (request additional lease)
-  let requested_budget = 50_000_000i64;  // $50 USD
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let requested_budget = 50_000_000i64; // $50 USD
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   let request_body = json!({
     "ic_token": ic_token,
@@ -314,31 +335,34 @@ async fn test_budget_invariant_after_refresh()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", access_token))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "LOUD FAILURE: Budget refresh should succeed"
   );
 
   // Verify budget invariant: total_allocated = total_spent + budget_remaining
-  let budget = sqlx::query( "SELECT total_allocated, total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
-    .await
-    .expect("LOUD FAILURE: Should fetch agent budget");
+  let budget = sqlx::query(
+    "SELECT total_allocated, total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?",
+  )
+  .bind(agent_id)
+  .fetch_one(&pool)
+  .await
+  .expect("LOUD FAILURE: Should fetch agent budget");
 
-  let total_allocated : i64 = budget.get( "total_allocated" );
-  let total_spent : i64 = budget.get( "total_spent" );
-  let budget_remaining : i64 = budget.get( "budget_remaining" );
+  let total_allocated: i64 = budget.get("total_allocated");
+  let total_spent: i64 = budget.get("total_spent");
+  let budget_remaining: i64 = budget.get("budget_remaining");
 
   assert_eq!(
     total_allocated,
@@ -360,13 +384,13 @@ async fn test_budget_invariant_after_refresh()
     budget_remaining,
     initial_budget - initial_grant - requested_budget,
     "LOUD FAILURE: budget_remaining incorrect. Expected: {}, Actual: {}",
-    initial_budget - initial_grant - requested_budget, budget_remaining
+    initial_budget - initial_grant - requested_budget,
+    budget_remaining
   );
 
   // Verify total_allocated unchanged (no new budget added, just reallocated)
   assert_eq!(
-    total_allocated,
-    initial_budget,
+    total_allocated, initial_budget,
     "LOUD FAILURE: total_allocated should remain unchanged. Expected: {}, Actual: {}",
     initial_budget, total_allocated
   );

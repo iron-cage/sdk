@@ -72,7 +72,10 @@
 //! | zero | agent_0 | Parse success (zero) | 400 | None (rejected) |
 //! | valid | agent_42 | Parse success (positive) | 200/403 | 42 (accepted) |
 
-use axum::{body::Body, http::{Request, StatusCode}};
+use axum::{
+  body::Body,
+  http::{Request, StatusCode},
+};
 use iron_control_api::ic_token::IcTokenClaims;
 use serde_json::json;
 use tower::ServiceExt;
@@ -87,10 +90,9 @@ mod common;
 fn create_ic_token_with_agent_id(
   agent_id_value: &str,
   ic_token_manager: &iron_control_api::ic_token::IcTokenManager,
-) -> String
-{
+) -> String {
   let claims = IcTokenClaims::new(
-    agent_id_value.to_string(),  // Allows malformed values (agent_INVALID, etc.)
+    agent_id_value.to_string(), // Allows malformed values (agent_INVALID, etc.)
     format!("budget_{}", agent_id_value),
     vec!["llm:call".to_string()],
     None,
@@ -108,8 +110,7 @@ fn create_ic_token_with_agent_id(
 ///
 /// This is the primary attack vector from the vulnerability analysis.
 #[tokio::test]
-async fn test_malformed_agent_id_alphabetic()
-{
+async fn test_malformed_agent_id_alphabetic() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
 
@@ -145,7 +146,9 @@ async fn test_malformed_agent_id_alphabetic()
     "Malformed agent_id (alphabetic) MUST return 401 Unauthorized, not default to agent_id=1"
   );
 
-  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
@@ -160,8 +163,7 @@ async fn test_malformed_agent_id_alphabetic()
 /// **Attack Vector:** agent_id="agent_!!!@@@###" (parse fails)
 /// **Expected:** 400 Bad Request
 #[tokio::test]
-async fn test_malformed_agent_id_special_chars()
-{
+async fn test_malformed_agent_id_special_chars() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 102, 100_000_000).await;
@@ -192,15 +194,15 @@ async fn test_malformed_agent_id_special_chars()
 /// **Attack Vector:** agent_id="agent_99999999999999999999" (overflow i64)
 /// **Expected:** 400 Bad Request
 #[tokio::test]
-async fn test_malformed_agent_id_overflow()
-{
+async fn test_malformed_agent_id_overflow() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 103, 100_000_000).await;
 
   // i64::MAX is 9223372036854775807 (19 digits)
   // This value has 20 digits and will overflow
-  let ic_token = create_ic_token_with_agent_id("agent_99999999999999999999", &state.ic_token_manager);
+  let ic_token =
+    create_ic_token_with_agent_id("agent_99999999999999999999", &state.ic_token_manager);
   let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
@@ -226,8 +228,7 @@ async fn test_malformed_agent_id_overflow()
 /// **Attack Vector:** agent_id="agent_-1" (parses as -1)
 /// **Expected:** 400 Bad Request (database IDs must be positive)
 #[tokio::test]
-async fn test_malformed_agent_id_negative()
-{
+async fn test_malformed_agent_id_negative() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 104, 100_000_000).await;
@@ -252,7 +253,9 @@ async fn test_malformed_agent_id_negative()
     "Negative agent_id MUST return 401 Unauthorized"
   );
 
-  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
@@ -267,8 +270,7 @@ async fn test_malformed_agent_id_negative()
 /// **Attack Vector:** agent_id="agent_0" (parses as 0)
 /// **Expected:** 400 Bad Request (database IDs start at 1)
 #[tokio::test]
-async fn test_malformed_agent_id_zero()
-{
+async fn test_malformed_agent_id_zero() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 105, 100_000_000).await;
@@ -301,8 +303,7 @@ async fn test_malformed_agent_id_zero()
 ///
 /// This test verifies that the fix doesn't break valid agent_id inputs.
 #[tokio::test]
-async fn test_valid_agent_id()
-{
+async fn test_valid_agent_id() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 106, 100_000_000).await;

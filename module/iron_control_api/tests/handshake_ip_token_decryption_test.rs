@@ -46,9 +46,12 @@
 //! - ✅ Decrypt IP Token
 //! - ✅ Verify decrypted value matches original provider key
 
-use axum::{ body::Body, http::{ Request, StatusCode } };
+use axum::{
+  body::Body,
+  http::{Request, StatusCode},
+};
 use iron_secrets::crypto::CryptoService;
-use serde_json::{ json, Value };
+use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
@@ -67,27 +70,27 @@ mod common;
 /// - IP Token should contain real encrypted provider key (not placeholder)
 /// - Decrypting IP Token should yield original provider key
 #[tokio::test]
-async fn test_handshake_decrypts_provider_key()
-{
+async fn test_handshake_decrypts_provider_key() {
   // Setup: Create test database and state
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   // Setup: Create agent with budget
   let agent_id = 200i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
   // Setup: Create real encrypted provider key
   let original_provider_key = "sk-proj-test_real_api_key_12345";
 
   // Create crypto service from environment
   // For tests, set IRON_SECRETS_MASTER_KEY to base64-encoded 32-byte key
-  let master_key : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key
-  let crypto_service = CryptoService::new( &master_key )
-    .expect( "LOUD FAILURE: Should create crypto service" );
+  let master_key: [u8; 32] = [42u8; 32]; // Test master key
+  let crypto_service =
+    CryptoService::new(&master_key).expect("LOUD FAILURE: Should create crypto service");
 
-  let encrypted = crypto_service.encrypt( original_provider_key )
-    .expect( "LOUD FAILURE: Should encrypt provider key" );
+  let encrypted = crypto_service
+    .encrypt(original_provider_key)
+    .expect("LOUD FAILURE: Should encrypt provider key");
 
   // Setup: Store encrypted provider key in database
   let provider_key_id = agent_id * 1000;
@@ -109,16 +112,16 @@ async fn test_handshake_decrypts_provider_key()
   .expect( "LOUD FAILURE: Should insert encrypted provider key" );
 
   // Setup: Create IC Token and store hash for runtime validation
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Execute: Call handshake endpoint
-  let app = common::budget::create_budget_router( state.clone() ).await;
+  let app = common::budget::create_budget_router(state.clone()).await;
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai",
@@ -128,7 +131,7 @@ async fn test_handshake_decrypts_provider_key()
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Verify: Handshake should succeed
   assert_eq!(
@@ -138,23 +141,28 @@ async fn test_handshake_decrypts_provider_key()
   );
 
   // Verify: Extract IP Token from response
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body : Value = serde_json::from_slice( &body_bytes )
-    .expect( "LOUD FAILURE: Response should be valid JSON" );
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body: Value =
+    serde_json::from_slice(&body_bytes).expect("LOUD FAILURE: Response should be valid JSON");
 
-  let ip_token = body[ "ip_token" ].as_str()
-    .expect( "LOUD FAILURE: Response should contain ip_token field" );
+  let ip_token = body["ip_token"]
+    .as_str()
+    .expect("LOUD FAILURE: Response should contain ip_token field");
 
   // Verify: IP Token should NOT be the placeholder
   assert!(
-    !ip_token.contains( "STUB" ),
+    !ip_token.contains("STUB"),
     "IP Token should not contain STUB placeholder: {}",
     ip_token
   );
 
   // Verify: Decrypt IP Token to recover provider key
-  let decrypted_provider_key = state.ip_token_crypto.decrypt( ip_token )
-    .expect( "LOUD FAILURE: Should decrypt IP Token" );
+  let decrypted_provider_key = state
+    .ip_token_crypto
+    .decrypt(ip_token)
+    .expect("LOUD FAILURE: Should decrypt IP Token");
 
   // Verify: Decrypted provider key matches original
   assert_eq!(
@@ -175,13 +183,12 @@ async fn test_handshake_decrypts_provider_key()
 /// - Should not panic
 /// - Should return 500 error with appropriate message
 #[tokio::test]
-async fn test_handshake_handles_decryption_failure()
-{
+async fn test_handshake_handles_decryption_failure() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 201i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
   // Setup: Store invalid encrypted provider key (corrupted data)
   let provider_key_id = agent_id * 1000;
@@ -202,14 +209,14 @@ async fn test_handshake_handles_decryption_failure()
   .await
   .unwrap();
 
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let app = common::budget::create_budget_router( state ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai",
@@ -219,7 +226,7 @@ async fn test_handshake_handles_decryption_failure()
     ))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Verify: Should return 500 Internal Server Error (not panic)
   assert_eq!(
@@ -228,11 +235,13 @@ async fn test_handshake_handles_decryption_failure()
     "Handshake should return 500 when provider key decryption fails"
   );
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_text = String::from_utf8( body_bytes.to_vec() ).unwrap();
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
-    body_text.contains( "error" ),
+    body_text.contains("error"),
     "Error response should contain error message: {}",
     body_text
   );

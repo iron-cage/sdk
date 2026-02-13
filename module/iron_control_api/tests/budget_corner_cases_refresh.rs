@@ -19,18 +19,13 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  seed_agent_with_budget,
-  create_budget_router,
-  create_ic_token,
 };
 use serde_json::json;
 use tower::ServiceExt;
@@ -45,36 +40,39 @@ use tower::ServiceExt;
 ///
 /// # Risk
 /// LOW - NULL is handled by Option<i64> with default value
-#[ tokio::test ]
-async fn test_refresh_null_additional_budget()
-{
+#[tokio::test]
+async fn test_refresh_null_additional_budget() {
   let pool = setup_test_db().await;
   let agent_id = 122i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create initial lease via handshake
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = router.clone().oneshot( handshake_request ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let handshake_response = router.clone().oneshot(handshake_request).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Create JWT token for authenticated request (GAP-003)
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   // Craft refresh request with null requested_budget (should use default)
   let request_body = json!({
@@ -86,12 +84,12 @@ async fn test_refresh_null_additional_budget()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", access_token))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -99,7 +97,8 @@ async fn test_refresh_null_additional_budget()
   // NULL requested_budget is valid - should succeed with default
   assert!(
     response.status() == StatusCode::OK,
-    "NULL requested_budget should succeed with default budget, got: {}", response.status()
+    "NULL requested_budget should succeed with default budget, got: {}",
+    response.status()
   );
 }
 
@@ -113,35 +112,38 @@ async fn test_refresh_null_additional_budget()
 ///
 /// # Risk
 /// MEDIUM - Budget overflow
-#[ tokio::test ]
-async fn test_refresh_float_overflow_f64_max()
-{
+#[tokio::test]
+async fn test_refresh_float_overflow_f64_max() {
   let pool = setup_test_db().await;
   let agent_id = 123i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create initial lease
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = router.clone().oneshot( handshake_request ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let handshake_response = router.clone().oneshot(handshake_request).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   let request_body = json!({
     "ic_token": ic_token,
@@ -152,19 +154,21 @@ async fn test_refresh_float_overflow_f64_max()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", access_token))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
 
   assert!(
-    response.status() == StatusCode::BAD_REQUEST || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-    "f64::MAX requested_budget should be rejected with 400 or 422, got: {}", response.status()
+    response.status() == StatusCode::BAD_REQUEST
+      || response.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "f64::MAX requested_budget should be rejected with 400 or 422, got: {}",
+    response.status()
   );
 }
 
@@ -179,35 +183,38 @@ async fn test_refresh_float_overflow_f64_max()
 /// # Note
 /// JSON doesn't support Infinity, so serde_json serializes it as null. This is valid for Option<i64>
 /// and triggers default budget behavior. This is acceptable - clients sending Infinity get default budget.
-#[ tokio::test ]
-async fn test_refresh_float_overflow_infinity()
-{
+#[tokio::test]
+async fn test_refresh_float_overflow_infinity() {
   let pool = setup_test_db().await;
   let agent_id = 124i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create initial lease
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = router.clone().oneshot( handshake_request ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let handshake_response = router.clone().oneshot(handshake_request).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   // f64::INFINITY serializes to JSON null
   let request_body = json!({
@@ -219,12 +226,12 @@ async fn test_refresh_float_overflow_infinity()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", access_token))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -232,7 +239,8 @@ async fn test_refresh_float_overflow_infinity()
   // Infinity becomes null, which is valid for Option<i64> - should succeed with default budget
   assert!(
     response.status() == StatusCode::OK,
-    "Infinity requested_budget (becomes null) should succeed with default budget, got: {}", response.status()
+    "Infinity requested_budget (becomes null) should succeed with default budget, got: {}",
+    response.status()
   );
 }
 
@@ -247,35 +255,38 @@ async fn test_refresh_float_overflow_infinity()
 /// # Note
 /// JSON doesn't support NaN, so serde_json serializes it as null. This is valid for Option<i64>
 /// and triggers default budget behavior. This is acceptable - clients sending NaN get default budget.
-#[ tokio::test ]
-async fn test_refresh_nan_additional_budget()
-{
+#[tokio::test]
+async fn test_refresh_nan_additional_budget() {
   let pool = setup_test_db().await;
   let agent_id = 125i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create initial lease
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = router.clone().oneshot( handshake_request ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let handshake_response = router.clone().oneshot(handshake_request).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   // f64::NAN serializes to JSON null
   let request_body = json!({
@@ -287,12 +298,12 @@ async fn test_refresh_nan_additional_budget()
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", access_token))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -300,6 +311,7 @@ async fn test_refresh_nan_additional_budget()
   // NaN becomes null, which is valid for Option<i64> - should succeed with default budget
   assert!(
     response.status() == StatusCode::OK,
-    "NaN requested_budget (becomes null) should succeed with default budget, got: {}", response.status()
+    "NaN requested_budget (becomes null) should succeed with default budget, got: {}",
+    response.status()
   );
 }

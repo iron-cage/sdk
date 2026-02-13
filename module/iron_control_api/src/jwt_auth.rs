@@ -8,21 +8,20 @@
 //! - Token blacklisting for logout
 
 use axum::extract::FromRef;
-use jsonwebtoken::{ encode, decode, Header, Validation, EncodingKey, DecodingKey };
-use serde::{ Serialize, Deserialize };
-use std::time::{ SystemTime, UNIX_EPOCH };
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// JWT claims for access tokens (30 days expiry)
-#[ derive( Debug, Serialize, Deserialize, Clone ) ]
-pub struct AccessTokenClaims
-{
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AccessTokenClaims {
   /// User ID
   pub sub: String,
   /// User Role
   pub role: String,
-  /// Issued at (Unix timestamp)
   /// User email
   pub email: String,
+  /// Issued at (Unix timestamp)
   pub iat: i64,
   /// Expiration time (Unix timestamp)
   pub exp: i64,
@@ -31,9 +30,8 @@ pub struct AccessTokenClaims
 }
 
 /// JWT claims for refresh tokens (7 days expiry)
-#[ derive( Debug, Serialize, Deserialize, Clone ) ]
-pub struct RefreshTokenClaims
-{
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RefreshTokenClaims {
   /// User ID
   pub sub: String,
   /// User email
@@ -49,21 +47,26 @@ pub struct RefreshTokenClaims
 }
 
 /// JWT secret manager
-pub struct JwtSecret
-{
+pub struct JwtSecret {
   secret: String,
 }
 
-impl JwtSecret
-{
+impl core::fmt::Debug for JwtSecret {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("JwtSecret")
+      .field("secret", &"<redacted>")
+      .finish()
+  }
+}
+
+impl JwtSecret {
   /// Create new JWT secret manager
   ///
   /// # Arguments
   ///
   /// * `secret` - Secret key for signing JWTs (should be from environment)
-  #[ must_use ]
-  pub fn new( secret: String ) -> Self
-  {
+  #[must_use]
+  pub fn new(secret: String) -> Self {
     Self { secret }
   }
 
@@ -78,12 +81,16 @@ impl JwtSecret
   /// # Errors
   ///
   /// Returns error if JWT encoding fails
-  pub fn generate_access_token( &self, user_id: &str, email: &str,role: &str, token_id: &str ) -> Result< String, jsonwebtoken::errors::Error >
-  {
+  pub fn generate_access_token(
+    &self,
+    user_id: &str,
+    email: &str,
+    role: &str,
+    token_id: &str,
+  ) -> Result<String, jsonwebtoken::errors::Error> {
     let now = chrono::Utc::now().timestamp();
 
-    let claims = AccessTokenClaims
-    {
+    let claims = AccessTokenClaims {
       sub: user_id.to_string(),
       role: role.to_string(),
       iat: now,
@@ -95,7 +102,7 @@ impl JwtSecret
     encode(
       &Header::default(),
       &claims,
-      &EncodingKey::from_secret( self.secret.as_bytes() ),
+      &EncodingKey::from_secret(self.secret.as_bytes()),
     )
   }
 
@@ -106,6 +113,10 @@ impl JwtSecret
   /// * `user_id` - User ID to encode in token
   /// * `token_id` - Unique token ID for blacklist tracking
   ///
+  /// # Panics
+  ///
+  /// Panics if the system clock is before the Unix epoch.
+  ///
   /// # Errors
   ///
   /// Returns error if JWT encoding fails
@@ -115,27 +126,25 @@ impl JwtSecret
     email: &str,
     role: &str,
     token_id: &str,
-  ) -> Result< String, jsonwebtoken::errors::Error >
-  {
+  ) -> Result<String, jsonwebtoken::errors::Error> {
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_secs();
 
-    let claims = RefreshTokenClaims
-    {
+    let claims = RefreshTokenClaims {
       sub: user_id.to_string(),
       email: email.to_string(),
       role: role.to_string(),
       iat: now,
-      exp: now + ( 7 * 24 * 3600 ), // 7 days
+      exp: now + (7 * 24 * 3600), // 7 days
       jti: token_id.to_string(),
     };
 
     encode(
       &Header::default(),
       &claims,
-      &EncodingKey::from_secret( self.secret.as_bytes() ),
+      &EncodingKey::from_secret(self.secret.as_bytes()),
     )
   }
 
@@ -151,15 +160,14 @@ impl JwtSecret
   pub fn verify_access_token(
     &self,
     token: &str,
-  ) -> Result< AccessTokenClaims, jsonwebtoken::errors::Error >
-  {
+  ) -> Result<AccessTokenClaims, jsonwebtoken::errors::Error> {
     let token_data = decode::<AccessTokenClaims>(
       token,
-      &DecodingKey::from_secret( self.secret.as_bytes() ),
+      &DecodingKey::from_secret(self.secret.as_bytes()),
       &Validation::default(),
     )?;
 
-    Ok( token_data.claims )
+    Ok(token_data.claims)
   }
 
   /// Verify refresh token
@@ -174,15 +182,14 @@ impl JwtSecret
   pub fn verify_refresh_token(
     &self,
     token: &str,
-  ) -> Result< RefreshTokenClaims, jsonwebtoken::errors::Error >
-  {
+  ) -> Result<RefreshTokenClaims, jsonwebtoken::errors::Error> {
     let token_data = decode::<RefreshTokenClaims>(
       token,
-      &DecodingKey::from_secret( self.secret.as_bytes() ),
+      &DecodingKey::from_secret(self.secret.as_bytes()),
       &Validation::default(),
     )?;
 
-    Ok( token_data.claims )
+    Ok(token_data.claims)
   }
 }
 
@@ -246,61 +253,64 @@ impl JwtSecret
 /// - Invalid signatures are rejected (HMAC-SHA256 verification)
 /// - Missing `Authorization` header returns 401 Unauthorized
 /// - Malformed headers (not "Bearer <token>") return 401 Unauthorized
-pub struct AuthenticatedUser( pub AccessTokenClaims );
+#[derive(Debug)]
+pub struct AuthenticatedUser(pub AccessTokenClaims);
 
-#[ axum::async_trait ]
-impl< S > axum::extract::FromRequestParts< S > for AuthenticatedUser
+#[axum::async_trait]
+impl<S> axum::extract::FromRequestParts<S> for AuthenticatedUser
 where
   S: Send + Sync,
-  crate::routes::auth::AuthState: axum::extract::FromRef< S >,
+  crate::routes::auth::AuthState: axum::extract::FromRef<S>,
 {
-  type Rejection = ( axum::http::StatusCode, axum::Json< serde_json::Value > );
+  type Rejection = (axum::http::StatusCode, axum::Json<serde_json::Value>);
 
   async fn from_request_parts(
     parts: &mut axum::http::request::Parts,
     state: &S,
-  ) -> Result< Self, Self::Rejection >
-  {
+  ) -> Result<Self, Self::Rejection> {
     // Extract auth state
-    let auth_state = crate::routes::auth::AuthState::from_ref( state );
+    let auth_state = crate::routes::auth::AuthState::from_ref(state);
 
     // Extract Authorization header
     let auth_header = parts
       .headers
-      .get( axum::http::header::AUTHORIZATION )
-      .and_then( |h| h.to_str().ok() )
-      .ok_or_else( || (
-        axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json( serde_json::json!({ "error": {
+      .get(axum::http::header::AUTHORIZATION)
+      .and_then(|h| h.to_str().ok())
+      .ok_or_else(|| {
+        (
+          axum::http::StatusCode::UNAUTHORIZED,
+          axum::Json(serde_json::json!({ "error": {
           "code": "AUTH_MISSING_TOKEN",
           "message": "Missing authentication token"
-        } }) ),
-      ) )?;
+        } })),
+        )
+      })?;
 
     // Parse "Bearer <token>" format
-    let token = auth_header
-      .strip_prefix( "Bearer ")
-      .ok_or_else( || (
+    let token = auth_header.strip_prefix("Bearer ").ok_or_else(|| {
+      (
         axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json( serde_json::json!({ "error": {
+        axum::Json(serde_json::json!({ "error": {
           "code": "AUTH_MISSING_TOKEN",
           "message": "Missing authentication token"
-        } }) ),
-      ) )?;
+        } })),
+      )
+    })?;
 
     // Verify token and extract claims
     let claims = auth_state
       .jwt_secret
-      .verify_access_token( token )
-      .map_err( |_| (
-        axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json( serde_json::json!({ "error": {
+      .verify_access_token(token)
+      .map_err(|_| {
+        (
+          axum::http::StatusCode::UNAUTHORIZED,
+          axum::Json(serde_json::json!({ "error": {
           "code": "AUTH_INVALID_TOKEN",
           "message": "Invalid or expired authentication token"
-        } }) ),
-      ) )?;
+        } })),
+        )
+      })?;
 
-    Ok( AuthenticatedUser( claims ) )
+    Ok(AuthenticatedUser(claims))
   }
 }
-

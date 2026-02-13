@@ -133,14 +133,17 @@ async fn test_concurrent_validation_during_regenerate() {
   });
 
   // Task 2: Regenerate (replace `Token A` with `Token B`)
-  let regenerate_handle = tokio::spawn(async move {
-    regenerate(&pool_regen, &mgr_regen, agent_id).await
-  });
+  let regenerate_handle =
+    tokio::spawn(async move { regenerate(&pool_regen, &mgr_regen, agent_id).await });
 
   // Both must complete within 5 seconds (no deadlock)
   let (val_results, token_b) = timeout(Duration::from_secs(5), async {
-    let val = validation_handle.await.expect("LOUD FAILURE: Validation task panicked");
-    let tok = regenerate_handle.await.expect("LOUD FAILURE: Regenerate task panicked");
+    let val = validation_handle
+      .await
+      .expect("LOUD FAILURE: Validation task panicked");
+    let tok = regenerate_handle
+      .await
+      .expect("LOUD FAILURE: Regenerate task panicked");
     (val, tok)
   })
   .await
@@ -187,13 +190,9 @@ async fn test_concurrent_double_regenerate() {
   let mgr1 = mgr.clone();
   let mgr2 = mgr.clone();
 
-  let handle1 = tokio::spawn(async move {
-    regenerate(&pool1, &mgr1, agent_id).await
-  });
+  let handle1 = tokio::spawn(async move { regenerate(&pool1, &mgr1, agent_id).await });
 
-  let handle2 = tokio::spawn(async move {
-    regenerate(&pool2, &mgr2, agent_id).await
-  });
+  let handle2 = tokio::spawn(async move { regenerate(&pool2, &mgr2, agent_id).await });
 
   // Both must complete within 5 seconds (no deadlock from IMMEDIATE transactions)
   let (token_x, token_y) = timeout(Duration::from_secs(5), async {

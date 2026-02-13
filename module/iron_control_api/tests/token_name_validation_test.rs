@@ -3,7 +3,7 @@
 //! ## Root Cause
 //!
 //! The `CreateTokenRequest::validate()` method only validates fields IF they are
-//! present (`if let Some(ref name) = self.name { validate... }`), but didnt ensure
+//! present (`if let Some(ref name) = self.name { validate... }`), but didn't ensure
 //! that ANY fields are provided. The validation allowed completely empty requests `{}`
 //! which contain no useful information.
 //!
@@ -20,7 +20,7 @@
 //!    string, too long), not MISSING fields
 //! 2. **Backward Compatibility Confusion:** The code attempted to support both
 //!    Protocol 014 (`name` required) and legacy format (`description` as name),
-//!    but the validation logic didnt enforce "at least one must be present"
+//!    but the validation logic didn't enforce "at least one must be present"
 //! 3. **Manual Testing Scope:** The Iron Cage Pilot testing focused on successful
 //!    token creation paths, not validation edge cases
 //!
@@ -53,13 +53,13 @@
 //! ```
 //!
 //! This prevents empty requests while supporting both Protocol 014 (name in request)
-//! and legacy format (user_id in request body).
+//! and legacy format (`user_id` in request body).
 //!
 //! ## Prevention
 //!
 //! 1. **Required Field Checklist:** When adding required fields, add explicit
 //!    tests for MISSING field (not just invalid values)
-//! 2. **Validation Audit:** Review validate() methods to ensure they check for
+//! 2. **Validation Audit:** Review `validate()` methods to ensure they check for
 //!    required field presence, not just optional field validity
 //! 3. **Protocol Compliance Tests:** Add comprehensive Protocol 014 compliance
 //!    test suite covering all validation rules (required, optional, formats)
@@ -70,7 +70,7 @@
 //!
 //! **Never assume `Option<T>` fields are validated for presence.** The pattern
 //! `if let Some(ref field) = self.field { validate... }` only validates when
-//! field is present - it doesnt enforce that required fields exist. Always add
+//! field is present - it doesn't enforce that required fields exist. Always add
 //! explicit checks:
 //!
 //! ```rust
@@ -89,15 +89,14 @@
 //! When supporting multiple formats (Protocol 014 + legacy), be explicit about
 //! which fields are required for each format and validate accordingly.
 
-#[ cfg( feature = "enabled" ) ]
-#[ tokio::test ]
-async fn bug_reproducer_token_creation_requires_name()
-{
+#[cfg(feature = "enabled")]
+#[tokio::test]
+async fn bug_reproducer_token_creation_requires_name() {
   use iron_control_api::routes::tokens::CreateTokenRequest;
 
   // Test 1: Truly empty body should fail validation
-  let empty_request = serde_json::from_str::<CreateTokenRequest>( "{}" )
-    .expect( "Should deserialize empty object" );
+  let empty_request =
+    serde_json::from_str::<CreateTokenRequest>("{}").expect("Should deserialize empty object");
 
   let result = empty_request.validate();
   assert!(
@@ -107,8 +106,9 @@ async fn bug_reproducer_token_creation_requires_name()
 
   // Test 2: Request with at least one field should pass (legacy format)
   let legacy_request = serde_json::from_str::<CreateTokenRequest>(
-    r#"{"user_id":"test-user","project_id":"test-project"}"#
-  ).expect( "Should deserialize legacy request" );
+    r#"{"user_id":"test-user","project_id":"test-project"}"#,
+  )
+  .expect("Should deserialize legacy request");
 
   let result = legacy_request.validate();
   assert!(
@@ -117,9 +117,8 @@ async fn bug_reproducer_token_creation_requires_name()
   );
 
   // Test 3: Request with only description should pass (legacy compatibility)
-  let desc_only_request = serde_json::from_str::<CreateTokenRequest>(
-    r#"{"description":"test"}"#
-  ).expect( "Should deserialize description-only request" );
+  let desc_only_request = serde_json::from_str::<CreateTokenRequest>(r#"{"description":"test"}"#)
+    .expect("Should deserialize description-only request");
 
   let result = desc_only_request.validate();
   assert!(
@@ -128,9 +127,8 @@ async fn bug_reproducer_token_creation_requires_name()
   );
 
   // Test 4: Valid Protocol 014 request with name should pass
-  let valid_request = serde_json::from_str::<CreateTokenRequest>(
-    r#"{"name":"test-token"}"#
-  ).expect( "Should deserialize valid request" );
+  let valid_request = serde_json::from_str::<CreateTokenRequest>(r#"{"name":"test-token"}"#)
+    .expect("Should deserialize valid request");
 
   let result = valid_request.validate();
   assert!(

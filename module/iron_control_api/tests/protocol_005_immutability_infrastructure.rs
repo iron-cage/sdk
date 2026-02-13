@@ -76,7 +76,6 @@
 //! | `bug_reproducer_issue_003_enforcement_coverage` | Verify all 16 enforcement mechanisms active | Count active enforcement actions | 16/16 (100%) | ❌ FAIL |
 //! | `bug_reproducer_issue_003_script_validates_working_directory` | Verify scripts fail loudly when run from wrong directory | Execute script from wrong location | Script fails with clear error | ❌ FAIL |
 
-
 /// ## Bug Reproducer: Missing Enforcement Documentation
 ///
 /// ### Root Cause
@@ -107,17 +106,16 @@
 /// Enforcement documentation specifically prevents rollback by documenting WHY
 /// changes are immutable and WHAT would break if rolled back.
 // test_kind: bug_reproducer(issue-003)
-#[ test ]
-fn bug_reproducer_issue_003_documentation_exists()
-{
+#[test]
+fn bug_reproducer_issue_003_documentation_exists() {
   // Get repository root (navigate up from module directory)
   let module_dir = std::env::current_dir().unwrap();
   let repo_root = module_dir
     .ancestors()
-    .find( | p | p.join( ".git" ).exists() )
-    .expect( "Could not find repository root" );
+    .find(|p| p.join(".git").exists())
+    .expect("Could not find repository root");
 
-  let docs_dir = repo_root.join( "dev/docs/enforcement" );
+  let docs_dir = repo_root.join("dev/docs/enforcement");
 
   let required_files = [
     "migration_complete.md",
@@ -128,33 +126,27 @@ fn bug_reproducer_issue_003_documentation_exists()
   let mut missing_files = Vec::new();
   let mut existing_files = Vec::new();
 
-  for file in &required_files
-  {
-    let file_path = docs_dir.join( file );
-    if file_path.exists()
-    {
-      existing_files.push( file.to_string() );
-    }
-    else
-    {
-      missing_files.push( file.to_string() );
+  for file in &required_files {
+    let file_path = docs_dir.join(file);
+    if file_path.exists() {
+      existing_files.push(file.to_string());
+    } else {
+      missing_files.push(file.to_string());
     }
   }
 
   // Report current state
-  println!( "\n=== ENFORCEMENT DOCUMENTATION STATUS ===" );
-  println!( "Expected directory: {}", docs_dir.display() );
-  println!( "\nExisting files ({}):", existing_files.len() );
-  for file in &existing_files
-  {
-    println!( "  ✓ {}", file );
+  println!("\n=== ENFORCEMENT DOCUMENTATION STATUS ===");
+  println!("Expected directory: {}", docs_dir.display());
+  println!("\nExisting files ({}):", existing_files.len());
+  for file in &existing_files {
+    println!("  ✓ {}", file);
   }
-  println!( "\nMissing files ({}):", missing_files.len() );
-  for file in &missing_files
-  {
-    println!( "  ✗ {}", file );
+  println!("\nMissing files ({}):", missing_files.len());
+  for file in &missing_files {
+    println!("  ✗ {}", file);
   }
-  println!( "========================================\n" );
+  println!("========================================\n");
 
   // CRITICAL ASSERTION: All documentation files must exist
   assert!(
@@ -173,7 +165,7 @@ fn bug_reproducer_issue_003_documentation_exists()
      - immutability_contract.md: Formal contract preventing rollback",
     missing_files.len(),
     required_files.len(),
-    missing_files.join( "\n     " )
+    missing_files.join("\n     ")
   );
 }
 
@@ -202,22 +194,20 @@ fn bug_reproducer_issue_003_documentation_exists()
 /// Stub files satisfy existence checks but provide zero enforcement.
 /// Always verify files contain WORKING code, not just exist.
 // test_kind: bug_reproducer(issue-003)
-#[ test ]
-#[ ignore = "requires pre-commit hook infrastructure" ]
-fn bug_reproducer_issue_003_git_hook_exists()
-{
+#[test]
+#[ignore = "requires pre-commit hook infrastructure"]
+fn bug_reproducer_issue_003_git_hook_exists() {
   // Get repository root
   let module_dir = std::env::current_dir().unwrap();
   let repo_root = module_dir
     .ancestors()
-    .find( | p | p.join( ".git" ).exists() )
-    .expect( "Could not find repository root" );
+    .find(|p| p.join(".git").exists())
+    .expect("Could not find repository root");
 
-  let hook_path = repo_root.join( ".git/hooks/pre-commit" );
+  let hook_path = repo_root.join(".git/hooks/pre-commit");
 
   // Check if hook exists
-  if !hook_path.exists()
-  {
+  if !hook_path.exists() {
     panic!(
       "BUG REPRODUCER: Pre-commit hook missing.\n\
        Expected: {}\n\
@@ -230,15 +220,22 @@ fn bug_reproducer_issue_003_git_hook_exists()
   }
 
   // Check hook size (must be >= 100 bytes for real enforcement logic)
-  let metadata = std::fs::metadata( &hook_path ).unwrap();
+  let metadata = std::fs::metadata(&hook_path).unwrap();
   let size = metadata.len();
 
-  println!( "\n=== PRE-COMMIT HOOK STATUS ===" );
-  println!( "Path: {}", hook_path.display() );
-  println!( "Size: {} bytes", size );
-  println!( "Required: >= 100 bytes" );
-  println!( "Status: {}", if size >= 100 { "✓ ADEQUATE" } else { "✗ STUB" } );
-  println!( "================================\n" );
+  println!("\n=== PRE-COMMIT HOOK STATUS ===");
+  println!("Path: {}", hook_path.display());
+  println!("Size: {} bytes", size);
+  println!("Required: >= 100 bytes");
+  println!(
+    "Status: {}",
+    if size >= 100 {
+      "✓ ADEQUATE"
+    } else {
+      "✗ STUB"
+    }
+  );
+  println!("================================\n");
 
   // CRITICAL ASSERTION: Hook must have real content
   assert!(
@@ -290,10 +287,9 @@ fn bug_reproducer_issue_003_git_hook_exists()
 /// enforcement mechanism creates bypass path. 80% is not "mostly done",
 /// it's "not done".
 // test_kind: bug_reproducer(issue-003)
-#[ test ]
-#[ ignore = "requires complete migration infrastructure" ]
-fn bug_reproducer_issue_003_migration_state_metrics()
-{
+#[test]
+#[ignore = "requires complete migration infrastructure"]
+fn bug_reproducer_issue_003_migration_state_metrics() {
   // Count completed migration patterns (from test status report)
   let completed_patterns = [
     "git_hook_file_exists",
@@ -307,7 +303,7 @@ fn bug_reproducer_issue_003_migration_state_metrics()
   ];
 
   let incomplete_patterns = [
-    "pre_commit_hook_content", // Stub only, needs real logic
+    "pre_commit_hook_content",    // Stub only, needs real logic
     "immutability_contract_docs", // 3 files missing
   ];
 
@@ -315,28 +311,27 @@ fn bug_reproducer_issue_003_migration_state_metrics()
   let old_pattern_count = incomplete_patterns.len();
   let new_pattern_count = completed_patterns.len();
 
-  let old_percentage = ( old_pattern_count as f64 / total_patterns as f64 ) * 100.0;
-  let new_percentage = ( new_pattern_count as f64 / total_patterns as f64 ) * 100.0;
+  let old_percentage = (old_pattern_count as f64 / total_patterns as f64) * 100.0;
+  let new_percentage = (new_pattern_count as f64 / total_patterns as f64) * 100.0;
 
-  println!( "\n=== MIGRATION STATE METRICS ===" );
-  println!( "Total patterns: {}", total_patterns );
-  println!( "Completed: {} ({:.0}%)", new_pattern_count, new_percentage );
-  println!( "Incomplete: {} ({:.0}%)", old_pattern_count, old_percentage );
-  println!( "\nCompleted patterns:" );
-  for pattern in &completed_patterns
-  {
-    println!( "  ✓ {}", pattern );
+  println!("\n=== MIGRATION STATE METRICS ===");
+  println!("Total patterns: {}", total_patterns);
+  println!("Completed: {} ({:.0}%)", new_pattern_count, new_percentage);
+  println!("Incomplete: {} ({:.0}%)", old_pattern_count, old_percentage);
+  println!("\nCompleted patterns:");
+  for pattern in &completed_patterns {
+    println!("  ✓ {}", pattern);
   }
-  println!( "\nIncomplete patterns:" );
-  for pattern in &incomplete_patterns
-  {
-    println!( "  ✗ {}", pattern );
+  println!("\nIncomplete patterns:");
+  for pattern in &incomplete_patterns {
+    println!("  ✗ {}", pattern);
   }
-  println!( "=================================\n" );
+  println!("=================================\n");
 
   // CRITICAL ASSERTION: Must be 100% complete
   assert_eq!(
-    old_pattern_count, 0,
+    old_pattern_count,
+    0,
     "BUG REPRODUCER: Migration not 100% complete.\n\
      Found {} incomplete patterns ({:.0}%), expected 0%.\n\
      \n\
@@ -347,16 +342,14 @@ fn bug_reproducer_issue_003_migration_state_metrics()
      Partial completion leaves bypass paths available.",
     old_pattern_count,
     old_percentage,
-    incomplete_patterns.join( "\n     " )
+    incomplete_patterns.join("\n     ")
   );
 
   assert_eq!(
     new_pattern_count, total_patterns,
     "BUG REPRODUCER: Migration not 100% complete.\n\
      Completed {}/{} patterns ({:.0}%), expected 100%.",
-    new_pattern_count,
-    total_patterns,
-    new_percentage
+    new_pattern_count, total_patterns, new_percentage
   );
 }
 
@@ -385,10 +378,9 @@ fn bug_reproducer_issue_003_migration_state_metrics()
 /// Enforcement mechanisms work as a SYSTEM. Missing one mechanism
 /// creates bypass path. Need ALL mechanisms active for true immutability.
 // test_kind: bug_reproducer(issue-003)
-#[ test ]
-#[ ignore = "requires all 16 enforcement mechanisms" ]
-fn bug_reproducer_issue_003_enforcement_coverage()
-{
+#[test]
+#[ignore = "requires all 16 enforcement mechanisms"]
+fn bug_reproducer_issue_003_enforcement_coverage() {
   // Count active enforcement mechanisms (from test status report)
   let active_mechanisms = [
     "git_hook_file_exists",
@@ -406,10 +398,10 @@ fn bug_reproducer_issue_003_enforcement_coverage()
 
   let inactive_mechanisms = [
     "pre_commit_enforcement_logic", // Hook is stub
-    "migration_complete_doc", // File missing
-    "rollback_impossibility_doc", // File missing
-    "immutability_contract_doc", // File missing
-    "additional_mechanism_tbd_1", // Scope unclear from report
+    "migration_complete_doc",       // File missing
+    "rollback_impossibility_doc",   // File missing
+    "immutability_contract_doc",    // File missing
+    "additional_mechanism_tbd_1",   // Scope unclear from report
   ];
 
   let required_total = 16; // Per test status report
@@ -417,27 +409,26 @@ fn bug_reproducer_issue_003_enforcement_coverage()
   let inactive_count = inactive_mechanisms.len();
   let current_total = active_count + inactive_count;
 
-  let coverage_percentage = ( active_count as f64 / required_total as f64 ) * 100.0;
+  let coverage_percentage = (active_count as f64 / required_total as f64) * 100.0;
 
-  println!( "\n=== ENFORCEMENT COVERAGE STATUS ===" );
-  println!( "Required mechanisms: {}", required_total );
-  println!( "Active: {} ({:.0}%)", active_count, coverage_percentage );
-  println!( "Inactive: {}", inactive_count );
-  println!( "\nActive mechanisms:" );
-  for mechanism in &active_mechanisms
-  {
-    println!( "  ✓ {}", mechanism );
+  println!("\n=== ENFORCEMENT COVERAGE STATUS ===");
+  println!("Required mechanisms: {}", required_total);
+  println!("Active: {} ({:.0}%)", active_count, coverage_percentage);
+  println!("Inactive: {}", inactive_count);
+  println!("\nActive mechanisms:");
+  for mechanism in &active_mechanisms {
+    println!("  ✓ {}", mechanism);
   }
-  println!( "\nInactive mechanisms:" );
-  for mechanism in &inactive_mechanisms
-  {
-    println!( "  ✗ {}", mechanism );
+  println!("\nInactive mechanisms:");
+  for mechanism in &inactive_mechanisms {
+    println!("  ✗ {}", mechanism);
   }
-  println!( "====================================\n" );
+  println!("====================================\n");
 
   // CRITICAL ASSERTION: Must have 100% coverage
   assert_eq!(
-    active_count, required_total,
+    active_count,
+    required_total,
     "BUG REPRODUCER: Enforcement coverage incomplete.\n\
      Active: {}/{} mechanisms ({:.0}%), expected 100%.\n\
      \n\
@@ -449,7 +440,7 @@ fn bug_reproducer_issue_003_enforcement_coverage()
     active_count,
     required_total,
     coverage_percentage,
-    inactive_mechanisms.join( "\n     " )
+    inactive_mechanisms.join("\n     ")
   );
 
   // Additional assertion: Verify we're tracking correct total
@@ -497,21 +488,19 @@ fn bug_reproducer_issue_003_enforcement_coverage()
 ///
 /// Loud failures with clear error messages prevent debugging waste.
 // test_kind: bug_reproducer(issue-003)
-#[ test ]
-#[ ignore = "requires dev/-dev1 verification script" ]
-fn bug_reproducer_issue_003_script_validates_working_directory()
-{
+#[test]
+#[ignore = "requires dev/-dev1 verification script"]
+fn bug_reproducer_issue_003_script_validates_working_directory() {
   // Find verification script from test status report
   let module_dir = std::env::current_dir().unwrap();
   let repo_root = module_dir
     .ancestors()
-    .find( | p | p.join( ".git" ).exists() )
-    .expect( "Could not find repository root" );
+    .find(|p| p.join(".git").exists())
+    .expect("Could not find repository root");
 
-  let script_path = repo_root.join( "dev/-dev1/-default_topic/-phase1_verify.sh" );
+  let script_path = repo_root.join("dev/-dev1/-default_topic/-phase1_verify.sh");
 
-  if !script_path.exists()
-  {
+  if !script_path.exists() {
     panic!(
       "BUG REPRODUCER: Verification script not found.\n\
        Expected: {}\n\
@@ -522,23 +511,28 @@ fn bug_reproducer_issue_003_script_validates_working_directory()
   }
 
   // Read script content
-  let script_content = std::fs::read_to_string( &script_path )
-    .expect( "Failed to read script" );
+  let script_content = std::fs::read_to_string(&script_path).expect("Failed to read script");
 
   // Check for working directory validation patterns
-  let has_directory_check = script_content.contains( "if [" )
-    && ( script_content.contains( "-d" ) || script_content.contains( "-f" ) );
+  let has_directory_check = script_content.contains("if [")
+    && (script_content.contains("-d") || script_content.contains("-f"));
 
-  let has_error_exit = script_content.contains( "exit 1" );
+  let has_error_exit = script_content.contains("exit 1");
 
   let has_validation = has_directory_check && has_error_exit;
 
-  println!( "\n=== SCRIPT VALIDATION STATUS ===" );
-  println!( "Script: {}", script_path.display() );
-  println!( "Has directory check: {}", if has_directory_check { "✓" } else { "✗" } );
-  println!( "Has error exit: {}", if has_error_exit { "✓" } else { "✗" } );
-  println!( "Validation complete: {}", if has_validation { "✓ YES" } else { "✗ NO" } );
-  println!( "==================================\n" );
+  println!("\n=== SCRIPT VALIDATION STATUS ===");
+  println!("Script: {}", script_path.display());
+  println!(
+    "Has directory check: {}",
+    if has_directory_check { "✓" } else { "✗" }
+  );
+  println!("Has error exit: {}", if has_error_exit { "✓" } else { "✗" });
+  println!(
+    "Validation complete: {}",
+    if has_validation { "✓ YES" } else { "✗ NO" }
+  );
+  println!("==================================\n");
 
   // CRITICAL ASSERTION: Script must validate working directory
   assert!(

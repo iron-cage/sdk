@@ -20,43 +20,39 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
-  setup_test_db,
-  create_test_budget_state,
-  seed_agent_with_budget,
-  create_budget_router,
+use common::budget::{
+  create_budget_router, create_test_budget_state, seed_agent_with_budget, setup_test_db,
 };
-use iron_control_api::ic_token::{ IcTokenClaims, IcTokenManager, sha256_hash };
+use iron_control_api::ic_token::{sha256_hash, IcTokenClaims, IcTokenManager};
 use serde_json::json;
-use std::time::{ SystemTime, UNIX_EPOCH };
+use std::time::{SystemTime, UNIX_EPOCH};
 use tower::ServiceExt;
 
 /// Helper: Create expired IC Token
 ///
 /// Generates IC Token with expiration in the past (1 hour ago)
-fn create_expired_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
-{
+fn create_expired_ic_token(agent_id: i64, manager: &IcTokenManager) -> String {
   let now = SystemTime::now()
-    .duration_since( UNIX_EPOCH )
+    .duration_since(UNIX_EPOCH)
     .expect("LOUD FAILURE: Time went backwards")
     .as_secs();
 
   let expired_time = now - 3600; // 1 hour ago
 
   let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
-    Some( expired_time ), // Expired
+    format!("agent_{}", agent_id),
+    format!("budget_{}", agent_id),
+    vec!["llm:call".to_string()],
+    Some(expired_time), // Expired
   );
 
-  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
+  manager
+    .generate_token(&claims)
+    .expect("LOUD FAILURE: Should generate IC Token")
 }
 
 /// E2: Handshake with expired IC Token
@@ -78,29 +74,31 @@ fn create_expired_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
 /// - Use of stolen/leaked tokens after revocation
 /// - Access with stale authorization
 /// - Replay attacks with old tokens
-#[ tokio::test ]
-async fn test_handshake_expired_ic_token()
-{
+#[tokio::test]
+async fn test_handshake_expired_ic_token() {
   let pool = setup_test_db().await;
   let agent_id = 300i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let expired_ic_token = create_expired_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let expired_ic_token = create_expired_ic_token(agent_id, &state.ic_token_manager);
+  let router = create_budget_router(state).await;
 
   // Attempt handshake with expired IC token
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": expired_ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": expired_ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -112,10 +110,12 @@ async fn test_handshake_expired_ic_token()
     "LOUD FAILURE: Expired IC Token should return 401 Unauthorized"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
-  let response_json: serde_json::Value = serde_json::from_str( &body_str )
-    .expect("LOUD FAILURE: Response should be valid JSON");
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
+  let response_json: serde_json::Value =
+    serde_json::from_str(&body_str).expect("LOUD FAILURE: Response should be valid JSON");
 
   // Assert: Error message mentions token issue
   assert!(
@@ -125,13 +125,12 @@ async fn test_handshake_expired_ic_token()
   );
 
   // Verify: No lease created
-  let lease_count: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM budget_leases WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query lease count");
+  let lease_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM budget_leases WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query lease count");
 
   assert_eq!(
     lease_count, 0,
@@ -139,13 +138,12 @@ async fn test_handshake_expired_ic_token()
   );
 
   // Verify: Budget unchanged (no reservation)
-  let budget_remaining: i64 = sqlx::query_scalar(
-    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query budget");
+  let budget_remaining: i64 =
+    sqlx::query_scalar("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query budget");
 
   assert_eq!(
     budget_remaining, 100_000_000,
@@ -166,56 +164,67 @@ async fn test_handshake_expired_ic_token()
 ///
 /// # Risk
 /// MEDIUM - Stale token used for budget refresh
-#[ tokio::test ]
-async fn test_refresh_expired_ic_token()
-{
+#[tokio::test]
+async fn test_refresh_expired_ic_token() {
   let pool = setup_test_db().await;
   let agent_id = 302i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Create initial lease with valid token
-  let valid_ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state.clone() ).await;
+  let valid_ic_token =
+    common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state.clone()).await;
 
   let handshake_response = router
     .clone()
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": valid_ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": valid_ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  let handshake_body = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_json: serde_json::Value = serde_json::from_slice( &handshake_body ).unwrap();
-  let current_lease_id = handshake_json["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
+  let handshake_body = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice(&handshake_body).unwrap();
+  let current_lease_id = handshake_json["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Should have lease_id");
 
   // Attempt refresh with EXPIRED IC token
-  let expired_ic_token = create_expired_ic_token( agent_id, &state.ic_token_manager );
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let expired_ic_token = create_expired_ic_token(agent_id, &state.ic_token_manager);
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .body( Body::from( json!({
-          "ic_token": expired_ic_token,
-          "current_lease_id": current_lease_id,
-          "requested_budget": 10_000_000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", access_token))
+        .body(Body::from(
+          json!({
+            "ic_token": expired_ic_token,
+            "current_lease_id": current_lease_id,
+            "requested_budget": 10_000_000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -228,13 +237,12 @@ async fn test_refresh_expired_ic_token()
   );
 
   // Verify: No new lease created (only initial handshake lease)
-  let lease_count: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM budget_leases WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query lease count");
+  let lease_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM budget_leases WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query lease count");
 
   assert_eq!(
     lease_count, 1,
@@ -242,13 +250,12 @@ async fn test_refresh_expired_ic_token()
   );
 
   // Verify: Budget unchanged (only handshake deduction)
-  let total_spent: i64 = sqlx::query_scalar(
-    "SELECT total_spent FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Should query budget");
+  let total_spent: i64 =
+    sqlx::query_scalar("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should query budget");
 
   assert_eq!(
     total_spent, 10_000_000,
@@ -272,38 +279,38 @@ async fn test_refresh_expired_ic_token()
 ///
 /// # Risk
 /// HIGH - Without jti, regenerate would not invalidate old token in same-second scenario
-#[ tokio::test ]
-async fn test_jti_guarantees_unique_token_hashes()
-{
-  let manager = IcTokenManager::new( "test_secret_for_jti".to_string() );
+#[tokio::test]
+async fn test_jti_guarantees_unique_token_hashes() {
+  let manager = IcTokenManager::new("test_secret_for_jti".to_string());
 
   // Generate two tokens with IDENTICAL parameters in rapid succession (same second)
   let claims_a = IcTokenClaims::new(
     "agent_500".to_string(),
     "budget_500".to_string(),
-    vec![ "llm:call".to_string() ],
+    vec!["llm:call".to_string()],
     None, // No expiration — long-lived
   );
 
   let claims_b = IcTokenClaims::new(
     "agent_500".to_string(),
     "budget_500".to_string(),
-    vec![ "llm:call".to_string() ],
+    vec!["llm:call".to_string()],
     None, // No expiration — long-lived
   );
 
   // Verify: jti (token_id) values are different
   assert_ne!(
-    claims_a.token_id,
-    claims_b.token_id,
+    claims_a.token_id, claims_b.token_id,
     "LOUD FAILURE: Two IcTokenClaims::new() calls must produce different jti values"
   );
 
   // Generate JWTs
-  let token_a = manager.generate_token( &claims_a )
-    .expect( "LOUD FAILURE: Should generate token A" );
-  let token_b = manager.generate_token( &claims_b )
-    .expect( "LOUD FAILURE: Should generate token B" );
+  let token_a = manager
+    .generate_token(&claims_a)
+    .expect("LOUD FAILURE: Should generate token A");
+  let token_b = manager
+    .generate_token(&claims_b)
+    .expect("LOUD FAILURE: Should generate token B");
 
   // Verify: JWT strings are different
   assert_ne!(
@@ -312,8 +319,8 @@ async fn test_jti_guarantees_unique_token_hashes()
   );
 
   // Verify: SHA-256 hashes are different
-  let hash_a = sha256_hash( &token_a );
-  let hash_b = sha256_hash( &token_b );
+  let hash_a = sha256_hash(&token_a);
+  let hash_b = sha256_hash(&token_b);
 
   assert_ne!(
     hash_a, hash_b,
@@ -334,32 +341,34 @@ async fn test_jti_guarantees_unique_token_hashes()
 ///
 /// # Risk
 /// CRITICAL - This is the core scenario that Task 001 fixes
-#[ tokio::test ]
-async fn test_regenerated_token_invalidates_old_token_via_hash_check()
-{
+#[tokio::test]
+async fn test_regenerated_token_invalidates_old_token_via_hash_check() {
   let pool = setup_test_db().await;
   let agent_id = 500i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Step 1: Generate Token A and store its hash (simulating initial generate)
-  let token_a = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let token_a = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Step 1b: Verify Token A works
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": token_a.clone(),
-          "provider": "openai",
-          "provider_key_id": agent_id * 1000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": token_a.clone(),
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -373,37 +382,42 @@ async fn test_regenerated_token_invalidates_old_token_via_hash_check()
   // Step 2: Regenerate — generate Token B and overwrite hash in DB
   // (simulating what routes/ic_token.rs::regenerate_ic_token does)
   let claims_b = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
+    format!("agent_{}", agent_id),
+    format!("budget_{}", agent_id),
+    vec!["llm:call".to_string()],
     None,
   );
-  let token_b = state.ic_token_manager.generate_token( &claims_b )
-    .expect( "LOUD FAILURE: Should generate token B" );
+  let token_b = state
+    .ic_token_manager
+    .generate_token(&claims_b)
+    .expect("LOUD FAILURE: Should generate token B");
 
   // Overwrite hash in DB (this is what regenerate does)
-  let new_hash = sha256_hash( &token_b );
-  sqlx::query( "UPDATE agents SET ic_token_hash = ? WHERE id = ?" )
-    .bind( &new_hash )
-    .bind( agent_id )
-    .execute( &pool )
+  let new_hash = sha256_hash(&token_b);
+  sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
+    .bind(&new_hash)
+    .bind(agent_id)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Should update ic_token_hash" );
+    .expect("LOUD FAILURE: Should update ic_token_hash");
 
   // Step 3: Old Token A should be REJECTED (hash mismatch)
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": token_a,
-          "provider": "openai",
-          "provider_key_id": agent_id * 1000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": token_a,
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -415,19 +429,22 @@ async fn test_regenerated_token_invalidates_old_token_via_hash_check()
   );
 
   // Step 4: New Token B should be ACCEPTED
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": token_b,
-          "provider": "openai",
-          "provider_key_id": agent_id * 1000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": token_b,
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -452,40 +469,42 @@ async fn test_regenerated_token_invalidates_old_token_via_hash_check()
 /// # Risk
 /// HIGH - Without jti, Token A and Token B could have identical hashes
 /// if generated in the same second, causing Token A to "come back to life"
-#[ tokio::test ]
-async fn test_revoke_then_reissue_old_token_stays_dead()
-{
+#[tokio::test]
+async fn test_revoke_then_reissue_old_token_stays_dead() {
   let pool = setup_test_db().await;
   let agent_id = 501i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Step 1: Generate Token A
-  let token_a = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let hash_a = sha256_hash( &token_a );
+  let token_a = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let hash_a = sha256_hash(&token_a);
 
   // Step 2: Revoke — set hash to NULL
-  sqlx::query( "UPDATE agents SET ic_token_hash = NULL WHERE id = ?" )
-    .bind( agent_id )
-    .execute( &pool )
+  sqlx::query("UPDATE agents SET ic_token_hash = NULL WHERE id = ?")
+    .bind(agent_id)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Should revoke token" );
+    .expect("LOUD FAILURE: Should revoke token");
 
   // Verify Token A is rejected after revoke
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": token_a.clone(),
-          "provider": "openai",
-          "provider_key_id": agent_id * 1000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": token_a.clone(),
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -498,14 +517,16 @@ async fn test_revoke_then_reissue_old_token_stays_dead()
 
   // Step 3: Re-issue Token B with same claims
   let claims_b = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
+    format!("agent_{}", agent_id),
+    format!("budget_{}", agent_id),
+    vec!["llm:call".to_string()],
     None,
   );
-  let token_b = state.ic_token_manager.generate_token( &claims_b )
-    .expect( "LOUD FAILURE: Should generate token B" );
-  let hash_b = sha256_hash( &token_b );
+  let token_b = state
+    .ic_token_manager
+    .generate_token(&claims_b)
+    .expect("LOUD FAILURE: Should generate token B");
+  let hash_b = sha256_hash(&token_b);
 
   // Critical assertion: hashes must differ (jti guarantees this)
   assert_ne!(
@@ -516,27 +537,30 @@ async fn test_revoke_then_reissue_old_token_stays_dead()
   );
 
   // Store new hash
-  sqlx::query( "UPDATE agents SET ic_token_hash = ? WHERE id = ?" )
-    .bind( &hash_b )
-    .bind( agent_id )
-    .execute( &pool )
+  sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
+    .bind(&hash_b)
+    .bind(agent_id)
+    .execute(&pool)
     .await
-    .expect( "LOUD FAILURE: Should store new hash" );
+    .expect("LOUD FAILURE: Should store new hash");
 
   // Step 4: Token A must STILL be rejected (hash mismatch, not NULL)
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": token_a,
-          "provider": "openai",
-          "provider_key_id": agent_id * 1000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": token_a,
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -548,19 +572,22 @@ async fn test_revoke_then_reissue_old_token_stays_dead()
   );
 
   // Step 5: Token B must be accepted
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": token_b,
-          "provider": "openai",
-          "provider_key_id": agent_id * 1000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": token_b,
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();

@@ -18,10 +18,9 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
   Router,
 };
 use iron_control_api::routes::budget::handshake;
@@ -34,17 +33,16 @@ use tower::ServiceExt;
 ///
 /// - Request with budget <= MAX_HANDSHAKE_BUDGET succeeds
 /// - Granted budget equals requested budget (if available)
-#[ tokio::test ]
-async fn test_handshake_with_valid_budget_request()
-{
+#[tokio::test]
+async fn test_handshake_with_valid_budget_request() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   // Create agent with sufficient budget
   let agent_id = 300i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await; // $100
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await; // $100
 
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Request $5 (5,000,000 microdollars) - within limits
   let request_body = json!(
@@ -56,17 +54,17 @@ async fn test_handshake_with_valid_budget_request()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -74,10 +72,12 @@ async fn test_handshake_with_valid_budget_request()
     "Handshake with valid budget request should succeed"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let response_json: serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-  let granted = response_json[ "budget_granted" ].as_i64().unwrap();
+  let granted = response_json["budget_granted"].as_i64().unwrap();
   assert_eq!(
     granted, 5_000_000,
     "Should grant requested budget of $5, got {} microdollars",
@@ -91,16 +91,15 @@ async fn test_handshake_with_valid_budget_request()
 ///
 /// - Request with budget > MAX_HANDSHAKE_BUDGET fails with 400 Bad Request
 /// - Error message indicates budget request too large
-#[ tokio::test ]
-async fn test_handshake_with_excessive_budget_request()
-{
+#[tokio::test]
+async fn test_handshake_with_excessive_budget_request() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 301i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 1_000_000_000 ).await; // $1000
+  common::budget::seed_agent_with_budget(&pool, agent_id, 1_000_000_000).await; // $1000
 
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Request $101 (101,000,000 microdollars) - exceeds MAX_HANDSHAKE_BUDGET ($100)
   let request_body = json!(
@@ -112,17 +111,17 @@ async fn test_handshake_with_excessive_budget_request()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -130,11 +129,13 @@ async fn test_handshake_with_excessive_budget_request()
     "Handshake with excessive budget request should fail with 400"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let response_text = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let response_text = String::from_utf8(body.to_vec()).unwrap();
 
   assert!(
-    response_text.contains( "budget" ) || response_text.contains( "exceeds" ),
+    response_text.contains("budget") || response_text.contains("exceeds"),
     "Error message should mention budget/exceeds, got: {}",
     response_text
   );
@@ -145,16 +146,15 @@ async fn test_handshake_with_excessive_budget_request()
 /// # Expected Behavior
 ///
 /// - Request with budget = 0 fails with 400 Bad Request
-#[ tokio::test ]
-async fn test_handshake_with_zero_budget_request()
-{
+#[tokio::test]
+async fn test_handshake_with_zero_budget_request() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 302i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   let request_body = json!(
   {
@@ -165,17 +165,17 @@ async fn test_handshake_with_zero_budget_request()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -189,16 +189,15 @@ async fn test_handshake_with_zero_budget_request()
 /// # Expected Behavior
 ///
 /// - Request with budget < 0 fails with 400 Bad Request
-#[ tokio::test ]
-async fn test_handshake_with_negative_budget_request()
-{
+#[tokio::test]
+async fn test_handshake_with_negative_budget_request() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 303i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   let request_body = json!(
   {
@@ -209,17 +208,17 @@ async fn test_handshake_with_negative_budget_request()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -234,16 +233,15 @@ async fn test_handshake_with_negative_budget_request()
 ///
 /// - Request without requested_budget field succeeds
 /// - Granted budget equals DEFAULT_HANDSHAKE_BUDGET ($10)
-#[ tokio::test ]
-async fn test_handshake_without_budget_request_uses_default()
-{
+#[tokio::test]
+async fn test_handshake_without_budget_request_uses_default() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 304i64;
-  common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let ic_token = common::budget::create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // No requested_budget field
   let request_body = json!(
@@ -254,17 +252,17 @@ async fn test_handshake_without_budget_request_uses_default()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -272,10 +270,12 @@ async fn test_handshake_without_budget_request_uses_default()
     "Handshake without budget request should succeed with default"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let response_json: serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-  let granted = response_json[ "budget_granted" ].as_i64().unwrap();
+  let granted = response_json["budget_granted"].as_i64().unwrap();
   assert_eq!(
     granted, 10_000_000,
     "Should grant default budget of $10, got {} microdollars",

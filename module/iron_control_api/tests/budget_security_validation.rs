@@ -34,18 +34,13 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  create_ic_token,
-  seed_agent_with_budget,
-  create_budget_router,
 };
 use serde_json::json;
 use tower::ServiceExt;
@@ -59,25 +54,24 @@ use tower::ServiceExt;
 /// - 400 Bad Request returned
 /// - Clear error message about JSON parsing failure
 /// - No server-side panic or crash
-#[ tokio::test ]
-async fn test_malformed_json_syntax()
-{
+#[tokio::test]
+async fn test_malformed_json_syntax() {
   let pool = setup_test_db().await;
   let agent_id = 500i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send malformed JSON to /api/budget/report
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( r#"{ "lease_id": "foo", invalid }"# ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{ "lease_id": "foo", invalid }"#))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -98,29 +92,31 @@ async fn test_malformed_json_syntax()
 /// # Expected Behavior
 /// - 415 Unsupported Media Type OR 400 Bad Request
 /// - Clear error about missing/invalid content-type
-#[ tokio::test ]
-async fn test_missing_content_type()
-{
+#[tokio::test]
+async fn test_missing_content_type() {
   let pool = setup_test_db().await;
   let agent_id = 501i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Send valid JSON but no content-type header
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
+        .method("POST")
+        .uri("/api/budget/handshake")
         // NO content-type header
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -144,25 +140,24 @@ async fn test_missing_content_type()
 /// # Expected Behavior
 /// - 400 Bad Request (missing required fields)
 /// - Clear validation error messages
-#[ tokio::test ]
-async fn test_empty_request_body()
-{
+#[tokio::test]
+async fn test_empty_request_body() {
   let pool = setup_test_db().await;
   let agent_id = 502i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send empty JSON object
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( "{}" ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from("{}"))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -184,27 +179,29 @@ async fn test_empty_request_body()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "ic_token required" or similar
-#[ tokio::test ]
-async fn test_handshake_missing_ic_token()
-{
+#[tokio::test]
+async fn test_handshake_missing_ic_token() {
   let pool = setup_test_db().await;
   let agent_id = 503i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send handshake without ic_token
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -226,28 +223,30 @@ async fn test_handshake_missing_ic_token()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "provider required" or similar
-#[ tokio::test ]
-async fn test_handshake_missing_provider()
-{
+#[tokio::test]
+async fn test_handshake_missing_provider() {
   let pool = setup_test_db().await;
   let agent_id = 504i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Send handshake without provider
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -269,31 +268,33 @@ async fn test_handshake_missing_provider()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "lease_id required" or similar
-#[ tokio::test ]
-async fn test_report_missing_lease_id()
-{
+#[tokio::test]
+async fn test_report_missing_lease_id() {
   let pool = setup_test_db().await;
   let agent_id = 505i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send report without lease_id
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "request_id": "req_test",
-          "tokens": 1000,
-          "cost_microdollars": 5_000_000,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "request_id": "req_test",
+            "tokens": 1000,
+            "cost_microdollars": 5_000_000,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -315,53 +316,60 @@ async fn test_report_missing_lease_id()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "cost_microdollars required" or similar
-#[ tokio::test ]
-async fn test_report_missing_cost()
-{
+#[tokio::test]
+async fn test_report_missing_cost() {
   let pool = setup_test_db().await;
   let agent_id = 506i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router_handshake = create_budget_router( state.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_json: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
   let lease_id = handshake_json["lease_id"].as_str().unwrap();
 
   // Send report without cost_microdollars
-  let router_report = create_budget_router( state ).await;
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_test",
-          "tokens": 1000,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_test",
+            "tokens": 1000,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -383,35 +391,33 @@ async fn test_report_missing_cost()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "ic_token required" or similar
-#[ tokio::test ]
-async fn test_refresh_missing_ic_token()
-{
+#[tokio::test]
+async fn test_refresh_missing_ic_token() {
   let pool = setup_test_db().await;
   let agent_id = 507i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let access_token = common::create_test_access_token(
-    "user_123",
-    "test@example.com",
-    "admin",
-    "test_jwt_secret"
-  );
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let access_token =
+    common::create_test_access_token("user_123", "test@example.com", "admin", "test_jwt_secret");
+  let router = create_budget_router(state).await;
 
   // Send refresh without ic_token
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "current_lease_id": "lease_123",
-          "requested_budget": 10_000_000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("authorization", format!("Bearer {}", access_token))
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "current_lease_id": "lease_123",
+            "requested_budget": 10_000_000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -433,36 +439,34 @@ async fn test_refresh_missing_ic_token()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "current_lease_id required" or similar
-#[ tokio::test ]
-async fn test_refresh_missing_current_lease_id()
-{
+#[tokio::test]
+async fn test_refresh_missing_current_lease_id() {
   let pool = setup_test_db().await;
   let agent_id = 508i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let access_token = common::create_test_access_token(
-    "user_123",
-    "test@example.com",
-    "admin",
-    "test_jwt_secret"
-  );
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let access_token =
+    common::create_test_access_token("user_123", "test@example.com", "admin", "test_jwt_secret");
+  let router = create_budget_router(state).await;
 
   // Send refresh without current_lease_id
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/refresh" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "requested_budget": 10_000_000
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/refresh")
+        .header("authorization", format!("Bearer {}", access_token))
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "requested_budget": 10_000_000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -484,30 +488,32 @@ async fn test_refresh_missing_current_lease_id()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "ic_token too long" or similar
-#[ tokio::test ]
-async fn test_oversized_ic_token()
-{
+#[tokio::test]
+async fn test_oversized_ic_token() {
   let pool = setup_test_db().await;
   let agent_id = 509i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Create 2001-character ic_token
-  let oversized_token = "a".repeat( 2001 );
+  let oversized_token = "a".repeat(2001);
 
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": oversized_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": oversized_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -529,34 +535,36 @@ async fn test_oversized_ic_token()
 ///
 /// # Expected Behavior
 /// - 400/422 validation error OR 404 Not Found (ID doesn't exist)
-#[ tokio::test ]
-async fn test_oversized_lease_id()
-{
+#[tokio::test]
+async fn test_oversized_lease_id() {
   let pool = setup_test_db().await;
   let agent_id = 510i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool ).await;
-  let router = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Create 101-character lease_id
-  let oversized_lease_id = format!( "lease_{}", "a".repeat( 95 ) );
+  let oversized_lease_id = format!("lease_{}", "a".repeat(95));
 
   let response = router
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": oversized_lease_id,
-          "request_id": "req_test",
-          "tokens": 1000,
-          "cost_microdollars": 5_000_000,
-          "model": "gpt-4",
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": oversized_lease_id,
+            "request_id": "req_test",
+            "tokens": 1000,
+            "cost_microdollars": 5_000_000,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -580,56 +588,63 @@ async fn test_oversized_lease_id()
 /// # Expected Behavior
 /// - 400/422 validation error
 /// - Error message: "model name too long" or similar
-#[ tokio::test ]
-async fn test_oversized_model_name()
-{
+#[tokio::test]
+async fn test_oversized_model_name() {
   let pool = setup_test_db().await;
   let agent_id = 511i64;
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let router_handshake = create_budget_router( state.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "ic_token": ic_token,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_json: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
   let lease_id = handshake_json["lease_id"].as_str().unwrap();
 
   // Create 10000-character model name
-  let oversized_model = "a".repeat( 10_000 );
+  let oversized_model = "a".repeat(10_000);
 
-  let router_report = create_budget_router( state ).await;
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( json!({
-          "lease_id": lease_id,
-          "request_id": "req_test",
-          "tokens": 1000,
-          "cost_microdollars": 5_000_000,
-          "model": oversized_model,
-          "provider": "openai"
-        }).to_string() ) )
-        .unwrap()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": lease_id,
+            "request_id": "req_test",
+            "tokens": 1000,
+            "cost_microdollars": 5_000_000,
+            "model": oversized_model,
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
     )
     .await
     .unwrap();

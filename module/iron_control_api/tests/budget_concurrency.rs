@@ -25,18 +25,13 @@
 
 mod common;
 
-use axum::
-{
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
 };
-use common::budget::
-{
+use common::budget::{
+  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
-  create_test_budget_state,
-  create_ic_token,
-  seed_agent_with_budget,
-  create_budget_router,
 };
 use serde_json::json;
 use tower::ServiceExt;
@@ -51,75 +46,66 @@ use tower::ServiceExt;
 ///
 /// # Priority
 /// CRITICAL - Prevents race conditions in budget allocation
-#[ tokio::test ]
-async fn test_multiple_simultaneous_handshakes()
-{
+#[tokio::test]
+async fn test_multiple_simultaneous_handshakes() {
   let pool = setup_test_db().await;
   let agent_id = 101;
 
   // Seed agent with exactly 100 USD budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let app = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = create_budget_router(state).await;
 
   // Launch 10 concurrent handshake requests
   let mut handles = vec![];
-  for _ in 0..10
-  {
+  for _ in 0..10 {
     let app_clone = app.clone();
     let ic_token_clone = ic_token.clone();
 
-    let handle = tokio::spawn( async move
-    {
+    let handle = tokio::spawn(async move {
       let request = Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from(
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
           json!({
             "ic_token": ic_token_clone,
             "provider": "openai"
-          }).to_string()
+          })
+          .to_string(),
         ))
         .unwrap();
 
-      app_clone.oneshot( request ).await
+      app_clone.oneshot(request).await
     });
 
-    handles.push( handle );
+    handles.push(handle);
   }
 
   // Wait for all requests to complete
   let mut results = Vec::new();
-  for handle in handles
-  {
-    results.push( handle.await );
+  for handle in handles {
+    results.push(handle.await);
   }
 
   // Count successful responses (HTTP 200)
   let mut successful_count = 0;
   let mut failed_responses = Vec::new();
-  for result in &results
-  {
-    if let Ok( Ok( response ) ) = result
-    {
-      if response.status() == StatusCode::OK
-      {
+  for result in &results {
+    if let Ok(Ok(response)) = result {
+      if response.status() == StatusCode::OK {
         successful_count += 1;
-      }
-      else
-      {
-        failed_responses.push( response.status() );
+      } else {
+        failed_responses.push(response.status());
       }
     }
   }
 
   // Debug: Print failed response statuses if any
-  if successful_count != 10
-  {
-    eprintln!( "Failed responses: {:?}", failed_responses );
+  if successful_count != 10 {
+    eprintln!("Failed responses: {:?}", failed_responses);
   }
 
   // All 10 requests should succeed (each gets 10 USD from 100 USD budget)
@@ -130,16 +116,18 @@ async fn test_multiple_simultaneous_handshakes()
   );
 
   // Verify final budget state
-  let remaining : i64 = sqlx::query_scalar(
-    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let remaining: i64 =
+    sqlx::query_scalar("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   // Budget should be fully allocated (0 remaining)
-  assert_eq!( remaining, 0, "Budget should be fully allocated after 10x 10 USD leases" );
+  assert_eq!(
+    remaining, 0,
+    "Budget should be fully allocated after 10x 10 USD leases"
+  );
 }
 
 /// Test 9: Concurrent usage reports on same lease
@@ -152,53 +140,53 @@ async fn test_multiple_simultaneous_handshakes()
 ///
 /// # Priority
 /// HIGH - Database consistency under concurrent writes
-#[ tokio::test ]
-async fn test_concurrent_usage_reports_on_same_lease()
-{
+#[tokio::test]
+async fn test_concurrent_usage_reports_on_same_lease() {
   let pool = setup_test_db().await;
   let agent_id = 102;
 
   // Seed agent with budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let app = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = create_budget_router(state).await;
 
   // Create initial lease via handshake
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.clone().oneshot( handshake_request ).await.unwrap();
-  assert_eq!( handshake_response.status(), StatusCode::OK );
+  let handshake_response = app.clone().oneshot(handshake_request).await.unwrap();
+  assert_eq!(handshake_response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Launch 2 concurrent usage reports (5 USD each)
   let mut handles = vec![];
-  for _ in 0..2
-  {
+  for _ in 0..2 {
     let app_clone = app.clone();
     let lease_id_clone = lease_id.clone();
 
-    let handle = tokio::spawn( async move
-    {
+    let handle = tokio::spawn(async move {
       let request = Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/report" )
-        .header( "content-type", "application/json" )
-        .body( Body::from(
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
           json!({
             "lease_id": lease_id_clone,
             "request_id": "req_test_001",
@@ -206,42 +194,47 @@ async fn test_concurrent_usage_reports_on_same_lease()
             "cost_microdollars": 5_000_000,
             "model": "gpt-4",
             "provider": "openai"
-          }).to_string()
+          })
+          .to_string(),
         ))
         .unwrap();
 
-      app_clone.oneshot( request ).await
+      app_clone.oneshot(request).await
     });
 
-    handles.push( handle );
+    handles.push(handle);
   }
 
   // Wait for both reports to complete
   let mut results = Vec::new();
-  for handle in handles
-  {
-    results.push( handle.await );
+  for handle in handles {
+    results.push(handle.await);
   }
 
   // Both reports should succeed
-  let successful_count = results.iter()
-    .filter_map( | r | r.as_ref().ok() )
-    .filter_map( | response | response.as_ref().ok() )
-    .filter( | response | response.status() == StatusCode::OK )
+  let successful_count = results
+    .iter()
+    .filter_map(|r| r.as_ref().ok())
+    .filter_map(|response| response.as_ref().ok())
+    .filter(|response| response.status() == StatusCode::OK)
     .count();
 
-  assert_eq!( successful_count, 2, "Both concurrent reports should succeed" );
+  assert_eq!(
+    successful_count, 2,
+    "Both concurrent reports should succeed"
+  );
 
   // Verify lease spent is exactly 10 USD (atomic updates, no lost writes)
-  let budget_spent : i64 = sqlx::query_scalar(
-    "SELECT budget_spent FROM budget_leases WHERE id = ?"
-  )
-  .bind( &lease_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let budget_spent: i64 = sqlx::query_scalar("SELECT budget_spent FROM budget_leases WHERE id = ?")
+    .bind(&lease_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
-  assert_eq!( budget_spent, 10_000_000, "Lease should have exactly 10 USD spent (no lost updates)" );
+  assert_eq!(
+    budget_spent, 10_000_000,
+    "Lease should have exactly 10 USD spent (no lost updates)"
+  );
 }
 
 /// Test 10: Concurrent report and refresh on same lease
@@ -254,47 +247,48 @@ async fn test_concurrent_usage_reports_on_same_lease()
 ///
 /// # Priority
 /// MEDIUM - Complex concurrent scenario
-#[ tokio::test ]
-async fn test_concurrent_report_and_refresh()
-{
+#[tokio::test]
+async fn test_concurrent_report_and_refresh() {
   let pool = setup_test_db().await;
   let agent_id = 103;
 
   // Seed agent with sufficient budget
-  seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let app = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = create_budget_router(state).await;
 
   // Create initial lease
   let handshake_request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let handshake_response = app.clone().oneshot( handshake_request ).await.unwrap();
-  let body_bytes = axum::body::to_bytes( handshake_response.into_body(), usize::MAX ).await.unwrap();
-  let handshake_data : serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let lease_id = handshake_data[ "lease_id" ].as_str().unwrap().to_string();
+  let handshake_response = app.clone().oneshot(handshake_request).await.unwrap();
+  let body_bytes = axum::body::to_bytes(handshake_response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let handshake_data: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let lease_id = handshake_data["lease_id"].as_str().unwrap().to_string();
 
   // Launch concurrent report and refresh
   let app_report = app.clone();
   let lease_id_report = lease_id.clone();
-  let report_handle = tokio::spawn( async move
-  {
+  let report_handle = tokio::spawn(async move {
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/budget/report" )
-      .header( "content-type", "application/json" )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/budget/report")
+      .header("content-type", "application/json")
+      .body(Body::from(
         json!({
           "lease_id": lease_id_report,
           "request_id": "req_test_concurrent",
@@ -302,56 +296,60 @@ async fn test_concurrent_report_and_refresh()
           "cost_microdollars": 3_000_000,
           "model": "gpt-4",
           "provider": "openai"
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    app_report.oneshot( request ).await
+    app_report.oneshot(request).await
   });
 
   let app_refresh = app.clone();
   let ic_token_refresh = ic_token.clone();
 
   // Create JWT token for authenticated request (GAP-003: JWT authentication required)
-  let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
-  let refresh_handle = tokio::spawn( async move
-  {
+  let refresh_handle = tokio::spawn(async move {
     let request = Request::builder()
-      .method( "POST" )
-      .uri( "/api/budget/refresh" )
-      .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", access_token ) )
-      .body( Body::from(
+      .method("POST")
+      .uri("/api/budget/refresh")
+      .header("content-type", "application/json")
+      .header("authorization", format!("Bearer {}", access_token))
+      .body(Body::from(
         json!({
           "ic_token": ic_token_refresh,
           "current_lease_id": lease_id,
           "requested_budget": 10_000_000
-        }).to_string()
+        })
+        .to_string(),
       ))
       .unwrap();
 
-    app_refresh.oneshot( request ).await
+    app_refresh.oneshot(request).await
   });
 
   // Wait for both operations
-  let ( report_result, refresh_result ) = tokio::join!( report_handle, refresh_handle );
+  let (report_result, refresh_result) = tokio::join!(report_handle, refresh_handle);
 
   // Both operations should succeed
-  assert!( report_result.unwrap().unwrap().status() == StatusCode::OK );
-  assert!( refresh_result.unwrap().unwrap().status() == StatusCode::OK );
+  assert!(report_result.unwrap().unwrap().status() == StatusCode::OK);
+  assert!(refresh_result.unwrap().unwrap().status() == StatusCode::OK);
 
   // Verify database consistency (no lost updates)
-  let lease_count : i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM budget_leases WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let lease_count: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM budget_leases WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   // Should have 2 leases total (original + refreshed)
-  assert_eq!( lease_count, 2, "Should have original lease + refreshed lease" );
+  assert_eq!(
+    lease_count, 2,
+    "Should have original lease + refreshed lease"
+  );
 }
 
 /// Test 11: Handshake while active lease exists
@@ -364,62 +362,64 @@ async fn test_concurrent_report_and_refresh()
 ///
 /// # Priority
 /// LOW - Design validation
-#[ tokio::test ]
-async fn test_handshake_with_existing_active_lease()
-{
+#[tokio::test]
+async fn test_handshake_with_existing_active_lease() {
   let pool = setup_test_db().await;
   let agent_id = 104;
 
   // Seed agent with sufficient budget for multiple leases
-  seed_agent_with_budget( &pool, agent_id, 50_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 50_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let app = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = create_budget_router(state).await;
 
   // Create first lease
   let first_handshake = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token.clone(),
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let first_response = app.clone().oneshot( first_handshake ).await.unwrap();
-  assert_eq!( first_response.status(), StatusCode::OK );
+  let first_response = app.clone().oneshot(first_handshake).await.unwrap();
+  assert_eq!(first_response.status(), StatusCode::OK);
 
   // Create second lease while first is still active
   let second_handshake = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from(
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(
       json!({
         "ic_token": ic_token,
         "provider": "openai"
-      }).to_string()
+      })
+      .to_string(),
     ))
     .unwrap();
 
-  let second_response = app.clone().oneshot( second_handshake ).await.unwrap();
+  let second_response = app.clone().oneshot(second_handshake).await.unwrap();
 
   // Second handshake should succeed
   assert_eq!(
-    second_response.status(), StatusCode::OK,
+    second_response.status(),
+    StatusCode::OK,
     "Should allow multiple active leases per agent"
   );
 
   // Verify both leases exist and are active
-  let active_lease_count : i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM budget_leases WHERE agent_id = ? AND lease_status = 'active'"
+  let active_lease_count: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM budget_leases WHERE agent_id = ? AND lease_status = 'active'",
   )
-  .bind( agent_id )
-  .fetch_one( &pool )
+  .bind(agent_id)
+  .fetch_one(&pool)
   .await
   .unwrap();
 
@@ -477,51 +477,48 @@ async fn test_handshake_with_existing_active_lease()
 /// Need to test with high concurrency (20+ threads) or add artificial delays
 /// to expose race window. Consider testing with PostgreSQL for finer-grained locking.
 // test_kind: bug_reproducer(issue-budget-006)
-#[ tokio::test ]
-async fn test_toctou_race_insufficient_budget()
-{
+#[tokio::test]
+async fn test_toctou_race_insufficient_budget() {
   let pool = setup_test_db().await;
   let agent_id = 105;
 
   // Seed agent with EXACTLY $10.00 (enough for only 1 handshake)
-  seed_agent_with_budget( &pool, agent_id, 10_000_000 ).await;
+  seed_agent_with_budget(&pool, agent_id, 10_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( &pool, agent_id, &state.ic_token_manager ).await;
-  let app = create_budget_router( state ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = create_budget_router(state).await;
 
   // Launch 2 concurrent handshake requests (each wants $10.00)
   let mut handles = vec![];
-  for _ in 0..2
-  {
+  for _ in 0..2 {
     let app_clone = app.clone();
     let ic_token_clone = ic_token.clone();
 
-    let handle = tokio::spawn( async move
-    {
+    let handle = tokio::spawn(async move {
       let request = Request::builder()
-        .method( "POST" )
-        .uri( "/api/budget/handshake" )
-        .header( "content-type", "application/json" )
-        .body( Body::from(
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
           json!({
             "ic_token": ic_token_clone,
             "provider": "openai"
-          }).to_string()
+          })
+          .to_string(),
         ))
         .unwrap();
 
-      app_clone.oneshot( request ).await
+      app_clone.oneshot(request).await
     });
 
-    handles.push( handle );
+    handles.push(handle);
   }
 
   // Wait for all requests to complete
   let mut results = Vec::new();
-  for handle in handles
-  {
-    results.push( handle.await );
+  for handle in handles {
+    results.push(handle.await);
   }
 
   // Count successful (200 OK) and failed (403 Forbidden) responses
@@ -529,24 +526,23 @@ async fn test_toctou_race_insufficient_budget()
   let mut forbidden_count = 0;
   let mut other_statuses = Vec::new();
 
-  for result in &results
-  {
-    if let Ok( Ok( response ) ) = result
-    {
-      match response.status()
-      {
+  for result in &results {
+    if let Ok(Ok(response)) = result {
+      match response.status() {
         StatusCode::OK => success_count += 1,
         StatusCode::FORBIDDEN => forbidden_count += 1,
-        status => other_statuses.push( status ),
+        status => other_statuses.push(status),
       }
     }
   }
 
   // Debug: Print actual distribution if test fails
-  if success_count != 1 || forbidden_count != 1
-  {
-    eprintln!( "TOCTOU Race Detected!" );
-    eprintln!( "Success: {}, Forbidden: {}, Other: {:?}", success_count, forbidden_count, other_statuses );
+  if success_count != 1 || forbidden_count != 1 {
+    eprintln!("TOCTOU Race Detected!");
+    eprintln!(
+      "Success: {}, Forbidden: {}, Other: {:?}",
+      success_count, forbidden_count, other_statuses
+    );
   }
 
   // CRITICAL: Exactly 1 should succeed, exactly 1 should fail
@@ -561,13 +557,12 @@ async fn test_toctou_race_insufficient_budget()
   );
 
   // Verify final budget state - should be EXACTLY 0 (not negative)
-  let remaining : i64 = sqlx::query_scalar(
-    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?"
-  )
-  .bind( agent_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let remaining: i64 =
+    sqlx::query_scalar("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   assert!(
     remaining >= 0,

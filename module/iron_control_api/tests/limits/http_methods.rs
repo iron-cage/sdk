@@ -26,43 +26,60 @@
 //! **Resource Limits:** Not applicable
 //! **Precondition Violations:** Not applicable
 
-use iron_control_api::routes::limits::LimitsState;
-use axum::{ Router, routing::{ post, get, put, delete }, http::{ Request, StatusCode } };
 use axum::body::Body;
+use axum::{
+  http::{Request, StatusCode},
+  routing::{delete, get, post, put},
+  Router,
+};
+use iron_control_api::routes::limits::LimitsState;
 use tower::ServiceExt;
 
 /// Create test router with limits routes.
-async fn create_test_router() -> Router
-{
-  let limits_state = LimitsState::new( "sqlite::memory:" )
+async fn create_test_router() -> Router {
+  let limits_state = LimitsState::new("sqlite::memory:")
     .await
-    .expect( "LOUD FAILURE: Failed to create limits state" );
+    .expect("LOUD FAILURE: Failed to create limits state");
 
   Router::new()
-    .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits", get( iron_control_api::routes::limits::list_limits ) )
-    .route( "/api/limits/:id", get( iron_control_api::routes::limits::get_limit ) )
-    .route( "/api/limits/:id", put( iron_control_api::routes::limits::update_limit ) )
-    .route( "/api/limits/:id", delete( iron_control_api::routes::limits::delete_limit ) )
-    .with_state( limits_state )
+    .route(
+      "/api/limits",
+      post(iron_control_api::routes::limits::create_limit),
+    )
+    .route(
+      "/api/limits",
+      get(iron_control_api::routes::limits::list_limits),
+    )
+    .route(
+      "/api/limits/:id",
+      get(iron_control_api::routes::limits::get_limit),
+    )
+    .route(
+      "/api/limits/:id",
+      put(iron_control_api::routes::limits::update_limit),
+    )
+    .route(
+      "/api/limits/:id",
+      delete(iron_control_api::routes::limits::delete_limit),
+    )
+    .with_state(limits_state)
 }
 
 /// Test POST /api/limits with GET method.
 ///
-/// WHY: GET /api/limits is list_limits endpoint, so GET succeeds (not 405).
+/// WHY: GET /api/limits is `list_limits` endpoint, so GET succeeds (not 405).
 /// This test documents that GET is supported for listing.
-#[ tokio::test ]
-async fn test_create_limit_get_method_not_rejected()
-{
+#[tokio::test]
+async fn test_create_limit_get_method_not_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/limits" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/limits")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -74,18 +91,17 @@ async fn test_create_limit_get_method_not_rejected()
 /// Test POST /api/limits with DELETE method → 405 Method Not Allowed.
 ///
 /// WHY: DELETE not supported on collection endpoint (only on individual resources).
-#[ tokio::test ]
-async fn test_create_limit_delete_method_rejected()
-{
+#[tokio::test]
+async fn test_create_limit_delete_method_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "DELETE" )
-    .uri( "/api/limits" )
-    .body( Body::empty() )
+    .method("DELETE")
+    .uri("/api/limits")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -97,19 +113,18 @@ async fn test_create_limit_delete_method_rejected()
 /// Test PUT /api/limits/:id with POST method → 405 Method Not Allowed.
 ///
 /// WHY: Update requires PUT, POST is for creation (different endpoint).
-#[ tokio::test ]
-async fn test_update_limit_post_method_rejected()
-{
+#[tokio::test]
+async fn test_update_limit_post_method_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/limits/1" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( r#"{"max_tokens_per_day":1000}"# ) )
+    .method("POST")
+    .uri("/api/limits/1")
+    .header("content-type", "application/json")
+    .body(Body::from(r#"{"max_tokens_per_day":1000}"#))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -120,20 +135,19 @@ async fn test_update_limit_post_method_rejected()
 
 /// Test DELETE /api/limits/:id with GET method.
 ///
-/// WHY: GET /api/limits/:id is get_limit endpoint, so GET succeeds (not 405).
+/// WHY: GET /api/limits/:id is `get_limit` endpoint, so GET succeeds (not 405).
 /// This test documents that GET is supported for retrieval.
-#[ tokio::test ]
-async fn test_delete_limit_get_method_not_rejected()
-{
+#[tokio::test]
+async fn test_delete_limit_get_method_not_rejected() {
   let router = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/limits/1" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/limits/1")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // GET succeeds (returns 404 for nonexistent limit, not 405)
   assert_eq!(

@@ -11,10 +11,9 @@
 //! organizational_principles.rulebook.md § Anti-Duplication Principle
 
 use axum::Router;
-use iron_control_api::
-{
-  ic_token::{ IcTokenClaims, IcTokenManager, IcTokenRateLimiter },
-  routes::budget::{ BudgetState, handshake, report_usage, refresh_budget, return_budget },
+use iron_control_api::{
+  ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
+  routes::budget::{handshake, refresh_budget, report_usage, return_budget, BudgetState},
 };
 use iron_token_manager::lease_manager::LeaseManager;
 use sqlx::SqlitePool;
@@ -24,11 +23,10 @@ use std::sync::Arc;
 ///
 /// Creates in-memory SQLite database and applies all token_manager migrations
 /// required for Protocol 005 budget testing.
-#[ allow( dead_code ) ]
-pub async fn setup_test_db() -> SqlitePool
-{
-  let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-  iron_token_manager::migrations::apply_all_migrations( &pool )
+#[allow(dead_code)]
+pub async fn setup_test_db() -> SqlitePool {
+  let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+  iron_token_manager::migrations::apply_all_migrations(&pool)
     .await
     .expect("LOUD FAILURE: Failed to apply migrations");
   pool
@@ -44,34 +42,29 @@ pub async fn setup_test_db() -> SqlitePool
 /// - Agent budget manager (budget accounting)
 /// - Provider key storage (API key management)
 /// - JWT secret (user authentication)
-#[ allow( dead_code ) ]
-pub async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
-{
+#[allow(dead_code)]
+pub async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
-  let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
-  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key for provider keys
+  let ip_token_key: [u8; 32] = [0u8; 32];
+  let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key for provider keys
 
-  let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
-  let ip_token_crypto = Arc::new(
-    iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
-  );
-  let provider_key_crypto = Arc::new(
-    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
-  );
-  let crypto_service = Arc::new(
-    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
-  );
-  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let agent_budget_manager = Arc::new(
-    iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
-  );
-  let provider_key_storage = Arc::new(
-    iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
-  );
-  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
+  let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
+  let ip_token_crypto =
+    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key).unwrap());
+  let provider_key_crypto =
+    Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
+  let crypto_service =
+    Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
+  let lease_manager = Arc::new(LeaseManager::from_pool(pool.clone()));
+  let agent_budget_manager =
+    Arc::new(iron_token_manager::agent_budget::AgentBudgetManager::from_pool(pool.clone()));
+  let provider_key_storage =
+    Arc::new(iron_token_manager::provider_key_storage::ProviderKeyStorage::new(pool.clone()));
+  let jwt_secret = Arc::new(iron_control_api::jwt_auth::JwtSecret::new(
+    "test_jwt_secret".to_string(),
+  ));
 
-  BudgetState
-  {
+  BudgetState {
     ic_token_manager,
     ip_token_crypto,
     lease_manager,
@@ -80,7 +73,7 @@ pub async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     provider_key_crypto,
     db_pool: pool,
     jwt_secret,
-    crypto_service: Some( crypto_service ),
+    crypto_service: Some(crypto_service),
     ic_token_rate_limiter: IcTokenRateLimiter::new(),
   }
 }
@@ -88,31 +81,27 @@ pub async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
 /// Helper: Create test budget state without crypto service
 ///
 /// Use this for testing crypto unavailable scenarios.
-#[ allow( dead_code ) ]
-pub async fn create_test_budget_state_no_crypto( pool: SqlitePool ) -> BudgetState
-{
+#[allow(dead_code)]
+pub async fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
-  let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
-  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ];
+  let ip_token_key: [u8; 32] = [0u8; 32];
+  let provider_key_master: [u8; 32] = [42u8; 32];
 
-  let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
-  let ip_token_crypto = Arc::new(
-    iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
-  );
-  let provider_key_crypto = Arc::new(
-    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
-  );
-  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let agent_budget_manager = Arc::new(
-    iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
-  );
-  let provider_key_storage = Arc::new(
-    iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
-  );
-  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
+  let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
+  let ip_token_crypto =
+    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key).unwrap());
+  let provider_key_crypto =
+    Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
+  let lease_manager = Arc::new(LeaseManager::from_pool(pool.clone()));
+  let agent_budget_manager =
+    Arc::new(iron_token_manager::agent_budget::AgentBudgetManager::from_pool(pool.clone()));
+  let provider_key_storage =
+    Arc::new(iron_token_manager::provider_key_storage::ProviderKeyStorage::new(pool.clone()));
+  let jwt_secret = Arc::new(iron_control_api::jwt_auth::JwtSecret::new(
+    "test_jwt_secret".to_string(),
+  ));
 
-  BudgetState
-  {
+  BudgetState {
     ic_token_manager,
     ip_token_crypto,
     lease_manager,
@@ -131,26 +120,27 @@ pub async fn create_test_budget_state_no_crypto( pool: SqlitePool ) -> BudgetSta
 /// Creates IC Token with standard claims and stores SHA-256 hash in
 /// `agents.ic_token_hash` so that `validate_ic_token_runtime` accepts it.
 /// Agent must already exist in the database.
-#[ allow( dead_code ) ]
-pub async fn create_ic_token( pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager ) -> String
-{
+#[allow(dead_code)]
+pub async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager) -> String {
   let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
+    format!("agent_{}", agent_id),
+    format!("budget_{}", agent_id),
+    vec!["llm:call".to_string()],
     None,
   );
 
-  let token = manager.generate_token( &claims ).expect( "LOUD FAILURE: Should generate IC Token" );
+  let token = manager
+    .generate_token(&claims)
+    .expect("LOUD FAILURE: Should generate IC Token");
 
-  let token_hash = iron_control_api::ic_token::sha256_hash( &token );
+  let token_hash = iron_control_api::ic_token::sha256_hash(&token);
 
-  sqlx::query( "UPDATE agents SET ic_token_hash = ? WHERE id = ?" )
-    .bind( &token_hash )
-    .bind( agent_id )
-    .execute( pool )
+  sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
+    .bind(&token_hash)
+    .bind(agent_id)
+    .execute(pool)
     .await
-    .expect( "LOUD FAILURE: Failed to store ic_token_hash" );
+    .expect("LOUD FAILURE: Failed to store ic_token_hash");
 
   token
 }
@@ -167,24 +157,23 @@ pub async fn create_ic_token( pool: &SqlitePool, agent_id: i64, manager: &IcToke
 /// # Fix(issue-concurrency-001)
 /// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
 /// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
-#[ allow( dead_code ) ]
-pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microdollars: i64 )
-{
+#[allow(dead_code)]
+pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdollars: i64) {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
   // Create test user if it doesn't exist (required for owner_id foreign key)
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
+     VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-  .bind( "test_user" )
-  .bind( "test_username" )
-  .bind( "$2b$12$test_password_hash" )
-  .bind( "test@example.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( pool )
+  .bind("test_user")
+  .bind("test_username")
+  .bind("$2b$12$test_password_hash")
+  .bind("test@example.com")
+  .bind("admin")
+  .bind(1)
+  .bind(now_ms)
+  .execute(pool)
   .await
   .unwrap();
 
@@ -218,12 +207,13 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_mi
   // Insert provider key
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
   // Create real encrypted provider key for testing
-  let test_provider_key = format!( "sk-test_key_for_agent_{}", agent_id );
-  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key (must match create_test_budget_state)
-  let crypto_service = iron_secrets::crypto::CryptoService::new( &provider_key_master )
-    .expect( "LOUD FAILURE: Should create crypto service" );
-  let encrypted = crypto_service.encrypt( &test_provider_key )
-    .expect( "LOUD FAILURE: Should encrypt provider key" );
+  let test_provider_key = format!("sk-test_key_for_agent_{}", agent_id);
+  let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
+  let crypto_service = iron_secrets::crypto::CryptoService::new(&provider_key_master)
+    .expect("LOUD FAILURE: Should create crypto service");
+  let encrypted = crypto_service
+    .encrypt(&test_provider_key)
+    .expect("LOUD FAILURE: Should encrypt provider key");
 
   sqlx::query(
     "INSERT OR IGNORE INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
@@ -258,20 +248,24 @@ pub async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_mi
 /// Helper: Create router for budget endpoints
 ///
 /// Builds Axum router with all budget endpoints mounted for testing.
-#[ allow( dead_code ) ]
-pub async fn create_budget_router( state: BudgetState ) -> Router
-{
+#[allow(dead_code)]
+pub async fn create_budget_router(state: BudgetState) -> Router {
   use iron_control_api::routes::budget::request_workflow::{
-    approve_budget_request,
-    reject_budget_request,
+    approve_budget_request, reject_budget_request,
   };
 
   Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .route( "/api/budget/report", axum::routing::post( report_usage ) )
-    .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
-    .route( "/api/budget/return", axum::routing::post( return_budget ) )
-    .route( "/api/v1/budget/requests/:id/approve", axum::routing::patch( approve_budget_request ) )
-    .route( "/api/v1/budget/requests/:id/reject", axum::routing::patch( reject_budget_request ) )
-    .with_state( state )
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .route("/api/budget/report", axum::routing::post(report_usage))
+    .route("/api/budget/refresh", axum::routing::post(refresh_budget))
+    .route("/api/budget/return", axum::routing::post(return_budget))
+    .route(
+      "/api/v1/budget/requests/:id/approve",
+      axum::routing::patch(approve_budget_request),
+    )
+    .route(
+      "/api/v1/budget/requests/:id/reject",
+      axum::routing::patch(reject_budget_request),
+    )
+    .with_state(state)
 }

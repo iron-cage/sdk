@@ -32,28 +32,36 @@
 //! **Resource Limits:** Not applicable (covered by token tests)
 //! **Precondition Violations:** Not applicable
 
-use iron_control_api::routes::limits::LimitsState;
-use axum::{ Router, routing::{ post, put }, http::{ Request, StatusCode } };
 use axum::body::Body;
-use tower::ServiceExt;
+use axum::{
+  http::{Request, StatusCode},
+  routing::{post, put},
+  Router,
+};
+use iron_control_api::routes::limits::LimitsState;
 use serde_json::json;
+use tower::ServiceExt;
 
 /// Create test router with limits routes.
-async fn create_test_router() -> Router
-{
-  let limits_state = LimitsState::new( "sqlite::memory:" )
+async fn create_test_router() -> Router {
+  let limits_state = LimitsState::new("sqlite::memory:")
     .await
-    .expect( "LOUD FAILURE: Failed to create limits state" );
+    .expect("LOUD FAILURE: Failed to create limits state");
 
   Router::new()
-    .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits/:id", put( iron_control_api::routes::limits::update_limit ) )
-    .with_state( limits_state )
+    .route(
+      "/api/limits",
+      post(iron_control_api::routes::limits::create_limit),
+    )
+    .route(
+      "/api/limits/:id",
+      put(iron_control_api::routes::limits::update_limit),
+    )
+    .with_state(limits_state)
 }
 
 /// Helper: Create a valid limit and return its ID.
-async fn create_limit( router: &Router ) -> i64
-{
+async fn create_limit(router: &Router) -> i64 {
   let request_body = json!({
     "user_id": "test_user",
     "project_id": null,
@@ -63,39 +71,40 @@ async fn create_limit( router: &Router ) -> i64
   });
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/limits" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/limits")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = router.clone().oneshot( request ).await.unwrap();
-  assert_eq!( response.status(), StatusCode::CREATED );
+  let response = router.clone().oneshot(request).await.unwrap();
+  assert_eq!(response.status(), StatusCode::CREATED);
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  body[ "id" ].as_i64().unwrap()
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  body["id"].as_i64().unwrap()
 }
 
 /// Test POST /api/limits with invalid JSON syntax (missing closing brace).
 ///
 /// WHY: Axum's JSON extractor should reject syntactically invalid JSON at the
 /// HTTP layer before reaching business logic.
-#[ tokio::test ]
-async fn test_create_limit_with_invalid_json_syntax()
-{
+#[tokio::test]
+async fn test_create_limit_with_invalid_json_syntax() {
   let router = create_test_router().await;
 
   let malformed_json = r#"{"user_id":"test","max_tokens_per_day":1000"#; // Missing closing brace
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/limits" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
+    .method("POST")
+    .uri("/api/limits")
+    .header("content-type", "application/json")
+    .body(Body::from(malformed_json))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -107,21 +116,20 @@ async fn test_create_limit_with_invalid_json_syntax()
 /// Test POST /api/limits with trailing comma (invalid JSON).
 ///
 /// WHY: JSON spec doesn't allow trailing commas. This tests strict parsing.
-#[ tokio::test ]
-async fn test_create_limit_with_trailing_comma()
-{
+#[tokio::test]
+async fn test_create_limit_with_trailing_comma() {
   let router = create_test_router().await;
 
   let malformed_json = r#"{"user_id":"test","max_tokens_per_day":1000,}"#; // Trailing comma
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/limits" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
+    .method("POST")
+    .uri("/api/limits")
+    .header("content-type", "application/json")
+    .body(Body::from(malformed_json))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -133,24 +141,23 @@ async fn test_create_limit_with_trailing_comma()
 /// Test PUT /api/limits/:id with invalid JSON syntax.
 ///
 /// WHY: Update endpoint should also reject malformed JSON at HTTP layer.
-#[ tokio::test ]
-async fn test_update_limit_with_invalid_json_syntax()
-{
+#[tokio::test]
+async fn test_update_limit_with_invalid_json_syntax() {
   let router = create_test_router().await;
 
   // First create a limit to update
-  let limit_id = create_limit( &router ).await;
+  let limit_id = create_limit(&router).await;
 
   let malformed_json = r#"{"max_tokens_per_day":2000"#; // Missing closing brace
 
   let request = Request::builder()
-    .method( "PUT" )
-    .uri( format!( "/api/limits/{}", limit_id ) )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
+    .method("PUT")
+    .uri(format!("/api/limits/{limit_id}"))
+    .header("content-type", "application/json")
+    .body(Body::from(malformed_json))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -162,25 +169,24 @@ async fn test_update_limit_with_invalid_json_syntax()
 /// Test PUT /api/limits/:id with unquoted string values (invalid JSON).
 ///
 /// WHY: JSON requires quoted string values. This ensures strict parsing.
-#[ tokio::test ]
-async fn test_update_limit_with_unquoted_values()
-{
+#[tokio::test]
+async fn test_update_limit_with_unquoted_values() {
   let router = create_test_router().await;
 
   // First create a limit to update
-  let limit_id = create_limit( &router ).await;
+  let limit_id = create_limit(&router).await;
 
   // Unquoted string value for user_id (if it were in update body)
   let malformed_json = r#"{"max_tokens_per_day":unquoted}"#; // Unquoted value
 
   let request = Request::builder()
-    .method( "PUT" )
-    .uri( format!( "/api/limits/{}", limit_id ) )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
+    .method("PUT")
+    .uri(format!("/api/limits/{limit_id}"))
+    .header("content-type", "application/json")
+    .body(Body::from(malformed_json))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
