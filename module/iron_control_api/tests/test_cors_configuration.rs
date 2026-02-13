@@ -1,6 +1,6 @@
 //! CORS configuration tests.
 //!
-//! Verifies CORS origins loaded from ALLOWED_ORIGINS environment variable,
+//! Verifies CORS origins loaded from `ALLOWED_ORIGINS `environment variable,
 //! not hardcoded in source code.
 
 mod common;
@@ -16,9 +16,9 @@ use common::source_analysis::*;
 /// environment-specific configuration.
 ///
 /// ## What This Proves
-/// - No hardcoded allow_origin arrays in server source
-/// - ALLOWED_ORIGINS environment variable parsing exists
-/// - Production enforcement (fails if ALLOWED_ORIGINS missing)
+/// - No hardcoded `allow_origin` arrays in server source
+/// - `ALLOWED_ORIGINS` environment variable parsing exists
+/// - Production enforcement (fails if `ALLOWED_ORIGINS` missing)
 ///
 /// ## Why This Matters
 /// Hardcoded origins:
@@ -63,18 +63,17 @@ fn test_no_hardcoded_cors_origins()
 
   assert!(
     has_enforcement,
-    "FAIL: Production enforcement missing in {}\n\
+    "FAIL: Production enforcement missing in {source_path}\n\
      Must panic/expect if ALLOWED_ORIGINS not set in production",
-    source_path
   );
 }
 
 /// Verify no fallback defeats purpose of env var.
 ///
 /// ## Purpose
-/// Using unwrap_or with default origins defeats the purpose of environment
-/// configuration. Server must REQUIRE ALLOWED_ORIGINS explicitly.
-/// unwrap_or_else with panic!() is acceptable for error handling.
+/// Using `unwrap_or` with default origins defeats the purpose of environment
+/// configuration. Server must REQUIRE `ALLOWED_ORIGINS` explicitly.
+/// `unwrap_or_else` with panic!() is acceptable for error handling.
 // test_kind: negative_acceptance
 #[ test ]
 fn test_no_cors_fallback()
@@ -124,11 +123,11 @@ fn test_no_cors_fallback()
 /// Integration test: Verify CORS origins loaded from environment at runtime.
 ///
 /// ## Purpose
-/// Prove that CORS middleware actually uses ALLOWED_ORIGINS environment
+/// Prove that CORS middleware actually uses `ALLOWED_ORIGINS` environment
 /// variable at runtime, not just at compile time.
 ///
 /// ## Test Strategy
-/// 1. Set ALLOWED_ORIGINS env var
+/// 1. Set `ALLOWED_ORIGINS` env var
 /// 2. Create test server
 /// 3. Make OPTIONS request with allowed origin
 /// 4. Verify CORS headers present

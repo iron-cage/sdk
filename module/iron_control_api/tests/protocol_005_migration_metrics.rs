@@ -58,12 +58,12 @@ async fn setup_test_db() -> SqlitePool
 /// ## Metric 1: Count Endpoints Accessible by Agent Tokens
 ///
 /// **What**: Number of API endpoints that agent tokens can use to get credentials
-/// **Initial State**: 1 (agent tokens could use /api/keys)
-/// **Final State**: 0 (agent tokens blocked from /api/keys)
+/// **Initial State**: 1 (agent tokens could use `/api/keys`)
+/// **Final State**: 0 (agent tokens blocked from `/api/keys`)
 ///
 /// **Verification Method**: Count enforcement checks in endpoint code
-#[ tokio::test ]
-async fn metric_1_agent_accessible_credential_endpoints()
+#[ test ]
+fn metric_1_agent_accessible_credential_endpoints()
 {
   // Read all route files
   let keys_source = include_str!( "../src/routes/keys.rs" );
@@ -100,15 +100,14 @@ async fn metric_1_agent_accessible_credential_endpoints()
   // CRITICAL ASSERTION: Zero unprotected endpoints
   assert_eq!(
     unprotected_count, 0,
-    "METRIC FAILURE: Found {} unprotected credential endpoints. \
+    "METRIC FAILURE: Found {unprotected_count} unprotected credential endpoints. \
      Expected 0. Each endpoint that provides credentials must enforce \
-     agent token restrictions.",
-    unprotected_count
+     agent token restrictions."
   );
 
   // Report metrics
-  println!( "✓ Metric 1: Agent-accessible credential endpoints = {}", unprotected_count );
-  println!( "  ├─ /api/keys: protected = {}", keys_has_enforcement );
+  println!( "✓ Metric 1: Agent-accessible credential endpoints = {unprotected_count}" );
+  println!( "  ├─ /api/keys: protected = {keys_has_enforcement}" );
   println!( "  └─ Expected: 0 unprotected endpoints" );
 }
 
@@ -162,30 +161,27 @@ async fn metric_2_budget_control_paths()
   // CRITICAL ASSERTIONS
   assert_eq!(
     table_count, 2,
-    "METRIC FAILURE: Found {} budget tables, expected 2 (budget_leases, agent_budgets)",
-    table_count
+    "METRIC FAILURE: Found {table_count} budget tables, expected 2 (budget_leases, agent_budgets)"
   );
 
   assert_eq!(
     endpoint_count, 3,
-    "METRIC FAILURE: Found {} budget endpoints, expected 3 (handshake, report, refresh)",
-    endpoint_count
+    "METRIC FAILURE: Found {endpoint_count} budget endpoints, expected 3 (handshake, report, refresh)"
   );
 
   // Calculate total budget control paths
   let total_paths = table_count + endpoint_count;
 
   // Report metrics
-  println!( "✓ Metric 2: Budget control paths = {}", total_paths );
-  println!( "  ├─ Budget tables: {} (budget_leases, agent_budgets)", table_count );
-  println!( "  ├─ Budget endpoints: {} (handshake, report, refresh)", endpoint_count );
+  println!( "✓ Metric 2: Budget control paths = {total_paths}" );
+  println!( "  ├─ Budget tables: {table_count} (budget_leases, agent_budgets)" );
+  println!( "  ├─ Budget endpoints: {endpoint_count} (handshake, report, refresh)" );
   println!( "  └─ Expected: 5 total paths (2 tables + 3 endpoints)" );
 
   assert!(
     total_paths >= 5,
     "METRIC FAILURE: Insufficient budget control infrastructure. \
-     Found {} paths, expected at least 5.",
-    total_paths
+     Found {total_paths} paths, expected at least 5."
   );
 }
 
@@ -218,7 +214,7 @@ async fn metric_3_enforcement_layers()
   }
   else
   {
-    println!( "  ✗ Layer 1: MISSING ({} foreign keys, expected 2)", fk_count );
+    println!( "  ✗ Layer 1: MISSING ({fk_count} foreign keys, expected 2)" );
   }
 
   // Layer 2: Token distinguishability (agent_id column)
@@ -229,14 +225,14 @@ async fn metric_3_enforcement_layers()
   .await
   .unwrap();
 
-  if !schema.is_empty()
+  if schema.is_empty()
   {
-    enforcement_count += 1;
-    println!( "  ✓ Layer 2: Token schema (agent_id column exists)" );
+    println!( "  ✗ Layer 2: MISSING (agent_id column not found)" );
   }
   else
   {
-    println!( "  ✗ Layer 2: MISSING (agent_id column not found)" );
+    enforcement_count += 1;
+    println!( "  ✓ Layer 2: Token schema (agent_id column exists)" );
   }
 
   // Layer 3: API enforcement code
@@ -258,13 +254,12 @@ async fn metric_3_enforcement_layers()
   // CRITICAL ASSERTION: All 3 layers must be present
   assert_eq!(
     enforcement_count, 3,
-    "METRIC FAILURE: Found {} enforcement layers, expected 3. \
-     Each layer is critical for security.",
-    enforcement_count
+    "METRIC FAILURE: Found {enforcement_count} enforcement layers, expected 3. \
+     Each layer is critical for security."
   );
 
   // Report metrics
-  println!( "✓ Metric 3: Enforcement layers = {}/3", enforcement_count );
+  println!( "✓ Metric 3: Enforcement layers = {enforcement_count}/3" );
   println!( "  └─ Expected: 3 layers (database, schema, API)" );
 }
 
@@ -283,7 +278,7 @@ async fn metric_4_migration_ratio_shift()
   // Count old pattern (bypass paths)
   let keys_source = include_str!( "../src/routes/keys.rs" );
   let has_agent_enforcement = keys_source.contains( "Agent tokens cannot use this endpoint" );
-  let bypass_paths = if has_agent_enforcement { 0 } else { 1 };
+  let bypass_paths = i32::from( !has_agent_enforcement );
 
   // Count new pattern (Protocol 005 paths)
   let budget_source = concat!(
@@ -295,7 +290,7 @@ async fn metric_4_migration_ratio_shift()
     include_str!( "../src/routes/budget/request_workflow.rs" )
   );
   let has_handshake = budget_source.contains( "pub async fn handshake" );
-  let protocol_paths = if has_handshake { 1 } else { 0 };
+  let protocol_paths = i32::from( has_handshake );
 
   // Count enforcement mechanisms
   let fk_count: i64 = sqlx::query_scalar(
@@ -313,10 +308,10 @@ async fn metric_4_migration_ratio_shift()
   // Report detailed metrics
   println!( "\n=== MIGRATION METRICS SUMMARY ===" );
   println!( "Old Pattern (Bypass Paths):" );
-  println!( "  └─ Count: {}", bypass_paths );
+  println!( "  └─ Count: {bypass_paths}" );
   println!( "  └─ Status: {}", if bypass_paths == 0 { "✓ BLOCKED" } else { "✗ AVAILABLE" } );
   println!( "\nNew Pattern (Protocol 005):" );
-  println!( "  └─ Count: {}", protocol_paths );
+  println!( "  └─ Count: {protocol_paths}" );
   println!( "  └─ Status: {}", if protocol_paths >= 1 { "✓ ACTIVE" } else { "✗ MISSING" } );
   println!( "\nEnforcement:" );
   println!( "  └─ Status: {}", if enforcement_active { "✓ ACTIVE" } else { "✗ INACTIVE" } );
@@ -334,29 +329,27 @@ async fn metric_4_migration_ratio_shift()
   {
     format!(
       "bypass:{:.0}% protocol:{:.0}%",
-      ( bypass_paths as f64 / total_paths as f64 ) * 100.0,
-      ( protocol_paths as f64 / total_paths as f64 ) * 100.0
+      ( f64::from( bypass_paths ) / f64::from( total_paths ) ) * 100.0,
+      ( f64::from( protocol_paths ) / f64::from( total_paths ) ) * 100.0
     )
   };
 
-  println!( "✓ Metric 4: Migration ratio = {}", ratio );
-  println!( "  ├─ Bypass paths: {}", bypass_paths );
-  println!( "  ├─ Protocol paths: {}", protocol_paths );
+  println!( "✓ Metric 4: Migration ratio = {ratio}" );
+  println!( "  ├─ Bypass paths: {bypass_paths}" );
+  println!( "  ├─ Protocol paths: {protocol_paths}" );
   println!( "  └─ Expected: bypass:0% protocol:100%" );
 
   // CRITICAL ASSERTIONS
   assert_eq!(
     bypass_paths, 0,
-    "METRIC FAILURE: Found {} bypass paths, expected 0. \
-     Migration incomplete - old pattern still accessible.",
-    bypass_paths
+    "METRIC FAILURE: Found {bypass_paths} bypass paths, expected 0. \
+     Migration incomplete - old pattern still accessible."
   );
 
   assert!(
     protocol_paths >= 1,
-    "METRIC FAILURE: Found {} Protocol 005 paths, expected at least 1. \
-     Migration incomplete - new pattern not implemented.",
-    protocol_paths
+    "METRIC FAILURE: Found {protocol_paths} Protocol 005 paths, expected at least 1. \
+     Migration incomplete - new pattern not implemented."
   );
 
   assert!(
@@ -506,26 +499,23 @@ async fn metric_summary_migration_score()
     score += 1;
   }
 
-  let percentage = ( score as f64 / total_checks as f64 ) * 100.0;
+  let percentage = ( f64::from( score ) / f64::from( total_checks ) ) * 100.0;
 
   println!( "\n╔════════════════════════════════════════╗" );
   println!( "║  PROTOCOL 005 MIGRATION COMPLETENESS   ║" );
   println!( "╠════════════════════════════════════════╣" );
-  println!( "║  Score: {}/{}  ({:.0}%)                    ║", score, total_checks, percentage );
+  println!( "║  Score: {score}/{total_checks}  ({percentage:.0}%)                    ║" );
   println!( "╠════════════════════════════════════════╣" );
   println!( "║  ✓ Bypass Blocked        [{}]          ║", if no_bypass { "PASS" } else { "FAIL" } );
   println!( "║  ✓ Protocol Active       [{}]          ║", if protocol_exists { "PASS" } else { "FAIL" } );
   println!( "║  ✓ Database Enforced     [{}]          ║", if fk_count >= 2 { "PASS" } else { "FAIL" } );
-  println!( "║  ✓ Schema Updated        [{}]          ║", if !schema.is_empty() { "PASS" } else { "FAIL" } );
+  println!( "║  ✓ Schema Updated        [{}]          ║", if schema.is_empty() { "FAIL" } else { "PASS" } );
   println!( "║  ✓ Tests Protected       [{}]          ║", if rollback_test_has_coverage { "PASS" } else { "FAIL" } );
   println!( "╚════════════════════════════════════════╝\n" );
 
   assert_eq!(
     score, total_checks,
-    "MIGRATION INCOMPLETE: Score {}/{} ({:.0}%). \
-     Migration requires 100% completion.",
-    score,
-    total_checks,
-    percentage
+    "MIGRATION INCOMPLETE: Score {score}/{total_checks} ({percentage:.0}%). \
+     Migration requires 100% completion."
   );
 }

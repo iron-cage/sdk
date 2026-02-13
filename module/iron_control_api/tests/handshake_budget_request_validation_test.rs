@@ -14,7 +14,7 @@
 //!
 //! GAP-002: Handshake endpoint doesn't enforce maximum budget request limits
 //! - Security implication: Client could request unlimited budgets
-//! - Fix: Add maximum budget validation to HandshakeRequest
+//! - Fix: Add maximum budget validation to `HandshakeRequest`
 
 mod common;
 
@@ -32,13 +32,13 @@ use tower::ServiceExt;
 ///
 /// # Expected Behavior
 ///
-/// - Request with budget <= MAX_HANDSHAKE_BUDGET succeeds
+/// - Request with budget <= `MAX_HANDSHAKE_BUDGET` succeeds
 /// - Granted budget equals requested budget (if available)
 #[ tokio::test ]
 async fn test_handshake_with_valid_budget_request()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   // Create agent with sufficient budget
   let agent_id = 300i64;
@@ -80,8 +80,7 @@ async fn test_handshake_with_valid_budget_request()
   let granted = response_json[ "budget_granted" ].as_i64().unwrap();
   assert_eq!(
     granted, 5_000_000,
-    "Should grant requested budget of $5, got {} microdollars",
-    granted
+    "Should grant requested budget of $5, got {granted} microdollars"
   );
 }
 
@@ -89,13 +88,13 @@ async fn test_handshake_with_valid_budget_request()
 ///
 /// # Expected Behavior
 ///
-/// - Request with budget > MAX_HANDSHAKE_BUDGET fails with 400 Bad Request
+/// - Request with budget > `MAX_HANDSHAKE_BUDGET` fails with 400 Bad Request
 /// - Error message indicates budget request too large
 #[ tokio::test ]
 async fn test_handshake_with_excessive_budget_request()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   let agent_id = 301i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 1_000_000_000 ).await; // $1000
@@ -135,8 +134,7 @@ async fn test_handshake_with_excessive_budget_request()
 
   assert!(
     response_text.contains( "budget" ) || response_text.contains( "exceeds" ),
-    "Error message should mention budget/exceeds, got: {}",
-    response_text
+    "Error message should mention budget/exceeds, got: {response_text}"
   );
 }
 
@@ -149,7 +147,7 @@ async fn test_handshake_with_excessive_budget_request()
 async fn test_handshake_with_zero_budget_request()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   let agent_id = 302i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
@@ -193,7 +191,7 @@ async fn test_handshake_with_zero_budget_request()
 async fn test_handshake_with_negative_budget_request()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   let agent_id = 303i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
@@ -232,13 +230,13 @@ async fn test_handshake_with_negative_budget_request()
 ///
 /// # Expected Behavior
 ///
-/// - Request without requested_budget field succeeds
-/// - Granted budget equals DEFAULT_HANDSHAKE_BUDGET ($10)
+/// - Request without `requested_budget` field succeeds
+/// - Granted budget equals `DEFAULT_HANDSHAKE_BUDGET` ($10)
 #[ tokio::test ]
 async fn test_handshake_without_budget_request_uses_default()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   let agent_id = 304i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
@@ -278,7 +276,6 @@ async fn test_handshake_without_budget_request_uses_default()
   let granted = response_json[ "budget_granted" ].as_i64().unwrap();
   assert_eq!(
     granted, 10_000_000,
-    "Should grant default budget of $10, got {} microdollars",
-    granted
+    "Should grant default budget of $10, got {granted} microdollars"
   );
 }

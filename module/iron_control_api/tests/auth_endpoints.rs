@@ -70,7 +70,7 @@ fn test_login_flow_concept()
 
   // User logs in with credentials (username/password validation would happen here)
   let user_id = "user_123";
-  let _user_role = Role::User;
+  let _ = Role::User;
 
   // Server generates access + refresh tokens
   let access_token = secret.generate_access_token( user_id, "user@mail.com", "c", "token_id_001" ).expect("LOUD FAILURE: Should generate");
@@ -81,9 +81,9 @@ fn test_login_flow_concept()
   assert!( !access_token.is_empty() );
   assert!( !refresh_token.is_empty() );
 
-  // Server returns tokens to client
-  // Client stores tokens
-  // Future requests include access_token in Authorization header
+  // Server returns tokens to client.
+  // Client stores tokens.
+  // Future requests include access_token in Authorization header.
 }
 
 #[ test ]

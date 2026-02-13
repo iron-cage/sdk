@@ -1,18 +1,18 @@
 //! Comprehensive Authorization Bypass Security Tests - Security Audit Phase 3
 //!
-//! **Authority:** `-security_test_implementation_status.md` § Phase 3
+//! **Authority:** `-security_test_implementation_status.md` Phase 3
 //! **Status:** Week 1 - Day 1 Implementation
 //!
 //! Tests comprehensive authorization bypass prevention across all endpoints:
-//! - Vertical privilege escalation (user → admin)
-//! - Horizontal privilege escalation (user A → user B resources)
+//! - Vertical privilege escalation (user to admin)
+//! - Horizontal privilege escalation (user A to user B resources)
 //! - Insecure Direct Object Reference (IDOR) vulnerabilities
 //! - Role modification prevention
 //! - RBAC permission matrix enforcement
 //!
 //! # Security Requirements
 //!
-//! Per OWASP Top 10 (Broken Access Control #1):
+//! Per OWASP Top 10 (Broken Access Control):
 //! - Users MUST only access their own resources
 //! - Users MUST NOT elevate privileges without authorization
 //! - Sequential IDs MUST NOT enable resource enumeration
@@ -21,23 +21,23 @@
 //!
 //! # Attack Vector Coverage
 //!
-//! - ✅ Vertical escalation (user→admin via token manipulation)
-//! - ✅ Horizontal escalation (user A accessing user B's data)
-//! - ✅ IDOR via sequential ID enumeration
-//! - ✅ IDOR via UUID guessing
-//! - ✅ Role modification via API
-//! - ✅ Role modification via token tampering
-//! - ✅ RBAC bypass attempts (all 25 permissions)
-//! - ✅ Bulk operation authorization checks
+//! - Vertical escalation (user to admin via token manipulation)
+//! - Horizontal escalation (user A accessing user B's data)
+//! - IDOR via sequential ID enumeration
+//! - IDOR via UUID guessing
+//! - Role modification via API
+//! - Role modification via token tampering
+//! - RBAC bypass attempts (all 25 permissions)
+//! - Bulk operation authorization checks
 //!
 //! # Test Coverage
 //!
 //! ## Phase 3: Authorization Bypass (5 tests)
-//! - ✅ Vertical privilege escalation prevention
-//! - ✅ Horizontal privilege escalation prevention
-//! - ✅ IDOR vulnerability prevention
-//! - ✅ Role modification prevention
-//! - ✅ RBAC permission matrix enforcement
+//! - Vertical privilege escalation prevention
+//! - Horizontal privilege escalation prevention
+//! - IDOR vulnerability prevention
+//! - Role modification prevention
+//! - RBAC permission matrix enforcement
 
 use super::common;
 use axum::
@@ -91,7 +91,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
   // Create admin user for comparison (role: "admin")
   common::auth::seed_test_user( &pool, "admin@example.com", "admin_password", "admin", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Login as regular user
   let user_login = Request::builder()
@@ -122,13 +122,13 @@ async fn test_vertical_privilege_escalation_user_to_admin()
     ( "GET", "/api/v1/admin/audit-log", json!({}) ),
   ];
 
-  for ( method, uri, body ) in admin_operations.iter()
+  for ( method, uri, body ) in &admin_operations
   {
     let request = Request::builder()
       .method( *method )
       .uri( *uri )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", user_token ) )
+      .header( "authorization", format!( "Bearer {user_token}" ) )
       .body( Body::from( body.to_string() ) )
       .unwrap();
 
@@ -137,8 +137,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
     assert_eq!(
       response.status(),
       StatusCode::FORBIDDEN,
-      "User role should be forbidden from admin endpoint: {} {}",
-      method, uri
+      "User role should be forbidden from admin endpoint: {method} {uri}"
     );
 
     // Verify error response indicates insufficient permissions
@@ -148,7 +147,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
     let error_code = error_data[ "error" ][ "code" ].as_str().unwrap();
     assert!(
       error_code.contains( "FORBIDDEN" ) || error_code.contains( "INSUFFICIENT_PERMISSIONS" ),
-      "Error code should indicate forbidden access, got: {}", error_code
+      "Error code should indicate forbidden access, got: {error_code}"
     );
   }
 
@@ -174,7 +173,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
     .method( "GET" )
     .uri( "/api/v1/admin/users" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", admin_token ) )
+    .header( "authorization", format!( "Bearer {admin_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -193,9 +192,9 @@ async fn test_vertical_privilege_escalation_user_to_admin()
 /// 1. Create user A and user B (both with "user" role)
 /// 2. User A creates resources (agent, budget, tokens)
 /// 3. User B attempts to access user A's resources:
-///    - GET /api/v1/agents/{user_a_agent_id}
-///    - PUT /api/v1/agents/{user_a_agent_id}
-///    - DELETE /api/v1/agents/{user_a_agent_id}
+///    - GET `/api/v1/agents/{user_a_agent_id}`
+///    - PUT `/api/v1/agents/{user_a_agent_id}`
+///    - DELETE `/api/v1/agents/{user_a_agent_id}`
 /// 4. Verify ALL attempts rejected with 403 Forbidden
 ///
 /// # Expected Behavior
@@ -203,7 +202,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
 /// - Users MUST only access their own resources
 /// - Resource ownership verified on EVERY request
 /// - No data leakage between users (multi-tenancy isolation)
-/// - Authorization checked at database level (owner_id filtering)
+/// - Authorization checked at database level (`owner_id` filtering)
 ///
 /// # Security Requirement
 ///
@@ -213,7 +212,7 @@ async fn test_vertical_privilege_escalation_user_to_admin()
 /// # Implementation Status
 ///
 /// ⚠️ REQUIRES VERIFICATION
-/// Existing authorization_checks.rs tests some scenarios.
+/// Existing `authorization_checks.rs` tests some scenarios.
 /// Need comprehensive coverage across ALL endpoints.
 #[ tokio::test ]
 #[ ignore = "Requires comprehensive horizontal privilege escalation prevention" ]
@@ -225,7 +224,7 @@ async fn test_horizontal_privilege_escalation_user_to_user()
   common::auth::seed_test_user( &pool, "user_a@example.com", "password_a", "user", true ).await;
   common::auth::seed_test_user( &pool, "user_b@example.com", "password_b", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Login as user A
   let login_a = Request::builder()
@@ -268,7 +267,7 @@ async fn test_horizontal_privilege_escalation_user_to_user()
     .method( "POST" )
     .uri( "/api/v1/agents" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", token_a ) )
+    .header( "authorization", format!( "Bearer {token_a}" ) )
     .body( Body::from(
       json!({
         "name": "User A's Agent",
@@ -290,18 +289,18 @@ async fn test_horizontal_privilege_escalation_user_to_user()
 
   // User B attempts to access user A's agent (horizontal escalation)
   let access_attempts = [
-    ( "GET", format!( "/api/v1/agents/{}", agent_id ), json!({}) ),
-    ( "PUT", format!( "/api/v1/agents/{}", agent_id ), json!({ "name": "Hijacked Agent" }) ),
-    ( "DELETE", format!( "/api/v1/agents/{}", agent_id ), json!({}) ),
+    ( "GET", format!( "/api/v1/agents/{agent_id}" ), json!({}) ),
+    ( "PUT", format!( "/api/v1/agents/{agent_id}" ), json!({ "name": "Hijacked Agent" }) ),
+    ( "DELETE", format!( "/api/v1/agents/{agent_id}" ), json!({}) ),
   ];
 
-  for ( method, uri, body ) in access_attempts.iter()
+  for ( method, uri, body ) in &access_attempts
   {
     let request = Request::builder()
       .method( *method )
       .uri( uri.as_str() )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", token_b ) )
+      .header( "authorization", format!( "Bearer {token_b}" ) )
       .body( Body::from( body.to_string() ) )
       .unwrap();
 
@@ -310,17 +309,16 @@ async fn test_horizontal_privilege_escalation_user_to_user()
     assert_eq!(
       response.status(),
       StatusCode::FORBIDDEN,
-      "User B should be forbidden from accessing user A's agent: {} {}",
-      method, uri
+      "User B should be forbidden from accessing user A's agent: {method} {uri}"
     );
   }
 
   // Verify user A can still access their own agent
   let user_a_access = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/v1/agents/{}", agent_id ) )
+    .uri( format!( "/api/v1/agents/{agent_id}" ) )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", token_a ) )
+    .header( "authorization", format!( "Bearer {token_a}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -372,8 +370,8 @@ async fn test_idor_vulnerabilities()
 
   for i in 1..=10
   {
-    let email = format!( "user{}@example.com", i );
-    let password = format!( "password_{}", i );
+    let email = format!( "user{i}@example.com" );
+    let password = format!( "password_{i}" );
 
     common::auth::seed_test_user( &pool, &email, &password, "user", true ).await;
 
@@ -389,7 +387,7 @@ async fn test_idor_vulnerabilities()
     user_ids.push( user_id );
   }
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Login as user 5
   let login_request = Request::builder()
@@ -417,9 +415,9 @@ async fn test_idor_vulnerabilities()
   {
     let request = Request::builder()
       .method( "GET" )
-      .uri( format!( "/api/v1/users/{}", target_user_id ) )
+      .uri( format!( "/api/v1/users/{target_user_id}" ) )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", user_5_token ) )
+      .header( "authorization", format!( "Bearer {user_5_token}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -433,7 +431,7 @@ async fn test_idor_vulnerabilities()
         successful_enumeration += 1;
       },
       StatusCode::FORBIDDEN => forbidden_count += 1,
-      other => panic!( "Unexpected status code for IDOR test: {}", other ),
+      other => panic!( "Unexpected status code for IDOR test: {other}" ),
     }
   }
 
@@ -492,7 +490,7 @@ async fn test_role_modification_prevention()
 
   common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Login as user
   let login_request = Request::builder()
@@ -519,13 +517,13 @@ async fn test_role_modification_prevention()
     ( "PATCH", "/api/v1/users/me", json!({ "role": "admin" }) ),
   ];
 
-  for ( method, uri, body ) in role_modification_attempts.iter()
+  for ( method, uri, body ) in &role_modification_attempts
   {
     let request = Request::builder()
       .method( *method )
       .uri( *uri )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", user_token ) )
+      .header( "authorization", format!( "Bearer {user_token}" ) )
       .body( Body::from( body.to_string() ) )
       .unwrap();
 
@@ -539,8 +537,7 @@ async fn test_role_modification_prevention()
       response.status() == StatusCode::FORBIDDEN
         || response.status() == StatusCode::BAD_REQUEST
         || response.status() == StatusCode::OK,
-      "Role modification attempt should be rejected or ignored: {} {}",
-      method, uri
+      "Role modification attempt should be rejected or ignored: {method} {uri}"
     );
 
     // If 200 OK, verify role was NOT actually changed
@@ -566,7 +563,7 @@ async fn test_role_modification_prevention()
     .method( "GET" )
     .uri( "/api/v1/users/me" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", user_token ) )
+    .header( "authorization", format!( "Bearer {user_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -630,7 +627,7 @@ async fn test_rbac_permission_matrix_enforcement()
   assert_eq!( permissions.len(), 25, "Should have 25 RBAC permissions defined" );
 
   // Define role→permission mappings
-  let admin_permissions: std::collections::HashSet<_> = permissions.iter().cloned().collect();
+  let admin_permissions: std::collections::HashSet<_> = permissions.iter().copied().collect();
 
   let user_permissions: std::collections::HashSet<_> = vec![
     "agent:create", "agent:read", "agent:update", "agent:delete",

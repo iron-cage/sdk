@@ -53,11 +53,11 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
   ( router, app_state )
 }
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -157,7 +157,7 @@ async fn test_rotate_token_delete_method_rejected()
 
 /// Test DELETE /api/v1/api-tokens/:id with GET method → not rejected.
 ///
-/// WHY: GET /api/v1/api-tokens/:id is the get_token endpoint (different from DELETE).
+/// WHY: GET /api/v1/api-tokens/:id is the `get_token` endpoint (different from DELETE).
 /// This test documents that GET is NOT rejected (different endpoint, not method validation).
 #[ tokio::test ]
 async fn test_revoke_token_get_method_rejected()
@@ -170,7 +170,7 @@ async fn test_revoke_token_get_method_rejected()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/v1/api-tokens/1" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -197,7 +197,7 @@ async fn test_revoke_token_post_method_rejected()
     .method( "POST" )
     .uri( "/api/v1/api-tokens/1" )
     .header( "content-type", "application/json" )
-    .body( Body::from( r#"{}"# ) )
+    .body( Body::from( r"{}" ) )
     .unwrap();
 
   let response = router.oneshot( request ).await.unwrap();

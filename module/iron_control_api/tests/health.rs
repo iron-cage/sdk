@@ -20,7 +20,7 @@ use http_body_util::BodyExt;
 /// **Impact:** Frontend expecting /api/health will get 404, breaks API contract
 ///
 /// **Root Cause:**
-/// Server configuration (iron_api_server.rs:194) routes health endpoint to `/health`
+/// Server configuration (`iron_api_server.rs:194`) routes health endpoint to `/health`
 /// instead of `/api/health` as specified in FR-2 (spec.md:152).
 ///
 /// **Pitfall:**
@@ -78,6 +78,7 @@ async fn test_old_health_path_returns_404()
 }
 
 /// Helper function to build test app with same configuration as main server
+#[allow(clippy::unused_async)]
 async fn build_test_app() -> Router
 {
   use axum::routing::get;

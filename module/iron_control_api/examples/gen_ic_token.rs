@@ -1,3 +1,8 @@
+//! IC Token Generation Example
+//!
+//! This example demonstrates how to generate an IC (Internal Control) token
+//! for development and testing purposes.
+
 use iron_control_api::ic_token::{IcTokenClaims, IcTokenManager};
 
 fn main() {

@@ -20,7 +20,7 @@ use axum::{ Router, routing::get, http::Request };
 use axum::body::Body;
 use tower::ServiceExt;
 use std::sync::Arc;
-use std::time::Duration;
+use core::time::Duration;
 
 use iron_control_api::routes::keys::{ KeysState, get_key, KeyResponse };
 use iron_token_manager::storage::TokenStorage;
@@ -188,7 +188,7 @@ async fn test_error_message_sanitization()
 // KeyResponse Structure Tests
 // =============================================================================
 
-/// Test KeyResponse serialization has correct fields.
+/// Test `KeyResponse` serialization has correct fields.
 ///
 /// WHY: API contract - consumers depend on field names.
 #[ test ]
@@ -209,9 +209,9 @@ fn test_key_response_serialization()
   assert!( json.contains( "sk-test-key" ), "API key should be present" );
 }
 
-/// Test KeyResponse omits null base_url.
+/// Test `KeyResponse` omits null `base_url`.
 ///
-/// WHY: API contract - skip_serializing_if = "Option::is_none"
+/// WHY: API contract - `skip_serializing_if` = `"Option::is_none"`
 #[ test ]
 fn test_key_response_omits_null_base_url()
 {

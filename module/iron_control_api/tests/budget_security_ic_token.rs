@@ -15,7 +15,7 @@
 //! | `test_refresh_expired_ic_token` | /refresh | Expired | 401 Unauthorized |
 //!
 //! # Note
-//! The /report endpoint does NOT require IC Token authentication. It uses lease_id
+//! The /report endpoint does NOT require IC Token authentication. It uses `lease_id`
 //! as the authentication credential. IC Token expiration testing is not applicable.
 
 mod common;
@@ -50,8 +50,8 @@ fn create_expired_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
   let expired_time = now - 3600; // 1 hour ago
 
   let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
+    format!( "agent_{agent_id}" ),
+    format!( "budget_{agent_id}" ),
     vec![ "llm:call".to_string() ],
     Some( expired_time ), // Expired
   );
@@ -85,9 +85,9 @@ async fn test_handshake_expired_ic_token()
   let agent_id = 300i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let expired_ic_token = create_expired_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Attempt handshake with expired IC token
   let response = router
@@ -120,8 +120,7 @@ async fn test_handshake_expired_ic_token()
   // Assert: Error message mentions token issue
   assert!(
     response_json.get("error").is_some(),
-    "LOUD FAILURE: Response should contain error message. Response: {}",
-    response_json
+    "LOUD FAILURE: Response should contain error message. Response: {response_json}"
   );
 
   // Verify: No lease created
@@ -149,8 +148,7 @@ async fn test_handshake_expired_ic_token()
 
   assert_eq!(
     budget_remaining, 100_000_000,
-    "LOUD FAILURE: Budget should be unchanged. Expected: $100, Actual: {}",
-    budget_remaining
+    "LOUD FAILURE: Budget should be unchanged. Expected: $100, Actual: {budget_remaining}"
   );
 }
 
@@ -173,11 +171,11 @@ async fn test_refresh_expired_ic_token()
   let agent_id = 302i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
 
   // Create initial lease with valid token
   let valid_ic_token = common::budget::create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router( state.clone() );
 
   let handshake_response = router
     .clone()
@@ -209,7 +207,7 @@ async fn test_refresh_expired_ic_token()
         .method( "POST" )
         .uri( "/api/budget/refresh" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
+        .header( "authorization", format!( "Bearer {access_token}" ) )
         .body( Body::from( json!({
           "ic_token": expired_ic_token,
           "current_lease_id": current_lease_id,

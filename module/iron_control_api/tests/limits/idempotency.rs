@@ -86,7 +86,7 @@ async fn test_delete_limit_twice_returns_204()
   // WHY: First delete should succeed
   let request1 = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/limits/{}", limit_id ) )
+    .uri( format!( "/api/limits/{limit_id}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -102,7 +102,7 @@ async fn test_delete_limit_twice_returns_204()
   // Both behaviors are valid, but inconsistent across endpoints
   let request2 = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/limits/{}", limit_id ) )
+    .uri( format!( "/api/limits/{limit_id}" ) )
     .body( Body::empty() )
     .unwrap();
 

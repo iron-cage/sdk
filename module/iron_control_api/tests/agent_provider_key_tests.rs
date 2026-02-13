@@ -1,12 +1,12 @@
 //! Integration tests for Agent Provider Key endpoint (Feature 014)
 //!
 //! Tests cover:
-//! - Success: Agent with provider_key_id retrieves decrypted key
-//! - 400 INVALID_TOKEN: Empty or malformed IC token
+//! - Success: Agent with `provider_key_id` retrieves decrypted key
+//! - 400 `INVALID_TOKEN`: Empty or malformed IC token
 //! - 401 UNAUTHORIZED: Invalid IC token signature
-//! - 403 NO_PROVIDER_ASSIGNED: Agent has no provider_key_id
-//! - 404 INVALID_TOKEN: Agent not found
-//! - 503 CRYPTO_UNAVAILABLE: CryptoService not configured
+//! - 403 `NO_PROVIDER_ASSIGNED`: Agent has no `provider_key_id`
+//! - 404 `INVALID_TOKEN`: Agent not found
+//! - 503 `CRYPTO_UNAVAILABLE`: `CryptoService` not configured
 //!
 //! ## Test Matrix
 //!
@@ -34,7 +34,7 @@ use tower::ServiceExt;
 use serde_json::json;
 
 /// Create router for agent provider key endpoint
-async fn create_provider_key_router( state: iron_control_api::routes::budget::BudgetState ) -> Router
+fn create_provider_key_router( state: iron_control_api::routes::budget::BudgetState ) -> Router
 {
   Router::new()
     .route( "/api/v1/agents/provider-key", post( get_provider_key ) )
@@ -43,9 +43,9 @@ async fn create_provider_key_router( state: iron_control_api::routes::budget::Bu
 
 /// Seed agent with properly encrypted provider key
 ///
-/// Creates test data that can actually be decrypted by the test CryptoService:
+/// Creates test data that can actually be decrypted by the test `CryptoService`:
 /// - Test user
-/// - Agent with provider_key_id pointing to the key
+/// - Agent with `provider_key_id` pointing to the key
 /// - Encrypted provider key using the test crypto service
 async fn seed_agent_with_encrypted_key(
   pool: &sqlx::SqlitePool,
@@ -57,7 +57,7 @@ async fn seed_agent_with_encrypted_key(
 {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
-  // Create test user if doesn't exist
+  // Create test user if it doesn't exist
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -101,7 +101,7 @@ async fn seed_agent_with_encrypted_key(
     "INSERT INTO agents (id, name, providers, created_at, owner_id, provider_key_id) VALUES (?, ?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
+  .bind( format!( "test_agent_{agent_id}" ) )
   .bind( serde_json::to_string( &vec![ provider ] ).unwrap() )
   .bind( now_ms )
   .bind( "test_user" )
@@ -116,7 +116,7 @@ async fn seed_agent_without_provider_key( pool: &sqlx::SqlitePool, agent_id: i64
 {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
-  // Create test user if doesn't exist
+  // Create test user if it doesn't exist
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -137,7 +137,7 @@ async fn seed_agent_without_provider_key( pool: &sqlx::SqlitePool, agent_id: i64
     "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
+  .bind( format!( "test_agent_{agent_id}") )
   .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
   .bind( now_ms )
   .bind( "test_user" )
@@ -154,13 +154,13 @@ async fn seed_agent_without_provider_key( pool: &sqlx::SqlitePool, agent_id: i64
 async fn test_get_provider_key_success()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
 
   // Seed agent with encrypted provider key
   let crypto = state.crypto_service.as_ref().unwrap();
   seed_agent_with_encrypted_key( &pool, 101, crypto, "sk-test-openai-key-12345", "openai" ).await;
 
-  let app = create_provider_key_router( state.clone() ).await;
+  let app = create_provider_key_router( state.clone() );
 
   // Generate IC token for agent_101
   let ic_token = create_ic_token( 101, &state.ic_token_manager );
@@ -198,8 +198,8 @@ async fn test_get_provider_key_success()
 async fn test_get_provider_key_empty_token()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool ).await;
-  let app = create_provider_key_router( state ).await;
+  let state = create_test_budget_state( pool );
+  let app = create_provider_key_router( state );
 
   let request_body = json!({ "ic_token": "" });
 
@@ -229,8 +229,8 @@ async fn test_get_provider_key_empty_token()
 async fn test_get_provider_key_invalid_token()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool ).await;
-  let app = create_provider_key_router( state ).await;
+  let state = create_test_budget_state( pool );
+  let app = create_provider_key_router( state );
 
   let request_body = json!({ "ic_token": "invalid.jwt.token" });
 
@@ -260,12 +260,12 @@ async fn test_get_provider_key_invalid_token()
 async fn test_get_provider_key_no_provider_assigned()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
 
   // Seed agent WITHOUT provider key
   seed_agent_without_provider_key( &pool, 102 ).await;
 
-  let app = create_provider_key_router( state.clone() ).await;
+  let app = create_provider_key_router( state.clone() );
 
   // Generate IC token for agent_102
   let ic_token = create_ic_token( 102, &state.ic_token_manager );
@@ -298,8 +298,8 @@ async fn test_get_provider_key_no_provider_assigned()
 async fn test_get_provider_key_agent_not_found()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool ).await;
-  let app = create_provider_key_router( state.clone() ).await;
+  let state = create_test_budget_state( pool );
+  let app = create_provider_key_router( state.clone() );
 
   // Generate IC token for non-existent agent
   let ic_token = create_ic_token( 99999, &state.ic_token_manager );
@@ -325,7 +325,7 @@ async fn test_get_provider_key_agent_not_found()
 async fn test_get_provider_key_crypto_unavailable()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state_no_crypto( pool.clone() ).await;
+  let state = create_test_budget_state_no_crypto( pool.clone() );
 
   // We need to seed with raw data since we don't have crypto service
   let now_ms = chrono::Utc::now().timestamp_millis();
@@ -351,7 +351,7 @@ async fn test_get_provider_key_crypto_unavailable()
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 103000i64 )
+  .bind( 103_000i64 )
   .bind( "openai" )
   .bind( "fake_encrypted_data" )
   .bind( "fake_nonce" )
@@ -371,12 +371,12 @@ async fn test_get_provider_key_crypto_unavailable()
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
-  .bind( 103000i64 )
+  .bind( 103_000i64 )
   .execute( &pool )
   .await
   .unwrap();
 
-  let app = create_provider_key_router( state.clone() ).await;
+  let app = create_provider_key_router( state.clone() );
 
   // Generate IC token for agent_103
   let ic_token = create_ic_token( 103, &state.ic_token_manager );
@@ -409,7 +409,7 @@ async fn test_get_provider_key_crypto_unavailable()
 async fn test_get_provider_key_disabled_key()
 {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
 
   let now_ms = chrono::Utc::now().timestamp_millis();
   let crypto = state.crypto_service.as_ref().unwrap();
@@ -441,7 +441,7 @@ async fn test_get_provider_key_disabled_key()
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 104000i64 )
+  .bind( 104_000i64 )
   .bind( "openai" )
   .bind( ciphertext_b64 )
   .bind( nonce_b64 )
@@ -461,12 +461,12 @@ async fn test_get_provider_key_disabled_key()
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
-  .bind( 104000i64 )
+  .bind( 104_000i64 )
   .execute( &pool )
   .await
   .unwrap();
 
-  let app = create_provider_key_router( state.clone() ).await;
+  let app = create_provider_key_router( state.clone() );
 
   let ic_token = create_ic_token( 104, &state.ic_token_manager );
   let request_body = json!({ "ic_token": ic_token });

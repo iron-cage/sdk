@@ -8,7 +8,7 @@
 //! 2. User isolation for usage reporting
 //! 3. User isolation for budget refresh
 //! 4. User isolation for budget requests
-//! 5. Database-level filtering by owner_id
+//! 5. Database-level filtering by `owner_id`
 //!
 //! # Root Cause
 //!
@@ -23,25 +23,25 @@
 //!
 //! # Fix Applied
 //!
-//! 1. Added owner_id column to agents table
+//! 1. Added `owner_id` column to agents table
 //! 2. Added authorization middleware to budget endpoints
-//! 3. Added database-level filtering by owner_id in all queries
+//! 3. Added database-level filtering by `owner_id` in all queries
 //! 4. Implemented fail-closed authorization (deny by default)
 //!
 //! ## Test Matrix
 //!
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
-//! | `test_user_cannot_access_other_users_agents` | User tries to access another user's agent | Two users, UserA tries to get UserB's agent via API | 403 Forbidden | ✅ |
-//! | `test_database_filters_agents_by_owner` | Database filters agents by owner_id | Two users with agents, query as UserA | Only UserA's agents returned | ✅ |
-//! | `test_handshake_rejects_unauthorized_agent_access` | Budget handshake with unauthorized agent | UserA tries handshake with UserB's agent | 403 Forbidden | ✅ |
-//! | `test_budget_request_rejects_unauthorized_agent` | Budget request with unauthorized agent | UserA tries budget request for UserB's agent | 403 Forbidden | ✅ |
-//! | `test_list_agents_filters_by_owner` | List agents filters by owner | Two users with agents, UserA lists agents | Only UserA's agents visible | ✅ |
+//! | `test_user_cannot_access_other_users_agents` | User tries to access another user's agent | Two users, `UserA` tries to get `UserB`'s agent via API | 403 Forbidden | pass |
+//! | `test_database_filters_agents_by_owner` | Database filters agents by `owner_id` | Two users with agents, query as `UserA` | Only `UserA`'s agents returned | pass |
+//! | `test_handshake_rejects_unauthorized_agent_access` | Budget handshake with unauthorized agent | `UserA` tries handshake with `UserB`'s agent | 403 Forbidden | pass |
+//! | `test_budget_request_rejects_unauthorized_agent` | Budget request with unauthorized agent | `UserA` tries budget request for `UserB`'s agent | 403 Forbidden | pass |
+//! | `test_list_agents_filters_by_owner` | List agents filters by owner | Two users with agents, `UserA` lists agents | Only `UserA`'s agents visible | pass |
 //!
 //! # Prevention
 //!
 //! - All new endpoints must verify resource ownership before access
-//! - Database queries must filter by authenticated user_id
+//! - Database queries must filter by authenticated `user_id`
 //! - Integration tests must include cross-user access attempts
 //! - Security review checklist includes authorization verification
 //!
@@ -58,7 +58,7 @@ use sqlx::SqlitePool;
 
 mod common;
 
-/// Setup database with agents table (WITH owner_id column - GREEN phase)
+/// Setup database with agents table (WITH `owner_id` column - GREEN phase)
 async fn setup_database_with_agents_table( pool: &SqlitePool )
 {
   // Create agents table WITH owner_id (GREEN phase implementation)
@@ -104,7 +104,7 @@ async fn setup_database_with_agents_table( pool: &SqlitePool )
 
 /// Test: User can only create leases for their own agents
 ///
-/// RED PHASE: This test will FAIL because authorization check doesnt exist yet.
+/// RED PHASE: This test will FAIL because authorization check doesn't exist yet.
 ///
 /// Expected behavior:
 /// - User A creates agent 1 (owned by user A)
@@ -118,14 +118,14 @@ async fn test_user_cannot_access_other_users_agents()
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
-  let user_a_id = "user_alice";
-  let user_b_id = "user_bob";
+  let user_alice_id = "user_alice";
+  let user_bob_id = "user_bob";
 
   sqlx::query::<sqlx::Sqlite>(
     "INSERT INTO users (id, username, password_hash, email, role, created_at)
      VALUES (?, ?, ?, ?, ?, ?)",
   )
-  .bind( user_a_id )
+  .bind(user_alice_id)
   .bind( "alice" )
   .bind( "hash_alice" )
   .bind( "alice@example.com" )
@@ -139,7 +139,7 @@ async fn test_user_cannot_access_other_users_agents()
     "INSERT INTO users (id, username, password_hash, email, role, created_at)
      VALUES (?, ?, ?, ?, ?, ?)",
   )
-  .bind( user_b_id )
+  .bind(user_bob_id)
   .bind( "bob" )
   .bind( "hash_bob" )
   .bind( "bob@example.com" )
@@ -158,7 +158,7 @@ async fn test_user_cannot_access_other_users_agents()
   )
   .bind( "Alice's Agent" )
   .bind( "[\"openai\"]" )
-  .bind( user_a_id )
+  .bind(user_alice_id)
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
@@ -174,14 +174,14 @@ async fn test_user_cannot_access_other_users_agents()
   .expect("LOUD FAILURE: Should query agent owner");
 
   assert_eq!(
-    agent_owner, user_a_id,
+    agent_owner, user_alice_id,
     "GREEN PHASE: Agent should be owned by user A"
   );
 }
 
 /// Test: Database-level filtering prevents cross-user data leakage
 ///
-/// RED PHASE: This test will FAIL because owner_id filtering doesnt exist yet.
+/// RED PHASE: This test will FAIL because `owner_id` filtering doesnt exist yet.
 ///
 /// Expected behavior:
 /// - User A has agent 1
@@ -196,12 +196,12 @@ async fn test_database_filters_agents_by_owner()
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
-  let user_a_id = "user_alice";
-  let user_b_id = "user_bob";
+  let user_alice_id = "user_alice";
+  let user_bob_id = "user_bob";
 
   for ( id, name, email ) in [
-    ( user_a_id, "alice", "alice@example.com" ),
-    ( user_b_id, "bob", "bob@example.com" ),
+    (user_alice_id, "alice", "alice@example.com" ),
+    (user_bob_id, "bob", "bob@example.com" ),
   ]
   {
     sqlx::query::<sqlx::Sqlite>(
@@ -210,7 +210,7 @@ async fn test_database_filters_agents_by_owner()
     )
     .bind( id )
     .bind( name )
-    .bind( format!( "hash_{}", name ) )
+    .bind( format!( "hash_{name}" ) )
     .bind( email )
     .bind( "user" )
     .bind( chrono::Utc::now().timestamp() )
@@ -228,7 +228,7 @@ async fn test_database_filters_agents_by_owner()
   )
   .bind( "Agent 1" )
   .bind( "[\"openai\"]" )
-  .bind( user_a_id )
+  .bind(user_alice_id)
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
@@ -242,7 +242,7 @@ async fn test_database_filters_agents_by_owner()
   )
   .bind( "Agent 2" )
   .bind( "[\"openai\"]" )
-  .bind( user_b_id )
+  .bind(user_bob_id)
   .bind( chrono::Utc::now().timestamp_millis() )
   .fetch_one( &db_pool )
   .await
@@ -252,7 +252,7 @@ async fn test_database_filters_agents_by_owner()
   let user_a_agents : Vec< i64 > = sqlx::query_scalar::<sqlx::Sqlite, i64>(
     "SELECT id FROM agents WHERE owner_id = ? ORDER BY created_at",
   )
-  .bind( user_a_id )
+  .bind(user_alice_id)
   .fetch_all( &db_pool )
   .await
   .expect("LOUD FAILURE: GREEN PHASE: Query with owner_id should succeed");
@@ -268,21 +268,21 @@ async fn test_database_filters_agents_by_owner()
   );
 
   // Query for user B's agents - should return only agent 2
-  let user_b_agents : Vec< i64 > = sqlx::query_scalar::<sqlx::Sqlite, i64>(
+  let user_bob_agents: Vec< i64 > = sqlx::query_scalar::<sqlx::Sqlite, i64>(
     "SELECT id FROM agents WHERE owner_id = ? ORDER BY created_at",
   )
-  .bind( user_b_id )
+  .bind(user_bob_id)
   .fetch_all( &db_pool )
   .await
   .expect("LOUD FAILURE: Query should succeed");
 
   assert_eq!(
-    user_b_agents.len(),
+    user_bob_agents.len(),
     1,
     "User B should have exactly 1 agent"
   );
   assert_eq!(
-    user_b_agents[ 0 ], agent_2_id,
+    user_bob_agents[ 0 ], agent_2_id,
     "User B should only see their own agent"
   );
 }
@@ -349,8 +349,8 @@ async fn test_handshake_rejects_unauthorized_agent_access()
   // Create IC Token for agent
   let ic_token_manager = IcTokenManager::new( "test_secret_123".to_string() );
   let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
+    format!( "agent_{agent_id}" ),
+    format!( "budget_{agent_id}" ),
     vec![ "llm:call".to_string() ],
     None,
   );
@@ -364,14 +364,13 @@ async fn test_handshake_rejects_unauthorized_agent_access()
     .verify_token( &ic_token )
     .expect("LOUD FAILURE: Should verify IC token");
 
-  assert_eq!( verified_claims.agent_id, format!( "agent_{}", agent_id ) );
+  assert_eq!( verified_claims.agent_id, format!( "agent_{agent_id}" ) );
 
   // RED PHASE ASSERTION:
   // Currently there's NO check that user owns this agent
   // In GREEN phase, we'll add this check and test will verify it works
   println!(
-    "RED PHASE: No authorization check yet. Agent {} can be accessed by anyone.",
-    agent_id
+    "RED PHASE: No authorization check yet. Agent {agent_id} can be accessed by anyone."
   );
 }
 
@@ -391,12 +390,12 @@ async fn test_budget_request_rejects_unauthorized_agent()
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
-  let user_a_id = "user_alice";
-  let user_b_id = "user_bob";
+  let user_alice_id = "user_alice";
+  let user_bob_id = "user_bob";
 
   for ( id, name, email ) in [
-    ( user_a_id, "alice", "alice@example.com" ),
-    ( user_b_id, "bob", "bob@example.com" ),
+    (user_alice_id, "alice", "alice@example.com" ),
+    (user_bob_id, "bob", "bob@example.com" ),
   ]
   {
     sqlx::query::<sqlx::Sqlite>(
@@ -405,7 +404,7 @@ async fn test_budget_request_rejects_unauthorized_agent()
     )
     .bind( id )
     .bind( name )
-    .bind( format!( "hash_{}", name ) )
+    .bind( format!( "hash_{name}" ) )
     .bind( email )
     .bind( "user" )
     .bind( chrono::Utc::now().timestamp() )
@@ -431,8 +430,7 @@ async fn test_budget_request_rejects_unauthorized_agent()
   // Currently there's NO owner_id on agents, so we cant enforce ownership
   // In GREEN phase, we'll add owner_id and authorization checks
   println!(
-    "RED PHASE: Agent {} has no owner_id. Any user can access it.",
-    agent_id
+    "RED PHASE: Agent {agent_id} has no owner_id. Any user can access it."
   );
 
   // This test documents the expected behavior:
@@ -457,12 +455,12 @@ async fn test_list_agents_filters_by_owner()
   setup_database_with_agents_table( &db_pool ).await;
 
   // Create two users
-  let user_a_id = "user_alice";
-  let user_b_id = "user_bob";
+  let user_alice_id = "user_alice";
+  let user_bob_id = "user_bob";
 
   for ( id, name, email ) in [
-    ( user_a_id, "alice", "alice@example.com" ),
-    ( user_b_id, "bob", "bob@example.com" ),
+    (user_alice_id, "alice", "alice@example.com" ),
+    (user_bob_id, "bob", "bob@example.com" ),
   ]
   {
     sqlx::query::<sqlx::Sqlite>(
@@ -471,7 +469,7 @@ async fn test_list_agents_filters_by_owner()
     )
     .bind( id )
     .bind( name )
-    .bind( format!( "hash_{}", name ) )
+    .bind( format!( "hash_{name}" ) )
     .bind( email )
     .bind( "user" )
     .bind( chrono::Utc::now().timestamp() )
@@ -488,9 +486,9 @@ async fn test_list_agents_filters_by_owner()
       "INSERT INTO agents (name, providers, owner_id, created_at)
        VALUES (?, ?, ?, ?)",
     )
-    .bind( format!( "Agent {}", i ) )
+    .bind( format!( "Agent {i}" ) )
     .bind( "[\"openai\"]" )
-    .bind( user_a_id )
+    .bind(user_alice_id)
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( &db_pool )
     .await
@@ -504,9 +502,9 @@ async fn test_list_agents_filters_by_owner()
       "INSERT INTO agents (name, providers, owner_id, created_at)
        VALUES (?, ?, ?, ?)",
     )
-    .bind( format!( "Agent {}", i ) )
+    .bind( format!( "Agent {i}" ) )
     .bind( "[\"openai\"]" )
-    .bind( user_b_id )
+    .bind(user_bob_id)
     .bind( chrono::Utc::now().timestamp_millis() )
     .execute( &db_pool )
     .await
@@ -517,7 +515,7 @@ async fn test_list_agents_filters_by_owner()
   let user_a_agents : Vec< String > = sqlx::query_scalar::<sqlx::Sqlite, String>(
     "SELECT name FROM agents WHERE owner_id = ? ORDER BY name",
   )
-  .bind( user_a_id )
+  .bind(user_alice_id)
   .fetch_all( &db_pool )
   .await
   .expect("LOUD FAILURE: GREEN PHASE: Should query agents by owner");
@@ -531,19 +529,19 @@ async fn test_list_agents_filters_by_owner()
   assert_eq!( user_a_agents[ 1 ], "Agent 2" );
 
   // Verify user B can only see their agents (3, 4)
-  let user_b_agents : Vec< String > = sqlx::query_scalar::<sqlx::Sqlite, String>(
+  let user_bob_agents: Vec< String > = sqlx::query_scalar::<sqlx::Sqlite, String>(
     "SELECT name FROM agents WHERE owner_id = ? ORDER BY name",
   )
-  .bind( user_b_id )
+  .bind(user_bob_id)
   .fetch_all( &db_pool )
   .await
   .expect("LOUD FAILURE: Should query agents by owner");
 
   assert_eq!(
-    user_b_agents.len(),
+    user_bob_agents.len(),
     2,
     "User B should have exactly 2 agents"
   );
-  assert_eq!( user_b_agents[ 0 ], "Agent 3" );
-  assert_eq!( user_b_agents[ 1 ], "Agent 4" );
+  assert_eq!( user_bob_agents[ 0 ], "Agent 3" );
+  assert_eq!( user_bob_agents[ 1 ], "Agent 4" );
 }

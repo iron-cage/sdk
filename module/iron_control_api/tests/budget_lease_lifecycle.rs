@@ -38,9 +38,9 @@ async fn test_report_on_expired_lease()
   let agent_id = 300i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Step 1: Handshake to create lease
   let handshake_response = router
@@ -138,9 +138,9 @@ async fn test_report_on_revoked_lease()
   let agent_id = 310i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Step 1: Handshake to create lease
   let handshake_response = router
@@ -236,7 +236,7 @@ async fn test_report_on_revoked_lease()
 
 /// L5: Test multiple reports on same lease
 ///
-/// Verifies that multiple usage reports correctly accumulate budget_spent
+/// Verifies that multiple usage reports correctly accumulate `budget_spent`
 /// and enforce lease budget limit.
 #[tokio::test]
 async fn test_multiple_reports_same_lease()
@@ -246,9 +246,9 @@ async fn test_multiple_reports_same_lease()
   let agent_id = 320i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Step 1: Handshake to create lease with $10 budget
   let handshake_response = router
@@ -302,7 +302,7 @@ async fn test_multiple_reports_same_lease()
     assert_eq!(
       report_response.status(),
       StatusCode::OK,
-      "LOUD FAILURE: Report {} should succeed", i
+      "LOUD FAILURE: Report {i} should succeed"
     );
   }
 
@@ -367,9 +367,9 @@ async fn test_lease_budget_exhaustion()
   let agent_id = 330i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Step 1: Handshake to create lease with $10 budget
   let handshake_response = router
@@ -490,9 +490,9 @@ async fn test_lease_renewal_workflow()
   let agent_id = 340i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Create JWT access token for refresh endpoint
   let access_token = common::create_test_access_token(
@@ -559,7 +559,7 @@ async fn test_lease_renewal_workflow()
         .method( "POST" )
         .uri( "/api/budget/refresh" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", access_token ) )
+        .header( "authorization", format!( "Bearer {access_token}") )
         .body( Body::from( json!(
         {
           "ic_token": ic_token,
@@ -688,6 +688,6 @@ async fn test_lease_renewal_workflow()
   let error_msg = old_report_json["error"].as_str().unwrap();
   assert!(
     error_msg.contains( "expired" ) || error_msg.contains( "revoked" ),
-    "LOUD FAILURE: Old lease should be expired or revoked. Got error: {}", error_msg
+    "LOUD FAILURE: Old lease should be expired or revoked. Got error: {error_msg}"
   );
 }

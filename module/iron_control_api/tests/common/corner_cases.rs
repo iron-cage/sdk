@@ -52,7 +52,7 @@ pub const UNICODE_STRINGS: &[&str] = &[
   "user\nwith\nnewlines",    // Embedded newlines
 ];
 
-/// Very long strings for DoS testing
+/// Very long strings for `DoS` testing
 pub fn long_string(length: usize) -> String {
   "A".repeat(length)
 }
@@ -161,7 +161,7 @@ pub const HTTP_METHODS: &[&str] = &[
 pub fn sql_injection_cases(field_name: &str) -> Vec<(String, &'static str)> {
   SQL_INJECTIONS
     .iter()
-    .map(|injection| (format!("{}: {}", field_name, injection), *injection))
+    .map(|injection| (format!("{field_name}: {injection}"), *injection))
     .collect()
 }
 
@@ -169,7 +169,7 @@ pub fn sql_injection_cases(field_name: &str) -> Vec<(String, &'static str)> {
 pub fn xss_cases(field_name: &str) -> Vec<(String, &'static str)> {
   XSS_VECTORS
     .iter()
-    .map(|xss| (format!("{}: {}", field_name, xss), *xss))
+    .map(|xss| (format!("{field_name}: {xss}"), *xss))
     .collect()
 }
 
@@ -177,7 +177,7 @@ pub fn xss_cases(field_name: &str) -> Vec<(String, &'static str)> {
 pub fn unicode_cases(field_name: &str) -> Vec<(String, &'static str)> {
   UNICODE_STRINGS
     .iter()
-    .map(|unicode| (format!("{}: {}", field_name, unicode), *unicode))
+    .map(|unicode| (format!("{field_name}: {unicode}"), *unicode))
     .collect()
 }
 
@@ -185,7 +185,7 @@ pub fn unicode_cases(field_name: &str) -> Vec<(String, &'static str)> {
 pub fn empty_whitespace_cases(field_name: &str) -> Vec<(String, &'static str)> {
   EMPTY_WHITESPACE
     .iter()
-    .map(|ws| (format!("{}: '{}'", field_name, ws), *ws))
+    .map(|ws| (format!("{field_name}: '{ws}'"), *ws))
     .collect()
 }
 

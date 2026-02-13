@@ -26,7 +26,7 @@ use axum::{ Router, routing::get, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 use std::sync::Arc;
-use std::time::Duration;
+use core::time::Duration;
 
 use iron_control_api::routes::keys::{ KeysState, get_key };
 use iron_token_manager::storage::TokenStorage;
@@ -105,8 +105,7 @@ async fn test_missing_auth_header_returns_401()
   let ( _status, body ) = extract_response( response ).await;
   assert!(
     body.contains( "Missing Authorization header" ),
-    "LOUD FAILURE: Error message should indicate missing header, got: {}",
-    body
+    "LOUD FAILURE: Error message should indicate missing header, got: {body}"
   );
 }
 
@@ -184,8 +183,7 @@ async fn test_invalid_token_returns_401()
   let ( _status, body ) = extract_response( response ).await;
   assert!(
     body.contains( "Invalid or expired token" ),
-    "LOUD FAILURE: Error message should indicate invalid token, got: {}",
-    body
+    "LOUD FAILURE: Error message should indicate invalid token, got: {body}"
   );
 }
 

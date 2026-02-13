@@ -145,7 +145,7 @@ async fn test_update_limit_with_invalid_json_syntax()
 
   let request = Request::builder()
     .method( "PUT" )
-    .uri( format!( "/api/limits/{}", limit_id ) )
+    .uri( format!( "/api/limits/{limit_id}" ) )
     .header( "content-type", "application/json" )
     .body( Body::from( malformed_json ) )
     .unwrap();
@@ -175,7 +175,7 @@ async fn test_update_limit_with_unquoted_values()
 
   let request = Request::builder()
     .method( "PUT" )
-    .uri( format!( "/api/limits/{}", limit_id ) )
+    .uri( format!( "/api/limits/{limit_id}" ) )
     .header( "content-type", "application/json" )
     .body( Body::from( malformed_json ) )
     .unwrap();

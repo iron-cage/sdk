@@ -77,7 +77,7 @@ async fn test_get_limit_with_non_numeric_id_returns_json_error()
     .unwrap_or( "" );
 
   assert!( content_type.contains( "application/json" ),
-    "Error response should have Content-Type: application/json, got: {}", content_type );
+    "Error response should have Content-Type: application/json, got: {content_type}");
 
   // Response body should be valid JSON
   let body = response.into_body().collect().await.unwrap().to_bytes();

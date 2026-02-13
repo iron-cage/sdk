@@ -8,15 +8,15 @@
 //! ## What Must Pass
 //!
 //! - GET /api/v1/version returns 200
-//! - Response has: current_version, supported_versions,
-//!   deprecated_versions, latest_endpoint, build
-//! - build.commit is a real git hash (7+ hex chars)
-//! - build.timestamp is static (build-time, not runtime)
+//! - Response has: `current_version`, `supported_versions`,
+//!   `deprecated_versions`, `latest_endpoint`, build
+//! - `build.commit` is a real git hash (7+ hex chars)
+//! - `build.timestamp` is static (build-time, not runtime)
 //! - GET /api/health has NO version field
 //!
 //! ## Migration Context
 //!
-//! This test enforces the migration from health.version to
+//! This test enforces the migration from `health.version` to
 //! dedicated /api/v1/version endpoint. Old pattern (version in
 //! health response) must not exist after implementation.
 
@@ -98,8 +98,7 @@ async fn test_version_endpoint_returns_valid_metadata()
   );
   assert!(
     commit.chars().all( |c| c.is_ascii_hexdigit() ),
-    "LOUD FAILURE: build.commit '{}' contains non-hex characters",
-    commit
+    "LOUD FAILURE: build.commit '{commit}' contains non-hex characters",
   );
 }
 
@@ -205,6 +204,7 @@ async fn test_health_has_no_version_field()
 ///
 /// This builds a minimal router with health and version endpoints
 /// for testing purposes.
+#[allow(clippy::unused_async)]
 async fn build_test_app() -> Router
 {
   use axum::routing::get;

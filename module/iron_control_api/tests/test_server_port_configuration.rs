@@ -1,6 +1,6 @@
 //! Server port configuration tests.
 //!
-//! Verifies SERVER_PORT loaded from environment variable, not hardcoded.
+//! Verifies `SERVER_PORT` loaded from environment variable, not hardcoded.
 
 mod common;
 use common::source_analysis::*;
@@ -15,13 +15,13 @@ use common::source_analysis::*;
 /// environment-specific configuration.
 ///
 /// ## What This Proves
-/// - No hardcoded SocketAddr with port number in server source
-/// - SERVER_PORT environment variable parsing exists
-/// - Production enforcement (fails if SERVER_PORT missing)
+/// - No hardcoded `SocketAddr` with port number in server source
+/// - `SERVER_PORT` environment variable parsing exists
+/// - Production enforcement (fails if `SERVER_PORT` missing)
 ///
 /// ## Why This Matters
 /// Hardcoded ports:
-/// - Prevent multi-environment deployment
+/// - Prevent multienvironment deployment
 /// - Require recompilation for port changes
 /// - Can't use same binary across environments
 /// - Create port conflicts in containerized deployments
@@ -69,18 +69,17 @@ fn test_no_hardcoded_server_port()
 
   assert!(
     has_enforcement,
-    "FAIL: Production enforcement missing in {}\\n\\
-     Must panic/expect if SERVER_PORT not set in production",
-    source_path
+    "FAIL: Production enforcement missing in {source_path}\\n\\
+     Must panic/expect if SERVER_PORT not set in production"
   );
 }
 
 /// Verify no fallback defeats purpose of env var.
 ///
 /// ## Purpose
-/// Using unwrap_or with default port defeats the purpose of environment
-/// configuration. Server must REQUIRE SERVER_PORT explicitly.
-/// unwrap_or_else with panic!() is acceptable for error handling.
+/// Using `unwrap_or` with default port defeats the purpose of environment
+/// configuration. Server must REQUIRE `SERVER_PORT` explicitly.
+/// `unwrap_or_else` with panic!() is acceptable for error handling.
 // test_kind: negative_acceptance
 #[ test ]
 fn test_no_port_fallback()

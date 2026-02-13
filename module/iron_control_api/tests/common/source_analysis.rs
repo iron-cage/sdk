@@ -57,12 +57,11 @@ pub fn read_source_file( path: &str ) -> String
 {
   fs::read_to_string( path )
     .unwrap_or_else( |_| panic!(
-      "LOUD FAILURE: Failed to read source file: {}\n\
+      "LOUD FAILURE: Failed to read source file: {path}\n\
        This may indicate:\n\
        - File moved or deleted\n\
        - Incorrect path (check from crate root)\n\
-       - Permissions issue",
-      path
+       - Permissions issue"
     ) )
 }
 
@@ -75,7 +74,7 @@ pub fn read_source_file( path: &str ) -> String
 ///
 /// ## Parameters
 ///
-/// - `source`: Source code content (from read_source_file)
+/// - `source`: Source code content (from `read_source_file`)
 /// - `pattern`: Pattern that must NOT exist
 /// - `file_path`: Path for error message
 /// - `message`: Reason why pattern forbidden
@@ -104,15 +103,12 @@ pub fn assert_source_not_contains(
 {
   assert!(
     !source.contains( pattern ),
-    "FAIL: Pattern '{}' found in {}\n\
-     Reason: {}\n\
+    "FAIL: Pattern '{pattern}' found in {file_path}\n\
+     Reason: {message}\n\
      \n\
      NEGATIVE ACCEPTANCE violation: This pattern must NOT exist in source code.\n\
      \n\
-     Fix: Remove all occurrences of this pattern.",
-    pattern,
-    file_path,
-    message
+     Fix: Remove all occurrences of this pattern."
   );
 }
 
@@ -125,7 +121,7 @@ pub fn assert_source_not_contains(
 ///
 /// ## Parameters
 ///
-/// - `source`: Source code content (from read_source_file)
+/// - `source`: Source code content (from `read_source_file`)
 /// - `pattern`: Pattern that MUST exist
 /// - `file_path`: Path for error message
 /// - `message`: Reason why pattern required
@@ -154,15 +150,12 @@ pub fn assert_source_contains(
 {
   assert!(
     source.contains( pattern ),
-    "FAIL: Required pattern '{}' missing in {}\n\
-     Reason: {}\n\
+    "FAIL: Required pattern '{pattern}' missing in {file_path}\n\
+     Reason: {message}\n\
      \n\
      Expected: This pattern must exist in source code.\n\
      \n\
-     Fix: Add the required implementation.",
-    pattern,
-    file_path,
-    message
+     Fix: Add the required implementation."
   );
 }
 
@@ -194,19 +187,15 @@ pub fn assert_file_not_exists( file_path: &str, message: &str )
 {
   assert!(
     !std::path::Path::new( file_path ).exists(),
-    "FAIL: File '{}' still exists\n\
-     Reason: {}\n\
+    "FAIL: File '{file_path}' still exists\n\
+     Reason: {message}\n\
      \n\
      NEGATIVE ACCEPTANCE violation: File must be deleted (not renamed, not moved).\n\
      \n\
      Fix: Delete file completely using:\n\
-     git rm {}\n\
+     git rm {file_path}\n\
      or\n\
-     rm {}",
-    file_path,
-    message,
-    file_path,
-    file_path
+     rm {file_path}"
   );
 }
 
@@ -237,14 +226,12 @@ pub fn assert_file_exists( file_path: &str, message: &str )
 {
   assert!(
     std::path::Path::new( file_path ).exists(),
-    "FAIL: Required file '{}' missing\n\
-     Reason: {}\n\
+    "FAIL: Required file '{file_path}' missing\n\
+     Reason: {message}\n\
      \n\
      Expected: File must exist.\n\
      \n\
-     Fix: Create the required file.",
-    file_path,
-    message
+     Fix: Create the required file."
   );
 }
 

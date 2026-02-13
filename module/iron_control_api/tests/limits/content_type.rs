@@ -1,7 +1,7 @@
-//! Content-Type validation tests for budget limits endpoints.
+//! `Content-Type` validation tests for budget limits endpoints.
 //!
 //! Tests that endpoints requiring JSON bodies properly reject requests
-//! with incorrect Content-Type headers with 415 Unsupported Media Type.
+//! with incorrect `Content-Type` headers with 415 Unsupported Media Type.
 //!
 //! ## Test Matrix
 //!
@@ -13,8 +13,8 @@
 //! ## Corner Cases Covered
 //!
 //! **Error Conditions:**
-//! - ✅ Wrong Content-Type on POST → 415
-//! - ✅ Wrong Content-Type on PUT → 415
+//! - Wrong `Content-Type` on POST -> 415
+//! - Wrong `Content-Type` on PUT -> 415
 //!
 //! **Why These Tests Matter:**
 //! - API contract enforcement for budget-sensitive operations
@@ -57,8 +57,7 @@ async fn test_create_limit_wrong_content_type()
   let status = response.status();
   assert!(
     status == StatusCode::UNSUPPORTED_MEDIA_TYPE || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Wrong Content-Type on POST /api/limits must return 415 or 400. Got: {}",
-    status
+    "LOUD FAILURE: Wrong Content-Type on POST /api/limits must return 415 or 400. Got: {status}"
   );
 }
 
@@ -81,7 +80,6 @@ async fn test_update_limit_wrong_content_type()
   let status = response.status();
   assert!(
     status == StatusCode::UNSUPPORTED_MEDIA_TYPE || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Wrong Content-Type on PUT /api/limits/:id must return 415 or 400. Got: {}",
-    status
+    "LOUD FAILURE: Wrong Content-Type on PUT /api/limits/:id must return 415 or 400. Got: {status}"
   );
 }

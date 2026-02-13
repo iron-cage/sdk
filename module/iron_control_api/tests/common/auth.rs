@@ -21,12 +21,12 @@ use iron_control_api::routes::auth::{ login, logout, refresh, validate, AuthStat
 use std::sync::Arc;
 use std::net::{ SocketAddr, IpAddr, Ipv4Addr };
 
-/// Setup in-memory SQLite database with auth schema for testing
+/// Setup in-memory `SQLite` database with auth schema for testing
 ///
 /// Creates:
 /// - users table
-/// - token_blacklist table
-/// - user_audit_log table
+/// - `token_blacklist` table
+/// - `user_audit_log` table
 ///
 /// Uses real database (not mocked) to catch integration issues
 #[allow(dead_code)]
@@ -39,7 +39,7 @@ pub async fn setup_auth_test_db() -> SqlitePool
     .expect( "LOUD FAILURE: Failed to create in-memory database for auth tests" );
 
   // Apply schema (same as common::TEST_SCHEMA)
-  let schema = r#"
+  let schema = r"
     CREATE TABLE IF NOT EXISTS users
     (
       id TEXT PRIMARY KEY,
@@ -86,7 +86,7 @@ pub async fn setup_auth_test_db() -> SqlitePool
       FOREIGN KEY(target_user_id) REFERENCES users(id),
       FOREIGN KEY(performed_by) REFERENCES users(id)
     );
-  "#;
+  ";
 
   sqlx::raw_sql( schema )
     .execute( &pool )
@@ -121,10 +121,12 @@ pub async fn seed_test_user(
   let password_hash = bcrypt::hash( password, 4 )
     .expect( "LOUD FAILURE: Failed to hash test password" );
 
-  let now = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect("LOUD FAILURE: Time went backwards")
-    .as_secs() as i64;
+  let now = i64::try_from(
+    std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .expect("LOUD FAILURE: Time went backwards")
+      .as_secs()
+  ).unwrap_or(i64::MAX);
 
   let user_id = format!( "user_{}", uuid::Uuid::new_v4() );
 
@@ -139,13 +141,12 @@ pub async fn seed_test_user(
   .bind( email )
   .bind( &password_hash )
   .bind( role )
-  .bind( if is_active { 1 } else { 0 } )
+  .bind( i32::from(is_active) )
   .bind( now )
   .execute( pool )
   .await
   .unwrap_or_else( |_| panic!(
-    "LOUD FAILURE: Failed to seed test user '{}'",
-    email
+    "LOUD FAILURE: Failed to seed test user '{email}'"
   ) );
 
   user_id
@@ -178,10 +179,12 @@ pub async fn seed_test_user_with_name(
   let password_hash = bcrypt::hash( password, 4 )
     .expect( "LOUD FAILURE: Failed to hash test password" );
 
-  let now = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect("LOUD FAILURE: Time went backwards")
-    .as_secs() as i64;
+  let now = i64::try_from(
+    std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .expect("LOUD FAILURE: Time went backwards")
+      .as_secs()
+  ).unwrap_or(i64::MAX);
 
   let user_id = format!( "user_{}", uuid::Uuid::new_v4() );
 
@@ -196,32 +199,30 @@ pub async fn seed_test_user_with_name(
   .bind( email )
   .bind( &password_hash )
   .bind( role )
-  .bind( if is_active { 1 } else { 0 } )
+  .bind( i32::from(is_active) )
   .bind( now )
   .bind( name )
   .execute( pool )
   .await
   .unwrap_or_else( |_| panic!(
-    "LOUD FAILURE: Failed to seed test user '{}' with name '{}'",
-    email,
-    name
+    "LOUD FAILURE: Failed to seed test user '{email}' with name '{name}'"
   ) );
 
   user_id
 }
 
-/// Middleware to inject ConnectInfo for tests
+/// Middleware to inject `ConnectInfo` for tests
 ///
-/// In production, ConnectInfo is provided by `into_make_service_with_connect_info`.
-/// For tests using `oneshot()`, we manually inject a fake SocketAddr.
+/// In production, `ConnectInfo` is provided by `into_make_service_with_connect_info`.
+/// For tests using `oneshot()`, we manually inject a fake `SocketAddr`.
 ///
-/// # Test SocketAddr
+/// # Test `SocketAddr`
 ///
 /// - Default: Uses 127.0.0.1:54321 as the test client address
 /// - Custom IP: If x-test-client-ip header is present, uses that IP address
 ///   (This allows testing IP-based rate limiting with different IPs)
 ///
-/// **Note:** x-test-client-ip is ONLY for testing. Production uses real TCP ConnectInfo.
+/// **Note:** x-test-client-ip is ONLY for testing. Production uses real TCP `ConnectInfo`.
 async fn inject_connect_info( mut request: Request, next: Next ) -> Response
 {
   // Check for custom test IP header
@@ -235,17 +236,17 @@ async fn inject_connect_info( mut request: Request, next: Next ) -> Response
       }
       else
       {
-        IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) )
+        IpAddr::V4( Ipv4Addr::LOCALHOST )
       }
     }
     else
     {
-      IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) )
+      IpAddr::V4( Ipv4Addr::LOCALHOST )
     }
   }
   else
   {
-    IpAddr::V4( Ipv4Addr::new( 127, 0, 0, 1 ) )
+    IpAddr::V4( Ipv4Addr::LOCALHOST )
   };
 
   // Create fake test socket address
@@ -272,20 +273,20 @@ async fn inject_connect_info( mut request: Request, next: Next ) -> Response
 /// - POST /api/v1/auth/refresh
 /// - POST /api/v1/auth/validate
 #[allow(dead_code)]
-pub async fn create_auth_router( pool: SqlitePool ) -> Router
+pub fn create_auth_router( pool: SqlitePool ) -> Router
 {
-  create_auth_router_internal( pool, false ).await
+  create_auth_router_internal( pool, false )
 }
 
 /// Create auth router with rate limiting enabled for rate limit tests
 #[allow(dead_code)]
-pub async fn create_auth_router_with_rate_limiting( pool: SqlitePool ) -> Router
+pub fn create_auth_router_with_rate_limiting( pool: SqlitePool ) -> Router
 {
-  create_auth_router_internal( pool, true ).await
+  create_auth_router_internal( pool, true )
 }
 
 /// Internal function to create auth router with configurable rate limiting
-async fn create_auth_router_internal( pool: SqlitePool, rate_limiting_enabled: bool ) -> Router
+fn create_auth_router_internal( pool: SqlitePool, rate_limiting_enabled: bool ) -> Router
 {
   let auth_state = AuthState
   {
@@ -306,10 +307,10 @@ async fn create_auth_router_internal( pool: SqlitePool, rate_limiting_enabled: b
     .layer( middleware::from_fn( inject_connect_info ) )
 }
 
-/// Combined test state (mimics AppState pattern from main server)
+/// Combined test state (mimics `AppState` pattern from main server)
 ///
-/// Allows AuthenticatedUser extractor to access AuthState even when
-/// routes use UserManagementState (via FromRef trait).
+/// Allows `AuthenticatedUser` extractor to access `AuthState` even when
+/// routes use `UserManagementState` (via `FromRef` trait).
 #[derive(Clone)]
 struct TestAppState
 {
@@ -317,7 +318,7 @@ struct TestAppState
   users: iron_control_api::routes::users::UserManagementState,
 }
 
-/// Enable AuthenticatedUser extractor to access AuthState from TestAppState
+/// Enable `AuthenticatedUser` extractor to access `AuthState` from `TestAppState`
 impl axum::extract::FromRef< TestAppState > for AuthState
 {
   fn from_ref( state: &TestAppState ) -> Self
@@ -326,7 +327,7 @@ impl axum::extract::FromRef< TestAppState > for AuthState
   }
 }
 
-/// Enable user routes to access UserManagementState from TestAppState
+/// Enable user routes to access `UserManagementState` from `TestAppState`
 impl axum::extract::FromRef< TestAppState > for iron_control_api::routes::users::UserManagementState
 {
   fn from_ref( state: &TestAppState ) -> Self
@@ -350,7 +351,7 @@ impl axum::extract::FromRef< TestAppState > for iron_control_api::routes::users:
 /// - POST /api/v1/auth/validate
 /// - POST /api/v1/users (create user - requires admin)
 #[allow(dead_code)]
-pub async fn create_full_router( pool: SqlitePool ) -> Router
+pub fn create_full_router( pool: &SqlitePool ) -> Router
 {
   use iron_control_api::routes::users::{ create_user, UserManagementState };
   use iron_control_api::rbac::PermissionChecker;

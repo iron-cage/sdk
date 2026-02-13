@@ -35,10 +35,10 @@ use common::budget::
 use serde_json::json;
 use tower::ServiceExt;
 
-/// B1: Maximum i64 value for cost_microdollars
+/// B1: Maximum i64 value for `cost_microdollars`
 ///
 /// # Corner Case
-/// POST /api/budget/report with cost_microdollars = i64::MAX
+/// POST /api/budget/report with `cost_microdollars = i64::MAX`
 ///
 /// # Expected Behavior
 /// - Request handled safely (either accepted with overflow protection or rejected with validation error)
@@ -54,9 +54,9 @@ async fn test_cost_i64_max()
   let agent_id = 400i64;
   seed_agent_with_budget( &pool, agent_id, i64::MAX ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Create lease
   let handshake_response = router
@@ -128,7 +128,7 @@ async fn test_cost_i64_max()
 /// B2: Zero cost for cached responses
 ///
 /// # Corner Case
-/// POST /api/budget/report with cost_microdollars = 0
+/// POST /api/budget/report with `cost_microdollars = 0`
 ///
 /// # Expected Behavior
 /// - Request accepted (200 OK) - zero cost is valid for cached responses
@@ -144,9 +144,9 @@ async fn test_cost_zero()
   let agent_id = 401i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Create lease
   let handshake_response = router
@@ -233,9 +233,9 @@ async fn test_budget_exactly_at_limit()
   let total_budget = 50_000_000i64; // $50 USD
   seed_agent_with_budget( &pool, agent_id, total_budget ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
 
   // Request handshake with exact remaining budget
   let response = router
@@ -297,13 +297,13 @@ async fn test_multiple_leases_equal_total_budget()
   let lease_size = 10_000_000i64;   // $10 USD per lease
   seed_agent_with_budget( &pool, agent_id, total_budget ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create 5 leases of $10 each ($50 total)
   for i in 0..5
   {
-    let router = create_budget_router( state.clone() ).await;
+    let router = create_budget_router( state.clone() );
     let response = router
       .oneshot(
         Request::builder()
@@ -342,7 +342,7 @@ async fn test_multiple_leases_equal_total_budget()
   );
 
   // Attempt 6th lease (should fail - insufficient budget)
-  let router = create_budget_router( state ).await;
+  let router = create_budget_router( state );
   let response = router
     .oneshot(
       Request::builder()
@@ -377,7 +377,7 @@ async fn test_multiple_leases_equal_total_budget()
 /// B3: Maximum i64 value for tokens field
 ///
 /// # Corner Case
-/// POST /api/budget/report with tokens = i64::MAX
+/// POST /api/budget/report with `tokens = i64::MAX`
 ///
 /// # Expected Behavior
 /// - Request handled safely (either accepted or rejected with validation error)
@@ -393,9 +393,9 @@ async fn test_tokens_i64_max()
   let agent_id = 404i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router_handshake = create_budget_router( state.clone() ).await;
+  let router_handshake = create_budget_router( state.clone() );
 
   // Create lease
   let handshake_response = router_handshake
@@ -420,7 +420,7 @@ async fn test_tokens_i64_max()
   let lease_id = handshake_data["lease_id"].as_str().expect("LOUD FAILURE: Should have lease_id");
 
   // Attempt to report with i64::MAX tokens
-  let router_report = create_budget_router( state ).await;
+  let router_report = create_budget_router( state );
   let response = router_report
     .oneshot(
       Request::builder()
@@ -471,13 +471,13 @@ async fn test_tokens_i64_max()
 /// B6: Lease expiration edge case - expires exactly at current timestamp
 ///
 /// # Corner Case
-/// Lease expires_at equals current_timestamp (millisecond precision)
+/// Lease `expires_at` equals `current_timestamp` (millisecond precision)
 ///
 /// # Expected Behavior
 /// Implementation-defined:
-/// - Option A: expires_at < now (strict) → expired
-/// - Option B: expires_at <= now (inclusive) → expired
-/// - Option C: expires_at == now (edge case) → still valid
+/// - Option A: `expires_at` < now (strict) → expired
+/// - Option B: `expires_at` <= now (inclusive) → expired
+/// - Option C: `expires_at` == now (edge case) → still valid
 ///
 /// Test documents actual behavior for consistency
 ///
@@ -490,9 +490,9 @@ async fn test_lease_expiration_exact_timestamp()
   let agent_id = 405i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router_handshake = create_budget_router( state.clone() ).await;
+  let router_handshake = create_budget_router( state.clone() );
 
   // Create lease
   let handshake_response = router_handshake
@@ -524,7 +524,7 @@ async fn test_lease_expiration_exact_timestamp()
     .expect( "LOUD FAILURE: Should update lease expiration to current timestamp" );
 
   // Attempt to report usage at exact expiration time
-  let router_report = create_budget_router( state ).await;
+  let router_report = create_budget_router( state );
   let response = router_report
     .oneshot(
       Request::builder()

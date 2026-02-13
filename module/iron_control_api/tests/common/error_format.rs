@@ -48,11 +48,11 @@ async fn create_token_router() -> ( Router, crate::common::test_state::TestAppSt
   ( router, app_state )
 }
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -99,8 +99,7 @@ async fn test_4xx_errors_return_json()
     .expect( "LOUD FAILURE: 401 response must be valid JSON" );
   assert!(
     json_401.get( "error" ).is_some(),
-    "LOUD FAILURE: 401 JSON must have 'error' field. Got: {:?}",
-    json_401
+    "LOUD FAILURE: 401 JSON must have 'error' field. Got: {json_401:?}"
   );
 
   // Test 405 Method Not Allowed
@@ -143,7 +142,7 @@ async fn test_validation_errors_return_json()
     .method( "POST" )
     .uri( "/api/tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( r#"{"user_id":""}"# ) ) // Empty user_id should fail validation
     .unwrap();
 
@@ -167,15 +166,13 @@ async fn test_validation_errors_return_json()
     .expect( "LOUD FAILURE: 400 response must be valid JSON" );
   assert!(
     json.get( "error" ).is_some(),
-    "LOUD FAILURE: 400 JSON must have 'error' field. Got: {:?}",
-    json
+    "LOUD FAILURE: 400 JSON must have 'error' field. Got: {json:?}"
   );
 
   // WHY: Verify no stack traces or internal details leaked
   let error_msg = json[ "error" ].as_str().unwrap();
   assert!(
     !error_msg.contains( "src/" ) && !error_msg.contains( ".rs:" ),
-    "LOUD FAILURE: Error message must not leak file paths. Got: {}",
-    error_msg
+    "LOUD FAILURE: Error message must not leak file paths. Got: {error_msg}"
   );
 }

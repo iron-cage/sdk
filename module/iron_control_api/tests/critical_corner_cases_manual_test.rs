@@ -45,11 +45,11 @@ use common::test_db;
 // CATEGORY 1: Analytics Aggregation Edge Cases
 // ============================================================================
 
-/// Test analytics aggregation with i64::MAX values to detect overflow
+/// Test analytics aggregation with `i64::MAX` values to detect overflow
 ///
 /// ## Corner Case
-/// **Input:** Multiple analytics records with costs near i64::MAX
-/// **Expected:** SUM() either handles gracefully or returns clear error
+/// **Input:** Multiple analytics records with costs near `i64::MAX`
+/// **Expected:** `SUM()` either handles gracefully or returns clear error
 /// **Risk:** Integer overflow could cause silent data corruption or wrong totals
 #[tokio::test]
 async fn test_analytics_sum_near_max_i64()
@@ -98,9 +98,8 @@ async fn test_analytics_sum_near_max_i64()
       let expected = max_i64 - 1;
       assert_eq!(
         sum, expected,
-        "LOUD FAILURE: SUM overflow detected! Expected {}, got {}. \
-         This indicates silent integer overflow in analytics aggregation.",
-        expected, sum
+        "LOUD FAILURE: SUM overflow detected! Expected {expected}, got {sum}. \
+         This indicates silent integer overflow in analytics aggregation."
       );
     },
     Ok( (None,) ) =>
@@ -110,7 +109,7 @@ async fn test_analytics_sum_near_max_i64()
     Err( e ) =>
     {
       // Overflow error is acceptable if clearly reported
-      eprintln!( "Note: Database correctly rejected overflow with error: {}", e );
+      eprintln!( "Note: Database correctly rejected overflow with error: {e}" );
       // This is OK - database detected overflow and failed safely
     }
   }
@@ -119,7 +118,7 @@ async fn test_analytics_sum_near_max_i64()
 /// Test analytics aggregation with negative cost values (should be rejected)
 ///
 /// ## Corner Case
-/// **Input:** Attempt to insert negative cost_cents
+/// **Input:** Attempt to insert negative `cost_cents`
 /// **Expected:** CHECK constraint violation
 /// **Risk:** Negative costs could corrupt financial calculations
 #[tokio::test]
@@ -147,7 +146,7 @@ async fn test_analytics_negative_cost_rejected()
   assert!(
     result.is_err(),
     "LOUD FAILURE: Database accepted negative cost_cents=-100! \
-     CHECK constraint not enforced. This is a critical data integrity bug."
+     CHECK constraint not enforced. This is a critical data integrity bug.",
   );
 
   // Verify error is CHECK constraint violation
@@ -156,8 +155,7 @@ async fn test_analytics_negative_cost_rejected()
     let error_msg = e.to_string().to_lowercase();
     assert!(
       error_msg.contains( "check" ) || error_msg.contains( "constraint" ),
-      "LOUD FAILURE: Expected CHECK constraint error, got: {}",
-      e
+      "LOUD FAILURE: Expected CHECK constraint error, got: {e}"
     );
   }
 }
@@ -165,8 +163,8 @@ async fn test_analytics_negative_cost_rejected()
 /// Test analytics aggregation with zero records (empty dataset)
 ///
 /// ## Corner Case
-/// **Input:** SUM() query on empty table
-/// **Expected:** SUM returns NULL or 0 (both acceptable, must be documented)
+/// **Input:** `SUM()` query on empty table
+/// **Expected:** `SUM` returns NULL or 0 (both acceptable, must be documented)
 /// **Risk:** Incorrect handling could cause NULL pointer errors in API
 #[tokio::test]
 async fn test_analytics_sum_empty_dataset()
@@ -215,7 +213,7 @@ async fn test_analytics_sum_empty_dataset()
 /// Test analytics aggregation with single record (boundary case)
 ///
 /// ## Corner Case
-/// **Input:** SUM() query with exactly one record
+/// **Input:** `SUM()` query with exactly one record
 /// **Expected:** Returns that record's value
 /// **Risk:** Off-by-one errors in aggregation logic
 #[tokio::test]
@@ -256,29 +254,29 @@ async fn test_analytics_sum_single_record()
 /// Test analytics integer-only cost handling (no fractional cents)
 ///
 /// ## Corner Case
-/// **Input:** Costs must be integer cents (i64)
-/// **Expected:** System rejects non-integer values or stores integers only
+/// **Input:** Costs must be integer cents (`i64`)
+/// **Expected:** System rejects noninteger values or stores integers only
 /// **Risk:** System design assumes integer-only cents; fractional values indicate schema violation
 ///
-/// ## Root Cause (issue-analytics-001)
+/// ## Root Cause (`issue-analytics-001`)
 /// Original test attempted to bind float (100.5) to INTEGER column.
-/// SQLite's type affinity stored this as REAL, causing SQLx type mismatch when fetching as i64.
+/// `SQLite`'s type affinity stored this as REAL, causing `SQLx` type mismatch when fetching as `i64`.
 ///
 /// ## Why Not Caught
 /// Test incorrectly assumed system should handle fractional cents.
-/// Production schema uses INTEGER (i64) for all cost_cents columns.
+/// Production schema uses INTEGER (`i64`) for all `cost_cents` columns.
 ///
 /// ## Fix Applied
 /// Changed test to verify integer-only behavior using integer binding.
 /// System stores costs as integer cents only (no fractional cent support).
 ///
 /// ## Prevention
-/// All cost tests must use integer values (i64).
+/// All cost tests must use integer values (`i64`).
 /// Schema must enforce INTEGER type for all cost columns.
 ///
 /// ## Pitfall
-/// SQLite's type affinity allows storing REAL in INTEGER columns via float binding,
-/// but SQLx cannot fetch REAL columns as i64, causing type mismatch.
+/// `SQLite`'s type affinity allows storing REAL in INTEGER columns via float binding,
+/// but `SQLx` cannot fetch REAL columns as `i64`, causing type mismatch.
 /// Always bind integer values to INTEGER columns.
 #[tokio::test]
 async fn test_analytics_fractional_cents_handling()
@@ -312,8 +310,7 @@ async fn test_analytics_fractional_cents_handling()
 
   assert_eq!(
     stored_value.0, cost_value,
-    "LOUD FAILURE: Expected exact integer storage, got {}",
-    stored_value.0
+    "LOUD FAILURE: Expected exact integer storage, got {}", stored_value.0
   );
 }
 
@@ -321,16 +318,16 @@ async fn test_analytics_fractional_cents_handling()
 // CATEGORY 2: Budget Concurrent Spending Race Conditions
 // ============================================================================
 
-/// Test concurrent spending from same budget (raw SQLite behavior without retry logic)
+/// Test concurrent spending from same budget (raw `SQLite` behavior without retry logic)
 ///
 /// ## Corner Case
 /// **Input:** 10 parallel transactions each trying to spend $10 from $50 budget
-/// **Expected:** 3-5 succeed (SQLite deadlocks without retry), NO overspending
+/// **Expected:** 3-5 succeed (`SQLite` deadlocks without retry), NO overspending
 /// **Risk:** Race condition could allow spending more than budget limit
 ///
-/// ## Root Cause (issue-budget-002)
+/// ## Root Cause (`issue-budget-002`)
 /// Original test expected exactly 5/10 transactions to succeed.
-/// Actual: 3/10 succeeded due to SQLite "database is deadlocked" errors (code 6).
+/// Actual: 3/10 succeeded due to `SQLite` "database is deadlocked" errors (code 6).
 /// Production code has retry logic (50 retries, exponential backoff) in
 /// `AgentBudgetManager::check_and_reserve_budget()` that handles these deadlocks.
 ///
@@ -340,7 +337,7 @@ async fn test_analytics_fractional_cents_handling()
 /// full production API with retry logic, where all 10/10 requests succeed.
 ///
 /// ## Fix Applied
-/// Adjusted assertions to accept 3-5 successful transactions (raw SQLite behavior).
+/// Adjusted assertions to accept 3-5 successful transactions (raw `SQLite` behavior).
 /// Test now verifies the CRITICAL property: no overspending under any concurrency level.
 /// Added documentation that production API has retry logic for 100% success rate.
 ///
@@ -351,7 +348,7 @@ async fn test_analytics_fractional_cents_handling()
 /// See `budget_concurrency.rs` for production-level concurrent budget tests.
 ///
 /// ## Pitfall
-/// SQLite DEFERRED transactions (default for `pool.begin()`) acquire read locks on SELECT,
+/// `SQLite` DEFERRED transactions (default for `pool.begin()`) acquire read locks on SELECT,
 /// then all try to upgrade to write locks on UPDATE, causing deadlocks. Without retry logic,
 /// only first 2-3 transactions succeed. Production uses BEGIN IMMEDIATE or retry logic.
 #[tokio::test]
@@ -403,7 +400,7 @@ async fn test_budget_concurrent_spending_no_overspend()
 
       let new_spent = current.0 + spend_amount;
 
-      // Check if would exceed budget
+      // Check if it would exceed budget
       let total: (i64,) = sqlx::query_as( "SELECT total_cents FROM budgets WHERE id = 1" )
         .fetch_one( &mut *tx )
         .await
@@ -450,16 +447,15 @@ async fn test_budget_concurrent_spending_no_overspend()
   assert!(
     final_spent.0 <= 5000,
     "LOUD FAILURE: Budget overspend detected! Spent {} cents from 5000 cent budget. \
-     This is a CRITICAL financial bug - race condition allowed overspending.",
-    final_spent.0
+     This is a CRITICAL financial bug - race condition allowed overspending.", final_spent.0
   );
 
   // Verify spent amount matches successful transaction count
-  let expected_spent = ( successes.len() as i64 ) * 1000;
+  let expected_spent = i64::try_from( successes.len() ).expect( "success count fits i64" ) * 1000;
   assert_eq!(
     final_spent.0, expected_spent,
-    "LOUD FAILURE: Spent amount {} doesn't match transaction count {} × $10 = {}",
-    final_spent.0, successes.len(), expected_spent
+    "LOUD FAILURE: Spent amount {} doesn't match transaction count {} x $10 = {expected_spent}",
+    final_spent.0, successes.len()
   );
 
   // Accept 1-5 successful transactions (raw SQLite deadlock behavior without retry logic)
@@ -468,8 +464,7 @@ async fn test_budget_concurrent_spending_no_overspend()
   assert!(
     !successes.is_empty() && successes.len() <= 5,
     "LOUD FAILURE: Expected 1-5 successful transactions (raw SQLite behavior), got {}. \
-     If consistently 0, investigate excessive deadlocks. If >5, budget constraint violated!",
-    successes.len()
+     If consistently 0, investigate excessive deadlocks. If >5, budget constraint violated!", successes.len()
   );
 }
 
@@ -480,7 +475,7 @@ async fn test_budget_concurrent_spending_no_overspend()
 /// Test deleting agent with existing usage data
 ///
 /// ## Corner Case
-/// **Input:** DELETE agent that has analytics_events records
+/// **Input:** DELETE agent that has `analytics_events` records
 /// **Expected:** Agent deleted, usage data preserved OR cascaded (document which)
 /// **Risk:** Orphaned data or data loss depending on FK constraints
 #[tokio::test]
@@ -543,8 +538,7 @@ async fn test_delete_agent_with_usage_data()
   assert_eq!(
     remaining_events.0, 0,
     "LOUD FAILURE: Expected CASCADE delete of analytics_events, but {} records remain. \
-     Check FK constraint is ON DELETE CASCADE.",
-    remaining_events.0
+     Check FK constraint is ON DELETE CASCADE.", remaining_events.0
   );
 }
 
@@ -552,12 +546,12 @@ async fn test_delete_agent_with_usage_data()
 // CATEGORY 4: Input Validation Boundaries
 // ============================================================================
 
-/// Test DoS protection: 501-character user_id
+/// Test `DoS` protection: 501-character `user_id`
 ///
 /// ## Corner Case
-/// **Input:** user_id with 501 characters (exceeds 500 char limit)
+/// **Input:** `user_id` with 501 characters (exceeds 500 char limit)
 /// **Expected:** Rejected with clear error before hitting database
-/// **Risk:** Unbounded strings cause memory exhaustion (DoS)
+/// **Risk:** Unbounded strings cause memory exhaustion (`DoS`)
 #[tokio::test]
 async fn test_dos_protection_oversized_user_id()
 {
@@ -591,10 +585,10 @@ async fn test_dos_protection_oversized_user_id()
   );
 }
 
-/// Test NULL byte injection in user_id
+/// Test NULL byte injection in `user_id`
 ///
 /// ## Corner Case
-/// **Input:** user_id containing embedded NULL byte "test\0user"
+/// **Input:** `user_id` containing embedded NULL byte `test\0user`
 /// **Expected:** Rejected (security issue with C string APIs)
 /// **Risk:** NULL bytes can truncate strings in C libraries, bypassing validation
 #[tokio::test]

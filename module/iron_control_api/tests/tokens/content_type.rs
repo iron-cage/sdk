@@ -36,17 +36,17 @@ use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
 /// Create test router with token routes.
 ///
-/// Uses TestAppState (auth + tokens) to support JWT authentication in routes.
+/// Uses `TestAppState` (auth + tokens) to support JWT authentication in routes.
 async fn create_test_router() -> ( Router, TestAppState )
 {
   let app_state = TestAppState::new().await;
@@ -69,7 +69,7 @@ async fn test_create_token_missing_content_type()
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     // No Content-Type header set
     .body( Body::from( r#"{"user_id":"test","project_id":"proj"}"# ) )
     .unwrap();
@@ -80,8 +80,7 @@ async fn test_create_token_missing_content_type()
   let status = response.status();
   assert!(
     status == StatusCode::UNSUPPORTED_MEDIA_TYPE || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Missing Content-Type must return 415 or 400. Got: {}",
-    status
+    "LOUD FAILURE: Missing Content-Type must return 415 or 400. Got: {status}"
   );
 }
 
@@ -96,7 +95,7 @@ async fn test_create_token_text_plain_rejected()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "text/plain" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( r#"{"user_id":"test","project_id":"proj"}"# ) )
     .unwrap();
 
@@ -106,8 +105,7 @@ async fn test_create_token_text_plain_rejected()
   let status = response.status();
   assert!(
     status == StatusCode::UNSUPPORTED_MEDIA_TYPE || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: text/plain Content-Type must return 415 or 400. Got: {}",
-    status
+    "LOUD FAILURE: text/plain Content-Type must return 415 or 400. Got: {status}"
   );
 }
 
@@ -122,7 +120,7 @@ async fn test_create_token_form_urlencoded_rejected()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/x-www-form-urlencoded" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( "user_id=test&project_id=proj" ) )
     .unwrap();
 
@@ -132,7 +130,6 @@ async fn test_create_token_form_urlencoded_rejected()
   let status = response.status();
   assert!(
     status == StatusCode::UNSUPPORTED_MEDIA_TYPE || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: application/x-www-form-urlencoded must return 415 or 400. Got: {}",
-    status
+    "LOUD FAILURE: application/x-www-form-urlencoded must return 415 or 400. Got: {status}"
   );
 }

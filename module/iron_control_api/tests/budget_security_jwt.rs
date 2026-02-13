@@ -59,9 +59,9 @@ async fn test_refresh_invalid_jwt_signature()
   let agent_id = 200i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router( state.clone() );
 
   // Create initial lease
   let handshake_response = router
@@ -104,7 +104,7 @@ async fn test_refresh_invalid_jwt_signature()
         .method( "POST" )
         .uri( "/api/budget/refresh" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", malicious_jwt ) )
+        .header( "authorization", format!( "Bearer {malicious_jwt}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap()
     )
@@ -124,15 +124,14 @@ async fn test_refresh_invalid_jwt_signature()
   // Parse JSON if possible (response might not be JSON)
   let response_json: serde_json::Value = serde_json::from_str( &body_str )
     .unwrap_or_else( |_| {
-      panic!("LOUD FAILURE: Response is not valid JSON. Body: {}", body_str)
+      panic!("LOUD FAILURE: Response is not valid JSON. Body: {body_str}")
     });
 
   // Assert: Clear error message (response might have different structure)
   let has_error = response_json.get("error").is_some() || response_json.get("message").is_some();
   assert!(
     has_error,
-    "LOUD FAILURE: Response should contain error message. Response: {}",
-    response_json
+    "LOUD FAILURE: Response should contain error message. Response: {response_json}"
   );
 
   // Verify: No new lease created (only initial handshake lease)
@@ -146,8 +145,7 @@ async fn test_refresh_invalid_jwt_signature()
 
   assert_eq!(
     lease_count, 1,
-    "LOUD FAILURE: No new lease should be created with invalid JWT. Expected: 1 (initial), Actual: {}",
-    lease_count
+    "LOUD FAILURE: No new lease should be created with invalid JWT. Expected: 1 (initial), Actual: {lease_count}"
   );
 
   // Verify: Agent budget unchanged (only handshake deduction)
@@ -162,14 +160,12 @@ async fn test_refresh_invalid_jwt_signature()
 
   assert_eq!(
     total_spent, 10_000_000,
-    "LOUD FAILURE: total_spent should only include handshake ($10M). Actual: {}",
-    total_spent
+    "LOUD FAILURE: total_spent should only include handshake ($10M). Actual: {total_spent}"
   );
 
   assert_eq!(
     budget_remaining, 90_000_000,
-    "LOUD FAILURE: budget_remaining should be $90M. Actual: {}",
-    budget_remaining
+    "LOUD FAILURE: budget_remaining should be $90M. Actual: {budget_remaining}"
   );
 }
 
@@ -191,9 +187,9 @@ async fn test_refresh_missing_jwt()
   let agent_id = 201i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router( state.clone() );
 
   // Create initial lease
   let handshake_response = router
@@ -273,9 +269,9 @@ async fn test_refresh_malformed_jwt()
   let agent_id = 202i64;
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let router = create_budget_router( state.clone() ).await;
+  let router = create_budget_router( state.clone() );
 
   // Create initial lease
   let handshake_response = router
@@ -310,7 +306,7 @@ async fn test_refresh_malformed_jwt()
         .method( "POST" )
         .uri( "/api/budget/refresh" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", malformed_jwt ) )
+        .header( "authorization", format!( "Bearer {malformed_jwt}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap()
     )

@@ -76,9 +76,9 @@ async fn test_sql_injection_in_provider_name()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Attempt SQL injection via provider field
   let malicious_provider = "openai'; DROP TABLE agents; --";
@@ -116,7 +116,7 @@ async fn test_sql_injection_in_provider_name()
 /// Test 13: Authorization enforcement - IC Token from different agent
 ///
 /// # Corner Case
-/// IC Token contains agent_id=123, but refresh request is for lease owned by agent_id=456
+/// IC Token contains `agent_id=123`, but refresh request is for lease owned by `agent_id=456`
 ///
 /// # Expected Behavior
 /// HTTP 403 Forbidden "Unauthorized - lease belongs to different agent"
@@ -134,13 +134,13 @@ async fn test_ic_token_authorization_enforcement()
   seed_agent_with_budget( &pool, agent_1, 100_000_000 ).await;
   seed_agent_with_budget( &pool, agent_2, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
 
   // Create IC Token for agent 1
   let ic_token_agent_1 = create_ic_token( agent_1, &state.ic_token_manager );
 
   // Create lease for agent 1
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -166,12 +166,12 @@ async fn test_ic_token_authorization_enforcement()
   // Create JWT token for authenticated request (GAP-003)
   let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
 
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", access_token ) )
+    .header( "authorization", format!( "Bearer {access_token}" ) )
     .body( Body::from(
       json!({
         "ic_token": ic_token_agent_2,
@@ -208,11 +208,11 @@ async fn test_ip_token_replay_prevention()
   // Seed agent with sufficient budget for multiple handshakes
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Perform first handshake
-  let app1 = create_budget_router( state.clone() ).await;
+  let app1 = create_budget_router( state.clone() );
   let request1 = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -233,7 +233,7 @@ async fn test_ip_token_replay_prevention()
   let ip_token_1 = data1[ "ip_token" ].as_str().unwrap();
 
   // Perform second handshake with same IC Token
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let request2 = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -279,7 +279,7 @@ async fn test_ic_token_invalid_signature()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
 
   // Create valid IC Token
   let valid_ic_token = create_ic_token( agent_id, &state.ic_token_manager );
@@ -294,7 +294,7 @@ async fn test_ic_token_invalid_signature()
     .encode( b"{\"agent_id\":\"agent_999\",\"budget_id\":\"budget_999\"}" );
   let tampered_token = format!( "{}.{}.{}", parts[ 0 ], tampered_payload, parts[ 2 ] );
 
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Attempt handshake with tampered IC Token
   let request = Request::builder()
@@ -323,7 +323,7 @@ async fn test_ic_token_invalid_signature()
 /// Test 16: Provider key mismatch
 ///
 /// # Corner Case
-/// Request openai provider using anthropic provider_key_id
+/// Request openai provider using anthropic `provider_key_id`
 ///
 /// # Expected Behavior
 /// HTTP 400/403 Provider key mismatch error
@@ -356,9 +356,9 @@ async fn test_provider_key_mismatch()
   .await
   .unwrap();
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Attempt handshake: request openai provider with anthropic provider_key_id
   let request = Request::builder()
@@ -386,7 +386,7 @@ async fn test_provider_key_mismatch()
 /// Test 17: Disabled provider key access
 ///
 /// # Corner Case
-/// Request with provider_key_id where is_enabled=0
+/// Request with `provider_key_id` where `is_enabled=0`
 ///
 /// # Expected Behavior
 /// HTTP 403 Forbidden "Provider key is disabled"
@@ -421,7 +421,7 @@ async fn test_disabled_provider_key_access()
     "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
+  .bind( format!( "test_agent_{agent_id}" ) )
   .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
   .bind( now_ms )
   .bind( "test_user" )
@@ -459,9 +459,9 @@ async fn test_disabled_provider_key_access()
   .await
   .unwrap();
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Attempt handshake with disabled provider key
   let request = Request::builder()
@@ -505,11 +505,11 @@ async fn test_revoked_lease_usage_reporting()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -537,7 +537,7 @@ async fn test_revoked_lease_usage_reporting()
     .unwrap();
 
   // Attempt to report usage on revoked lease
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let report_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/report" )
@@ -582,11 +582,11 @@ async fn test_sql_injection_in_model_name()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -609,7 +609,7 @@ async fn test_sql_injection_in_model_name()
   // Attempt SQL injection via model field
   let malicious_model = "gpt-4'; DROP TABLE budget_leases; --";
 
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let report_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/report" )
@@ -667,11 +667,11 @@ async fn test_sql_injection_in_reason_field()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -697,12 +697,12 @@ async fn test_sql_injection_in_reason_field()
   // Create JWT token for authenticated request (GAP-003)
   let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
 
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", access_token ) )
+    .header( "authorization", format!( "Bearer {access_token}" ) )
     .body( Body::from(
       json!({
         "ic_token": ic_token,
@@ -747,8 +747,8 @@ async fn test_sql_injection_in_reason_field()
 ///
 /// # Why Not Caught
 /// - No security test for refresh on revoked lease existed (until now)
-/// - Refresh was implemented by copying parts of report_usage validation but not all checks
-/// - Corner case list included this scenario but it wasn't tested until manual testing phase
+/// - Refresh was implemented by copying parts of `report_usage` validation but not all checks
+/// - Corner case list included this scenario, but it wasn't tested until manual testing phase
 /// - Automated tests only covered happy path refresh scenarios
 ///
 /// # Fix Applied (issue-budget-007)
@@ -769,7 +769,7 @@ async fn test_sql_injection_in_reason_field()
 ///     .into_response();
 /// }
 /// ```
-/// Placed immediately after authorization check and before budget checks, matching report_usage pattern.
+/// Placed immediately after authorization check and before budget checks, matching `report_usage` pattern.
 ///
 /// # Prevention
 /// - Create validation checklists for resource operations: (1) existence, (2) authorization,
@@ -797,11 +797,11 @@ async fn test_refresh_on_revoked_lease()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -832,12 +832,12 @@ async fn test_refresh_on_revoked_lease()
   let access_token = common::create_test_access_token( "test_user", "test@example.com", "admin", "test_jwt_secret" );
 
   // Attempt to refresh on revoked lease
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", access_token ) )
+    .header( "authorization", format!( "Bearer {access_token}" ) )
     .body( Body::from(
       json!({
         "ic_token": ic_token,
@@ -875,11 +875,11 @@ async fn test_return_on_revoked_lease()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create lease via handshake
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -907,7 +907,7 @@ async fn test_return_on_revoked_lease()
     .unwrap();
 
   // Attempt to return budget on revoked lease
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let return_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/return" )
@@ -949,11 +949,11 @@ async fn test_handshake_after_revocation()
   // Seed agent with sufficient budget for 2 leases
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create first lease via handshake
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_request = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -981,7 +981,7 @@ async fn test_handshake_after_revocation()
     .unwrap();
 
   // Attempt new handshake after revocation (should succeed)
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let handshake_request_2 = Request::builder()
     .method( "POST" )
     .uri( "/api/budget/handshake" )
@@ -1013,10 +1013,10 @@ async fn test_handshake_after_revocation()
   );
 }
 
-/// E5: SQL injection in lease_id parameter
+/// E5: SQL injection in `lease_id` parameter
 ///
 /// # Corner Case
-/// Malicious lease_id attempting SQL injection
+/// Malicious `lease_id` attempting SQL injection
 ///
 /// # Expected Behavior
 /// - Request rejected (404 Not Found) OR SQL injection prevented (200 OK with no damage)
@@ -1033,11 +1033,11 @@ async fn test_sql_injection_in_lease_id()
 
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create valid lease first
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_response = app
     .oneshot(
       Request::builder()
@@ -1058,7 +1058,7 @@ async fn test_sql_injection_in_lease_id()
   // Attempt SQL injection via lease_id
   let malicious_lease_id = "lease_123'; DROP TABLE budget_leases; --";
 
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let report_response = app2
     .oneshot(
       Request::builder()
@@ -1118,11 +1118,11 @@ async fn test_xss_in_model_parameter()
 
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
 
   // Create lease
-  let app = create_budget_router( state.clone() ).await;
+  let app = create_budget_router( state.clone() );
   let handshake_response = app
     .oneshot(
       Request::builder()
@@ -1147,7 +1147,7 @@ async fn test_xss_in_model_parameter()
   // Attempt XSS via model parameter
   let malicious_model = "<script>alert('XSS')</script>";
 
-  let app2 = create_budget_router( state ).await;
+  let app2 = create_budget_router( state );
   let report_response = app2
     .oneshot(
       Request::builder()

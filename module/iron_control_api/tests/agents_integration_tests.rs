@@ -15,33 +15,33 @@
 //! - `test_get_agent_without_auth_unauthorized`: Prevents unauthenticated agent access
 //! - `test_delete_agent_without_auth_unauthorized`: Prevents unauthenticated agent deletion
 //! - `test_delete_nonexistent_agent_as_admin`: Verifies proper 404 error handling
-//! - `test_admin_can_assign_agent_to_other_user`: Admins can assign agents to other users via owner_id
+//! - `test_admin_can_assign_agent_to_other_user`: Admins can assign agents to other users via `owner_id`
 //!
 //! These tests ensure authentication middleware cannot be accidentally removed.
-//! Note: Admins can specify owner_id to assign agents to other users; regular users cannot.
+//! Note: Admins can specify `owner_id` to assign agents to other users; regular users cannot.
 //!
 //! ## Test Matrix
 //!
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
-//! | `test_create_agent_as_admin_success` | Admin creates agent | POST /api/agents with admin token, valid agent data | 201 Created, agent in DB with correct owner_id | ✅ |
-//! | `test_create_agent_as_user_forbidden` | Regular user creates agent | POST /api/agents with user token, valid agent data | 403 Forbidden | ✅ |
-//! | `test_create_agent_without_auth_unauthorized` | Unauthenticated creation | POST /api/agents without auth header, valid agent data | 401 Unauthorized | ✅ |
-//! | `test_admin_can_assign_agent_to_other_user` | Admin assigns agent to user | POST /api/agents with admin token, request includes owner_id field | 201 Created, owner_id set to specified user | ✅ |
-//! | `test_list_agents_as_admin_sees_all` | Admin lists all agents | GET /api/agents with admin token, DB has agents from multiple users | 200 OK, all agents returned | ✅ |
-//! | `test_list_agents_as_user_sees_only_accessible` | User lists accessible agents | GET /api/agents with user token, DB has user's agents + others | 200 OK, only user's agents returned | ✅ |
-//! | `test_list_agents_without_auth_unauthorized` | Unauthenticated listing | GET /api/agents without auth header | 401 Unauthorized | ✅ |
-//! | `test_get_agent_as_admin_success` | Admin retrieves specific agent | GET /api/agents/:id with admin token, agent exists | 200 OK, agent details returned | ✅ |
-//! | `test_get_agent_as_user_without_access_forbidden` | User retrieves other user's agent | GET /api/agents/:id with user token, agent belongs to different user | 403 Forbidden | ✅ |
-//! | `test_get_agent_not_found` | Retrieve nonexistent agent | GET /api/agents/999999 with admin token | 404 Not Found | ✅ |
-//! | `test_get_agent_without_auth_unauthorized` | Unauthenticated retrieval | GET /api/agents/:id without auth header | 401 Unauthorized | ✅ |
-//! | `test_update_agent_as_admin_success` | Admin updates agent | PUT /api/agents/:id with admin token, valid update data | 200 OK, agent updated in DB | ✅ |
-//! | `test_update_agent_as_user_forbidden` | User updates other user's agent | PUT /api/agents/:id with user token, agent belongs to different user | 403 Forbidden | ✅ |
-//! | `test_delete_agent_as_admin_success` | Admin deletes agent | DELETE /api/agents/:id with admin token | 204 No Content, agent removed from DB | ✅ |
-//! | `test_delete_agent_as_user_forbidden` | User deletes other user's agent | DELETE /api/agents/:id with user token, agent belongs to different user | 403 Forbidden | ✅ |
-//! | `test_delete_nonexistent_agent_as_admin` | Delete nonexistent agent | DELETE /api/agents/999999 with admin token | 404 Not Found | ✅ |
-//! | `test_delete_agent_without_auth_unauthorized` | Unauthenticated deletion | DELETE /api/agents/:id without auth header | 401 Unauthorized | ✅ |
-//! | `test_get_agent_tokens_success` | Retrieve agent's API tokens | GET /api/agents/:id/tokens with admin token, agent has tokens | 200 OK, list of agent's tokens returned | ✅ |
+//! | `test_create_agent_as_admin_success` | Admin creates agent | POST with admin token, valid agent data | 201 Created, agent in DB with correct `owner_id` | pass |
+//! | `test_create_agent_as_user_forbidden` | Regular user creates agent | POST with user token, valid agent data | 403 Forbidden | pass |
+//! | `test_create_agent_without_auth_unauthorized` | Unauthenticated creation | POST without auth header, valid agent data | 401 Unauthorized | pass |
+//! | `test_admin_can_assign_agent_to_other_user` | Admin assigns agent to user | POST with admin token, request includes `owner_id` field | 201 Created, `owner_id` set to specified user | pass |
+//! | `test_list_agents_as_admin_sees_all` | Admin lists all agents | GET with admin token, DB has agents from multiple users | 200 OK, all agents returned | pass |
+//! | `test_list_agents_as_user_sees_only_accessible` | User lists accessible agents | GET with user token, DB has user's agents and others | 200 OK, only user's agents returned | pass |
+//! | `test_list_agents_without_auth_unauthorized` | Unauthenticated listing | GET without auth header | 401 Unauthorized | pass |
+//! | `test_get_agent_as_admin_success` | Admin retrieves specific agent | GET with admin token, agent exists | 200 OK, agent details returned | pass |
+//! | `test_get_agent_as_user_without_access_forbidden` | User retrieves other user's agent | GET with user token, agent belongs to different user | 403 Forbidden | pass |
+//! | `test_get_agent_not_found` | Retrieve nonexistent agent | GET /api/agents/999999 with admin token | 404 Not Found | pass |
+//! | `test_get_agent_without_auth_unauthorized` | Unauthenticated retrieval | GET without auth header | 401 Unauthorized | pass |
+//! | `test_update_agent_as_admin_success` | Admin updates agent | PUT with admin token, valid update data | 200 OK, agent updated in DB | pass |
+//! | `test_update_agent_as_user_forbidden` | User updates other user's agent | PUT with user token, agent belongs to different user | 403 Forbidden | pass |
+//! | `test_delete_agent_as_admin_success` | Admin deletes agent | DELETE with admin token | 204 No Content, agent removed from DB | pass |
+//! | `test_delete_agent_as_user_forbidden` | User deletes other user's agent | DELETE with user token, agent belongs to different user | 403 Forbidden | pass |
+//! | `test_delete_nonexistent_agent_as_admin` | Delete nonexistent agent | DELETE /api/agents/999999 with admin token | 404 Not Found | pass |
+//! | `test_delete_agent_without_auth_unauthorized` | Unauthenticated deletion | DELETE without auth header | 401 Unauthorized | pass |
+//! | `test_get_agent_tokens_success` | Retrieve agent's API tokens | GET with admin token, agent has tokens | 200 OK, list of agent's tokens returned | pass |
 
 mod common;
 
@@ -58,7 +58,7 @@ use sqlx::SqlitePool;
 use iron_secrets::crypto::CryptoService;
 
 /// Test schema for agents integration tests
-const AGENTS_SCHEMA: &str = r#"
+const AGENTS_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS agents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   last_used_at INTEGER,
   FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
 );
-"#;
+";
 
 /// Helper to create test router with agents endpoints
 async fn create_agents_router() -> ( Router, SqlitePool, String, String, String, String )
@@ -150,7 +150,7 @@ async fn test_create_agent_as_admin_success()
     "name": "Test Agent",
     "providers": ["openai", "anthropic"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000
+    "initial_budget_microdollars": 1_000_000
   });
 
   let response = app
@@ -159,7 +159,7 @@ async fn test_create_agent_as_admin_success()
         .method( Method::POST )
         .uri( "/api/agents" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap(),
     )
@@ -187,7 +187,7 @@ async fn test_create_agent_as_user_forbidden()
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000
+    "initial_budget_microdollars": 1_000_000
   });
 
   let response = app
@@ -196,7 +196,7 @@ async fn test_create_agent_as_user_forbidden()
         .method( Method::POST )
         .uri( "/api/agents" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .header( "authorization", format!( "Bearer {user_token}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap(),
     )
@@ -215,7 +215,7 @@ async fn test_create_agent_without_auth_unauthorized()
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000
+    "initial_budget_microdollars": 1_000_000
   });
 
   let response = app
@@ -267,7 +267,7 @@ async fn test_list_agents_as_admin_sees_all()
       Request::builder()
         .method( Method::GET )
         .uri( "/api/agents" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -323,7 +323,7 @@ async fn test_list_agents_as_user_sees_only_accessible()
       Request::builder()
         .method( Method::GET )
         .uri( "/api/agents" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .header( "authorization", format!( "Bearer {user_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -367,8 +367,8 @@ async fn test_get_agent_as_admin_success()
     .oneshot(
       Request::builder()
         .method( Method::GET )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -407,8 +407,8 @@ async fn test_get_agent_as_user_without_access_forbidden()
     .oneshot(
       Request::builder()
         .method( Method::GET )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
+        .header( "authorization", format!( "Bearer {user_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -428,7 +428,7 @@ async fn test_get_agent_not_found()
       Request::builder()
         .method( Method::GET )
         .uri( "/api/agents/999999" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -469,9 +469,9 @@ async fn test_update_agent_as_admin_success()
     .oneshot(
       Request::builder()
         .method( Method::PUT )
-        .uri( format!( "/api/agents/{}", agent_id ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap(),
     )
@@ -515,9 +515,9 @@ async fn test_update_agent_as_user_forbidden()
     .oneshot(
       Request::builder()
         .method( Method::PUT )
-        .uri( format!( "/api/agents/{}", agent_id ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .header( "authorization", format!( "Bearer {user_token}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap(),
     )
@@ -553,8 +553,8 @@ async fn test_delete_agent_as_admin_success()
     .oneshot(
       Request::builder()
         .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -595,8 +595,8 @@ async fn test_delete_agent_as_user_forbidden()
     .oneshot(
       Request::builder()
         .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
+        .header( "authorization", format!( "Bearer {user_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -658,8 +658,8 @@ async fn test_get_agent_tokens_success()
     .oneshot(
       Request::builder()
         .method( Method::GET )
-        .uri( format!( "/api/agents/{}/tokens", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .uri( format!( "/api/agents/{agent_id}/tokens" ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -674,7 +674,7 @@ async fn test_get_agent_tokens_success()
   if status != StatusCode::OK
   {
     let body_str = String::from_utf8( body_bytes.to_vec() ).unwrap();
-    panic!( "Expected 200 OK, got {}. Body: {}", status, body_str );
+    panic!( "Expected 200 OK, got {status}. Body: {body_str}" );
   }
 
   let tokens: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
@@ -730,7 +730,7 @@ async fn test_get_agent_without_auth_unauthorized()
     .oneshot(
       Request::builder()
         .method( Method::GET )
-        .uri( format!( "/api/agents/{}", agent_id ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -766,7 +766,7 @@ async fn test_delete_agent_without_auth_unauthorized()
     .oneshot(
       Request::builder()
         .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}", agent_id ) )
+        .uri( format!( "/api/agents/{agent_id}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -790,7 +790,7 @@ async fn test_delete_nonexistent_agent_as_admin()
       Request::builder()
         .method( Method::DELETE )
         .uri( "/api/agents/99999" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -818,7 +818,7 @@ async fn test_admin_can_assign_agent_to_other_user()
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000,
+    "initial_budget_microdollars": 1_000_000,
     "owner_id": user_id  // Admin assigns agent to user
   });
 
@@ -828,7 +828,7 @@ async fn test_admin_can_assign_agent_to_other_user()
         .method( Method::POST )
         .uri( "/api/agents" )
         .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
+        .header( "authorization", format!( "Bearer {admin_token}" ) )
         .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
         .unwrap(),
     )

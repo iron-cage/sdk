@@ -60,9 +60,9 @@ async fn test_multiple_simultaneous_handshakes()
   // Seed agent with exactly 100 USD budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Launch 10 concurrent handshake requests
   let mut handles = vec![];
@@ -119,14 +119,13 @@ async fn test_multiple_simultaneous_handshakes()
   // Debug: Print failed response statuses if any
   if successful_count != 10
   {
-    eprintln!( "Failed responses: {:?}", failed_responses );
+    eprintln!( "Failed responses: {failed_responses:?}" );
   }
 
   // All 10 requests should succeed (each gets 10 USD from 100 USD budget)
   assert_eq!(
     successful_count, 10,
-    "All concurrent handshakes should succeed when sufficient budget available. Failed statuses: {:?}",
-    failed_responses
+    "All concurrent handshakes should succeed when sufficient budget available. Failed statuses: {failed_responses:?}"
   );
 
   // Verify final budget state
@@ -161,9 +160,9 @@ async fn test_concurrent_usage_reports_on_same_lease()
   // Seed agent with budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Create initial lease via handshake
   let handshake_request = Request::builder()
@@ -263,9 +262,9 @@ async fn test_concurrent_report_and_refresh()
   // Seed agent with sufficient budget
   seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Create initial lease
   let handshake_request = Request::builder()
@@ -321,7 +320,7 @@ async fn test_concurrent_report_and_refresh()
       .method( "POST" )
       .uri( "/api/budget/refresh" )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", access_token ) )
+      .header( "authorization", format!( "Bearer {access_token}" ) )
       .body( Body::from(
         json!({
           "ic_token": ic_token_refresh,
@@ -338,8 +337,8 @@ async fn test_concurrent_report_and_refresh()
   let ( report_result, refresh_result ) = tokio::join!( report_handle, refresh_handle );
 
   // Both operations should succeed
-  assert!( report_result.unwrap().unwrap().status() == StatusCode::OK );
-  assert!( refresh_result.unwrap().unwrap().status() == StatusCode::OK );
+  assert_eq!( report_result.unwrap().unwrap().status(), StatusCode::OK );
+  assert_eq!( refresh_result.unwrap().unwrap().status(), StatusCode::OK );
 
   // Verify database consistency (no lost updates)
   let lease_count : i64 = sqlx::query_scalar(
@@ -373,9 +372,9 @@ async fn test_handshake_with_existing_active_lease()
   // Seed agent with sufficient budget for multiple leases
   seed_agent_with_budget( &pool, agent_id, 50_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Create first lease
   let first_handshake = Request::builder()
@@ -433,20 +432,20 @@ async fn test_handshake_with_existing_active_lease()
 ///
 /// # Corner Case
 /// 2 concurrent handshake requests, agent budget = exactly $10.00
-/// Each request wants DEFAULT_HANDSHAKE_BUDGET ($10.00)
+/// Each request wants `DEFAULT_HANDSHAKE_BUDGET` ($10.00)
 ///
 /// # Expected Behavior
 /// Exactly 1 request succeeds, exactly 1 fails with 403 Budget Exceeded
 /// This tests the Time-of-Check-to-Time-of-Use (TOCTOU) race condition
 ///
 /// # Root Cause (if this test fails)
-/// Handshake function checks budget_remaining BEFORE creating lease and recording spending.
+/// Handshake function checks `budget_remaining` BEFORE creating lease and recording spending.
 /// Without transactional protection of the entire check-grant-record sequence:
-/// - Thread A: checks budget_remaining = $10, passes
-/// - Thread B: checks budget_remaining = $10, passes  (before Thread A commits)
+/// - Thread A: checks `budget_remaining` = $10, passes
+/// - Thread B: checks `budget_remaining` = $10, passes  (before Thread A commits)
 /// - Thread A: grants $10 lease, records -$10 spending
 /// - Thread B: grants $10 lease, records -$10 spending
-/// - Result: budget_remaining = -$10 (NEGATIVE, violates invariant)
+/// - Result: `budget_remaining` = -$10 (NEGATIVE, violates invariant)
 ///
 /// # Why Not Caught (if this test didn't exist)
 /// Existing test `test_multiple_simultaneous_handshakes` uses sufficient budget ($100 for 10x$10),
@@ -456,12 +455,12 @@ async fn test_handshake_with_existing_active_lease()
 /// Created `AgentBudgetManager::check_and_reserve_budget()` method that atomically
 /// checks and reserves budget using conditional UPDATE with WHERE clause and CASE
 /// expression to calculate partial grants: `min(requested, budget_remaining)`.
-/// SQLite's row-level write lock ensures only one UPDATE succeeds when multiple
+/// `SQLite`'s row-level write lock ensures only one UPDATE succeeds when multiple
 /// transactions compete for insufficient budget. This is the "optimistic concurrency
 /// control" pattern. Replaced separate `get_budget_status()` + `record_spending()`
 /// calls in handshake with single `check_and_reserve_budget()` call.
 ///
-/// **Critical discovery**: Under high concurrency (10+ simultaneous requests), SQLite
+/// **Critical discovery**: Under high concurrency (10+ simultaneous requests), `SQLite`
 /// returns "database is deadlocked" errors (not just "locked" or "busy"). Added retry
 /// logic with exponential backoff (50 retries, max 256ms delay) that detects all three
 /// error types: "database is locked", "database is busy", and "deadlock".
@@ -473,9 +472,9 @@ async fn test_handshake_with_existing_active_lease()
 /// - Add "insufficient budget" variants for all concurrency tests
 ///
 /// # Pitfall
-/// SQLite's database-level locking might HIDE this race in simple tests.
+/// `SQLite's` database-level locking might HIDE this race in simple tests.
 /// Need to test with high concurrency (20+ threads) or add artificial delays
-/// to expose race window. Consider testing with PostgreSQL for finer-grained locking.
+/// to expose race window. Consider testing with `PostgreSQL` for finer-grained locking.
 // test_kind: bug_reproducer(issue-budget-006)
 #[ tokio::test ]
 async fn test_toctou_race_insufficient_budget()
@@ -486,9 +485,9 @@ async fn test_toctou_race_insufficient_budget()
   // Seed agent with EXACTLY $10.00 (enough for only 1 handshake)
   seed_agent_with_budget( &pool, agent_id, 10_000_000 ).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state( pool.clone() );
   let ic_token = create_ic_token( agent_id, &state.ic_token_manager );
-  let app = create_budget_router( state ).await;
+  let app = create_budget_router( state );
 
   // Launch 2 concurrent handshake requests (each wants $10.00)
   let mut handles = vec![];
@@ -546,7 +545,7 @@ async fn test_toctou_race_insufficient_budget()
   if success_count != 1 || forbidden_count != 1
   {
     eprintln!( "TOCTOU Race Detected!" );
-    eprintln!( "Success: {}, Forbidden: {}, Other: {:?}", success_count, forbidden_count, other_statuses );
+    eprintln!( "Success: {success_count}, Forbidden: {forbidden_count}, Other: {other_statuses:?}" );
   }
 
   // CRITICAL: Exactly 1 should succeed, exactly 1 should fail

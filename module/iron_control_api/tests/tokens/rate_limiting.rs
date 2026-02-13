@@ -14,17 +14,17 @@
 use axum::{ Router, routing::post, http::{ Request, StatusCode }, body::Body };
 use tower::ServiceExt;
 use serde_json::json;
-use std::sync::atomic::{ AtomicUsize, Ordering };
+use core::sync::atomic::{ AtomicUsize, Ordering };
 use std::sync::Arc;
 
 /// Global counter for generating unique database names across tests
 static DB_COUNTER: AtomicUsize = AtomicUsize::new( 0 );
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -47,7 +47,7 @@ async fn create_test_router_with_shared_db( db_path: &str ) -> ( Router, crate::
 /// Test that user cannot exceed 10 active tokens
 ///
 /// WHY: Protocol 014 requires max 10 active tokens per user to prevent
-/// resource exhaustion and DoS attacks.
+/// resource exhaustion and `DoS` attacks.
 ///
 /// APPROACH:
 /// 1. Create 10 tokens for user (should all succeed)
@@ -77,7 +77,7 @@ async fn test_max_active_tokens_per_user()
     let jwt = generate_jwt_for_user( &app_state, user_id );
 
     let request_body = json!({
-      "name": format!( "token_{}", i ),
+      "name": format!( "token_{i}" ),
       "description": "Rate limit test token"
     });
 
@@ -85,7 +85,7 @@ async fn test_max_active_tokens_per_user()
       .method( "POST" )
       .uri( "/api/v1/api-tokens" )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", jwt ) )
+      .header( "authorization", format!( "Bearer {jwt}" ) )
       .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
       .unwrap();
 
@@ -94,7 +94,7 @@ async fn test_max_active_tokens_per_user()
     assert_eq!(
       response.status(),
       StatusCode::CREATED,
-      "LOUD FAILURE: First 10 token creations must succeed (token {})", i
+      "LOUD FAILURE: First 10 token creations must succeed (token {i})"
     );
   }
 
@@ -112,7 +112,7 @@ async fn test_max_active_tokens_per_user()
       .method( "POST" )
       .uri( "/api/v1/api-tokens" )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", jwt ) )
+      .header( "authorization", format!( "Bearer {jwt}" ) )
       .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
       .unwrap();
 
@@ -130,7 +130,7 @@ async fn test_max_active_tokens_per_user()
     let error_msg = body[ "error" ].as_str().unwrap();
     assert!(
       error_msg == "Rate limit exceeded" || error_msg == "Token limit exceeded",
-      "LOUD FAILURE: Error message must indicate a rate limit was exceeded, got: {}", error_msg
+      "LOUD FAILURE: Error message must indicate a rate limit was exceeded, got: {error_msg}"
     );
   }
 }

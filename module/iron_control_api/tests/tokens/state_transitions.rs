@@ -63,11 +63,11 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
   ( router, app_state )
 }
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -86,7 +86,7 @@ async fn create_token( router: &Router, app_state: &crate::common::test_state::T
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -103,8 +103,8 @@ async fn revoke_token( router: &Router, app_state: &crate::common::test_state::T
 
   let request = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -136,8 +136,8 @@ async fn test_rotate_revoked_token()
   // Attempt to rotate revoked token
   let request = Request::builder()
     .method( "POST" )
-    .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}/rotate" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -170,8 +170,8 @@ async fn test_get_revoked_token_shows_metadata()
   // Get revoked token metadata
   let request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -227,7 +227,7 @@ async fn test_rotate_nonexistent_token()
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens/99999/rotate" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -279,7 +279,7 @@ async fn test_token_state_after_failed_rotation()
   // Get original token state
   let get_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
     .header( "Authorization", format!( "Bearer {}", jwt_token.clone() ) )
     .body( Body::empty() )
     .unwrap();
@@ -301,8 +301,8 @@ async fn test_token_state_after_failed_rotation()
 
   let final_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -321,7 +321,7 @@ async fn test_token_state_after_failed_rotation()
 /// to prevent orphaned data.
 ///
 /// NOTE: This test verifies the database schema CASCADE DELETE constraint.
-/// iron_token_manager/tests/database_schema.rs has unit test for schema.
+/// `iron_token_manager/tests/database_schema.rs` has unit test for schema.
 /// This integration test ensures the API respects the cascade.
 #[ tokio::test ]
 async fn test_cascade_delete_token_removes_usage()
@@ -358,8 +358,8 @@ async fn test_cascade_delete_token_removes_usage()
   // Verify token is revoked (still retrievable for audit but marked inactive)
   let get_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 

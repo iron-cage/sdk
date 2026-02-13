@@ -12,7 +12,7 @@
 //!
 //! GAP-003: Budget refresh endpoint doesn't extract approver identity from JWT for audit trail
 //! - Security implication: Can't track who approved budget increases
-//! - Fix: Add JWT authentication middleware, extract user_id from JWT claims
+//! - Fix: Add JWT authentication middleware, extract `user_id` from JWT claims
 
 mod common;
 
@@ -35,7 +35,7 @@ use tower::ServiceExt;
 async fn test_budget_refresh_without_jwt_returns_401()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   // Create agent and lease
   let agent_id = 400i64;
@@ -107,7 +107,7 @@ async fn test_budget_refresh_without_jwt_returns_401()
 async fn test_budget_refresh_with_invalid_jwt_returns_401()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   let agent_id = 401i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
@@ -172,12 +172,12 @@ async fn test_budget_refresh_with_invalid_jwt_returns_401()
 /// # Expected Behavior
 ///
 /// - Request with valid JWT succeeds
-/// - Approver user_id is extracted from JWT claims
+/// - Approver `user_id` is extracted from JWT claims
 #[ tokio::test ]
 async fn test_budget_refresh_with_valid_jwt_succeeds()
 {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state( pool.clone() ).await;
+  let state = common::budget::create_test_budget_state( pool.clone() );
 
   let agent_id = 402i64;
   common::budget::seed_agent_with_budget( &pool, agent_id, 100_000_000 ).await;
@@ -227,7 +227,7 @@ async fn test_budget_refresh_with_valid_jwt_succeeds()
     .method( "POST" )
     .uri( "/api/budget/refresh" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", access_token ) )
+    .header( "authorization", format!( "Bearer {access_token}") )
     .body( Body::from( serde_json::to_string( &refresh_body ).unwrap() ) )
     .unwrap();
 

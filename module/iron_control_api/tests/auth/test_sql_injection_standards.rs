@@ -3,14 +3,14 @@
 //! Tests that verify the SQL injection testing standards document is complete.
 //!
 //! # TDD Phase: RED
-//! This test is written FIRST, before -sql_injection_standards.md exists.
+//! This test is written FIRST, before `-sql_injection_standards.md` exists.
 //! Expected to fail with: "No such file or directory"
 //!
 //! # Rulebook Compliance
-//! - test_organization.rulebook.md: Test in tests/ directory ✓
-//! - code_style.rulebook.md: 2-space indentation ✓
-//! - codebase_hygiene.rulebook.md: Clear test name ✓
-//! - files_structure.rulebook.md: Checked readme.md, no overlap ✓
+//! - `test_organization.rulebook.md`: Test in tests/ directory ✓
+//! - `code_style.rulebook.md`: 2-space indentation ✓
+//! - `codebase_hygiene.rulebook.md`: Clear test name ✓
+//! - `files_structure.rulebook.md`: Checked readme.md, no overlap ✓
 
 #![cfg(test)]
 
@@ -19,15 +19,14 @@ use std::path::Path;
 
 /// Test: Standards document exists and is readable
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_sql_injection_standards_exists()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
 
   assert!(
     standards_path.exists(),
-    "SQL injection standards not found at: {:?}",
-    standards_path
+    "SQL injection standards not found at: {standards_path:?}"
   );
 
   let content = fs::read_to_string(standards_path)
@@ -41,7 +40,7 @@ fn test_sql_injection_standards_exists()
 
 /// Test: Standards document defines expected security behavior
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_standards_defines_security_behavior()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -63,7 +62,7 @@ fn test_standards_defines_security_behavior()
 
 /// Test: Standards document defines test structure
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_standards_defines_test_structure()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -85,7 +84,7 @@ fn test_standards_defines_test_structure()
 
 /// Test: Standards document provides helper function specifications
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_standards_provides_helper_specifications()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");
@@ -101,7 +100,7 @@ fn test_standards_provides_helper_specifications()
 
 /// Test: Standards document defines verification patterns
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_standards_defines_verification_patterns()
 {
   let standards_path = Path::new("tests/auth/-sql_injection_standards.md");

@@ -7,17 +7,17 @@
 //!
 //! This server uses a combined `AppState` pattern to manage multiple service states
 //! (authentication, token management) while keeping routes modular. The `FromRef` trait
-//! allows Axum extractors (like `AuthenticatedUser`) to access specific sub-states
+//! allows Axum extractors (like `AuthenticatedUser`) to access specific substates
 //! without coupling to the full state structure.
 //!
 //! # Configuration
 //!
-//! - **DATABASE_URL**: SQLite connection string (default: `sqlite://./iron.db?mode=rwc`)
+//! - **`DATABASE_URL`**: `SQLite` connection string (default: `sqlite://./iron.db?mode=rwc`)
 //!   - Canonical path: `iron.db` for standalone module use
-//!   - Project Makefile overrides with module-specific paths (dev_control.db)
-//!   - The `?mode=rwc` parameter is REQUIRED for SQLite to create the database file
-//!   - Production should use PostgreSQL: `postgres://user:pass@host/database`
-//! - **JWT_SECRET**: Secret key for JWT signing (default: dev-secret-change-in-production)
+//!   - Project Makefile overrides with module-specific paths (`dev_control.db`)
+//!   - The `?mode=rwc` parameter is REQUIRED for `SQLite` to create the database file
+//!   - Production should use `PostgreSQL`: `postgres://user:pass@host/database`
+//! - **`JWT_SECRET`**: Secret key for JWT signing (default: dev-secret-change-in-production)
 //!   - Production MUST use a cryptographically secure random value
 //!   - Generate with: `openssl rand -base64 32`
 //!
@@ -40,12 +40,12 @@
 //!
 //! # Known Pitfalls
 //!
-//! **Pitfall:** SQLite database creation fails without `?mode=rwc` parameter.
+//! **Pitfall:** `SQLite` database creation fails without `?mode=rwc` parameter.
 //!
-//! **Root Cause:** SQLite requires explicit permission to create files. Without
+//! **Root Cause:** `SQLite` requires explicit permission to create files. Without
 //! `mode=rwc`, connection attempts to non-existent databases fail.
 //!
-//! **Fix:** Always include `?mode=rwc` in SQLite URLs: `sqlite://./path.db?mode=rwc`
+//! **Fix:** Always include `?mode=rwc` in `SQLite` URLs: `sqlite://./path.db?mode=rwc`
 //!
 //! **Prevention:** Use environment variable `DATABASE_URL` with proper format, or
 //! ensure default value includes the parameter (as implemented here).
@@ -61,21 +61,21 @@ use workspace_tools::workspace;
 ///
 /// Used to detect whether the server is running in:
 /// - **Pilot**: Localhost development environment
-/// - **ProductionUnconfirmed**: Production environment detected but not explicitly configured
-/// - **Production**: Explicit production deployment (IRON_DEPLOYMENT_MODE=production)
+/// - **`ProductionUnconfirmed`**: Production environment detected but not explicitly configured
+/// - **Production**: Explicit production deployment (`IRON_DEPLOYMENT_MODE=production`)
 enum DeploymentMode
 {
   /// Localhost development environment (safe to use defaults)
   Pilot,
 
-  /// Production environment detected but IRON_DEPLOYMENT_MODE not set
+  /// Production environment detected but `IRON_DEPLOYMENT_MODE` not set
   /// (triggers warning to ensure conscious production deployment)
   ProductionUnconfirmed,
 
-  /// Explicit production deployment (IRON_DEPLOYMENT_MODE=production set)
+  /// Explicit production deployment (`IRON_DEPLOYMENT_MODE=production` set)
   Production,
 
-  /// Explicit development deployment (IRON_DEPLOYMENT_MODE=development set)
+  /// Explicit development deployment (`IRON_DEPLOYMENT_MODE=development` set)
   Development,
 }
 
@@ -86,7 +86,7 @@ enum DeploymentMode
 /// - **Kubernetes**: `KUBERNETES_SERVICE_HOST` present
 /// - **AWS**: `AWS_EXECUTION_ENV` present (Lambda/ECS)
 /// - **Heroku**: `DYNO` environment variable
-/// - **Build Type**: Release build (debug_assertions disabled)
+/// - **Build Type**: Release build (`debug_assertions` disabled)
 ///
 /// Returns:
 /// - `Production`: Explicitly configured for production
@@ -122,15 +122,15 @@ fn detect_deployment_mode() -> DeploymentMode
 
 /// Get database URL with workspace-relative path resolution
 ///
-/// Resolves database path using workspace_tools for context-independent paths:
-/// - **Pilot mode**: {workspace_root}/iron.db
-/// - **Development mode**: {workspace_root}/data/dev_control.db
-/// - **Production mode**: {workspace_root}/data/iron_production.db
+/// Resolves database path using `workspace_tools` for context-independent paths:
+/// - **Pilot mode**: `{workspace_root}/iron.db`
+/// - **Development mode**: `{workspace_root}/data/dev_control.db`
+/// - **Production mode**: `{workspace_root}/data/iron_production.db`
 ///
-/// Respects DATABASE_URL environment variable if set (highest priority).
+/// Respects `DATABASE_URL` environment variable if set (highest priority).
 /// All paths are workspace-relative and work regardless of execution directory.
 ///
-/// Returns SQLite URL with ?mode=rwc parameter for database creation.
+/// Returns `SQLite` URL with ?mode=rwc parameter for database creation.
 fn get_database_url() -> Result< String, Box< dyn std::error::Error > >
 {
   // Check for explicit DATABASE_URL override (highest priority)
@@ -141,7 +141,7 @@ fn get_database_url() -> Result< String, Box< dyn std::error::Error > >
 
   // Detect workspace root
   let ws = workspace()
-    .map_err( | e | format!( "Failed to detect workspace: {}", e ) )?;
+    .map_err( | e | format!( "Failed to detect workspace: {e}" ) )?;
 
   // Get deployment mode
   let mode = detect_deployment_mode();
@@ -179,7 +179,7 @@ fn get_database_url() -> Result< String, Box< dyn std::error::Error > >
 ///
 /// This pattern allows routes to access only the state they need through Axum's
 /// `FromRef` mechanism. Routes using `State<AuthState>` or `State<TokenState>`
-/// automatically extract their sub-state from the combined `AppState`.
+/// automatically extract their substate from the combined `AppState`.
 ///
 /// # Why This Pattern
 ///
@@ -215,10 +215,10 @@ struct AppState
   ic_token: iron_control_api::routes::ic_token::IcTokenState,
 }
 
-/// Enable auth routes and extractors to access AuthState from combined AppState
+/// Enable auth routes and extractors to access `AuthState` from combined `AppState`
 ///
 /// This implementation allows:
-/// - Routes with `State<AuthState>` parameter to extract auth sub-state
+/// - Routes with `State<AuthState>` parameter to extract auth substate
 /// - `AuthenticatedUser` extractor to access JWT secret for token verification
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::auth::AuthState
 {
@@ -228,10 +228,10 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::auth::Auth
   }
 }
 
-/// Enable token routes to access TokenState from combined AppState
+/// Enable token routes to access `TokenState` from combined `AppState`
 ///
 /// This implementation allows routes with `State<TokenState>` parameter to
-/// extract the token management sub-state (database connection, token generator).
+/// extract the token management substate (database connection, token generator).
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::tokens::TokenState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -240,7 +240,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::tokens::To
   }
 }
 
-/// Enable usage routes to access UsageState from combined AppState
+/// Enable usage routes to access `UsageState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::usage::UsageState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -249,7 +249,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::usage::Usa
   }
 }
 
-/// Enable limits routes to access LimitsState from combined AppState
+/// Enable limits routes to access `LimitsState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::limits::LimitsState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -258,7 +258,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::limits::Li
   }
 }
 
-/// Enable providers routes to access ProvidersState from combined AppState
+/// Enable providers routes to access `ProvidersState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::providers::ProvidersState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -267,7 +267,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::providers:
   }
 }
 
-/// Enable keys routes to access KeysState from combined AppState
+/// Enable keys routes to access `KeysState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::keys::KeysState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -276,7 +276,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::keys::Keys
   }
 }
 
-/// Enable user management routes to access UserManagementState from combined AppState
+/// Enable user management routes to access `UserManagementState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::users::UserManagementState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -285,7 +285,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::users::Use
   }
 }
 
-/// Enable agent routes to access SqlitePool from combined AppState
+/// Enable agent routes to access `SqlitePool` from combined `AppState`
 impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
 {
   fn from_ref( state: &AppState ) -> Self
@@ -294,7 +294,7 @@ impl axum::extract::FromRef< AppState > for sqlx::SqlitePool
   }
 }
 
-/// Enable budget routes to access BudgetState from combined AppState
+/// Enable budget routes to access `BudgetState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::budget::BudgetState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -303,7 +303,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::budget::Bu
   }
 }
 
-/// Enable API token authentication extractor to access ApiTokenState from combined AppState
+/// Enable API token authentication extractor to access `ApiTokenState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::token_auth::ApiTokenState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -315,7 +315,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::token_auth::ApiTok
   }
 }
 
-/// Enable analytics routes to access AnalyticsState from combined AppState
+/// Enable analytics routes to access `AnalyticsState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::analytics::AnalyticsState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -324,7 +324,7 @@ impl axum::extract::FromRef< AppState > for iron_control_api::routes::analytics:
   }
 }
 
-/// Enable IC token routes to access IcTokenState from combined AppState
+/// Enable IC token routes to access `IcTokenState` from combined `AppState`
 impl axum::extract::FromRef< AppState > for iron_control_api::routes::ic_token::IcTokenState
 {
   fn from_ref( state: &AppState ) -> Self
@@ -343,10 +343,13 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   tracing_subscriber::fmt::init();
 
   // Log .env loading result (after tracing is initialized)
-  match dotenv_result
+  if let Ok( path ) = dotenv_result
   {
-    Ok( path ) => tracing::debug!( "Loaded .env from: {:?}", path ),
-    Err( _ ) => tracing::debug!( "No .env file loaded (not required)" ),
+    tracing::debug!( "Loaded .env from: {path:?}");
+  }
+  else
+  {
+    tracing::debug!( "No .env file loaded (not required)" );
   }
 
   // Database URL (workspace-relative paths via workspace_tools)
@@ -380,7 +383,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
       tracing::warn!( "⚠️  See docs/production_deployment.md for security checklist" );
       tracing::warn!( "" );
       tracing::warn!( "Sleeping 10 seconds to ensure this warning is visible..." );
-      std::thread::sleep( std::time::Duration::from_secs( 10 ) );
+      tokio::time::sleep(core::time::Duration::from_secs(10)).await;
     }
     DeploymentMode::Production =>
     {
@@ -422,15 +425,15 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   }
 
   // JWT secret for authentication
-  let jwt_secret = std::env::var( "JWT_SECRET" )
+  let jwt_secret = env::var( "JWT_SECRET" )
     .unwrap_or_else( |_| "dev-secret-change-in-production".to_string() );
 
   // Protocol 005: Budget Control Protocol secrets
-  let ic_token_secret = std::env::var( "IC_TOKEN_SECRET" )
+  let ic_token_secret = env::var( "IC_TOKEN_SECRET" )
     .unwrap_or_else( |_| "dev-ic-token-secret-change-in-production".to_string() );
 
   // IP Token encryption key (32 bytes for AES-256-GCM)
-  let ip_token_key_hex = std::env::var( "IP_TOKEN_KEY" )
+  let ip_token_key_hex = env::var( "IP_TOKEN_KEY" )
     .unwrap_or_else( |_| "0000000000000000000000000000000000000000000000000000000000000000".to_string() );
 
   // Fix(production-secret-validation): Block server startup if insecure defaults detected in production
@@ -509,10 +512,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   let ip_token_key = hex::decode( &ip_token_key_hex )
     .expect( "LOUD FAILURE: IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)" );
 
-  if ip_token_key.len() != 32
-  {
-    panic!( "IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters), got {} bytes", ip_token_key.len() );
-  }
+  assert_eq!(ip_token_key.len(), 32, "IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters), got {} bytes", ip_token_key.len() );
 
   tracing::info!( "Initializing API server..." );
   tracing::info!( "Database: {}", database_url );
@@ -555,7 +555,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
 
   // Initialize keys state for /api/keys endpoint (requires crypto)
   // Read provider key master key from environment (used for both keys API and budget protocol)
-  let provider_key_master_b64 = std::env::var( "IRON_SECRETS_MASTER_KEY" )
+  let provider_key_master_b64 = env::var( "IRON_SECRETS_MASTER_KEY" )
     .expect( "LOUD FAILURE: IRON_SECRETS_MASTER_KEY required for provider key encryption" );
 
   let provider_key_master_bytes = base64::Engine::decode(
@@ -572,7 +572,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Rate limiter for /api/keys endpoint: 10 requests per minute per user/project
   let key_rate_limiter = iron_token_manager::rate_limiter::RateLimiter::new(
     10,
-    std::time::Duration::from_secs( 60 ),
+    core::time::Duration::from_secs( 60 ),
   );
 
   // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
@@ -662,7 +662,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     ic_token: ic_token_state,
   };
 
-  // Fix(ironcage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
+  // Fix(iron-cage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
   // Root cause: Hardcoded origins prevented multi-domain production deployment
   // Pitfall: Never hardcode deployment-specific config (origins, ports, URLs)
   let allowed_origins_str = std::env::var( "ALLOWED_ORIGINS" )
@@ -672,14 +672,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .split( ',' )
     .map( |origin| {
       origin.trim().parse::<axum::http::HeaderValue>()
-        .unwrap_or_else( |_| panic!( "Invalid origin in ALLOWED_ORIGINS: {}", origin ) )
+        .unwrap_or_else( |_| panic!( "Invalid origin in ALLOWED_ORIGINS: {origin}" ) )
     } )
     .collect();
 
   tracing::info!( "✅ Configured CORS for {} origins", allowed_origins.len() );
   for origin in &allowed_origins
   {
-    tracing::info!( "   - {}", origin.to_str().unwrap() );
+    tracing::info!( "   - {}", origin.to_str()? );
   }
 
   // Build router with all endpoints
@@ -701,9 +701,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/users", get( iron_control_api::routes::users::list_users ) )
     .route( "/api/v1/users/:id", get( iron_control_api::routes::users::get_user ) )
     .route( "/api/v1/users/:id", delete( iron_control_api::routes::users::delete_user ) )
-    .route( "/api/v1/users/:id/suspend", axum::routing::put( iron_control_api::routes::users::suspend_user ) )
-    .route( "/api/v1/users/:id/activate", axum::routing::put( iron_control_api::routes::users::activate_user ) )
-    .route( "/api/v1/users/:id/role", axum::routing::put( iron_control_api::routes::users::change_user_role ) )
+    .route( "/api/v1/users/:id/suspend", put( iron_control_api::routes::users::suspend_user ) )
+    .route( "/api/v1/users/:id/activate", put( iron_control_api::routes::users::activate_user ) )
+    .route( "/api/v1/users/:id/role", put( iron_control_api::routes::users::change_user_role ) )
     .route( "/api/v1/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
 
     // Token management endpoints
@@ -724,14 +724,14 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     .route( "/api/v1/limits", get( iron_control_api::routes::limits::list_limits ) )
     .route( "/api/v1/limits", post( iron_control_api::routes::limits::create_limit ) )
     .route( "/api/v1/limits/:id", get( iron_control_api::routes::limits::get_limit ) )
-    .route( "/api/v1/limits/:id", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
-    .route( "/api/v1/limits/:id", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
+    .route( "/api/v1/limits/:id", put( iron_control_api::routes::limits::update_limit ) )
+    .route( "/api/v1/limits/:id", delete( iron_control_api::routes::limits::delete_limit ) )
 
     // Provider key management endpoints
     .route( "/api/v1/providers", post( iron_control_api::routes::providers::create_provider_key ) )
     .route( "/api/v1/providers", get( iron_control_api::routes::providers::list_provider_keys ) )
     .route( "/api/v1/providers/:id", get( iron_control_api::routes::providers::get_provider_key ) )
-    .route( "/api/v1/providers/:id", axum::routing::put( iron_control_api::routes::providers::update_provider_key ) )
+    .route( "/api/v1/providers/:id", put( iron_control_api::routes::providers::update_provider_key ) )
     .route( "/api/v1/providers/:id", delete( iron_control_api::routes::providers::delete_provider_key ) )
     .route( "/api/v1/projects/:project_id/provider", post( iron_control_api::routes::providers::assign_provider_to_project ) )
     .route( "/api/v1/projects/:project_id/provider", delete( iron_control_api::routes::providers::unassign_provider_from_project ) )
@@ -745,9 +745,9 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
     // Agent Provider Key endpoint (Feature 014) - must be before :id routes
     .route( "/api/v1/agents/provider-key", post( iron_control_api::routes::agent_provider_key::get_provider_key ) )
     .route( "/api/v1/agents/:id", get( iron_control_api::routes::agents::get_agent ) )
-    .route( "/api/v1/agents/:id", axum::routing::put( iron_control_api::routes::agents::update_agent ) )
+    .route( "/api/v1/agents/:id", put( iron_control_api::routes::agents::update_agent ) )
     .route( "/api/v1/agents/:id", delete( iron_control_api::routes::agents::delete_agent ) )
-    .route( "/api/v1/agents/:id/budget", axum::routing::put( iron_control_api::routes::agents::update_agent_budget ) )
+    .route( "/api/v1/agents/:id/budget", put( iron_control_api::routes::agents::update_agent_budget ) )
     .route( "/api/v1/agents/:id/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
 
     // IC Token management endpoints (agent authentication with budget runtime)
@@ -794,20 +794,20 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
         .allow_headers( [ header::CONTENT_TYPE, header::AUTHORIZATION ] )
     );
 
-  // Fix(ironcage-migration): Replace hardcoded port with SERVER_PORT env var
-  // Root cause: Hardcoded port prevented multi-environment deployment
+  // Fix(iron-cage-migration): Replace hardcoded port with SERVER_PORT env var
+  // Root cause: Hardcoded port prevented multienvironment deployment
   // Pitfall: Never hardcode deployment-specific config (ports, hosts, URLs)
   let server_port_str = std::env::var( "SERVER_PORT" )
     .expect( "SERVER_PORT environment variable required (port number 1-65535)" );
 
   let server_port: u16 = server_port_str.parse::< u16 >()
-    .unwrap_or_else( |_| panic!( "Invalid SERVER_PORT: {} (must be 1-65535)", server_port_str ) );
+    .unwrap_or_else( |_| panic!( "Invalid SERVER_PORT: {server_port_str} (must be 1-65535)" ) );
 
   // Server address (0.0.0.0 for Docker container networking)
   let addr = SocketAddr::from( ( [0, 0, 0, 0], server_port ) );
 
-  tracing::info!( "✅ API server configured on port {}", server_port );
-  tracing::info!( "API server listening on http://{}", addr );
+  tracing::info!( "✅ API server configured on port {server_port}");
+  tracing::info!( "API server listening on http://{addr}");
   tracing::info!( "Endpoints:" );
   tracing::info!( "  GET  /api/health" );
   tracing::info!( "  POST /api/auth/login" );
@@ -857,7 +857,7 @@ async fn main() -> Result< (), Box< dyn std::error::Error > >
   // Fix(login-connect-info): Enable ConnectInfo extraction for per-IP rate limiting
   // Root cause: Login handler uses ConnectInfo<SocketAddr> for per-IP rate limiting
   //             (Fix issue-GAP-006), but axum::serve() doesnt provide ConnectInfo by
-  //             default. Must explicitly opt-in via into_make_service_with_connect_info.
+  //             default. Must explicitly opt in via into_make_service_with_connect_info.
   // Pitfall: Never use axum::serve(listener, app) when handlers need ConnectInfo.
   //          Always use app.into_make_service_with_connect_info::<SocketAddr>() to
   //          make client addresses available. Without this, requests fail with 500

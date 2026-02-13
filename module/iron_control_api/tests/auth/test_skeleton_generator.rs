@@ -7,10 +7,10 @@
 //! Expected to fail with: "Binary not found" or compilation error.
 //!
 //! # Rulebook Compliance
-//! - test_organization.rulebook.md: Test in tests/ directory ✓
-//! - code_style.rulebook.md: 2-space indentation ✓
-//! - codebase_hygiene.rulebook.md: Clear test name ✓
-//! - files_structure.rulebook.md: Checked readme.md, no overlap ✓
+//! - `test_organization.rulebook.md`: Test in tests/ directory ✓
+//! - `code_style.rulebook.md`: 2-space indentation ✓
+//! - `codebase_hygiene.rulebook.md`: Clear test name ✓
+//! - `files_structure.rulebook.md`: Checked readme.md, no overlap ✓
 
 #![cfg(test)]
 
@@ -19,7 +19,7 @@ use std::path::Path;
 
 /// Test: Generator can read parameter matrix
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_generator_reads_parameter_matrix()
 {
   let matrix_path = Path::new("tests/auth/-parameter_matrix.md");
@@ -40,7 +40,7 @@ fn test_generator_reads_parameter_matrix()
 
 /// Test: Generator can read attack taxonomy
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_generator_reads_attack_taxonomy()
 {
   let taxonomy_path = Path::new("tests/auth/-attack_taxonomy.md");
@@ -61,7 +61,7 @@ fn test_generator_reads_attack_taxonomy()
 
 /// Test: Generator calculates correct test count
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_generator_calculates_test_count()
 {
   // Based on parameter matrix:
@@ -79,7 +79,7 @@ fn test_generator_calculates_test_count()
 
 /// Test: Generator creates output directory structure
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_generator_creates_directory_structure()
 {
   let _output_dir = Path::new("tests/auth/-generated_skeletons");
@@ -92,7 +92,7 @@ fn test_generator_creates_directory_structure()
 
 /// Test: Generated skeleton files have correct structure
 #[test]
-#[ignore]
+#[ignore = "TODO: Test not yet implemented"]
 fn test_generated_skeletons_have_correct_structure()
 {
   // This test verifies AFTER generator runs that skeletons have:

@@ -4,14 +4,14 @@
 //! standards defined in tests/auth/-sql_injection_standards.md.
 //!
 //! # TDD Phase: GREEN
-//! Minimal implementation to make test_sql_injection_helpers.rs pass.
+//! Minimal implementation to make `test_sql_injection_helpers.rs` pass.
 //!
 //! # Rulebook Compliance
-//! - code_style.rulebook.md: 2-space indentation (NOT cargo fmt) ✓
-//! - test_organization.rulebook.md: Helpers in tests/common/ ✓
-//! - code_design.rulebook.md: Clear single responsibility ✓
+//! - `code_style.rulebook.md`: 2-space indentation (NOT `cargo fmt`) ✓
+//! - `test_organization.rulebook.md`: Helpers in `tests/common/` ✓
+//! - `code_design.rulebook.md`: Clear single responsibility ✓
 
-use std::time::Duration;
+use core::time::Duration;
 use axum::http::StatusCode;
 
 /// Test response wrapper for SQL injection tests
@@ -143,7 +143,7 @@ pub fn verify_response_secure(response: &TestResponse)
   for name in &schema_names {
     assert!(
       !body_lower.contains(name),
-      "Response leaked table name: {}", name
+      "Response leaked table name: {name}"
     );
   }
 
@@ -156,7 +156,7 @@ pub fn verify_response_secure(response: &TestResponse)
   for keyword in &sql_keywords {
     assert!(
       !body_lower.contains(keyword),
-      "Response leaked SQL keyword: {}", keyword
+      "Response leaked SQL keyword: {keyword}"
     );
   }
 }
@@ -186,7 +186,7 @@ pub fn verify_authentication_failed(response: &TestResponse)
     body.contains("Authentication failed") ||
     body.contains("Invalid credentials") ||
     body.contains("Invalid token"),
-    "Expected generic auth failure message, got: {}", body
+    "Expected generic auth failure message, got: {body}"
   );
 
   // Must not contain access/refresh tokens
@@ -226,7 +226,7 @@ pub fn verify_no_sql_leakage(response: &TestResponse)
   for keyword in &sql_keywords {
     assert!(
       !body_lower.contains(keyword),
-      "Response leaked SQL keyword: {}", keyword
+      "Response leaked SQL keyword: {keyword}"
     );
   }
 
@@ -261,12 +261,12 @@ pub fn verify_no_sql_leakage(response: &TestResponse)
 ///
 /// # Security Requirement
 /// Response time MUST be consistent to prevent timing-based information
-/// disclosure (e.g., SLEEP() or WAITFOR DELAY attacks)
+/// disclosure (e.g., `SLEEP()` or `WAITFOR DELAY` attacks)
 pub fn verify_no_timing_attack(elapsed: Duration)
 {
   assert!(
     elapsed < Duration::from_secs(1),
-    "Response too slow ({:?}), timing attack possible", elapsed
+    "Response too slow ({elapsed:?}), timing attack possible"
   );
 }
 

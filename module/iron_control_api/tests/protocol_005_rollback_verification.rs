@@ -16,7 +16,7 @@
 //! ## Why Rollback Is Impossible
 //!
 //! **Cannot Remove API Enforcement:**
-//! - Removing the agent_id check in keys.rs would re-enable the bypass
+//! - Removing the `agent_id` check in keys.rs would re-enable the bypass
 //! - This would allow agents to access credentials without budget control
 //! - Budget control protocol guarantee would be violated
 //!
@@ -54,10 +54,11 @@ async fn setup_test_db() -> SqlitePool
 /// Create test agent and tokens for rollback verification
 async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
 {
-  let now_ms = std::time::SystemTime::now()
+  let now_ms = i64::try_from(std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .unwrap()
-    .as_millis() as i64;
+    .as_millis())
+    .unwrap();
 
   // Create test user with explicit ID
   let password_hash = bcrypt::hash( "test_password", bcrypt::DEFAULT_COST ).unwrap();
@@ -216,7 +217,7 @@ async fn test_protocol_005_budget_flow_works()
 
   // Step 2: Create budget lease
   let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let lease_id = format!( "lease_{}", agent_id );
+  let lease_id = format!( "lease_{agent_id}" );
   let budget_id = agent_id; // budget_id = agent_id (1:1 relationship)
 
   lease_manager

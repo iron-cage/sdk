@@ -1,8 +1,8 @@
 //! Usage data persistence tests for FR-8.
 //!
 //! ## Purpose
-//! Verify that usage data persists across UsageTracker restarts when using
-//! file-based SQLite databases (not in-memory).
+//! Verify that usage data persists across `UsageTracker` restarts when using
+//! file-based `SQLite` databases (not in-memory).
 //!
 //! ## Why This Test Exists
 //! During manual testing (2025-12-07), usage aggregation returned zeros after
@@ -94,7 +94,7 @@
 //!    check for existence before dropping
 //! 5. **Document CASCADE constraints:** Explicitly note which deletes trigger cascades
 //! 6. **Migration framework consideration:** For production, use proper migration
-//!    tracking (like SQLx migrations or Diesel) instead of raw SQL
+//!    tracking (like `SQLx` migrations or Diesel) instead of raw SQL
 //!
 //! ## Pitfall
 //!
@@ -105,14 +105,14 @@
 //! migration runs twice?" If the answer is data loss, add a guard table.
 //!
 //! ## Test Strategy
-//! 1. Create UsageTracker with file-based database
+//! 1. Create `UsageTracker` with file-based database
 //! 2. Record usage via proper API (`UsageTracker.record_usage_with_cost()`)
 //! 3. Drop tracker (simulates server stop)
 //! 4. Create new tracker with same database (simulates server restart)
 //! 5. Verify all usage data persisted
 //!
 //! ## Coverage
-//! - File-based SQLite persistence (production scenario)
+//! - File-based `SQLite` persistence (production scenario)
 //! - Cross-token aggregation persistence
 //! - Cross-provider breakdown persistence
 //! - Cost tracking persistence
@@ -127,7 +127,7 @@ use iron_control_api::routes::usage::UsageState;
 use iron_control_api::routes::tokens::TokenState;
 use iron_token_manager::token_generator::TokenGenerator;
 
-/// Test usage data persists across UsageState restart (simulates server restart).
+/// Test usage data persists across `UsageState` restart (simulates server restart).
 ///
 /// WHY: Critical for production - usage data must persist for billing/analytics.
 /// If this fails: CRITICAL BUG - usage data loss on server restart.
@@ -136,7 +136,7 @@ async fn test_usage_persists_across_restart()
 {
   // Create temporary file database
   let temp_db = format!( "/tmp/iron_test_usage_persistence_{}.db", std::process::id() );
-  let db_url = format!( "sqlite://{}?mode=rwc", temp_db );
+  let db_url = format!( "sqlite://{temp_db}?mode=rwc" );
 
   // Clean up any existing test database
   let _ = std::fs::remove_file( &temp_db );
@@ -157,10 +157,11 @@ async fn test_usage_persists_across_restart()
 
     // Create test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
-    let now_ms = std::time::SystemTime::now()
+    let now_ms = i64::try_from(std::time::SystemTime::now()
       .duration_since( std::time::UNIX_EPOCH )
       .unwrap()
-      .as_millis() as i64;
+      .as_millis())
+      .unwrap();
 
     sqlx::query(
       "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -305,7 +306,7 @@ async fn test_usage_persists_across_restart()
 async fn test_usage_persists_across_multiple_restarts()
 {
   let temp_db = format!( "/tmp/iron_test_multi_restart_{}.db", std::process::id() );
-  let db_url = format!( "sqlite://{}?mode=rwc", temp_db );
+  let db_url = format!( "sqlite://{temp_db}?mode=rwc" );
 
   let _ = std::fs::remove_file( &temp_db );
 
@@ -316,10 +317,11 @@ async fn test_usage_persists_across_multiple_restarts()
 
     // Create test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
-    let now_ms = std::time::SystemTime::now()
+    let now_ms = i64::try_from(std::time::SystemTime::now()
       .duration_since( std::time::UNIX_EPOCH )
       .unwrap()
-      .as_millis() as i64;
+      .as_millis())
+      .unwrap();
 
     sqlx::query(
       "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -365,10 +367,11 @@ async fn test_usage_persists_across_multiple_restarts()
 
     // Create second test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
-    let now_ms = std::time::SystemTime::now()
+    let now_ms = i64::try_from(std::time::SystemTime::now()
       .duration_since( std::time::UNIX_EPOCH )
       .unwrap()
-      .as_millis() as i64;
+      .as_millis())
+      .unwrap();
 
     sqlx::query(
       "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"

@@ -24,8 +24,8 @@ use tokio::net::TcpListener;
 /// ```
 ///
 /// ## Implementation Note
-/// Uses modern axum API (axum::serve with tokio::net::TcpListener).
-/// Spawns server in background tokio task for non-blocking operation.
+/// Uses modern axum API (`axum::serve` with `tokio::net::TcpListener`).
+/// Spawns server in background `tokio` task for non-blocking operation.
 #[ allow( dead_code ) ]
 pub async fn create_test_server( app: Router ) -> SocketAddr
 {
@@ -67,7 +67,7 @@ pub async fn create_test_server( app: Router ) -> SocketAddr
 /// ```
 ///
 /// ## For More Complex Requests
-/// Use reqwest::Client directly for requests with headers, body, etc.:
+/// Use `reqwest::Client` directly for requests with headers, body, etc.:
 /// ```rust,ignore
 /// let client = reqwest::Client::new();
 /// let response = client
@@ -85,15 +85,15 @@ pub async fn test_request(
 ) -> reqwest::Response
 {
   let client = reqwest::Client::new();
-  let url = format!( "http://{}{}", addr, path );
+  let url = format!( "http://{addr}{path}" );
 
   let http_method = method.parse::< reqwest::Method >()
-    .unwrap_or_else( |_| panic!( "Invalid HTTP method: {}", method ) );
+    .unwrap_or_else( |_| panic!( "Invalid HTTP method: {method}" ) );
 
   client.request( http_method, &url )
     .send()
     .await
-    .unwrap_or_else( |_| panic!( "HTTP {} request to {} failed", method, url ) )
+    .unwrap_or_else( |_| panic!( "HTTP {method} request to {url} failed" ) )
 }
 
 #[ cfg( test ) ]
@@ -102,7 +102,7 @@ mod tests
   use super::*;
   use axum::{ Router, routing::get };
 
-  /// Verify test_request helper parses HTTP methods correctly.
+  /// Verify `test_request` helper parses HTTP methods correctly.
   #[ tokio::test ]
   async fn test_request_method_parsing()
   {
@@ -111,7 +111,7 @@ mod tests
     for method in methods
     {
       let _parsed = method.parse::< reqwest::Method >()
-        .unwrap_or_else( |_| panic!( "Failed to parse method: {}", method ) );
+        .unwrap_or_else( |_| panic!( "Failed to parse method: {method}" ) );
     }
   }
 
@@ -119,9 +119,9 @@ mod tests
   ///
   /// **Corner Case:** P0-Critical - Server binding and address return
   ///
-  /// Tests that create_test_server:
+  /// Tests that `create_test_server`:
   /// 1. Successfully binds to random port (127.0.0.1:0)
-  /// 2. Returns valid SocketAddr
+  /// 2. Returns valid `SocketAddr`
   /// 3. Server is immediately accessible
   #[ tokio::test ]
   async fn test_create_server_basic()
@@ -194,7 +194,7 @@ mod tests
   ///
   /// **Corner Case:** P0-Critical - Valid paths with/without leading slash
   ///
-  /// Tests that test_request handles:
+  /// Tests that `test_request` handles:
   /// 1. Path with leading slash "/api/test"
   /// 2. Path without leading slash "api/test" (should fail - URLs need slash)
   /// 3. Root path "/"
@@ -299,7 +299,7 @@ mod tests
   ///
   /// Tests that:
   /// 1. 404 Not Found returns as valid response
-  /// 2. test_request doesn't panic on 404
+  /// 2. `test_request` doesn't panic on 404
   /// 3. Status code accessible
   #[ tokio::test ]
   async fn test_404_not_found_response()

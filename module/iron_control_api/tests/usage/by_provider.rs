@@ -14,14 +14,14 @@
 //!
 //! ## Known Edge Cases
 //! - Unknown provider returns 200 OK with zero usage (not 404)
-//! - Provider name is case-sensitive ("openai" ≠ "OpenAI")
+//! - Provider name is case-sensitive ("openai" != "`OpenAI`")
 //! - Aggregation must include ALL tokens using the provider
 //!
 //! ## Failure Modes
 //! If these tests fail:
-//! 1. Check UsageTracker::get_all_usage_for_provider() WHERE clause on provider field
+//! 1. Check `UsageTracker::get_all_usage_for_provider()` WHERE clause on provider field
 //! 2. Check Path parameter extraction handles lowercase/uppercase correctly
-//! 3. Verify provider field in token_usage table matches expected values
+//! 3. Verify provider field in `token_usage` table matches expected values
 
 use crate::common::{ extract_json_response, extract_response };
 use iron_control_api::routes::usage::{ UsageState, ProviderStats };
@@ -87,7 +87,7 @@ async fn test_by_provider_unknown_returns_zeros()
   );
 }
 
-/// Test response structure matches ProviderStats specification.
+/// Test response structure matches `ProviderStats` specification.
 #[ tokio::test ]
 async fn test_by_provider_response_structure()
 {
@@ -162,7 +162,7 @@ async fn test_by_provider_common_providers()
 
 /// Test case sensitivity (lowercase vs uppercase).
 ///
-/// WHY: Database provider field is lowercase ("openai"), not mixed case ("OpenAI").
+/// WHY: Database provider field is lowercase ("openai"), not mixed case ("`OpenAI`").
 #[ tokio::test ]
 async fn test_by_provider_case_sensitivity()
 {
@@ -233,7 +233,6 @@ async fn test_by_provider_content_type_is_json()
 
   assert!(
     content_type.contains( "application/json" ),
-    "LOUD FAILURE: Content-Type must be application/json, got: {}",
-    content_type
+    "LOUD FAILURE: Content-Type must be application/json, got: {content_type}"
   );
 }

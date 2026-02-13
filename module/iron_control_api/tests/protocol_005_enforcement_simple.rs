@@ -39,7 +39,7 @@ async fn setup_test_db() -> SqlitePool
   pool
 }
 
-/// TEST 1: Database foreign key constraints exist for budget_leases
+/// TEST 1: Database foreign key constraints exist for `budget_leases`
 ///
 /// This test verifies that the database schema enforces the agent-budget
 /// relationship at the database level. Without these constraints, orphaned
@@ -85,9 +85,9 @@ async fn test_database_constraints_enforce_agent_budget_relationship()
   );
 }
 
-/// TEST 2: API tokens table supports agent_id column
+/// TEST 2: API tokens table supports `agent_id` column
 ///
-/// This test verifies that the api_tokens table schema includes the agent_id
+/// This test verifies that the `api_tokens` table schema includes the `agent_id`
 /// column, which is required for the `/api/keys` enforcement check.
 #[ tokio::test ]
 async fn test_api_tokens_table_has_agent_id_column()
@@ -110,10 +110,10 @@ async fn test_api_tokens_table_has_agent_id_column()
   );
 }
 
-/// TEST 3: Agent tokens can be identified by agent_id field
+/// TEST 3: Agent tokens can be identified by `agent_id` field
 ///
 /// This test verifies that we can distinguish agent tokens from user tokens
-/// by checking the agent_id field. This is the mechanism used by `/api/keys`
+/// by checking the `agent_id` field. This is the mechanism used by `/api/keys`
 /// to enforce Protocol 005.
 #[ tokio::test ]
 async fn test_agent_tokens_are_distinguishable_from_user_tokens()
@@ -121,10 +121,12 @@ async fn test_agent_tokens_are_distinguishable_from_user_tokens()
   let pool = setup_test_db().await;
 
   // Create test user
-  let now_ms = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .unwrap()
-    .as_millis() as i64;
+  let now_ms = i64::try_from(
+    std::time::SystemTime::now()
+      .duration_since( std::time::UNIX_EPOCH )
+      .unwrap()
+      .as_millis()
+  ).expect( "timestamp fits i64" );
 
   let password_hash = bcrypt::hash( "test_password", bcrypt::DEFAULT_COST ).unwrap();
   let user_id = "test_user_id";
@@ -232,7 +234,7 @@ async fn test_agent_tokens_are_distinguishable_from_user_tokens()
 /// This test documents and verifies all layers of Protocol 005 enforcement:
 /// 1. Database foreign keys prevent orphaned budget data
 /// 2. API tokens can be identified as agent vs user tokens
-/// 3. `/api/keys` endpoint code checks agent_id (verified in keys.rs:103-136)
+/// 3. `/api/keys` endpoint code checks `agent_id` (verified in `keys.rs`:103-136)
 ///
 /// Together, these ensure Protocol 005 is the ONLY path for agent credentials.
 #[ test ]

@@ -46,7 +46,7 @@ fn test_handshake_request_validation()
   // Empty ic_token
   let empty_token_req = HandshakeRequest
   {
-    ic_token: "".to_string(),
+    ic_token: String::new(),
     provider: "openai".to_string(),
     provider_key_id: Some( 1 ),
     requested_budget: None,
@@ -57,7 +57,7 @@ fn test_handshake_request_validation()
   let empty_provider_req = HandshakeRequest
   {
     ic_token: "valid_token".to_string(),
-    provider: "".to_string(),
+    provider: String::new(),
     provider_key_id: Some( 1 ),
     requested_budget: None,
   };
@@ -145,7 +145,7 @@ fn test_usage_report_request_validation()
   // Empty lease_id
   let empty_lease_req = UsageReportRequest
   {
-    lease_id: "".to_string(),
+    lease_id: String::new(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
     cost_microdollars: 50_000, // $0.05
@@ -216,7 +216,7 @@ fn test_budget_refresh_request_validation()
   // Empty ic_token
   let empty_token_req = BudgetRefreshRequest
   {
-    ic_token: "".to_string(),
+    ic_token: String::new(),
     current_lease_id: "lease_abc123".to_string(),
     requested_budget: Some( 10_000_000 ), // $10
   };
@@ -226,7 +226,7 @@ fn test_budget_refresh_request_validation()
   let empty_lease_req = BudgetRefreshRequest
   {
     ic_token: "valid_token_here".to_string(),
-    current_lease_id: "".to_string(),
+    current_lease_id: String::new(),
     requested_budget: Some( 10_000_000 ), // $10
   };
   assert!( empty_lease_req.validate().is_err() );
@@ -355,7 +355,7 @@ fn test_ic_token_expiration()
   assert!( long_lived_claims.validate().is_ok() );
 }
 
-/// Test IC Token agent_id format validation
+/// Test IC Token `agent_id` format validation
 #[ test ]
 fn test_ic_token_agent_id_format()
 {

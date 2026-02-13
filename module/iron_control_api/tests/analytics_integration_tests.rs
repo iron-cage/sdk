@@ -3,7 +3,7 @@
 //! Tests cover:
 //! - Usage analytics endpoints (aggregate, by-project, by-provider)
 //! - Traces endpoints (list, get)
-//! - Path parameter validation (DoS prevention)
+//! - Path parameter validation (`DoS` prevention)
 //! - Error cases (400, 404, 500)
 //!
 //! ## Test Matrix
@@ -31,7 +31,7 @@ use tower::ServiceExt;
 use sqlx::SqlitePool;
 
 /// Test schema for analytics integration tests
-const ANALYTICS_SCHEMA: &str = r#"
+const ANALYTICS_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS usage_records (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   token_id INTEGER NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS api_call_traces (
   cost_cents INTEGER NOT NULL,
   traced_at INTEGER NOT NULL
 );
-"#;
+";
 
 /// Helper to create test router with analytics endpoints
 async fn create_analytics_router() -> ( Router, SqlitePool, String, String )
@@ -179,7 +179,7 @@ async fn test_get_usage_by_project_too_long()
     .oneshot(
       Request::builder()
         .method( Method::GET )
-        .uri( format!( "/api/usage/by-project/{}", long_id ) )
+        .uri( format!( "/api/usage/by-project/{long_id}" ) )
         .body( Body::empty() )
         .unwrap(),
     )
@@ -244,7 +244,7 @@ async fn test_get_usage_by_provider_too_long()
     .oneshot(
       Request::builder()
         .method( Method::GET )
-        .uri( format!( "/api/usage/by-provider/{}", long_provider ) )
+        .uri( format!( "/api/usage/by-provider/{long_provider}" ) )
         .body( Body::empty() )
         .unwrap(),
     )

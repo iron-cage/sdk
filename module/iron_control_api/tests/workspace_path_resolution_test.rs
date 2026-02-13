@@ -1,6 +1,6 @@
 //! Workspace path resolution tests
 //!
-//! Verifies that workspace_tools integration provides context-independent
+//! Verifies that `workspace_tools` integration provides context-independent
 //! database path resolution.
 
 use workspace_tools::workspace;
@@ -13,7 +13,7 @@ fn test_workspace_detection()
 
   // Verify workspace root contains Cargo.toml
   let cargo_toml = ws.root().join( "Cargo.toml" );
-  assert!( cargo_toml.exists(), "Workspace Cargo.toml not found at {:?}", cargo_toml );
+  assert!( cargo_toml.exists(), "Workspace Cargo.toml not found at {cargo_toml:?}" );
 }
 
 #[ test ]

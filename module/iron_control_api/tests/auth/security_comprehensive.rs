@@ -1,6 +1,6 @@
 //! Comprehensive Authentication Security Tests - Security Audit Phase 2
 //!
-//! **Authority:** `-security_test_implementation_status.md` § Phase 1
+//! **Authority:** `-security_test_implementation_status.md` Phase 1
 //! **Status:** Week 1 - Day 1 Implementation
 //!
 //! Tests advanced security requirements for authentication:
@@ -17,10 +17,10 @@
 //! - Account lockout: 15-30 minute duration
 //! - Constant-time password verification (<5ms variance)
 //! - JWT signature verification (no tampering allowed)
-//! - JWT algorithm substitution prevention (HS256→none blocked)
-//! - JWT key confusion prevention (RS256→HS256 blocked)
+//! - JWT algorithm substitution prevention (`HS256` to `none` blocked)
+//! - JWT key confusion prevention (`RS256` to `HS256` blocked)
 //! - JWT expiration enforcement (<1s accuracy)
-//! - JTI blacklist verification
+//! - `JTI` blacklist verification
 //! - Session fixation prevention
 //! - Session regeneration on auth
 //! - Concurrent session limit (3 max)
@@ -29,27 +29,27 @@
 //! # Test Coverage
 //!
 //! ## Phase 1: Brute Force Protection (4 tests)
-//! - ✅ IP-based rate limiting (10 attempts/min)
-//! - ✅ Username-based rate limiting (15 attempts/5min)
-//! - ✅ Distributed attack prevention
-//! - ✅ Account lockout duration (15-30min)
+//! - IP-based rate limiting (10 attempts/min)
+//! - Username-based rate limiting (15 attempts/5min)
+//! - Distributed attack prevention
+//! - Account lockout duration (15-30min)
 //!
 //! ## Phase 2: Timing Attack Prevention (2 tests)
-//! - ✅ Constant-time password verification
-//! - ✅ Timing variance measurement (<5ms)
+//! - Constant-time password verification
+//! - Timing variance measurement (<5ms)
 //!
 //! ## Phase 3: JWT Manipulation (5 tests)
-//! - ✅ Signature tampering detection
-//! - ✅ Algorithm substitution prevention
-//! - ✅ Key confusion attack prevention
-//! - ✅ Expiration enforcement
-//! - ✅ JTI blacklist verification
+//! - Signature tampering detection
+//! - Algorithm substitution prevention
+//! - Key confusion attack prevention
+//! - Expiration enforcement
+//! - `JTI` blacklist verification
 //!
 //! ## Phase 4: Session Management (4 tests)
-//! - ✅ Session fixation prevention
-//! - ✅ Session regeneration on auth
-//! - ✅ Concurrent session limit
-//! - ✅ Session timeout enforcement
+//! - Session fixation prevention
+//! - Session regeneration on auth
+//! - Concurrent session limit
+//! - Session timeout enforcement
 
 use super::common;
 use axum::
@@ -61,7 +61,8 @@ use base64::{ Engine as _, engine::general_purpose::URL_SAFE_NO_PAD };
 use serde_json::json;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
-use std::time::{ Duration, Instant };
+use core::time::Duration;
+use std::time::Instant;
 
 // ============================================================================
 // Phase 1: Brute Force Protection Tests (4 tests)
@@ -69,7 +70,7 @@ use std::time::{ Duration, Instant };
 
 /// Test IP-based rate limiting (5 attempts per 5 minutes per IP)
 ///
-/// **Authority:** Protocol 007 § Security Considerations (line 156, 342-343)
+/// **Authority:** Protocol 007 Security Considerations (line 156, 342-343)
 ///
 /// # Test Scenario
 ///
@@ -92,7 +93,7 @@ use std::time::{ Duration, Instant };
 ///
 /// # Implementation Status
 ///
-/// ✅ IMPLEMENTED in src/rate_limiter.rs
+/// IMPLEMENTED in `src/rate_limiter.rs`
 #[ tokio::test ]
 async fn test_ip_based_rate_limiting()
 {
@@ -102,7 +103,7 @@ async fn test_ip_based_rate_limiting()
   common::auth::seed_test_user( &pool, "valid@example.com", "valid_password_123", "user", true ).await;
 
   // Use rate limiting enabled router for this test
-  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() ).await;
+  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() );
 
   // Phase 1: Establish baseline (valid login from different IP should succeed)
   // Use different IP to not interfere with rate limit count for IP A
@@ -136,7 +137,7 @@ async fn test_ip_based_rate_limiting()
       .header( "x-test-client-ip", "192.168.1.100" )
       .body( Body::from(
         json!({
-          "email": format!( "attacker{}@malicious.com", attempt ),
+          "email": format!( "attacker{attempt}@malicious.com" ),
           "password": "wrong_password"
         }).to_string()
       ))
@@ -146,7 +147,7 @@ async fn test_ip_based_rate_limiting()
     assert_eq!(
       response.status(),
       StatusCode::UNAUTHORIZED,
-      "Attempt {} from IP A should return 401", attempt
+      "Attempt {attempt} from IP A should return 401"
     );
   }
 
@@ -243,12 +244,12 @@ async fn test_username_based_rate_limiting()
   common::auth::seed_test_user( &pool, "user_a@example.com", "password_a", "user", true ).await;
   common::auth::seed_test_user( &pool, "user_b@example.com", "password_b", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Attempt 15 failed logins for user A from different IPs
   for attempt in 1..=15
   {
-    let ip = format!( "192.168.1.{}", attempt );
+    let ip = format!( "192.168.1.{attempt}" );
 
     let request = Request::builder()
       .method( "POST" )
@@ -267,7 +268,7 @@ async fn test_username_based_rate_limiting()
     assert_eq!(
       response.status(),
       StatusCode::UNAUTHORIZED,
-      "Attempt {} for user A from IP {} should return 401", attempt, ip
+      "Attempt {attempt} for user A from IP {ip} should return 401"
     );
   }
 
@@ -346,7 +347,7 @@ async fn test_distributed_attack_prevention()
 
   common::auth::seed_test_user( &pool, "target@example.com", "correct_password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Simulate distributed attack (20 IPs, 3 attempts each = 60 total)
   let mut successful_401_count = 0;
@@ -356,7 +357,7 @@ async fn test_distributed_attack_prevention()
   {
     for attempt in 1..=3
     {
-      let ip = format!( "10.0.{}.{}", ip_num, attempt );
+      let ip = format!( "10.0.{ip_num}.{attempt}" );
 
       let request = Request::builder()
         .method( "POST" )
@@ -376,9 +377,8 @@ async fn test_distributed_attack_prevention()
       match response.status()
       {
         StatusCode::UNAUTHORIZED => successful_401_count += 1,
-        StatusCode::TOO_MANY_REQUESTS => rate_limited_count += 1,
-        StatusCode::LOCKED => rate_limited_count += 1,
-        other => panic!( "Unexpected status code: {}", other ),
+        StatusCode::TOO_MANY_REQUESTS | StatusCode::LOCKED => rate_limited_count += 1,
+        other => panic!( "Unexpected status code: {other}" ),
       }
     }
   }
@@ -434,11 +434,11 @@ async fn test_distributed_attack_prevention()
 /// # Security Requirement
 ///
 /// Account lockout MUST persist for minimum 15 minutes to prevent
-/// rapid brute force attempts. Maximum 30 minutes to avoid DoS.
+/// rapid brute force attempts. Maximum 30 minutes to avoid `DoS`.
 ///
 /// # Implementation Status
 ///
-/// **Authority:** Protocol 007 § Security Considerations (line 158)
+/// **Authority:** Protocol 007 Security Considerations (line 158)
 /// "Account lockout after 10 failed attempts (manual unlock by admin)"
 #[ tokio::test ]
 async fn test_account_lockout_duration()
@@ -447,13 +447,13 @@ async fn test_account_lockout_duration()
 
   common::auth::seed_test_user( &pool, "user@example.com", "correct_password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Trigger account lockout (10 failed attempts per Protocol 007)
   // Use different IPs to bypass IP-based rate limiting (5 attempts/5min per IP)
   for attempt in 1..=10
   {
-    let test_ip = format!( "10.0.0.{}", attempt );
+    let test_ip = format!( "10.0.0.{attempt}" );
     let request = Request::builder()
       .method( "POST" )
       .uri( "/api/v1/auth/login" )
@@ -504,7 +504,7 @@ async fn test_account_lockout_duration()
   let retry_after = error_response[ "error" ][ "details" ][ "retry_after" ].as_i64().unwrap();
   assert!(
     (900..=1800).contains(&retry_after),
-    "Retry after should be 15-30 minutes (900-1800 seconds), got {}", retry_after
+    "Retry after should be 15-30 minutes (900-1800 seconds), got {retry_after}"
   );
 
   // Phase 4: NOTE - Cannot test time-based release without time manipulation
@@ -544,7 +544,7 @@ async fn test_account_lockout_duration()
 /// # Implementation Status
 ///
 /// ⚠️ REQUIRES IMPLEMENTATION
-/// Need to verify bcrypt verify_password uses constant-time comparison.
+/// Need to verify bcrypt `verify_password` uses constant-time comparison.
 /// May need timing analysis to confirm no early returns.
 #[ tokio::test ]
 #[ ignore = "Requires constant-time password verification analysis" ]
@@ -554,7 +554,7 @@ async fn test_constant_time_password_verification()
 
   common::auth::seed_test_user( &pool, "user@example.com", "correct_password_123", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Measure timing for non-existent user
   let start = Instant::now();
@@ -623,8 +623,7 @@ async fn test_constant_time_password_verification()
 
   assert!(
     variance < 5,
-    "Timing variance should be <5ms to prevent timing attacks. Got {}ms (nonexistent: {}ms, wrong: {}ms, correct: {}ms)",
-    variance, nonexistent_user_time, wrong_password_time, correct_password_time
+    "Timing variance should be <5ms to prevent timing attacks. Got {variance}ms (nonexistent: {nonexistent_user_time}ms, wrong: {wrong_password_time}ms, correct: {correct_password_time}ms)",
   );
 }
 
@@ -662,7 +661,7 @@ async fn test_timing_variance_measurement()
 
   common::auth::seed_test_user( &pool, "user@example.com", "correct_password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   let mut timings: Vec<u128> = Vec::new();
 
@@ -703,15 +702,15 @@ async fn test_timing_variance_measurement()
   let min = timings[ 0 ];
   let max = timings[ timings.len() - 1 ];
   let median = timings[ timings.len() / 2 ];
+  #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
   let p99 = timings[ ( timings.len() as f64 * 0.99 ) as usize ];
 
   let variance_us = max - min;
-  let variance_ms = variance_us / 1000;
+  let variance_in_ms = variance_us / 1000;
 
   assert!(
-    variance_ms < 5,
-    "Timing variance should be <5ms. Stats: min={}μs, max={}μs, median={}μs, p99={}μs, variance={}ms",
-    min, max, median, p99, variance_ms
+    variance_in_ms < 5,
+    "Timing variance should be <5ms. Stats: min={min}μs, max={max}μs, median={median}μs, p99={p99}μs, variance={variance_in_ms}ms",
   );
 }
 
@@ -724,7 +723,7 @@ async fn test_timing_variance_measurement()
 /// # Test Scenario
 ///
 /// 1. Generate valid JWT token
-/// 2. Tamper with payload (change user_id or role)
+/// 2. Tamper with payload (change `user_id` or role)
 /// 3. Keep original signature
 /// 4. Verify token rejected (401 Unauthorized)
 ///
@@ -741,8 +740,8 @@ async fn test_timing_variance_measurement()
 ///
 /// # Implementation Status
 ///
-/// **Authority:** Protocol 007 § JWT Validation (line 257-269)
-/// JWT signature verification enforced by jsonwebtoken library.
+/// **Authority:** Protocol 007 JWT Validation (line 257-269)
+/// JWT signature verification enforced by `jsonwebtoken` library.
 #[ tokio::test ]
 async fn test_jwt_signature_tampering()
 {
@@ -750,7 +749,7 @@ async fn test_jwt_signature_tampering()
 
   common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Get valid JWT token
   let login_request = Request::builder()
@@ -789,14 +788,16 @@ async fn test_jwt_signature_tampering()
   let tampered_payload = URL_SAFE_NO_PAD.encode( serde_json::to_string( &payload ).unwrap().as_bytes() );
 
   // Reconstruct JWT with tampered payload but original signature
-  let tampered_token = format!( "{}.{}.{}", parts[ 0 ], tampered_payload, parts[ 2 ] );
+  let header_part = parts[ 0 ];
+  let sig_part = parts[ 2 ];
+  let tampered_token = format!( "{header_part}.{tampered_payload}.{sig_part}" );
 
   // Phase 3: Verify tampered token rejected
   let protected_request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/auth/validate" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", tampered_token ) )
+    .header( "authorization", format!( "Bearer {tampered_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -824,11 +825,11 @@ async fn test_jwt_signature_tampering()
   );
 }
 
-/// Test JWT algorithm substitution attack prevention (HS256→none)
+/// Test JWT algorithm substitution attack prevention (`HS256` to `none`)
 ///
 /// # Test Scenario
 ///
-/// 1. Generate valid JWT token (HS256)
+/// 1. Generate valid JWT token (`HS256`)
 /// 2. Modify header to algorithm "none"
 /// 3. Remove signature
 /// 4. Verify token rejected (401 Unauthorized)
@@ -846,13 +847,13 @@ async fn test_jwt_signature_tampering()
 ///
 /// # Implementation Status
 ///
-/// **Authority:** Protocol 007 § JWT Validation (line 257-269)
-/// jsonwebtoken library rejects "none" algorithm by default.
+/// **Authority:** Protocol 007 JWT Validation (line 257-269)
+/// `jsonwebtoken` library rejects "none" algorithm by default.
 #[ tokio::test ]
 async fn test_jwt_algorithm_substitution()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Craft JWT with algorithm "none"
   let header = json!({
@@ -864,7 +865,7 @@ async fn test_jwt_algorithm_substitution()
     "user_id": "user_123",
     "email": "attacker@malicious.com",
     "role": "admin",
-    "exp": ( std::time::SystemTime::now().duration_since( std::time::UNIX_EPOCH ).unwrap().as_secs() + 3600 ) as i64
+    "exp": i64::try_from( std::time::SystemTime::now().duration_since( std::time::UNIX_EPOCH ).unwrap().as_secs() + 3600 ).unwrap_or( i64::MAX )
   });
 
   let header_b64 = URL_SAFE_NO_PAD.encode( serde_json::to_string( &header ).unwrap().as_bytes() );
@@ -872,14 +873,14 @@ async fn test_jwt_algorithm_substitution()
   let payload_b64 = URL_SAFE_NO_PAD.encode( serde_json::to_string( &payload ).unwrap().as_bytes() );
 
   // Algorithm "none" tokens have empty signature
-  let none_token = format!( "{}.{}.", header_b64, payload_b64 );
+  let none_token = format!( "{header_b64}.{payload_b64}." );
 
   // Phase 2: Verify token rejected
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/auth/validate" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", none_token ) )
+    .header( "authorization", format!( "Bearer {none_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -907,19 +908,19 @@ async fn test_jwt_algorithm_substitution()
   );
 }
 
-/// Test JWT key confusion attack prevention (RS256→HS256)
+/// Test JWT key confusion attack prevention (`RS256` to `HS256`)
 ///
 /// # Test Scenario
 ///
-/// 1. If using RS256 (asymmetric), attacker tries to sign with public key using HS256
-/// 2. System configured for RS256 asymmetric verification
-/// 3. Attacker modifies header to HS256 and signs with public key (symmetric)
+/// 1. If using `RS256` (asymmetric), attacker tries to sign with public key using `HS256`
+/// 2. System configured for `RS256` asymmetric verification
+/// 3. Attacker modifies header to `HS256` and signs with public key (symmetric)
 /// 4. Verify token rejected (algorithm mismatch)
 ///
 /// # Expected Behavior
 ///
 /// - Token algorithm MUST match expected algorithm
-/// - Cannot substitute RS256 → HS256
+/// - Cannot substitute `RS256` with `HS256`
 /// - Response indicates algorithm mismatch
 ///
 /// # Security Requirement
@@ -929,9 +930,9 @@ async fn test_jwt_algorithm_substitution()
 ///
 /// # Implementation Status
 ///
-/// ⚠️ REQUIRES VERIFICATION
-/// Current implementation uses HS256 (symmetric). Need to verify
-/// algorithm enforcement if migrating to RS256 (asymmetric).
+/// REQUIRES VERIFICATION
+/// Current implementation uses `HS256` (symmetric). Need to verify
+/// algorithm enforcement if migrating to `RS256` (asymmetric).
 #[ tokio::test ]
 #[ ignore = "Requires JWT key confusion attack prevention test" ]
 async fn test_jwt_key_confusion_attack()
@@ -958,7 +959,7 @@ async fn test_jwt_key_confusion_attack()
 ///
 /// 1. Generate JWT token with exp timestamp in past
 /// 2. Verify token rejected immediately (401 Unauthorized)
-/// 3. Generate token with exp = current_time + 1s
+/// 3. Generate token with exp = `current_time` + 1s
 /// 4. Wait 2 seconds
 /// 5. Verify token rejected (expired)
 ///
@@ -976,7 +977,7 @@ async fn test_jwt_key_confusion_attack()
 /// # Implementation Status
 ///
 /// ✅ ENABLED
-/// JWT validation enforces exp claim (jsonwebtoken library validates automatically).
+/// JWT validation enforces exp claim (`jsonwebtoken` library validates automatically).
 #[ tokio::test ]
 async fn test_jwt_expiration_enforcement()
 {
@@ -987,7 +988,7 @@ async fn test_jwt_expiration_enforcement()
 
   let user_id = common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Create an already-expired JWT token manually
   let jwt_secret = "test_jwt_secret_for_authentication_tests_only";
@@ -1001,7 +1002,7 @@ async fn test_jwt_expiration_enforcement()
     email: "user@example.com".to_string(),
     iat: past_timestamp - 3600, // Issued 2 hours ago
     exp: past_timestamp,        // Expired 1 hour ago
-    jti: format!( "expired_test_{}", uuid::Uuid::new_v4() ),
+    jti: { let id = uuid::Uuid::new_v4(); format!( "expired_test_{id}" ) },
   };
 
   let expired_token = encode(
@@ -1016,7 +1017,7 @@ async fn test_jwt_expiration_enforcement()
     .method( "POST" )
     .uri( "/api/v1/auth/validate" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", expired_token ) )
+    .header( "authorization", format!( "Bearer {expired_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -1045,30 +1046,30 @@ async fn test_jwt_expiration_enforcement()
   );
 }
 
-/// Test JWT JTI blacklist verification
+/// Test JWT `JTI` blacklist verification
 ///
 /// # Test Scenario
 ///
 /// 1. Generate valid JWT token
-/// 2. Logout (adds jti to blacklist)
+/// 2. Logout (adds `jti` to blacklist)
 /// 3. Attempt to use same token again
 /// 4. Verify token rejected (401 Unauthorized)
 /// 5. Verify error indicates token blacklisted
 ///
 /// # Expected Behavior
 ///
-/// - Blacklisted JTI MUST be rejected
+/// - Blacklisted `JTI` MUST be rejected
 /// - Blacklist checked on every protected request
 /// - Response indicates token revoked/blacklisted
 ///
 /// # Security Requirement
 ///
-/// JWT blacklist (via jti) MUST be enforced. Logout MUST immediately
+/// JWT blacklist (via `jti`) MUST be enforced. Logout MUST immediately
 /// invalidate token, preventing reuse.
 ///
 /// # Implementation Status
 ///
-/// **Authority:** Protocol 007 § Logout implementation (line 177-182)
+/// **Authority:** Protocol 007 Logout implementation (line 177-182)
 /// Token blacklist table exists, verifying enforcement.
 #[ tokio::test ]
 async fn test_jwt_blacklist_verification()
@@ -1077,7 +1078,7 @@ async fn test_jwt_blacklist_verification()
 
   common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Login to get valid token
   let login_request = Request::builder()
@@ -1104,7 +1105,7 @@ async fn test_jwt_blacklist_verification()
     .method( "POST" )
     .uri( "/api/v1/auth/validate" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", user_token ) )
+    .header( "authorization", format!( "Bearer {user_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -1120,7 +1121,7 @@ async fn test_jwt_blacklist_verification()
     .method( "POST" )
     .uri( "/api/v1/auth/logout" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", user_token ) )
+    .header( "authorization", format!( "Bearer {user_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -1136,7 +1137,7 @@ async fn test_jwt_blacklist_verification()
     .method( "POST" )
     .uri( "/api/v1/auth/validate" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", user_token ) )
+    .header( "authorization", format!( "Bearer {user_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -1195,16 +1196,17 @@ async fn test_jwt_blacklist_verification()
 ///
 /// # Implementation Status
 ///
-/// **Authority:** Protocol 007 § JWT User Token Format (line 142-151)
-/// JWT-based auth with unique JTI per login (session fixation prevention).
+/// **Authority:** Protocol 007 JWT User Token Format (line 142-151)
+/// JWT-based auth with unique `JTI` per login (session fixation prevention).
 #[ tokio::test ]
+#[allow(clippy::similar_names)]
 async fn test_session_fixation_prevention()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
   common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: First login - get initial JTI
   let login_request_1 = Request::builder()
@@ -1268,15 +1270,15 @@ async fn test_session_fixation_prevention()
 ///
 /// # Test Scenario
 ///
-/// 1. User logs in → gets JWT with JTI_1
-/// 2. User logs out → JTI_1 blacklisted
-/// 3. User logs in again → gets JWT with JTI_2
-/// 4. Verify JTI_2 != JTI_1
-/// 5. Verify JTI_1 remains blacklisted
+/// 1. User logs in, gets JWT with `JTI_1`
+/// 2. User logs out, `JTI_1` blacklisted
+/// 3. User logs in again, gets JWT with `JTI_2`
+/// 4. Verify `JTI_2` != `JTI_1`
+/// 5. Verify `JTI_1` remains blacklisted
 ///
 /// # Expected Behavior
 ///
-/// - New session ID (JTI) generated on each login
+/// - New session ID (`JTI`) generated on each login
 /// - Old session IDs not reused
 /// - Blacklisted session IDs remain blacklisted
 ///
@@ -1287,8 +1289,8 @@ async fn test_session_fixation_prevention()
 ///
 /// # Implementation Status
 ///
-/// **Authority:** Protocol 007 § JWT User Token Format (line 142-151)
-/// JTI uniqueness and blacklist persistence verified.
+/// **Authority:** Protocol 007 JWT User Token Format (line 142-151)
+/// `JTI` uniqueness and blacklist persistence verified.
 #[ tokio::test ]
 async fn test_session_regeneration()
 {
@@ -1296,7 +1298,7 @@ async fn test_session_regeneration()
 
   common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Login → Logout → Login
   let mut jtis = Vec::new();
@@ -1334,7 +1336,7 @@ async fn test_session_regeneration()
       .method( "POST" )
       .uri( "/api/v1/auth/logout" )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", token ) )
+      .header( "authorization", format!( "Bearer {token}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -1383,7 +1385,7 @@ async fn test_concurrent_session_limit()
 
   common::auth::seed_test_user( &pool, "user@example.com", "password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   let mut tokens = Vec::new();
 
@@ -1394,7 +1396,7 @@ async fn test_concurrent_session_limit()
       .method( "POST" )
       .uri( "/api/v1/auth/login" )
       .header( "content-type", "application/json" )
-      .header( "user-agent", format!( "Device-{}", device ) )
+      .header( "user-agent", format!( "Device-{device}" ) )
       .body( Body::from(
         json!({
           "email": "user@example.com",
@@ -1437,7 +1439,7 @@ async fn test_concurrent_session_limit()
       .method( "POST" )
       .uri( "/api/v1/auth/validate" )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", token ) )
+      .header( "authorization", format!( "Bearer {token}" ) )
       .body( Body::empty() )
       .unwrap();
 

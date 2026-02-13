@@ -1,22 +1,22 @@
 //! Limit creation validation tests.
 //!
-//! ## Test Matrix: CreateLimitRequest Validation
+//! ## Test Matrix: `CreateLimitRequest` Validation
 //!
 //! | Field | Valid Values | Invalid Values | Edge Cases |
 //! |-------|--------------|----------------|------------|
-//! | max_tokens_per_day | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
-//! | max_requests_per_minute | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
-//! | max_cost_per_month_microdollars | 1..MAX_SAFE | 0, -1, i64::MAX | NULL (None) OK |
+//! | `max_tokens_per_day` | `1..MAX_SAFE` | 0, -1, `i64::MAX` | NULL (None) OK |
+//! | `max_requests_per_minute` | `1..MAX_SAFE` | 0, -1, `i64::MAX` | NULL (None) OK |
+//! | `max_cost_per_month_microdollars` | `1..MAX_SAFE` | 0, -1, `i64::MAX` | NULL (None) OK |
 //! | (all limits) | at least one set | all None | - |
 //!
 //! ## Corner Cases Covered
-//! - ✅ All None (must reject - at least one limit required)
-//! - ✅ Zero values (must reject - positive only)
-//! - ✅ Negative values (must reject)
-//! - ✅ Overflow values (i64::MAX - must reject)
-//! - ✅ Valid single limit (must accept)
-//! - ✅ Valid multiple limits (must accept)
-//! - ✅ Mixed valid/invalid (must reject)
+//! - All None (must reject - at least one limit required)
+//! - Zero values (must reject - positive only)
+//! - Negative values (must reject)
+//! - Overflow values (`i64::MAX` - must reject)
+//! - Valid single limit (must accept)
+//! - Valid multiple limits (must accept)
+//! - Mixed valid/invalid (must reject)
 
 use iron_control_api::routes::limits::CreateLimitRequest;
 
@@ -28,7 +28,7 @@ async fn test_valid_single_limit_tokens()
   {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1000000 ),
+    max_tokens_per_day: Some( 1_000_000 ),
     max_requests_per_minute: None,
     max_cost_per_month_microdollars: None,
   };
@@ -72,7 +72,7 @@ async fn test_valid_single_limit_cost()
     project_id: Some( "project_123".to_string() ),
     max_tokens_per_day: None,
     max_requests_per_minute: None,
-    max_cost_per_month_microdollars: Some( 500000 ),
+    max_cost_per_month_microdollars: Some( 500_000 ),
   };
 
   let result = request.validate();
@@ -91,9 +91,9 @@ async fn test_valid_multiple_limits()
   {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1000000 ),
+    max_tokens_per_day: Some( 1_000_000 ),
     max_requests_per_minute: Some( 100 ),
-    max_cost_per_month_microdollars: Some( 500000 ),
+    max_cost_per_month_microdollars: Some( 500_000 ),
   };
 
   let result = request.validate();
@@ -126,12 +126,11 @@ async fn test_all_none_rejected()
   let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "at least one" ) || err_msg.contains( "required" ),
-    "LOUD FAILURE: Error message must indicate at least one limit is required. Got: {}",
-    err_msg
+    "LOUD FAILURE: Error message must indicate at least one limit is required. Got: {err_msg}"
   );
 }
 
-/// Test zero tokens_per_day rejected.
+/// Test zero `tokens_per_day` rejected.
 #[ tokio::test ]
 async fn test_zero_tokens_per_day_rejected()
 {
@@ -153,12 +152,11 @@ async fn test_zero_tokens_per_day_rejected()
   let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "positive" ) || err_msg.contains( "greater than" ) || err_msg.contains( "must be" ),
-    "LOUD FAILURE: Error message must indicate value must be positive. Got: {}",
-    err_msg
+    "LOUD FAILURE: Error message must indicate value must be positive. Got: {err_msg}"
   );
 }
 
-/// Test negative tokens_per_day rejected.
+/// Test negative `tokens_per_day` rejected.
 #[ tokio::test ]
 async fn test_negative_tokens_per_day_rejected()
 {
@@ -178,7 +176,7 @@ async fn test_negative_tokens_per_day_rejected()
   );
 }
 
-/// Test zero requests_per_minute rejected.
+/// Test zero `requests_per_minute` rejected.
 #[ tokio::test ]
 async fn test_zero_requests_per_minute_rejected()
 {
@@ -198,7 +196,7 @@ async fn test_zero_requests_per_minute_rejected()
   );
 }
 
-/// Test negative requests_per_minute rejected.
+/// Test negative `requests_per_minute` rejected.
 #[ tokio::test ]
 async fn test_negative_requests_per_minute_rejected()
 {
@@ -218,7 +216,7 @@ async fn test_negative_requests_per_minute_rejected()
   );
 }
 
-/// Test zero cost_per_month_cents rejected.
+/// Test zero `cost_per_month_cents` rejected.
 #[ tokio::test ]
 async fn test_zero_cost_per_month_rejected()
 {
@@ -238,7 +236,7 @@ async fn test_zero_cost_per_month_rejected()
   );
 }
 
-/// Test negative cost_per_month_cents rejected.
+/// Test negative `cost_per_month_cents` rejected.
 #[ tokio::test ]
 async fn test_negative_cost_per_month_rejected()
 {
@@ -258,7 +256,7 @@ async fn test_negative_cost_per_month_rejected()
   );
 }
 
-/// Test overflow tokens_per_day rejected.
+/// Test overflow `tokens_per_day` rejected.
 #[ tokio::test ]
 async fn test_overflow_tokens_per_day_rejected()
 {
@@ -280,12 +278,11 @@ async fn test_overflow_tokens_per_day_rejected()
   let err_msg = result.unwrap_err().to_string();
   assert!(
     err_msg.contains( "too large" ) || err_msg.contains( "maximum" ) || err_msg.contains( "overflow" ),
-    "LOUD FAILURE: Error must mention value is too large. Got: {}",
-    err_msg
+    "LOUD FAILURE: Error must mention value is too large. Got: {err_msg}"
   );
 }
 
-/// Test overflow requests_per_minute rejected.
+/// Test overflow `requests_per_minute` rejected.
 #[ tokio::test ]
 async fn test_overflow_requests_per_minute_rejected()
 {
@@ -305,7 +302,7 @@ async fn test_overflow_requests_per_minute_rejected()
   );
 }
 
-/// Test overflow cost_per_month_cents rejected.
+/// Test overflow `cost_per_month_cents` rejected.
 #[ tokio::test ]
 async fn test_overflow_cost_per_month_rejected()
 {
@@ -333,7 +330,7 @@ async fn test_mixed_valid_invalid_rejected()
   {
     user_id: "user_test".to_string(),
     project_id: None,
-    max_tokens_per_day: Some( 1000000 ),  // Valid
+    max_tokens_per_day: Some( 1_000_000 ),  // Valid
     max_requests_per_minute: Some( -10 ), // Invalid
     max_cost_per_month_microdollars: None,
   };
@@ -366,7 +363,7 @@ async fn test_boundary_value_one_accepted()
   );
 }
 
-/// Test MAX_SAFE_LIMIT accepted (maximum safe value).
+/// Test `MAX_SAFE_LIMIT` accepted (maximum safe value).
 #[ tokio::test ]
 async fn test_max_safe_limit_accepted()
 {

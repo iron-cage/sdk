@@ -6,7 +6,7 @@
 //! ## Purpose
 //!
 //! Determine if the low success rate is due to:
-//! 1. SQLite serialization failures (expected with DEFERRED transactions)
+//! 1. `SQLite` serialization failures (expected with DEFERRED transactions)
 //! 2. Application logic bug
 //! 3. Deadlocks or timeouts
 //!
@@ -57,7 +57,7 @@ async fn attempt_spend(
     return TransactionResult {
       task_id,
       success: false,
-      error_type: Some( format!( "begin() failed: {}", e ) ),
+      error_type: Some( format!( "begin() failed: {e}" ) ),
       spent_seen: None,
       timestamp_ms: start_time,
     };
@@ -81,7 +81,7 @@ async fn attempt_spend(
       return TransactionResult {
         task_id,
         success: false,
-        error_type: Some( format!( "SELECT failed: {}", e ) ),
+        error_type: Some( format!( "SELECT failed: {e}" ) ),
         spent_seen: None,
         timestamp_ms: start_time,
       };
@@ -106,7 +106,7 @@ async fn attempt_spend(
       return TransactionResult {
         task_id,
         success: false,
-        error_type: Some( format!( "SELECT total failed: {}", e ) ),
+        error_type: Some( format!( "SELECT total failed: {e}" ) ),
         spent_seen: Some( spent_seen ),
         timestamp_ms: start_time,
       };
@@ -120,7 +120,7 @@ async fn attempt_spend(
     return TransactionResult {
       task_id,
       success: false,
-      error_type: Some( format!( "Budget exceeded: {} + {} > {}", spent_seen, spend_amount, total ) ),
+      error_type: Some( format!( "Budget exceeded: {spent_seen} + {spend_amount} > {total}" ) ),
       spent_seen: Some( spent_seen ),
       timestamp_ms: start_time,
     };
@@ -138,7 +138,7 @@ async fn attempt_spend(
     return TransactionResult {
       task_id,
       success: false,
-      error_type: Some( format!( "UPDATE failed: {}", e ) ),
+      error_type: Some( format!( "UPDATE failed: {e}" ) ),
       spent_seen: Some( spent_seen ),
       timestamp_ms: start_time,
     };
@@ -149,7 +149,7 @@ async fn attempt_spend(
 
   match commit_result
   {
-    Ok( _ ) => TransactionResult {
+    Ok( () ) => TransactionResult {
       task_id,
       success: true,
       error_type: None,
@@ -159,7 +159,7 @@ async fn attempt_spend(
     Err( e ) => TransactionResult {
       task_id,
       success: false,
-      error_type: Some( format!( "COMMIT failed: {}", e ) ),
+      error_type: Some( format!( "COMMIT failed: {e}" ) ),
       spent_seen: Some( spent_seen ),
       timestamp_ms: start_time,
     }
@@ -167,7 +167,7 @@ async fn attempt_spend(
 }
 
 #[tokio::test]
-#[ignore] // Flaky diagnostic test - run manually with `cargo test -- --ignored`
+#[ignore = "Flaky diagnostics test"] // run manually with `cargo test -- --ignored`
 async fn test_budget_concurrent_spending_diagnostic()
 {
   let db: TestDatabase = test_db::create_test_db().await;
@@ -245,7 +245,7 @@ async fn test_budget_concurrent_spending_diagnostic()
   println!( "Error summary:" );
   for (error_type, count) in &error_summary
   {
-    println!( "  {}: {} occurrences", error_type, count );
+    println!( "  {error_type}: {count} occurrences");
   }
   println!();
 

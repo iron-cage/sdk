@@ -86,7 +86,7 @@
 //! | Documentation test 1 | Production | All defaults | BLOCKED (panic) |
 //! | Documentation test 2 | Production | Secure secrets | ALLOWED (starts) |
 //! | Documentation test 3 | Pilot | All defaults | ALLOWED (dev mode) |
-//! | Documentation test 4 | ProductionUnconfirmed | JWT default only | BLOCKED (partial defaults) |
+//! | Documentation test 4 | `ProductionUnconfirmed` | JWT default only | BLOCKED (partial defaults) |
 //!
 //! **Note:** Actual server startup tests are not possible in unit tests (require
 //! full async runtime + database + network binding). These tests document the
@@ -197,12 +197,12 @@ fn test_pilot_with_defaults_allowed_documented()
   // env vars, observe successful startup in pilot mode.
 }
 
-/// **Test 4 (Documentation):** ProductionUnconfirmed with partial defaults blocked
+/// **Test 4 (Documentation):** `ProductionUnconfirmed` with partial defaults blocked
 ///
 /// **Expected:** Server panics if ANY secret uses default (not all or nothing)
 ///
 /// **Environment:**
-/// - Release build (triggers ProductionUnconfirmed)
+/// - Release build (triggers `ProductionUnconfirmed`)
 /// - `JWT_SECRET=dev-secret-change-in-production` (default - INSECURE)
 /// - `IC_TOKEN_SECRET=$(openssl rand -hex 32)` (secure)
 /// - `IP_TOKEN_KEY=$(openssl rand -hex 32)` (secure)
@@ -242,7 +242,7 @@ fn test_production_unconfirmed_partial_defaults_blocked_documented()
 
 /// **Test 5 (Documentation):** Development mode with database wiping
 ///
-/// **Expected:** Server wipes SQLite database before startup
+/// **Expected:** Server wipes `SQLite` database before startup
 ///
 /// **Environment:**
 /// - `IRON_DEPLOYMENT_MODE=development`

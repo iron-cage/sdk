@@ -36,7 +36,7 @@ async fn test_user_creation_with_name_field()
   // Seed user with explicit name
   seed_test_user_with_name( &pool, "alice@example.com", "password123", "user", true, "Alice Smith" ).await;
 
-  let router: Router = create_auth_router( pool.clone() ).await;
+  let router: Router = create_auth_router( pool.clone() );
 
   // Login with valid credentials
   let login_request = Request::builder()
@@ -69,8 +69,7 @@ async fn test_user_creation_with_name_field()
   assert_eq!(
     returned_name,
     "Alice Smith",
-    "LOUD FAILURE: Login response should return actual user name 'Alice Smith', not email or username. Got: {}",
-    returned_name
+    "LOUD FAILURE: Login response should return actual user name 'Alice Smith', not email or username. Got: {returned_name}"
   );
 }
 
@@ -83,7 +82,7 @@ async fn test_backward_compatibility_no_name_shows_email()
   // Seed user WITHOUT name (backward compatibility)
   seed_test_user( &pool, "olduser@example.com", "password123", "user", true ).await;
 
-  let router: Router = create_auth_router( pool.clone() ).await;
+  let router: Router = create_auth_router( pool.clone() );
 
   // Login
   let login_request = Request::builder()
@@ -108,8 +107,7 @@ async fn test_backward_compatibility_no_name_shows_email()
   assert_eq!(
     returned_name,
     "olduser",
-    "LOUD FAILURE: When name is NULL, should fallback to username. Got: {}",
-    returned_name
+    "LOUD FAILURE: When name is NULL, should fallback to username. Got: {returned_name}"
   );
 }
 

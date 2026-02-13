@@ -49,7 +49,7 @@ async fn create_test_router() -> Router
 
 /// Test POST /api/limits with GET method.
 ///
-/// WHY: GET /api/limits is list_limits endpoint, so GET succeeds (not 405).
+/// WHY: GET /api/limits is `list_limits` endpoint, so GET succeeds (not 405).
 /// This test documents that GET is supported for listing.
 #[ tokio::test ]
 async fn test_create_limit_get_method_not_rejected()
@@ -120,7 +120,7 @@ async fn test_update_limit_post_method_rejected()
 
 /// Test DELETE /api/limits/:id with GET method.
 ///
-/// WHY: GET /api/limits/:id is get_limit endpoint, so GET succeeds (not 405).
+/// WHY: GET /api/limits/:id is `get_limit` endpoint, so GET succeeds (not 405).
 /// This test documents that GET is supported for retrieval.
 #[ tokio::test ]
 async fn test_delete_limit_get_method_not_rejected()

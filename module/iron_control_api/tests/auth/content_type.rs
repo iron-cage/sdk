@@ -39,7 +39,7 @@ async fn create_test_router() -> Router
 async fn test_login_wrong_content_type()
 {
   let router = create_test_router().await;
-  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
 
   // WHY: Login credentials must be sent with proper Content-Type
   // Security-critical: prevent parser confusion on credentials
@@ -59,7 +59,6 @@ async fn test_login_wrong_content_type()
   let status = response.status();
   assert!(
     status == StatusCode::UNSUPPORTED_MEDIA_TYPE || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Wrong Content-Type on POST /api/auth/login must return 415 or 400. Got: {}",
-    status
+    "LOUD FAILURE: Wrong Content-Type on POST /api/auth/login must return 415 or 400. Got: {status}"
   );
 }

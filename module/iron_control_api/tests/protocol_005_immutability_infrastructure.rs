@@ -133,26 +133,27 @@ fn bug_reproducer_issue_003_documentation_exists()
     let file_path = docs_dir.join( file );
     if file_path.exists()
     {
-      existing_files.push( file.to_string() );
+      existing_files.push( file.to_owned() );
     }
     else
     {
-      missing_files.push( file.to_string() );
+      missing_files.push( file.to_owned() );
     }
   }
 
   // Report current state
   println!( "\n=== ENFORCEMENT DOCUMENTATION STATUS ===" );
-  println!( "Expected directory: {}", docs_dir.display() );
+  let docs_display = docs_dir.display();
+  println!( "Expected directory: {docs_display}" );
   println!( "\nExisting files ({}):", existing_files.len() );
   for file in &existing_files
   {
-    println!( "  ✓ {}", file );
+    println!( "  ✓ {file}" );
   }
   println!( "\nMissing files ({}):", missing_files.len() );
   for file in &missing_files
   {
-    println!( "  ✗ {}", file );
+    println!( "  ✗ {file}" );
   }
   println!( "========================================\n" );
 
@@ -170,9 +171,7 @@ fn bug_reproducer_issue_003_documentation_exists()
      Required files:\n\
      - migration_complete.md: Documents migration completion criteria\n\
      - rollback_impossibility.md: Explains why rollback would break system\n\
-     - immutability_contract.md: Formal contract preventing rollback",
-    missing_files.len(),
-    required_files.len(),
+     - immutability_contract.md: Formal contract preventing rollback", missing_files.len(), required_files.len(),
     missing_files.join( "\n     " )
   );
 }
@@ -214,28 +213,25 @@ fn bug_reproducer_issue_003_git_hook_exists()
     .expect( "Could not find repository root" );
 
   let hook_path = repo_root.join( ".git/hooks/pre-commit" );
+  let hook_display = hook_path.display();
 
   // Check if hook exists
-  if !hook_path.exists()
-  {
-    panic!(
-      "BUG REPRODUCER: Pre-commit hook missing.\n\
-       Expected: {}\n\
-       \n\
-       Pre-commit hook prevents accidental rollback during development.\n\
-       Without it, developers can commit code that removes Protocol 005\n\
-       enforcement without immediate detection.",
-      hook_path.display()
-    );
-  }
+  assert!(hook_path.exists(),
+    "BUG REPRODUCER: Pre-commit hook missing.\n\
+     Expected: {hook_display}\n\
+     \n\
+     Pre-commit hook prevents accidental rollback during development.\n\
+     Without it, developers can commit code that removes Protocol 005\n\
+     enforcement without immediate detection."
+  );
 
   // Check hook size (must be >= 100 bytes for real enforcement logic)
   let metadata = std::fs::metadata( &hook_path ).unwrap();
   let size = metadata.len();
 
   println!( "\n=== PRE-COMMIT HOOK STATUS ===" );
-  println!( "Path: {}", hook_path.display() );
-  println!( "Size: {} bytes", size );
+  println!( "Path: {hook_display}" );
+  println!( "Size: {size} bytes" );
   println!( "Required: >= 100 bytes" );
   println!( "Status: {}", if size >= 100 { "✓ ADEQUATE" } else { "✗ STUB" } );
   println!( "================================\n" );
@@ -243,7 +239,7 @@ fn bug_reproducer_issue_003_git_hook_exists()
   // CRITICAL ASSERTION: Hook must have real content
   assert!(
     size >= 100,
-    "BUG REPRODUCER: Pre-commit hook is stub ({} bytes, need >= 100).\n\
+    "BUG REPRODUCER: Pre-commit hook is stub ({size} bytes, need >= 100).\n\
      \n\
      Current hook does not contain enforcement logic. It cannot prevent\n\
      accidental rollback of Protocol 005 code.\n\
@@ -253,8 +249,7 @@ fn bug_reproducer_issue_003_git_hook_exists()
      - Agent token enforcement present\n\
      - Migration metrics pass\n\
      \n\
-     Stub hooks provide ZERO protection against rollback.",
-    size
+     Stub hooks provide ZERO protection against rollback."
   );
 
   // TODO: Add content validation
@@ -315,22 +310,24 @@ fn bug_reproducer_issue_003_migration_state_metrics()
   let old_pattern_count = incomplete_patterns.len();
   let new_pattern_count = completed_patterns.len();
 
+  #[allow( clippy::cast_precision_loss )]
   let old_percentage = ( old_pattern_count as f64 / total_patterns as f64 ) * 100.0;
+  #[allow( clippy::cast_precision_loss )]
   let new_percentage = ( new_pattern_count as f64 / total_patterns as f64 ) * 100.0;
 
   println!( "\n=== MIGRATION STATE METRICS ===" );
-  println!( "Total patterns: {}", total_patterns );
-  println!( "Completed: {} ({:.0}%)", new_pattern_count, new_percentage );
-  println!( "Incomplete: {} ({:.0}%)", old_pattern_count, old_percentage );
+  println!( "Total patterns: {total_patterns}" );
+  println!( "Completed: {new_pattern_count} ({new_percentage:.0}%)" );
+  println!( "Incomplete: {old_pattern_count} ({old_percentage:.0}%)" );
   println!( "\nCompleted patterns:" );
   for pattern in &completed_patterns
   {
-    println!( "  ✓ {}", pattern );
+    println!( "  ✓ {pattern}" );
   }
   println!( "\nIncomplete patterns:" );
   for pattern in &incomplete_patterns
   {
-    println!( "  ✗ {}", pattern );
+    println!( "  ✗ {pattern}" );
   }
   println!( "=================================\n" );
 
@@ -338,25 +335,20 @@ fn bug_reproducer_issue_003_migration_state_metrics()
   assert_eq!(
     old_pattern_count, 0,
     "BUG REPRODUCER: Migration not 100% complete.\n\
-     Found {} incomplete patterns ({:.0}%), expected 0%.\n\
+     Found {old_pattern_count} incomplete patterns ({old_percentage:.0}%), expected 0%.\n\
      \n\
      Incomplete patterns:\n\
      {}\n\
      \n\
      Migration requires ALL patterns complete for full immutability.\n\
      Partial completion leaves bypass paths available.",
-    old_pattern_count,
-    old_percentage,
     incomplete_patterns.join( "\n     " )
   );
 
   assert_eq!(
     new_pattern_count, total_patterns,
     "BUG REPRODUCER: Migration not 100% complete.\n\
-     Completed {}/{} patterns ({:.0}%), expected 100%.",
-    new_pattern_count,
-    total_patterns,
-    new_percentage
+     Completed {new_pattern_count}/{total_patterns} patterns ({new_percentage:.0}%), expected 100%."
   );
 }
 
@@ -417,21 +409,22 @@ fn bug_reproducer_issue_003_enforcement_coverage()
   let inactive_count = inactive_mechanisms.len();
   let current_total = active_count + inactive_count;
 
+  #[allow( clippy::cast_precision_loss )]
   let coverage_percentage = ( active_count as f64 / required_total as f64 ) * 100.0;
 
   println!( "\n=== ENFORCEMENT COVERAGE STATUS ===" );
-  println!( "Required mechanisms: {}", required_total );
-  println!( "Active: {} ({:.0}%)", active_count, coverage_percentage );
-  println!( "Inactive: {}", inactive_count );
+  println!( "Required mechanisms: {required_total}" );
+  println!( "Active: {active_count} ({coverage_percentage:.0}%)" );
+  println!( "Inactive: {inactive_count}" );
   println!( "\nActive mechanisms:" );
   for mechanism in &active_mechanisms
   {
-    println!( "  ✓ {}", mechanism );
+    println!( "  ✓ {mechanism}" );
   }
   println!( "\nInactive mechanisms:" );
   for mechanism in &inactive_mechanisms
   {
-    println!( "  ✗ {}", mechanism );
+    println!( "  ✗ {mechanism}" );
   }
   println!( "====================================\n" );
 
@@ -439,16 +432,13 @@ fn bug_reproducer_issue_003_enforcement_coverage()
   assert_eq!(
     active_count, required_total,
     "BUG REPRODUCER: Enforcement coverage incomplete.\n\
-     Active: {}/{} mechanisms ({:.0}%), expected 100%.\n\
+     Active: {active_count}/{required_total} mechanisms ({coverage_percentage:.0}%), expected 100%.\n\
      \n\
      Inactive mechanisms:\n\
      {}\n\
      \n\
      Each enforcement mechanism is critical. Missing mechanisms\n\
      create bypass paths that undermine entire immutability system.",
-    active_count,
-    required_total,
-    coverage_percentage,
     inactive_mechanisms.join( "\n     " )
   );
 
@@ -456,10 +446,8 @@ fn bug_reproducer_issue_003_enforcement_coverage()
   assert!(
     current_total >= required_total,
     "BUG REPRODUCER: Mechanism count mismatch.\n\
-     Tracking {} mechanisms, but spec requires {}.\n\
-     Need to identify remaining mechanisms.",
-    current_total,
-    required_total
+     Tracking {current_total} mechanisms, but spec requires {required_total}.\n\
+     Need to identify remaining mechanisms."
   );
 }
 
@@ -510,16 +498,13 @@ fn bug_reproducer_issue_003_script_validates_working_directory()
 
   let script_path = repo_root.join( "dev/-dev1/-default_topic/-phase1_verify.sh" );
 
-  if !script_path.exists()
-  {
-    panic!(
-      "BUG REPRODUCER: Verification script not found.\n\
-       Expected: {}\n\
-       \n\
-       Cannot verify working directory validation if script doesn't exist.",
-      script_path.display()
-    );
-  }
+  let script_display = script_path.display();
+  assert!(script_path.exists(),
+    "BUG REPRODUCER: Verification script not found.\n\
+     Expected: {script_display}\n\
+     \n\
+     Cannot verify working directory validation if script doesn't exist."
+  );
 
   // Read script content
   let script_content = std::fs::read_to_string( &script_path )
@@ -534,7 +519,7 @@ fn bug_reproducer_issue_003_script_validates_working_directory()
   let has_validation = has_directory_check && has_error_exit;
 
   println!( "\n=== SCRIPT VALIDATION STATUS ===" );
-  println!( "Script: {}", script_path.display() );
+  println!( "Script: {script_display}" );
   println!( "Has directory check: {}", if has_directory_check { "✓" } else { "✗" } );
   println!( "Has error exit: {}", if has_error_exit { "✓" } else { "✗" } );
   println!( "Validation complete: {}", if has_validation { "✓ YES" } else { "✗ NO" } );

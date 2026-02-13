@@ -2,7 +2,7 @@
 //!
 //! ## Purpose
 //! Verify that project-specific usage endpoint correctly aggregates usage for all tokens
-//! belonging to a specific project_id (via JOIN with api_tokens table).
+//! belonging to a specific `project_id` (via JOIN with `api_tokens` table).
 //!
 //! ## Test Matrix
 //!
@@ -11,20 +11,20 @@
 //! | Unknown project | No matching tokens | 200 OK | All zeros (COALESCE) |
 //! | Valid project | 1+ tokens | 200 OK | Aggregate for project |
 //! | Empty project | Token exists, no usage | 200 OK | All zeros |
-//! | Multiple providers | OpenAI + Anthropic | 200 OK | Breakdown by provider |
+//! | Multiple providers | `OpenAI` + Anthropic | 200 OK | Breakdown by provider |
 //!
 //! ## Known Edge Cases
-//! - Endpoint uses JOIN query with COALESCE, so non-existent project_id
+//! - Endpoint uses JOIN query with COALESCE, so non-existent `project_id`
 //!   returns 200 OK with zero values (not 404 or 500)
-//! - Provider breakdown must filter by project_id correctly
+//! - Provider breakdown must filter by `project_id` correctly
 //! - URL parameter must handle special characters (URL encoding)
 //!
 //! ## Failure Modes
 //! If these tests fail:
-//! 1. Check UsageTracker::get_usage_by_project() JOIN query correctness
-//! 2. Check UsageTracker::get_usage_by_provider_for_project() GROUP BY with WHERE clause
+//! 1. Check `UsageTracker::get_usage_by_project()` JOIN query correctness
+//! 2. Check `UsageTracker::get_usage_by_provider_for_project()` GROUP BY with WHERE clause
 //! 3. Check Path parameter extraction in handler function
-//! 4. Verify api_tokens table schema matches production
+//! 4. Verify `api_tokens` table schema matches production
 
 use crate::common::extract_response;
 use iron_control_api::routes::usage::UsageState;
@@ -47,10 +47,10 @@ async fn create_test_router() -> Router
     .with_state( usage_state )
 }
 
-/// Test unknown project_id returns 200 OK with zero usage.
+/// Test unknown `project_id` returns 200 OK with zero usage.
 ///
 /// WHY: SQL query uses COALESCE which returns 0 for NULL values.
-/// Non-existent project_id returns valid result (all zeros), not database error.
+/// Non-existent `project_id` returns valid result (all zeros), not database error.
 /// This is correct behavior - unknown project is valid query, not error condition.
 #[ tokio::test ]
 async fn test_by_project_unknown_project_returns_zeros()
@@ -90,7 +90,7 @@ async fn test_by_project_unknown_project_returns_zeros()
 
 /// Test URL path parameter extraction.
 ///
-/// WHY: Axum Path extractor must correctly extract project_id from URL.
+/// WHY: Axum Path extractor must correctly extract `project_id` from URL.
 #[ tokio::test ]
 async fn test_by_project_path_parameter_extraction()
 {
@@ -112,7 +112,7 @@ async fn test_by_project_path_parameter_extraction()
   );
 }
 
-/// Test special characters in project_id (URL encoding).
+/// Test special characters in `project_id` (URL encoding).
 ///
 /// WHY: Project IDs might contain hyphens, underscores, or encoded characters.
 #[ tokio::test ]
@@ -179,7 +179,6 @@ async fn test_by_project_error_content_type_is_json()
 
   assert!(
     content_type.contains( "application/json" ),
-    "LOUD FAILURE: Error response Content-Type must be application/json, got: {}",
-    content_type
+    "LOUD FAILURE: Error response Content-Type must be application/json, got: {content_type}"
   );
 }

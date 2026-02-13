@@ -4,18 +4,18 @@
 //!
 //! | Endpoint | Method | Test Cases | Expected Status Codes |
 //! |----------|--------|------------|----------------------|
-//! | /api/v1/api-tokens | POST | Valid request, Empty user_id, Invalid fields | 201, 400 |
+//! | /api/v1/api-tokens | POST | Valid request, Empty `user_id`, Invalid fields | 201, 400 |
 //! | /api/v1/api-tokens | GET | NOT TESTED - Requires authentication | - |
 //! | /api/v1/api-tokens/:id | GET | Valid ID, Non-existent ID | 200, 404 |
 //! | /api/v1/api-tokens/:id/rotate | POST | Valid rotation, Non-existent ID | 200, 404 |
 //! | /api/v1/api-tokens/:id | DELETE | Valid revocation, Non-existent ID | 204, 404 |
 //!
-//! Note: GET /api/v1/api-tokens (list_tokens) requires JWT authentication via AuthenticatedUser.
+//! Note: GET /api/v1/api-tokens (`list_tokens`) requires JWT authentication via `AuthenticatedUser`.
 //! This endpoint is not tested in integration tests as they don't include auth infrastructure.
 //! The endpoint is functional and can be tested via manual/integration tests with auth setup.
 //!
 //! Coverage:
-//! - Request validation (user_id, project_id, description length)
+//! - Request validation (`user_id`, `project_id`, description length)
 //! - HTTP status codes (201, 200, 204, 400, 404, 500)
 //! - JSON response structure
 //! - Database persistence
@@ -26,9 +26,9 @@
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
 //! | `test_create_token_valid_request` | Create token with valid complete request | POST /api/v1/api-tokens with all fields | 201 Created, token returned | ✅ |
-//! | `test_create_token_minimal_request` | Create token with minimal fields | POST /api/v1/api-tokens with user_id only | 201 Created, token returned | ✅ |
-//! | `test_create_token_empty_user_id_rejected` | Create token with empty user_id | POST with user_id="" | 400 Bad Request "user_id cannot be empty" | ✅ |
-//! | `test_create_token_empty_project_id_rejected` | Create token with empty project_id | POST with project_id="" | 400 Bad Request "project_id cannot be empty" | ✅ |
+//! | `test_create_token_minimal_request` | Create token with minimal fields | POST /api/v1/api-tokens with `user_id` only | 201 Created, token returned | ✅ |
+//! | `test_create_token_empty_user_id_rejected` | Create token with empty user_id | POST with user_id="" | 400 Bad Request "`user_id` cannot be empty" | ✅ |
+//! | `test_create_token_empty_project_id_rejected` | Create token with empty project_id | POST with project_id="" | 400 Bad Request "`project_id` cannot be empty" | ✅ |
 //! | `test_create_token_description_too_long_rejected` | Create token with oversized description | POST with description=501 chars | 400 Bad Request "description too long" | ✅ |
 //! | `test_get_token_valid_id_returns_200` | Get token by valid ID | GET /api/v1/api-tokens/:id with existing token | 200 OK, token metadata returned | ✅ |
 //! | `test_get_token_nonexistent_id_returns_404` | Get token by nonexistent ID | GET /api/v1/api-tokens/999999 | 404 Not Found | ✅ |
@@ -68,11 +68,11 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
   ( router, app_state )
 }
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -93,7 +93,7 @@ async fn test_create_token_valid_request()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -123,7 +123,7 @@ async fn test_create_token_valid_request()
   );
 }
 
-/// Test POST /api/v1/api-tokens with minimal valid request (only user_id).
+/// Test POST /api/v1/api-tokens with minimal valid request (only `user_id`).
 #[ tokio::test ]
 async fn test_create_token_minimal_request()
 {
@@ -140,7 +140,7 @@ async fn test_create_token_minimal_request()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -158,7 +158,7 @@ async fn test_create_token_minimal_request()
   assert_eq!( body.description, None );
 }
 
-/// Test POST /api/v1/api-tokens with empty user_id returns 400.
+/// Test POST /api/v1/api-tokens with empty `user_id` returns 400.
 #[ tokio::test ]
 async fn test_create_token_empty_user_id_rejected()
 {
@@ -175,7 +175,7 @@ async fn test_create_token_empty_user_id_rejected()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -191,12 +191,11 @@ async fn test_create_token_empty_user_id_rejected()
   assert_eq!( status, StatusCode::BAD_REQUEST );
   assert!(
     body.contains( "user_id" ) || body.contains( "empty" ),
-    "LOUD FAILURE: Error must mention user_id or empty. Got: {}",
-    body
+    "LOUD FAILURE: Error must mention user_id or empty. Got: {body}"
   );
 }
 
-/// Test POST /api/v1/api-tokens with empty project_id returns 400.
+/// Test POST /api/v1/api-tokens with empty `project_id` returns 400.
 #[ tokio::test ]
 async fn test_create_token_empty_project_id_rejected()
 {
@@ -213,7 +212,7 @@ async fn test_create_token_empty_project_id_rejected()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -229,8 +228,7 @@ async fn test_create_token_empty_project_id_rejected()
   assert_eq!( status, StatusCode::BAD_REQUEST );
   assert!(
     body.contains( "project_id" ) || body.contains( "empty" ),
-    "LOUD FAILURE: Error must mention project_id or empty. Got: {}",
-    body
+    "LOUD FAILURE: Error must mention project_id or empty. Got: {body}"
   );
 }
 
@@ -253,7 +251,7 @@ async fn test_create_token_description_too_long_rejected()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -269,8 +267,7 @@ async fn test_create_token_description_too_long_rejected()
   assert_eq!( status, StatusCode::BAD_REQUEST );
   assert!(
     body.contains( "description" ) || body.contains( "long" ) || body.contains( "500" ),
-    "LOUD FAILURE: Error must mention description length limit. Got: {}",
-    body
+    "LOUD FAILURE: Error must mention description length limit. Got: {body}"
   );
 }
 
@@ -294,7 +291,7 @@ async fn test_get_token_valid_id_returns_200()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &create_body ).unwrap() ) )
     .unwrap();
 
@@ -305,8 +302,8 @@ async fn test_get_token_valid_id_returns_200()
   // Now get the token by ID with authentication
   let get_request = Request::builder()
     .method( "GET" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -338,7 +335,7 @@ async fn test_get_token_nonexistent_id_returns_404()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/v1/api-tokens/999999" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -354,8 +351,7 @@ async fn test_get_token_nonexistent_id_returns_404()
   assert_eq!( status, StatusCode::NOT_FOUND );
   assert!(
     body.contains( "not found" ) || body.contains( "error" ),
-    "LOUD FAILURE: 404 response must contain error message. Got: {}",
-    body
+    "LOUD FAILURE: 404 response must contain error message. Got: {body}"
   );
 }
 
@@ -379,7 +375,7 @@ async fn test_revoke_token_valid_id_returns_204()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &create_body ).unwrap() ) )
     .unwrap();
 
@@ -390,8 +386,8 @@ async fn test_revoke_token_valid_id_returns_204()
   // Now revoke the token with authentication
   let delete_request = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -416,7 +412,7 @@ async fn test_revoke_token_nonexistent_id_returns_404()
   let request = Request::builder()
     .method( "DELETE" )
     .uri( "/api/v1/api-tokens/999999" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -429,7 +425,7 @@ async fn test_revoke_token_nonexistent_id_returns_404()
   );
 }
 
-/// Test token created_at timestamp is present and valid.
+/// Test token `created_at` timestamp is present and valid.
 #[ tokio::test ]
 async fn test_token_created_at_timestamp()
 {
@@ -446,7 +442,7 @@ async fn test_token_created_at_timestamp()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -460,12 +456,13 @@ async fn test_token_created_at_timestamp()
   );
 
   // created_at is in milliseconds, so just verify it's reasonable (within last hour)
-  let now = std::time::SystemTime::now()
+  let now = i64::try_from(std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .unwrap()
-    .as_millis() as i64;
+    .as_millis())
+    .unwrap();
 
-  let one_hour = 3600000; // 1 hour in milliseconds
+  let one_hour = 3_600_000; // 1 hour in milliseconds
   assert!(
     body.created_at >= now - one_hour && body.created_at <= now + one_hour,
     "LOUD FAILURE: created_at must be within reasonable time range. Got: {}, now: {}",
@@ -492,7 +489,7 @@ async fn test_token_id_auto_increment()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request1_body ).unwrap() ) )
     .unwrap();
 
@@ -512,7 +509,7 @@ async fn test_token_id_auto_increment()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token2 ) )
+    .header( "authorization", format!( "Bearer {jwt_token2}" ) )
     .body( Body::from( serde_json::to_string( &request2_body ).unwrap() ) )
     .unwrap();
 
@@ -522,9 +519,7 @@ async fn test_token_id_auto_increment()
 
   assert!(
     id2 > id1,
-    "LOUD FAILURE: Second token ID must be greater than first. id1={}, id2={}",
-    id1,
-    id2
+    "LOUD FAILURE: Second token ID must be greater than first. id1={id1}, id2={id2}"
   );
 }
 
@@ -548,7 +543,7 @@ async fn test_rotate_token_valid_id_returns_200()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &create_body ).unwrap() ) )
     .unwrap();
 
@@ -560,8 +555,8 @@ async fn test_rotate_token_valid_id_returns_200()
   // Now rotate the token with authentication
   let rotate_request = Request::builder()
     .method( "POST" )
-    .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}/rotate" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -611,7 +606,7 @@ async fn test_rotate_token_nonexistent_id_returns_404()
   let request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/api-tokens/999999/rotate" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -631,7 +626,7 @@ async fn test_rotate_token_nonexistent_id_returns_404()
 /// Deliverable 1.6: POST /api/v1/api-tokens/validate endpoint
 ///
 /// This endpoint allows external services to validate API tokens without authentication.
-/// It returns token validity status and metadata (user_id, project_id) for valid tokens.
+/// It returns token validity status and metadata (`user_id`, `project_id`) for valid tokens.
 #[ tokio::test ]
 async fn test_validate_token_valid_returns_metadata()
 {
@@ -645,7 +640,7 @@ async fn test_validate_token_valid_returns_metadata()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "Content-Type", "application/json" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( json!({ "user_id": "test_user_validate" }).to_string() ) )
     .unwrap();
 
@@ -675,15 +670,13 @@ async fn test_validate_token_valid_returns_metadata()
   assert_eq!(
     result[ "valid" ],
     true,
-    "LOUD FAILURE: Valid token must return {{\"valid\":true}}. Got: {:?}",
-    result
+    "LOUD FAILURE: Valid token must return {{\"valid\":true}}. Got: {result:?}"
   );
 
   assert_eq!(
     result[ "user_id" ].as_str().unwrap(),
     "test_user_validate",
-    "LOUD FAILURE: Valid token must return user_id. Got: {:?}",
-    result
+    "LOUD FAILURE: Valid token must return user_id. Got: {result:?}"
   );
 }
 
@@ -714,8 +707,7 @@ async fn test_validate_token_invalid_returns_false()
   assert_eq!(
     result[ "valid" ],
     false,
-    "LOUD FAILURE: Invalid token must return {{\"valid\":false}}. Got: {:?}",
-    result
+    "LOUD FAILURE: Invalid token must return {{\"valid\":false}}. Got: {result:?}"
   );
 }
 
@@ -733,7 +725,7 @@ async fn test_validate_token_revoked_returns_false()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "Content-Type", "application/json" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( json!({ "user_id": "test_user_revoke" }).to_string() ) )
     .unwrap();
 
@@ -745,8 +737,8 @@ async fn test_validate_token_revoked_returns_false()
   // Revoke the token
   let revoke_request = Request::builder()
     .method( "DELETE" )
-    .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -774,8 +766,7 @@ async fn test_validate_token_revoked_returns_false()
   assert_eq!(
     result[ "valid" ],
     false,
-    "LOUD FAILURE: Revoked token must return {{\"valid\":false}}. Got: {:?}",
-    result
+    "LOUD FAILURE: Revoked token must return {{\"valid\":false}}. Got: {result:?}"
   );
 }
 
@@ -828,11 +819,11 @@ async fn test_validate_token_no_auth_required()
 
 // --- Bug Reproducer Tests ---
 
-/// Fix(issue-001): Generic error for FK constraint violation when creating token with non-existent user_id
+/// Fix(issue-001): Generic error for FK constraint violation when creating token with non-existent `user_id`
 ///
-/// Root cause: The create_token handler in routes/tokens.rs catches database errors with a generic
+/// Root cause: The `create_token` handler in routes/tokens.rs catches database errors with a generic
 /// "Failed to create token" message without distinguishing between different failure modes. When
-/// SQLite's foreign key constraint fails (user_id doesn't exist in users table), the specific
+/// `SQLite`'s foreign key constraint fails (`user_id` doesn't exist in users table), the specific
 /// constraint error is swallowed and replaced with a generic message.
 ///
 /// Pitfall: Generic error messages make API integration difficult because clients cannot distinguish
@@ -841,10 +832,10 @@ async fn test_validate_token_no_auth_required()
 /// and expose specific constraint violation details to clients with appropriate HTTP status codes.
 ///
 /// Current Behavior: Returns 500 with {"error": "Failed to create token"}
-/// Expected After Fix: Should return 404 with {"error": "User not found: 'nonexistent_user_xyz'", "code": "USER_NOT_FOUND"}
-/// OR: 409 with {"error": "Foreign key constraint failed: user_id 'nonexistent_user_xyz' does not exist", "code": "FK_CONSTRAINT_VIOLATION"}
+/// Expected After Fix: Should return 404 with {"error": "User not found: '`nonexistent_user_xyz`'", "code": "`USER_NOT_FOUND`"}
+/// OR: 409 with {"error": "Foreign key constraint failed: `user_id` '`nonexistent_user_xyz`' does not exist", "code": "`FK_CONSTRAINT_VIOLATION`"}
 #[ tokio::test ]
-#[ ignore ]
+#[ ignore = "TODO: Fix issue-001 (generic error for FK violation) before enabling" ]
 async fn bug_reproducer_issue_001_fk_constraint_generic_error()
 {
   let ( router, app_state ) = create_test_router().await;
@@ -861,7 +852,7 @@ async fn bug_reproducer_issue_001_fk_constraint_generic_error()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -878,8 +869,7 @@ async fn bug_reproducer_issue_001_fk_constraint_generic_error()
   assert_eq!( status, StatusCode::INTERNAL_SERVER_ERROR );
   assert!(
     body.contains( "Failed to create token" ),
-    "LOUD FAILURE: Current error message is generic. Got: {}",
-    body
+    "LOUD FAILURE: Current error message is generic. Got: {body}"
   );
 
   // After fix, this test should be updated to assert:

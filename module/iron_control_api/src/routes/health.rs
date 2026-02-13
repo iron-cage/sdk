@@ -24,7 +24,8 @@ pub struct HealthResponse
 ///
 /// Always returns 200 OK with service status
 #[ must_use ]
-pub fn health_check() -> impl IntoResponse
+#[ allow( clippy::unused_async ) ]
+pub async fn health_check() -> impl IntoResponse
 {
   let now = Utc::now().timestamp();
 

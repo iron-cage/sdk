@@ -1,15 +1,15 @@
-//! Test: Login endpoint requires ConnectInfo for per-IP rate limiting
+//! Test: Login endpoint requires `ConnectInfo` for per-IP rate limiting
 //!
 //! ## Root Cause
 //!
 //! The login handler in `auth/handlers.rs` uses `ConnectInfo<SocketAddr>` extractor
 //! for per-IP rate limiting (Fix issue-GAP-006). However, the server startup code
 //! in `bin/iron_control_api_server.rs` uses `axum::serve(listener, app)` which does
-//! NOT provide the ConnectInfo extension. Axum requires explicit opt-in via
+//! NOT provide the `ConnectInfo` extension. Axum requires explicit opt-in via
 //! `.into_make_service_with_connect_info::<SocketAddr>()` to make client socket
 //! addresses available to handlers.
 //!
-//! When a request reaches the login endpoint, Axum tries to extract ConnectInfo
+//! When a request reaches the login endpoint, Axum tries to extract `ConnectInfo`
 //! but finds the extension missing, resulting in a 500 Internal Server Error with
 //! message: "Missing request extension: Extension of type `ConnectInfo<SocketAddr>`
 //! was not found."
@@ -17,11 +17,11 @@
 //! ## Why Not Caught
 //!
 //! 1. **No Integration Tests:** The existing auth tests use `TestServer` helper
-//!    which may provide ConnectInfo automatically, masking the production issue
+//!    which may provide `ConnectInfo` automatically, masking the production issue
 //! 2. **Manual Testing Gap:** The Iron Cage Pilot launch plan focused on API
-//!    token endpoints but didnt include comprehensive auth endpoint testing
-//! 3. **Code Review Blind Spot:** The ConnectInfo requirement was added in
-//!    Fix(issue-GAP-006) but the reviewer didnt verify that the server startup
+//!    token endpoints but didn't include comprehensive auth endpoint testing
+//! 3. **Code Review Blind Spot:** The `ConnectInfo` requirement was added in
+//!    Fix(issue-GAP-006) but the reviewer didn't verify that the server startup
 //!    code provides this extension
 //!
 //! ## Fix Applied
@@ -39,25 +39,25 @@
 //! ).await?;
 //! ```
 //!
-//! This explicitly opts into ConnectInfo extraction, making client socket addresses
+//! This explicitly opts into `ConnectInfo` extraction, making client socket addresses
 //! available to all route handlers.
 //!
 //! ## Prevention
 //!
 //! 1. **Integration Test Coverage:** Add test that starts actual server (not
-//!    TestServer helper) and verifies login works end-to-end
-//! 2. **Handler Signature Validation:** If handler uses ConnectInfo extractor,
+//!    `TestServer` helper) and verifies login works end-to-end
+//! 2. **Handler Signature Validation:** If handler uses `ConnectInfo` extractor,
 //!    CI must verify server provides it (could use compile-time check or runtime
 //!    assertion on startup)
 //! 3. **Manual Testing Checklist:** Include auth endpoints in launch verification,
 //!    not just new feature endpoints
-//! 4. **Documentation:** Add comment in server.rs next to serve() call explaining
-//!    ConnectInfo requirement and consequences of removing it
+//! 4. **Documentation:** Add comment in server.rs next to `serve()` call explaining
+//!    `ConnectInfo` requirement and consequences of removing it
 //!
 //! ## Pitfall
 //!
 //! **Never assume Axum extractors work without configuration.** Extractors like
-//! ConnectInfo, Extension, and State require server-side setup. Always:
+//! `ConnectInfo`, Extension, and State require server-side setup. Always:
 //! - Check extractor documentation for setup requirements
 //! - Verify server provides required extensions/layers
 //! - Test with real server instance (not just test helpers)
@@ -108,7 +108,7 @@ async fn bug_reproducer_login_requires_connect_info()
   // Attempt login request
   let client = reqwest::Client::new();
   let response = client
-    .post( format!( "http://{}/api/v1/auth/login", addr ) )
+    .post( format!( "http://{addr}/api/v1/auth/login" ) )
     .json( &serde_json::json!({
       "email": "admin@admin.com",
       "password": "testpass"
@@ -155,7 +155,7 @@ async fn bug_reproducer_login_requires_connect_info()
 
   // Attempt login request with fixed server
   let response2 = client
-    .post( format!( "http://{}/api/v1/auth/login", addr2 ) )
+    .post( format!( "http://{addr2}/api/v1/auth/login" ) )
     .json( &serde_json::json!({
       "email": "admin@admin.com",
       "password": "testpass"

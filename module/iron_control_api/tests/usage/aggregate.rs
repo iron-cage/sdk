@@ -2,7 +2,7 @@
 //!
 //! ## Purpose
 //! Verify that aggregate usage endpoint correctly aggregates token usage statistics
-//! across ALL tokens in the system, regardless of user_id or project_id.
+//! across ALL tokens in the system, regardless of `user_id` or `project_id`.
 //!
 //! ## Test Matrix
 //!
@@ -11,19 +11,19 @@
 //! | Empty database | No usage records | 200 OK | All zeros |
 //! | Single token | 1 usage record | 200 OK | Match record |
 //! | Multiple tokens | 3 usage records | 200 OK | Sum of all |
-//! | Multiple providers | OpenAI + Anthropic | 200 OK | Breakdown by provider |
+//! | Multiple providers | `OpenAI` + Anthropic | 200 OK | Breakdown by provider |
 //! | Database error | (simulated) | 500 Error | Error message |
 //!
 //! ## Known Edge Cases
 //! - Empty database must return 200 OK with zero values (not 404)
 //! - Provider breakdown must include ALL providers with usage, not just active tokens
-//! - Aggregation must use COALESCE to handle NULL values correctly
+//! - Aggregation must use `COALESCE` to handle NULL values correctly
 //!
 //! ## Failure Modes
 //! If these tests fail:
-//! 1. Check UsageTracker::get_all_aggregate_usage() SQL query (no token_id filter)
-//! 2. Check UsageTracker::get_usage_by_provider_all() GROUP BY logic
-//! 3. Check error handler returns HTTP 500 (not silent failure with vec![])
+//! 1. Check `UsageTracker::get_all_aggregate_usage()` SQL query (no `token_id` filter)
+//! 2. Check `UsageTracker::get_usage_by_provider_all()` GROUP BY logic
+//! 3. Check error handler returns HTTP 500 (not silent failure with `vec![]`)
 //! 4. Verify in-memory database schema matches production schema
 
 use crate::common::{ extract_json_response, extract_response };
@@ -135,7 +135,7 @@ async fn test_aggregate_response_structure()
   );
 }
 
-/// Test Content-Type header is application/json.
+/// Test `Content-Type` header is `application/json`.
 ///
 /// WHY: Frontend expects JSON, not plain text.
 #[ tokio::test ]
@@ -158,8 +158,7 @@ async fn test_aggregate_content_type_is_json()
 
   assert!(
     content_type.contains( "application/json" ),
-    "LOUD FAILURE: Content-Type must be application/json, got: {}",
-    content_type
+    "LOUD FAILURE: Content-Type must be application/json, got: {content_type}"
   );
 }
 

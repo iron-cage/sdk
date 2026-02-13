@@ -1,29 +1,29 @@
-//! Auth request validation tests (LoginRequest, RefreshRequest, LogoutRequest)
+//! Auth request validation tests (`LoginRequest`, `RefreshRequest`, `LogoutRequest`)
 //!
-//! Test Matrix: LoginRequest validation
+//! Test Matrix: `LoginRequest` validation
 //!
 //! | Field    | Valid Values         | Invalid Values           | Edge Cases              |
 //! |----------|----------------------|--------------------------|-------------------------|
 //! | email    | Non-empty string     | "" (empty), whitespace   | 1 char OK, 255 max      |
 //! | password | Non-empty string     | "" (empty), whitespace   | 1 char OK, 1000 max     |
 //!
-//! Test Matrix: RefreshRequest validation
+//! Test Matrix: `RefreshRequest` validation
 //!
 //! | Field         | Valid Values     | Invalid Values           | Edge Cases          |
 //! |---------------|------------------|--------------------------|---------------------|
-//! | refresh_token | Non-empty JWT    | "" (empty), whitespace   | 1 char OK, 2000 max |
+//! | `refresh_token` | Non-empty JWT    | "" (empty), whitespace   | 1 char OK, 2000 max |
 //!
-//! Test Matrix: LogoutRequest validation
+//! Test Matrix: `LogoutRequest` validation
 //!
 //! | Field         | Valid Values     | Invalid Values           | Edge Cases          |
 //! |---------------|------------------|--------------------------|---------------------|
-//! | refresh_token | Non-empty JWT    | "" (empty), whitespace   | 1 char OK, 2000 max |
+//! | `refresh_token` | Non-empty JWT    | "" (empty), whitespace   | 1 char OK, 2000 max |
 //!
 //! Corner cases covered:
-//! - Empty fields (email, password, refresh_token)
+//! - Empty fields (email, password, `refresh_token`)
 //! - Whitespace-only fields
 //! - Valid minimal inputs (1 char)
-//! - Field length limits (DoS prevention)
+//! - Field length limits (`DoS` prevention)
 //! - Valid complete requests
 //!
 //! ## Test Matrix
@@ -50,7 +50,7 @@ async fn test_empty_email_rejected()
 {
   let request = LoginRequest
   {
-    email: "".to_string(),
+    email: String::new(),
     password: "valid_password".to_string(),
     
   };
@@ -73,7 +73,7 @@ async fn test_empty_password_rejected()
   let request = LoginRequest
   {
     email: "valid_user".to_string(),
-    password: "".to_string(),
+    password: String::new(),
   };
 
   let result = request.validate();
@@ -175,7 +175,7 @@ async fn test_email_too_long_rejected()
   let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "email" ) && error_msg.contains( "255" ),
-    "LOUD FAILURE: Error must specify email length limit, got: {}", error_msg
+    "LOUD FAILURE: Error must specify email length limit, got: {error_msg}"
   );
 }
 
@@ -199,7 +199,7 @@ async fn test_password_too_long_rejected()
   let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "password" ) && error_msg.contains( "1000" ),
-    "LOUD FAILURE: Error must specify password length limit, got: {}", error_msg
+    "LOUD FAILURE: Error must specify password length limit, got: {error_msg}"
   );
 }
 

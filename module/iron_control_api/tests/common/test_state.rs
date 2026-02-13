@@ -1,9 +1,9 @@
 //! Test state builders for creating Axum application state.
 //!
 //! Provides builders for:
-//! - AuthState (JWT authentication)
-//! - TokenState (token management)
-//! - UsageState (usage tracking)
+//! - `AuthState` (JWT authentication)
+//! - `TokenState` (token management)
+//! - `UsageState` (usage tracking)
 //! - Combined application state
 
 use sqlx::SqlitePool;
@@ -17,7 +17,7 @@ pub const TEST_JWT_SECRET: &str = "test_jwt_secret_key_for_testing_12345";
 /// Seed common test users for token tests.
 ///
 /// Creates users that token tests expect:
-/// - Normal test users (user_test, user_minimal, etc.)
+/// - Normal test users (`user_test`, `user_minimal`, etc.)
 /// - Security test users (command injection, unicode, etc.)
 ///
 /// This is required because migration 013 added FK constraint from `api_tokens` to users.
@@ -131,7 +131,7 @@ async fn seed_test_users_for_tokens( pool: &SqlitePool )
   }
 }
 
-/// Create test AuthState with known JWT secret and in-memory database.
+/// Create test `AuthState` with known JWT secret and in-memory database.
 /// Rate limiting is disabled for tests to allow rapid testing.
 pub async fn create_test_auth_state() -> AuthState
 {
@@ -140,7 +140,7 @@ pub async fn create_test_auth_state() -> AuthState
     .expect( "LOUD FAILURE: Failed to create test AuthState" )
 }
 
-/// Create test TokenState with in-memory database and seed test users.
+/// Create test `TokenState` with in-memory database and seed test users.
 pub async fn create_test_token_state() -> TokenState
 {
   let token_state = TokenState::new( "sqlite::memory:" )
@@ -153,9 +153,9 @@ pub async fn create_test_token_state() -> TokenState
   token_state
 }
 
-/// Create test UsageState with in-memory database.
+/// Create test `UsageState` with in-memory database.
 ///
-/// Note: This requires iron_token_manager's UsageTracker to support in-memory database.
+/// Note: This requires `iron_token_manager`'s `UsageTracker` to support in-memory database.
 /// If it doesn't, this will need to be updated to use a file-based test database.
 #[ allow( dead_code ) ]
 pub async fn create_test_usage_state() -> UsageState
@@ -166,6 +166,7 @@ pub async fn create_test_usage_state() -> UsageState
 }
 
 /// Combined application state for integration tests.
+#[ allow( missing_debug_implementations ) ]
 #[ derive( Clone ) ]
 pub struct TestAppState
 {
@@ -217,13 +218,14 @@ impl TestAppState
   }
 
   /// Get JWT secret for token generation in tests.
+  #[ allow( clippy::unused_self ) ]
   pub fn jwt_secret( &self ) -> String
   {
     TEST_JWT_SECRET.to_string()
   }
 }
 
-/// Enable AuthState extraction from TestAppState.
+/// Enable `AuthState` extraction from `TestAppState`.
 impl axum::extract::FromRef< TestAppState > for AuthState
 {
   fn from_ref( state: &TestAppState ) -> Self
@@ -232,7 +234,7 @@ impl axum::extract::FromRef< TestAppState > for AuthState
   }
 }
 
-/// Enable TokenState extraction from TestAppState.
+/// Enable `TokenState` extraction from `TestAppState`.
 impl axum::extract::FromRef< TestAppState > for TokenState
 {
   fn from_ref( state: &TestAppState ) -> Self
@@ -241,7 +243,7 @@ impl axum::extract::FromRef< TestAppState > for TokenState
   }
 }
 
-/// Enable SqlitePool extraction from TestAppState.
+/// Enable `SqlitePool` extraction from `TestAppState`.
 impl axum::extract::FromRef< TestAppState > for SqlitePool
 {
   fn from_ref( state: &TestAppState ) -> Self

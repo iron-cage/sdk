@@ -16,7 +16,7 @@
 //! - ✅ Completely empty body → 400 (cannot parse as JSON)
 //!
 //! **Why These Tests Matter:**
-//! 1. **Protocol 014**: Requires at least one field (name, description, project_id, etc.)
+//! 1. **Protocol 014**: Requires at least one field (name, description, `project_id`, etc.)
 //! 2. **API Contract**: Empty requests provide no useful information and should be rejected
 //! 3. **Security**: Prevent meaningless token creation attempts
 
@@ -25,17 +25,17 @@ use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
 /// Create test router with token routes.
 ///
-/// Uses TestAppState (auth + tokens) to support JWT authentication in routes.
+/// Uses `TestAppState` (auth + tokens) to support JWT authentication in routes.
 async fn create_test_router() -> ( Router, TestAppState )
 {
   let app_state = TestAppState::new().await;
@@ -58,7 +58,7 @@ async fn test_create_token_with_empty_json_object()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( "{}" ) )
     .unwrap();
 
@@ -82,7 +82,7 @@ async fn test_create_token_with_no_body()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 

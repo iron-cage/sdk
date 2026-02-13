@@ -1,6 +1,6 @@
 //! Authentication Security Tests - GAP-004 & GAP-005
 //!
-//! **Authority:** pilot_implementation_gaps.md § GAP-004, GAP-005
+//! **Authority:** `pilot_implementation_gaps.md` § `GAP-004`, `GAP-005`
 //!
 //! Tests security audit logging for authentication events:
 //! - Failed login attempts (GAP-004)
@@ -11,13 +11,13 @@
 //! Per Protocol 007 and implementation gaps:
 //! - Failed login attempts MUST be logged with structured security audit data
 //! - Logout events MUST be logged for session lifecycle tracking
-//! - Logs must include: timestamp, email/user_id, IP address, user_agent
+//! - Logs must include: timestamp, `email/user_id`, IP address, `user_agent`
 //! - Passwords must NEVER be logged
 //!
 //! # Test Coverage
 //!
 //! - ✅ Failed login attempt returns 401
-//! - ✅ Failed login logging implicit (tracing::warn! in code)
+//! - ✅ Failed login logging implicit (`tracing::warn`! in code)
 //! - ✅ Multiple failed attempts each logged independently
 //! - ✅ Password never logged in security events
 
@@ -37,13 +37,13 @@ use tower::ServiceExt;
 ///
 /// 1. Attempt login with invalid credentials
 /// 2. Verify 401 Unauthorized returned
-/// 3. Verify security log entry created (implicit - presence of tracing::warn! in code)
+/// 3. Verify security log entry created (implicit - presence of `tracing::warn`! in code)
 ///
 /// # Expected Behavior
 ///
 /// - Failed login returns 401
-/// - tracing::warn! called with structured security event data
-/// - Log contains: email, failure_reason
+/// - `tracing::warn`! called with structured security event data
+/// - Log contains: email, `failure_reason`
 /// - Log does NOT contain: password
 ///
 /// # Security Note
@@ -59,7 +59,7 @@ async fn test_failed_login_generates_security_audit_log()
   // Seed valid user for comparison
   common::auth::seed_test_user( &pool, "valid@example.com", "valid_password_123", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Attempt login with INVALID credentials
   let invalid_request = Request::builder()
@@ -115,7 +115,7 @@ async fn test_failed_login_generates_security_audit_log()
 async fn test_multiple_failed_logins_logged_independently()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   let failed_emails = vec![
     "attacker1@malicious.com",
@@ -143,7 +143,7 @@ async fn test_multiple_failed_logins_logged_independently()
     assert_eq!(
       response.status(),
       StatusCode::UNAUTHORIZED,
-      "Failed login for {} should return 401", email
+      "Failed login for {email} should return 401"
     );
   }
 
@@ -159,8 +159,8 @@ async fn test_multiple_failed_logins_logged_independently()
 ///
 /// # Expected Behavior
 ///
-/// - tracing::warn! does NOT include password field
-/// - Only email, failure_reason, IP, user_agent logged
+/// - `tracing::warn`! does NOT include password field
+/// - Only email, `failure_reason`, IP, `user_agent` logged
 ///
 /// # Security Note
 ///
@@ -170,7 +170,7 @@ async fn test_multiple_failed_logins_logged_independently()
 async fn test_password_never_logged_in_security_events()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   let request = Request::builder()
     .method( "POST" )
@@ -203,13 +203,13 @@ async fn test_password_never_logged_in_security_events()
 /// 1. Login successfully to get valid token
 /// 2. Logout with valid token
 /// 3. Verify 204 No Content returned
-/// 4. Verify security log entry created (implicit - presence of tracing::info! in code)
+/// 4. Verify security log entry created (implicit - presence of `tracing::info`! in code)
 ///
 /// # Expected Behavior
 ///
 /// - Successful logout returns 204 No Content
-/// - tracing::info! called with structured security event data
-/// - Log contains: user_id, session_id (jti)
+/// - `tracing::info`! called with structured security event data
+/// - Log contains: `user_id`, `session_id` (jti)
 ///
 /// # Security Note
 ///
@@ -225,7 +225,7 @@ async fn test_logout_event_generates_security_audit_log()
   let password = "test_password_123";
   common::auth::seed_test_user( &pool, "user@example.com", password, "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Login to get valid token
   let login_request = Request::builder()
@@ -252,7 +252,7 @@ async fn test_logout_event_generates_security_audit_log()
     .method( "POST" )
     .uri( "/api/v1/auth/logout" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", user_token ) )
+    .header( "authorization", format!( "Bearer {user_token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -282,7 +282,7 @@ async fn test_logout_event_generates_security_audit_log()
 ///
 /// - First 5 attempts return 401 Unauthorized
 /// - 6th attempt returns 429 Too Many Requests
-/// - Response includes retry_after in details
+/// - Response includes `retry_after` in details
 ///
 /// # Note
 ///
@@ -293,7 +293,7 @@ async fn test_rate_limiting_blocks_excessive_attempts()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
   // Use rate limiting enabled router for this test
-  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() ).await;
+  let router = common::auth::create_auth_router_with_rate_limiting( pool.clone() );
 
   // Attempt 6 logins in rapid succession
   for attempt in 1..=6
@@ -318,7 +318,7 @@ async fn test_rate_limiting_blocks_excessive_attempts()
       assert_eq!(
         response.status(),
         StatusCode::UNAUTHORIZED,
-        "Attempt {} should return 401 Unauthorized", attempt
+        "Attempt {attempt} should return 401 Unauthorized"
       );
     }
     else
@@ -327,7 +327,7 @@ async fn test_rate_limiting_blocks_excessive_attempts()
       assert_eq!(
         response.status(),
         StatusCode::TOO_MANY_REQUESTS,
-        "Attempt {} should return 429 Too Many Requests (rate limited)", attempt
+        "Attempt {attempt} should return 429 Too Many Requests (rate limited)"
       );
 
       // Verify response includes retry_after

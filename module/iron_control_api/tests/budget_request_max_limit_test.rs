@@ -31,7 +31,7 @@
 //! When protocol specifications define operational limits (pilot $10K) separate from
 //! technical limits (i64 overflow $9.2T), implementation must enforce BOTH constraints.
 //! Test the operational limit with boundary tests, not just the technical limit.
-//! A passing overflow test doesnt validate business requirements.
+//! A passing overflow test doesn't validate business requirements.
 //!
 //! ## Test Coverage
 //!
@@ -69,8 +69,7 @@ fn test_budget_request_at_exact_limit()
 
   assert!(
     result.is_ok(),
-    "Budget request at exact $10K limit should succeed, got: {:?}",
-    result
+    "Budget request at exact $10K limit should succeed, got: {result:?}"
   );
 }
 
@@ -95,8 +94,7 @@ fn test_budget_request_just_under_limit()
 
   assert!(
     result.is_ok(),
-    "Budget request at $9,999.99 should succeed, got: {:?}",
-    result
+    "Budget request at $9,999.99 should succeed, got: {result:?}"
   );
 }
 
@@ -127,8 +125,7 @@ fn test_budget_request_just_over_limit()
   let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "exceeds maximum" ) || error_msg.contains( "10000" ),
-    "Error message should mention exceeds/maximum/10000, got: {}",
-    error_msg
+    "Error message should mention exceeds/maximum/10000, got: {error_msg}"
   );
 }
 
@@ -159,8 +156,7 @@ fn test_budget_request_significantly_over_limit()
   let error_msg = result.unwrap_err().to_string();
   assert!(
     error_msg.contains( "exceeds maximum" ) && error_msg.contains( "10000" ),
-    "Error should mention 'exceeds maximum' and '10000', got: {}",
-    error_msg
+    "Error should mention 'exceeds maximum' and '10000', got: {error_msg}"
   );
 }
 
@@ -185,8 +181,7 @@ fn test_budget_request_at_minimum()
 
   assert!(
     result.is_ok(),
-    "Budget request at $0.01 should succeed, got: {:?}",
-    result
+    "Budget request at $0.01 should succeed, got: {result:?}"
   );
 }
 
@@ -216,20 +211,17 @@ fn test_error_message_format()
   // Error should be specific and actionable
   assert!(
     error_msg.contains( "requested_budget_usd" ),
-    "Error should mention field name, got: {}",
-    error_msg
+    "Error should mention field name, got: {error_msg}"
   );
 
   assert!(
     error_msg.contains( "10000" ),
-    "Error should include limit value, got: {}",
-    error_msg
+    "Error should include limit value, got: {error_msg}"
   );
 
   assert!(
     error_msg.contains( "exceeds" ) || error_msg.contains( "maximum" ),
-    "Error should explain why it failed, got: {}",
-    error_msg
+    "Error should explain why it failed, got: {error_msg}"
   );
 }
 
@@ -254,8 +246,7 @@ fn test_budget_request_large_but_valid()
 
   assert!(
     result.is_ok(),
-    "Budget request at $9,500 should succeed, got: {:?}",
-    result
+    "Budget request at $9,500 should succeed, got: {result:?}"
   );
 }
 
@@ -286,7 +277,6 @@ fn test_validation_fails_on_budget_limit_first()
   // (validation order matters for error reporting)
   assert!(
     error_msg.contains( "budget" ) || error_msg.contains( "exceeds" ) || error_msg.contains( "10000" ),
-    "Should fail on budget limit check first, got: {}",
-    error_msg
+    "Should fail on budget limit check first, got: {error_msg}"
   );
 }

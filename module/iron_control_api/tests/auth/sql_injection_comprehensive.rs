@@ -143,7 +143,7 @@ async fn test_username_sql_injection_comprehensive()
   // Seed valid user for comparison (ensure legitimate auth works)
   common::auth::seed_test_user( &pool, "valid@example.com", "valid_password", "user", true ).await;
 
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Baseline - verify legitimate auth works
   let valid_request = Request::builder()
@@ -193,14 +193,13 @@ async fn test_username_sql_injection_comprehensive()
   }
 
   // Phase 3: Verify ALL injection attempts failed safely
-  for ( idx, payload, status, body ) in results.iter()
+  for ( idx, payload, status, body ) in &results
   {
     // MUST return 401 or 429 (both are "safe" - rate limiting or authentication failure)
     // MUST NOT return 200 (bypass) or 500 (SQL execution error)
     assert!(
       *status == StatusCode::UNAUTHORIZED || *status == StatusCode::TOO_MANY_REQUESTS,
-      "Injection #{} ('{}') should return 401 or 429, got: {}",
-      idx, payload, status
+      "Injection #{idx} ('{payload}') should return 401 or 429, got: {status}",
     );
 
     // MUST NOT leak database schema information
@@ -214,12 +213,11 @@ async fn test_username_sql_injection_comprehensive()
       "unrecognized token",
     ];
 
-    for keyword in leaked_keywords.iter()
+    for keyword in &leaked_keywords
     {
       assert!(
         !body.to_lowercase().contains( keyword ),
-        "Injection #{} ('{}') leaked database info: body contains '{}'",
-        idx, payload, keyword
+        "Injection #{idx} ('{payload}') leaked database info: body contains '{keyword}'",
       );
     }
   }
@@ -241,7 +239,7 @@ async fn test_username_sql_injection_comprehensive()
   let error_codes: Vec<_> = results.iter()
     .filter_map( |( _idx, _payload, _status, body )| {
       serde_json::from_str::<serde_json::Value>( body ).ok()
-        .and_then( |json| json[ "error" ][ "code" ].as_str().map( |s| s.to_string() ) )
+        .and_then( |json| json[ "error" ][ "code" ].as_str().map( ToString::to_string ) )
     })
     .collect();
 
@@ -249,8 +247,7 @@ async fn test_username_sql_injection_comprehensive()
   let unique_error_codes: std::collections::HashSet<_> = error_codes.iter().collect();
   assert!(
     unique_error_codes.len() <= 2,
-    "Error codes should be consistent across injection attempts, got: {:?}",
-    unique_error_codes
+    "Error codes should be consistent across injection attempts, got: {unique_error_codes:?}"
   );
 }
 
@@ -287,7 +284,7 @@ async fn test_user_creation_sql_injection()
   // Seed admin user for authentication
   common::auth::seed_test_user( &pool, "admin@example.com", "admin_password", "admin", true ).await;
 
-  let router = common::auth::create_full_router( pool.clone() ).await;
+  let router = common::auth::create_full_router( &pool );
 
   // Phase 1: Login as admin to get JWT token
   let login_request = Request::builder()
@@ -323,13 +320,13 @@ async fn test_user_creation_sql_injection()
     "test'/*",
   ];
 
-  for payload in dangerous_payloads.iter()
+  for payload in &dangerous_payloads
   {
     let request = Request::builder()
       .method( "POST" )
       .uri( "/api/v1/users" )
       .header( "content-type", "application/json" )
-      .header( "authorization", format!( "Bearer {}", admin_token ) )
+      .header( "authorization", format!( "Bearer {admin_token}" ) )
       .body( Body::from(
         json!({
           "username": payload,
@@ -509,7 +506,7 @@ async fn test_second_order_sql_injection()
 async fn test_error_message_sql_injection_leakage()
 {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
-  let router = common::auth::create_auth_router( pool.clone() ).await;
+  let router = common::auth::create_auth_router( pool.clone() );
 
   // Phase 1: Trigger various error conditions
   let error_triggering_payloads = [
@@ -520,7 +517,7 @@ async fn test_error_message_sql_injection_leakage()
     "' AND SLEEP(999999)--",                              // Function not found (SQLite)
   ];
 
-  for payload in error_triggering_payloads.iter()
+  for payload in &error_triggering_payloads
   {
     let request = Request::builder()
       .method( "POST" )
@@ -539,8 +536,7 @@ async fn test_error_message_sql_injection_leakage()
     // Should return 401 (invalid credentials) not 500 (database error)
     assert!(
       response.status() != StatusCode::INTERNAL_SERVER_ERROR,
-      "Database errors should not leak to client (payload: '{}')",
-      payload
+      "Database errors should not leak to client (payload: '{payload}')"
     );
 
     // Parse response body
@@ -577,13 +573,11 @@ async fn test_error_message_sql_injection_leakage()
       "C:\\",
     ];
 
-    for leaked_keyword in leaked_info.iter()
+    for leaked_keyword in &leaked_info
     {
       assert!(
         !body_text.to_lowercase().contains( leaked_keyword ),
-        "Error message leaked database info: '{}' (payload: '{}')",
-        leaked_keyword,
-        payload
+        "Error message leaked database info: '{leaked_keyword}' (payload: '{payload}')"
       );
     }
 
@@ -609,7 +603,7 @@ async fn test_error_message_sql_injection_leakage()
       {
         assert!(
           !msg.to_lowercase().contains( "sql" ),
-          "Error message should not mention 'SQL': {}", msg
+          "Error message should not mention 'SQL': {msg}"
         );
       }
     }

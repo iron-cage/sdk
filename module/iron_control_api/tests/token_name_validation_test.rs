@@ -3,7 +3,7 @@
 //! ## Root Cause
 //!
 //! The `CreateTokenRequest::validate()` method only validates fields IF they are
-//! present (`if let Some(ref name) = self.name { validate... }`), but didnt ensure
+//! present (`if let Some(ref name) = self.name { validate... }`), but didn't ensure
 //! that ANY fields are provided. The validation allowed completely empty requests `{}`
 //! which contain no useful information.
 //!
@@ -20,7 +20,7 @@
 //!    string, too long), not MISSING fields
 //! 2. **Backward Compatibility Confusion:** The code attempted to support both
 //!    Protocol 014 (`name` required) and legacy format (`description` as name),
-//!    but the validation logic didnt enforce "at least one must be present"
+//!    but the validation logic didn't enforce "at least one must be present"
 //! 3. **Manual Testing Scope:** The Iron Cage Pilot testing focused on successful
 //!    token creation paths, not validation edge cases
 //!
@@ -53,13 +53,13 @@
 //! ```
 //!
 //! This prevents empty requests while supporting both Protocol 014 (name in request)
-//! and legacy format (user_id in request body).
+//! and legacy format (`user_id` in request body).
 //!
 //! ## Prevention
 //!
 //! 1. **Required Field Checklist:** When adding required fields, add explicit
 //!    tests for MISSING field (not just invalid values)
-//! 2. **Validation Audit:** Review validate() methods to ensure they check for
+//! 2. **Validation Audit:** Review `validate()` methods to ensure they check for
 //!    required field presence, not just optional field validity
 //! 3. **Protocol Compliance Tests:** Add comprehensive Protocol 014 compliance
 //!    test suite covering all validation rules (required, optional, formats)
@@ -70,7 +70,7 @@
 //!
 //! **Never assume `Option<T>` fields are validated for presence.** The pattern
 //! `if let Some(ref field) = self.field { validate... }` only validates when
-//! field is present - it doesnt enforce that required fields exist. Always add
+//! field is present - it doesn't enforce that required fields exist. Always add
 //! explicit checks:
 //!
 //! ```rust

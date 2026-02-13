@@ -57,7 +57,7 @@ async fn create_auth_router() -> Router
     rate_limiting_enabled: false, // Disabled for tests
   };
 
-  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
 
   Router::new()
     .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
@@ -115,7 +115,7 @@ async fn test_login_success()
       .await
       .unwrap();
     let body_str = String::from_utf8( body.to_vec() ).unwrap();
-    panic!( "Expected 200 OK, got {}. Body: {}", status, body_str );
+    panic!( "Expected 200 OK, got {status}. Body: {body_str}");
   }
 
   assert_eq!( status, StatusCode::OK );
@@ -189,7 +189,7 @@ async fn test_refresh_token_flow()
         .method( "POST" )
         .uri( "/api/auth/refresh" )
         .header( "content-type", "application/json" )
-        .header( "Authorization", format!( "Bearer {}", refresh_token ) )
+        .header( "Authorization", format!( "Bearer {refresh_token}") )
         .body( Body::from( serde_json::to_string( &refresh_body ).unwrap() ) )
         .unwrap(),
     )
@@ -240,7 +240,7 @@ async fn test_logout_flow()
         .method( "POST" )
         .uri( "/api/auth/logout" )
         .header( "content-type", "application/json" )
-        .header( "Authorization", format!( "Bearer {}", user_token ) )
+        .header( "Authorization", format!( "Bearer {user_token}") )
         .body( Body::from( serde_json::to_string( &logout_body ).unwrap() ) )
         .unwrap(),
     )

@@ -10,7 +10,7 @@
 //! | `test_create_token_with_invalid_json_syntax` | POST /api/v1/api-tokens | Missing closing brace | 400 Bad Request | ✅ |
 //! | `test_create_token_with_trailing_comma` | POST /api/v1/api-tokens | Trailing comma in object | 400 Bad Request | ✅ |
 //! | `test_create_token_with_unquoted_keys` | POST /api/v1/api-tokens | Object keys without quotes | 400 Bad Request | ✅ |
-//! | `test_create_token_with_deeply_nested_json` | POST /api/v1/api-tokens | >100 nesting levels (DoS) | 400 Bad Request | ✅ |
+//! | `test_create_token_with_deeply_nested_json` | POST /api/v1/api-tokens | >100 nesting levels (`DoS`) | 400 Bad Request | ✅ |
 //! | `test_create_token_with_invalid_utf8` | POST /api/v1/api-tokens | Invalid UTF-8 sequences | 400 Bad Request | ✅ |
 //! | `test_rotate_token_with_malformed_body` | POST /api/v1/api-tokens/:id/rotate | Malformed JSON (if body expected) | 400/204 | ✅ |
 //!
@@ -25,7 +25,7 @@
 //! - ✅ Invalid UTF-8 encoding → 400 Bad Request
 //!
 //! **Edge Cases:**
-//! - ✅ Deeply nested JSON (DoS prevention) → 400 Bad Request
+//! - ✅ Deeply nested JSON (`DoS` prevention) → 400 Bad Request
 //! - ✅ Empty body when JSON expected → 400 Bad Request
 //! - ✅ Rotate endpoint with/without body (validate behavior)
 //!
@@ -41,11 +41,11 @@ use axum::{ Router, routing::post, http::{ Request, StatusCode } };
 use axum::body::Body;
 use tower::ServiceExt;
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -81,7 +81,7 @@ async fn test_create_token_with_invalid_json_syntax()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -110,7 +110,7 @@ async fn test_create_token_with_trailing_comma()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -139,7 +139,7 @@ async fn test_create_token_with_unquoted_keys()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -152,13 +152,13 @@ async fn test_create_token_with_unquoted_keys()
   );
 }
 
-/// Test POST /api/v1/api-tokens with deeply nested JSON (DoS prevention).
+/// Test POST /api/v1/api-tokens with deeply nested JSON (`DoS` prevention).
 ///
 /// WHY: Deeply nested JSON can cause stack overflow or excessive memory
 /// allocation during parsing. This tests the parser's depth limit to prevent
-/// DoS attacks via malicious payloads.
+/// `DoS` attacks via malicious payloads.
 ///
-/// NOTE: The actual nesting limit depends on serde_json's configuration.
+/// NOTE: The actual nesting limit depends on `serde_json`'s configuration.
 /// This test documents expected behavior (rejection at some reasonable depth).
 #[ tokio::test ]
 async fn test_create_token_with_deeply_nested_json()
@@ -184,7 +184,7 @@ async fn test_create_token_with_deeply_nested_json()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( deeply_nested ) )
     .unwrap();
 
@@ -214,7 +214,7 @@ async fn test_create_token_with_invalid_utf8()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( &invalid_utf8[..] ) )
     .unwrap();
 
@@ -245,7 +245,7 @@ async fn test_rotate_token_with_malformed_body()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( r#"{"user_id":"test_rotate","project_id":"proj","description":"Test"}"# ) )
     .unwrap();
 
@@ -261,9 +261,9 @@ async fn test_rotate_token_with_malformed_body()
 
   let rotate_request = Request::builder()
     .method( "POST" )
-    .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
+    .uri( format!( "/api/v1/api-tokens/{token_id}/rotate" ) )
     .header( "content-type", "application/json" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( malformed_json ) )
     .unwrap();
 
@@ -274,7 +274,6 @@ async fn test_rotate_token_with_malformed_body()
   let status = rotate_response.status();
   assert!(
     status == StatusCode::OK || status == StatusCode::BAD_REQUEST,
-    "LOUD FAILURE: Rotate with malformed JSON must return 200 (ignores body) or 400 (rejects). Got: {}",
-    status
+    "LOUD FAILURE: Rotate with malformed JSON must return 200 (ignores body) or 400 (rejects). Got: {status}"
   );
 }

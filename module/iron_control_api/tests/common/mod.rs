@@ -36,7 +36,8 @@ pub async fn create_test_admin( pool: &SqlitePool ) -> ( String, String )
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .expect("LOUD FAILURE: Time went backwards")
-    .as_secs() as i64;
+    .as_secs();
+  let now = i64::try_from( now ).unwrap_or( i64::MAX );
 
   let user_id = "user_admin_test".to_string();
 
@@ -63,7 +64,7 @@ pub async fn create_test_admin( pool: &SqlitePool ) -> ( String, String )
 
 /// Create test user with known credentials.
 ///
-/// Returns (user_id, password_hash) for test assertions.
+/// Returns (`user_id`, `password_hash`) for test assertions.
 pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, String )
 {
   let password_hash = bcrypt::hash( "test_password", 4 )
@@ -72,7 +73,8 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .expect("LOUD FAILURE: Time went backwards")
-    .as_secs() as i64;
+    .as_secs();
+  let now = i64::try_from( now ).unwrap_or( i64::MAX );
 
   sqlx::query(
     "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -87,8 +89,7 @@ pub async fn create_test_user( pool: &SqlitePool, email: &str ) -> ( String, Str
   .execute( pool )
   .await
   .unwrap_or_else( |_| panic!(
-    "LOUD FAILURE: Failed to create test user '{}'",
-    email
+    "LOUD FAILURE: Failed to create test user '{email}'"
   ) );
 
   ( "user_123".to_string(), password_hash )
@@ -102,8 +103,7 @@ pub fn create_test_access_token( user_id: &str, email: &str, role: &str, jwt_sec
   let jwt = JwtSecret::new( jwt_secret.to_string() );
   jwt.generate_access_token( user_id, email, role, jwt_secret )
     .unwrap_or_else( |_| panic!(
-      "LOUD FAILURE: Failed to generate test JWT for user '{}'",
-      user_id
+      "LOUD FAILURE: Failed to generate test JWT for user '{user_id}'"
     ) )
 }
 
@@ -131,8 +131,7 @@ pub fn create_test_refresh_token( user_id: &str, email: &str, role: &str, token_
   let jwt = JwtSecret::new( jwt_secret.to_string() );
   jwt.generate_refresh_token( user_id, email, role, token_id )
     .unwrap_or_else( |_| panic!(
-      "LOUD FAILURE: Failed to generate test refresh token for user '{}'",
-      user_id
+      "LOUD FAILURE: Failed to generate test refresh token for user '{user_id}'"
     ) )
 }
 
@@ -178,8 +177,7 @@ where
   let ( status, body ) = extract_response( response ).await;
   let json = serde_json::from_str::< T >( &body )
     .unwrap_or_else( |_| panic!(
-      "LOUD FAILURE: Failed to parse response body as JSON: {}",
-      body
+      "LOUD FAILURE: Failed to parse response body as JSON: {body}"
     ) );
 
   ( status, json )
@@ -192,7 +190,8 @@ pub async fn blacklist_refresh_token( pool: &SqlitePool, token_id: &str, user_id
   let now = std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .expect("LOUD FAILURE: Time went backwards")
-    .as_secs() as i64;
+    .as_secs();
+  let now = i64::try_from( now ).unwrap_or( i64::MAX );
 
   sqlx::query(
     "INSERT INTO token_blacklist (jti, user_id, blacklisted_at) VALUES (?, ?, ?)"

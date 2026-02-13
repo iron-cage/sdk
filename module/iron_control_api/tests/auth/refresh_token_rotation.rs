@@ -40,19 +40,19 @@ use crate::common::auth::{ setup_auth_test_db, seed_test_user, create_auth_route
 /// ## Expected Behavior
 ///
 /// - POST /api/v1/auth/refresh with valid refresh token
-/// - Response includes new refresh_token field
+/// - Response includes new `refresh_token` field
 /// - New refresh token is different from old token
 ///
 /// ## Success Criteria
 ///
 /// - Status: 200 OK
-/// - Response contains refresh_token field
+/// - Response contains `refresh_token` field
 /// - New token != old token
 #[ tokio::test ]
 async fn test_refresh_returns_new_refresh_token()
 {
   let pool: SqlitePool = setup_auth_test_db().await;
-  let router: Router = create_auth_router( pool.clone() ).await;
+  let router: Router = create_auth_router( pool.clone() );
 
   // Seed test user
   seed_test_user( &pool, "bob@example.com", "password456", "user", true ).await;
@@ -82,7 +82,7 @@ async fn test_refresh_returns_new_refresh_token()
   let refresh_request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/auth/refresh" )
-    .header( "authorization", format!( "Bearer {}", original_refresh_token ) )
+    .header( "authorization", format!( "Bearer {original_refresh_token}" ) )
     .header( "content-type", "application/json" )
     .body( Body::empty() )
     .unwrap();
@@ -119,9 +119,9 @@ async fn test_refresh_returns_new_refresh_token()
 ///
 /// ## Expected Behavior
 ///
-/// 1. Login → get refresh_token_1
-/// 2. Refresh with refresh_token_1 → get refresh_token_2
-/// 3. Refresh with refresh_token_1 again → 401 Unauthorized
+/// 1. Login → get `refresh_token_1`
+/// 2. Refresh with `refresh_token_1` → get `refresh_token_2`
+/// 3. Refresh with `refresh_token_1` again → 401 Unauthorized
 ///
 /// ## Success Criteria
 ///
@@ -132,7 +132,7 @@ async fn test_refresh_returns_new_refresh_token()
 async fn test_old_refresh_token_cannot_be_reused()
 {
   let pool: SqlitePool = setup_auth_test_db().await;
-  let router: Router = create_auth_router( pool.clone() ).await;
+  let router: Router = create_auth_router( pool.clone() );
 
   // Seed test user
   seed_test_user( &pool, "charlie@example.com", "password789", "user", true ).await;
@@ -162,7 +162,7 @@ async fn test_old_refresh_token_cannot_be_reused()
   let refresh_request_1 = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/auth/refresh" )
-    .header( "authorization", format!( "Bearer {}", original_refresh_token ) )
+    .header( "authorization", format!( "Bearer {original_refresh_token}" ) )
     .header( "content-type", "application/json" )
     .body( Body::empty() )
     .unwrap();
@@ -179,7 +179,7 @@ async fn test_old_refresh_token_cannot_be_reused()
   let refresh_request_2 = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/auth/refresh" )
-    .header( "authorization", format!( "Bearer {}", original_refresh_token ) )
+    .header( "authorization", format!( "Bearer {original_refresh_token}" ) )
     .header( "content-type", "application/json" )
     .body( Body::empty() )
     .unwrap();
@@ -201,8 +201,7 @@ async fn test_old_refresh_token_cannot_be_reused()
 
   assert!(
     error_message.contains( "Invalid" ) || error_message.contains( "expired" ),
-    "LOUD FAILURE: Error message should indicate token is invalid/expired. Got: {}",
-    error_message
+    "LOUD FAILURE: Error message should indicate token is invalid/expired. Got: {error_message}"
   );
 }
 
@@ -211,10 +210,10 @@ async fn test_old_refresh_token_cannot_be_reused()
 /// ## Expected Behavior
 ///
 /// Multiple sequential refreshes should work:
-/// 1. Login → token_1
-/// 2. Refresh with token_1 → token_2
-/// 3. Refresh with token_2 → token_3
-/// 4. Refresh with token_3 → token_4
+/// 1. Login → `token_1`
+/// 2. Refresh with `token_1` → `token_2`
+/// 3. Refresh with `token_2` → `token_3`
+/// 4. Refresh with `token_3` → `token_4`
 ///
 /// ## Success Criteria
 ///
@@ -225,7 +224,7 @@ async fn test_old_refresh_token_cannot_be_reused()
 async fn test_refresh_token_rotation_chain()
 {
   let pool: SqlitePool = setup_auth_test_db().await;
-  let router: Router = create_auth_router( pool.clone() ).await;
+  let router: Router = create_auth_router( pool.clone() );
 
   // Seed test user
   seed_test_user( &pool, "diana@example.com", "password000", "user", true ).await;
@@ -260,7 +259,7 @@ async fn test_refresh_token_rotation_chain()
     let refresh_request = Request::builder()
       .method( "POST" )
       .uri( "/api/v1/auth/refresh" )
-      .header( "authorization", format!( "Bearer {}", current_refresh_token ) )
+      .header( "authorization", format!( "Bearer {current_refresh_token}" ) )
       .header( "content-type", "application/json" )
       .body( Body::empty() )
       .unwrap();
@@ -270,8 +269,7 @@ async fn test_refresh_token_rotation_chain()
     assert_eq!(
       refresh_response.status(),
       StatusCode::OK,
-      "LOUD FAILURE: Refresh #{} must succeed",
-      i
+      "LOUD FAILURE: Refresh #{i} must succeed"
     );
 
     let refresh_body_bytes = axum::body::to_bytes( refresh_response.into_body(), usize::MAX ).await.unwrap();
@@ -285,8 +283,7 @@ async fn test_refresh_token_rotation_chain()
     assert_ne!(
       new_token,
       current_refresh_token,
-      "LOUD FAILURE: Refresh #{} must return different token",
-      i
+      "LOUD FAILURE: Refresh #{i} must return different token"
     );
 
     current_refresh_token = new_token;
@@ -296,7 +293,7 @@ async fn test_refresh_token_rotation_chain()
   let reuse_request = Request::builder()
     .method( "POST" )
     .uri( "/api/v1/auth/refresh" )
-    .header( "authorization", format!( "Bearer {}", first_token ) )
+    .header( "authorization", format!( "Bearer {first_token}" ) )
     .header( "content-type", "application/json" )
     .body( Body::empty() )
     .unwrap();

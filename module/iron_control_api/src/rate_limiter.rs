@@ -105,6 +105,10 @@ impl LoginRateLimiter
   }
 
   /// Clear all rate limit data (for testing)
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal mutex is poisoned.
   #[ cfg( test ) ]
   pub fn clear( &self )
   {
@@ -125,7 +129,7 @@ impl Default for LoginRateLimiter
 mod tests
 {
   use super::*;
-  use std::{ net::Ipv4Addr, time::Duration };
+  use core::{ net::Ipv4Addr, time::Duration };
 
   #[ test ]
   fn test_rate_limiter_allows_initial_attempts()
@@ -191,7 +195,8 @@ mod tests
     // Manually insert old attempts
     {
       let mut attempts = limiter.attempts.lock().unwrap();
-      let old_time = Instant::now() - Duration::from_secs( 301 ); // 5 minutes + 1 second ago
+      // 5 minutes + 1 second ago
+      let old_time = Instant::now().checked_sub(Duration::from_secs(301)).unwrap();
       attempts.insert(
         ip,
         vec![

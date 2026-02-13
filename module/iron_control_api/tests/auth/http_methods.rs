@@ -37,7 +37,7 @@ use tower::ServiceExt;
 async fn create_test_router() -> Router
 {
   let auth_state = create_test_auth_state().await;
-  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
 
   Router::new()
     .route( "/api/auth/login", post( auth::login ) )

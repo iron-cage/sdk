@@ -95,7 +95,7 @@ async fn test_create_and_list_users() {
 
     // Create admin user for auth
     let (admin_id, _) = common::create_test_admin(&state.auth.db_pool).await;
-    let token = create_test_access_token(&admin_id.to_string(), "admin@mail.com", "admin", "test_secret");
+    let token = create_test_access_token(&admin_id.clone(), "admin@mail.com", "admin", "test_secret");
 
     // 1. Create a new user
     let create_request = CreateUserRequest {
@@ -109,7 +109,7 @@ async fn test_create_and_list_users() {
         Request::builder()
             .method("POST")
             .uri("/api/v1/users")
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(serde_json::to_string(&create_request).unwrap()))
             .unwrap()
@@ -126,7 +126,7 @@ async fn test_create_and_list_users() {
         Request::builder()
             .method("GET")
             .uri("/api/v1/users")
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap()
     ).await.unwrap();

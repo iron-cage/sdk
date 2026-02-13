@@ -1,15 +1,15 @@
-//! url_redirect deletion verification.
+//! `url_redirect` deletion verification.
 //!
-//! NEGATIVE ACCEPTANCE: Proves url_redirect middleware completely removed.
+//! NEGATIVE ACCEPTANCE: Proves `url_redirect` middleware completely removed.
 //!
 //! ## Purpose
 //!
-//! Verifies that backward compatibility middleware url_redirect has been
+//! Verifies that backward compatibility middleware `url_redirect` has been
 //! completely deleted (not just disabled or commented out).
 //!
 //! ## Why This Matters
 //!
-//! The url_redirect middleware served zero actual clients. Keeping unused
+//! The `url_redirect` middleware served zero actual clients. Keeping unused
 //! backward compatibility code creates:
 //! - Maintenance burden (must update with API changes)
 //! - API confusion (which endpoint should users call?)
@@ -26,17 +26,17 @@
 mod common;
 use common::source_analysis::*;
 
-/// Verify url_redirect.rs file deleted.
+/// Verify `url_redirect.rs` file deleted.
 ///
 /// ## Purpose
 ///
-/// Backward compatibility middleware url_redirect served zero clients.
+/// Backward compatibility middleware `url_redirect` served zero clients.
 /// Must be completely removed, not just disabled.
 ///
 /// ## What This Proves
 ///
-/// - url_redirect.rs file doesn't exist
-/// - Not renamed (e.g., url_redirect_old.rs)
+/// - `url_redirect.rs` file doesn't exist
+/// - Not renamed (e.g., `url_redirect_old.rs`)
 /// - Not moved to deprecated/ directory
 /// - Completely deleted from repository
 ///
@@ -54,15 +54,14 @@ fn test_url_redirect_file_deleted()
   let file_path = "src/middleware/url_redirect.rs";
   assert!(
     !std::path::Path::new( file_path ).exists(),
-    "FAIL: url_redirect.rs still exists at {}\n\
+    "FAIL: url_redirect.rs still exists at {file_path}\n\
      Must DELETE file completely (not rename, not comment out)\n\
      \n\
-     Fix: git rm src/middleware/url_redirect.rs",
-    file_path
+     Fix: git rm src/middleware/url_redirect.rs"
   );
 }
 
-/// Verify no url_redirect module export.
+/// Verify no `url_redirect` module export.
 ///
 /// ## Purpose
 ///
@@ -89,7 +88,7 @@ fn test_no_url_redirect_module_export()
   );
 }
 
-/// Verify no url_redirect usage in router.
+/// Verify no `url_redirect` usage in router.
 ///
 /// ## Purpose
 ///
@@ -109,7 +108,7 @@ fn test_no_url_redirect_in_router()
   );
 }
 
-/// Verify no url_redirect imports anywhere.
+/// Verify no `url_redirect` imports anywhere.
 ///
 /// ## Purpose
 ///

@@ -1,7 +1,7 @@
 //! Full flow integration tests for GET /api/keys (FR-12: Key Fetch API).
 //!
 //! These tests verify the complete end-to-end flow:
-//! 1. Create a token with project_id
+//! 1. Create a token with `project_id`
 //! 2. Create and encrypt a provider key
 //! 3. Assign the provider key to the project
 //! 4. Fetch the key via /api/keys endpoint
@@ -22,7 +22,7 @@ use axum::{ Router, routing::get, http::{ Request, StatusCode, header } };
 use axum::body::Body;
 use tower::ServiceExt;
 use std::sync::Arc;
-use std::time::Duration;
+use core::time::Duration;
 
 use iron_control_api::routes::keys::{ KeysState, get_key, KeyResponse };
 use iron_token_manager::storage::TokenStorage;
@@ -76,10 +76,11 @@ impl TestState
 
     // Create test users to satisfy foreign key constraints (migration 013)
     let pool = token_storage.pool();
-    let now = std::time::SystemTime::now()
+    let now = i64::try_from(std::time::SystemTime::now()
       .duration_since( std::time::UNIX_EPOCH )
       .expect("LOUD FAILURE: Time went backwards")
-      .as_secs() as i64;
+      .as_secs())
+      .unwrap();
 
     // Create test_user (used in most tests)
     sqlx::query(
@@ -237,7 +238,7 @@ async fn test_full_flow_encrypt_store_fetch_decrypt()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -265,7 +266,7 @@ async fn test_full_flow_encrypt_store_fetch_decrypt()
   );
 }
 
-/// Test token without project_id returns 400 Bad Request.
+/// Test token without `project_id` returns 400 Bad Request.
 ///
 /// WHY: Project ID is required to look up the assigned key.
 #[ tokio::test ]
@@ -280,7 +281,7 @@ async fn test_token_without_project_returns_400()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -295,8 +296,7 @@ async fn test_token_without_project_returns_400()
   let ( _status, body ) = extract_response( response ).await;
   assert!(
     body.contains( "Token not assigned to a project" ),
-    "LOUD FAILURE: Error message should indicate missing project, got: {}",
-    body
+    "LOUD FAILURE: Error message should indicate missing project, got: {body}"
   );
 }
 
@@ -316,7 +316,7 @@ async fn test_no_key_assigned_returns_404()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -331,8 +331,7 @@ async fn test_no_key_assigned_returns_404()
   let ( _status, body ) = extract_response( response ).await;
   assert!(
     body.contains( "No provider key assigned" ),
-    "LOUD FAILURE: Error message should indicate no key assigned, got: {}",
-    body
+    "LOUD FAILURE: Error message should indicate no key assigned, got: {body}"
   );
 }
 
@@ -359,7 +358,7 @@ async fn test_disabled_key_returns_403()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -374,8 +373,7 @@ async fn test_disabled_key_returns_403()
   let ( _status, body ) = extract_response( response ).await;
   assert!(
     body.contains( "disabled" ),
-    "LOUD FAILURE: Error message should indicate key is disabled, got: {}",
-    body
+    "LOUD FAILURE: Error message should indicate key is disabled, got: {body}"
   );
 }
 
@@ -403,7 +401,7 @@ async fn test_rate_limit_exceeded_returns_429()
     let request = Request::builder()
       .method( "GET" )
       .uri( "/api/keys" )
-      .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
+      .header( header::AUTHORIZATION, format!( "Bearer {token}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -422,7 +420,7 @@ async fn test_rate_limit_exceeded_returns_429()
   let request = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -437,8 +435,7 @@ async fn test_rate_limit_exceeded_returns_429()
   let ( _status, body ) = extract_response( response ).await;
   assert!(
     body.contains( "Rate limit exceeded" ),
-    "LOUD FAILURE: Error message should indicate rate limit, got: {}",
-    body
+    "LOUD FAILURE: Error message should indicate rate limit, got: {body}"
   );
 }
 
@@ -471,7 +468,7 @@ async fn test_different_projects_have_separate_keys()
   let request_a = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token_a ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token_a}" ) )
     .body( Body::empty() )
     .unwrap();
 
@@ -484,7 +481,7 @@ async fn test_different_projects_have_separate_keys()
   let request_b = Request::builder()
     .method( "GET" )
     .uri( "/api/keys" )
-    .header( header::AUTHORIZATION, format!( "Bearer {}", token_b ) )
+    .header( header::AUTHORIZATION, format!( "Bearer {token_b}" ) )
     .body( Body::empty() )
     .unwrap();
 

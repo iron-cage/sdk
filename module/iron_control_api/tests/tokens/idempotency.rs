@@ -15,7 +15,7 @@
 //!
 //! **Non-Idempotency (by design):**
 //! - ✅ POST /api/v1/api-tokens is NOT idempotent
-//! - ✅ Same user_id + project_id → Different token each time
+//! - ✅ Same `user_id` + `project_id` → Different token each time
 //! - ✅ Security: Prevents token prediction
 //!
 //! **Idempotency:**
@@ -24,7 +24,7 @@
 //! **Why These Tests Matter:**
 //! 1. **Security**: Token uniqueness prevents prediction attacks
 //! 2. **API Contract**: Clients expect new token on each POST
-//! 3. **RESTful Semantics**: POST creates new resource, not idempotent
+//! 3. **`RESTful` Semantics**: POST creates new resource, not idempotent
 //!
 //! **Note**: Token revocation idempotency (delete twice → 404) is tested
 //! in `state_transitions.rs::test_revoke_already_revoked_token`.
@@ -35,11 +35,11 @@ use axum::body::Body;
 use tower::ServiceExt;
 use serde_json::json;
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
@@ -73,7 +73,7 @@ async fn test_create_token_same_data_produces_different_tokens()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -92,7 +92,7 @@ async fn test_create_token_same_data_produces_different_tokens()
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -135,7 +135,7 @@ async fn test_revoke_nonexistent_token_returns_404()
   let request = Request::builder()
     .method( "DELETE" )
     .uri( "/api/v1/api-tokens/999999" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "Authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::empty() )
     .unwrap();
 

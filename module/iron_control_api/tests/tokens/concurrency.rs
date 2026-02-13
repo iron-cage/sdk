@@ -33,15 +33,15 @@
 //!
 //! **Edge Cases:**
 //! - ✅ Database locking prevents corruption
-//! - ✅ SQLite IMMEDIATE transactions ensure serializability
+//! - ✅ `SQLite` IMMEDIATE transactions ensure serializability
 //!
 //! **Boundary Conditions:** Not applicable
 //! **Resource Limits:** Not applicable (unbounded token count)
-//! **Precondition Violations:** Tested via second operation seeing NOT_FOUND
+//! **Precondition Violations:** Tested via second operation seeing `NOT_FOUND`
 //!
 //! ## Test Isolation Pattern
 //!
-//! **Problem:** SQLite shared memory databases (`mode=memory&cache=shared`) require unique
+//! **Problem:** `SQLite` shared memory databases (`mode=memory&cache=shared`) require unique
 //! connection strings when tests run in parallel. Tests sharing the same database path will
 //! interfere with each other, causing non-deterministic failures.
 //!
@@ -66,23 +66,23 @@ use tower::ServiceExt;
 use serde_json::json;
 use tokio::task::JoinHandle;
 use std::sync::Arc;
-use std::sync::atomic::{ AtomicUsize, Ordering };
+use core::sync::atomic::{ AtomicUsize, Ordering };
 
 /// Global counter for generating unique database names across concurrent tests
 static DB_COUNTER: AtomicUsize = AtomicUsize::new( 0 );
 
-/// Helper: Generate JWT token for a given user_id
+/// Helper: Generate JWT token for a given `user_id`
 fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
 {
   app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
+    .generate_access_token( user_id, &format!( "{user_id}@test.com" ), "user", &format!( "token_{user_id}" ) )
     .expect( "LOUD FAILURE: Failed to generate JWT token" )
 }
 
 /// Create test router with token routes using shared database file.
 ///
 /// NOTE: Concurrency tests require a shared database file (not `:memory:`)
-/// because in-memory databases are connection-specific in SQLite.
+/// because in-memory databases are connection-specific in `SQLite`.
 async fn create_test_router() -> ( Router, crate::common::test_state::TestAppState )
 {
   // Use a unique temporary file for this test run
@@ -121,7 +121,7 @@ async fn create_token( router: Arc< Router >, app_state: &crate::common::test_st
     .method( "POST" )
     .uri( "/api/v1/api-tokens" )
     .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", jwt_token ) )
+    .header( "authorization", format!( "Bearer {jwt_token}" ) )
     .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
     .unwrap();
 
@@ -158,7 +158,7 @@ async fn test_concurrent_token_creation_uniqueness()
   {
     let router_clone = Arc::clone( &router );
     let app_state_clone = app_state.clone();
-    let user_id = format!( "user_concurrent_{}", i );
+    let user_id = format!( "user_concurrent_{i}" );
 
     let handle = tokio::spawn( async move
     {
@@ -229,8 +229,8 @@ async fn test_concurrent_rotate_same_token()
   {
     let request = Request::builder()
       .method( "POST" )
-      .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
-      .header( "Authorization", format!( "Bearer {}", jwt_token1 ) )
+      .uri( format!( "/api/v1/api-tokens/{token_id}/rotate" ) )
+      .header( "Authorization", format!( "Bearer {jwt_token1}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -242,8 +242,8 @@ async fn test_concurrent_rotate_same_token()
   {
     let request = Request::builder()
       .method( "POST" )
-      .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
-      .header( "Authorization", format!( "Bearer {}", jwt_token2 ) )
+      .uri( format!( "/api/v1/api-tokens/{token_id}/rotate" ) )
+      .header( "Authorization", format!( "Bearer {jwt_token2}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -262,15 +262,13 @@ async fn test_concurrent_rotate_same_token()
   assert_eq!(
     success_count,
     1,
-    "LOUD FAILURE: Exactly one rotation must succeed. Got {} successes",
-    success_count
+    "LOUD FAILURE: Exactly one rotation must succeed. Got {success_count} successes"
   );
 
   assert_eq!(
     not_found_count,
     1,
-    "LOUD FAILURE: Exactly one rotation must fail with 404. Got {} 404s",
-    not_found_count
+    "LOUD FAILURE: Exactly one rotation must fail with 404. Got {not_found_count} 404s"
   );
 }
 
@@ -301,8 +299,8 @@ async fn test_concurrent_revoke_same_token()
   {
     let request = Request::builder()
       .method( "DELETE" )
-      .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-      .header( "Authorization", format!( "Bearer {}", jwt_token1 ) )
+      .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+      .header( "Authorization", format!( "Bearer {jwt_token1}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -314,8 +312,8 @@ async fn test_concurrent_revoke_same_token()
   {
     let request = Request::builder()
       .method( "DELETE" )
-      .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-      .header( "Authorization", format!( "Bearer {}", jwt_token2 ) )
+      .uri( format!( "/api/v1/api-tokens/{token_id}" ) )
+      .header( "Authorization", format!( "Bearer {jwt_token2}" ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -334,21 +332,17 @@ async fn test_concurrent_revoke_same_token()
   assert_eq!(
     success_count,
     1,
-    "LOUD FAILURE: Exactly one revocation must succeed with 200 OK. Got {} successes. Statuses: {:?}",
-    success_count,
-    statuses
+    "LOUD FAILURE: Exactly one revocation must succeed with 200 OK. Got {success_count} successes. Statuses: {statuses:?}"
   );
 
   assert_eq!(
     conflict_count,
     1,
-    "LOUD FAILURE: Exactly one revocation must fail with 409 CONFLICT. Got {} conflicts. Statuses: {:?}",
-    conflict_count,
-    statuses
+    "LOUD FAILURE: Exactly one revocation must fail with 409 CONFLICT. Got {conflict_count} conflicts. Statuses: {statuses:?}"
   );
 }
 
-/// Test concurrent rotate and revoke operations on the same token.
+/// Test concurrent rotate and revoke operations by the same token.
 ///
 /// WHY: This tests the race condition between rotation and revocation.
 /// One operation will win, the other will see the token as non-existent.
@@ -375,8 +369,8 @@ async fn test_concurrent_rotate_and_revoke()
   {
     let request = Request::builder()
       .method( "POST" )
-      .uri( format!( "/api/v1/api-tokens/{}/rotate", token_id ) )
-      .header( "Authorization", format!( "Bearer {}", jwt_token1 ) )
+      .uri( format!( "/api/v1/api-tokens/{token_id}/rotate",  ) )
+      .header( "Authorization", format!( "Bearer {jwt_token1}",  ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -388,8 +382,8 @@ async fn test_concurrent_rotate_and_revoke()
   {
     let request = Request::builder()
       .method( "DELETE" )
-      .uri( format!( "/api/v1/api-tokens/{}", token_id ) )
-      .header( "Authorization", format!( "Bearer {}", jwt_token2 ) )
+      .uri( format!( "/api/v1/api-tokens/{token_id}",  ) )
+      .header( "Authorization", format!( "Bearer {jwt_token2}",  ) )
       .body( Body::empty() )
       .unwrap();
 
@@ -413,14 +407,12 @@ async fn test_concurrent_rotate_and_revoke()
   assert_eq!(
     success_count,
     1,
-    "LOUD FAILURE: Exactly one operation must succeed. Results: {:?}",
-    results
+    "LOUD FAILURE: Exactly one operation must succeed. Results: {results:?}"
   );
 
   assert_eq!(
     failure_count,
     1,
-    "LOUD FAILURE: Exactly one operation must fail with 404 or 409. Results: {:?}",
-    results
+    "LOUD FAILURE: Exactly one operation must fail with 404 or 409. Results: {results:?}"
   );
 }
