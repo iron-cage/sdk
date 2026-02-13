@@ -86,6 +86,12 @@ pub struct KeyResponse
 /// - 404: No provider key assigned to project
 /// - 429: Rate limit exceeded
 /// - 500: Decryption failed
+///
+/// # Errors
+///
+/// Returns `(StatusCode, Json)` on rate limit (429), invalid token (401),
+/// agent token usage (403), missing project assignment (400),
+/// missing provider key (404), or decryption failure (500).
 pub async fn get_key(
   auth: ApiTokenAuth,
   State( state ): State< KeysState >,

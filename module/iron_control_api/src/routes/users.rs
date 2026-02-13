@@ -101,6 +101,11 @@ impl CreateUserRequest
   const MIN_PASSWORD_LENGTH: usize = 8;
 
   /// Validates all request fields.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError`] if username, password, or email fail
+  /// length, format, or presence checks.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Username validation
@@ -290,6 +295,10 @@ impl SuspendUserRequest
   const MAX_REASON_LENGTH: usize = 1000;
 
   /// Validates the suspension reason length.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError::TooLong`] if reason exceeds the maximum length.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if let Some( ref reason ) = self.reason
@@ -318,6 +327,10 @@ pub struct ChangeRoleRequest
 impl ChangeRoleRequest
 {
   /// Validates the role value.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError::InvalidFormat`] if the role is not a recognized value.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     let valid_roles = [ "viewer", "user", "admin" ];
@@ -349,6 +362,11 @@ impl ResetPasswordRequest
   const MIN_PASSWORD_LENGTH: usize = 8;
 
   /// Validates the new password length.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError::TooShort`] or [`ValidationError::TooLong`]
+  /// if the password is outside the allowed length range.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.new_password.len() < Self::MIN_PASSWORD_LENGTH

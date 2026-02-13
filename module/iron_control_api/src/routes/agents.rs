@@ -95,6 +95,10 @@ pub struct AgentBudgetResponse {
 }
 
 /// List all agents (filtered by user role)
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` on database query failure.
 pub async fn list_agents(
     State(pool): State<SqlitePool>,
     user: AuthenticatedUser,
@@ -160,6 +164,10 @@ pub async fn list_agents(
 }
 
 /// Get a single agent
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if the agent is not found or on database failure.
 pub async fn get_agent(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -206,6 +214,11 @@ pub async fn get_agent(
 }
 
 /// Create a new agent (admin only)
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if the user is not admin, budget is invalid,
+/// or on database failure.
 pub async fn create_agent(
     State(pool): State<SqlitePool>,
     user: AuthenticatedUser,
@@ -354,6 +367,11 @@ pub async fn create_agent(
 }
 
 /// Update an agent (admin only)
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if the user is not admin, agent is not found,
+/// or on database failure.
 pub async fn update_agent(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -555,6 +573,11 @@ pub async fn update_agent(
 }
 
 /// Delete an agent (admin only)
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if the user is not admin, agent is not found,
+/// or on database failure.
 pub async fn delete_agent(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -590,6 +613,11 @@ pub async fn delete_agent(
 ///
 /// Update an agent's total allocated budget (microdollars).
 /// Recomputes `budget_remaining` = `total_allocated` - `total_spent`.
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if the user is not admin, budget is invalid,
+/// agent is not found, or on database failure.
 pub async fn update_agent_budget(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
@@ -692,6 +720,11 @@ pub struct AgentTokenItem {
 }
 
 /// Get all tokens for an agent (filtered by user role)
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if the agent is not found, user lacks access,
+/// or on database failure.
 pub async fn get_agent_tokens(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,

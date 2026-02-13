@@ -274,6 +274,11 @@ mod implementation
     }
 
     /// Start API server
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TCP listener fails to bind or the server
+    /// encounters a fatal runtime error.
     pub async fn start(self) -> Result<(), anyhow::Error>
     {
       let app = Router::new()

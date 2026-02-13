@@ -47,6 +47,10 @@ impl ProvidersState
   ///
   /// If `IRON_SECRETS_MASTER_KEY` is not set, the state will be created
   /// but crypto operations will be disabled (routes return 503).
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the database connection fails.
   pub async fn new( database_url: &str ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let storage = ProviderKeyStorage::connect( database_url ).await
@@ -106,6 +110,11 @@ impl CreateProviderKeyRequest
   const MAX_DESCRIPTION_LENGTH: usize = 500;
 
   /// Validate request
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError`] if provider is unsupported, API key is empty
+  /// or too long, or optional fields exceed length limits.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate provider type

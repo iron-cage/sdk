@@ -29,6 +29,11 @@ impl GetProviderKeyRequest
   const MAX_IC_TOKEN_LENGTH: usize = 2000;
 
   /// Validate request parameters
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError::MissingField`] if `ic_token` is empty,
+  /// or [`ValidationError::TooLong`] if it exceeds the maximum length.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.ic_token.trim().is_empty()

@@ -64,6 +64,11 @@ impl LoginRateLimiter
   /// # Arguments
   ///
   /// * `ip` - IP address to check
+  ///
+  /// # Errors
+  ///
+  /// Returns `Err(retry_after_seconds)` if the IP has exceeded the
+  /// maximum login attempts within the rate limit window.
   pub fn check_and_record( &self, ip: IpAddr ) -> Result< (), u64 >
   {
     let mut attempts = self.attempts.lock().unwrap();

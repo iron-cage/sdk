@@ -628,6 +628,10 @@ impl AnalyticsState
   /// # Arguments
   /// * `database_url` - `SQLite` database connection URL
   /// * `ic_token_secret` - Secret for verifying IC tokens
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if the database connection or migration fails.
   pub async fn new( database_url: &str, ic_token_secret: String ) -> Result< Self, Box< dyn std::error::Error > >
   {
     let pool = SqlitePoolOptions::new()

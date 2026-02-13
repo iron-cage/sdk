@@ -123,6 +123,10 @@ impl CreateTokenRequest
   /// **Legacy format:** Validates `user_id` (required, non-empty) when `name` not provided
   ///
   /// Both formats validate `description` (optional, max 500 chars) and `project_id` (optional, non-empty).
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError`] if any field fails length, format, or presence checks.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Protocol 014 validation: If `name` is provided, validate it
@@ -328,6 +332,11 @@ impl UpdateTokenRequest
   const MAX_PROVIDER_LENGTH: usize = 64;
 
   /// Validate the update token request fields
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError::MissingField`] if `provider` is empty,
+  /// or [`ValidationError::TooLong`] if it exceeds the maximum length.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     // Validate provider if provided

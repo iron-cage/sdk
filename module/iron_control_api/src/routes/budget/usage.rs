@@ -340,6 +340,11 @@ impl BudgetReturnRequest
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
   /// Validate budget return request parameters
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ValidationError`] if `lease_id` is empty or too long,
+  /// or if `spent_microdollars` is negative.
   pub fn validate( &self ) -> Result< (), ValidationError >
   {
     if self.lease_id.trim().is_empty()
