@@ -219,12 +219,12 @@ impl std::fmt::Display for IpTokenError
   {
     match self
     {
-      Self::InvalidKeyLength => write!( f, "Invalid key length: must be {} bytes", KEY_SIZE ),
+      Self::InvalidKeyLength => write!( f, "Invalid key length: must be {KEY_SIZE} bytes" ),
       Self::InvalidKey => write!( f, "Invalid encryption key" ),
       Self::InvalidFormat => write!( f, "Invalid IP Token format (expected: AES256:{{IV}}:{{ciphertext}}:{{tag}})" ),
       Self::InvalidBase64 => write!( f, "Invalid base64 encoding" ),
-      Self::InvalidNonceLength => write!( f, "Invalid nonce length: must be {} bytes", NONCE_SIZE ),
-      Self::InvalidTagLength => write!( f, "Invalid auth tag length: must be {} bytes", TAG_SIZE ),
+      Self::InvalidNonceLength => write!( f, "Invalid nonce length: must be {NONCE_SIZE} bytes" ),
+      Self::InvalidTagLength => write!( f, "Invalid auth tag length: must be {TAG_SIZE} bytes" ),
       Self::EncryptionFailed => write!( f, "Encryption failed" ),
       Self::DecryptionFailed => write!( f, "Decryption failed: wrong key or tampered data" ),
       Self::InvalidUtf8 => write!( f, "Decrypted data is not valid UTF-8" ),

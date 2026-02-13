@@ -85,7 +85,7 @@ pub async fn login(
         Json( ErrorResponse {
           error: ErrorDetail {
             code: "RATE_LIMIT_EXCEEDED".to_string(),
-            message: format!( "Too many login attempts. Please try again in {} seconds.", retry_after_secs ),
+            message: format!( "Too many login attempts. Please try again in {retry_after_secs} seconds." ),
             details: Some( serde_json::json!({
               "retry_after": retry_after_secs
             })),
@@ -123,7 +123,7 @@ pub async fn login(
         Json( ErrorResponse {
           error: ErrorDetail {
             code: "AUTH_ACCOUNT_LOCKED".to_string(),
-            message: format!( "Account locked due to too many failed login attempts. Try again in {} seconds.", retry_after_secs ),
+            message: format!( "Account locked due to too many failed login attempts. Try again in {retry_after_secs} seconds." ),
             details: Some( serde_json::json!({
               "retry_after": retry_after_secs,
               "locked_until": locked_until_ts
@@ -261,7 +261,7 @@ pub async fn login(
 
   // Generate User Token (30 days expiration)
   // Generate unique token ID for blacklist tracking (UUID for session fixation prevention)
-  let access_token_id = format!("access_{}_{}", user_id, uuid::Uuid::new_v4());
+  let access_token_id = format!("access_{user_id}_{}", uuid::Uuid::new_v4());
   let user_token = match state.jwt_secret.generate_access_token(user_id, &user.email, user_role, &access_token_id) {
     Ok(token) => token,
     Err(err) => {
@@ -282,7 +282,7 @@ pub async fn login(
 
   // Generate refresh token (optional, future feature)
   // Per Protocol 007: refresh_token is optional
-  let refresh_token_id = format!("refresh_{}_{}", user_id, chrono::Utc::now().timestamp());
+  let refresh_token_id = format!("refresh_{user_id}_{}", chrono::Utc::now().timestamp());
   let refresh_token = match state
     .jwt_secret
     .generate_refresh_token(user_id, &user.email, user_role, &refresh_token_id)

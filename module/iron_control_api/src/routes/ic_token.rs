@@ -91,7 +91,7 @@ async fn check_agent_access(
     .await
     .map_err(|e| (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        Json(serde_json::json!({"error": format!("Database error: {e}")})),
     ))?;
 
     match owner_id {
@@ -130,7 +130,7 @@ pub async fn generate_ic_token(
     .await
     .map_err(|e| (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        Json(serde_json::json!({"error": format!("Database error: {e}")})),
     ))
     .unwrap_or(None);
 
@@ -146,8 +146,8 @@ pub async fn generate_ic_token(
 
     // Generate IC token
     let ic_claims = IcTokenClaims::new(
-        format!("agent_{}", agent_id),
-        format!("budget_{}", agent_id),  // Legacy field, kept for compatibility
+        format!("agent_{agent_id}"),
+        format!("budget_{agent_id}"),  // Legacy field, kept for compatibility
         vec!["llm:call".to_string(), "analytics:write".to_string()],
         None,  // Long-lived, no expiration
     );
@@ -157,7 +157,7 @@ pub async fn generate_ic_token(
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to generate IC token: {}", e)})),
+                Json(serde_json::json!({"error": format!("Failed to generate IC token: {e}")})),
             ).into_response();
         }
     };
@@ -177,7 +177,7 @@ pub async fn generate_ic_token(
     {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to save IC token: {}", e)})),
+            Json(serde_json::json!({"error": format!("Failed to save IC token: {e}")})),
         ).into_response();
     }
 
@@ -216,7 +216,7 @@ pub async fn get_ic_token_status(
     .await
     .map_err(|e| (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        Json(serde_json::json!({"error": format!("Database error: {e}")})),
     ))
     .unwrap_or(None);
 
@@ -252,8 +252,8 @@ pub async fn regenerate_ic_token(
 
     // Generate new IC token
     let ic_claims = IcTokenClaims::new(
-        format!("agent_{}", agent_id),
-        format!("budget_{}", agent_id),
+        format!("agent_{agent_id}"),
+        format!("budget_{agent_id}"),
         vec!["llm:call".to_string(), "analytics:write".to_string()],
         None,
     );
@@ -263,7 +263,7 @@ pub async fn regenerate_ic_token(
         Err(e) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to generate IC token: {}", e)})),
+                Json(serde_json::json!({"error": format!("Failed to generate IC token: {e}")})),
             ).into_response();
         }
     };
@@ -288,7 +288,7 @@ pub async fn regenerate_ic_token(
         ).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to save IC token: {}", e)})),
+            Json(serde_json::json!({"error": format!("Failed to save IC token: {e}")})),
         ).into_response(),
         Ok(_) => (
             StatusCode::OK,
@@ -332,7 +332,7 @@ pub async fn revoke_ic_token(
         ).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to revoke IC token: {}", e)})),
+            Json(serde_json::json!({"error": format!("Failed to revoke IC token: {e}")})),
         ).into_response(),
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
     }

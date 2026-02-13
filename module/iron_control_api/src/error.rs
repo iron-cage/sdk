@@ -184,7 +184,7 @@ where
         let error_response = if error_msg.contains( "missing field" )
         {
           ErrorResponse::with_code(
-            format!( "Missing required field: {}", error_msg ),
+            format!( "Missing required field: {error_msg}" ),
             "MISSING_FIELD"
           )
         }
@@ -269,19 +269,19 @@ impl std::fmt::Display for ValidationError
     match self
     {
       Self::MissingField( field ) =>
-        write!( f, "{} cannot be empty", field ),
+        write!( f, "{field} cannot be empty" ),
       Self::InvalidValue { field, reason } =>
-        write!( f, "Invalid {}: {}", field, reason ),
+        write!( f, "Invalid {field}: {reason}" ),
       Self::TooLong { field, max_length } =>
-        write!( f, "{} too long (max {} characters)", field, max_length ),
+        write!( f, "{field} too long (max {max_length} characters)" ),
       Self::TooShort { field, min_length } =>
-        write!( f, "{} too short (min {} characters)", field, min_length ),
+        write!( f, "{field} too short (min {min_length} characters)" ),
       Self::InvalidFormat { field, expected } =>
-        write!( f, "Invalid {}: must be {}", field, expected ),
+        write!( f, "Invalid {field}: must be {expected}" ),
       Self::InvalidCharacter { field, character } =>
-        write!( f, "{} contains invalid {} character)", field, character ),
+        write!( f, "{field} contains invalid {character} character)" ),
       Self::Custom( msg ) =>
-        write!( f, "{}", msg ),
+        write!( f, "{msg}" ),
     }
   }
 }

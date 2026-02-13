@@ -75,7 +75,7 @@ impl FromStr for Role
       "admin" => Ok( Self::Admin ),
       "user" => Ok( Self::User ),
       "viewer" => Ok( Self::Viewer ),
-      _ => Err( format!( "Invalid role: {}", s ) ),
+      _ => Err( format!( "Invalid role: {s}" ) ),
     }
   }
 }
@@ -121,7 +121,7 @@ impl FromStr for Permission
       "read_metrics" => Ok( Self::ReadMetrics ),
       "manage_users" => Ok( Self::ManageUsers ),
       "manage_tokens" => Ok( Self::ManageTokens ),
-      _ => Err( format!( "Invalid permission: {}", s ) ),
+      _ => Err( format!( "Invalid permission: {s}" ) ),
     }
   }
 }

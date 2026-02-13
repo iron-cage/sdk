@@ -123,7 +123,7 @@ pub async fn list_agents(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?
     } else {
@@ -148,7 +148,7 @@ pub async fn list_agents(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?
     };
@@ -192,7 +192,7 @@ pub async fn get_agent(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            format!("Database error: {e}"),
         )
     })?
     .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
@@ -249,7 +249,7 @@ pub async fn create_agent(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            format!("Database error: {e}"),
         )
     })?;
 
@@ -265,7 +265,7 @@ pub async fn create_agent(
     let providers_json = serde_json::to_string(&provider_list).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("JSON error: {}", e),
+            format!("JSON error: {e}"),
         )
     })?;
 
@@ -293,14 +293,14 @@ pub async fn create_agent(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?;
 
         if user_exists.is_none() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                format!("Specified owner_id '{}' does not exist", specified_owner),
+                format!("Specified owner_id '{specified_owner}' does not exist"),
             ));
         }
 
@@ -325,7 +325,7 @@ pub async fn create_agent(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            format!("Database error: {e}"),
         )
     })?;
 
@@ -349,7 +349,7 @@ pub async fn create_agent(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to create agent budget: {}", e),
+            format!("Failed to create agent budget: {e}"),
         )
     })?;
 
@@ -394,7 +394,7 @@ pub async fn update_agent(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?;
 
@@ -412,7 +412,7 @@ pub async fn update_agent(
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {}", e),
+                    format!("Database error: {e}"),
                 )
             })?;
     }
@@ -421,7 +421,7 @@ pub async fn update_agent(
         let providers_json = serde_json::to_string(providers).map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("JSON error: {}", e),
+                format!("JSON error: {e}"),
             )
         })?;
         sqlx::query("UPDATE agents SET providers = ? WHERE id = ?")
@@ -432,7 +432,7 @@ pub async fn update_agent(
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {}", e),
+                    format!("Database error: {e}"),
                 )
             })?;
     }
@@ -449,7 +449,7 @@ pub async fn update_agent(
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {}", e),
+                    format!("Database error: {e}"),
                 )
             })?;
             let provider_name: String = match provider_row {
@@ -463,7 +463,7 @@ pub async fn update_agent(
             let providers_json = serde_json::to_string(&vec![provider_name]).map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("JSON error: {}", e),
+                    format!("JSON error: {e}"),
                 )
             })?;
 
@@ -476,7 +476,7 @@ pub async fn update_agent(
                 .map_err(|e| {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Database error: {}", e),
+                        format!("Database error: {e}"),
                     )
                 })?;
         } else {
@@ -484,7 +484,7 @@ pub async fn update_agent(
             let providers_json = serde_json::to_string(&Vec::<String>::new()).map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("JSON error: {}", e),
+                    format!("JSON error: {e}"),
                 )
             })?;
 
@@ -496,7 +496,7 @@ pub async fn update_agent(
                 .map_err(|e| {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Database error: {}", e),
+                        format!("Database error: {e}"),
                     )
                 })?;
         }
@@ -516,14 +516,14 @@ pub async fn update_agent(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?;
 
         if user_exists.is_none() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                format!("Specified owner_id '{}' does not exist", new_owner),
+                format!("Specified owner_id '{new_owner}' does not exist"),
             ));
         }
 
@@ -535,7 +535,7 @@ pub async fn update_agent(
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {}", e),
+                    format!("Database error: {e}"),
                 )
             })?;
     }
@@ -560,7 +560,7 @@ pub async fn update_agent(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {}", e),
+            format!("Database error: {e}"),
         )
     })?;
 
@@ -598,7 +598,7 @@ pub async fn delete_agent(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?;
 
@@ -643,7 +643,7 @@ pub async fn update_agent_budget(
         .bind(id)
         .fetch_optional(&pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {e}")))?;
 
     if agent_exists.is_none() {
         return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
@@ -656,7 +656,7 @@ pub async fn update_agent_budget(
     .bind(id)
     .fetch_optional(&pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))?;
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {e}")))?;
 
     let total_spent = budget_row.map(|r| r.0).unwrap_or(0);
 
@@ -690,7 +690,7 @@ pub async fn update_agent_budget(
     .bind(now_ms)
     .execute(&pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))?;
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {e}")))?;
 
     Ok(Json(AgentBudgetResponse {
         agent_id: id,
@@ -738,7 +738,7 @@ pub async fn get_agent_tokens(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?;
 
@@ -781,7 +781,7 @@ pub async fn get_agent_tokens(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?
     } else {
@@ -808,7 +808,7 @@ pub async fn get_agent_tokens(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {}", e),
+                format!("Database error: {e}"),
             )
         })?
     };
