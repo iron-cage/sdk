@@ -742,11 +742,8 @@ pub async fn get_agent_tokens(
             )
         })?;
 
-    let owner_id = match agent_owner {
-        Some(owner) => owner,
-        None => {
-            return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
-        }
+    let Some(owner_id) = agent_owner else {
+        return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
     };
 
     // Check if user has access (admin or owns the agent)

@@ -164,16 +164,12 @@ pub async fn refresh_budget(
   }
 
   // Verify IC Token
-  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  let Ok( claims ) = state.ic_token_manager.verify_token( &request.ic_token ) else
   {
-    Ok( claims ) => claims,
-    Err( _ ) =>
+    return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
     {
-      return ( StatusCode::UNAUTHORIZED, Json( serde_json::json!(
-      {
-        "error": "Invalid IC Token"
-      } ) ) ).into_response();
-    }
+      "error": "Invalid IC Token"
+    } ) ) ).into_response();
   };
 
   // Extract agent_id from IC Token claims

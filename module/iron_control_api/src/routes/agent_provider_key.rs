@@ -109,19 +109,15 @@ pub async fn get_provider_key(
   }
 
   // 2. Verify IC Token
-  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  let Ok( claims ) = state.ic_token_manager.verify_token( &request.ic_token ) else
   {
-    Ok( claims ) => claims,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json( serde_json::json!({
-          "error": "Invalid IC Token",
-          "code": "UNAUTHORIZED"
-        }) ),
-      ).into_response();
-    }
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json( serde_json::json!({
+        "error": "Invalid IC Token",
+        "code": "UNAUTHORIZED"
+      }) ),
+    ).into_response();
   };
 
   // 3. Parse agent_id from claims (format: agent_<id>)
@@ -186,19 +182,15 @@ pub async fn get_provider_key(
   };
 
   // 5. Check if agent has provider assigned
-  let provider_key_id = match provider_key_id
+  let Some( provider_key_id ) = provider_key_id else
   {
-    Some( id ) => id,
-    None =>
-    {
-      return (
-        StatusCode::FORBIDDEN,
-        Json( serde_json::json!({
-          "error": "Agent has no provider assigned",
-          "code": "NO_PROVIDER_ASSIGNED"
-        }) ),
-      ).into_response();
-    }
+    return (
+      StatusCode::FORBIDDEN,
+      Json( serde_json::json!({
+        "error": "Agent has no provider assigned",
+        "code": "NO_PROVIDER_ASSIGNED"
+      }) ),
+    ).into_response();
   };
 
   // 6. Get provider key record (includes encrypted data)
@@ -231,20 +223,16 @@ pub async fn get_provider_key(
   }
 
   // 8. Get crypto service
-  let crypto = match &state.crypto_service
+  let Some( crypto ) = &state.crypto_service else
   {
-    Some( c ) => c,
-    None =>
-    {
-      tracing::error!( "CryptoService not configured" );
-      return (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json( serde_json::json!({
-          "error": "Crypto service unavailable",
-          "code": "CRYPTO_UNAVAILABLE"
-        }) ),
-      ).into_response();
-    }
+    tracing::error!( "CryptoService not configured" );
+    return (
+      StatusCode::SERVICE_UNAVAILABLE,
+      Json( serde_json::json!({
+        "error": "Crypto service unavailable",
+        "code": "CRYPTO_UNAVAILABLE"
+      }) ),
+    ).into_response();
   };
 
   // 9. Reconstruct encrypted secret from base64

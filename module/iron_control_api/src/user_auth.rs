@@ -150,10 +150,9 @@ pub async fn authenticate_user(
 ) -> Result< Option< User >, sqlx::Error >
 {
   // Fetch user from database
-  let user = match get_user_by_email( pool, email ).await?
+  let Some( user ) = get_user_by_email( pool, email ).await? else
   {
-    Some( user ) => user,
-    None => return Ok( None ), // User not found
+    return Ok( None ); // User not found
   };
 
   if verify_password( password, &user.password_hash )

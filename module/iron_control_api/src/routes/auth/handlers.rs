@@ -362,18 +362,15 @@ pub async fn logout(
   // - jti: Token ID from JWT claims
   // - blacklisted_at: Current timestamp
   // - expires_at: Original token expiration (for cleanup)
-  let expires_at = match chrono::DateTime::from_timestamp( claims.exp, 0 ) {
-    Some( dt ) => dt,
-    None => {
-      tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
-      return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
-        error: ErrorDetail {
-          code: "INVALID_TOKEN".to_string(),
-          message: "Token contains invalid expiration timestamp".to_string(),
-          details: None,
-        },
-      } ) ).into_response();
-    }
+  let Some( expires_at ) = chrono::DateTime::from_timestamp( claims.exp, 0 ) else {
+    tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
+    return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
+      error: ErrorDetail {
+        code: "INVALID_TOKEN".to_string(),
+        message: "Token contains invalid expiration timestamp".to_string(),
+        details: None,
+      },
+    } ) ).into_response();
   };
   match user_auth::add_token_to_blacklist(&state.db_pool, &jti, &user_id, expires_at).await {
     Ok(()) => {},
@@ -439,21 +436,18 @@ pub async fn refresh(
   // AuthenticatedUser( claims ): AuthenticatedUser
 
 ) -> impl IntoResponse {
-  let claims = match state.jwt_secret.verify_refresh_token(bearer.token()) {
-    Ok(claims) => claims,
-    Err(_) => {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "AUTH_INVALID_TOKEN".to_string(),
-            message: "Invalid or expired authentication token".to_string(),
-            details: None,
-          },
-        }),
-      )
-        .into_response();
-    }
+  let Ok(claims) = state.jwt_secret.verify_refresh_token(bearer.token()) else {
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json(ErrorResponse {
+        error: ErrorDetail {
+          code: "AUTH_INVALID_TOKEN".to_string(),
+          message: "Invalid or expired authentication token".to_string(),
+          details: None,
+        },
+      }),
+    )
+      .into_response();
   };
 
   let blacklisted = match user_auth::get_blacklisted_token(&state.db_pool, &claims.jti).await {
@@ -506,13 +500,11 @@ pub async fn refresh(
     }
   };
 
-  let user = match user {
-    Some(user) => user,
-    None => {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(ErrorResponse {
-          error: ErrorDetail {
+  let Some(user) = user else {
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json(ErrorResponse {
+        error: ErrorDetail {
           code: "USER_NOT_FOUND".to_string(),
           message: "User not found".to_string(),
           details: None,
@@ -520,7 +512,6 @@ pub async fn refresh(
       }),
     )
       .into_response();
-    }
   };
 
   // Generate new User Token (30 days) with unique JTI (session fixation prevention)
@@ -695,31 +686,25 @@ pub async fn validate(
     }
   };
 
-  let user = match user_option {
-    Some(user) => user,
-    None => {
-      return (StatusCode::NOT_FOUND, Json(ErrorResponse {
-        error: ErrorDetail {
-          code: "USER_NOT_FOUND".to_string(),
-          message: "User not found".to_string(),
-          details: None,
-        },
-      })).into_response();
-    }
+  let Some(user) = user_option else {
+    return (StatusCode::NOT_FOUND, Json(ErrorResponse {
+      error: ErrorDetail {
+        code: "USER_NOT_FOUND".to_string(),
+        message: "User not found".to_string(),
+        details: None,
+      },
+    })).into_response();
   };
 
-  let expires_at = match chrono::DateTime::from_timestamp(claims.exp, 0) {
-    Some( dt ) => dt,
-    None => {
-      tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
-      return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
-        error: ErrorDetail {
-          code: "INVALID_TOKEN".to_string(),
-          message: "Token contains invalid expiration timestamp".to_string(),
-          details: None,
-        },
-      } ) ).into_response();
-    }
+  let Some( expires_at ) = chrono::DateTime::from_timestamp(claims.exp, 0) else {
+    tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
+    return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
+      error: ErrorDetail {
+        code: "INVALID_TOKEN".to_string(),
+        message: "Token contains invalid expiration timestamp".to_string(),
+        details: None,
+      },
+    } ) ).into_response();
   };
   let expires_in = (expires_at - chrono::Utc::now()).num_seconds() as u64;
 

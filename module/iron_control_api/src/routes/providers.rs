@@ -261,10 +261,9 @@ pub async fn create_provider_key(
 ) -> impl IntoResponse
 {
   // Check if crypto is enabled
-  let crypto = match &state.crypto
+  let Some( crypto ) = &state.crypto else
   {
-    Some( c ) => c,
-    None => return feature_disabled_response().into_response(),
+    return feature_disabled_response().into_response();
   };
 
   // Validate request
@@ -289,29 +288,21 @@ pub async fn create_provider_key(
   };
 
   // Encrypt API key
-  let encrypted = match crypto.encrypt( &request.api_key )
+  let Ok( encrypted ) = crypto.encrypt( &request.api_key ) else
   {
-    Ok( enc ) => enc,
-    Err( _ ) =>
-    {
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "Failed to encrypt API key"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+      "error": "Failed to encrypt API key"
+    }) ) ).into_response();
   };
 
   // Create masked key for response
   let masked_key = mask_api_key( &request.api_key );
 
-  let keys = match state.storage.get_keys_by_provider(provider).await
+  let Ok( keys ) = state.storage.get_keys_by_provider(provider).await else
   {
-    Ok( keys ) => keys,
-    Err( _ ) =>
-    {
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "Failed to get provider keys"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+      "error": "Failed to get provider keys"
+    }) ) ).into_response();
   };
   let key_id = if !keys.is_empty()
   {
@@ -354,15 +345,11 @@ pub async fn create_provider_key(
   };
 
   // Get metadata for response
-  let metadata = match state.storage.get_key_metadata( key_id ).await
+  let Ok( metadata ) = state.storage.get_key_metadata( key_id ).await else
   {
-    Ok( meta ) => meta,
-    Err( _ ) =>
-    {
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "Failed to retrieve provider key metadata"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+      "error": "Failed to retrieve provider key metadata"
+    }) ) ).into_response();
   };
 
   ( StatusCode::CREATED, Json( ProviderKeyResponse
@@ -387,15 +374,11 @@ pub async fn list_provider_keys(
   crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
 ) -> impl IntoResponse
 {
-  let keys = match state.storage.list_keys( &claims.sub ).await
+  let Ok( keys ) = state.storage.list_keys( &claims.sub ).await else
   {
-    Ok( keys ) => keys,
-    Err( _ ) =>
-    {
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "Failed to fetch provider keys"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+      "error": "Failed to fetch provider keys"
+    }) ) ).into_response();
   };
 
   // For each key, fetch assigned projects and build response
@@ -435,15 +418,11 @@ pub async fn get_provider_key(
   Path( key_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  let metadata = match state.storage.get_key_metadata( key_id ).await
+  let Ok( metadata ) = state.storage.get_key_metadata( key_id ).await else
   {
-    Ok( meta ) => meta,
-    Err( _ ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
-        "error": "Provider key not found"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
+      "error": "Provider key not found"
+    }) ) ).into_response();
   };
 
   // Verify ownership
@@ -485,15 +464,11 @@ pub async fn update_provider_key(
 ) -> impl IntoResponse
 {
   // Verify ownership
-  let metadata = match state.storage.get_key_metadata( key_id ).await
+  let Ok( metadata ) = state.storage.get_key_metadata( key_id ).await else
   {
-    Ok( meta ) => meta,
-    Err( _ ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
-        "error": "Provider key not found"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
+      "error": "Provider key not found"
+    }) ) ).into_response();
   };
 
   if metadata.user_id != claims.sub
@@ -536,15 +511,11 @@ pub async fn update_provider_key(
   }
 
   // Get updated metadata
-  let updated = match state.storage.get_key_metadata( key_id ).await
+  let Ok( updated ) = state.storage.get_key_metadata( key_id ).await else
   {
-    Ok( meta ) => meta,
-    Err( _ ) =>
-    {
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-        "error": "Failed to retrieve updated metadata"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+      "error": "Failed to retrieve updated metadata"
+    }) ) ).into_response();
   };
 
   // Fetch assigned projects
@@ -577,15 +548,11 @@ pub async fn delete_provider_key(
 ) -> impl IntoResponse
 {
   // Verify ownership
-  let metadata = match state.storage.get_key_metadata( key_id ).await
+  let Ok( metadata ) = state.storage.get_key_metadata( key_id ).await else
   {
-    Ok( meta ) => meta,
-    Err( _ ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
-        "error": "Provider key not found"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
+      "error": "Provider key not found"
+    }) ) ).into_response();
   };
 
   if metadata.user_id != claims.sub
@@ -619,15 +586,11 @@ pub async fn assign_provider_to_project(
 ) -> impl IntoResponse
 {
   // Verify key ownership
-  let metadata = match state.storage.get_key_metadata( request.provider_key_id ).await
+  let Ok( metadata ) = state.storage.get_key_metadata( request.provider_key_id ).await else
   {
-    Ok( meta ) => meta,
-    Err( _ ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
-        "error": "Provider key not found"
-      }) ) ).into_response();
-    }
+    return ( StatusCode::NOT_FOUND, Json( serde_json::json!({
+      "error": "Provider key not found"
+    }) ) ).into_response();
   };
 
   if metadata.user_id != claims.sub

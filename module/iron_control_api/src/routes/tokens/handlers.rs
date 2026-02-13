@@ -70,30 +70,24 @@ pub async fn create_token(
   // Rate limiting: Check both limits (Protocol 014)
   // 1. Max active tokens per user: 10
   // 2. Max token creates per minute: 10
-  let active_token_count = match state.storage.count_active_tokens_for_user( user_id ).await
+  let Ok( active_token_count ) = state.storage.count_active_tokens_for_user( user_id ).await
+  else
   {
-    Ok( count ) => count,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to check token limit" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to check token limit" }) ),
+    )
+      .into_response();
   };
 
-  let recent_creations = match state.storage.count_recent_token_creations( user_id ).await
+  let Ok( recent_creations ) = state.storage.count_recent_token_creations( user_id ).await
+  else
   {
-    Ok( count ) => count,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to check rate limit" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to check rate limit" }) ),
+    )
+      .into_response();
   };
 
   // Check rate limit first (time-based constraint is more restrictive in practice)
@@ -178,17 +172,14 @@ pub async fn create_token(
   };
 
   // Get metadata for response
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to retrieve token metadata" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to retrieve token metadata" }) ),
+    )
+      .into_response();
   };
 
   // Log token creation to audit_log (Protocol 014 requirement)
@@ -237,17 +228,14 @@ pub async fn list_tokens(
 {
   let user_id = &claims.sub;
 
-  let tokens = match state.storage.list_user_tokens( user_id ).await
+  let Ok( tokens ) = state.storage.list_user_tokens( user_id ).await
+  else
   {
-    Ok( tokens ) => tokens,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to fetch tokens" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to fetch tokens" }) ),
+    )
+      .into_response();
   };
 
   let token_list: Vec< TokenListItem > = tokens
@@ -280,17 +268,14 @@ pub async fn get_token(
 {
   let user_id = &claims.sub;
 
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::NOT_FOUND,
+      Json( serde_json::json!({ "error": "Token not found" }) ),
+    )
+      .into_response();
   };
 
   if metadata.user_id != *user_id
@@ -337,17 +322,14 @@ pub async fn update_token(
     }) ) ).into_response();
   }
 
-  let existing_metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( existing_metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::NOT_FOUND,
+      Json( serde_json::json!({ "error": "Token not found" }) ),
+    )
+      .into_response();
   };
 
   if existing_metadata.user_id != *user_id
@@ -375,17 +357,14 @@ pub async fn update_token(
       .into_response();
   }
 
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to retrieve updated token" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to retrieve updated token" }) ),
+    )
+      .into_response();
   };
 
   let item = TokenListItem
@@ -412,17 +391,14 @@ pub async fn rotate_token(
   Path( token_id ): Path< i64 >,
 ) -> impl IntoResponse
 {
-  let existing_metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( existing_metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::NOT_FOUND,
+      Json( serde_json::json!({ "error": "Token not found" }) ),
+    )
+      .into_response();
   };
 
   if !existing_metadata.is_active
@@ -445,7 +421,7 @@ pub async fn rotate_token(
 
   let new_token = state.generator.generate();
 
-  let new_token_id = match state
+  let Ok( new_token_id ) = state
     .storage
     .create_token(
       &new_token,
@@ -456,29 +432,23 @@ pub async fn rotate_token(
       existing_metadata.provider.as_deref(),
     )
     .await
+  else
   {
-    Ok( id ) => id,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to create new token" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to create new token" }) ),
+    )
+      .into_response();
   };
 
-  let new_metadata = match state.storage.get_token_metadata( new_token_id ).await
+  let Ok( new_metadata ) = state.storage.get_token_metadata( new_token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to retrieve new token metadata" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to retrieve new token metadata" }) ),
+    )
+      .into_response();
   };
 
   ( StatusCode::OK, Json( CreateTokenResponse
@@ -506,17 +476,14 @@ pub async fn revoke_token(
 {
   let user_id = &claims.sub;
 
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::NOT_FOUND,
+      Json( serde_json::json!({ "error": "Token not found" }) ),
+    )
+      .into_response();
   };
 
   if metadata.user_id != *user_id
@@ -620,36 +587,30 @@ pub async fn validate_token(
   crate::error::JsonBody( request ): crate::error::JsonBody< ValidateTokenRequest >,
 ) -> impl IntoResponse
 {
-  let token_id = match state.storage.verify_token( &request.token ).await
+  let Ok( token_id ) = state.storage.verify_token( &request.token ).await
+  else
   {
-    Ok( id ) => id,
-    Err( _ ) =>
+    return ( StatusCode::OK, Json( ValidateTokenResponse
     {
-      return ( StatusCode::OK, Json( ValidateTokenResponse
-      {
-        valid: false,
-        user_id: None,
-        project_id: None,
-        token_id: None,
-      } ) )
-        .into_response();
-    }
+      valid: false,
+      user_id: None,
+      project_id: None,
+      token_id: None,
+    } ) )
+      .into_response();
   };
 
-  let metadata = match state.storage.get_token_metadata( token_id ).await
+  let Ok( metadata ) = state.storage.get_token_metadata( token_id ).await
+  else
   {
-    Ok( metadata ) => metadata,
-    Err( _ ) =>
+    return ( StatusCode::OK, Json( ValidateTokenResponse
     {
-      return ( StatusCode::OK, Json( ValidateTokenResponse
-      {
-        valid: false,
-        user_id: None,
-        project_id: None,
-        token_id: None,
-      } ) )
-        .into_response();
-    }
+      valid: false,
+      user_id: None,
+      project_id: None,
+      token_id: None,
+    } ) )
+      .into_response();
   };
 
   ( StatusCode::OK, Json( ValidateTokenResponse

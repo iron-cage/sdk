@@ -160,17 +160,13 @@ pub async fn handshake(
   }
 
   // Verify IC Token
-  let claims = match state.ic_token_manager.verify_token( &request.ic_token )
+  let Ok( claims ) = state.ic_token_manager.verify_token( &request.ic_token ) else
   {
-    Ok( claims ) => claims,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
+    )
+      .into_response();
   };
 
   // Helper: create a dev placeholder provider key for agent_1 if missing
@@ -276,18 +272,14 @@ pub async fn handshake(
     }
   };
 
-  let owner_id = match owner_id
+  let Some( owner_id ) = owner_id else
   {
-    Some( id ) => id,
-    None =>
-    {
-      // Security: Use generic error to prevent agent enumeration attacks
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
-      )
-        .into_response();
-    }
+    // Security: Use generic error to prevent agent enumeration attacks
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json( serde_json::json!({ "error": "Invalid IC Token" }) ),
+    )
+      .into_response();
   };
 
   let owner_for_key = if owner_id.trim().is_empty() { "user_admin".to_string() } else { owner_id.clone() };
@@ -569,21 +561,17 @@ pub async fn handshake(
   }
 
   // Decrypt provider API key from database
-  let encrypted_secret = match iron_secrets::crypto::EncryptedSecret::from_base64(
+  let Ok( encrypted_secret ) = iron_secrets::crypto::EncryptedSecret::from_base64(
     &_key_record.encrypted_api_key,
     &_key_record.encryption_nonce,
-  )
+  ) else
   {
-    Ok( secret ) => secret,
-    Err( _ ) =>
-    {
-      tracing::error!( "Failed to decode provider key base64" );
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Key storage error" }) ),
-      )
-        .into_response();
-    }
+    tracing::error!( "Failed to decode provider key base64" );
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Key storage error" }) ),
+    )
+      .into_response();
   };
 
   let provider_key = match state.provider_key_crypto.decrypt( &encrypted_secret )
@@ -601,17 +589,13 @@ pub async fn handshake(
   };
 
   // Encrypt provider API key into IP Token
-  let ip_token = match state.ip_token_crypto.encrypt( &provider_key )
+  let Ok( ip_token ) = state.ip_token_crypto.encrypt( &provider_key ) else
   {
-    Ok( token ) => token,
-    Err( _ ) =>
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to encrypt IP Token" }) ),
-      )
-        .into_response();
-    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to encrypt IP Token" }) ),
+    )
+      .into_response();
   };
 
   // Create budget lease
