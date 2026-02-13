@@ -116,18 +116,27 @@ __msg_info "Apply k8s"
 kubectl apply -k ./k8s -n ${ARTIFACT_REPO_NAME}
 
 __msg_info "Wait for deployment"
-if ! kubectl rollout status deployment/app -n ${ARTIFACT_REPO_NAME} --timeout=120s; then
-  __msg_error "Rollout failed -> auto rollback"
-  kubectl rollout undo deployment/app -n ${ARTIFACT_REPO_NAME}
 
-  # Wait for rollback to complete
-  if kubectl rollout status deployment/app -n ${ARTIFACT_REPO_NAME} --timeout=120s; then
-    __msg_success "Rollback successful"
-    exit 1  # Exit with error (deployment failed, but service restored)
-  else
-    __msg_error "Rollback FAILED - service may be down!"
-    exit 2
-  fi
+__msg_info "Wait for backend deployment"
+if ! kubectl rollout status deployment/backend -n ${ARTIFACT_REPO_NAME} --timeout=120s; then
+  __msg_error "Backend rollout failed -> rolling back both deployments"
+
+  kubectl rollout undo deployment/backend -n ${ARTIFACT_REPO_NAME} || true
+  kubectl rollout undo deployment/frontend -n ${ARTIFACT_REPO_NAME} || true
+
+  exit 1
 fi
+__msg_success "Backend deployment ready"
+
+__msg_info "Wait for frontend deployment"
+if ! kubectl rollout status deployment/frontend -n ${ARTIFACT_REPO_NAME} --timeout=120s; then
+  __msg_error "Frontend rollout failed -> rolling back both deployments"
+
+  kubectl rollout undo deployment/frontend -n ${ARTIFACT_REPO_NAME} || true
+  kubectl rollout undo deployment/backend -n ${ARTIFACT_REPO_NAME} || true
+
+  exit 1
+fi
+__msg_success "Frontend deployment ready"
 
 __msg_success "Deployment complete"
