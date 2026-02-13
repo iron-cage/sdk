@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub struct AuthState {
   /// Shared JWT signing secret
   pub jwt_secret: Arc<JwtSecret>,
-  /// SQLite database connection pool
+  /// `SQLite` database connection pool
   pub db_pool: Pool<Sqlite>,
   /// Login attempt rate limiter
   pub rate_limiter: crate::rate_limiter::LoginRateLimiter,
@@ -24,6 +24,7 @@ impl core::fmt::Debug for AuthState {
     f.debug_struct( "AuthState" )
       .field( "jwt_secret", &"<JwtSecret>" )
       .field( "db_pool", &"<SqlitePool>" )
+      .field( "rate_limiter", &"<LoginRateLimiter>" )
       .field( "rate_limiting_enabled", &self.rate_limiting_enabled )
       .finish()
   }
@@ -202,7 +203,7 @@ impl UserInfo {
   #[must_use]
   pub fn from_claims_and_user(claims: &crate::jwt_auth::AccessTokenClaims, user: &crate::user_auth::User) -> Self {
     Self {
-      id: user.id.to_string(),
+      id: user.id.clone(),
       email: user.username.clone(),
       role: claims.role.clone(),
       name: user.name.clone().unwrap_or_else( || user.username.clone() ),
@@ -217,7 +218,7 @@ impl UserInfo {
   #[must_use]
   pub fn from_user(user: &crate::user_auth::User) -> Self {
     Self {
-      id: user.id.to_string(),
+      id: user.id.clone(),
       email: user.email.clone(),
       role: user.role.clone(),
       name: user.name.clone().unwrap_or_else( || user.username.clone() ),

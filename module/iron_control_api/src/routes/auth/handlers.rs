@@ -165,7 +165,7 @@ pub async fn login(
         if count >= 10
         {
           // Lock for 30 minutes (1800000 milliseconds)
-          let locked_until = now + 1800000;
+          let locked_until = now + 1_800_000;
           sqlx::query(
             "UPDATE users SET locked_until = ? WHERE email = ?"
           )
@@ -295,7 +295,7 @@ pub async fn login(
   };
 
   // Calculate expiration (30 days from now)
-  let expires_in = 2592000u64; // 30 days in seconds
+  let expires_in = 2_592_000_u64; // 30 days in seconds
   let expires_at = chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(expires_in).unwrap_or(i64::MAX));
 
   (
@@ -566,7 +566,7 @@ pub async fn refresh(
   }
 
   // Calculate expiration (30 days from now)
-  let expires_in = 2592000u64; // 30 days in seconds
+  let expires_in = 2_592_000_u64; // 30 days in seconds
   let expires_at = chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(expires_in).unwrap_or(i64::MAX));
 
   // Return response with new tokens (both access and refresh)

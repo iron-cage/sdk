@@ -116,6 +116,10 @@ impl JwtSecret
   /// * `user_id` - User ID to encode in token
   /// * `token_id` - Unique token ID for blacklist tracking
   ///
+  /// # Panics
+  ///
+  /// Panics if the system clock is before the Unix epoch.
+  ///
   /// # Errors
   ///
   /// Returns error if JWT encoding fails

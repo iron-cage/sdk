@@ -15,7 +15,7 @@ pub struct User
   pub id: String,
   /// Login username
   pub username: String,
-  /// BCrypt password hash
+  /// `BCrypt` password hash
   pub password_hash: String,
   /// RBAC role name
   pub role: String,

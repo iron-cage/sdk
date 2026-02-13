@@ -65,7 +65,7 @@ pub struct BuildInfo
 /// - timestamp: Build timestamp from `VERGEN_BUILD_TIMESTAMP` (`build.rs`)
 /// - environment: Runtime environment from ENVIRONMENT var or "development"
 #[ must_use ]
-pub async fn get_version() -> impl IntoResponse
+pub fn get_version() -> impl IntoResponse
 {
   let response = VersionResponse
   {

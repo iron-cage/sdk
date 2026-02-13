@@ -29,7 +29,7 @@ use iron_token_manager::user_service::
 };
 use crate::jwt_auth::AuthenticatedUser;
 use crate::error::ValidationError;
-use std::str::FromStr;
+use core::str::FromStr;
 
 /// State for user management endpoints
 #[ derive( Clone ) ]

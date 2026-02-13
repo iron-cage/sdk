@@ -57,18 +57,15 @@ impl ProvidersState
       .map_err( |e| Box::new( e ) as Box< dyn std::error::Error > )?;
 
     // Try to initialize crypto, but don't fail if master key not set
-    let crypto = match CryptoService::from_env()
+    let crypto = if let Ok( c ) = CryptoService::from_env()
     {
-      Ok( c ) =>
-      {
-        tracing::info!( "AI Provider Keys feature enabled" );
-        Some( Arc::new( c ) )
-      }
-      Err( _ ) =>
-      {
-        tracing::warn!( "AI Provider Keys feature disabled: IRON_SECRETS_MASTER_KEY not set" );
-        None
-      }
+      tracing::info!( "AI Provider Keys feature enabled" );
+      Some( Arc::new( c ) )
+    }
+    else
+    {
+      tracing::warn!( "AI Provider Keys feature disabled: IRON_SECRETS_MASTER_KEY not set" );
+      None
     };
 
     Ok( Self {
@@ -305,8 +302,26 @@ pub async fn create_provider_key(
       "error": "Failed to get provider keys"
     }) ) ).into_response();
   };
-  let key_id = if !keys.is_empty()
+  let key_id = if keys.is_empty()
   {
+    match state.storage.create_key(
+      provider,
+      &encrypted.ciphertext_base64(),
+      &encrypted.nonce_base64(),
+      request.base_url.as_deref(),
+      request.description.as_deref(),
+      &claims.sub,
+    ).await
+    {
+      Ok( id ) => id,
+      Err( _ ) =>
+      {
+        return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
+          "error": "Failed to create provider key"
+        }) ) ).into_response();
+      }
+    }
+  } else {
     match state.storage.update_key(
       keys[0],
       provider,
@@ -322,24 +337,6 @@ pub async fn create_provider_key(
       {
         return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
           "error": "Failed to update provider key"
-        }) ) ).into_response();
-      }
-    }
-  } else {
-    match state.storage.create_key(
-      provider,
-      &encrypted.ciphertext_base64(),
-      &encrypted.nonce_base64(),
-      request.base_url.as_deref(),
-      request.description.as_deref(),
-      &claims.sub,
-    ).await
-    {
-      Ok( id ) => id,
-      Err( _ ) =>
-      {
-        return ( StatusCode::INTERNAL_SERVER_ERROR, Json( serde_json::json!({
-          "error": "Failed to create provider key"
         }) ) ).into_response();
       }
     }

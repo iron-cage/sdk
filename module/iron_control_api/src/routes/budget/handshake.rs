@@ -313,8 +313,7 @@ pub async fn handshake(
         let current_cost = current_cost_opt.unwrap_or( 0 );
         match limit_max_opt
         {
-          None => 0, // No max_cost configured - block
-          Some( 0 ) => 0, // Explicit zero limit - block
+          None | Some( 0 ) => 0, // No/zero max_cost configured - block
           Some( limit_max ) if limit_max > current_cost => limit_max - current_cost,
           Some( _ ) => 0, // Limit exhausted - block
         }
@@ -518,7 +517,7 @@ pub async fn handshake(
   };
 
   // Get provider key record (encrypted)
-  let _key_record = match state.provider_key_storage.get_key( key_id ).await
+  let key_record = match state.provider_key_storage.get_key( key_id ).await
   {
     Ok( record ) => record,
     Err( TokenError::Database( sqlx::Error::RowNotFound ) ) =>
@@ -541,7 +540,7 @@ pub async fn handshake(
   };
 
   // Validate provider key matches requested provider
-  if _key_record.metadata.provider != provider_type
+  if key_record.metadata.provider != provider_type
   {
     return (
       StatusCode::FORBIDDEN,
@@ -551,7 +550,7 @@ pub async fn handshake(
   }
 
   // Validate provider key is enabled
-  if !_key_record.metadata.is_enabled
+  if !key_record.metadata.is_enabled
   {
     return (
       StatusCode::FORBIDDEN,
@@ -562,8 +561,8 @@ pub async fn handshake(
 
   // Decrypt provider API key from database
   let Ok( encrypted_secret ) = iron_secrets::crypto::EncryptedSecret::from_base64(
-    &_key_record.encrypted_api_key,
-    &_key_record.encryption_nonce,
+    &key_record.encrypted_api_key,
+    &key_record.encryption_nonce,
   ) else
   {
     tracing::error!( "Failed to decode provider key base64" );
@@ -648,8 +647,7 @@ pub async fn handshake(
     .await
     .ok()
     .flatten()
-    .map( |b| b.budget_remaining )
-    .unwrap_or( 0 );
+    .map_or( 0, |b| b.budget_remaining );
 
   // Return successful handshake response
   ( StatusCode::OK, Json( HandshakeResponse

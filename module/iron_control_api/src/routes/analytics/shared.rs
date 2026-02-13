@@ -51,6 +51,10 @@ pub enum Period
 impl Period
 {
   /// Convert period to (`start_ms`, `end_ms`) range
+  ///
+  /// # Panics
+  ///
+  /// Panics if midnight `NaiveDateTime` construction fails (should never happen).
   #[must_use]
   pub fn to_range( &self ) -> ( i64, i64 )
   {
@@ -182,7 +186,7 @@ pub struct AnalyticsEventRequest
   pub event_type: String,
   /// Model name used in request
   pub model: String,
-  /// Provider name (e.g. OpenAI, Anthropic)
+  /// Provider name (e.g. `OpenAI`, `Anthropic`)
   pub provider: String,
   /// Number of input tokens consumed
   #[serde( default )]
@@ -617,7 +621,7 @@ pub struct AnalyticsEventWithAgent
 #[derive( Debug, Clone )]
 pub struct AnalyticsState
 {
-  /// SQLite connection pool
+  /// `SQLite` connection pool
   pub pool: SqlitePool,
   /// Shared IC token manager
   pub ic_token_manager: Arc< IcTokenManager >,

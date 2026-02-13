@@ -15,12 +15,13 @@
 //!
 //! Post-pilot: Replace with Redis for distributed deployment
 
+use core::time::Duration;
 use std::
 {
   collections::HashMap,
   net::IpAddr,
   sync::{ Arc, Mutex },
-  time::{ Duration, Instant },
+  time::Instant,
 };
 
 /// Rate limiter configuration
@@ -70,6 +71,10 @@ impl LoginRateLimiter
   ///
   /// Returns `Err(retry_after_seconds)` if the IP has exceeded the
   /// maximum login attempts within the rate limit window.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal mutex is poisoned.
   pub fn check_and_record( &self, ip: IpAddr ) -> Result< (), u64 >
   {
     let mut attempts = self.attempts.lock().unwrap();

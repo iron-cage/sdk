@@ -31,7 +31,7 @@ pub struct BudgetState
   pub provider_key_storage: Arc< ProviderKeyStorage >,
   /// Crypto service for provider key encryption
   pub provider_key_crypto: Arc< CryptoService >,
-  /// SQLite database connection pool
+  /// `SQLite` database connection pool
   pub db_pool: SqlitePool,
   /// JWT secret for access token auth
   pub jwt_secret: Arc< JwtSecret >,

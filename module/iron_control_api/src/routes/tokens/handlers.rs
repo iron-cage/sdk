@@ -505,14 +505,12 @@ pub async fn revoke_token(
       )
         .into_response();
     }
-    else
-    {
-      return (
-        StatusCode::NOT_FOUND,
-        Json( serde_json::json!({ "error": "Token not found" }) ),
-      )
-        .into_response();
-    }
+
+    return (
+      StatusCode::NOT_FOUND,
+      Json( serde_json::json!({ "error": "Token not found" }) ),
+    )
+      .into_response();
   }
 
   match state.storage.revoke_token( token_id ).await

@@ -287,7 +287,7 @@ pub mod middleware
   #[ must_use ]
   pub fn extract_role_from_claims( claims: &crate::jwt_auth::AccessTokenClaims ) -> Role
   {
-    use std::str::FromStr;
+    use core::str::FromStr;
     Role::from_str( &claims.role ).unwrap_or( Role::User )
   }
 }

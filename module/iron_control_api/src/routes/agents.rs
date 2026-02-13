@@ -387,7 +387,7 @@ pub async fn update_agent(
     }
 
     // Check if agent exists
-    let _existing: Option<i64> = sqlx::query_scalar("SELECT id FROM agents WHERE id = ?")
+    let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM agents WHERE id = ?")
         .bind(id)
         .fetch_optional(&pool)
         .await
@@ -398,7 +398,7 @@ pub async fn update_agent(
             )
         })?;
 
-    if _existing.is_none() {
+    if existing.is_none() {
         return Err((StatusCode::NOT_FOUND, "Agent not found".to_string()));
     }
 
@@ -658,7 +658,7 @@ pub async fn update_agent_budget(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {e}")))?;
 
-    let total_spent = budget_row.map(|r| r.0).unwrap_or(0);
+    let total_spent = budget_row.map_or(0, |r| r.0);
 
     if req.total_allocated_microdollars < total_spent {
         return Err((

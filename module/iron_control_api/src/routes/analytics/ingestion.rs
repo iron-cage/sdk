@@ -111,11 +111,11 @@ pub async fn post_event(
 
   // INSERT OR IGNORE for deduplication (agent_id from verified token)
   let result = sqlx::query(
-    r#"INSERT OR IGNORE INTO analytics_events
+    r"INSERT OR IGNORE INTO analytics_events
        (event_id, timestamp_ms, event_type, model, provider,
         input_tokens, output_tokens, cost_micros,
         agent_id, provider_id, error_code, error_message, received_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   )
     .bind( &event.event_id )
     .bind( event.timestamp_ms )
@@ -214,7 +214,7 @@ pub async fn list_events(
   // Build data query with agent join
   let query = if params.agent_id.is_some()
   {
-    r#"SELECT
+    r"SELECT
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
          COALESCE(a.name, 'Unknown') as agent_name,
@@ -223,11 +223,11 @@ pub async fn list_events(
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ? AND e.agent_id = ?
        ORDER BY e.timestamp_ms DESC
-       LIMIT ? OFFSET ?"#
+       LIMIT ? OFFSET ?"
   }
   else
   {
-    r#"SELECT
+    r"SELECT
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
          COALESCE(a.name, 'Unknown') as agent_name,
@@ -236,7 +236,7 @@ pub async fn list_events(
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
        ORDER BY e.timestamp_ms DESC
-       LIMIT ? OFFSET ?"#
+       LIMIT ? OFFSET ?"
   };
 
   let data: Vec< AnalyticsEventWithAgent > = match if let Some( agent_id ) = params.agent_id

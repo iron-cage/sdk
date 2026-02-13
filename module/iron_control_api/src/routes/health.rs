@@ -24,7 +24,7 @@ pub struct HealthResponse
 ///
 /// Always returns 200 OK with service status
 #[ must_use ]
-pub async fn health_check() -> impl IntoResponse
+pub fn health_check() -> impl IntoResponse
 {
   let now = Utc::now().timestamp();
 

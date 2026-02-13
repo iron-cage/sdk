@@ -678,7 +678,7 @@ pub async fn approve_budget_request(
       {
         "Cannot approve cancelled budget request"
       }
-      _ => "Budget request is not pending",
+      iron_token_manager::budget_request::RequestStatus::Pending => "Budget request is not pending",
     };
 
     return ( StatusCode::CONFLICT, Json( serde_json::json!(
@@ -804,7 +804,7 @@ pub async fn reject_budget_request(
       {
         "Cannot reject cancelled budget request"
       }
-      _ => "Budget request is not pending",
+      iron_token_manager::budget_request::RequestStatus::Pending => "Budget request is not pending",
     };
 
     return ( StatusCode::CONFLICT, Json( serde_json::json!(

@@ -213,9 +213,9 @@ pub enum IpTokenError
   InvalidUtf8,
 }
 
-impl std::fmt::Display for IpTokenError
+impl core::fmt::Display for IpTokenError
 {
-  fn fmt( &self, f : &mut std::fmt::Formatter< '_ > ) -> std::fmt::Result
+  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
   {
     match self
     {

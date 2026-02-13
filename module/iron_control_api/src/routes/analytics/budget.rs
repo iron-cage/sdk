@@ -155,7 +155,7 @@ pub async fn get_budget_status(
       data.sort_by(|a, b| {
         b.percent_used
           .partial_cmp(&a.percent_used)
-          .unwrap_or(std::cmp::Ordering::Equal)
+          .unwrap_or(core::cmp::Ordering::Equal)
       });
 
       (

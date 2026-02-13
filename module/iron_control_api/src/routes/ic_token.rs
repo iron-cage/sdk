@@ -33,7 +33,7 @@ use crate::jwt_auth::AuthenticatedUser;
 /// IC Token route state
 #[derive(Debug, Clone)]
 pub struct IcTokenState {
-    /// SQLite database connection pool
+    /// `SQLite` database connection pool
     pub pool: SqlitePool,
     /// Shared IC token manager instance
     pub ic_token_manager: Arc<IcTokenManager>,

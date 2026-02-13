@@ -47,7 +47,7 @@ pub struct IcTokenClaims
   #[ serde( rename = "iss" ) ]
   pub issuer: String,
 
-  /// Allowed operations (e.g., ["llm:call", "data:read"])
+  /// Allowed operations (e.g., `["llm:call", "data:read"]`)
   pub permissions: Vec< String >,
 }
 
@@ -65,6 +65,10 @@ impl IcTokenClaims
   /// # Returns
   ///
   /// New `IcTokenClaims` with current timestamp as `issued_at`
+  ///
+  /// # Panics
+  ///
+  /// Panics if the system clock is before the Unix epoch.
   #[ must_use ]
   pub fn new(
     agent_id: String,
@@ -94,6 +98,10 @@ impl IcTokenClaims
   /// - Issuer is "iron-control-panel"
   /// - If `expires_at` is set, token hasn't expired
   /// - `agent_id` format is valid
+  ///
+  /// # Panics
+  ///
+  /// Panics if the system clock is before the Unix epoch.
   ///
   /// # Errors
   ///
