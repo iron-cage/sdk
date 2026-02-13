@@ -207,7 +207,8 @@ fn bug_reproducer_issue_003_git_hook_exists() {
   let hook_path = repo_root.join(".git/hooks/pre-commit");
 
   // Check if hook exists
-  assert!(hook_path.exists(),
+  assert!(
+    hook_path.exists(),
     "BUG REPRODUCER: Pre-commit hook missing.\n\
      Expected: {}\n\
      \n\
@@ -494,7 +495,8 @@ fn bug_reproducer_issue_003_script_validates_working_directory() {
 
   let script_path = repo_root.join("dev/-dev1/-default_topic/-phase1_verify.sh");
 
-  assert!(script_path.exists(),
+  assert!(
+    script_path.exists(),
     "BUG REPRODUCER: Verification script not found.\n\
      Expected: {}\n\
      \n\

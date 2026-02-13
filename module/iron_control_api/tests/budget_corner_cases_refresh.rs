@@ -96,7 +96,8 @@ async fn test_refresh_null_additional_budget() {
 
   // NULL requested_budget is valid - should succeed with default
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "NULL requested_budget should succeed with default budget, got: {}",
     response.status()
   );
@@ -238,7 +239,8 @@ async fn test_refresh_float_overflow_infinity() {
 
   // Infinity becomes null, which is valid for Option<i64> - should succeed with default budget
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "Infinity requested_budget (becomes null) should succeed with default budget, got: {}",
     response.status()
   );
@@ -310,7 +312,8 @@ async fn test_refresh_nan_additional_budget() {
 
   // NaN becomes null, which is valid for Option<i64> - should succeed with default budget
   assert_eq!(
-    response.status(), StatusCode::OK,
+    response.status(),
+    StatusCode::OK,
     "NaN requested_budget (becomes null) should succeed with default budget, got: {}",
     response.status()
   );

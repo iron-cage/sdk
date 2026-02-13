@@ -128,11 +128,8 @@ async fn test_refresh_invalid_jwt_signature() {
   let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   // Parse JSON if possible (response might not be JSON)
-  let response_json: serde_json::Value = serde_json::from_str(&body_str).unwrap_or_else(|_| {
-    panic!(
-      "LOUD FAILURE: Response is not valid JSON. Body: {body_str}"
-    )
-  });
+  let response_json: serde_json::Value = serde_json::from_str(&body_str)
+    .unwrap_or_else(|_| panic!("LOUD FAILURE: Response is not valid JSON. Body: {body_str}"));
 
   // Assert: Clear error message (response might have different structure)
   let has_error = response_json.get("error").is_some() || response_json.get("message").is_some();

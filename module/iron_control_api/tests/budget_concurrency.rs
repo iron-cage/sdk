@@ -538,9 +538,7 @@ async fn test_toctou_race_insufficient_budget() {
   // Debug: Print actual distribution if test fails
   if success_count != 1 || forbidden_count != 1 {
     eprintln!("TOCTOU Race Detected!");
-    eprintln!(
-      "Success: {success_count}, Forbidden: {forbidden_count}, Other: {other_statuses:?}"
-    );
+    eprintln!("Success: {success_count}, Forbidden: {forbidden_count}, Other: {other_statuses:?}");
   }
 
   // CRITICAL: Exactly 1 should succeed, exactly 1 should fail

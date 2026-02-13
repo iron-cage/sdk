@@ -89,7 +89,7 @@ impl BudgetRefreshRequest {
   }
 
   /// Get requested budget or default
-  #[must_use] 
+  #[must_use]
   pub fn get_requested_budget(&self) -> i64 {
     self
       .requested_budget

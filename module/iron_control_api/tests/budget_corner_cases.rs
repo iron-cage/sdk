@@ -1477,11 +1477,12 @@ async fn test_idempotency_duplicate_event_id() {
   );
 
   // Get budget after first report
-  let budget_after_first = sqlx::query("SELECT total_spent FROM agent_budgets WHERE `agent_id` = ?")
-    .bind(agent_id)
-    .fetch_one(&pool)
-    .await
-    .expect("LOUD FAILURE: Should fetch agent budget");
+  let budget_after_first =
+    sqlx::query("SELECT total_spent FROM agent_budgets WHERE `agent_id` = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should fetch agent budget");
 
   let total_spent_after_first: i64 = budget_after_first.get("total_spent");
 
@@ -1510,11 +1511,12 @@ async fn test_idempotency_duplicate_event_id() {
   );
 
   // Get budget after second report
-  let budget_after_second = sqlx::query("SELECT total_spent FROM agent_budgets WHERE `agent_id` = ?")
-    .bind(agent_id)
-    .fetch_one(&pool)
-    .await
-    .expect("LOUD FAILURE: Should fetch agent budget");
+  let budget_after_second =
+    sqlx::query("SELECT total_spent FROM agent_budgets WHERE `agent_id` = ?")
+      .bind(agent_id)
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Should fetch agent budget");
 
   let total_spent_after_second: i64 = budget_after_second.get("total_spent");
 

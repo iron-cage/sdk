@@ -15,19 +15,19 @@ use crate::error::ValidationError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json};
 use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::time::Duration;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
-use core::time::Duration;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 /// Compute SHA-256 hash of a token string (hex-encoded)
-#[must_use] 
+#[must_use]
 pub fn sha256_hash(token: &str) -> String {
   format!("{:x}", Sha256::digest(token.as_bytes()))
 }
