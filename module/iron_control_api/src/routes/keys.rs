@@ -212,10 +212,7 @@ pub async fn get_key(
     } )?;
 
   // 7. Log to audit_log
-  let now_ms = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect( "LOUD FAILURE: Time went backwards" )
-    .as_millis() as i64;
+  let now_ms = chrono::Utc::now().timestamp_millis();
 
   let changes = serde_json::json!({
     "token_id": auth.token_id,

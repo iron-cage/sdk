@@ -273,10 +273,7 @@ pub async fn get_provider_key(
   };
 
   // 11. Log audit entry (fire and forget)
-  let now_ms = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect( "LOUD FAILURE: Time went backwards" )
-    .as_millis() as i64;
+  let now_ms = chrono::Utc::now().timestamp_millis();
 
   let changes = serde_json::json!({
     "agent_id": agent_id,

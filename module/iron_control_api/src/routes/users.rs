@@ -487,8 +487,8 @@ pub async fn list_users(
     role: query.role,
     is_active: query.is_active,
     search: query.search,
-    limit: Some( page_size as i64 ),
-    offset: Some( offset as i64 ),
+    limit: Some( i64::from(page_size) ),
+    offset: Some( i64::from(offset) ),
   };
 
   // List users

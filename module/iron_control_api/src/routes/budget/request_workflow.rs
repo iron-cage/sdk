@@ -261,6 +261,7 @@ pub async fn create_budget_request(
   // Generate unique request ID
   let request_id = format!( "breq_{}", Uuid::new_v4() );
   let now_ms = chrono::Utc::now().timestamp_millis();
+  #[allow(clippy::cast_possible_truncation)] // Budget USD values are always within i64 range
   let requested_budget_micros = ( request.requested_budget_usd * 1_000_000.0 ) as i64;
 
   // Fix(issue-004): Validate requested budget differs from current budget

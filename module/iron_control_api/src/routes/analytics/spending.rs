@@ -157,8 +157,8 @@ pub async fn get_spending_by_agent(
     sqlx::query_as(base_query)
       .bind(start_ms)
       .bind(end_ms)
-      .bind(page.per_page as i64)
-      .bind(offset as i64)
+      .bind(i64::from(page.per_page))
+      .bind(i64::from(offset))
       .fetch_all(&state.pool)
       .await
   } else {
@@ -166,8 +166,8 @@ pub async fn get_spending_by_agent(
       .bind(start_ms)
       .bind(end_ms)
       .bind(&user.0.sub)
-      .bind(page.per_page as i64)
-      .bind(offset as i64)
+      .bind(i64::from(page.per_page))
+      .bind(i64::from(offset))
       .fetch_all(&state.pool)
       .await
   };
@@ -241,9 +241,9 @@ pub async fn get_spending_by_agent(
           summary: SpendingSummary {
             total_spend,
             total_budget,
-            total_agents: total_count as u32,
+            total_agents: u32::try_from(total_count).unwrap_or(u32::MAX),
           },
-          pagination: Pagination::new(page.page, page.per_page, total_count as u32),
+          pagination: Pagination::new(page.page, page.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
           period: format!("{:?}", params.period)
             .to_lowercase()
             .replace("_", "-"),
@@ -350,7 +350,7 @@ pub async fn get_spending_by_provider(
           summary: ProviderSpendingSummary {
             total_spend,
             total_requests,
-            providers_count: data.len() as u32,
+            providers_count: u32::try_from(data.len()).unwrap_or(u32::MAX),
           },
           data,
           period: format!("{:?}", params.period)

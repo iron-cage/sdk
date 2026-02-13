@@ -200,7 +200,7 @@ pub async fn list_events(
 
   let total = match count_result
   {
-    Ok( c ) => c as u32,
+    Ok( c ) => u32::try_from( c ).unwrap_or( u32::MAX ),
     Err( e ) =>
     {
       tracing::error!( "Failed to count events: {}", e );
@@ -245,8 +245,8 @@ pub async fn list_events(
       .bind( start_ms )
       .bind( end_ms )
       .bind( agent_id )
-      .bind( params.per_page as i64 )
-      .bind( offset as i64 )
+      .bind( i64::from(params.per_page) )
+      .bind( i64::from(offset) )
       .fetch_all( &state.pool )
       .await
   }
@@ -255,8 +255,8 @@ pub async fn list_events(
     sqlx::query_as( query )
       .bind( start_ms )
       .bind( end_ms )
-      .bind( params.per_page as i64 )
-      .bind( offset as i64 )
+      .bind( i64::from(params.per_page) )
+      .bind( i64::from(offset) )
       .fetch_all( &state.pool )
       .await
   }

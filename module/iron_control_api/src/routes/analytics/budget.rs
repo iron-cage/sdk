@@ -62,7 +62,7 @@ pub async fn get_budget_status(
   if let Some(agent_id) = params.agent_id {
     q = q.bind(agent_id);
   }
-  q = q.bind(params.per_page as i64).bind(offset as i64);
+  q = q.bind(i64::from(params.per_page)).bind(i64::from(offset));
 
   let rows = q.fetch_all(&state.pool).await;
 
@@ -83,7 +83,7 @@ pub async fn get_budget_status(
   match rows {
     Ok(rows) => {
       let mut summary = BudgetSummary {
-        total_agents: rows.len() as u32,
+        total_agents: u32::try_from(rows.len()).unwrap_or(u32::MAX),
         active: 0,
         exhausted: 0,
         critical: 0,
@@ -105,7 +105,7 @@ pub async fn get_budget_status(
 
           // Apply threshold filter
           if let Some(threshold) = params.threshold {
-            if percent_used <= threshold as f64 {
+            if percent_used <= f64::from(threshold) {
               return None;
             }
           }
@@ -163,7 +163,7 @@ pub async fn get_budget_status(
         Json(BudgetStatusResponse {
           data,
           summary,
-          pagination: Pagination::new(params.page, params.per_page, total_count as u32),
+          pagination: Pagination::new(params.page, params.per_page, u32::try_from(total_count).unwrap_or(u32::MAX)),
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )

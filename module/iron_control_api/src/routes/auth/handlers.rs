@@ -296,7 +296,7 @@ pub async fn login(
 
   // Calculate expiration (30 days from now)
   let expires_in = 2592000u64; // 30 days in seconds
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in as i64);
+  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(expires_in).unwrap_or(i64::MAX));
 
   (
     StatusCode::OK,
@@ -546,7 +546,7 @@ pub async fn refresh(
   };
 
   // Blacklist old User Token (atomic operation)
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(claims.exp as i64);
+  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(claims.exp).unwrap_or(i64::MAX));
   match user_auth::add_token_to_blacklist(&state.db_pool, &claims.jti, &user.id, expires_at).await {
     Ok(()) => {},
     Err(err) => {
@@ -567,7 +567,7 @@ pub async fn refresh(
 
   // Calculate expiration (30 days from now)
   let expires_in = 2592000u64; // 30 days in seconds
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in as i64);
+  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(expires_in).unwrap_or(i64::MAX));
 
   // Return response with new tokens (both access and refresh)
   (
@@ -706,7 +706,7 @@ pub async fn validate(
       },
     } ) ).into_response();
   };
-  let expires_in = (expires_at - chrono::Utc::now()).num_seconds() as u64;
+  let expires_in = u64::try_from((expires_at - chrono::Utc::now()).num_seconds()).unwrap_or(0);
 
   // Placeholder response
   (

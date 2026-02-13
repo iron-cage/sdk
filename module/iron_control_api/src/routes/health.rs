@@ -3,6 +3,7 @@
 //! Phase 4 Day 29: REST API Endpoints - Health Check
 
 use axum::{ http::StatusCode, response::{ IntoResponse, Json } };
+use chrono::Utc;
 use serde::{ Serialize };
 
 /// Health check response
@@ -25,10 +26,7 @@ pub struct HealthResponse
 #[ must_use ]
 pub async fn health_check() -> impl IntoResponse
 {
-  let now = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect( "LOUD FAILURE: Time went backwards" )
-    .as_secs() as i64;
+  let now = Utc::now().timestamp();
 
   ( StatusCode::OK, Json( HealthResponse
   {
