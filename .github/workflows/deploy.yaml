@@ -1,17 +1,4 @@
-name: Deploy CI
 
-on:
-  push:
-    branches: [ "master" ]
-
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: iron_cage_sdk
-    steps:
-    - uses: actions/checkout@v4
-    
     - name: Create secret.sh file
       run: |
         {
@@ -41,4 +28,119 @@ jobs:
         echo "${{ secrets.SECRET_RSA_PUBLIC_KEY }}"   > ${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}
 
     - name: 'Build the image, push and deploy'
-      run: 'make -f Makefile.deploy deploy'
+      run: 'make -f ./deploy/Makefile.deploy deploy'
+
+name: Deploy CI
+
+on:
+  push:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, staging, production]
+
+concurrency:
+  group: deploy-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY }}
+    environment: >
+      ${{
+        github.event_name == 'push'
+        && 'dev'
+        || inputs.environment
+      }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Decode service account credentials
+      env:
+        GCP_CREDS_B64: ${{ secrets.SECRET_GCP_CREDENTIALS }}
+      run: |
+        echo "::add-mask::${GCP_CREDS_B64}"
+        printf '%s' "${GCP_CREDS_B64}" | base64 --decode > "${{ secrets.GOOGLE_SE_CREDS_PATH }}"
+        if [ ! -s "${{ secrets.GOOGLE_SE_CREDS_PATH }}" ]; then
+          echo "ERROR: Failed to decode service account credentials"
+          exit 1
+        fi
+        chmod 600 "${{ secrets.GOOGLE_SE_CREDS_PATH }}"
+
+    - name: Create key files
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SECRET_RSA_PRIVATE_KEY }}
+        SSH_PUBLIC_KEY: ${{ secrets.SECRET_RSA_PUBLIC_KEY }}
+      run: |
+        install -m 600 /dev/null "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
+        printf '%s\n' "${SSH_PRIVATE_KEY}" > "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
+
+        install -m 644 /dev/null "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
+        printf '%s\n' "${SSH_PUBLIC_KEY}" > "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
+
+    - name: Create secret.sh file
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_SE_CREDS_PATH }}
+        GOOGLE_APPLICATION_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID }}
+        GOOGLE_APPLICATION_REGION: ${{ secrets.GOOGLE_APPLICATION_REGION }}
+        GOOGLE_ENCRYPTION_KEY: ${{ secrets.SECRET_STATE_ARCHIVE_KEY }}
+        SSH_PRIVATE_KEY_PATH: ${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}
+        SSH_PUBLIC_KEY_PATH: ${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}
+        HOST_SERVER_NAME: ${{ secrets.HOST_SERVER_NAME }}
+        HOST_SERVER_IP: ${{ secrets.HOST_SERVER_IP }}
+        HETZNER_CLOUD_TOKEN: ${{ secrets.SECRET_HETZNER_CLOUD_TOKEN }}
+        DEPLOYMENT_MODE: ${{ vars.DEPLOYMENT_MODE }}
+        PROJECT_NAME: ${{ vars.PROJECT_NAME }}
+        PROJECT_DOMAIN: ${{ vars.PROJECT_DOMAIN }}
+        PROJECT_CERT_EMAIL: ${{ vars.PROJECT_CERT_EMAIL }}
+        HOST_SERVER_IMAGE: ${{ vars.HOST_SERVER_IMAGE }}
+        HOST_SERVER_LOCATION: ${{ vars.HOST_SERVER_LOCATION }}
+        HOST_SERVER_TYPE: ${{ vars.HOST_SERVER_TYPE }}
+      run: |
+        install -m 600 /dev/null .secret/-secret.sh
+        cat > .secret/-secret.sh <<EOF
+        GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}
+        GOOGLE_APPLICATION_PROJECT_ID=${GOOGLE_APPLICATION_PROJECT_ID}
+        GOOGLE_APPLICATION_REGION=${GOOGLE_APPLICATION_REGION}
+        GOOGLE_ENCRYPTION_KEY=${GOOGLE_ENCRYPTION_KEY}
+        SSH_PRIVATE_KEY_PATH=${SSH_PRIVATE_KEY_PATH}
+        SSH_PUBLIC_KEY_PATH=${SSH_PUBLIC_KEY_PATH}
+        HOST_SERVER_NAME=${HOST_SERVER_NAME}
+        HOST_SERVER_IP=${HOST_SERVER_IP}
+        HETZNER_CLOUD_TOKEN=${HETZNER_CLOUD_TOKEN}
+        DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
+        PROJECT_NAME=${PROJECT_NAME}
+        PROJECT_DOMAIN=${PROJECT_DOMAIN}
+        PROJECT_CERT_EMAIL=${PROJECT_CERT_EMAIL}
+        HOST_SERVER_IMAGE=${HOST_SERVER_IMAGE}
+        HOST_SERVER_LOCATION=${HOST_SERVER_LOCATION}
+        HOST_SERVER_TYPE=${HOST_SERVER_TYPE}
+        EOF
+
+    - name: 'Build the image, push and deploy' 
+      run: 'make deploy'
+
+    - name: 'Verify deployment health'
+      run: |
+        # /#/health is the actual route — the app uses hash-based routing
+        timeout 300 bash -c 'until curl -f -k https://${{ vars.PROJECT_DOMAIN }}/#/health; do sleep 5; done'
+
+    - name: Cleanup secrets
+      if: always()
+      run: |
+        if [ -f .secret/-secret.sh ]; then
+          shred -vfz -n 3 .secret/-secret.sh
+        fi
+        if [ -f "${{ secrets.GOOGLE_SE_CREDS_PATH }}" ]; then
+          shred -vfz -n 3 "${{ secrets.GOOGLE_SE_CREDS_PATH }}"
+        fi
+        if [ -f "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}" ]; then
+          shred -vfz -n 3 "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
+        fi
+        if [ -f "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}" ]; then
+          shred -vfz -n 3 "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
+        fi
+
