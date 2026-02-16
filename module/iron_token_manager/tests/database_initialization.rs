@@ -166,7 +166,7 @@ async fn test_production_schema_matches_test_schema()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  assert_eq!( index_count, 42, "Should have 42 indexes across all migrations" );
+  assert_eq!( index_count, 43, "Should have 43 indexes across all migrations" );
 }
 
 #[ tokio::test ]

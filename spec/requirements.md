@@ -1790,6 +1790,22 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
   - Security audits via `cargo audit` weekly
 - **Validation:** Run `cargo deny check`, verify zero vulnerabilities
 
+### NFR-2.5.4: Code Style Standards
+- **Requirement:** Consistent Rust formatting across all codebase
+- **Principles:**
+  - As an **open-source project**, formatting standards follow idiomatic Rust and `rustfmt` conventions
+  - Only deviation: 2-space indentation (configured in `rustfmt.toml`)
+  - All other formatting (brace placement, spacing, line width) follows standard `rustfmt` defaults
+- **Rationale:**
+  - Open-source projects benefit from widely-adopted conventions for contributor onboarding
+  - Standard `rustfmt` ensures consistency with the broader Rust ecosystem
+  - Minimal deviations reduce cognitive load and tooling friction
+- **Enforcement:**
+  - CI pipeline checks formatting with `cargo fmt --all -- --check`
+  - Pre-commit hooks recommended (not mandatory) for local development
+  - Complete formatting rules documented in `codestyle.md`
+- **Validation:** Run `make fmt-check`, verify zero formatting violations
+
 ### 2.6 Testing (MUST)
 
 ### NFR-2.6.1: Database Test Isolation

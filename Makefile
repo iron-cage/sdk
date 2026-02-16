@@ -57,18 +57,18 @@ dashboard: ## Run dashboard only (port 5173)
 # Testing
 #===============================================================================
 
-# test-w3: ## Run all tests via w3 (nextest + clippy + doc tests)
-#	w3 .test l::3
-
-test: ## Run nextest (use ARGS="..." for extra arguments)
-	@echo "[*] Running tests..."
+test: ## Run tests (nextest + doc tests, use ARGS="..." for nextest)
+	@echo "[*] Running nextest..."
 	@cargo nextest run --all-features --no-fail-fast $(ARGS)
+	@echo "[*] Running doc tests..."
+	@cargo test --doc --all-features
 
 test_one: ## Run single test: `make test_one <test_name>`
-	@$(MAKE) test ARGS="$(filter-out $@,$(MAKECMDGOALS))"
+	@test_name="$(filter-out $@,$(MAKECMDGOALS))"; \
+	$(MAKE) test ARGS="-E 'test($$test_name)'"
 
 test_in: ## Run tests in module: `make test_in <module_name>`
-	@$(MAKE) test ARGS="--test $(filter-out $@,$(MAKECMDGOALS))"
+	@$(MAKE) test ARGS="-p $(filter-out $@,$(MAKECMDGOALS))"
 
 test_not: ## Exclude tests: `make test_not <test1> <test2> ...`
 	@expr=$$(echo "$(filter-out $@,$(MAKECMDGOALS))" \
@@ -79,10 +79,13 @@ test_not: ## Exclude tests: `make test_not <test1> <test2> ...`
 # Code Quality
 #===============================================================================
 
-fmt: ## Check and fix Rust formatting
+fmt-check: ## Check Rust formatting (CI use)
 	@echo "[*] Checking formatting..."
-	@cargo fmt --all -- --check \
-		|| (echo "[*] Formatting code..." && cargo fmt --all)
+	@cargo fmt --all -- --check
+
+fmt-fix: ## Auto-format Rust code (local use)
+	@echo "[*] Formatting code..."
+	@cargo fmt --all
 
 lint: ## Run clippy in strict mode
 	@echo "[*] Running clippy..."
@@ -94,7 +97,7 @@ lint-docs: ## Check documentation ID format compliance
 lint-python: ## Check Python tooling compliance
 	@scripts/lint_python_tooling.sh
 
-check: fmt lint ## Quick code quality check
+check: fmt-check lint ## Quick code quality check
 
 #===============================================================================
 # Build & Validation
