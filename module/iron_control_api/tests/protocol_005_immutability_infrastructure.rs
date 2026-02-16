@@ -195,11 +195,11 @@ fn bug_reproducer_issue_003_documentation_exists()
 //
 // FULL DOCUMENTATION PRESERVED IN:
 // - GitHub Issue: "Protocol 005: Complete Infrastructure Layer"
-// - Git history: Commit b76442e (2026-02-16)
+// - Git history: Commit c422b9a (2026-02-16)
 //
 // RECOVERY:
 // When infrastructure is complete, restore tests from git history:
-//   git show b76442e:module/iron_control_api/tests/protocol_005_immutability_infrastructure.rs
+//   git show c422b9a:module/iron_control_api/tests/protocol_005_immutability_infrastructure.rs
 //
 // Or use test code from GitHub issue.
 // ===========================================================================
