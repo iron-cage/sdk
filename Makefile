@@ -57,9 +57,6 @@ dashboard: ## Run dashboard only (port 5173)
 # Testing
 #===============================================================================
 
-# test-w3: ## Run all tests via w3 (nextest + clippy + doc tests)
-#	w3 .test l::3
-
 test: ## Run tests (nextest + doc tests, use ARGS="..." for nextest)
 	@echo "[*] Running nextest..."
 	@cargo nextest run --all-features --no-fail-fast $(ARGS)
@@ -67,10 +64,11 @@ test: ## Run tests (nextest + doc tests, use ARGS="..." for nextest)
 	@cargo test --doc --all-features
 
 test_one: ## Run single test: `make test_one <test_name>`
-	@$(MAKE) test ARGS="$(filter-out $@,$(MAKECMDGOALS))"
+	@test_name="$(filter-out $@,$(MAKECMDGOALS))"; \
+	$(MAKE) test ARGS="-E 'test($$test_name)'"
 
 test_in: ## Run tests in module: `make test_in <module_name>`
-	@$(MAKE) test ARGS="--test $(filter-out $@,$(MAKECMDGOALS))"
+	@$(MAKE) test ARGS="-p $(filter-out $@,$(MAKECMDGOALS))"
 
 test_not: ## Exclude tests: `make test_not <test1> <test2> ...`
 	@expr=$$(echo "$(filter-out $@,$(MAKECMDGOALS))" \
