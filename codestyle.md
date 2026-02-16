@@ -674,7 +674,7 @@ secret/
 ```
 project_root/
 ├── src/                          # Production code ONLY
-├── spec/                         # Project specification (alternative to spec.md)
+├── spec/                         # Project specification
 │   └── readme.md                 # MANDATORY: Specification overview
 ├── tests/                        # ALL functional/integration tests
 │   ├── readme.md                 # MANDATORY: Test organization & principles
@@ -687,7 +687,6 @@ project_root/
 ├── secret/                       # Secrets and credentials
 │   ├── readme.md                 # MANDATORY: Secret management documentation
 │   └── -api_keys.sh             # Secret files (- prefix mandatory)
-├── spec.md                       # Project specification (alternative to spec/ dir)
 ├── readme.md                     # Primary documentation (lowercase)
 ├── license                       # License file (lowercase)
 └── [tooling files]               # Language-specific tooling (Cargo.toml, etc.)
@@ -702,7 +701,7 @@ Every directory (except `src/`) **must** contain a `readme.md` file (lowercase, 
 **ABSOLUTE File Type Separation Rules (No Exceptions):**
 - **Performance/Benchmark tests:** MUST be in `benches/` directory
 - **Functional tests:** MUST be in `tests/` directory
-- **Specifications:** MUST be in `spec/` directory OR single `spec.md` file
+- **Specifications:** MUST be in `spec/` directory
 - **Secrets:** MUST be in `secret/` directory with `-` prefix naming
 - **Production code:** Must be separated from tests and benchmarks
 - **Examples:** Must be demonstrations only, NO tests, NO benchmarks
