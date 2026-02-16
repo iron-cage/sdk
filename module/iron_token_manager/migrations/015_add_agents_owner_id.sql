@@ -22,3 +22,4 @@ CREATE INDEX IF NOT EXISTS idx_agents_owner_id ON agents(owner_id);
 
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_015_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_015_completed (id) VALUES (1);

@@ -64,3 +64,4 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_provider_timestamp
 
 -- Guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_012_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_012_completed (id) VALUES (1);

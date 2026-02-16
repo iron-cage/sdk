@@ -16,4 +16,5 @@ ALTER TABLE api_tokens ADD COLUMN revoked_at INTEGER;
 -- New revocations will set this field
 
 -- Create guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_016_completed (id INTEGER PRIMARY KEY)
+CREATE TABLE IF NOT EXISTS _migration_016_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_016_completed (id) VALUES (1);

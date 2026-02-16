@@ -19,3 +19,4 @@ CREATE INDEX IF NOT EXISTS idx_budget_leases_updated ON budget_leases( updated_a
 
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_017_completed ( id INTEGER PRIMARY KEY );
+INSERT INTO _migration_017_completed ( id ) VALUES ( 1 );

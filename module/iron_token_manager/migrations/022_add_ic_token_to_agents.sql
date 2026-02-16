@@ -18,3 +18,4 @@ CREATE INDEX IF NOT EXISTS idx_agents_ic_token_hash ON agents(ic_token_hash);
 
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_022_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_022_completed (id) VALUES (1);
