@@ -113,38 +113,41 @@ pub async fn apply_all_migrations( pool: &SqlitePool ) -> Result< () >
   // Migration 011: Budget requests (Protocol 012)
   apply_migration_011( pool ).await?;
 
-  // Migration 012: Budget history (Protocol 012)
+  // Migration 012: Analytics events table
   apply_migration_012( pool ).await?;
 
-  // Migration 013: Add FK constraint to api_tokens (Protocol 014)
+  // Migration 013: Budget modification history (Protocol 017)
   apply_migration_013( pool ).await?;
 
-  // Migration 014: Add owner_id to agents table
+  // Migration 014: Add FK constraint to api_tokens
   apply_migration_014( pool ).await?;
 
-  // Migration 015: Add revoked_at timestamp to api_tokens
+  // Migration 015: Add owner_id to agents table
   apply_migration_015( pool ).await?;
 
-  // Migration 016: Add lease return columns (Protocol 005)
+  // Migration 016: Add revoked_at timestamp to api_tokens
   apply_migration_016( pool ).await?;
 
-  // Migration 017: Create system_config table and seed dev data
+  // Migration 017: Add lease return columns (Protocol 005)
   apply_migration_017( pool ).await?;
 
-  // Migration 018: Convert budget columns from REAL to INTEGER (microdollars)
+  // Migration 018: Create system_config table and seed dev data
   apply_migration_018( pool ).await?;
 
-  // Migration 019: Add provider_key_id to agents table (Feature 014)
+  // Migration 019: Convert budget columns from REAL to INTEGER (microdollars)
   apply_migration_019( pool ).await?;
 
-  // Migration 020: Add account lockout fields (Protocol 007)
+  // Migration 020: Add provider_key_id to agents table (Feature 014)
   apply_migration_020( pool ).await?;
 
-  // Migration 021: Add IC token fields to agents table
+  // Migration 021: Add account lockout fields (Protocol 007)
   apply_migration_021( pool ).await?;
 
-  // Migration 022: Seed dev IC token hash for agent_1 (demo)
+  // Migration 022: Add IC token fields to agents table
   apply_migration_022( pool ).await?;
+
+  // Migration 023: Seed dev IC token hash for agent_1 (demo)
+  apply_migration_023( pool ).await?;
 
   Ok( () )
 }
@@ -408,7 +411,7 @@ async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/012_create_budget_history.sql" );
+    let migration = include_str!( "../migrations/012_create_analytics_events.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
@@ -435,7 +438,7 @@ async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/013_add_api_tokens_fk.sql" );
+    let migration = include_str!( "../migrations/013_create_budget_history.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
@@ -462,7 +465,7 @@ async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/014_add_agents_owner_id.sql" );
+    let migration = include_str!( "../migrations/014_add_api_tokens_fk.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
@@ -493,7 +496,7 @@ async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/015_add_revoked_at.sql" );
+    let migration = include_str!( "../migrations/015_add_agents_owner_id.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
@@ -522,7 +525,7 @@ async fn apply_migration_016( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/016_add_lease_return_columns.sql" );
+    let migration = include_str!( "../migrations/016_add_revoked_at.sql" );
     sqlx::raw_sql( migration )
       .execute( pool )
       .await
@@ -549,7 +552,7 @@ async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
   if completed == 0
   {
     // The SQL file handles table creation, data seeding, and guard table creation
-    let migration = include_str!( "../migrations/017_create_system_config.sql" );
+    let migration = include_str!( "../migrations/017_add_lease_return_columns.sql" );
 
     sqlx::raw_sql( migration )
         .execute( pool )
@@ -560,7 +563,7 @@ async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 018: Convert budget columns from REAL (USD) to INTEGER (microdollars)
+/// Migration 018: Create system_config table and seed development data
 #[ allow( dead_code ) ]
 async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
 {
@@ -576,8 +579,7 @@ async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
   // Only execute if not previously completed
   if completed == 0
   {
-    // The SQL file handles schema conversion and guard table creation
-    let migration = include_str!( "../migrations/018_convert_budgets_to_microdollars.sql" );
+    let migration = include_str!( "../migrations/018_create_system_config.sql" );
 
     sqlx::raw_sql( migration )
         .execute( pool )
@@ -591,10 +593,7 @@ async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 019: Add `provider_key_id` to agents table (Feature 014)
-///
-/// Adds FK from agents to `ai_provider_keys` for provider key assignment.
-/// Each agent can have one assigned provider key.
+/// Migration 019: Convert budget columns from REAL (USD) to INTEGER (microdollars)
 #[ allow( dead_code ) ]
 async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
 {
@@ -610,7 +609,8 @@ async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
   // Only execute if not previously completed
   if completed == 0
   {
-    let migration = include_str!( "../migrations/019_add_agent_provider_key_id.sql" );
+    // The SQL file handles schema conversion and guard table creation
+    let migration = include_str!( "../migrations/019_convert_budgets_to_microdollars.sql" );
 
     sqlx::raw_sql( migration )
         .execute( pool )
@@ -624,12 +624,10 @@ async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 020: Add account lockout fields (Protocol 007)
+/// Migration 020: Add `provider_key_id` to agents table (Feature 014)
 ///
-/// Adds columns to users table for login attempt tracking and lockout:
-/// - `failed_login_count`: Counter for consecutive failed login attempts
-/// - `last_failed_login`: Timestamp of most recent failed login
-/// - `locked_until`: Timestamp when account lockout expires
+/// Adds FK from agents to `ai_provider_keys` for provider key assignment.
+/// Each agent can have one assigned provider key.
 #[ allow( dead_code ) ]
 async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
 {
@@ -643,7 +641,7 @@ async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/020_add_account_lockout_fields.sql" );
+    let migration = include_str!( "../migrations/020_add_agent_provider_key_id.sql" );
 
     sqlx::raw_sql( migration )
         .execute( pool )
@@ -657,11 +655,12 @@ async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 021: Add IC token fields to agents table
+/// Migration 021: Add account lockout fields (Protocol 007)
 ///
-/// Adds columns for IC token storage metadata:
-/// - `ic_token_hash` (TEXT)
-/// - `ic_token_created_at` (INTEGER)
+/// Adds columns to users table for login attempt tracking and lockout:
+/// - `failed_login_count`: Counter for consecutive failed login attempts
+/// - `last_failed_login`: Timestamp of most recent failed login
+/// - `locked_until`: Timestamp when account lockout expires
 #[ allow( dead_code ) ]
 async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
 {
@@ -675,24 +674,48 @@ async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/021_add_ic_token_to_agents.sql" );
-
-    sqlx::raw_sql( migration )
-        .execute( pool )
+    // Check if columns already exist (for idempotency)
+    let column_exists: i64 = query_scalar(
+      "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='failed_login_count'"
+    )
+        .fetch_one( pool )
         .await
-        .map_err( |e| {
-          eprintln!("Migration 021 failed: {e:?}");
-          crate::error::TokenError::Generic
-        } )?;
+        .map_err( |_| crate::error::TokenError::Generic )?;
+
+    if column_exists == 0
+    {
+      // Columns don't exist, apply migration
+      let migration = include_str!( "../migrations/021_add_account_lockout_fields.sql" );
+
+      sqlx::raw_sql( migration )
+          .execute( pool )
+          .await
+          .map_err( |e| {
+            eprintln!("Migration 021 failed: {e:?}");
+            crate::error::TokenError::Generic
+          } )?;
+    }
+    else
+    {
+      // Columns already exist, just create guard table
+      sqlx::query(
+        "CREATE TABLE IF NOT EXISTS _migration_021_completed (applied_at INTEGER NOT NULL);
+         INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);"
+      )
+          .execute( pool )
+          .await
+          .map_err( |_| crate::error::TokenError::Generic )?;
+    }
   }
 
   Ok( () )
 }
 
-/// Migration 022: Seed dev IC token hash for `agent_1`
+/// Migration 022: Add IC token fields to agents table
 ///
-/// Sets `ic_token_hash`/`ic_token_created_at` for `agent_1` using the pre-generated dev IC token
-/// from migration 017. Safe to run multiple times (only updates when hash is NULL).
+/// Adds columns for IC token storage metadata:
+/// - `ic_token_hash` (TEXT)
+/// - `ic_token_created_at` (INTEGER)
 #[ allow( dead_code ) ]
 async fn apply_migration_022( pool: &SqlitePool ) -> Result< () >
 {
@@ -706,13 +729,44 @@ async fn apply_migration_022( pool: &SqlitePool ) -> Result< () >
 
   if completed == 0
   {
-    let migration = include_str!( "../migrations/022_seed_agent1_ic_token.sql" );
+    let migration = include_str!( "../migrations/022_add_ic_token_to_agents.sql" );
 
     sqlx::raw_sql( migration )
         .execute( pool )
         .await
         .map_err( |e| {
           eprintln!("Migration 022 failed: {e:?}");
+          crate::error::TokenError::Generic
+        } )?;
+  }
+
+  Ok( () )
+}
+
+/// Migration 023: Seed dev IC token hash for `agent_1`
+///
+/// Sets `ic_token_hash`/`ic_token_created_at` for `agent_1` using the pre-generated dev IC token
+/// from migration 018. Safe to run multiple times (only updates when hash is NULL).
+#[ allow( dead_code ) ]
+async fn apply_migration_023( pool: &SqlitePool ) -> Result< () >
+{
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_023_completed'"
+  )
+      .fetch_one( pool )
+      .await
+      .map_err( |_| crate::error::TokenError::Generic )?;
+
+  if completed == 0
+  {
+    let migration = include_str!( "../migrations/023_seed_agent1_ic_token.sql" );
+
+    sqlx::raw_sql( migration )
+        .execute( pool )
+        .await
+        .map_err( |e| {
+          eprintln!("Migration 023 failed: {e:?}");
           crate::error::TokenError::Generic
         } )?;
   }

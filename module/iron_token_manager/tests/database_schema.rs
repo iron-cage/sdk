@@ -411,7 +411,7 @@ async fn test_all_indexes_created()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  // Expected: All migrations create 43 indexes total
+  // Expected: All migrations create 51 indexes total
   // Migration 001: 15 indexes (api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
   // Migration 003: 2 indexes (users, token_blacklist)
   // Migration 004: 5 indexes (ai_provider_keys, project_key_assignments)
@@ -421,13 +421,14 @@ async fn test_all_indexes_created()
   // Migration 009: 3 indexes (budget_leases)
   // Migration 010: 1 index (idx_agent_budgets_updated)
   // Migration 011: 2 indexes (budget_change_requests)
-  // Migration 012: 1 index (budget_modification_history)
-  // Migration 013: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
-  // Migration 014: 1 index (idx_agents_owner_id)
-  // Migration 016: 1 index (idx_budget_leases_updated)
-  // Migration 018: Rebuilds budget_leases, agent_budgets, usage_limits (now recreates idx_agent_budgets_updated)
-  // Migration 019: 1 index (idx_agents_provider_key_id)
-  // Migration 021: 1 index (idx_agents_ic_token_hash)
-  // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 43
-  assert_eq!( index_count, 43, "Expected 43 indexes to be created across all migrations" );
+  // Migration 012: 8 indexes (analytics_events: 6 single + 2 composite)
+  // Migration 013: 1 index (budget_modification_history)
+  // Migration 014: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
+  // Migration 015: 1 index (idx_agents_owner_id)
+  // Migration 017: 1 index (idx_budget_leases_updated)
+  // Migration 019: Rebuilds budget_leases, agent_budgets, usage_limits (now recreates idx_agent_budgets_updated)
+  // Migration 020: 1 index (idx_agents_provider_key_id)
+  // Migration 022: 1 index (idx_agents_ic_token_hash)
+  // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
+  assert_eq!( index_count, 51, "Expected 51 indexes to be created across all migrations" );
 }

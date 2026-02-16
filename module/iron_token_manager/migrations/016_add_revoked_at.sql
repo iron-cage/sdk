@@ -1,4 +1,4 @@
--- Migration 015: Add revoked_at timestamp to distinguish revoked vs rotated tokens
+-- Migration 016: Add revoked_at timestamp to distinguish revoked vs rotated tokens
 --
 -- WHY: Token can be inactive for two reasons:
 --   1. Explicitly revoked (should return 409 on second revoke)
@@ -16,4 +16,4 @@ ALTER TABLE api_tokens ADD COLUMN revoked_at INTEGER;
 -- New revocations will set this field
 
 -- Create guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_015_completed (id INTEGER PRIMARY KEY)
+CREATE TABLE IF NOT EXISTS _migration_016_completed (id INTEGER PRIMARY KEY)

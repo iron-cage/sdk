@@ -76,7 +76,7 @@ async fn test_migrations_are_idempotent()
   .await
   .expect("LOUD FAILURE: Failed to count tables");
 
-  assert_eq!( table_count, 16, "Should have exactly 16 application tables after multiple runs" );
+  assert_eq!( table_count, 17, "Should have exactly 17 application tables after multiple runs" );
 }
 
 #[ tokio::test ]
@@ -141,6 +141,7 @@ async fn test_production_schema_matches_test_schema()
     "agent_budgets",
     "agents",
     "ai_provider_keys",
+    "analytics_events",
     "api_call_traces",
     "api_tokens",
     "audit_log",
@@ -166,7 +167,7 @@ async fn test_production_schema_matches_test_schema()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  assert_eq!( index_count, 43, "Should have 43 indexes across all migrations" );
+  assert_eq!( index_count, 51, "Should have 51 indexes across all migrations" );
 }
 
 #[ tokio::test ]

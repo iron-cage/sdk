@@ -1,4 +1,4 @@
--- Migration 013: Add foreign key constraint from api_tokens to users
+-- Migration 014: Add foreign key constraint from api_tokens to users
 --
 -- Purpose: Enforce referential integrity - tokens cannot exist without valid users
 -- Impact: Implements IMPOSSIBLE STATE: "Cannot create token without valid user_id (FK constraint fails)"
@@ -15,12 +15,12 @@
 -- Pitfall: FK column constraints must be compatible with referenced column constraints
 
 -- Check if migration already applied
-CREATE TABLE IF NOT EXISTS _migration_013_completed (applied_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS _migration_014_completed (applied_at INTEGER NOT NULL);
 
 -- Only proceed if not already applied
-INSERT INTO _migration_013_completed (applied_at)
+INSERT INTO _migration_014_completed (applied_at)
 SELECT strftime('%s', 'now') * 1000
-WHERE NOT EXISTS (SELECT 1 FROM _migration_013_completed);
+WHERE NOT EXISTS (SELECT 1 FROM _migration_014_completed);
 
 -- Rebuild api_tokens table with FK constraint
 -- Step 1: Create new table with FK
