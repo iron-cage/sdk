@@ -106,6 +106,9 @@ FROM agent_budgets;
 DROP TABLE agent_budgets;
 ALTER TABLE agent_budgets_new RENAME TO agent_budgets;
 
+-- Recreate index (from migration 010)
+CREATE INDEX IF NOT EXISTS idx_agent_budgets_updated ON agent_budgets( updated_at );
+
 -- ============================================================================
 -- PART 3: Convert usage_limits table from cents to microdollars
 -- ============================================================================
