@@ -5,7 +5,7 @@
 #
 # Rules:
 # 1. Database must have exactly 34 tables (13 application + 21 migration guards)
-# 2. Database must have exactly 42 indexes (idx_* pattern)
+# 2. Database must have exactly 43 indexes (idx_* pattern)
 # 3. All migration guard tables must exist
 # 4. Foreign keys must be enabled
 # 5. Core application tables must exist
@@ -97,14 +97,14 @@ fi
 # Rule 2: Check index count
 # ============================================================================
 
-log_info "Rule 2: Checking index count (expect 42)..."
+log_info "Rule 2: Checking index count (expect 43)..."
 
 INDEX_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%';")
 
-if [ "$INDEX_COUNT" -eq 42 ]; then
+if [ "$INDEX_COUNT" -eq 43 ]; then
   log_success "Index count correct: $INDEX_COUNT"
 else
-  log_error "Index count mismatch: expected 42, found $INDEX_COUNT"
+  log_error "Index count mismatch: expected 43, found $INDEX_COUNT"
   ((VIOLATIONS++))
 fi
 
