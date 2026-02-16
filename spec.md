@@ -127,6 +127,3 @@ Architecture, design philosophy, crate catalog, data stores, and security model 
 * **[docs/security/readme.md](docs/security/readme.md)** — threat model, isolation, credential flow, audit
 * **[docs/principles/001_design_philosophy.md](docs/principles/001_design_philosophy.md)** — seven guiding principles
 * **[codestyle.md](codestyle.md)** — Rust formatting standards
-
-> **Codestyle principle:**  
-> As an open-source project, our formatting standards stay as close to idiomatic Rust and default `rustfmt` as possible. Deviations exist only where they provide clear organizational value and are explicitly documented with rationale in `codestyle.md`.

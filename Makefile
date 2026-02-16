@@ -79,10 +79,13 @@ test_not: ## Exclude tests: `make test_not <test1> <test2> ...`
 # Code Quality
 #===============================================================================
 
-fmt: ## Check and fix Rust formatting
+fmt-check: ## Check Rust formatting (CI use)
 	@echo "[*] Checking formatting..."
-	@cargo fmt --all -- --check \
-		|| (echo "[*] Formatting code..." && cargo fmt --all)
+	@cargo fmt --all -- --check
+
+fmt-fix: ## Auto-format Rust code (local use)
+	@echo "[*] Formatting code..."
+	@cargo fmt --all
 
 lint: ## Run clippy in strict mode
 	@echo "[*] Running clippy..."
@@ -94,7 +97,7 @@ lint-docs: ## Check documentation ID format compliance
 lint-python: ## Check Python tooling compliance
 	@scripts/lint_python_tooling.sh
 
-check: fmt lint ## Quick code quality check
+check: fmt-check lint ## Quick code quality check
 
 #===============================================================================
 # Build & Validation

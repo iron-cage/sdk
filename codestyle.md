@@ -70,7 +70,7 @@ The `rustfmt.toml` at the project root enforces this:
 tab_spaces = 2
 ```
 
-All contributors must run `cargo fmt` before committing. The formatter handles brace placement, spacing, line width, and all other formatting concerns automatically.
+The formatter handles brace placement, spacing, line width, and all other formatting concerns automatically.
 
 **Rationale:** 2-space indentation provides a more compact visual layout while maintaining readability, especially in deeply nested Rust code with generics and trait bounds.
 
