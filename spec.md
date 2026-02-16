@@ -1,7 +1,7 @@
 # System Specification
 
 - **Name:** Iron Cage - AI Agent Governance SDK
-- **Version:** 0.1.0
+- **Version:** 0.3.0
 - **Date:** 2026-02-12
 - **Status:** PILOT
 
