@@ -60,9 +60,11 @@ dashboard: ## Run dashboard only (port 5173)
 # test-w3: ## Run all tests via w3 (nextest + clippy + doc tests)
 #	w3 .test l::3
 
-test: ## Run nextest (use ARGS="..." for extra arguments)
-	@echo "[*] Running tests..."
+test: ## Run tests (nextest + doc tests, use ARGS="..." for nextest)
+	@echo "[*] Running nextest..."
 	@cargo nextest run --all-features --no-fail-fast $(ARGS)
+	@echo "[*] Running doc tests..."
+	@cargo test --doc --all-features
 
 test_one: ## Run single test: `make test_one <test_name>`
 	@$(MAKE) test ARGS="$(filter-out $@,$(MAKECMDGOALS))"
