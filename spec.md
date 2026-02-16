@@ -112,7 +112,7 @@ Measurable quality targets across five attributes: Performance (<5ms gateway ove
 
 Protocol specifications for all external interfaces: LLM Provider APIs (OpenAI, Anthropic, Google), Control Panel REST API, WebSocket real-time events, token management, authentication, and budget control.
 
-* **[docs/protocol/readme.md](docs/protocol/readme.md)** — all 15 protocol specifications
+* **[docs/protocol/readme.md](docs/protocol/readme.md)** — all 17 protocol specifications
 * **[docs/integration/001_llm_providers.md](docs/integration/001_llm_providers.md)** — LLM provider integration patterns
 
 ---
