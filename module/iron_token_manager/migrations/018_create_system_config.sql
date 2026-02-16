@@ -57,3 +57,4 @@ VALUES (
 
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_018_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_018_completed (id) VALUES (1);

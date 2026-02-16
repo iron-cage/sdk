@@ -563,7 +563,7 @@ async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 018: Create system_config table and seed development data
+/// Migration 018: Create `system_config` table and seed development data
 #[ allow( dead_code ) ]
 async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
 {
