@@ -50,7 +50,7 @@ fn test_no_hardcoded_cors_origins() {
   // Must have env var parsing
   assert_source_contains(
     &source,
-    "std::env::var( \"ALLOWED_ORIGINS\" )",
+    "std::env::var(\"ALLOWED_ORIGINS\")",
     source_path,
     "ALLOWED_ORIGINS environment variable parsing required",
   );

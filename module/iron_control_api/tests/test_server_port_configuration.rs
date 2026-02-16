@@ -56,7 +56,7 @@ fn test_no_hardcoded_server_port() {
   // Must have env var parsing
   assert_source_contains(
     &source,
-    "std::env::var( \"SERVER_PORT\" )",
+    "std::env::var(\"SERVER_PORT\")",
     source_path,
     "SERVER_PORT environment variable parsing required",
   );
