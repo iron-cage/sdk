@@ -7,4 +7,4 @@ SET ic_token_hash = '897b52e23fde48c0c98b1f5aa80b80292cf1d8301adc51e7475d36068d5
     ic_token_created_at = strftime('%s','now')
 WHERE id = 1 AND ic_token_hash IS NULL;
 
-CREATE TABLE IF NOT EXISTS _migration_022_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS _migration_023_completed (id INTEGER PRIMARY KEY);

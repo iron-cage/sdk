@@ -1,4 +1,4 @@
--- Migration 011: Create analytics_events table
+-- Migration 012: Create analytics_events table
 --
 -- Stores LLM request events for Protocol 012 Analytics API.
 -- Supports per-agent event deduplication, period filtering, and aggregation queries.
@@ -63,4 +63,4 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_provider_timestamp
   ON analytics_events(provider, timestamp_ms);
 
 -- Guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_011_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS _migration_012_completed (id INTEGER PRIMARY KEY);

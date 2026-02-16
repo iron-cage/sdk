@@ -57,22 +57,22 @@ async fn test_analytics_sum_near_max_i64()
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
-  // Create analytics table
+  // Create test table for overflow testing (not using real analytics_events schema)
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS analytics_events (
+    "CREATE TABLE IF NOT EXISTS test_analytics_overflow (
       id INTEGER PRIMARY KEY,
-      cost_cents INTEGER NOT NULL CHECK(cost_cents >= 0)
+      cost_micros INTEGER NOT NULL CHECK(cost_micros >= 0)
     )"
   )
   .execute( &pool )
   .await
-  .expect( "LOUD FAILURE: Failed to create analytics table" );
+  .expect( "LOUD FAILURE: Failed to create test table" );
 
   // Insert records with values that would overflow if summed
   let max_i64 = i64::MAX;
   let half_max = max_i64 / 2;
 
-  sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?), (?)" )
+  sqlx::query( "INSERT INTO test_analytics_overflow (cost_micros) VALUES (?), (?)" )
     .bind( half_max )
     .bind( half_max )
     .execute( &pool )
@@ -84,7 +84,7 @@ async fn test_analytics_sum_near_max_i64()
   // 2. Return error (if overflow detected)
   // 3. Return wrong value (BUG - silent overflow)
   let result: Result<(Option<i64>,), sqlx::Error> = sqlx::query_as(
-    "SELECT SUM(cost_cents) FROM analytics_events"
+    "SELECT SUM(cost_micros) FROM test_analytics_overflow"
   )
   .fetch_one( &pool )
   .await;
@@ -119,7 +119,7 @@ async fn test_analytics_sum_near_max_i64()
 /// Test analytics aggregation with negative cost values (should be rejected)
 ///
 /// ## Corner Case
-/// **Input:** Attempt to insert negative cost_cents
+/// **Input:** Attempt to insert negative cost_micros
 /// **Expected:** CHECK constraint violation
 /// **Risk:** Negative costs could corrupt financial calculations
 #[tokio::test]
@@ -129,9 +129,9 @@ async fn test_analytics_negative_cost_rejected()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS analytics_events (
+    "CREATE TABLE IF NOT EXISTS test_analytics_negative (
       id INTEGER PRIMARY KEY,
-      cost_cents INTEGER NOT NULL CHECK(cost_cents >= 0)
+      cost_micros INTEGER NOT NULL CHECK(cost_micros >= 0)
     )"
   )
   .execute( &pool )
@@ -139,14 +139,14 @@ async fn test_analytics_negative_cost_rejected()
   .expect( "LOUD FAILURE: Failed to create table" );
 
   // Attempt to insert negative cost - should FAIL
-  let result = sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?)" )
+  let result = sqlx::query( "INSERT INTO test_analytics_negative (cost_micros) VALUES (?)" )
     .bind( -100_i64 )
     .execute( &pool )
     .await;
 
   assert!(
     result.is_err(),
-    "LOUD FAILURE: Database accepted negative cost_cents=-100! \
+    "LOUD FAILURE: Database accepted negative cost_micros=-100! \
      CHECK constraint not enforced. This is a critical data integrity bug."
   );
 
@@ -175,9 +175,9 @@ async fn test_analytics_sum_empty_dataset()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS analytics_events (
+    "CREATE TABLE IF NOT EXISTS test_cost_table (
       id INTEGER PRIMARY KEY,
-      cost_cents INTEGER NOT NULL
+      cost_micros INTEGER NOT NULL
     )"
   )
   .execute( &pool )
@@ -185,7 +185,7 @@ async fn test_analytics_sum_empty_dataset()
   .expect( "LOUD FAILURE: Failed to create table" );
 
   // Query SUM on empty table
-  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_cents) FROM analytics_events" )
+  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_micros) FROM test_cost_table" )
     .fetch_one( &pool )
     .await
     .expect( "LOUD FAILURE: Query failed on empty table" );
@@ -200,7 +200,7 @@ async fn test_analytics_sum_empty_dataset()
 
   // Demonstrate correct handling with COALESCE
   let safe_result: (i64,) = sqlx::query_as(
-    "SELECT COALESCE(SUM(cost_cents), 0) FROM analytics_events"
+    "SELECT COALESCE(SUM(cost_micros), 0) FROM test_cost_table"
   )
   .fetch_one( &pool )
   .await
@@ -225,9 +225,9 @@ async fn test_analytics_sum_single_record()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS analytics_events (
+    "CREATE TABLE IF NOT EXISTS test_cost_table (
       id INTEGER PRIMARY KEY,
-      cost_cents INTEGER NOT NULL
+      cost_micros INTEGER NOT NULL
     )"
   )
   .execute( &pool )
@@ -235,13 +235,13 @@ async fn test_analytics_sum_single_record()
   .expect( "LOUD FAILURE: Failed to create table" );
 
   let single_value = 12345_i64;
-  sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?)" )
+  sqlx::query( "INSERT INTO test_cost_table (cost_micros) VALUES (?)" )
     .bind( single_value )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to insert record" );
 
-  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_cents) FROM analytics_events" )
+  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_micros) FROM test_cost_table" )
     .fetch_one( &pool )
     .await
     .expect( "LOUD FAILURE: Query failed" );
@@ -266,7 +266,7 @@ async fn test_analytics_sum_single_record()
 ///
 /// ## Why Not Caught
 /// Test incorrectly assumed system should handle fractional cents.
-/// Production schema uses INTEGER (i64) for all cost_cents columns.
+/// Production schema uses INTEGER (i64) for all cost_micros columns.
 ///
 /// ## Fix Applied
 /// Changed test to verify integer-only behavior using integer binding.
@@ -287,25 +287,25 @@ async fn test_analytics_fractional_cents_handling()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS analytics_events (
+    "CREATE TABLE IF NOT EXISTS test_cost_table (
       id INTEGER PRIMARY KEY,
-      cost_cents INTEGER NOT NULL
+      cost_micros INTEGER NOT NULL
     )"
   )
   .execute( &pool )
   .await
   .expect( "LOUD FAILURE: Failed to create table" );
 
-  // Insert integer value (system uses integer cents only)
+  // Insert integer value (system uses integer microdollars only)
   let cost_value = 100_i64;
-  sqlx::query( "INSERT INTO analytics_events (cost_cents) VALUES (?)" )
+  sqlx::query( "INSERT INTO test_cost_table (cost_micros) VALUES (?)" )
     .bind( cost_value )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to insert integer value" );
 
   // Verify stored value is exact integer
-  let stored_value: (i64,) = sqlx::query_as( "SELECT cost_cents FROM analytics_events" )
+  let stored_value: (i64,) = sqlx::query_as( "SELECT cost_micros FROM test_cost_table" )
     .fetch_one( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to fetch value" );
@@ -501,16 +501,16 @@ async fn test_delete_agent_with_usage_data()
   .expect( "LOUD FAILURE: Failed to create agents table" );
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS analytics_events (
+    "CREATE TABLE IF NOT EXISTS test_analytics_fk (
       id INTEGER PRIMARY KEY,
       agent_id INTEGER NOT NULL,
-      cost_cents INTEGER NOT NULL,
+      cost_micros INTEGER NOT NULL,
       FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
     )"
   )
   .execute( &pool )
   .await
-  .expect( "LOUD FAILURE: Failed to create analytics table" );
+  .expect( "LOUD FAILURE: Failed to create test analytics table" );
 
   // Create agent and usage data
   let now = chrono::Utc::now().timestamp_millis();
@@ -520,7 +520,7 @@ async fn test_delete_agent_with_usage_data()
     .await
     .expect( "LOUD FAILURE: Failed to create agent" );
 
-  sqlx::query( "INSERT INTO analytics_events (agent_id, cost_cents) VALUES (100, 100)" )
+  sqlx::query( "INSERT INTO test_analytics_fk (agent_id, cost_micros) VALUES (100, 100)" )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to create usage data" );
@@ -533,7 +533,7 @@ async fn test_delete_agent_with_usage_data()
 
   // Check if usage data was cascaded or orphaned
   let remaining_events: (i64,) = sqlx::query_as(
-    "SELECT COUNT(*) FROM analytics_events WHERE agent_id = 100"
+    "SELECT COUNT(*) FROM test_analytics_fk WHERE agent_id = 100"
   )
   .fetch_one( &pool )
   .await

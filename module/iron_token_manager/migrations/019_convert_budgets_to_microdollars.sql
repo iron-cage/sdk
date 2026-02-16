@@ -1,4 +1,4 @@
--- Migration 018: Convert budget columns from REAL (USD) to INTEGER (microdollars)
+-- Migration 019: Convert budget columns from REAL (USD) to INTEGER (microdollars)
 --
 -- ## Rationale
 --
@@ -18,12 +18,12 @@
 -- - usage_limits: max_cost_cents_per_month, current_cost_cents_this_month (renamed to microdollars)
 
 -- Check if migration already applied
-CREATE TABLE IF NOT EXISTS _migration_018_completed (applied_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS _migration_019_completed (applied_at INTEGER NOT NULL);
 
 -- Only proceed if not already applied
-INSERT INTO _migration_018_completed (applied_at)
+INSERT INTO _migration_019_completed (applied_at)
 SELECT strftime('%s', 'now') * 1000
-WHERE NOT EXISTS (SELECT 1 FROM _migration_018_completed);
+WHERE NOT EXISTS (SELECT 1 FROM _migration_019_completed);
 
 -- ============================================================================
 -- PART 1: Convert budget_leases table (must be first due to FK dependency)

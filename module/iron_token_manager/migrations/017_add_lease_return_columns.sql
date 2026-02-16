@@ -1,4 +1,4 @@
--- Migration 016: Add return columns to budget_leases
+-- Migration 017: Add return columns to budget_leases
 --
 -- This migration adds columns to support Protocol 005 lease return flow:
 -- - returned_amount: USD returned to agent budget on lease close
@@ -18,4 +18,4 @@ ALTER TABLE budget_leases ADD COLUMN updated_at INTEGER;
 CREATE INDEX IF NOT EXISTS idx_budget_leases_updated ON budget_leases( updated_at );
 
 -- Create guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_016_completed ( id INTEGER PRIMARY KEY );
+CREATE TABLE IF NOT EXISTS _migration_017_completed ( id INTEGER PRIMARY KEY );
