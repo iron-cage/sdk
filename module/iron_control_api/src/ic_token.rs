@@ -236,7 +236,7 @@ impl IcTokenManager {
     // Create custom validation that doesn't require exp claim
     // IC Tokens can have expires_at=null for long-lived tokens
     let mut validation = Validation::default();
-    validation.required_spec_claims.clear(); // Dont require standard claims
+    validation.required_spec_claims.clear(); // Don't require standard claims
     validation.validate_exp = false; // Manual expiration check in validate()
 
     // Decode JWT
@@ -375,10 +375,11 @@ impl IcTokenRateLimiter {
     }
   }
 
-  /// Extract rate-limit key from raw token (first 16 chars of SHA-256 hash).
-  /// Using a prefix saves memory while maintaining sufficient uniqueness.
+  /// Extract rate-limit key from raw token (first 32 chars of SHA-256 hash = 128 bits).
+  /// 128-bit prefix provides standard security margin against deliberate collision attacks
+  /// while saving memory compared to storing the full 256-bit hash.
   fn token_key(token: &str) -> String {
-    sha256_hash(token)[..16].to_string()
+    sha256_hash(token)[..32].to_string()
   }
 
   /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
@@ -459,7 +460,11 @@ impl Default for IcTokenRateLimiter {
 /// Target duration for all validation responses (success and error).
 /// All paths are padded to this floor so external observers cannot
 /// distinguish error types by response latency.
-const VALIDATION_TIMING_TARGET: Duration = Duration::from_millis(5);
+///
+/// Set to 50ms to cover typical `SQLite` query latency (10–30ms under normal load).
+/// A target below the actual DB query time would defeat the padding entirely,
+/// as the fast path (429 rate-limit, < 1ms) would remain distinguishable.
+const VALIDATION_TIMING_TARGET: Duration = Duration::from_millis(50);
 
 /// Validate IC Token for a runtime endpoint, returning HTTP response on error.
 ///

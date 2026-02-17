@@ -22,6 +22,7 @@
 //! | `test_usage_report_response_serialization` | UsageReportResponse JSON serialization | Serialize UsageReportResponse to JSON | Valid JSON with required fields | ✅ |
 //! | `test_budget_refresh_response_serialization` | BudgetRefreshResponse JSON serialization | Serialize BudgetRefreshResponse to JSON | Valid JSON with required fields | ✅ |
 
+use iron_control_api::ic_token::IcTokenRateLimiter;
 use iron_control_api::{
   ic_token::{IcTokenClaims, IcTokenManager},
   ip_token::IpTokenCrypto,
@@ -373,12 +374,13 @@ async fn test_budget_state_creation() {
   let database_url = "sqlite::memory:";
 
   let state = BudgetState::new(
-    ic_token_secret,
+    std::sync::Arc::new(IcTokenManager::new(ic_token_secret)),
     &ip_token_key,
     &provider_key_master,
     jwt_secret,
     database_url,
     None,
+    IcTokenRateLimiter::new(),
   )
   .await;
   assert!(state.is_ok(), "Should create budget state");
