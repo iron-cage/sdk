@@ -1,4 +1,4 @@
-//! Endpoint integration tests for GET /api/usage/by-project/:project_id.
+//! Endpoint integration tests for GET /api/usage/by-project/{project_id}.
 //!
 //! ## Purpose
 //! Verify that project-specific usage endpoint correctly aggregates usage for all tokens
@@ -44,7 +44,7 @@ async fn create_test_router() -> Router {
 
   Router::new()
     .route(
-      "/api/usage/by-project/:project_id",
+      "/api/usage/by-project/{project_id}",
       get(iron_control_api::routes::usage::get_usage_by_project),
     )
     .with_state(usage_state)

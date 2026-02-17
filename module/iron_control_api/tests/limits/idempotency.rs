@@ -7,8 +7,8 @@
 //!
 //! | Test Case | Endpoint | Operation | Expected Result | Status |
 //! |-----------|----------|-----------|----------------|--------|
-//! | `test_delete_limit_twice_returns_204` | DELETE /api/limits/:id | Delete twice | Both 204 | ✅ |
-//! | `test_delete_nonexistent_limit_returns_204` | DELETE /api/limits/:id | Delete non-existent | 204 No Content | ✅ |
+//! | `test_delete_limit_twice_returns_204` | DELETE /api/limits/{id} | Delete twice | Both 204 | ✅ |
+//! | `test_delete_nonexistent_limit_returns_204` | DELETE /api/limits/{id} | Delete non-existent | 204 No Content | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -48,7 +48,7 @@ async fn create_test_router() -> Router {
       post(iron_control_api::routes::limits::create_limit),
     )
     .route(
-      "/api/limits/:id",
+      "/api/limits/{id}",
       delete(iron_control_api::routes::limits::delete_limit),
     )
     .with_state(limit_state)

@@ -2,7 +2,7 @@
 # Minimal commands for daily development workflow
 
 .PHONY: help dev api dashboard test test_one test_in test_not clean setup status ports
-.PHONY: fmt lint check typecheck build validate lint-docs lint-python
+.PHONY: fmt-check fmt-fix lint check typecheck build validate lint-docs lint-python
 .PHONY: db-reset db-reset-seed db-seed db-admin db-inspect debug-setup
 .PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-sync py-clean
 .PHONY: docker-build docker-up docker-down docker-down-volumes docker-logs docker-logs-backend docker-logs-frontend docker-ps
@@ -57,18 +57,18 @@ dashboard: ## Run dashboard only (port 5173)
 # Testing
 #===============================================================================
 
-# test-w3: ## Run all tests via w3 (nextest + clippy + doc tests)
-#	w3 .test l::3
-
-test: ## Run nextest (use ARGS="..." for extra arguments)
-	@echo "[*] Running tests..."
-	@cargo nextest run --all-features --no-fail-fast $(ARGS)
+test: ## Run tests (nextest + doc tests, use ARGS="..." for nextest)
+	@echo "[*] Running nextest..."
+	@RUSTFLAGS="-D warnings" cargo nextest run --all-features --no-fail-fast $(ARGS)
+	@echo "[*] Running doc tests..."
+	@RUSTDOCFLAGS="-D warnings" cargo test --doc --all-features
 
 test_one: ## Run single test: `make test_one <test_name>`
-	@$(MAKE) test ARGS="$(filter-out $@,$(MAKECMDGOALS))"
+	@test_name="$(filter-out $@,$(MAKECMDGOALS))"; \
+	$(MAKE) test ARGS="-E 'test($$test_name)'"
 
 test_in: ## Run tests in module: `make test_in <module_name>`
-	@$(MAKE) test ARGS="--test $(filter-out $@,$(MAKECMDGOALS))"
+	@$(MAKE) test ARGS="-p $(filter-out $@,$(MAKECMDGOALS))"
 
 test_not: ## Exclude tests: `make test_not <test1> <test2> ...`
 	@expr=$$(echo "$(filter-out $@,$(MAKECMDGOALS))" \
@@ -79,10 +79,13 @@ test_not: ## Exclude tests: `make test_not <test1> <test2> ...`
 # Code Quality
 #===============================================================================
 
-fmt: ## Check and fix Rust formatting
+fmt-check: ## Check Rust formatting (CI use)
 	@echo "[*] Checking formatting..."
-	@cargo fmt --all -- --check \
-		|| (echo "[*] Formatting code..." && cargo fmt --all)
+	@cargo fmt --all -- --check
+
+fmt-fix: ## Auto-format Rust code (local use)
+	@echo "[*] Formatting code..."
+	@cargo fmt --all
 
 lint: ## Run clippy in strict mode
 	@echo "[*] Running clippy..."
@@ -94,7 +97,7 @@ lint-docs: ## Check documentation ID format compliance
 lint-python: ## Check Python tooling compliance
 	@scripts/lint_python_tooling.sh
 
-check: fmt lint ## Quick code quality check
+check: fmt-check lint ## Quick code quality check
 
 #===============================================================================
 # Build & Validation
@@ -281,6 +284,7 @@ docker-logs-frontend: ## View frontend nginx logs only
 docker-ps: ## Show status of Control Panel services
 	docker compose ps
 
-# Prevent "No rule to make target" error for arguments passed to test_one, test_in, test_not
+# Prevent "No rule to make target" error for positional args passed to test_one, test_in, test_not.
+# Side effect: typos like `make lint-dcos` also succeed silently instead of failing.
 %:
 	@:

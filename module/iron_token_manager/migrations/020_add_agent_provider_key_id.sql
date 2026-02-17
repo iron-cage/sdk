@@ -1,4 +1,4 @@
--- Migration 019: Add provider_key_id to agents table
+-- Migration 020: Add provider_key_id to agents table
 --
 -- Feature 014: Agent-Provider Key Assignment
 -- Adds a foreign key from agents to ai_provider_keys, enabling each agent
@@ -11,4 +11,5 @@ ALTER TABLE agents ADD COLUMN provider_key_id INTEGER REFERENCES ai_provider_key
 CREATE INDEX IF NOT EXISTS idx_agents_provider_key_id ON agents(provider_key_id);
 
 -- Guard table to prevent re-running migration
-CREATE TABLE IF NOT EXISTS _migration_019_completed ( id INTEGER PRIMARY KEY );
+CREATE TABLE IF NOT EXISTS _migration_020_completed ( id INTEGER PRIMARY KEY );
+INSERT INTO _migration_020_completed ( id ) VALUES ( 1 );

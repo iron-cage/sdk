@@ -9,10 +9,10 @@
 //! |-----------|----------|-------------|----------------|--------|
 //! | `test_create_token_get_method_rejected` | POST /api/v1/api-tokens | GET | 405 Method Not Allowed | ✅ |
 //! | `test_create_token_put_method_rejected` | POST /api/v1/api-tokens | PUT | 405 Method Not Allowed | ✅ |
-//! | `test_rotate_token_get_method_rejected` | POST /api/v1/api-tokens/:id/rotate | GET | 405 Method Not Allowed | ✅ |
-//! | `test_rotate_token_delete_method_rejected` | POST /api/v1/api-tokens/:id/rotate | DELETE | 405 Method Not Allowed | ✅ |
-//! | `test_revoke_token_get_method_rejected` | DELETE /api/v1/api-tokens/:id | GET | 405 Method Not Allowed | ✅ |
-//! | `test_revoke_token_post_method_rejected` | DELETE /api/v1/api-tokens/:id | POST | 405 Method Not Allowed | ✅ |
+//! | `test_rotate_token_get_method_rejected` | POST /api/v1/api-tokens/{id}/rotate | GET | 405 Method Not Allowed | ✅ |
+//! | `test_rotate_token_delete_method_rejected` | POST /api/v1/api-tokens/{id}/rotate | DELETE | 405 Method Not Allowed | ✅ |
+//! | `test_revoke_token_get_method_rejected` | DELETE /api/v1/api-tokens/{id} | GET | 405 Method Not Allowed | ✅ |
+//! | `test_revoke_token_post_method_rejected` | DELETE /api/v1/api-tokens/{id} | POST | 405 Method Not Allowed | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -51,19 +51,19 @@ async fn create_test_router() -> (Router, crate::common::test_state::TestAppStat
       post(iron_control_api::routes::tokens::create_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       get(iron_control_api::routes::tokens::get_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       delete(iron_control_api::routes::tokens::revoke_token),
     )
     .route(
-      "/api/v1/api-tokens/:id/rotate",
+      "/api/v1/api-tokens/{id}/rotate",
       post(iron_control_api::routes::tokens::rotate_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       put(iron_control_api::routes::tokens::update_token),
     )
     .with_state(app_state.clone());
@@ -134,7 +134,7 @@ async fn test_create_token_put_method_rejected() {
   );
 }
 
-/// Test POST /api/v1/api-tokens/:id/rotate with GET method → 405 Method Not Allowed.
+/// Test POST /api/v1/api-tokens/{id}/rotate with GET method → 405 Method Not Allowed.
 ///
 /// WHY: Rotation is a mutating operation, GET should be rejected.
 #[tokio::test]
@@ -156,7 +156,7 @@ async fn test_rotate_token_get_method_rejected() {
   );
 }
 
-/// Test POST /api/v1/api-tokens/:id/rotate with DELETE method → 405 Method Not Allowed.
+/// Test POST /api/v1/api-tokens/{id}/rotate with DELETE method → 405 Method Not Allowed.
 ///
 /// WHY: Rotation requires POST, DELETE is for revocation (different endpoint).
 #[tokio::test]
@@ -178,9 +178,9 @@ async fn test_rotate_token_delete_method_rejected() {
   );
 }
 
-/// Test DELETE /api/v1/api-tokens/:id with GET method → not rejected.
+/// Test DELETE /api/v1/api-tokens/{id} with GET method → not rejected.
 ///
-/// WHY: GET /api/v1/api-tokens/:id is the `get_token` endpoint (different from DELETE).
+/// WHY: GET /api/v1/api-tokens/{id} is the `get_token` endpoint (different from DELETE).
 /// This test documents that GET is NOT rejected (different endpoint, not method validation).
 #[tokio::test]
 async fn test_revoke_token_get_method_rejected() {
@@ -198,7 +198,7 @@ async fn test_revoke_token_get_method_rejected() {
 
   let response = router.oneshot(request).await.unwrap();
 
-  // Note: GET /api/v1/api-tokens/:id is the get_token endpoint (200 or 404)
+  // Note: GET /api/v1/api-tokens/{id} is the get_token endpoint (200 or 404)
   // This test documents that GET is NOT rejected (different endpoint)
   assert!(
     response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::OK,
@@ -207,7 +207,7 @@ async fn test_revoke_token_get_method_rejected() {
   );
 }
 
-/// Test DELETE /api/v1/api-tokens/:id with POST method → 405 Method Not Allowed.
+/// Test DELETE /api/v1/api-tokens/{id} with POST method → 405 Method Not Allowed.
 ///
 /// WHY: Revocation requires DELETE, POST is for creation (different endpoint).
 #[tokio::test]

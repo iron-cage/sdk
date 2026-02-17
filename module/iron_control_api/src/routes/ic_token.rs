@@ -5,10 +5,10 @@
 //!
 //! # Endpoints
 //!
-//! - POST /api/v1/agents/:id/ic-token - Generate IC token for agent
-//! - GET /api/v1/agents/:id/ic-token - Get IC token status (not the actual token)
-//! - POST /api/v1/agents/:id/ic-token/regenerate - Regenerate IC token (invalidates old)
-//! - DELETE /api/v1/agents/:id/ic-token - Revoke IC token
+//! - POST /api/v1/agents/{id}/ic-token - Generate IC token for agent
+//! - GET /api/v1/agents/{id}/ic-token - Get IC token status (not the actual token)
+//! - POST /api/v1/agents/{id}/ic-token/regenerate - Regenerate IC token (invalidates old)
+//! - DELETE /api/v1/agents/{id}/ic-token - Revoke IC token
 //!
 //! # Security
 //!
@@ -103,7 +103,7 @@ async fn check_agent_access(
   }
 }
 
-/// POST /api/v1/agents/:id/ic-token
+/// POST /api/v1/agents/{id}/ic-token
 ///
 /// Generate a new IC token for an agent.
 /// Returns 409 Conflict if agent already has an IC token.
@@ -170,7 +170,7 @@ pub async fn generate_ic_token(
   ))
 }
 
-/// GET /api/v1/agents/:id/ic-token
+/// GET /api/v1/agents/{id}/ic-token
 ///
 /// Get IC token status for an agent.
 /// Does NOT return the actual token (security).
@@ -203,7 +203,7 @@ pub async fn get_ic_token_status(
   }))
 }
 
-/// POST /api/v1/agents/:id/ic-token/regenerate
+/// POST /api/v1/agents/{id}/ic-token/regenerate
 ///
 /// Regenerate IC token for an agent.
 /// Invalidates the old token immediately.
@@ -273,7 +273,7 @@ pub async fn regenerate_ic_token(
   }
 }
 
-/// DELETE /api/v1/agents/:id/ic-token
+/// DELETE /api/v1/agents/{id}/ic-token
 ///
 /// Revoke IC token for an agent.
 /// Agent will not be able to authenticate until a new token is generated.

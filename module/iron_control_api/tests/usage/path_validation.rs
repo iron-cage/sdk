@@ -53,18 +53,18 @@ async fn create_test_router() -> Router {
 
   Router::new()
     .route(
-      "/api/usage/by-project/:project_id",
+      "/api/usage/by-project/{project_id}",
       get(iron_control_api::routes::usage::get_usage_by_project),
     )
     .route(
-      "/api/usage/by-provider/:provider",
+      "/api/usage/by-provider/{provider}",
       get(iron_control_api::routes::usage::get_usage_by_provider),
     )
     .with_state(usage_state)
 }
 
 // ========================================
-// GET /api/usage/by-project/:project_id
+// GET /api/usage/by-project/{project_id}
 // ========================================
 
 /// Test whitespace-only `project_id` is rejected.
@@ -153,7 +153,7 @@ async fn test_by_project_valid_id_accepted() {
 }
 
 // ========================================
-// GET /api/usage/by-provider/:provider
+// GET /api/usage/by-provider/{provider}
 // ========================================
 
 /// Test whitespace-only provider is rejected.

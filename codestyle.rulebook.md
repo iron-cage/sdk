@@ -70,7 +70,7 @@ The `rustfmt.toml` at the project root enforces this:
 tab_spaces = 2
 ```
 
-All contributors must run `cargo fmt` before committing. The formatter handles brace placement, spacing, line width, and all other formatting concerns automatically.
+The formatter handles brace placement, spacing, line width, and all other formatting concerns automatically.
 
 **Rationale:** 2-space indentation provides a more compact visual layout while maintaining readability, especially in deeply nested Rust code with generics and trait bounds.
 
@@ -247,20 +247,28 @@ Make sure you have no warnings from clippy with these lints enabled.
 
 ```toml
 [workspace.lints.rust]
-rust_2018_idioms = { level = "warn", priority = -1 }
-future_incompatible = { level = "warn", priority = -1 }
+# Warn on unsafe code (not deny - we need FFI for landlock/seccomp)
+unsafe_code = "warn"
+# Warn if public items lack documentation
 missing_docs = "warn"
+# Denies non-idiomatic code for Rust 2018 edition
+rust_2018_idioms = { level = "warn", priority = -1 }
+# Denies using features that may break in future Rust versions
+future_incompatible = { level = "warn", priority = -1 }
+# Warns for public types not implementing Debug
 missing_debug_implementations = "warn"
-unsafe-code = "deny"
 
 [workspace.lints.clippy]
+# Denies pedantic lints, enforcing strict coding styles and conventions
 pedantic = { level = "warn", priority = -1 }
+# Denies undocumented unsafe blocks
 undocumented_unsafe_blocks = "deny"
+# Denies to prefer `core` over `std` when available, for `no_std` compatibility
 std_instead_of_core = "warn"
+# Denies including files in documentation unconditionally
 doc_include_without_cfg = "warn"
-missing_inline_in_public_items = "warn"
 
-# exceptions
+# Exceptions
 single_call_fn = "allow"
 inline_always = "allow"
 module_name_repetitions = "allow"
@@ -275,6 +283,8 @@ implicit_return = "allow"
 arbitrary_source_item_ordering = "allow"
 mod_module_files = "allow"
 missing_docs_in_private_items = "allow"
+# Don't require inline in public items (too restrictive for this use case)
+missing_inline_in_public_items = "allow"
 ```
 
 ### Lints & Docs : Strict Workspace Lint Inheritance
@@ -674,7 +684,7 @@ secret/
 ```
 project_root/
 ├── src/                          # Production code ONLY
-├── spec/                         # Project specification (alternative to spec.md)
+├── spec/                         # Project specification
 │   └── readme.md                 # MANDATORY: Specification overview
 ├── tests/                        # ALL functional/integration tests
 │   ├── readme.md                 # MANDATORY: Test organization & principles
@@ -687,7 +697,6 @@ project_root/
 ├── secret/                       # Secrets and credentials
 │   ├── readme.md                 # MANDATORY: Secret management documentation
 │   └── -api_keys.sh             # Secret files (- prefix mandatory)
-├── spec.md                       # Project specification (alternative to spec/ dir)
 ├── readme.md                     # Primary documentation (lowercase)
 ├── license                       # License file (lowercase)
 └── [tooling files]               # Language-specific tooling (Cargo.toml, etc.)
@@ -702,7 +711,7 @@ Every directory (except `src/`) **must** contain a `readme.md` file (lowercase, 
 **ABSOLUTE File Type Separation Rules (No Exceptions):**
 - **Performance/Benchmark tests:** MUST be in `benches/` directory
 - **Functional tests:** MUST be in `tests/` directory
-- **Specifications:** MUST be in `spec/` directory OR single `spec.md` file
+- **Specifications:** MUST be in `spec/` directory
 - **Secrets:** MUST be in `secret/` directory with `-` prefix naming
 - **Production code:** Must be separated from tests and benchmarks
 - **Examples:** Must be demonstrations only, NO tests, NO benchmarks

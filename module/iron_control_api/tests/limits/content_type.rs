@@ -8,7 +8,7 @@
 //! | Test Case | Endpoint | Content-Type | Expected Result | Status |
 //! |-----------|----------|-------------|----------------|--------|
 //! | `test_create_limit_wrong_content_type` | POST /api/limits | text/plain | 415 | ✅ |
-//! | `test_update_limit_wrong_content_type` | PUT /api/limits/:id | text/html | 415 | ✅ |
+//! | `test_update_limit_wrong_content_type` | PUT /api/limits/{id} | text/html | 415 | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -41,7 +41,7 @@ async fn create_test_router() -> Router {
       post(iron_control_api::routes::limits::create_limit),
     )
     .route(
-      "/api/limits/:id",
+      "/api/limits/{id}",
       put(iron_control_api::routes::limits::update_limit),
     )
     .with_state(limit_state)

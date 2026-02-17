@@ -327,12 +327,9 @@ async fn test_enforcement_code_exists_in_keys_endpoint() {
   // Read the keys.rs source file
   let keys_source = include_str!("../src/routes/keys.rs");
 
-  // Verify the enforcement check exists (with or without formatting spaces)
-  let has_agent_id_check = keys_source.contains("let agent_id: Option<i64>")
-    || keys_source.contains("let agent_id: Option< i64 >");
-
+  // Verify the enforcement check exists
   assert!(
-    has_agent_id_check
+    keys_source.contains("let agent_id: Option<i64>")
       && keys_source.contains("SELECT agent_id FROM api_tokens WHERE id = ?")
       && keys_source.contains("if agent_id.is_some()")
       && keys_source.contains("Agent tokens cannot use this endpoint"),

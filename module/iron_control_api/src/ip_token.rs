@@ -11,11 +11,10 @@
 //! LLM API calls without exposing provider credentials to the developer.
 
 use aes_gcm::{
-  aead::{Aead, KeyInit, OsRng},
+  aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
   Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use rand::RngCore;
 use zeroize::Zeroizing;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)

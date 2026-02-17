@@ -6,9 +6,9 @@
 //! |----------|--------|------------|----------------------|
 //! | /api/v1/api-tokens | POST | Valid request, Empty `user_id`, Invalid fields | 201, 400 |
 //! | /api/v1/api-tokens | GET | NOT TESTED - Requires authentication | - |
-//! | /api/v1/api-tokens/:id | GET | Valid ID, Non-existent ID | 200, 404 |
-//! | /api/v1/api-tokens/:id/rotate | POST | Valid rotation, Non-existent ID | 200, 404 |
-//! | /api/v1/api-tokens/:id | DELETE | Valid revocation, Non-existent ID | 204, 404 |
+//! | /api/v1/api-tokens/{id} | GET | Valid ID, Non-existent ID | 200, 404 |
+//! | /api/v1/api-tokens/{id}/rotate | POST | Valid rotation, Non-existent ID | 200, 404 |
+//! | /api/v1/api-tokens/{id} | DELETE | Valid revocation, Non-existent ID | 204, 404 |
 //!
 //! Note: GET /api/v1/api-tokens (`list_tokens`) requires JWT authentication via `AuthenticatedUser`.
 //! This endpoint is not tested in integration tests as they don't include auth infrastructure.
@@ -30,13 +30,13 @@
 //! | `test_create_token_empty_user_id_rejected` | Create token with empty user_id | POST with user_id="" | 400 Bad Request "`user_id` cannot be empty" | ✅ |
 //! | `test_create_token_empty_project_id_rejected` | Create token with empty project_id | POST with project_id="" | 400 Bad Request "`project_id` cannot be empty" | ✅ |
 //! | `test_create_token_description_too_long_rejected` | Create token with oversized description | POST with description=501 chars | 400 Bad Request "description too long" | ✅ |
-//! | `test_get_token_valid_id_returns_200` | Get token by valid ID | GET /api/v1/api-tokens/:id with existing token | 200 OK, token metadata returned | ✅ |
+//! | `test_get_token_valid_id_returns_200` | Get token by valid ID | GET /api/v1/api-tokens/{id} with existing token | 200 OK, token metadata returned | ✅ |
 //! | `test_get_token_nonexistent_id_returns_404` | Get token by nonexistent ID | GET /api/v1/api-tokens/999999 | 404 Not Found | ✅ |
-//! | `test_revoke_token_valid_id_returns_204` | Revoke token by valid ID | DELETE /api/v1/api-tokens/:id with existing token | 204 No Content, token marked inactive | ✅ |
+//! | `test_revoke_token_valid_id_returns_204` | Revoke token by valid ID | DELETE /api/v1/api-tokens/{id} with existing token | 204 No Content, token marked inactive | ✅ |
 //! | `test_revoke_token_nonexistent_id_returns_404` | Revoke token by nonexistent ID | DELETE /api/v1/api-tokens/999999 | 404 Not Found | ✅ |
 //! | `test_token_created_at_timestamp` | Verify created_at timestamp | Create token, check created_at field | Timestamp within last 5 seconds | ✅ |
 //! | `test_token_id_auto_increment` | Verify ID auto-increment | Create 3 tokens sequentially | IDs increment (1, 2, 3) | ✅ |
-//! | `test_rotate_token_valid_id_returns_200` | Rotate token by valid ID | POST /api/v1/api-tokens/:id/rotate | 200 OK, new token returned, old revoked | ✅ |
+//! | `test_rotate_token_valid_id_returns_200` | Rotate token by valid ID | POST /api/v1/api-tokens/{id}/rotate | 200 OK, new token returned, old revoked | ✅ |
 //! | `test_rotate_token_nonexistent_id_returns_404` | Rotate token by nonexistent ID | POST /api/v1/api-tokens/999999/rotate | 404 Not Found | ✅ |
 //! | `test_validate_token_valid_returns_metadata` | Validate valid token | POST /api/v1/api-tokens/validate with valid token | 200 OK, metadata returned | ✅ |
 //! | `test_validate_token_invalid_returns_false` | Validate invalid token | POST /api/v1/api-tokens/validate with invalid token | 200 OK, valid=false | ✅ |
@@ -70,15 +70,15 @@ async fn create_test_router() -> (Router, crate::common::test_state::TestAppStat
       post(iron_control_api::routes::tokens::validate_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       get(iron_control_api::routes::tokens::get_token),
     )
     .route(
-      "/api/v1/api-tokens/:id/rotate",
+      "/api/v1/api-tokens/{id}/rotate",
       post(iron_control_api::routes::tokens::rotate_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       delete(iron_control_api::routes::tokens::revoke_token),
     )
     .with_state(app_state.clone());
@@ -293,7 +293,7 @@ async fn test_create_token_description_too_long_rejected() {
   );
 }
 
-/// Test GET /api/v1/api-tokens/:id with valid ID returns 200 OK.
+/// Test GET /api/v1/api-tokens/{id} with valid ID returns 200 OK.
 #[tokio::test]
 async fn test_get_token_valid_id_returns_200() {
   let (router, app_state) = create_test_router().await;
@@ -348,7 +348,7 @@ async fn test_get_token_valid_id_returns_200() {
   );
 }
 
-/// Test GET /api/v1/api-tokens/:id with non-existent ID returns 404.
+/// Test GET /api/v1/api-tokens/{id} with non-existent ID returns 404.
 #[tokio::test]
 async fn test_get_token_nonexistent_id_returns_404() {
   let (router, app_state) = create_test_router().await;
@@ -379,7 +379,7 @@ async fn test_get_token_nonexistent_id_returns_404() {
   );
 }
 
-/// Test DELETE /api/v1/api-tokens/:id with valid ID returns 200 OK (Protocol 014).
+/// Test DELETE /api/v1/api-tokens/{id} with valid ID returns 200 OK (Protocol 014).
 #[tokio::test]
 async fn test_revoke_token_valid_id_returns_204() {
   let (router, app_state) = create_test_router().await;
@@ -424,7 +424,7 @@ async fn test_revoke_token_valid_id_returns_204() {
   );
 }
 
-/// Test DELETE /api/v1/api-tokens/:id with non-existent ID returns 404.
+/// Test DELETE /api/v1/api-tokens/{id} with non-existent ID returns 404.
 #[tokio::test]
 async fn test_revoke_token_nonexistent_id_returns_404() {
   let (router, app_state) = create_test_router().await;
@@ -546,7 +546,7 @@ async fn test_token_id_auto_increment() {
   );
 }
 
-/// Test POST /api/v1/api-tokens/:id/rotate with valid ID returns 200 and new token.
+/// Test POST /api/v1/api-tokens/{id}/rotate with valid ID returns 200 and new token.
 #[tokio::test]
 async fn test_rotate_token_valid_id_returns_200() {
   let (router, app_state) = create_test_router().await;
@@ -615,7 +615,7 @@ async fn test_rotate_token_valid_id_returns_200() {
   );
 }
 
-/// Test POST /api/v1/api-tokens/:id/rotate with non-existent ID returns 404.
+/// Test POST /api/v1/api-tokens/{id}/rotate with non-existent ID returns 404.
 #[tokio::test]
 async fn test_rotate_token_nonexistent_id_returns_404() {
   let (router, app_state) = create_test_router().await;

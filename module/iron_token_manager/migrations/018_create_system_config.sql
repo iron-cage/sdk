@@ -1,4 +1,4 @@
--- Migration 017: Create system_config table and seed development data
+-- Migration 018: Create system_config table and seed development data
 --
 -- This migration:
 -- 1. Creates system_config table for persistent configuration
@@ -56,4 +56,5 @@ VALUES (
 );
 
 -- Create guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_017_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS _migration_018_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_018_completed (id) VALUES (1);

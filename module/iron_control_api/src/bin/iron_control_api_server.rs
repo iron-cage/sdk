@@ -31,9 +31,9 @@
 //! ## Token Management (Requires Authentication)
 //! - `GET /api/v1/api-tokens` - List user's tokens
 //! - `POST /api/v1/api-tokens` - Create new token
-//! - `GET /api/v1/api-tokens/:id` - Get specific token
-//! - `POST /api/v1/api-tokens/:id/rotate` - Rotate token (issue new value)
-//! - `DELETE /api/v1/api-tokens/:id` - Revoke token (soft delete)
+//! - `GET /api/v1/api-tokens/{id}` - Get specific token
+//! - `POST /api/v1/api-tokens/{id}/rotate` - Rotate token (issue new value)
+//! - `DELETE /api/v1/api-tokens/{id}` - Revoke token (soft delete)
 //!
 //! ## Health Check (Public)
 //! - `GET /health` - Server health status
@@ -667,27 +667,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       get(iron_control_api::routes::users::list_users),
     )
     .route(
-      "/api/v1/users/:id",
+      "/api/v1/users/{id}",
       get(iron_control_api::routes::users::get_user),
     )
     .route(
-      "/api/v1/users/:id",
+      "/api/v1/users/{id}",
       delete(iron_control_api::routes::users::delete_user),
     )
     .route(
-      "/api/v1/users/:id/suspend",
-      put(iron_control_api::routes::users::suspend_user),
+      "/api/v1/users/{id}/suspend",
+      axum::routing::put(iron_control_api::routes::users::suspend_user),
     )
     .route(
-      "/api/v1/users/:id/activate",
-      put(iron_control_api::routes::users::activate_user),
+      "/api/v1/users/{id}/activate",
+      axum::routing::put(iron_control_api::routes::users::activate_user),
     )
     .route(
-      "/api/v1/users/:id/role",
-      put(iron_control_api::routes::users::change_user_role),
+      "/api/v1/users/{id}/role",
+      axum::routing::put(iron_control_api::routes::users::change_user_role),
     )
     .route(
-      "/api/v1/users/:id/reset-password",
+      "/api/v1/users/{id}/reset-password",
       post(iron_control_api::routes::users::reset_password),
     )
     // Token management endpoints
@@ -704,19 +704,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       get(iron_control_api::routes::tokens::list_tokens),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       get(iron_control_api::routes::tokens::get_token),
     )
     .route(
-      "/api/v1/api-tokens/:id/rotate",
+      "/api/v1/api-tokens/{id}/rotate",
       post(iron_control_api::routes::tokens::rotate_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       delete(iron_control_api::routes::tokens::revoke_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       put(iron_control_api::routes::tokens::update_token),
     )
     // Usage analytics endpoints
@@ -725,11 +725,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       get(iron_control_api::routes::usage::get_aggregate_usage),
     )
     .route(
-      "/api/v1/usage/by-project/:project_id",
+      "/api/v1/usage/by-project/{project_id}",
       get(iron_control_api::routes::usage::get_usage_by_project),
     )
     .route(
-      "/api/v1/usage/by-provider/:provider",
+      "/api/v1/usage/by-provider/{provider}",
       get(iron_control_api::routes::usage::get_usage_by_provider),
     )
     // Limits management endpoints
@@ -742,16 +742,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       post(iron_control_api::routes::limits::create_limit),
     )
     .route(
-      "/api/v1/limits/:id",
+      "/api/v1/limits/{id}",
       get(iron_control_api::routes::limits::get_limit),
     )
     .route(
-      "/api/v1/limits/:id",
-      put(iron_control_api::routes::limits::update_limit),
+      "/api/v1/limits/{id}",
+      axum::routing::put(iron_control_api::routes::limits::update_limit),
     )
     .route(
-      "/api/v1/limits/:id",
-      delete(iron_control_api::routes::limits::delete_limit),
+      "/api/v1/limits/{id}",
+      axum::routing::delete(iron_control_api::routes::limits::delete_limit),
     )
     // Provider key management endpoints
     .route(
@@ -763,23 +763,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       get(iron_control_api::routes::providers::list_provider_keys),
     )
     .route(
-      "/api/v1/providers/:id",
+      "/api/v1/providers/{id}",
       get(iron_control_api::routes::providers::get_provider_key),
     )
     .route(
-      "/api/v1/providers/:id",
-      put(iron_control_api::routes::providers::update_provider_key),
+      "/api/v1/providers/{id}",
+      axum::routing::put(iron_control_api::routes::providers::update_provider_key),
     )
     .route(
-      "/api/v1/providers/:id",
+      "/api/v1/providers/{id}",
       delete(iron_control_api::routes::providers::delete_provider_key),
     )
     .route(
-      "/api/v1/projects/:project_id/provider",
+      "/api/v1/projects/{project_id}/provider",
       post(iron_control_api::routes::providers::assign_provider_to_project),
     )
     .route(
-      "/api/v1/projects/:project_id/provider",
+      "/api/v1/projects/{project_id}/provider",
       delete(iron_control_api::routes::providers::unassign_provider_from_project),
     )
     // Key fetch endpoint (API token authentication)
@@ -799,40 +799,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       post(iron_control_api::routes::agent_provider_key::get_provider_key),
     )
     .route(
-      "/api/v1/agents/:id",
+      "/api/v1/agents/{id}",
       get(iron_control_api::routes::agents::get_agent),
     )
     .route(
-      "/api/v1/agents/:id",
-      put(iron_control_api::routes::agents::update_agent),
+      "/api/v1/agents/{id}",
+      axum::routing::put(iron_control_api::routes::agents::update_agent),
     )
     .route(
-      "/api/v1/agents/:id",
+      "/api/v1/agents/{id}",
       delete(iron_control_api::routes::agents::delete_agent),
     )
     .route(
-      "/api/v1/agents/:id/budget",
-      put(iron_control_api::routes::agents::update_agent_budget),
+      "/api/v1/agents/{id}/budget",
+      axum::routing::put(iron_control_api::routes::agents::update_agent_budget),
     )
     .route(
-      "/api/v1/agents/:id/tokens",
+      "/api/v1/agents/{id}/tokens",
       get(iron_control_api::routes::agents::get_agent_tokens),
     )
     // IC Token management endpoints (agent authentication with budget runtime)
     .route(
-      "/api/v1/agents/:id/ic-token",
+      "/api/v1/agents/{id}/ic-token",
       post(iron_control_api::routes::ic_token::generate_ic_token),
     )
     .route(
-      "/api/v1/agents/:id/ic-token",
+      "/api/v1/agents/{id}/ic-token",
       get(iron_control_api::routes::ic_token::get_ic_token_status),
     )
     .route(
-      "/api/v1/agents/:id/ic-token/regenerate",
+      "/api/v1/agents/{id}/ic-token/regenerate",
       post(iron_control_api::routes::ic_token::regenerate_ic_token),
     )
     .route(
-      "/api/v1/agents/:id/ic-token",
+      "/api/v1/agents/{id}/ic-token",
       delete(iron_control_api::routes::ic_token::revoke_ic_token),
     )
     // Budget Control Protocol endpoints (Protocol 005)
@@ -858,7 +858,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       post(iron_control_api::routes::budget::create_budget_request),
     )
     .route(
-      "/api/v1/budget/requests/:id",
+      "/api/v1/budget/requests/{id}",
       get(iron_control_api::routes::budget::get_budget_request),
     )
     .route(
@@ -866,11 +866,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       get(iron_control_api::routes::budget::list_budget_requests),
     )
     .route(
-      "/api/v1/budget/requests/:id/approve",
+      "/api/v1/budget/requests/{id}/approve",
       axum::routing::patch(iron_control_api::routes::budget::approve_budget_request),
     )
     .route(
-      "/api/v1/budget/requests/:id/reject",
+      "/api/v1/budget/requests/{id}/reject",
       axum::routing::patch(iron_control_api::routes::budget::reject_budget_request),
     )
     // Analytics endpoints (Protocol 012)

@@ -57,7 +57,7 @@ async fn create_test_router_with_shared_db(
       post(iron_control_api::routes::tokens::create_token),
     )
     .route(
-      "/api/v1/api-tokens/:id/revoke",
+      "/api/v1/api-tokens/{id}/revoke",
       post(iron_control_api::routes::tokens::revoke_token),
     )
     .with_state(app_state.clone());

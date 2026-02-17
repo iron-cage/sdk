@@ -145,7 +145,6 @@ pub type ApiResult<T> = Result<T, ApiError>;
 #[derive(Debug)]
 pub struct JsonPath<T>(pub T);
 
-#[async_trait::async_trait]
 impl<T, S> axum::extract::FromRequestParts<S> for JsonPath<T>
 where
   T: serde::de::DeserializeOwned + Send,
@@ -199,7 +198,6 @@ where
 #[derive(Debug)]
 pub struct JsonBody<T>(pub T);
 
-#[async_trait::async_trait]
 impl<T, S> axum::extract::FromRequest<S> for JsonBody<T>
 where
   T: serde::de::DeserializeOwned,

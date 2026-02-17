@@ -256,7 +256,6 @@ impl JwtSecret {
 #[derive(Debug)]
 pub struct AuthenticatedUser(pub AccessTokenClaims);
 
-#[axum::async_trait]
 impl<S> axum::extract::FromRequestParts<S> for AuthenticatedUser
 where
   S: Send + Sync,

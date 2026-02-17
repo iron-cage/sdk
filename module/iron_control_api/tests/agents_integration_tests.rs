@@ -24,24 +24,24 @@
 //!
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
-//! | `test_create_agent_as_admin_success` | Admin creates agent | POST with admin token, valid agent data | 201 Created, agent in DB with correct `owner_id` | pass |
-//! | `test_create_agent_as_user_forbidden` | Regular user creates agent | POST with user token, valid agent data | 403 Forbidden | pass |
-//! | `test_create_agent_without_auth_unauthorized` | Unauthenticated creation | POST without auth header, valid agent data | 401 Unauthorized | pass |
-//! | `test_admin_can_assign_agent_to_other_user` | Admin assigns agent to user | POST with admin token, request includes `owner_id` field | 201 Created, `owner_id` set to specified user | pass |
-//! | `test_list_agents_as_admin_sees_all` | Admin lists all agents | GET with admin token, DB has agents from multiple users | 200 OK, all agents returned | pass |
-//! | `test_list_agents_as_user_sees_only_accessible` | User lists accessible agents | GET with user token, DB has user's agents and others | 200 OK, only user's agents returned | pass |
-//! | `test_list_agents_without_auth_unauthorized` | Unauthenticated listing | GET without auth header | 401 Unauthorized | pass |
-//! | `test_get_agent_as_admin_success` | Admin retrieves specific agent | GET with admin token, agent exists | 200 OK, agent details returned | pass |
-//! | `test_get_agent_as_user_without_access_forbidden` | User retrieves other user's agent | GET with user token, agent belongs to different user | 403 Forbidden | pass |
-//! | `test_get_agent_not_found` | Retrieve nonexistent agent | GET /api/agents/999999 with admin token | 404 Not Found | pass |
-//! | `test_get_agent_without_auth_unauthorized` | Unauthenticated retrieval | GET without auth header | 401 Unauthorized | pass |
-//! | `test_update_agent_as_admin_success` | Admin updates agent | PUT with admin token, valid update data | 200 OK, agent updated in DB | pass |
-//! | `test_update_agent_as_user_forbidden` | User updates other user's agent | PUT with user token, agent belongs to different user | 403 Forbidden | pass |
-//! | `test_delete_agent_as_admin_success` | Admin deletes agent | DELETE with admin token | 204 No Content, agent removed from DB | pass |
-//! | `test_delete_agent_as_user_forbidden` | User deletes other user's agent | DELETE with user token, agent belongs to different user | 403 Forbidden | pass |
-//! | `test_delete_nonexistent_agent_as_admin` | Delete nonexistent agent | DELETE /api/agents/999999 with admin token | 404 Not Found | pass |
-//! | `test_delete_agent_without_auth_unauthorized` | Unauthenticated deletion | DELETE without auth header | 401 Unauthorized | pass |
-//! | `test_get_agent_tokens_success` | Retrieve agent's API tokens | GET with admin token, agent has tokens | 200 OK, list of agent's tokens returned | pass |
+//! | `test_create_agent_as_admin_success` | Admin creates agent | POST /api/agents with admin token, valid agent data | 201 Created, agent in DB with correct owner_id | ✅ |
+//! | `test_create_agent_as_user_forbidden` | Regular user creates agent | POST /api/agents with user token, valid agent data | 403 Forbidden | ✅ |
+//! | `test_create_agent_without_auth_unauthorized` | Unauthenticated creation | POST /api/agents without auth header, valid agent data | 401 Unauthorized | ✅ |
+//! | `test_admin_can_assign_agent_to_other_user` | Admin assigns agent to user | POST /api/agents with admin token, request includes owner_id field | 201 Created, owner_id set to specified user | ✅ |
+//! | `test_list_agents_as_admin_sees_all` | Admin lists all agents | GET /api/agents with admin token, DB has agents from multiple users | 200 OK, all agents returned | ✅ |
+//! | `test_list_agents_as_user_sees_only_accessible` | User lists accessible agents | GET /api/agents with user token, DB has user's agents + others | 200 OK, only user's agents returned | ✅ |
+//! | `test_list_agents_without_auth_unauthorized` | Unauthenticated listing | GET /api/agents without auth header | 401 Unauthorized | ✅ |
+//! | `test_get_agent_as_admin_success` | Admin retrieves specific agent | GET /api/agents/{id} with admin token, agent exists | 200 OK, agent details returned | ✅ |
+//! | `test_get_agent_as_user_without_access_forbidden` | User retrieves other user's agent | GET /api/agents/{id} with user token, agent belongs to different user | 403 Forbidden | ✅ |
+//! | `test_get_agent_not_found` | Retrieve nonexistent agent | GET /api/agents/999999 with admin token | 404 Not Found | ✅ |
+//! | `test_get_agent_without_auth_unauthorized` | Unauthenticated retrieval | GET /api/agents/{id} without auth header | 401 Unauthorized | ✅ |
+//! | `test_update_agent_as_admin_success` | Admin updates agent | PUT /api/agents/{id} with admin token, valid update data | 200 OK, agent updated in DB | ✅ |
+//! | `test_update_agent_as_user_forbidden` | User updates other user's agent | PUT /api/agents/{id} with user token, agent belongs to different user | 403 Forbidden | ✅ |
+//! | `test_delete_agent_as_admin_success` | Admin deletes agent | DELETE /api/agents/{id} with admin token | 204 No Content, agent removed from DB | ✅ |
+//! | `test_delete_agent_as_user_forbidden` | User deletes other user's agent | DELETE /api/agents/{id} with user token, agent belongs to different user | 403 Forbidden | ✅ |
+//! | `test_delete_nonexistent_agent_as_admin` | Delete nonexistent agent | DELETE /api/agents/999999 with admin token | 404 Not Found | ✅ |
+//! | `test_delete_agent_without_auth_unauthorized` | Unauthenticated deletion | DELETE /api/agents/{id} without auth header | 401 Unauthorized | ✅ |
+//! | `test_get_agent_tokens_success` | Retrieve agent's API tokens | GET /api/agents/{id}/tokens with admin token, agent has tokens | 200 OK, list of agent's tokens returned | ✅ |
 
 mod common;
 
@@ -147,19 +147,19 @@ async fn create_agents_router() -> (Router, SqlitePool, String, String, String, 
       post(iron_control_api::routes::agents::create_agent),
     )
     .route(
-      "/api/agents/:id",
+      "/api/agents/{id}",
       get(iron_control_api::routes::agents::get_agent),
     )
     .route(
-      "/api/agents/:id",
+      "/api/agents/{id}",
       put(iron_control_api::routes::agents::update_agent),
     )
     .route(
-      "/api/agents/:id",
+      "/api/agents/{id}",
       delete_route(iron_control_api::routes::agents::delete_agent),
     )
     .route(
-      "/api/agents/:id/tokens",
+      "/api/agents/{id}/tokens",
       get(iron_control_api::routes::agents::get_agent_tokens),
     )
     .with_state(app_state.clone());

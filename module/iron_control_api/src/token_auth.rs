@@ -28,7 +28,6 @@ pub struct ApiTokenState {
   pub token_storage: Arc<TokenStorage>,
 }
 
-#[axum::async_trait]
 impl<S> axum::extract::FromRequestParts<S> for ApiTokenAuth
 where
   S: Send + Sync,
