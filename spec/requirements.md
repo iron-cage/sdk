@@ -1803,7 +1803,7 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 - **Enforcement:**
   - CI pipeline checks formatting with `cargo fmt --all -- --check`
   - Pre-commit hooks recommended (not mandatory) for local development
-  - Complete formatting rules documented in `codestyle.md`
+  - Complete formatting rules documented in `codestyle.rulebook.md`
 - **Validation:** Run `make fmt-check`, verify zero formatting violations
 
 ### 2.6 Testing (MUST)
