@@ -61,9 +61,9 @@
 //! ### Agent Management
 //!
 //! ```text
-//! GET  /api/agents/:id/status   - Get agent status
-//! POST /api/agents/:id/stop     - Stop agent
-//! GET  /api/agents/:id/metrics  - Get agent metrics
+//! GET  /api/agents/{id}/status   - Get agent status
+//! POST /api/agents/{id}/stop     - Stop agent
+//! GET  /api/agents/{id}/metrics  - Get agent metrics
 //! ```
 //!
 //! ### Analytics & Usage
@@ -255,9 +255,9 @@ mod implementation
     pub async fn start(self) -> Result<(), anyhow::Error>
     {
       let app = Router::new()
-        .route("/api/agents/:id/status", get(get_agent_status))
-        .route("/api/agents/:id/stop", post(stop_agent))
-        .route("/api/agents/:id/metrics", get(get_agent_metrics))
+        .route("/api/agents/{id}/status", get(get_agent_status))
+        .route("/api/agents/{id}/stop", post(stop_agent))
+        .route("/api/agents/{id}/metrics", get(get_agent_metrics))
         .route("/ws", get(websocket_handler))
         .layer(CorsLayer::permissive())
         .with_state(self.state);

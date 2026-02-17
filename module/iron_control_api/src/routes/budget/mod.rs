@@ -9,10 +9,10 @@
 //! - POST /api/budget/refresh - Request additional budget when running low
 //! - POST /api/budget/return - Return unused budget when runtime shuts down
 //! - POST /api/v1/budget/requests - Create budget change request (Protocol 012)
-//! - GET /api/v1/budget/requests/:id - Get budget request details
+//! - GET /api/v1/budget/requests/{id} - Get budget request details
 //! - GET /api/v1/budget/requests - List budget requests with filtering
-//! - PATCH /api/v1/budget/requests/:id/approve - Approve budget request
-//! - PATCH /api/v1/budget/requests/:id/reject - Reject budget request
+//! - PATCH /api/v1/budget/requests/{id}/approve - Approve budget request
+//! - PATCH /api/v1/budget/requests/{id}/reject - Reject budget request
 
 // Module declarations
 pub mod state;

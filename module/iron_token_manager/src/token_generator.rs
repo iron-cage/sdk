@@ -117,7 +117,7 @@
 //! - Implementation: `encode_base62()` function (uses modulo arithmetic)
 //! - Mathematical analysis: test doc comments explain why strict chi-squared fails
 
-use rand::{ Rng, thread_rng };
+use rand::{rng, RngExt};
 use sha2::{ Sha256, Digest };
 use subtle::ConstantTimeEq;
 
@@ -206,7 +206,7 @@ impl TokenGenerator
   #[ must_use ]
   pub fn generate( &self ) -> String
   {
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     // Generate 48 random bytes (384 bits entropy)
     let mut random_bytes = vec![ 0u8; 48 ];

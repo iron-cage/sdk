@@ -9,8 +9,8 @@
 //! |-----------|----------|----------------|----------------|--------|
 //! | `test_create_limit_with_invalid_json_syntax` | POST /api/limits | Missing closing brace | 400 Bad Request | ✅ |
 //! | `test_create_limit_with_trailing_comma` | POST /api/limits | Trailing comma in object | 400 Bad Request | ✅ |
-//! | `test_update_limit_with_invalid_json_syntax` | PUT /api/limits/:id | Malformed JSON | 400 Bad Request | ✅ |
-//! | `test_update_limit_with_unquoted_values` | PUT /api/limits/:id | Unquoted string values | 400 Bad Request | ✅ |
+//! | `test_update_limit_with_invalid_json_syntax` | PUT /api/limits/{id} | Malformed JSON | 400 Bad Request | ✅ |
+//! | `test_update_limit_with_unquoted_values` | PUT /api/limits/{id} | Unquoted string values | 400 Bad Request | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -47,7 +47,7 @@ async fn create_test_router() -> Router
 
   Router::new()
     .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits/:id", put( iron_control_api::routes::limits::update_limit ) )
+    .route( "/api/limits/{id}", put( iron_control_api::routes::limits::update_limit ) )
     .with_state( limits_state )
 }
 
@@ -130,7 +130,7 @@ async fn test_create_limit_with_trailing_comma()
   );
 }
 
-/// Test PUT /api/limits/:id with invalid JSON syntax.
+/// Test PUT /api/limits/{id} with invalid JSON syntax.
 ///
 /// WHY: Update endpoint should also reject malformed JSON at HTTP layer.
 #[ tokio::test ]
@@ -159,7 +159,7 @@ async fn test_update_limit_with_invalid_json_syntax()
   );
 }
 
-/// Test PUT /api/limits/:id with unquoted string values (invalid JSON).
+/// Test PUT /api/limits/{id} with unquoted string values (invalid JSON).
 ///
 /// WHY: JSON requires quoted string values. This ensures strict parsing.
 #[ tokio::test ]

@@ -9,7 +9,7 @@
 //! | Test Case | Endpoint | Operation | Expected Result | Status |
 //! |-----------|----------|-----------|----------------|--------|
 //! | `test_create_token_same_data_produces_different_tokens` | POST /api/v1/api-tokens | Create twice with same data | Two different tokens | ✅ |
-//! | `test_revoke_nonexistent_token_returns_404` | DELETE /api/v1/api-tokens/:id | Delete non-existent | 404 Not Found | ✅ |
+//! | `test_revoke_nonexistent_token_returns_404` | DELETE /api/v1/api-tokens/{id} | Delete non-existent | 404 Not Found | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -51,7 +51,7 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 
   let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/v1/api-tokens/{id}", delete( iron_control_api::routes::tokens::revoke_token ) )
     .with_state( app_state.clone() );
 
   ( router, app_state )

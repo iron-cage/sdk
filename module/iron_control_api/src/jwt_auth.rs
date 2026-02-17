@@ -248,7 +248,6 @@ impl JwtSecret
 /// - Malformed headers (not "Bearer <token>") return 401 Unauthorized
 pub struct AuthenticatedUser( pub AccessTokenClaims );
 
-#[ axum::async_trait ]
 impl< S > axum::extract::FromRequestParts< S > for AuthenticatedUser
 where
   S: Send + Sync,
