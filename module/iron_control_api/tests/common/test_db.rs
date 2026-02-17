@@ -1,6 +1,6 @@
-//! Test database creation using iron_test_db
+//! Test database creation using `iron_test_db`
 //!
-//! This module provides a thin wrapper around iron_test_db for creating
+//! This module provides a thin wrapper around `iron_test_db` for creating
 //! test databases with migrations applied.
 //!
 //! # Usage
@@ -16,17 +16,17 @@
 //!
 //! # Migration History
 //!
-//! Created during iron_test_db universal adoption migration to replace
-//! duplicated test database infrastructure. See module/iron_test_db/tests/
-//! migration_verification.rs for full migration rationale.
+//! Created during `iron_test_db` universal adoption migration to replace
+//! duplicated test database infrastructure. See `module/iron_test_db/tests/
+//! migration_verification.rs` for full migration rationale.
 
-use iron_test_db::{ TestDatabase, TestDatabaseBuilder };
+use iron_test_db::{TestDatabase, TestDatabaseBuilder};
 
-/// Authentication schema for iron_control_api tests
+/// Authentication schema for `iron_control_api` tests
 ///
 /// Provides tables for user authentication, token blacklisting, and user audit logging
-/// that are specific to control API tests (beyond token_manager migrations).
-const AUTH_SCHEMA: &str = r#"
+/// that are specific to control API tests (beyond `token_manager` migrations).
+const AUTH_SCHEMA: &str = r"
 -- Users table for authentication tests
 CREATE TABLE IF NOT EXISTS users
 (
@@ -73,15 +73,15 @@ CREATE TABLE IF NOT EXISTS user_audit_log
   FOREIGN KEY(target_user_id) REFERENCES users(id),
   FOREIGN KEY(performed_by) REFERENCES users(id)
 );
-"#;
+";
 
 /// Create a test database with all migrations and authentication schema applied.
 ///
 /// This function:
-/// 1. Creates an in-memory SQLite database
+/// 1. Creates an in-memory `SQLite` database
 /// 2. Configures connection pool (size: 5)
-/// 3. Applies all migrations from iron_token_manager
-/// 4. Applies authentication schema (users, token_blacklist, user_audit_log tables)
+/// 3. Applies all migrations from `iron_token_manager`
+/// 4. Applies authentication schema (`users`, `token_blacklist`, `user_audit_log` tables)
 ///
 /// # Panics
 ///
@@ -105,24 +105,23 @@ CREATE TABLE IF NOT EXISTS user_audit_log
 ///   .expect("Query failed");
 /// # }
 /// ```
-pub async fn create_test_db() -> TestDatabase
-{
+pub async fn create_test_db() -> TestDatabase {
   let db = TestDatabaseBuilder::new()
     .in_memory()
-    .pool_size( 5 )
+    .pool_size(5)
     .build()
     .await
-    .expect( "LOUD FAILURE: Failed to create test database" );
+    .expect("LOUD FAILURE: Failed to create test database");
 
-  iron_token_manager::migrations::apply_all_migrations( db.pool() )
+  iron_token_manager::migrations::apply_all_migrations(db.pool())
     .await
-    .expect( "LOUD FAILURE: Failed to apply migrations" );
+    .expect("LOUD FAILURE: Failed to apply migrations");
 
   // Apply authentication-specific schema on top of migrations
-  sqlx::raw_sql( AUTH_SCHEMA )
-    .execute( db.pool() )
+  sqlx::raw_sql(AUTH_SCHEMA)
+    .execute(db.pool())
     .await
-    .expect( "LOUD FAILURE: Failed to apply authentication schema" );
+    .expect("LOUD FAILURE: Failed to apply authentication schema");
 
   db
 }

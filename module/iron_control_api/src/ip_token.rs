@@ -5,16 +5,13 @@
 //! IP Tokens are AES-256-GCM encrypted provider API keys that are:
 //! - Never written to disk (memory-only storage)
 //! - Encrypted with runtime session key
-//! - Format: AES256:{IV_base64}:{ciphertext_base64}:{auth_tag_base64}
+//! - Format: `AES256:{IV_base64}:{ciphertext_base64}:{auth_tag_base64}`
 //!
 //! The runtime acts as a secure proxy, decrypting IP Tokens on-demand to make
 //! LLM API calls without exposing provider credentials to the developer.
 
-use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
-
 use aes_gcm::{
-  aead::rand_core::RngCore,
-  aead::{Aead, KeyInit, OsRng},
+  aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
   Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -37,8 +34,8 @@ pub struct IpTokenCrypto {
   cipher: Aes256Gcm,
 }
 
-impl Debug for IpTokenCrypto {
-  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+impl core::fmt::Debug for IpTokenCrypto {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     f.debug_struct("IpTokenCrypto")
       .field("cipher", &"<redacted>")
       .finish()
@@ -59,7 +56,9 @@ impl IpTokenCrypto {
     if key.len() != KEY_SIZE {
       return Err(IpTokenError::InvalidKeyLength);
     }
+
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| IpTokenError::InvalidKey)?;
+
     Ok(Self { cipher })
   }
 
@@ -115,7 +114,7 @@ impl IpTokenCrypto {
   ///
   /// # Returns
   ///
-  /// Decrypted provider API key (zeroed on drop)
+  /// Decrypted provider API key (zeroized on drop)
   ///
   /// # Errors
   ///
@@ -201,8 +200,8 @@ pub enum IpTokenError {
   InvalidUtf8,
 }
 
-impl Display for IpTokenError {
-  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+impl core::fmt::Display for IpTokenError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match self {
       Self::InvalidKeyLength => write!(f, "Invalid key length: must be {KEY_SIZE} bytes"),
       Self::InvalidKey => write!(f, "Invalid encryption key"),

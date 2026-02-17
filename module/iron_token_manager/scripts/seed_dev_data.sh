@@ -151,13 +151,14 @@ VALUES
 -- ============================================================================
 
 -- Set generous limits for development (INSERT OR IGNORE for idempotency)
--- Schema: max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month
+-- Schema: max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month
+-- Note: After migration 019, cost is in microdollars (1 cent = 10,000 microdollars)
 INSERT OR IGNORE INTO usage_limits (
   user_id,
   project_id,
   max_tokens_per_day,
   max_requests_per_minute,
-  max_cost_cents_per_month,
+  max_cost_microdollars_per_month,
   created_at,
   updated_at
 )
@@ -167,7 +168,7 @@ VALUES
     NULL,
     1000000,
     1000,
-    1000000,
+    10000000000,  -- 1,000,000 cents = 10B microdollars (\$10,000)
     $NOW_MS,
     $NOW_MS
   ),
@@ -176,7 +177,7 @@ VALUES
     'project_beta',
     500000,
     500,
-    500000,
+    5000000000,  -- 500,000 cents = 5B microdollars (\$5,000)
     $NOW_MS,
     $NOW_MS
   ),
@@ -185,7 +186,7 @@ VALUES
     'project_beta',
     100000,
     100,
-    100000,
+    1000000000,  -- 100,000 cents = 1B microdollars (\$1,000)
     $NOW_MS,
     $NOW_MS
   );
