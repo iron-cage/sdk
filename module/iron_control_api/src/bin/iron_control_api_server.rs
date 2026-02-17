@@ -540,11 +540,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     permission_checker,
   );
 
+  // Shared IC Token rate limiter — one instance across all endpoint groups.
+  // Cloning shares the inner `Arc<Mutex<...>>`, so budget and analytics endpoints
+  // draw from the same failure counter and cannot be bypassed by mixing endpoints.
+  let ic_token_rate_limiter = iron_control_api::ic_token::IcTokenRateLimiter::new();
+
   // Initialize analytics state (Protocol 012)
   // Uses same IC_TOKEN_SECRET as budget module for consistent agent authentication
   let analytics_state = iron_control_api::routes::analytics::AnalyticsState::new(
     &database_url,
     ic_token_secret.clone(),
+    ic_token_rate_limiter.clone(),
   )
   .await
   .expect("LOUD FAILURE: Failed to initialize analytics state");
@@ -588,6 +594,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     auth_state.jwt_secret.clone(),
     &database_url,
     Some(crypto_service_for_budget),
+    ic_token_rate_limiter,
   )
   .await
   .expect("LOUD FAILURE: Failed to initialize budget state");

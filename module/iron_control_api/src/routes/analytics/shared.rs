@@ -642,6 +642,7 @@ impl AnalyticsState {
   pub async fn new(
     database_url: &str,
     ic_token_secret: String,
+    ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn std::error::Error>> {
     let pool = SqlitePoolOptions::new()
       .max_connections(5)
@@ -657,7 +658,7 @@ impl AnalyticsState {
     Ok(Self {
       pool,
       ic_token_manager,
-      ic_token_rate_limiter: IcTokenRateLimiter::new(),
+      ic_token_rate_limiter,
     })
   }
 }

@@ -78,6 +78,7 @@ impl BudgetState {
     jwt_secret: Arc<JwtSecret>,
     database_url: &str,
     crypto_service: Option<Arc<CryptoService>>,
+    ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn std::error::Error>> {
     let db_pool = SqlitePool::connect(database_url).await?;
     let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
@@ -97,7 +98,7 @@ impl BudgetState {
       db_pool,
       jwt_secret,
       crypto_service,
-      ic_token_rate_limiter: IcTokenRateLimiter::new(),
+      ic_token_rate_limiter,
     })
   }
 }
