@@ -641,7 +641,7 @@ impl AnalyticsState {
   /// - Migration execution fails
   pub async fn new(
     database_url: &str,
-    ic_token_secret: String,
+    ic_token_manager: Arc<IcTokenManager>,
     ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn std::error::Error>> {
     let pool = SqlitePoolOptions::new()
@@ -652,8 +652,6 @@ impl AnalyticsState {
     // Run migration
     let migration = include_str!("../../../migrations/011_create_analytics_events.sql");
     sqlx::raw_sql(migration).execute(&pool).await?;
-
-    let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
 
     Ok(Self {
       pool,

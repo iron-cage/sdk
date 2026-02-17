@@ -72,7 +72,7 @@ impl BudgetState {
   ///
   /// Returns error if database connection or crypto initialization fails
   pub async fn new(
-    ic_token_secret: String,
+    ic_token_manager: Arc<IcTokenManager>,
     ip_token_key: &[u8],
     provider_key_master: &[u8],
     jwt_secret: Arc<JwtSecret>,
@@ -81,7 +81,6 @@ impl BudgetState {
     ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn std::error::Error>> {
     let db_pool = SqlitePool::connect(database_url).await?;
-    let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
     let ip_token_crypto = Arc::new(IpTokenCrypto::new(ip_token_key)?);
     let provider_key_crypto = Arc::new(CryptoService::new(provider_key_master)?);
     let lease_manager = Arc::new(LeaseManager::from_pool(db_pool.clone()));
