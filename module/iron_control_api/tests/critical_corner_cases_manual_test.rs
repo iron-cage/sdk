@@ -61,7 +61,7 @@ async fn test_analytics_sum_near_max_i64() {
     "CREATE TABLE IF NOT EXISTS test_analytics_overflow (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL CHECK(cost_micros >= 0)
-    )"
+    )",
   )
   .execute(&pool)
   .await
@@ -82,11 +82,10 @@ async fn test_analytics_sum_near_max_i64() {
   // 1. Return correct sum (if using larger type internally)
   // 2. Return error (if overflow detected)
   // 3. Return wrong value (BUG - silent overflow)
-  let result: Result<(Option<i64>,), sqlx::Error> = sqlx::query_as(
-    "SELECT SUM(cost_micros) FROM test_analytics_overflow"
-  )
-  .fetch_one(&pool)
-  .await;
+  let result: Result<(Option<i64>,), sqlx::Error> =
+    sqlx::query_as("SELECT SUM(cost_micros) FROM test_analytics_overflow")
+      .fetch_one(&pool)
+      .await;
 
   match result {
     Ok((Some(sum),)) => {
@@ -95,9 +94,8 @@ async fn test_analytics_sum_near_max_i64() {
       let expected = max_i64 - 1;
       assert_eq!(
         sum, expected,
-        "LOUD FAILURE: SUM overflow detected! Expected {}, got {}. \
+        "LOUD FAILURE: SUM overflow detected! Expected {expected}, got {sum}. \
          This indicates silent integer overflow in analytics aggregation.",
-        expected, sum
       );
     }
     Ok((None,)) => {
@@ -128,7 +126,7 @@ async fn test_analytics_negative_cost_rejected() {
     "CREATE TABLE IF NOT EXISTS test_analytics_negative (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL CHECK(cost_micros >= 0)
-    )"
+    )",
   )
   .execute(&pool)
   .await
@@ -171,7 +169,7 @@ async fn test_analytics_sum_empty_dataset() {
     "CREATE TABLE IF NOT EXISTS test_cost_table (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL
-    )"
+    )",
   )
   .execute(&pool)
   .await
@@ -192,12 +190,11 @@ async fn test_analytics_sum_empty_dataset() {
   );
 
   // Demonstrate correct handling with COALESCE
-  let safe_result: (i64,) = sqlx::query_as(
-    "SELECT COALESCE(SUM(cost_micros), 0) FROM test_cost_table"
-  )
-  .fetch_one(&pool)
-  .await
-  .expect("LOUD FAILURE: COALESCE query failed");
+  let safe_result: (i64,) =
+    sqlx::query_as("SELECT COALESCE(SUM(cost_micros), 0) FROM test_cost_table")
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: COALESCE query failed");
 
   assert_eq!(
     safe_result.0, 0,
@@ -220,7 +217,7 @@ async fn test_analytics_sum_single_record() {
     "CREATE TABLE IF NOT EXISTS test_cost_table (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL
-    )"
+    )",
   )
   .execute(&pool)
   .await
@@ -281,7 +278,7 @@ async fn test_analytics_fractional_cents_handling() {
     "CREATE TABLE IF NOT EXISTS test_cost_table (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL
-    )"
+    )",
   )
   .execute(&pool)
   .await
@@ -500,11 +497,13 @@ async fn test_delete_agent_with_usage_data() {
 
   // Create agent and usage data
   let now = chrono::Utc::now().timestamp_millis();
-  sqlx::query("INSERT INTO agents (id, name, providers, created_at) VALUES (100, 'test-agent', '[]', ?)")
-    .bind(now)
-    .execute(&pool)
-    .await
-    .expect("LOUD FAILURE: Failed to create agent");
+  sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at) VALUES (100, 'test-agent', '[]', ?)",
+  )
+  .bind(now)
+  .execute(&pool)
+  .await
+  .expect("LOUD FAILURE: Failed to create agent");
 
   sqlx::query("INSERT INTO test_analytics_fk (agent_id, cost_micros) VALUES (100, 100)")
     .execute(&pool)
@@ -518,12 +517,11 @@ async fn test_delete_agent_with_usage_data() {
     .expect("LOUD FAILURE: Failed to delete agent");
 
   // Check if usage data was cascaded or orphaned
-  let remaining_events: (i64,) = sqlx::query_as(
-    "SELECT COUNT(*) FROM test_analytics_fk WHERE agent_id = 100"
-  )
-  .fetch_one(&pool)
-  .await
-  .expect("LOUD FAILURE: Failed to count events");
+  let remaining_events: (i64,) =
+    sqlx::query_as("SELECT COUNT(*) FROM test_analytics_fk WHERE agent_id = 100")
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Failed to count events");
 
   // With ON DELETE CASCADE, events should be deleted
   assert_eq!(

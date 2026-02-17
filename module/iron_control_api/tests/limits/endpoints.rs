@@ -14,16 +14,16 @@
 //!
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
-//! | `test_endpoint_valid_request_accepted` | Create limit with valid request | POST /api/limits with tokens=1000000 | 201 Created, `LimitResponse` returned | |
-//! | `test_endpoint_all_none_rejected` | Create limit with all None fields | POST /api/limits with all fields None | 422 Unprocessable Entity | |
-//! | `test_endpoint_zero_value_rejected` | Create limit with zero value | POST /api/limits with tokens=0 | 400 Bad Request "positive number" | |
-//! | `test_endpoint_negative_value_rejected` | Create limit with negative value | POST /api/limits with tokens=-100 | 400 Bad Request "positive number" | |
-//! | `test_endpoint_overflow_rejected` | Create limit with overflow value | POST /api/limits with tokens=`i64::MAX` | 400 Bad Request "too large" | |
-//! | `test_endpoint_valid_multiple_limits_accepted` | Create limit with multiple fields | POST /api/limits with multiple valid limits | 201 Created | |
-//! | `test_endpoint_mixed_valid_invalid_rejected` | Create limit with mixed valid/invalid | POST /api/limits with valid + invalid fields | 400 Bad Request | |
-//! | `test_update_limit_all_none_rejected` | Update limit with all None | PUT /api/limits/:id with all fields None | 422 Unprocessable Entity | |
-//! | `test_update_limit_negative_value_rejected` | Update limit with negative value | PUT /api/limits/:id with tokens=-100 | 400 Bad Request "positive number" | |
-//! | `test_update_limit_overflow_rejected` | Update limit with overflow value | PUT /api/limits/:id with tokens=`i64::MAX` | 400 Bad Request "too large" | |
+//! | `test_endpoint_valid_request_accepted` | Create limit with valid request | POST /api/limits with tokens=1000000 | 201 Created, LimitResponse returned | ✅ |
+//! | `test_endpoint_all_none_rejected` | Create limit with all None fields | POST /api/limits with all fields None | 422 Unprocessable Entity | ✅ |
+//! | `test_endpoint_zero_value_rejected` | Create limit with zero value | POST /api/limits with tokens=0 | 400 Bad Request "positive number" | ✅ |
+//! | `test_endpoint_negative_value_rejected` | Create limit with negative value | POST /api/limits with tokens=-100 | 400 Bad Request "positive number" | ✅ |
+//! | `test_endpoint_overflow_rejected` | Create limit with overflow value | POST /api/limits with tokens=i64::MAX | 400 Bad Request "too large" | ✅ |
+//! | `test_endpoint_valid_multiple_limits_accepted` | Create limit with multiple fields | POST /api/limits with multiple valid limits | 201 Created | ✅ |
+//! | `test_endpoint_mixed_valid_invalid_rejected` | Create limit with mixed valid/invalid | POST /api/limits with valid + invalid fields | 400 Bad Request | ✅ |
+//! | `test_update_limit_all_none_rejected` | Update limit with all None | PUT /api/limits/{id} with all fields None | 422 Unprocessable Entity | ✅ |
+//! | `test_update_limit_negative_value_rejected` | Update limit with negative value | PUT /api/limits/{id} with tokens=-100 | 400 Bad Request "positive number" | ✅ |
+//! | `test_update_limit_overflow_rejected` | Update limit with overflow value | PUT /api/limits/{id} with tokens=i64::MAX | 400 Bad Request "too large" | ✅ |
 
 use crate::common::{extract_json_response, extract_response};
 use axum::body::Body;
@@ -301,7 +301,7 @@ async fn test_endpoint_mixed_valid_invalid_rejected() {
 }
 
 //
-// PUT /api/limits/:id validation tests
+// PUT /api/limits/{id} validation tests
 //
 
 /// Create test router with `update_limit` route.
@@ -313,7 +313,7 @@ async fn create_update_test_router() -> Router {
 
   Router::new()
     .route(
-      "/api/limits/:id",
+      "/api/limits/{id}",
       axum::routing::put(iron_control_api::routes::limits::update_limit),
     )
     .with_state(limits_state)

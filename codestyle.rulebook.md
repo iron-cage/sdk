@@ -247,20 +247,28 @@ Make sure you have no warnings from clippy with these lints enabled.
 
 ```toml
 [workspace.lints.rust]
-rust_2018_idioms = { level = "warn", priority = -1 }
-future_incompatible = { level = "warn", priority = -1 }
+# Warn on unsafe code (not deny - we need FFI for landlock/seccomp)
+unsafe_code = "warn"
+# Warn if public items lack documentation
 missing_docs = "warn"
+# Denies non-idiomatic code for Rust 2018 edition
+rust_2018_idioms = { level = "warn", priority = -1 }
+# Denies using features that may break in future Rust versions
+future_incompatible = { level = "warn", priority = -1 }
+# Warns for public types not implementing Debug
 missing_debug_implementations = "warn"
-unsafe-code = "deny"
 
 [workspace.lints.clippy]
+# Denies pedantic lints, enforcing strict coding styles and conventions
 pedantic = { level = "warn", priority = -1 }
+# Denies undocumented unsafe blocks
 undocumented_unsafe_blocks = "deny"
+# Denies to prefer `core` over `std` when available, for `no_std` compatibility
 std_instead_of_core = "warn"
+# Denies including files in documentation unconditionally
 doc_include_without_cfg = "warn"
-missing_inline_in_public_items = "warn"
 
-# exceptions
+# Exceptions
 single_call_fn = "allow"
 inline_always = "allow"
 module_name_repetitions = "allow"
@@ -275,6 +283,8 @@ implicit_return = "allow"
 arbitrary_source_item_ordering = "allow"
 mod_module_files = "allow"
 missing_docs_in_private_items = "allow"
+# Don't require inline in public items (too restrictive for this use case)
+missing_inline_in_public_items = "allow"
 ```
 
 ### Lints & Docs : Strict Workspace Lint Inheritance

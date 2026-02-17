@@ -108,4 +108,3 @@ fn test_ci_test_database_path() {
     "Test DB not in target/"
   );
 }
-

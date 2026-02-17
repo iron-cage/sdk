@@ -5,11 +5,10 @@
 
 use aes_gcm::
 {
-  aead::{ Aead, KeyInit, OsRng },
+  aead::{Aead, KeyInit, OsRng, rand_core::RngCore},
   Aes256Gcm,
   Nonce,
 };
-use rand::RngCore;
 use zeroize::Zeroizing;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)

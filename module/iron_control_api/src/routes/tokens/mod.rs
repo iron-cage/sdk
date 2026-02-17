@@ -11,10 +11,10 @@
 //!
 //! - POST /api/tokens - Create new API token (Protocol 014 compliant)
 //! - GET /api/tokens - List all tokens for user
-//! - GET /api/tokens/:id - Get specific token details
-//! - POST /api/tokens/:id/update - Update token provider
-//! - POST /api/tokens/:id/rotate - Rotate token (generate new value)
-//! - DELETE /api/tokens/:id - Revoke token
+//! - GET /api/tokens/{id} - Get specific token details
+//! - POST /api/tokens/{id}/update - Update token provider
+//! - POST /api/tokens/{id}/rotate - Rotate token (generate new value)
+//! - DELETE /api/tokens/{id} - Revoke token
 //! - POST /api/tokens/validate - Validate token (Deliverable 1.6)
 //!
 //! # Protocol 014 Compliance

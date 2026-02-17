@@ -12,7 +12,7 @@
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
 //! | `test_token_plaintext_only_on_creation` | Token plaintext returned only once | Create token, query DB directly | Token in response, only SHA-256 hash in DB | ✅ |
-//! | `test_get_token_never_returns_plaintext` | GET endpoint never exposes plaintext | GET /api/v1/api-tokens/:id | Response excludes token field | ✅ |
+//! | `test_get_token_never_returns_plaintext` | GET endpoint never exposes plaintext | GET /api/v1/api-tokens/{id} | Response excludes token field | ✅ |
 //! | `test_get_token_negative_id_returns_404` | GET with negative ID | GET /api/v1/api-tokens/-1 | 404 Not Found | ✅ |
 //! | `test_get_token_zero_id_returns_404` | GET with zero ID | GET /api/v1/api-tokens/0 | 404 Not Found | ✅ |
 //! | `test_get_token_very_large_id_handles_gracefully` | GET with overflow ID | GET /api/v1/api-tokens/999999999999 | 404 Not Found (no crash) | ✅ |
@@ -44,15 +44,15 @@ async fn create_test_router() -> (Router, TestAppState) {
       post(iron_control_api::routes::tokens::create_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       get(iron_control_api::routes::tokens::get_token),
     )
     .route(
-      "/api/v1/api-tokens/:id/rotate",
+      "/api/v1/api-tokens/{id}/rotate",
       post(iron_control_api::routes::tokens::rotate_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       delete(iron_control_api::routes::tokens::revoke_token),
     )
     .with_state(app_state.clone());

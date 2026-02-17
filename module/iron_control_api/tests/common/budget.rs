@@ -245,11 +245,11 @@ pub fn create_budget_router(state: BudgetState) -> Router {
     .route("/api/budget/refresh", axum::routing::post(refresh_budget))
     .route("/api/budget/return", axum::routing::post(return_budget))
     .route(
-      "/api/v1/budget/requests/:id/approve",
+      "/api/v1/budget/requests/{id}/approve",
       axum::routing::patch(approve_budget_request),
     )
     .route(
-      "/api/v1/budget/requests/:id/reject",
+      "/api/v1/budget/requests/{id}/reject",
       axum::routing::patch(reject_budget_request),
     )
     .with_state(state)

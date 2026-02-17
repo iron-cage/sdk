@@ -2,7 +2,7 @@
 # Minimal commands for daily development workflow
 
 .PHONY: help dev api dashboard test test_one test_in test_not clean setup status ports
-.PHONY: fmt lint check typecheck build validate lint-docs lint-python
+.PHONY: fmt-check fmt-fix lint check typecheck build validate lint-docs lint-python
 .PHONY: db-reset db-reset-seed db-seed db-admin db-inspect debug-setup
 .PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-sync py-clean
 .PHONY: docker-build docker-up docker-down docker-down-volumes docker-logs docker-logs-backend docker-logs-frontend docker-ps
@@ -59,9 +59,9 @@ dashboard: ## Run dashboard only (port 5173)
 
 test: ## Run tests (nextest + doc tests, use ARGS="..." for nextest)
 	@echo "[*] Running nextest..."
-	@cargo nextest run --all-features --no-fail-fast $(ARGS)
+	@RUSTFLAGS="-D warnings" cargo nextest run --all-features --no-fail-fast $(ARGS)
 	@echo "[*] Running doc tests..."
-	@cargo test --doc --all-features
+	@RUSTDOCFLAGS="-D warnings" cargo test --doc --all-features
 
 test_one: ## Run single test: `make test_one <test_name>`
 	@test_name="$(filter-out $@,$(MAKECMDGOALS))"; \
@@ -284,6 +284,7 @@ docker-logs-frontend: ## View frontend nginx logs only
 docker-ps: ## Show status of Control Panel services
 	docker compose ps
 
-# Prevent "No rule to make target" error for arguments passed to test_one, test_in, test_not
+# Prevent "No rule to make target" error for positional args passed to test_one, test_in, test_not.
+# Side effect: typos like `make lint-dcos` also succeed silently instead of failing.
 %:
 	@:

@@ -8,7 +8,7 @@
 //! | Test Case | Endpoint | Body | Expected Result | Status |
 //! |-----------|----------|------|----------------|--------|
 //! | `test_create_limit_with_empty_json` | POST /api/limits | {} | 422 Unprocessable Entity | ✅ |
-//! | `test_update_limit_with_empty_json` | PUT /api/limits/:id | {} | 422 Unprocessable Entity | ✅ |
+//! | `test_update_limit_with_empty_json` | PUT /api/limits/{id} | {} | 422 Unprocessable Entity | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -43,7 +43,7 @@ async fn create_test_router() -> Router {
       post(iron_control_api::routes::limits::create_limit),
     )
     .route(
-      "/api/limits/:id",
+      "/api/limits/{id}",
       put(iron_control_api::routes::limits::update_limit),
     )
     .with_state(limit_state)

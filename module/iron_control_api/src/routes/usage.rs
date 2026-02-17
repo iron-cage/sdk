@@ -4,8 +4,8 @@
 //!
 //! Endpoints:
 //! - GET /api/usage/aggregate - Aggregate usage statistics
-//! - GET /api/usage/by-project/:project_id - Usage by specific project
-//! - GET /api/usage/by-provider/:provider - Usage by specific provider
+//! - GET /api/usage/by-project/{project_id} - Usage by specific project
+//! - GET /api/usage/by-provider/{provider} - Usage by specific provider
 //!
 //! # Path Parameter Validation
 //!
@@ -199,7 +199,7 @@ pub async fn get_aggregate_usage(State(state): State<UsageState>) -> impl IntoRe
   (StatusCode::OK, Json(response)).into_response()
 }
 
-/// GET /api/usage/by-project/:project_id
+/// GET /api/usage/by-project/{project_id}
 ///
 /// Get usage statistics for specific project
 ///
@@ -285,7 +285,7 @@ pub async fn get_usage_by_project(
   (StatusCode::OK, Json(response)).into_response()
 }
 
-/// GET /api/usage/by-provider/:provider
+/// GET /api/usage/by-provider/{provider}
 ///
 /// Get usage statistics for specific provider
 ///

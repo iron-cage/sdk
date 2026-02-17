@@ -5,10 +5,10 @@
 //!
 //! **Endpoints:**
 //! - `GET /agents` - List agents (filtered by user role)
-//! - `GET /agents/:id` - Get single agent (with access control)
+//! - `GET /agents/{id}` - Get single agent (with access control)
 //! - `POST /agents` - Create agent (admin only)
-//! - `PUT /agents/:id` - Update agent (admin only)
-//! - `DELETE /agents/:id` - Delete agent (admin only)
+//! - `PUT /agents/{id}` - Update agent (admin only)
+//! - `DELETE /agents/{id}` - Delete agent (admin only)
 //!
 //! **Access Control:**
 //! - Admins: Full access to all agents
@@ -608,7 +608,7 @@ pub async fn delete_agent(
   Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT /api/v1/agents/:id/budget
+/// PUT /api/v1/agents/{id}/budget
 ///
 /// Update an agent's total allocated budget (microdollars).
 /// Recomputes `budget_remaining` = `total_allocated` - `total_spent`.

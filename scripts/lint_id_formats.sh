@@ -7,5 +7,7 @@
 
 set -euo pipefail
 
-echo "lint_id_formats: not implemented yet"
+# NOT IMPLEMENTED — ALWAYS SUCCEEDS (stub)
+# This target is a placeholder; lint-docs in CI will not block until implemented.
+echo "lint_id_formats: not implemented yet (stub — always exits 0)"
 exit 0

@@ -7,5 +7,7 @@
 
 set -euo pipefail
 
-echo "lint_python_tooling: not implemented yet"
+# NOT IMPLEMENTED — ALWAYS SUCCEEDS (stub)
+# This target is a placeholder; lint-python in CI will not block until implemented.
+echo "lint_python_tooling: not implemented yet (stub — always exits 0)"
 exit 0

@@ -48,11 +48,11 @@ async fn create_token_router() -> (Router, crate::common::test_state::TestAppSta
       post(iron_control_api::routes::tokens::create_token),
     )
     .route(
-      "/api/tokens/:id",
+      "/api/tokens/{id}",
       get(iron_control_api::routes::tokens::get_token),
     )
     .route(
-      "/api/tokens/:id",
+      "/api/tokens/{id}",
       delete(iron_control_api::routes::tokens::revoke_token),
     )
     .with_state(app_state.clone());
@@ -90,7 +90,7 @@ async fn create_limit_router() -> Router {
       post(iron_control_api::routes::limits::create_limit),
     )
     .route(
-      "/api/limits/:id",
+      "/api/limits/{id}",
       put(iron_control_api::routes::limits::update_limit),
     )
     .with_state(limit_state)

@@ -250,7 +250,7 @@ pub async fn list_tokens(
   (StatusCode::OK, Json(token_list)).into_response()
 }
 
-/// GET /api/tokens/:id
+/// GET /api/tokens/{id}
 ///
 /// Get specific token details
 pub async fn get_token(
@@ -291,7 +291,7 @@ pub async fn get_token(
   (StatusCode::OK, Json(item)).into_response()
 }
 
-/// PUT /api/tokens/:id
+/// PUT /api/tokens/{id}
 ///
 /// Update token provider
 pub async fn update_token(
@@ -364,7 +364,7 @@ pub async fn update_token(
   (StatusCode::OK, Json(item)).into_response()
 }
 
-/// POST /api/tokens/:id/rotate
+/// POST /api/tokens/{id}/rotate
 ///
 /// Rotate token (generate new value, invalidate old)
 pub async fn rotate_token(
@@ -440,7 +440,7 @@ pub async fn rotate_token(
     .into_response()
 }
 
-/// DELETE /api/tokens/:id
+/// DELETE /api/tokens/{id}
 ///
 /// Revoke token (Protocol 014 compliant)
 pub async fn revoke_token(

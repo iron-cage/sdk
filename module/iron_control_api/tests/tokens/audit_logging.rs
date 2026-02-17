@@ -8,7 +8,7 @@
 //! | Test Case | Operation | Expected Audit Log | Status |
 //! |-----------|-----------|-------------------|--------|
 //! | `test_create_token_logs_creation` | POST /api/v1/api-tokens | `audit_log` entry with action='created' | ❌ |
-//! | `test_revoke_token_logs_revocation` | DELETE /api/v1/api-tokens/:id | `audit_log` entry with action='revoked' | ❌ |
+//! | `test_revoke_token_logs_revocation` | DELETE /api/v1/api-tokens/{id} | `audit_log` entry with action='revoked' | ❌ |
 //! | `test_audit_log_excludes_token_value` | POST /api/v1/api-tokens | changes field does NOT contain plaintext token | ❌ |
 //!
 //! ## Audit Log Schema (migration 001)
@@ -64,7 +64,7 @@ async fn create_test_router() -> (Router, crate::common::test_state::TestAppStat
       post(iron_control_api::routes::tokens::create_token),
     )
     .route(
-      "/api/v1/api-tokens/:id",
+      "/api/v1/api-tokens/{id}",
       delete(iron_control_api::routes::tokens::revoke_token),
     )
     .with_state(app_state.clone());
