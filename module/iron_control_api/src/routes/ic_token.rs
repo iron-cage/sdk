@@ -235,9 +235,10 @@ pub async fn regenerate_ic_token(
     .generate_token(&ic_claims)
     .map_err(|e| ApiError::Internal(format!("Failed to generate IC token: {e}")))?;
 
-  // Store new hash inside IMMEDIATE transaction to prevent concurrent regenerate race condition.
-  // BEGIN IMMEDIATE acquires a write-lock immediately, so a second concurrent regenerate
-  // will block until this transaction completes (instead of both reading stale state).
+  // Store new hash inside a transaction. pool.begin() issues BEGIN DEFERRED (SQLite default).
+  // There is no read-modify-write inside this transaction, so DEFERRED is sufficient:
+  // SQLite serializes writers regardless — a concurrent regenerate will block on the first
+  // write attempt and retry after this transaction commits.
   let token_hash = sha256_hash(&ic_token);
   let created_at = chrono::Utc::now().timestamp();
 
