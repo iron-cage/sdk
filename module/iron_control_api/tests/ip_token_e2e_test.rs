@@ -1,15 +1,15 @@
 //! End-to-end IP Token encryption tests
 //!
 //! Verifies the full encrypt/decrypt flow across security boundaries:
-//! - Server encrypts provider key with IP_TOKEN_KEY → HTTP response
-//! - Client decrypts with the same IP_TOKEN_KEY → recovers original key
+//! - Server encrypts provider key with `IP_TOKEN_KEY` → HTTP response
+//! - Client decrypts with the same `IP_TOKEN_KEY` → recovers original key
 //!
 //! ## Flows tested
 //!
 //! | Flow | Endpoint | Server action | Client action |
 //! |------|----------|---------------|---------------|
-//! | 1 | POST /api/budget/handshake | encrypt ip_token | decrypt ip_token |
-//! | 2 | POST /api/v1/agents/provider-key | encrypt ip_token | decrypt ip_token |
+//! | 1 | POST /api/budget/handshake | encrypt `ip_token` | decrypt `ip_token` |
+//! | 2 | POST /api/v1/agents/provider-key | encrypt `ip_token` | decrypt `ip_token` |
 //!
 //! ## Security invariant
 //!
@@ -76,6 +76,7 @@ async fn seed_encrypted_provider_key(pool: &sqlx::SqlitePool, agent_id: i64, api
     .unwrap();
 }
 
+#[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
 #[tokio::test]
 async fn e2e_handshake_server_encrypts_client_decrypts() {
   // --- Server side ---
@@ -133,6 +134,7 @@ async fn e2e_handshake_server_encrypts_client_decrypts() {
   assert_eq!(decrypted.as_str(), original_key);
 }
 
+#[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
 #[tokio::test]
 async fn e2e_provider_key_server_encrypts_client_decrypts() {
   // --- Server side ---
@@ -194,6 +196,7 @@ async fn e2e_provider_key_server_encrypts_client_decrypts() {
   assert_eq!(decrypted.as_str(), original_key);
 }
 
+#[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
 #[tokio::test]
 async fn e2e_corrupted_ip_token_client_handles_gracefully() {
   // Get a real IP Token from server
@@ -229,7 +232,7 @@ async fn e2e_corrupted_ip_token_client_handles_gracefully() {
   let ip_token = body["ip_token"].as_str().unwrap();
 
   // Corrupt the IP Token (simulate network tampering)
-  let corrupted = format!("{}CORRUPTED", ip_token);
+  let corrupted = format!("{ip_token}CORRUPTED");
 
   // Client should fail gracefully, not panic
   let client_crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();

@@ -56,16 +56,16 @@ iron_secrets = { workspace = true, optional = true }
 workspace_tools = { workspace = true }
 
 # Web framework
-axum = { workspace = true, features = ["ws"], optional = true }
+axum = { workspace = true, optional = true, features = ["ws"] }
 axum-extra = { workspace = true, optional = true, features = ["typed-header"] }
 tower = { workspace = true, optional = true }
-tower-http = { workspace = true, features = ["cors", "trace"], optional = true }
+tower-http = { workspace = true, optional = true, features = ["cors", "trace"] }
 
 # Async runtime
-tokio = { workspace = true, features = ["full"], optional = true }
+tokio = { workspace = true, optional = true, features = ["full"] }
 
 # Serialization
-serde = { workspace = true, features = ["derive"], optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 
 # Error handling
@@ -112,6 +112,7 @@ sha2 = { workspace = true, optional = true }
 vergen = { version = "8.0", features = ["build", "git", "gitcl"] }
 
 [dev-dependencies]
+axum = { workspace = true, features = ["ws"] }
 iron_token_manager = { path = "../iron_token_manager" }
 iron_test_db = { path = "../iron_test_db", features = ["enabled"] }
 tokio = { workspace = true, features = ["full"] }

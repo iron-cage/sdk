@@ -76,6 +76,10 @@ pub struct GetProviderKeyResponse
 /// 8. Log audit entry
 /// 9. Return decrypted key
 ///
+/// # Panics
+///
+/// Panics if the system clock is set before the Unix epoch.
+///
 /// # Returns
 ///
 /// - 200 OK with provider key
@@ -279,10 +283,11 @@ pub async fn get_provider_key(
   };
 
   // 12. Log audit entry (fire and forget)
-  let now_ms = std::time::SystemTime::now()
+  let now_ms = i64::try_from(std::time::SystemTime::now()
     .duration_since( std::time::UNIX_EPOCH )
     .expect( "LOUD FAILURE: Time went backwards" )
-    .as_millis() as i64;
+    .as_millis())
+    .unwrap_or(i64::MAX);
 
   let changes = serde_json::json!({
     "agent_id": agent_id,
