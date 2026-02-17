@@ -344,6 +344,10 @@ impl IcTokenManager {
 /// Rate limiter configuration for IC Token validation
 const IC_TOKEN_MAX_FAILURES: usize = 20;
 const IC_TOKEN_WINDOW: Duration = Duration::from_secs(60);
+/// Hard cap on unique token keys tracked simultaneously.
+/// Prevents unbounded `HashMap` growth from unique-key flood attacks.
+/// When exceeded, oldest entries (by first-failure timestamp) are evicted.
+pub const MAX_RATE_LIMIT_ENTRIES: usize = 100_000;
 
 /// Per-token-hash rate limiter for IC Token validation endpoints.
 ///
@@ -390,6 +394,20 @@ impl IcTokenRateLimiter {
       ts.retain(|t| now.duration_since(*t) < IC_TOKEN_WINDOW);
       !ts.is_empty()
     });
+
+    // Evict the oldest entries to enforce hard cap — prevents unbounded growth
+    // from unique-key flood attacks that outpace the TTL sweep.
+    if map.len() > MAX_RATE_LIMIT_ENTRIES {
+      let excess = map.len() - MAX_RATE_LIMIT_ENTRIES;
+      let mut keys_by_age = map
+        .iter()
+        .filter_map(|(key, timestamp)| timestamp.first().map(|t| (key.clone(), t.to_owned())))
+        .collect::<Vec<_>>();
+      keys_by_age.sort_unstable_by_key(|(_, timestamp)| *timestamp);
+      for (key, _) in keys_by_age.into_iter().take(excess) {
+        map.remove(&key);
+      }
+    }
 
     (map, now)
   }
