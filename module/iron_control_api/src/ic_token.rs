@@ -362,16 +362,31 @@ pub const MAX_RATE_LIMIT_ENTRIES: usize = 100_000;
 /// 3. Matches the threat model: timing attacks require many requests with the same token
 #[derive(Clone, Debug)]
 pub struct IcTokenRateLimiter {
-  /// Map from token hash prefix (16 hex chars) to list of failure timestamps
+  /// Map from token hash prefix (32 hex chars) to list of failure timestamps
   failures: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
+  /// Sliding window for failure counting (production: `IC_TOKEN_WINDOW`)
+  window: Duration,
 }
 
 impl IcTokenRateLimiter {
-  /// Create new rate limiter
+  /// Create new rate limiter with production window (`IC_TOKEN_WINDOW` = 60s).
   #[must_use]
   pub fn new() -> Self {
     Self {
       failures: Arc::new(Mutex::new(HashMap::new())),
+      window: IC_TOKEN_WINDOW,
+    }
+  }
+
+  /// Create rate limiter with a custom sliding window.
+  ///
+  /// The failure cap remains at `IC_TOKEN_MAX_FAILURES`.
+  /// Intended for testing scenarios that need a shorter window than the 60s default.
+  #[must_use]
+  pub fn with_window(window: Duration) -> Self {
+    Self {
+      failures: Arc::new(Mutex::new(HashMap::new())),
+      window,
     }
   }
 
@@ -382,17 +397,20 @@ impl IcTokenRateLimiter {
     sha256_hash(token)[..32].to_string()
   }
 
-  /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
-  /// Acquire lock (with poison recovery) and sweep all stale entries.
-  fn lock_and_sweep(&self) -> (MutexGuard<'_, HashMap<String, Vec<Instant>>>, Instant) {
+  /// Acquire lock (with poison recovery), sweep stale entries, and return the window.
+  /// Returning `window` avoids accessing `self` while the `MutexGuard` is alive.
+  fn lock_and_sweep(
+    &self,
+  ) -> (MutexGuard<'_, HashMap<String, Vec<Instant>>>, Instant, Duration) {
     let now = Instant::now();
+    let window = self.window; // copy before acquiring lock
     let mut map = self.failures.lock().unwrap_or_else(|e| {
       tracing::error!("IcTokenRateLimiter mutex poisoned, recovering");
       e.into_inner()
     });
 
     map.retain(|_, ts| {
-      ts.retain(|t| now.duration_since(*t) < IC_TOKEN_WINDOW);
+      ts.retain(|t| now.duration_since(*t) < window);
       !ts.is_empty()
     });
 
@@ -410,7 +428,7 @@ impl IcTokenRateLimiter {
       }
     }
 
-    (map, now)
+    (map, now, window)
   }
 
   /// Check if token is rate-limited. Returns `Err(retry_after_secs)` if blocked.
@@ -425,7 +443,7 @@ impl IcTokenRateLimiter {
   /// as empty lists are filtered during sweep.
   pub fn check(&self, token: &str) -> Result<(), u64> {
     let key = Self::token_key(token);
-    let (map, now) = self.lock_and_sweep();
+    let (map, now, window) = self.lock_and_sweep();
 
     let Some(entries) = map.get(&key) else {
       return Ok(());
@@ -433,7 +451,7 @@ impl IcTokenRateLimiter {
 
     if entries.len() >= IC_TOKEN_MAX_FAILURES {
       let oldest = entries.first().unwrap();
-      let retry_after = IC_TOKEN_WINDOW
+      let retry_after = window
         .saturating_sub(now.duration_since(*oldest))
         .as_secs()
         .max(1);
@@ -446,7 +464,7 @@ impl IcTokenRateLimiter {
   /// Record a failed validation attempt for the given token.
   pub fn record_failure(&self, token: &str) {
     let key = Self::token_key(token);
-    let (mut map, now) = self.lock_and_sweep();
+    let (mut map, now, _window) = self.lock_and_sweep();
     map.entry(key).or_default().push(now);
   }
 }

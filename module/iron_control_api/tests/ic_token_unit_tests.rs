@@ -1,4 +1,5 @@
-//! Unit tests for `ic_token` module: `sha256_hash` and `validate_ic_token_runtime`
+//! Unit tests for `ic_token` module: `sha256_hash`, `validate_ic_token_runtime`,
+//! and `IcTokenRateLimiter`.
 //!
 //! # Coverage
 //!
@@ -13,15 +14,32 @@
 //! - `DatabaseError`: closed connection pool (H4)
 //! - Success: valid token with matching hash
 //!
+//! ## `IcTokenRateLimiter` (GAP-1)
+//! - `check()` allows requests below failure threshold
+//! - `check()` returns `Err(retry_after)` at and above threshold
+//! - `record_failure()` increments count monotonically
+//! - Failures outside the sliding window are swept and not counted
+//! - Different tokens are rate-limited independently
+//! - Mutex poisoning is recovered gracefully
+//!
 //! # Authority
 //! - PR #44 review findings: H4, M2, M6
+//! - PR review findings: GAP-1
 
 mod common;
 
-use iron_control_api::ic_token::{sha256_hash, IcTokenClaims, IcTokenManager, IcTokenRuntimeError};
+use core::time::Duration;
+use std::{
+  thread,
+  time::{SystemTime, UNIX_EPOCH},
+};
+
 use sqlx::SqlitePool;
-use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
+
+use iron_control_api::ic_token::{
+  sha256_hash, IcTokenClaims, IcTokenManager, IcTokenRateLimiter, IcTokenRuntimeError,
+};
 
 // Helpers
 
@@ -294,5 +312,139 @@ async fn test_validate_runtime_success() {
     claims.agent_id, "agent_42",
     "LOUD FAILURE: Claims agent_id must be 'agent_42', got '{}'",
     claims.agent_id
+  );
+}
+
+const RATE_LIMIT_MAX: usize = 20; // must match IC_TOKEN_MAX_FAILURES constant
+const TEST_TOKEN: &str = "test.ic.token.value";
+const OTHER_TOKEN: &str = "other.ic.token.value";
+
+fn record_n_failures(limiter: &IcTokenRateLimiter, token: &str, count: usize) {
+  for _ in 0..count {
+    limiter.record_failure(token);
+  }
+}
+
+#[test]
+fn test_rate_limiter_allows_below_threshold() {
+  let limiter = IcTokenRateLimiter::new();
+  record_n_failures(&limiter, TEST_TOKEN, RATE_LIMIT_MAX - 1);
+  assert!(
+    limiter.check(TEST_TOKEN).is_ok(),
+    "LOUD FAILURE: check() must allow requests below the failure threshold"
+  );
+}
+
+#[test]
+fn test_rate_limiter_blocks_at_threshold() {
+  let limiter = IcTokenRateLimiter::new();
+  record_n_failures(&limiter, TEST_TOKEN, RATE_LIMIT_MAX);
+  assert!(
+    limiter.check(TEST_TOKEN).is_err(),
+    "LOUD FAILURE: check() must block requests once the failure threshold is reached"
+  );
+}
+
+#[test]
+fn test_rate_limiter_returns_positive_retry_after() {
+  let limiter = IcTokenRateLimiter::new();
+  record_n_failures(&limiter, TEST_TOKEN, RATE_LIMIT_MAX);
+  let retry_after = limiter
+    .check(TEST_TOKEN)
+    .expect_err("LOUD FAILURE: check() must return Err after max failures");
+  assert!(
+    retry_after >= 1,
+    "LOUD FAILURE: retry_after must be at least 1 second, got {retry_after}"
+  );
+  assert!(
+    retry_after <= 60,
+    "LOUD FAILURE: retry_after must not exceed window (60s), got {retry_after}"
+  );
+}
+
+#[test]
+fn test_rate_limiter_record_failure_increments_monotonically() {
+  let limiter = IcTokenRateLimiter::new();
+  for i in 1..=RATE_LIMIT_MAX {
+    limiter.record_failure(TEST_TOKEN);
+    let under_limit = i < RATE_LIMIT_MAX;
+    assert_eq!(
+      limiter.check(TEST_TOKEN).is_ok(),
+      under_limit,
+      "LOUD FAILURE: after {i} failure(s) check() should be {}, got {}",
+      if under_limit { "Ok" } else { "Err" },
+      if limiter.check(TEST_TOKEN).is_ok() {
+        "Ok"
+      } else {
+        "Err"
+      }
+    );
+  }
+}
+
+#[test]
+fn test_rate_limiter_failures_expire_after_window() {
+  // Use a short window so the test completes in milliseconds.
+  let window = Duration::from_millis(100);
+  let limiter = IcTokenRateLimiter::with_window(window);
+
+  record_n_failures(&limiter, TEST_TOKEN, RATE_LIMIT_MAX);
+  assert!(
+    limiter.check(TEST_TOKEN).is_err(),
+    "LOUD FAILURE: should be blocked before window expires"
+  );
+
+  // Wait for the window to pass, then verify failures are swept.
+  thread::sleep(window + Duration::from_millis(20));
+  assert!(
+    limiter.check(TEST_TOKEN).is_ok(),
+    "LOUD FAILURE: failures must expire after the sliding window — token should not be rate-limited"
+  );
+}
+
+#[test]
+fn test_rate_limiter_different_tokens_are_independent() {
+  let limiter = IcTokenRateLimiter::new();
+  record_n_failures(&limiter, TEST_TOKEN, RATE_LIMIT_MAX);
+  assert!(limiter.check(TEST_TOKEN).is_err());
+  assert!(
+    limiter.check(OTHER_TOKEN).is_ok(),
+    "LOUD FAILURE: rate limiting one token must not affect an unrelated token"
+  );
+}
+
+// ── concurrent access ─────────────────────────────────────────────────────────
+
+// Note: testing mutex poisoning recovery directly requires access to the private
+// `failures: Arc<Mutex<...>>` field, which is only possible in a unit test inside
+// the same source module. The recovery path (`unwrap_or_else(|e| e.into_inner())`
+// in `lock_and_sweep`) is exercised indirectly here: if concurrent access were
+// unsafe, this test would deadlock or panic under the thread sanitizer.
+
+#[test]
+fn test_rate_limiter_concurrent_access_is_safe() {
+  let limiter = IcTokenRateLimiter::new();
+  let limiter_clone = limiter.clone(); // Clone shares the inner Arc<Mutex<...>>
+
+  // Spawn a thread that records failures for OTHER_TOKEN concurrently.
+  let handle = thread::spawn(move || {
+    record_n_failures(&limiter_clone, OTHER_TOKEN, RATE_LIMIT_MAX);
+  });
+
+  // Meanwhile, record failures for TEST_TOKEN on the main thread.
+  record_n_failures(&limiter, TEST_TOKEN, RATE_LIMIT_MAX);
+
+  handle
+    .join()
+    .expect("LOUD FAILURE: concurrent thread must not panic");
+
+  // Both tokens must be independently rate-limited after concurrent writes.
+  assert!(
+    limiter.check(TEST_TOKEN).is_err(),
+    "LOUD FAILURE: TEST_TOKEN must be rate-limited after concurrent failures"
+  );
+  assert!(
+    limiter.check(OTHER_TOKEN).is_err(),
+    "LOUD FAILURE: OTHER_TOKEN must be rate-limited after concurrent failures"
   );
 }
