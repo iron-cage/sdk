@@ -19,7 +19,7 @@
 //! | `test_unicode_in_user_id` | Unicode characters in user_id | POST with user_id containing emoji/CJK | 201 Created, stored correctly | ✅ |
 //! | `test_sql_injection_in_user_id` | SQL injection attempt in user_id | user_id="'; DROP TABLE api_tokens; --" | 201 Created, stored safely | ✅ |
 //! | `test_sql_injection_in_project_id` | SQL injection attempt in project_id | project_id with SQL injection payload | 201 Created, stored safely | ✅ |
-//! | `test_xss_in_description_stored_as_literal` | XSS attempt in description | description="<script>alert('xss')</script>" | 201 Created, stored as literal string | ✅ |
+//! | `test_xss_in_description_rejected` | XSS attempt in description | description="<script>alert('xss')</script>" | 400 BAD_REQUEST (HTML tags rejected, defense-in-depth) | ✅ |
 
 use crate::common::extract_json_response;
 use crate::common::test_state::TestAppState;
@@ -448,7 +448,7 @@ async fn test_sql_injection_in_project_id()
 /// # Pitfall
 /// Validation must reject `<` and `>` characters to prevent stored XSS.
 #[ tokio::test ]
-async fn test_xss_in_description_stored_as_literal()
+async fn test_xss_in_description_rejected()
 {
   let ( router, state ) = create_test_router().await;
 

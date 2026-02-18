@@ -212,7 +212,7 @@ async fn test_all_migrations_have_guards()
   let pool = db.pool().clone();
   core::mem::forget( db );
 
-  // Verify guard tables exist for migrations that need them
+  // Verify guard tables exist for migrations that need them (001 and 007 have no guards)
   let guard_tables = vec![
     "_migration_002_completed",
     "_migration_003_completed",
@@ -222,6 +222,19 @@ async fn test_all_migrations_have_guards()
     "_migration_008_completed",
     "_migration_009_completed",
     "_migration_010_completed",
+    "_migration_011_completed",
+    "_migration_012_completed",
+    "_migration_013_completed",
+    "_migration_014_completed",
+    "_migration_015_completed",
+    "_migration_016_completed",
+    "_migration_017_completed",
+    "_migration_018_completed",
+    "_migration_019_completed",
+    "_migration_020_completed",
+    "_migration_021_completed",
+    "_migration_022_completed",
+    "_migration_023_completed",
   ];
 
   for guard_table in guard_tables
