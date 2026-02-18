@@ -88,9 +88,9 @@ VALUES
     $NOW_MS
   ),
   (
-    'user_developer',
-    'developer',
-    'developer@developer.com',
+    'user_demo',
+    'demo',
+    'demo@ironcage.ai',
     'user',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     1,
@@ -131,9 +131,9 @@ VALUES
   ),
   (
     '$HASH_PM',
-    'user_developer',
+    'user_demo',
     'project_beta',
-    'Developer Development Token',
+    'Demo Development Token',
     1,
     $NOW_MS
   ),
@@ -173,7 +173,7 @@ VALUES
     $NOW_MS
   ),
   (
-    'user_developer',
+    'user_demo',
     'project_beta',
     500000,
     500,
@@ -249,7 +249,7 @@ SELECT
   'token',
   (SELECT id FROM api_tokens WHERE token_hash = '$HASH_PM' LIMIT 1),
   'created',
-  'user_developer',
+  'user_demo',
   '{"method":"api","reason":"development"}',
   $NOW_MS - 86400000
 UNION ALL
@@ -264,7 +264,7 @@ SELECT
 EOF
 
 # Verify data was inserted
-USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'developer', 'viewer');")
+USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer');")
 TOKEN_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE token_hash IN ('$HASH_ADMIN', '$HASH_PM', '$HASH_VIEWER');")
 USAGE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM token_usage WHERE token_id IN (SELECT id FROM api_tokens WHERE token_hash IN ('$HASH_ADMIN', '$HASH_PM', '$HASH_VIEWER'));")
 
@@ -277,14 +277,14 @@ echo "  Usage records:   $USAGE_COUNT"
 echo ""
 log_info "Test tokens (save these for API testing):"
 echo "  Admin:      $TOKEN_ADMIN"
-echo "  Developer:  $TOKEN_PM"
+echo "  Demo:       $TOKEN_PM"
 echo "  Viewer:     $TOKEN_VIEWER"
 echo ""
 log_info "Test credentials:"
 echo "  Admin:      username=admin, role=admin, is_active=1"
-echo "  Developer:  username=developer, role=user, is_active=1"
+echo "  Demo:       username=demo, role=user, is_active=1"
 echo "  Viewer:     username=viewer, role=user, is_active=0 (INACTIVE)"
 echo ""
 log_info "Projects:"
 echo "  project_alpha (admin)"
-echo "  project_beta (developer + viewer)"
+echo "  project_beta (demo + viewer)"
