@@ -387,12 +387,12 @@ async fn handle_proxy(
   // Set provider-specific auth headers
   if target_provider == "anthropic" {
     req_builder = req_builder
-      .header("x-api-key", &provider_key.api_key)
+      .header("x-api-key", provider_key.api_key.as_str())
       .header("anthropic-version", "2023-06-01");
   } else {
     req_builder = req_builder.header(
       header::AUTHORIZATION,
-      format!("Bearer {}", provider_key.api_key),
+      format!("Bearer {}", provider_key.api_key.as_str()),
     );
   }
 

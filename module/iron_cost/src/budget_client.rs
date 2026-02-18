@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use zeroize::Zeroizing;
 
 /// Errors that can occur in budget client operations
 #[derive(Debug)]
@@ -85,7 +86,7 @@ pub struct ProviderKey {
   /// Provider type: "openai" or "anthropic"
   pub provider: String,
   /// The actual API key (decrypted)
-  pub api_key: String,
+  pub api_key: Zeroizing<String>,
   /// Optional custom base URL for the provider
   pub base_url: Option<String>,
 }
@@ -273,12 +274,19 @@ impl BudgetClient {
     let data: HandshakeResponse = response.json().await?;
 
     // Decrypt IP Token to get provider API key
+    // Fix(issue-002): None arm previously passed ciphertext verbatim as the API key.
+    // Root cause: Optional ip_token_crypto allowed silent fallback when IP_TOKEN_KEY was absent.
+    // Pitfall: Without this guard, the handshake completes but every subsequent LLM call fails
+    //          with 401 and the ciphertext is transmitted to the provider endpoint.
     let api_key = match &self.ip_token_crypto {
       Some(crypto) => crypto
         .decrypt(&data.ip_token)
-        .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?
-        .to_string(),
-      None => data.ip_token,
+        .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?,
+      None => {
+        return Err(BudgetClientError::IpTokenDecrypt(
+          "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),
+        ))
+      }
     };
 
     let provider_key = ProviderKey {

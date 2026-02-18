@@ -6,6 +6,7 @@ use reqwest::Client;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use zeroize::Zeroizing;
 
 /// Provider key information returned from Iron Cage server
 #[derive(Clone, Debug)]
@@ -13,7 +14,7 @@ pub struct ProviderKey {
   /// Provider type: "openai" or "anthropic"
   pub provider: String,
   /// The actual API key (e.g., sk-xxx for OpenAI)
-  pub api_key: String,
+  pub api_key: Zeroizing<String>,
   /// Optional custom base URL for the provider
   pub base_url: Option<String>,
 }
@@ -92,7 +93,7 @@ impl KeyFetcher {
     let provider = ProviderKey::detect_provider_from_key(&api_key).to_string();
     let static_key = ProviderKey {
       provider,
-      api_key,
+      api_key: Zeroizing::new(api_key),
       base_url,
     };
 
@@ -194,12 +195,18 @@ impl KeyFetcher {
       .map_err(|e| LlmRouterError::KeyFetch(e.to_string()))?;
 
     // Decrypt IP Token to get plaintext provider API key
+    // Fix(issue-001): None arm previously passed ciphertext verbatim as the API key.
+    // Root cause: Optional ip_token_crypto allowed silent fallback when IP_TOKEN_KEY was absent.
+    // Pitfall: Without this guard, every LLM call fails with 401 and the ciphertext leaks to the provider.
     let api_key = match &self.ip_token_crypto {
       Some(crypto) => crypto
         .decrypt(&data.ip_token)
-        .map_err(|e| LlmRouterError::KeyFetch(format!("IP Token decryption failed: {}", e)))?
-        .to_string(),
-      None => data.ip_token,
+        .map_err(|e| LlmRouterError::KeyFetch(format!("IP Token decryption failed: {}", e)))?,
+      None => {
+        return Err(LlmRouterError::KeyFetch(
+          "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),
+        ))
+      }
     };
 
     Ok(ProviderKey {

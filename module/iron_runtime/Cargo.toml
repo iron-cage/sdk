@@ -20,6 +20,7 @@ enabled = [
   "dep:iron_cost",
   "dep:iron_reliability",
   "dep:iron_secrets",
+  "dep:zeroize",
   "dep:hex",
   "dep:tokio",
   "dep:serde",
@@ -69,6 +70,9 @@ reqwest = { workspace = true, features = ["json", "blocking"], optional = true }
 
 # Hex decoding (IP_TOKEN_KEY env var)
 hex = { workspace = true, optional = true }
+
+# Memory-safe secret zeroing (IP Token decryption)
+zeroize = { workspace = true, optional = true }
 
 # Logging
 tracing = { workspace = true, optional = true }
