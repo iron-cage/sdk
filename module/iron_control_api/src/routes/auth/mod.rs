@@ -31,25 +31,14 @@
 //! - Token blacklisting for logout
 //! - Account lockout after 10 failed attempts
 
-mod shared;
 mod handlers;
+mod shared;
 
 // Re-export shared types and state
 pub use shared::{
-  AuthState,
-  LoginRequest,
-  UserInfo,
-  LoginResponse,
-  ErrorResponse,
-  ErrorDetail,
-  RefreshResponse,
+  AuthState, ErrorDetail, ErrorResponse, LoginRequest, LoginResponse, RefreshResponse, UserInfo,
   ValidateResponse,
 };
 
 // Re-export all handler functions
-pub use handlers::{
-  login,
-  logout,
-  refresh,
-  validate,
-};
+pub use handlers::{login, logout, refresh, validate};

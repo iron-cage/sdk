@@ -32,51 +32,77 @@
 //! **Resource Limits:** Not applicable
 //! **Precondition Violations:** Not applicable
 
-use axum::{ Router, http::{ Request, StatusCode }, routing::{ delete, get, post, put } };
 use axum::body::Body;
+use axum::{
+  http::{Request, StatusCode},
+  routing::{delete, get, post, put},
+  Router,
+};
 use tower::ServiceExt;
 
 /// Create test router with token routes.
-async fn create_test_router() -> ( Router, crate::common::test_state::TestAppState )
-{
+async fn create_test_router() -> (Router, crate::common::test_state::TestAppState) {
   // Create test application state with auth + token support
   let app_state = crate::common::test_state::TestAppState::new().await;
 
   let router = Router::new()
-    .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/{id}", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/v1/api-tokens/{id}", delete( iron_control_api::routes::tokens::revoke_token ) )
-    .route( "/api/v1/api-tokens/{id}/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/v1/api-tokens/{id}", put( iron_control_api::routes::tokens::update_token ) )
-    .with_state( app_state.clone() );
+    .route(
+      "/api/v1/api-tokens",
+      post(iron_control_api::routes::tokens::create_token),
+    )
+    .route(
+      "/api/v1/api-tokens/{id}",
+      get(iron_control_api::routes::tokens::get_token),
+    )
+    .route(
+      "/api/v1/api-tokens/{id}",
+      delete(iron_control_api::routes::tokens::revoke_token),
+    )
+    .route(
+      "/api/v1/api-tokens/{id}/rotate",
+      post(iron_control_api::routes::tokens::rotate_token),
+    )
+    .route(
+      "/api/v1/api-tokens/{id}",
+      put(iron_control_api::routes::tokens::update_token),
+    )
+    .with_state(app_state.clone());
 
-  ( router, app_state )
+  (router, app_state)
 }
 
-/// Helper: Generate JWT token for a given user_id
-fn generate_jwt_for_user( app_state: &crate::common::test_state::TestAppState, user_id: &str ) -> String
-{
-  app_state.auth.jwt_secret
-    .generate_access_token( user_id, &format!( "{}@test.com", user_id ), "user", &format!( "token_{}", user_id ) )
-    .expect( "LOUD FAILURE: Failed to generate JWT token" )
+/// Helper: Generate JWT token for a given `user_id`
+fn generate_jwt_for_user(
+  app_state: &crate::common::test_state::TestAppState,
+  user_id: &str,
+) -> String {
+  app_state
+    .auth
+    .jwt_secret
+    .generate_access_token(
+      user_id,
+      &format!("{user_id}@test.com"),
+      "user",
+      &format!("token_{user_id}"),
+    )
+    .expect("LOUD FAILURE: Failed to generate JWT token")
 }
 
 /// Test POST /api/v1/api-tokens with GET method → 405 Method Not Allowed.
 ///
 /// WHY: Axum router should reject unsupported methods at the routing layer
 /// before reaching handler logic. This documents the API contract.
-#[ tokio::test ]
-async fn test_create_token_get_method_rejected()
-{
-  let ( router, _app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_create_token_get_method_rejected() {
+  let (router, _app_state) = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/v1/api-tokens" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/v1/api-tokens")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -88,19 +114,18 @@ async fn test_create_token_get_method_rejected()
 /// Test POST /api/v1/api-tokens with PUT method → 405 Method Not Allowed.
 ///
 /// WHY: PUT method not supported for token creation (would be for updates).
-#[ tokio::test ]
-async fn test_create_token_put_method_rejected()
-{
-  let ( router, _app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_create_token_put_method_rejected() {
+  let (router, _app_state) = create_test_router().await;
 
   let request = Request::builder()
-    .method( "PUT" )
-    .uri( "/api/v1/api-tokens" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( r#"{"user_id":"test"}"# ) )
+    .method("PUT")
+    .uri("/api/v1/api-tokens")
+    .header("content-type", "application/json")
+    .body(Body::from(r#"{"user_id":"test"}"#))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -112,18 +137,17 @@ async fn test_create_token_put_method_rejected()
 /// Test POST /api/v1/api-tokens/{id}/rotate with GET method → 405 Method Not Allowed.
 ///
 /// WHY: Rotation is a mutating operation, GET should be rejected.
-#[ tokio::test ]
-async fn test_rotate_token_get_method_rejected()
-{
-  let ( router, _app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_rotate_token_get_method_rejected() {
+  let (router, _app_state) = create_test_router().await;
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/v1/api-tokens/1/rotate" )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/v1/api-tokens/1/rotate")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -135,18 +159,17 @@ async fn test_rotate_token_get_method_rejected()
 /// Test POST /api/v1/api-tokens/{id}/rotate with DELETE method → 405 Method Not Allowed.
 ///
 /// WHY: Rotation requires POST, DELETE is for revocation (different endpoint).
-#[ tokio::test ]
-async fn test_rotate_token_delete_method_rejected()
-{
-  let ( router, _app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_rotate_token_delete_method_rejected() {
+  let (router, _app_state) = create_test_router().await;
 
   let request = Request::builder()
-    .method( "DELETE" )
-    .uri( "/api/v1/api-tokens/1/rotate" )
-    .body( Body::empty() )
+    .method("DELETE")
+    .uri("/api/v1/api-tokens/1/rotate")
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -157,24 +180,23 @@ async fn test_rotate_token_delete_method_rejected()
 
 /// Test DELETE /api/v1/api-tokens/{id} with GET method → not rejected.
 ///
-/// WHY: GET /api/v1/api-tokens/{id} is the get_token endpoint (different from DELETE).
+/// WHY: GET /api/v1/api-tokens/{id} is the `get_token` endpoint (different from DELETE).
 /// This test documents that GET is NOT rejected (different endpoint, not method validation).
-#[ tokio::test ]
-async fn test_revoke_token_get_method_rejected()
-{
-  let ( router, app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_revoke_token_get_method_rejected() {
+  let (router, app_state) = create_test_router().await;
 
   // Generate JWT for a test user
-  let jwt_token = generate_jwt_for_user( &app_state, "test_user" );
+  let jwt_token = generate_jwt_for_user(&app_state, "test_user");
 
   let request = Request::builder()
-    .method( "GET" )
-    .uri( "/api/v1/api-tokens/1" )
-    .header( "Authorization", format!( "Bearer {}", jwt_token ) )
-    .body( Body::empty() )
+    .method("GET")
+    .uri("/api/v1/api-tokens/1")
+    .header("Authorization", format!("Bearer {jwt_token}"))
+    .body(Body::empty())
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   // Note: GET /api/v1/api-tokens/{id} is the get_token endpoint (200 or 404)
   // This test documents that GET is NOT rejected (different endpoint)
@@ -188,19 +210,18 @@ async fn test_revoke_token_get_method_rejected()
 /// Test DELETE /api/v1/api-tokens/{id} with POST method → 405 Method Not Allowed.
 ///
 /// WHY: Revocation requires DELETE, POST is for creation (different endpoint).
-#[ tokio::test ]
-async fn test_revoke_token_post_method_rejected()
-{
-  let ( router, _app_state ) = create_test_router().await;
+#[tokio::test]
+async fn test_revoke_token_post_method_rejected() {
+  let (router, _app_state) = create_test_router().await;
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/v1/api-tokens/1" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( r#"{}"# ) )
+    .method("POST")
+    .uri("/api/v1/api-tokens/1")
+    .header("content-type", "application/json")
+    .body(Body::from(r"{}"))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),

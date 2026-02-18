@@ -15,10 +15,10 @@
 //! - `test_get_agent_without_auth_unauthorized`: Prevents unauthenticated agent access
 //! - `test_delete_agent_without_auth_unauthorized`: Prevents unauthenticated agent deletion
 //! - `test_delete_nonexistent_agent_as_admin`: Verifies proper 404 error handling
-//! - `test_admin_can_assign_agent_to_other_user`: Admins can assign agents to other users via owner_id
+//! - `test_admin_can_assign_agent_to_other_user`: Admins can assign agents to other users via `owner_id`
 //!
 //! These tests ensure authentication middleware cannot be accidentally removed.
-//! Note: Admins can specify owner_id to assign agents to other users; regular users cannot.
+//! Note: Admins can specify `owner_id` to assign agents to other users; regular users cannot.
 //!
 //! ## Test Matrix
 //!
@@ -45,20 +45,22 @@
 
 mod common;
 
-use common::{ create_test_user, create_test_admin, create_test_access_token, test_state::TestAppState };
 use axum::{
-  Router,
-  routing::{ get, post, put, delete as delete_route },
-  http::{ StatusCode, Request, Method },
   body::Body,
+  http::{Method, Request, StatusCode},
+  routing::{delete as delete_route, get, post, put},
+  Router,
 };
-use tower::ServiceExt;
+use common::{
+  create_test_access_token, create_test_admin, create_test_user, test_state::TestAppState,
+};
+use iron_secrets::crypto::CryptoService;
 use serde_json::json;
 use sqlx::SqlitePool;
-use iron_secrets::crypto::CryptoService;
+use tower::ServiceExt;
 
 /// Test schema for agents integration tests
-const AGENTS_SCHEMA: &str = r#"
+const AGENTS_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS agents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -79,36 +81,46 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   last_used_at INTEGER,
   FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
 );
-"#;
+";
 
 /// Helper to create test router with agents endpoints
-async fn create_agents_router() -> ( Router, SqlitePool, String, String, String, String )
-{
+async fn create_agents_router() -> (Router, SqlitePool, String, String, String, String) {
   // Create TestAppState with auth support
   let app_state = TestAppState::new().await;
 
   // Add agents schema to database
-  sqlx::raw_sql( AGENTS_SCHEMA )
-    .execute( &app_state.database )
+  sqlx::raw_sql(AGENTS_SCHEMA)
+    .execute(&app_state.database)
     .await
-    .expect( "LOUD FAILURE: Failed to apply agents schema" );
+    .expect("LOUD FAILURE: Failed to apply agents schema");
 
   // Create admin and regular user
-  let ( admin_id, _ ) = create_test_admin( &app_state.database ).await;
-  let ( user_id, _ ) = create_test_user( &app_state.database, "regular_user@mail.com" ).await;
+  let (admin_id, _) = create_test_admin(&app_state.database).await;
+  let (user_id, _) = create_test_user(&app_state.database, "regular_user@mail.com").await;
 
   // Generate tokens using TEST_JWT_SECRET
-  let admin_token = create_test_access_token( &admin_id, "admin@admin.com", "admin", "test_jwt_secret_key_for_testing_12345" );
-  let user_token = create_test_access_token( &user_id, "regular_user@mail.com", "user", "test_jwt_secret_key_for_testing_12345" );
+  let admin_token = create_test_access_token(
+    &admin_id,
+    "admin@admin.com",
+    "admin",
+    "test_jwt_secret_key_for_testing_12345",
+  );
+  let user_token = create_test_access_token(
+    &user_id,
+    "regular_user@mail.com",
+    "user",
+    "test_jwt_secret_key_for_testing_12345",
+  );
 
   // Seed provider key for agent tests (id=1 is used by tests)
   let now_ms = chrono::Utc::now().timestamp_millis();
   let test_provider_key = "sk-test_key_for_integration_tests";
   let provider_key_master: [u8; 32] = [42u8; 32];
-  let crypto_service = CryptoService::new( &provider_key_master )
-    .expect( "LOUD FAILURE: Should create crypto service" );
-  let encrypted = crypto_service.encrypt( test_provider_key )
-    .expect( "LOUD FAILURE: Should encrypt provider key" );
+  let crypto_service =
+    CryptoService::new(&provider_key_master).expect("LOUD FAILURE: Should create crypto service");
+  let encrypted = crypto_service
+    .encrypt(test_provider_key)
+    .expect("LOUD FAILURE: Should encrypt provider key");
 
   sqlx::query(
     "INSERT OR IGNORE INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
@@ -126,337 +138,377 @@ async fn create_agents_router() -> ( Router, SqlitePool, String, String, String,
   .expect( "LOUD FAILURE: Failed to seed provider key" );
 
   let router = Router::new()
-    .route( "/api/agents", get( iron_control_api::routes::agents::list_agents ) )
-    .route( "/api/agents", post( iron_control_api::routes::agents::create_agent ) )
-    .route( "/api/agents/{id}", get( iron_control_api::routes::agents::get_agent ) )
-    .route( "/api/agents/{id}", put( iron_control_api::routes::agents::update_agent ) )
-    .route( "/api/agents/{id}", delete_route( iron_control_api::routes::agents::delete_agent ) )
-    .route( "/api/agents/{id}/tokens", get( iron_control_api::routes::agents::get_agent_tokens ) )
-    .with_state( app_state.clone() );
+    .route(
+      "/api/agents",
+      get(iron_control_api::routes::agents::list_agents),
+    )
+    .route(
+      "/api/agents",
+      post(iron_control_api::routes::agents::create_agent),
+    )
+    .route(
+      "/api/agents/{id}",
+      get(iron_control_api::routes::agents::get_agent),
+    )
+    .route(
+      "/api/agents/{id}",
+      put(iron_control_api::routes::agents::update_agent),
+    )
+    .route(
+      "/api/agents/{id}",
+      delete_route(iron_control_api::routes::agents::delete_agent),
+    )
+    .route(
+      "/api/agents/{id}/tokens",
+      get(iron_control_api::routes::agents::get_agent_tokens),
+    )
+    .with_state(app_state.clone());
 
-  ( router, app_state.database.clone(), admin_token, user_token, admin_id, user_id )
+  (
+    router,
+    app_state.database.clone(),
+    admin_token,
+    user_token,
+    admin_id,
+    user_id,
+  )
 }
 
 // ============================================================================
 // Agent Creation Tests
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_create_agent_as_admin_success()
-{
-  let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_create_agent_as_admin_success() {
+  let (app, _pool, admin_token, _user_token, _admin_id, _user_id) = create_agents_router().await;
 
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai", "anthropic"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000
+    "initial_budget_microdollars": 1_000_000
   });
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::POST )
-        .uri( "/api/agents" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .method(Method::POST)
+        .uri("/api/agents")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::CREATED, "Admin should create agent successfully" );
+  assert_eq!(
+    response.status(),
+    StatusCode::CREATED,
+    "Admin should create agent successfully"
+  );
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
-  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let agent: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
-  assert_eq!( agent[ "name" ].as_str().unwrap(), "Test Agent" );
+  assert_eq!(agent["name"].as_str().unwrap(), "Test Agent");
   // Implementation normalizes providers to match the provider key's provider
-  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 1 );
+  assert_eq!(agent["providers"].as_array().unwrap().len(), 1);
 }
 
-#[ tokio::test ]
-async fn test_create_agent_as_user_forbidden()
-{
-  let ( app, _pool, _admin_token, user_token, _admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_create_agent_as_user_forbidden() {
+  let (app, _pool, _admin_token, user_token, _admin_id, _user_id) = create_agents_router().await;
 
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000
+    "initial_budget_microdollars": 1_000_000
   });
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::POST )
-        .uri( "/api/agents" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .method(Method::POST)
+        .uri("/api/agents")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {user_token}"))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::FORBIDDEN, "Regular user should not create agents" );
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "Regular user should not create agents"
+  );
 }
 
-#[ tokio::test ]
-async fn test_create_agent_without_auth_unauthorized()
-{
-  let ( app, _pool, _admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_create_agent_without_auth_unauthorized() {
+  let (app, _pool, _admin_token, _user_token, _admin_id, _user_id) = create_agents_router().await;
 
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000
+    "initial_budget_microdollars": 1_000_000
   });
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::POST )
-        .uri( "/api/agents" )
-        .header( "content-type", "application/json" )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .method(Method::POST)
+        .uri("/api/agents")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::UNAUTHORIZED, "Unauthenticated request should fail" );
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "Unauthenticated request should fail"
+  );
 }
 
 // ============================================================================
 // Agent Listing Tests
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_list_agents_as_admin_sees_all()
-{
-  let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_list_agents_as_admin_sees_all() {
+  let (app, pool, admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create test agents
   let now = chrono::Utc::now().timestamp_millis();
-  sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Agent 1" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
+  sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+    .bind("Agent 1")
+    .bind("[\"openai\"]")
+    .bind(now)
+    .bind(&admin_id)
+    .execute(&pool)
     .await
     .unwrap();
 
-  sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Agent 2" )
-    .bind( "[\"anthropic\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
+  sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+    .bind("Agent 2")
+    .bind("[\"anthropic\"]")
+    .bind(now)
+    .bind(&admin_id)
+    .execute(&pool)
     .await
     .unwrap();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( "/api/agents" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri("/api/agents")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::OK );
+  assert_eq!(response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
-  let agents: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
+  let agents: Vec<serde_json::Value> = serde_json::from_slice(&body_bytes).unwrap();
 
-  assert!( agents.len() >= 2, "Admin should see at least the 2 created agents (plus any seeded agents)" );
+  assert!(
+    agents.len() >= 2,
+    "Admin should see at least the 2 created agents (plus any seeded agents)"
+  );
 
   // Verify the created agents are present
-  let agent_names: Vec< &str > = agents.iter()
-    .filter_map( |a| a[ "name" ].as_str() )
-    .collect();
-  assert!( agent_names.contains( &"Agent 1" ), "Should contain Agent 1" );
-  assert!( agent_names.contains( &"Agent 2" ), "Should contain Agent 2" );
+  let agent_names: Vec<&str> = agents.iter().filter_map(|a| a["name"].as_str()).collect();
+  assert!(agent_names.contains(&"Agent 1"), "Should contain Agent 1");
+  assert!(agent_names.contains(&"Agent 2"), "Should contain Agent 2");
 }
 
-#[ tokio::test ]
-async fn test_list_agents_as_user_sees_only_accessible()
-{
-  let ( app, pool, _admin_token, user_token, admin_id, user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_list_agents_as_user_sees_only_accessible() {
+  let (app, pool, _admin_token, user_token, admin_id, user_id) = create_agents_router().await;
 
   // Create agents - one owned by admin, one owned by user
   let now = chrono::Utc::now().timestamp_millis();
-  sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( 100 )
-    .bind( "Admin Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
+  )
+  .bind(100)
+  .bind("Admin Agent")
+  .bind("[\"openai\"]")
+  .bind(now)
+  .bind(&admin_id)
+  .execute(&pool)
+  .await
+  .unwrap();
 
-  sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( 101 )
-    .bind( "User Agent" )
-    .bind( "[\"anthropic\"]" )
-    .bind( now )
-    .bind( &user_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
+  )
+  .bind(101)
+  .bind("User Agent")
+  .bind("[\"anthropic\"]")
+  .bind(now)
+  .bind(&user_id)
+  .execute(&pool)
+  .await
+  .unwrap();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( "/api/agents" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri("/api/agents")
+        .header("authorization", format!("Bearer {user_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::OK );
+  assert_eq!(response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
-  let agents: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
+  let agents: Vec<serde_json::Value> = serde_json::from_slice(&body_bytes).unwrap();
 
-  assert_eq!( agents.len(), 1, "User should only see agents they own" );
-  assert_eq!( agents[ 0 ][ "name" ].as_str().unwrap(), "User Agent" );
+  assert_eq!(agents.len(), 1, "User should only see agents they own");
+  assert_eq!(agents[0]["name"].as_str().unwrap(), "User Agent");
 }
 
 // ============================================================================
 // Get Agent Tests
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_get_agent_as_admin_success()
-{
-  let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_get_agent_as_admin_success() {
+  let (app, pool, admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri(format!("/api/agents/{agent_id}"))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::OK );
+  assert_eq!(response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
-  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let agent: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
-  assert_eq!( agent[ "name" ].as_str().unwrap(), "Test Agent" );
+  assert_eq!(agent["name"].as_str().unwrap(), "Test Agent");
 }
 
-#[ tokio::test ]
-async fn test_get_agent_as_user_without_access_forbidden()
-{
-  let ( app, pool, _admin_token, user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_get_agent_as_user_without_access_forbidden() {
+  let (app, pool, _admin_token, user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri(format!("/api/agents/{agent_id}"))
+        .header("authorization", format!("Bearer {user_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::FORBIDDEN, "User without token access should not see agent" );
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "User without token access should not see agent"
+  );
 }
 
-#[ tokio::test ]
-async fn test_get_agent_not_found()
-{
-  let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_get_agent_not_found() {
+  let (app, _pool, admin_token, _user_token, _admin_id, _user_id) = create_agents_router().await;
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( "/api/agents/999999" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri("/api/agents/999999")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::NOT_FOUND );
+  assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
 // ============================================================================
 // Update Agent Tests
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_update_agent_as_admin_success()
-{
-  let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_update_agent_as_admin_success() {
+  let (app, pool, admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Old Name" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Old Name")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
@@ -468,42 +520,42 @@ async fn test_update_agent_as_admin_success()
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::PUT )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .method(Method::PUT)
+        .uri(format!("/api/agents/{agent_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::OK );
+  assert_eq!(response.status(), StatusCode::OK);
 
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
-  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
+  let agent: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
-  assert_eq!( agent[ "name" ].as_str().unwrap(), "New Name" );
-  assert_eq!( agent[ "providers" ].as_array().unwrap().len(), 2 );
+  assert_eq!(agent["name"].as_str().unwrap(), "New Name");
+  assert_eq!(agent["providers"].as_array().unwrap().len(), 2);
 }
 
-#[ tokio::test ]
-async fn test_update_agent_as_user_forbidden()
-{
-  let ( app, pool, _admin_token, user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_update_agent_as_user_forbidden() {
+  let (app, pool, _admin_token, user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
@@ -514,118 +566,119 @@ async fn test_update_agent_as_user_forbidden()
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::PUT )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .method(Method::PUT)
+        .uri(format!("/api/agents/{agent_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {user_token}"))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::FORBIDDEN );
+  assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 // ============================================================================
 // Delete Agent Tests
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_delete_agent_as_admin_success()
-{
-  let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_delete_agent_as_admin_success() {
+  let (app, pool, admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::empty() )
+        .method(Method::DELETE)
+        .uri(format!("/api/agents/{agent_id}"))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::NO_CONTENT );
+  assert_eq!(response.status(), StatusCode::NO_CONTENT);
 
   // Verify deletion
-  let count: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM agents WHERE id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
+  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agents WHERE id = ?")
+    .bind(agent_id)
+    .fetch_one(&pool)
     .await
     .unwrap();
 
-  assert_eq!( count, 0, "Agent should be deleted" );
+  assert_eq!(count, 0, "Agent should be deleted");
 }
 
-#[ tokio::test ]
-async fn test_delete_agent_as_user_forbidden()
-{
-  let ( app, pool, _admin_token, user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_delete_agent_as_user_forbidden() {
+  let (app, pool, _admin_token, user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", user_token ) )
-        .body( Body::empty() )
+        .method(Method::DELETE)
+        .uri(format!("/api/agents/{agent_id}"))
+        .header("authorization", format!("Bearer {user_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
-  assert_eq!( response.status(), StatusCode::FORBIDDEN );
+  assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 // ============================================================================
 // Get Agent Tokens Tests
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_get_agent_tokens_success()
-{
-  let ( app, pool, admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_get_agent_tokens_success() {
+  let (app, pool, admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)" )
-    .bind( 100 )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result = sqlx::query(
+    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
+  )
+  .bind(100)
+  .bind("Test Agent")
+  .bind("[\"openai\"]")
+  .bind(now)
+  .bind(&admin_id)
+  .execute(&pool)
+  .await
+  .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
@@ -657,45 +710,43 @@ async fn test_get_agent_tokens_success()
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( format!( "/api/agents/{}/tokens", agent_id ) )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri(format!("/api/agents/{agent_id}/tokens"))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
     .unwrap();
 
   let status = response.status();
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
 
-  if status != StatusCode::OK
-  {
-    let body_str = String::from_utf8( body_bytes.to_vec() ).unwrap();
-    panic!( "Expected 200 OK, got {}. Body: {}", status, body_str );
+  if status != StatusCode::OK {
+    let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
+    panic!("Expected 200 OK, got {status}. Body: {body_str}");
   }
 
-  let tokens: Vec< serde_json::Value > = serde_json::from_slice( &body_bytes ).unwrap();
-  assert_eq!( tokens.len(), 2, "Should return all agent tokens" );
+  let tokens: Vec<serde_json::Value> = serde_json::from_slice(&body_bytes).unwrap();
+  assert_eq!(tokens.len(), 2, "Should return all agent tokens");
 }
 
 // ============================================================================
 // Security Tests - Unauthenticated Access
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_list_agents_without_auth_unauthorized()
-{
-  let ( app, _pool, _admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_list_agents_without_auth_unauthorized() {
+  let (app, _pool, _admin_token, _user_token, _admin_id, _user_id) = create_agents_router().await;
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( "/api/agents" )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri("/api/agents")
+        .body(Body::empty())
         .unwrap(),
     )
     .await
@@ -708,30 +759,30 @@ async fn test_list_agents_without_auth_unauthorized()
   );
 }
 
-#[ tokio::test ]
-async fn test_get_agent_without_auth_unauthorized()
-{
-  let ( app, pool, _admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_get_agent_without_auth_unauthorized() {
+  let (app, pool, _admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent first
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::GET )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .body( Body::empty() )
+        .method(Method::GET)
+        .uri(format!("/api/agents/{agent_id}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
@@ -744,30 +795,30 @@ async fn test_get_agent_without_auth_unauthorized()
   );
 }
 
-#[ tokio::test ]
-async fn test_delete_agent_without_auth_unauthorized()
-{
-  let ( app, pool, _admin_token, _user_token, admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_delete_agent_without_auth_unauthorized() {
+  let (app, pool, _admin_token, _user_token, admin_id, _user_id) = create_agents_router().await;
 
   // Create agent first
   let now = chrono::Utc::now().timestamp_millis();
-  let result = sqlx::query( "INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)" )
-    .bind( "Test Agent" )
-    .bind( "[\"openai\"]" )
-    .bind( now )
-    .bind( &admin_id )
-    .execute( &pool )
-    .await
-    .unwrap();
+  let result =
+    sqlx::query("INSERT INTO agents (name, providers, created_at, owner_id) VALUES (?, ?, ?, ?)")
+      .bind("Test Agent")
+      .bind("[\"openai\"]")
+      .bind(now)
+      .bind(&admin_id)
+      .execute(&pool)
+      .await
+      .unwrap();
 
   let agent_id = result.last_insert_rowid();
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::DELETE )
-        .uri( format!( "/api/agents/{}", agent_id ) )
-        .body( Body::empty() )
+        .method(Method::DELETE)
+        .uri(format!("/api/agents/{agent_id}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
@@ -780,18 +831,17 @@ async fn test_delete_agent_without_auth_unauthorized()
   );
 }
 
-#[ tokio::test ]
-async fn test_delete_nonexistent_agent_as_admin()
-{
-  let ( app, _pool, admin_token, _user_token, _admin_id, _user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_delete_nonexistent_agent_as_admin() {
+  let (app, _pool, admin_token, _user_token, _admin_id, _user_id) = create_agents_router().await;
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::DELETE )
-        .uri( "/api/agents/99999" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::empty() )
+        .method(Method::DELETE)
+        .uri("/api/agents/99999")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
         .unwrap(),
     )
     .await
@@ -808,28 +858,27 @@ async fn test_delete_nonexistent_agent_as_admin()
 // Security Tests - Owner ID Override Attempts
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_admin_can_assign_agent_to_other_user()
-{
-  let ( app, pool, admin_token, _user_token, _admin_id, user_id ) = create_agents_router().await;
+#[tokio::test]
+async fn test_admin_can_assign_agent_to_other_user() {
+  let (app, pool, admin_token, _user_token, _admin_id, user_id) = create_agents_router().await;
 
   // Admin creates agent and assigns it to another user
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
     "provider_key_id": 1,
-    "initial_budget_microdollars": 1000000,
+    "initial_budget_microdollars": 1_000_000,
     "owner_id": user_id  // Admin assigns agent to user
   });
 
   let response = app
     .oneshot(
       Request::builder()
-        .method( Method::POST )
-        .uri( "/api/agents" )
-        .header( "content-type", "application/json" )
-        .header( "authorization", format!( "Bearer {}", admin_token ) )
-        .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+        .method(Method::POST)
+        .uri("/api/agents")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::from(serde_json::to_string(&request_body).unwrap()))
         .unwrap(),
     )
     .await
@@ -842,16 +891,16 @@ async fn test_admin_can_assign_agent_to_other_user()
   );
 
   // Verify owner_id is set to the specified user (admin can assign to others)
-  let body_bytes = axum::body::to_bytes( response.into_body(), usize::MAX )
+  let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
     .await
     .unwrap();
-  let agent: serde_json::Value = serde_json::from_slice( &body_bytes ).unwrap();
-  let agent_id = agent[ "id" ].as_i64().unwrap();
+  let agent: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+  let agent_id = agent["id"].as_i64().unwrap();
 
   // Query database to verify actual owner_id
-  let row: ( String, ) = sqlx::query_as( "SELECT owner_id FROM agents WHERE id = ?" )
-    .bind( agent_id )
-    .fetch_one( &pool )
+  let row: (String,) = sqlx::query_as("SELECT owner_id FROM agents WHERE id = ?")
+    .bind(agent_id)
+    .fetch_one(&pool)
     .await
     .unwrap();
 

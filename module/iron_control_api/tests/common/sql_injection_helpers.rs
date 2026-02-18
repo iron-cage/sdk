@@ -4,32 +4,29 @@
 //! standards defined in tests/auth/-sql_injection_standards.md.
 //!
 //! # TDD Phase: GREEN
-//! Minimal implementation to make test_sql_injection_helpers.rs pass.
+//! Minimal implementation to make `test_sql_injection_helpers.rs` pass.
 //!
 //! # Rulebook Compliance
-//! - code_style.rulebook.md: 2-space indentation (NOT cargo fmt) ✓
-//! - test_organization.rulebook.md: Helpers in tests/common/ ✓
-//! - code_design.rulebook.md: Clear single responsibility ✓
+//! - `code_style.rulebook.md`: 2-space indentation (NOT `cargo fmt`) ✓
+//! - `test_organization.rulebook.md`: Helpers in `tests/common/` ✓
+//! - `code_design.rulebook.md`: Clear single responsibility ✓
 
-use std::time::Duration;
 use axum::http::StatusCode;
+use core::time::Duration;
 
 /// Test response wrapper for SQL injection tests
 ///
 /// Provides a simple interface for response verification that abstracts
 /// away HTTP response details.
 #[derive(Debug, Clone)]
-pub struct TestResponse
-{
+pub struct TestResponse {
   status: StatusCode,
   body: String,
 }
 
-impl TestResponse
-{
+impl TestResponse {
   /// Create new test response
-  pub fn new() -> Self
-  {
+  pub fn new() -> Self {
     Self {
       status: StatusCode::OK,
       body: String::new(),
@@ -37,35 +34,28 @@ impl TestResponse
   }
 
   /// Set status code
-  pub fn set_status(&mut self, code: u16)
-  {
-    self.status = StatusCode::from_u16(code)
-      .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+  pub fn set_status(&mut self, code: u16) {
+    self.status = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
   }
 
   /// Set response body
-  pub fn set_body(&mut self, body: &str)
-  {
+  pub fn set_body(&mut self, body: &str) {
     self.body = body.to_string();
   }
 
   /// Get status code
-  pub fn status(&self) -> StatusCode
-  {
+  pub fn status(&self) -> StatusCode {
     self.status
   }
 
   /// Get response body as string
-  pub fn body_str(&self) -> &str
-  {
+  pub fn body_str(&self) -> &str {
     &self.body
   }
 }
 
-impl Default for TestResponse
-{
-  fn default() -> Self
-  {
+impl Default for TestResponse {
+  fn default() -> Self {
     Self::new()
   }
 }
@@ -83,8 +73,7 @@ impl Default for TestResponse
 /// This is a minimal implementation for testing the helpers themselves.
 /// In actual SQL injection tests, this would make real HTTP requests to
 /// the test server.
-pub fn send_login_request(_email: &str, _password: &str) -> TestResponse
-{
+pub fn send_login_request(_email: &str, _password: &str) -> TestResponse {
   // Minimal implementation: return valid auth failure response
   let mut response = TestResponse::new();
   response.set_status(401);
@@ -104,8 +93,7 @@ pub fn send_login_request(_email: &str, _password: &str) -> TestResponse
 /// This is a minimal implementation for testing the helpers themselves.
 /// In actual SQL injection tests, this would make real HTTP requests to
 /// the test server.
-pub fn send_logout_request(_token: &str) -> TestResponse
-{
+pub fn send_logout_request(_token: &str) -> TestResponse {
   // Minimal implementation: return valid auth failure response
   let mut response = TestResponse::new();
   response.set_status(401);
@@ -127,12 +115,12 @@ pub fn send_logout_request(_token: &str) -> TestResponse
 ///
 /// # Security Requirement
 /// OWASP ASVS V5.3.4: SQL Injection Prevention
-pub fn verify_response_secure(response: &TestResponse)
-{
+pub fn verify_response_secure(response: &TestResponse) {
   // Status must be 4xx (client error), not 5xx (server error)
   assert!(
     response.status().is_client_error(),
-    "Expected 4xx status, got {}", response.status()
+    "Expected 4xx status, got {}",
+    response.status()
   );
 
   let body_lower = response.body_str().to_lowercase();
@@ -143,20 +131,20 @@ pub fn verify_response_secure(response: &TestResponse)
   for name in &schema_names {
     assert!(
       !body_lower.contains(name),
-      "Response leaked table name: {}", name
+      "Response leaked table name: {name}"
     );
   }
 
   // Response must not contain SQL keywords
   let sql_keywords = [
-    "sql", "syntax", "select", "union", "where", "from",
-    "insert", "update", "delete", "drop", "table", "column"
+    "sql", "syntax", "select", "union", "where", "from", "insert", "update", "delete", "drop",
+    "table", "column",
   ];
 
   for keyword in &sql_keywords {
     assert!(
       !body_lower.contains(keyword),
-      "Response leaked SQL keyword: {}", keyword
+      "Response leaked SQL keyword: {keyword}"
     );
   }
 }
@@ -173,20 +161,20 @@ pub fn verify_response_secure(response: &TestResponse)
 ///
 /// # Security Requirement
 /// Authentication MUST fail for all SQL injection attempts
-pub fn verify_authentication_failed(response: &TestResponse)
-{
+pub fn verify_authentication_failed(response: &TestResponse) {
   assert_eq!(
     response.status(),
     StatusCode::UNAUTHORIZED,
-    "Authentication should fail with 401, got {}", response.status()
+    "Authentication should fail with 401, got {}",
+    response.status()
   );
 
   let body = response.body_str();
   assert!(
-    body.contains("Authentication failed") ||
-    body.contains("Invalid credentials") ||
-    body.contains("Invalid token"),
-    "Expected generic auth failure message, got: {}", body
+    body.contains("Authentication failed")
+      || body.contains("Invalid credentials")
+      || body.contains("Invalid token"),
+    "Expected generic auth failure message, got: {body}"
   );
 
   // Must not contain access/refresh tokens
@@ -213,20 +201,19 @@ pub fn verify_authentication_failed(response: &TestResponse)
 ///
 /// # Security Requirement
 /// Responses MUST NOT leak database schema or SQL errors
-pub fn verify_no_sql_leakage(response: &TestResponse)
-{
+pub fn verify_no_sql_leakage(response: &TestResponse) {
   let body_lower = response.body_str().to_lowercase();
 
   // Check for SQL keywords
   let sql_keywords = [
-    "select", "union", "where", "from", "insert", "update", "delete",
-    "drop", "table", "column", "database", "schema", "sql"
+    "select", "union", "where", "from", "insert", "update", "delete", "drop", "table", "column",
+    "database", "schema", "sql",
   ];
 
   for keyword in &sql_keywords {
     assert!(
       !body_lower.contains(keyword),
-      "Response leaked SQL keyword: {}", keyword
+      "Response leaked SQL keyword: {keyword}"
     );
   }
 
@@ -261,23 +248,20 @@ pub fn verify_no_sql_leakage(response: &TestResponse)
 ///
 /// # Security Requirement
 /// Response time MUST be consistent to prevent timing-based information
-/// disclosure (e.g., SLEEP() or WAITFOR DELAY attacks)
-pub fn verify_no_timing_attack(elapsed: Duration)
-{
+/// disclosure (e.g., `SLEEP()` or `WAITFOR DELAY` attacks)
+pub fn verify_no_timing_attack(elapsed: Duration) {
   assert!(
     elapsed < Duration::from_secs(1),
-    "Response too slow ({:?}), timing attack possible", elapsed
+    "Response too slow ({elapsed:?}), timing attack possible"
   );
 }
 
 #[cfg(test)]
-mod tests
-{
+mod tests {
   use super::*;
 
   #[test]
-  fn test_test_response_creation()
-  {
+  fn test_test_response_creation() {
     let mut response = TestResponse::new();
     response.set_status(401);
     response.set_body("Test body");
@@ -287,22 +271,19 @@ mod tests
   }
 
   #[test]
-  fn test_send_login_request_returns_response()
-  {
+  fn test_send_login_request_returns_response() {
     let response = send_login_request("test@example.com", "password");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
   }
 
   #[test]
-  fn test_send_logout_request_returns_response()
-  {
+  fn test_send_logout_request_returns_response() {
     let response = send_logout_request("Bearer token");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
   }
 
   #[test]
-  fn test_verify_response_secure_passes_for_safe_response()
-  {
+  fn test_verify_response_secure_passes_for_safe_response() {
     let mut response = TestResponse::new();
     response.set_status(401);
     response.set_body("Authentication failed");
@@ -313,8 +294,7 @@ mod tests
 
   #[test]
   #[should_panic(expected = "SQL keyword")]
-  fn test_verify_response_secure_detects_sql()
-  {
+  fn test_verify_response_secure_detects_sql() {
     let mut response = TestResponse::new();
     response.set_status(401);
     response.set_body("Error: SQL syntax error");
@@ -323,8 +303,7 @@ mod tests
   }
 
   #[test]
-  fn test_verify_authentication_failed_passes()
-  {
+  fn test_verify_authentication_failed_passes() {
     let mut response = TestResponse::new();
     response.set_status(401);
     response.set_body("Authentication failed");
@@ -334,8 +313,7 @@ mod tests
   }
 
   #[test]
-  fn test_verify_no_sql_leakage_passes()
-  {
+  fn test_verify_no_sql_leakage_passes() {
     let mut response = TestResponse::new();
     response.set_status(401);
     response.set_body("Authentication failed");
@@ -346,8 +324,7 @@ mod tests
 
   #[test]
   #[should_panic(expected = "SQL keyword")]
-  fn test_verify_no_sql_leakage_detects_keywords()
-  {
+  fn test_verify_no_sql_leakage_detects_keywords() {
     let mut response = TestResponse::new();
     response.set_status(401);
     response.set_body("Error in SELECT statement");
@@ -356,8 +333,7 @@ mod tests
   }
 
   #[test]
-  fn test_verify_no_timing_attack_passes()
-  {
+  fn test_verify_no_timing_attack_passes() {
     let fast = Duration::from_millis(100);
 
     // Should not panic
@@ -366,8 +342,7 @@ mod tests
 
   #[test]
   #[should_panic(expected = "timing attack")]
-  fn test_verify_no_timing_attack_detects_delays()
-  {
+  fn test_verify_no_timing_attack_detects_delays() {
     let slow = Duration::from_secs(5);
 
     verify_no_timing_attack(slow);

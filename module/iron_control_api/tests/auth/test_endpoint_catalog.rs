@@ -3,14 +3,14 @@
 //! Tests that verify the endpoint catalog is complete and accurate.
 //!
 //! # TDD Phase: RED
-//! This test is written FIRST, before -endpoint_catalog.md exists.
+//! This test is written FIRST, before `-endpoint_catalog.md` exists.
 //! Expected to fail with: "No such file or directory"
 //!
 //! # Rulebook Compliance
-//! - test_organization.rulebook.md: Test in tests/ directory ✓
-//! - code_style.rulebook.md: 2-space indentation ✓
-//! - codebase_hygiene.rulebook.md: Clear test name ✓
-//! - files_structure.rulebook.md: Checked readme.md, no overlap ✓
+//! - `test_organization.rulebook.md`: Test in tests/ directory ✓
+//! - `code_style.rulebook.md`: 2-space indentation ✓
+//! - `codebase_hygiene.rulebook.md`: Clear test name ✓
+//! - `files_structure.rulebook.md`: Checked readme.md, no overlap ✓
 
 #![cfg(test)]
 
@@ -28,24 +28,18 @@ use std::path::Path;
 /// 2. Verify file is readable
 /// 3. Verify file is not empty
 #[test]
-#[ignore]
-fn test_endpoint_catalog_exists()
-{
+#[ignore = "TODO: Test not yet implemented"]
+fn test_endpoint_catalog_exists() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
 
   assert!(
     catalog_path.exists(),
-    "Endpoint catalog not found at: {:?}",
-    catalog_path
+    "Endpoint catalog not found at: {catalog_path:?}"
   );
 
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
-  assert!(
-    !content.is_empty(),
-    "Endpoint catalog is empty"
-  );
+  assert!(!content.is_empty(), "Endpoint catalog is empty");
 }
 
 /// Test: Endpoint catalog contains all 4 auth endpoints
@@ -62,12 +56,10 @@ fn test_endpoint_catalog_exists()
 /// 3. Verify HTTP methods are specified
 /// 4. Verify endpoint paths are correct
 #[test]
-#[ignore]
-fn test_endpoint_catalog_contains_all_auth_endpoints()
-{
+#[ignore = "TODO: Test not yet implemented"]
+fn test_endpoint_catalog_contains_all_auth_endpoints() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
   // Define expected endpoints with HTTP methods
   let expected_endpoints = [
@@ -79,8 +71,8 @@ fn test_endpoint_catalog_contains_all_auth_endpoints()
 
   // Verify each endpoint is documented
   let mut missing_endpoints = Vec::new();
-  for (method, path) in expected_endpoints.iter() {
-    let endpoint_str = format!("{} {}", method, path);
+  for (method, path) in &expected_endpoints {
+    let endpoint_str = format!("{method} {path}");
     if !content.contains(&endpoint_str) && !content.contains(path) {
       missing_endpoints.push(endpoint_str);
     }
@@ -106,21 +98,18 @@ fn test_endpoint_catalog_contains_all_auth_endpoints()
 /// # Test Strategy
 /// Verify catalog contains parameter documentation for login endpoint
 #[test]
-#[ignore]
-fn test_endpoint_catalog_documents_parameters()
-{
+#[ignore = "TODO: Test not yet implemented"]
+fn test_endpoint_catalog_documents_parameters() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
   // Login endpoint should have documented parameters
   assert!(
-    content.contains("login") && (
-      content.contains("email") ||
-      content.contains("username") ||
-      content.contains("password") ||
-      content.contains("Parameters")
-    ),
+    content.contains("login")
+      && (content.contains("email")
+        || content.contains("username")
+        || content.contains("password")
+        || content.contains("Parameters")),
     "Catalog should document parameters for endpoints"
   );
 }
@@ -130,21 +119,16 @@ fn test_endpoint_catalog_documents_parameters()
 /// # Test Strategy
 /// Verify the catalog uses markdown formatting for readability
 #[test]
-#[ignore]
-fn test_endpoint_catalog_is_markdown()
-{
+#[ignore = "TODO: Test not yet implemented"]
+fn test_endpoint_catalog_is_markdown() {
   let catalog_path = Path::new("tests/auth/-endpoint_catalog.md");
-  let content = fs::read_to_string(catalog_path)
-    .expect("Failed to read endpoint catalog");
+  let content = fs::read_to_string(catalog_path).expect("Failed to read endpoint catalog");
 
   // Check for markdown elements
-  let has_markdown = content.contains("#") ||
-                     content.contains("|") ||
-                     content.contains("*") ||
-                     content.contains("-");
+  let has_markdown = content.contains('#')
+    || content.contains('|')
+    || content.contains('*')
+    || content.contains('-');
 
-  assert!(
-    has_markdown,
-    "Catalog should use markdown formatting"
-  );
+  assert!(has_markdown, "Catalog should use markdown formatting");
 }

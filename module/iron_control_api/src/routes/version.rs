@@ -18,26 +18,32 @@
 //! This separation ensures health endpoint is minimal (status, timestamp only)
 //! while version information is available through proper discovery mechanism.
 
-use axum::{ Json, response::IntoResponse };
-use serde::{ Serialize, Deserialize };
+use axum::{response::IntoResponse, Json};
+use serde::{Deserialize, Serialize};
 
 /// API version response structure
-#[ derive( Debug, Serialize, Deserialize ) ]
-pub struct VersionResponse
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VersionResponse {
+  /// Current API version
   pub current_version: String,
-  pub supported_versions: Vec< String >,
-  pub deprecated_versions: Vec< String >,
+  /// List of supported API versions
+  pub supported_versions: Vec<String>,
+  /// List of deprecated API versions
+  pub deprecated_versions: Vec<String>,
+  /// Endpoint for latest API version
   pub latest_endpoint: String,
+  /// Build metadata
   pub build: BuildInfo,
 }
 
 /// Build metadata from compile-time
-#[ derive( Debug, Serialize, Deserialize ) ]
-pub struct BuildInfo
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BuildInfo {
+  /// Git commit SHA
   pub commit: String,
+  /// Build timestamp
   pub timestamp: String,
+  /// Runtime environment name
   pub environment: String,
 }
 
@@ -53,26 +59,23 @@ pub struct BuildInfo
 ///
 /// ## Build Metadata
 ///
-/// - commit: Git SHA from VERGEN_GIT_SHA (build.rs)
-/// - timestamp: Build timestamp from VERGEN_BUILD_TIMESTAMP (build.rs)
+/// - commit: Git SHA from `VERGEN_GIT_SHA` (`build.rs`)
+/// - timestamp: Build timestamp from `VERGEN_BUILD_TIMESTAMP` (`build.rs`)
 /// - environment: Runtime environment from ENVIRONMENT var or "development"
-#[ must_use ]
-pub async fn get_version() -> impl IntoResponse
-{
-  let response = VersionResponse
-  {
+#[must_use]
+#[allow(clippy::unused_async)]
+pub async fn get_version() -> impl IntoResponse {
+  let response = VersionResponse {
     current_version: "v1".to_string(),
-    supported_versions: vec![ "v1".to_string() ],
+    supported_versions: vec!["v1".to_string()],
     deprecated_versions: vec![],
     latest_endpoint: "/api/v1".to_string(),
-    build: BuildInfo
-    {
-      commit: env!( "VERGEN_GIT_SHA" ).to_string(),
-      timestamp: env!( "VERGEN_BUILD_TIMESTAMP" ).to_string(),
-      environment: std::env::var( "ENVIRONMENT" )
-        .unwrap_or_else( |_| "development".to_string() ),
+    build: BuildInfo {
+      commit: env!("VERGEN_GIT_SHA").to_string(),
+      timestamp: env!("VERGEN_BUILD_TIMESTAMP").to_string(),
+      environment: std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()),
     },
   };
 
-  Json( response )
+  Json(response)
 }
