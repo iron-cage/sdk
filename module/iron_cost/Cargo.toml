@@ -33,3 +33,6 @@ zeroize = { workspace = true, optional = true }
 [dev-dependencies]
 # Enable test utilities for ID types in tests
 iron_types = { workspace = true, features = ["test-helpers"] }
+# BudgetClient integration tests — encrypt tokens for mock server responses
+iron_secrets = { workspace = true }
+tokio = { workspace = true, features = ["full"] }

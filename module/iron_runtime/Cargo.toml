@@ -81,6 +81,8 @@ tracing = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["full"] }
 # Enable test utilities for ID types in tests
 iron_types = { workspace = true, features = ["test-helpers"] }
+# KeyFetcher integration tests — encrypt tokens for mock server responses
+iron_secrets = { workspace = true }
 
 [lib]
 name = "iron_runtime"

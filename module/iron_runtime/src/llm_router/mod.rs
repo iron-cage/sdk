@@ -10,7 +10,7 @@ mod router;
 mod translator;
 
 pub use error::LlmRouterError;
-pub use key_fetcher::ProviderKey;
+pub use key_fetcher::{KeyFetcher, ProviderKey};
 pub use router::LlmRouter;
 
 // Re-export proxy utilities for testing
