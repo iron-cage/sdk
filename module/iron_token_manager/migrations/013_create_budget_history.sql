@@ -15,5 +15,5 @@ CREATE TABLE IF NOT EXISTS budget_modification_history
   FOREIGN KEY ( related_request_id ) REFERENCES budget_change_requests( id ) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_budget_history_agent ON budget_modification_history( agent_id );
-CREATE TABLE _migration_013_completed ( id INTEGER PRIMARY KEY );
+CREATE TABLE IF NOT EXISTS _migration_013_completed ( id INTEGER PRIMARY KEY );
 INSERT INTO _migration_013_completed ( id ) VALUES ( 1 );
