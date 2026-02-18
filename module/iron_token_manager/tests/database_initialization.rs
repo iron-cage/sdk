@@ -300,7 +300,7 @@ async fn test_seed_data_creates_expected_records()
 
   // Verify 3 users created
   let user_count: i64 = query_scalar(
-    "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'developer', 'viewer')"
+    "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer')"
   )
   .fetch_one( &pool )
   .await
