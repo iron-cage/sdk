@@ -7,6 +7,7 @@
 | access_control.rs | Implements access control mechanisms placeholder |
 | audit.rs | Implements audit logging placeholder |
 | crypto.rs | Performs AES-256-GCM encryption and decryption |
+| ip_token.rs | Implements AES-256-GCM IP Token encryption/decryption for Protocol 005 provider key transit |
 | error.rs | Defines secrets management error types |
 | lib.rs | Exports secrets module public API |
 | secrets_manager.rs | Implements secrets manager placeholder |

@@ -52,7 +52,7 @@ tests/
 
 ## Responsibility Table
 
-| Entity | Responsibility | Input→Output | Out of Scope |
+| File | Responsibility | Input→Output | Out of Scope |
 |--------|----------------|--------------|--------------|
 | `tokens/` | Test Protocol 014 API token endpoints including validate | Token scenarios → Test results | NOT auth flows (auth/), NOT agents (agents/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
 | `agents/` | Test Protocol 010 agent CRUD endpoints and budgets | Agent scenarios → Test results | NOT tokens (tokens/), NOT auth (auth/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
@@ -78,6 +78,7 @@ tests/
 | `users.rs` | Test user management CRUD endpoints | User management scenarios → CRUD validation | NOT auth (auth/, auth_endpoints.rs), NOT tokens (tokens/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
 | `auth_rate_limiting.rs` | Test Protocol 007 login rate limiting for brute force prevention | Login rate limit scenarios → Attack prevention validation | NOT token rate limiting (tokens/rate_limiting.rs), NOT auth flows (auth/), NOT JWT lifecycle (auth_endpoints.rs), NOT user management (users.rs) |
 | `agent_provider_key_tests.rs` | Test provider API key retrieval endpoint | Key fetch scenarios → Retrieval validation | Feature 014 provider key tests | NOT budget (budget_*), NOT auth (auth/), NOT tokens (tokens/) |
+| `ip_token_e2e_test.rs` | Test end-to-end IP Token encryption flow across server/client boundary | Server response → Client plaintext key | NOT HTTP integration (integration_tests.rs), NOT budget flow (budget_*), NOT auth (auth/) |
 | `test_no_url_redirect.rs` | Validate url_redirect middleware deletion | Source code → NEGATIVE ACCEPTANCE validation | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_cors_configuration.rs` | Validate CORS configuration via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_server_port_configuration.rs` | Validate server port via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
