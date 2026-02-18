@@ -699,8 +699,14 @@ async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
     {
       // Columns already exist, just create guard table
       sqlx::query(
-        "CREATE TABLE IF NOT EXISTS _migration_021_completed (applied_at INTEGER NOT NULL);
-         INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);"
+        "CREATE TABLE IF NOT EXISTS _migration_021_completed (applied_at INTEGER NOT NULL)"
+      )
+          .execute( pool )
+          .await
+          .map_err( |_| crate::error::TokenError::Generic )?;
+
+      sqlx::query(
+        "INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000)"
       )
           .execute( pool )
           .await
