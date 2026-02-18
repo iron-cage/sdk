@@ -862,7 +862,7 @@ Close issue referencing commit with reproducer test.
 
 - [ ] All tests pass: `cargo nextest run --all-features`
 - [ ] Clippy clean: `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] Code formatted per rulebooks (NOT cargo fmt)
+- [ ] Code formatted with `cargo fmt --all` (2-space indent via rustfmt.toml)
 - [ ] Documentation updated
 - [ ] No forbidden patterns (backup files, non-hyphenated temp files)
 

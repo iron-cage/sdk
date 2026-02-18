@@ -11,12 +11,12 @@
 //! | Test Case | Scenario | Input/Setup | Expected | Status |
 //! |-----------|----------|-------------|----------|--------|
 //! | `test_get_usage_aggregate_empty` | Aggregate usage with no data | GET /api/usage/aggregate with admin token, empty database | 200 OK, zero totals | ✅ |
-//! | `test_get_usage_by_project_valid_id` | Usage by valid project ID | GET /api/usage/by-project/:id with admin token, existing project | 200 OK, project-specific usage data | ✅ |
+//! | `test_get_usage_by_project_valid_id` | Usage by valid project ID | GET /api/usage/by-project/{id} with admin token, existing project | 200 OK, project-specific usage data | ✅ |
 //! | `test_get_usage_by_project_empty_id` | Usage with empty project ID | GET /api/usage/by-project/ (empty ID) with admin token | 400 Bad Request (path validation) | ✅ |
-//! | `test_get_usage_by_project_too_long` | Usage with oversized project ID (DoS) | GET /api/usage/by-project/:id with 100K+ char ID | 400 Bad Request (DoS prevention) | ✅ |
-//! | `test_get_usage_by_provider_valid` | Usage by valid provider name | GET /api/usage/by-provider/:provider with admin token, valid provider | 200 OK, provider-specific usage data | ✅ |
+//! | `test_get_usage_by_project_too_long` | Usage with oversized project ID (DoS) | GET /api/usage/by-project/{id} with 100K+ char ID | 400 Bad Request (DoS prevention) | ✅ |
+//! | `test_get_usage_by_provider_valid` | Usage by valid provider name | GET /api/usage/by-provider/{provider} with admin token, valid provider | 200 OK, provider-specific usage data | ✅ |
 //! | `test_get_usage_by_provider_empty` | Usage with empty provider name | GET /api/usage/by-provider/ (empty provider) with admin token | 400 Bad Request (path validation) | ✅ |
-//! | `test_get_usage_by_provider_too_long` | Usage with oversized provider name (DoS) | GET /api/usage/by-provider/:provider with 100K+ char name | 400 Bad Request (DoS prevention) | ✅ |
+//! | `test_get_usage_by_provider_too_long` | Usage with oversized provider name (DoS) | GET /api/usage/by-provider/{provider} with 100K+ char name | 400 Bad Request (DoS prevention) | ✅ |
 
 mod common;
 
@@ -85,8 +85,8 @@ async fn create_analytics_router() -> ( Router, SqlitePool, String, String )
 
   let router = Router::new()
     .route( "/api/usage/aggregate", get( iron_control_api::routes::usage::get_aggregate_usage ) )
-    .route( "/api/usage/by-project/:project_id", get( iron_control_api::routes::usage::get_usage_by_project ) )
-    .route( "/api/usage/by-provider/:provider", get( iron_control_api::routes::usage::get_usage_by_provider ) )
+    .route( "/api/usage/by-project/{project_id}", get( iron_control_api::routes::usage::get_usage_by_project ) )
+    .route( "/api/usage/by-provider/{provider}", get( iron_control_api::routes::usage::get_usage_by_provider ) )
     .with_state( usage_state.clone() );
 
   ( router, app_state.database.clone(), admin_token, user_token )

@@ -8,8 +8,8 @@
 //! | Test Case | Concurrent Operations | Expected Result | Status |
 //! |-----------|----------------------|----------------|--------|
 //! | `test_concurrent_token_creation_uniqueness` | 2x POST /api/v1/api-tokens | Both succeed with unique tokens | ✅ |
-//! | `test_concurrent_rotate_same_token` | 2x POST /api/v1/api-tokens/:id/rotate | One succeeds, one gets 404 | ✅ |
-//! | `test_concurrent_revoke_same_token` | 2x DELETE /api/v1/api-tokens/:id | One 200, one 409 | ✅ |
+//! | `test_concurrent_rotate_same_token` | 2x POST /api/v1/api-tokens/{id}/rotate | One succeeds, one gets 404 | ✅ |
+//! | `test_concurrent_revoke_same_token` | 2x DELETE /api/v1/api-tokens/{id} | One 200, one 409 | ✅ |
 //! | `test_concurrent_rotate_and_revoke` | Rotate + Revoke same token | One succeeds, one 404/409 | ✅ |
 //!
 //! ## Corner Cases Covered
@@ -98,8 +98,8 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 
   let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/v1/api-tokens/{id}/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/{id}", delete( iron_control_api::routes::tokens::revoke_token ) )
     .with_state( app_state.clone() );
 
   ( router, app_state )

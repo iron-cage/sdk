@@ -126,7 +126,7 @@ missing_inline_in_public_items = "allow"
 ## Error Handling - MUST use error_tools per rulebook
 
 [workspace.dependencies.error_tools]
-version = "0.35"
+version = "0.37"
 
 ## Serialization
 
@@ -137,10 +137,10 @@ features = ["derive"]
 ## Web Framework Dependencies
 
 [workspace.dependencies.axum]
-version = "0.7"
+version = "0.8"
 
 [workspace.dependencies.axum-extra]
-version = "0.9"
+version = "0.12"
 features = ["typed-header"]
 
 [workspace.dependencies.tower]
@@ -162,7 +162,7 @@ version = "0.1"
 ## Concurrency & State
 
 [workspace.dependencies.dashmap]
-version = "5.5"
+version = "6.1"
 
 ## Persistence
 
@@ -177,7 +177,7 @@ features = ["tokio-comp", "connection-manager"]
 ## Additional Error Handling
 
 [workspace.dependencies.thiserror]
-version = "1.0"
+version = "2.0"
 
 [workspace.dependencies.anyhow]
 version = "1.0"
@@ -191,7 +191,7 @@ version = "1.0"
 version = "0.9"
 
 [workspace.dependencies.toml]
-version = "0.8"
+version = "1.0.2"
 
 ## Logging & Tracing
 
@@ -219,7 +219,7 @@ version = "4.0"
 features = ["derive"]
 
 [workspace.dependencies.rand]
-version = "0.8"
+version = "0.10"
 
 ## Workspace Management
 
@@ -231,6 +231,9 @@ features = ["serde", "secrets", "secure", "testing"]
 
 [workspace.dependencies.sha2]
 version = "0.10"
+
+[workspace.dependencies.hex]
+version = "0.4"
 
 [workspace.dependencies.aes-gcm]
 version = "0.10"
@@ -244,10 +247,11 @@ version = "1"
 ## Authentication & Rate Limiting
 
 [workspace.dependencies.jsonwebtoken]
-version = "9.0"
+version = "10.3"
+features = ["rust_crypto"]
 
 [workspace.dependencies.governor]
-version = "0.7"
+version = "0.10"
 
 [workspace.dependencies.nonzero_ext]
 version = "0.3"
@@ -261,7 +265,7 @@ version = "0.4"
 ## Modularity
 
 [workspace.dependencies.mod_interface]
-version = "0.54"
+version = "0.58"
 
 ## PyO3 for Python Bindings
 ## Fix(pyo3-buffer-overflow): Updated to 0.24.1+ for RUSTSEC-2025-0020
@@ -358,7 +362,7 @@ path = "module/iron_sdk"
 ## HTTP Client
 
 [workspace.dependencies.reqwest]
-version = "0.12"
+version = "0.13"
 features = ["json"]
 
 ## Environment Loading
@@ -369,7 +373,10 @@ version = "0.15"
 ## Password Hashing
 
 [workspace.dependencies.bcrypt]
-version = "0.16"
+version = "0.18"
+
+[workspace.dependencies.subtle]
+version = "2.6"
 
 ## Dev Dependencies
 
@@ -391,3 +398,6 @@ version = "0.8.4"
 
 [workspace.dependencies.wiremock]
 version = "0.6.5"
+
+[workspace.dependencies.tokio-test]
+version = "0.4"

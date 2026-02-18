@@ -41,8 +41,8 @@ async fn create_token_router() -> ( Router, crate::common::test_state::TestAppSt
 
   let router = Router::new()
     .route( "/api/tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/tokens/{id}", get( iron_control_api::routes::tokens::get_token ) )
+    .route( "/api/tokens/{id}", delete( iron_control_api::routes::tokens::revoke_token ) )
     .with_state( app_state.clone() );
 
   ( router, app_state )
@@ -66,7 +66,7 @@ async fn create_limit_router() -> Router
 
   Router::new()
     .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits/:id", put( iron_control_api::routes::limits::update_limit ) )
+    .route( "/api/limits/{id}", put( iron_control_api::routes::limits::update_limit ) )
     .with_state( limit_state )
 }
 

@@ -7,13 +7,13 @@
 //!
 //! | Test Case | Initial State | Operation | Expected Result | Status |
 //! |-----------|--------------|-----------|----------------|--------|
-//! | `test_rotate_revoked_token` | Token revoked | POST /api/v1/api-tokens/:id/rotate | 404 Not Found | ✅ |
-//! | `test_get_revoked_token_shows_metadata` | Token revoked | GET /api/v1/api-tokens/:id | 200 OK with metadata | ✅ |
-//! | `test_revoke_already_revoked_token` | Token revoked | DELETE /api/v1/api-tokens/:id | 409 Conflict | ✅ |
-//! | `test_token_state_after_failed_rotation` | Valid token, rotation fails | POST /api/v1/api-tokens/:id/rotate | Original token still valid | ✅ |
-//! | `test_cascade_delete_token_removes_usage` | Token with usage records | DELETE /api/v1/api-tokens/:id | 200 OK, usage deleted | ✅ |
-//! | `test_rotate_nonexistent_token` | No token | POST /api/v1/api-tokens/:id/rotate | 404 Not Found | ✅ |
-//! | `test_revoke_nonexistent_token` | No token | DELETE /api/v1/api-tokens/:id | 404 Not Found | ✅ |
+//! | `test_rotate_revoked_token` | Token revoked | POST /api/v1/api-tokens/{id}/rotate | 404 Not Found | ✅ |
+//! | `test_get_revoked_token_shows_metadata` | Token revoked | GET /api/v1/api-tokens/{id} | 200 OK with metadata | ✅ |
+//! | `test_revoke_already_revoked_token` | Token revoked | DELETE /api/v1/api-tokens/{id} | 409 Conflict | ✅ |
+//! | `test_token_state_after_failed_rotation` | Valid token, rotation fails | POST /api/v1/api-tokens/{id}/rotate | Original token still valid | ✅ |
+//! | `test_cascade_delete_token_removes_usage` | Token with usage records | DELETE /api/v1/api-tokens/{id} | 200 OK, usage deleted | ✅ |
+//! | `test_rotate_nonexistent_token` | No token | POST /api/v1/api-tokens/{id}/rotate | 404 Not Found | ✅ |
+//! | `test_revoke_nonexistent_token` | No token | DELETE /api/v1/api-tokens/{id} | 404 Not Found | ✅ |
 //!
 //! ## Corner Cases Covered (Protocol 014)
 //!
@@ -55,9 +55,9 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 
   let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/:id", get( iron_control_api::routes::tokens::get_token ) )
-    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
-    .route( "/api/v1/api-tokens/:id", delete( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/v1/api-tokens/{id}", get( iron_control_api::routes::tokens::get_token ) )
+    .route( "/api/v1/api-tokens/{id}/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/{id}", delete( iron_control_api::routes::tokens::revoke_token ) )
     .with_state( app_state.clone() );
 
   ( router, app_state )
@@ -329,7 +329,7 @@ async fn test_cascade_delete_token_removes_usage()
   // This is an integration test that would require:
   // 1. Creating a token via POST /api/v1/api-tokens
   // 2. Recording usage via iron_token_manager (or usage API if it existed)
-  // 3. Deleting the token via DELETE /api/v1/api-tokens/:id
+  // 3. Deleting the token via DELETE /api/v1/api-tokens/{id}
   // 4. Verifying usage records are gone
   //
   // Current iron_api doesn't expose usage recording endpoint (it's internal).

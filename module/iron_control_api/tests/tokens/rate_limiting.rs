@@ -38,7 +38,7 @@ async fn create_test_router_with_shared_db( db_path: &str ) -> ( Router, crate::
 
   let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/:id/revoke", post( iron_control_api::routes::tokens::revoke_token ) )
+    .route( "/api/v1/api-tokens/{id}/revoke", post( iron_control_api::routes::tokens::revoke_token ) )
     .with_state( app_state.clone() );
 
   ( router, app_state )

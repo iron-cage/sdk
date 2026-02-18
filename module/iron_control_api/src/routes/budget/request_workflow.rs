@@ -324,7 +324,7 @@ pub struct GetBudgetRequestResponse
   pub updated_at: i64,
 }
 
-/// GET /api/v1/budget/requests/:id
+/// GET /api/v1/budget/requests/{id}
 ///
 /// Get a budget change request by ID (Protocol 012)
 ///
@@ -593,7 +593,7 @@ pub struct ApproveBudgetRequestResponse
   pub updated_at: i64,
 }
 
-/// PATCH /api/v1/budget/requests/:id/approve
+/// PATCH /api/v1/budget/requests/{id}/approve
 ///
 /// Approve a budget change request (Protocol 012)
 ///
@@ -707,14 +707,14 @@ pub struct RejectBudgetRequestResponse
   pub updated_at: i64,
 }
 
-/// PATCH /api/v1/budget/requests/:id/reject
+/// PATCH /api/v1/budget/requests/{id}/reject
 ///
 /// Rejects a budget change request (Protocol 012).
 ///
 /// # Request
 ///
 /// - Method: PATCH
-/// - Path: `/api/v1/budget/requests/:id/reject`
+/// - Path: `/api/v1/budget/requests/{id}/reject`
 /// - Path parameter: `id` - Budget request ID
 ///
 /// # Response
