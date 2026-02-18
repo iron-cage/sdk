@@ -14,7 +14,7 @@
 use crate::error::ValidationError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json};
-use core::fmt::{Display, Debug, Formatter, Result as FmtResult};
+use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use core::time::Duration;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -408,7 +408,11 @@ impl IcTokenRateLimiter {
   /// Returning `window` avoids accessing `self` while the `MutexGuard` is alive.
   fn lock_and_sweep(
     &self,
-  ) -> (MutexGuard<'_, HashMap<String, Vec<Instant>>>, Instant, Duration) {
+  ) -> (
+    MutexGuard<'_, HashMap<String, Vec<Instant>>>,
+    Instant,
+    Duration,
+  ) {
     let now = Instant::now();
     let window = self.window; // copy before acquiring lock
     let mut map = self.failures.lock().unwrap_or_else(|e| {

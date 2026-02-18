@@ -26,7 +26,7 @@
 mod common;
 
 use axum::{
-  body::{Body},
+  body::Body,
   http::{Request, StatusCode},
 };
 use common::budget::{
@@ -271,20 +271,32 @@ async fn test_refresh_expired_ic_token() {
 
 /// JTI-1: Two tokens with same claims produce different JWT hashes
 ///
-/// # Edge Case (Pre-jti bug)
+/// ## Root Cause
+/// Without `jti`, two `IcTokenClaims::new()` calls in the same second with
+/// identical parameters produced identical JWTs (same HMAC-SHA256 payload →
+/// same signature → same SHA-256 hash). After regenerate, the new token's hash
+/// matched the old token's hash — the old (supposedly invalidated) token still
+/// passed the hash-check.
 ///
-/// Before jti was added, two `IcTokenClaims::new()` calls in the same second
-/// with identical parameters would produce identical JWTs (same HMAC-SHA256 payload
-/// → same signature → same SHA-256 hash). After regenerate, the new token's hash
-/// could match the old token's hash, so the old token would still pass hash-check.
+/// ## Why Not Caught Initially
+/// `IcTokenClaims` was designed without a uniqueness constraint. The risk is
+/// non-obvious because two token issuance's normally happen seconds apart. The
+/// same-second scenario only arises under automated testing or scripted regeneration.
 ///
-/// # Expected Behavior (Post-jti fix)
+/// ## Fix Applied
+/// Added `token_id: Uuid::new_v4()` (serialized as `jti`) to `IcTokenClaims::new()`.
+/// Each call now embeds a unique UUID v4 — even tokens issued in the same millisecond
+/// have different JWT strings and therefore different SHA-256 hashes.
 ///
-/// Each `IcTokenClaims::new()` generates a unique UUID v4 as `jti`, so even
-/// with identical parameters in the same second, the JWTs and their hashes differ.
+/// ## Prevention
+/// Any token claim struct using hash-based revocation must include a unique identifier
+/// (`jti` per RFC 7519 §4.1.7). Never rely solely on timestamps for token uniqueness
+/// in security-critical paths.
 ///
-/// # Risk
-/// HIGH - Without jti, regenerate would not invalidate old token in same-second scenario
+/// ## Pitfall to Avoid
+/// Do not remove `token_id` from `IcTokenClaims`. Without it, same-second regenerations
+/// silently produce colliding hashes, re-allowing revoked tokens to pass hash-check.
+// test_kind: bug_reproducer(issue-budget-009)
 #[tokio::test]
 async fn test_jti_guarantees_unique_token_hashes() {
   let manager = IcTokenManager::new("test_secret_for_jti".to_string());
@@ -337,15 +349,33 @@ async fn test_jti_guarantees_unique_token_hashes() {
 
 /// JTI-2: After regenerate, old token rejected by hash-check (end-to-end)
 ///
-/// # Scenario
+/// ## Root Cause
+/// Without `jti`, `regenerate_ic_token` could silently fail to invalidate the old
+/// token. If both the old and new tokens were issued in the same second with identical
+/// claims, their SHA-256 hashes were identical — the DB hash for the new token also
+/// matched the old token, defeating revocation entirely.
 ///
-/// 1. Agent receives IC Token A → hash stored in DB → handshake succeeds
-/// 2. Admin calls regenerate → IC Token B generated → new hash stored in DB
-/// 3. Agent tries handshake with OLD Token A → hash mismatch → 401 Unauthorized
-/// 4. Agent uses NEW Token B → hash matches → 200 OK
+/// ## Why Not Caught Initially
+/// An end-to-end regeneration test was missing. The `validate_ic_token_runtime`
+/// hash-check appeared correct in isolation, but the same-second hash collision
+/// scenario was untested. The failure mode requires two token operations within
+/// one second.
 ///
-/// # Risk
-/// CRITICAL - This is the core scenario that Task 001 fixes
+/// ## Fix Applied
+/// `jti` (`token_id: Uuid::new_v4()`) guarantees unique JWT strings regardless of
+/// issuance timing. After regeneration the new hash in the DB will never match any
+/// previously issued token — old tokens are always invalidated.
+///
+/// ## Prevention
+/// Always write end-to-end token lifecycle tests covering the regenerate path.
+/// Unit tests for individual validation steps are insufficient — test the full
+/// "issue → regenerate → verify old rejected, new accepted" cycle.
+///
+/// ## Pitfall to Avoid
+/// Do not test only the happy path after regeneration (new token accepted).
+/// Also explicitly assert that the OLD token is rejected — this is the core
+/// security property that `jti` guarantees.
+// test_kind: bug_reproducer(issue-budget-009)
 #[tokio::test]
 async fn test_regenerated_token_invalidates_old_token_via_hash_check() {
   let pool = setup_test_db().await;
@@ -463,17 +493,32 @@ async fn test_regenerated_token_invalidates_old_token_via_hash_check() {
 
 /// JTI-3: After revoke, re-issued token has different hash (not re-usable)
 ///
-/// # Scenario
+/// ## Root Cause
+/// Without `jti`, revoking Token A (NULL hash) then re-issuing Token B with the same
+/// claims in the same second produced Token B with the same SHA-256 hash as Token A.
+/// Storing Token B's hash in the DB then caused Token A to pass the hash-check —
+/// the revoked token silently "came back to life".
 ///
-/// 1. Agent has Token A → hash stored → works
-/// 2. Admin revokes → hash set to NULL → Token A rejected
-/// 3. Admin re-issues Token B (same claims) → new hash stored
-/// 4. Token A still rejected (hash mismatch, thanks to jti)
-/// 5. Token B accepted
+/// ## Why Not Caught Initially
+/// Revocation (NULL hash) was tested in isolation. The revoke+re-issue scenario —
+/// specifically with same-second timing — was absent from the test suite. The failure
+/// mode requires both operations to complete within one second.
 ///
-/// # Risk
-/// HIGH - Without jti, Token A and Token B could have identical hashes
-/// if generated in the same second, causing Token A to "come back to life"
+/// ## Fix Applied
+/// `jti` (`token_id: Uuid::new_v4()`) ensures Token A and Token B have different
+/// SHA-256 hashes even when issued in the same second. After re-issue, only Token B's
+/// new hash is stored — Token A's hash is permanently different, so it stays rejected.
+///
+/// ## Prevention
+/// Test revoke and re-issue as a combined operation, not in isolation. Verify:
+/// (1) revoked token rejected, (2) re-issued token accepted, (3) ORIGINAL revoked
+/// token still rejected after re-issue.
+///
+/// ## Pitfall to Avoid
+/// Do not assume that setting `ic_token_hash = NULL` provides permanent protection.
+/// When the hash is later replaced with a new token's hash, old tokens must still be
+/// rejected — this requires `jti` uniqueness, not NULL-guard logic alone.
+// test_kind: bug_reproducer(issue-budget-009)
 #[tokio::test]
 async fn test_revoke_then_reissue_old_token_stays_dead() {
   let pool = setup_test_db().await;
@@ -607,11 +652,7 @@ async fn test_revoke_then_reissue_old_token_stays_dead() {
 /// Helper: Create a lease via handshake for a test agent.
 ///
 /// Returns the `lease_id` string.
-async fn create_lease_via_handshake(
-  agent_id: i64,
-  ic_token: &str,
-  state: &BudgetState,
-) -> String {
+async fn create_lease_via_handshake(agent_id: i64, ic_token: &str, state: &BudgetState) -> String {
   let router = create_budget_router(state.clone()).await;
   let response = router
     .oneshot(
