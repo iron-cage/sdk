@@ -83,6 +83,7 @@ async fn test_emoji_in_model_name() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_emoji_test",
             "tokens": 1000,
@@ -177,6 +178,7 @@ async fn test_non_latin_characters() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_chinese_test",
             "tokens": 1000,
@@ -257,6 +259,7 @@ async fn test_zero_width_characters() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_\u{200B}test", // U+200B = zero-width space
             "tokens": 1000,
@@ -352,6 +355,7 @@ async fn test_rtl_override_attack() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_rtl_test",
             "tokens": 1000,

@@ -91,6 +91,7 @@ async fn test_cost_i64_max() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_i64_max_test",
             "tokens": 1000,
@@ -189,6 +190,7 @@ async fn test_cost_zero() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_zero_cost_test",
             "tokens": 1000,
@@ -454,6 +456,7 @@ async fn test_tokens_i64_max() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_tokens_max_test",
             "tokens": i64::MAX,
@@ -563,6 +566,7 @@ async fn test_lease_expiration_exact_timestamp() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_edge_timestamp_test",
             "tokens": 1000,

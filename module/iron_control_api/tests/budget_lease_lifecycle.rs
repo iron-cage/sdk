@@ -87,6 +87,7 @@ async fn test_report_on_expired_lease() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_expired_test",
           "tokens": 1000,
@@ -193,6 +194,7 @@ async fn test_report_on_revoked_lease() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_revoked_test",
           "tokens": 1000,
@@ -307,6 +309,7 @@ async fn test_multiple_reports_same_lease() {
           .body(Body::from(
             json!(
           {
+            "ic_token": ic_token.clone(),
             "lease_id": lease_id,
             "request_id": format!( "req_multi_{}", i ),
             "tokens": 500,
@@ -350,6 +353,7 @@ async fn test_multiple_reports_same_lease() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_multi_6",
           "tokens": 500,
@@ -439,6 +443,7 @@ async fn test_lease_budget_exhaustion() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_exhaustion_1",
           "tokens": 4500,
@@ -474,6 +479,7 @@ async fn test_lease_budget_exhaustion() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_exhaustion_2",
           "tokens": 1000,
@@ -579,6 +585,7 @@ async fn test_lease_renewal_workflow() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token.clone(),
           "lease_id": lease_1,
           "request_id": "req_renewal_1",
           "tokens": 2500,
@@ -720,6 +727,7 @@ async fn test_lease_renewal_workflow() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_1,
           "request_id": "req_old_lease_test",
           "tokens": 500,

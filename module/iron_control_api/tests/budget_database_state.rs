@@ -474,11 +474,15 @@ async fn test_handshake_with_insufficient_budget_for_lease() {
 #[tokio::test]
 async fn test_report_usage_with_nonexistent_lease() {
   let pool = setup_test_db().await;
+  seed_agent_with_budget(&pool, 119, 100_000_000).await;
+
   let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 119, &state.ic_token_manager).await;
 
   // Create usage report for non-existent lease
   let request_body = json!(
   {
+    "ic_token": ic_token,
     "lease_id": "lease_00000000-0000-0000-0000-000000000000",
     "request_id": "req_12345",
     "tokens": 1000,
@@ -551,6 +555,7 @@ async fn test_report_usage_on_expired_lease() {
   seed_agent_with_budget(&pool, 116, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 116, &state.ic_token_manager).await;
 
   // Create lease that expired 1 hour ago
   let now_ms = chrono::Utc::now().timestamp_millis();
@@ -566,6 +571,7 @@ async fn test_report_usage_on_expired_lease() {
   // Try to report usage on expired lease
   let request_body = json!(
   {
+    "ic_token": ic_token,
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 1000,
@@ -711,6 +717,7 @@ async fn test_report_usage_exceeding_lease_budget() {
   seed_agent_with_budget(&pool, 117, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 117, &state.ic_token_manager).await;
 
   // Create lease with $1.00 budget
   let lease_id = "lease_budget_test";
@@ -730,6 +737,7 @@ async fn test_report_usage_exceeding_lease_budget() {
   // Try to report $0.50 usage (exceeds remaining $0.10)
   let request_body = json!(
   {
+    "ic_token": ic_token,
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 5000,

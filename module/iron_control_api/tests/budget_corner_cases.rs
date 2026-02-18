@@ -290,7 +290,7 @@ async fn test_report_usage_negative_tokens() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
-        "ic_token": ic_token,
+        "ic_token": ic_token.clone(),
         "provider": "openai"
       })
       .to_string(),
@@ -312,6 +312,7 @@ async fn test_report_usage_negative_tokens() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
+        "ic_token": ic_token,
         "lease_id": lease_id,
         "request_id": "req_test_001",
         "tokens": -1000,  // NEGATIVE VALUE
@@ -380,7 +381,7 @@ async fn test_report_usage_negative_cost() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
-        "ic_token": ic_token,
+        "ic_token": ic_token.clone(),
         "provider": "openai"
       })
       .to_string(),
@@ -402,6 +403,7 @@ async fn test_report_usage_negative_cost() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
+        "ic_token": ic_token,
         "lease_id": lease_id,
         "request_id": "req_test_001",
         "tokens": 1000,
@@ -518,7 +520,7 @@ async fn test_report_usage_zero_cost_cached_response() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
-        "ic_token": ic_token,
+        "ic_token": ic_token.clone(),
         "provider": "openai"
       })
       .to_string(),
@@ -542,6 +544,7 @@ async fn test_report_usage_zero_cost_cached_response() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
+        "ic_token": ic_token,
         "lease_id": lease_id,
         "request_id": "req_cached_001",
         "tokens": 1000,       // Tokens used but cached
@@ -1151,6 +1154,7 @@ async fn test_cost_exactly_equals_remaining_budget() {
   let pool = setup_test_db().await;
   seed_agent_with_budget(&pool, 120, 100_000_000).await;
   let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 120, &state.ic_token_manager).await;
 
   // Create lease with $10.00 budget
   let lease_id = "lease_exact_boundary_test";
@@ -1170,6 +1174,7 @@ async fn test_cost_exactly_equals_remaining_budget() {
   // Report exactly $0.50 usage (exactly equals remaining)
   let router = create_budget_router(state.clone()).await;
   let request_body = json!({
+    "ic_token": ic_token,
     "lease_id": lease_id,
     "request_id": "req_boundary_test",
     "tokens": 500,

@@ -1,11 +1,12 @@
 //! IC Token security tests for Protocol 005 Budget endpoints
 //!
-//! Tests verify that budget endpoints properly validate IC Token expiration
-//! and reject requests with expired or invalid tokens.
+//! Tests verify that budget endpoints properly validate IC Token authentication
+//! and reject requests with expired, invalid, revoked, or cross-tenant tokens.
 //!
 //! # Authority
 //! - Protocol 005 specification: IC Token authentication requirement
 //! - Security best practices: Token expiration enforcement
+//! - PR review finding H-2: /report and /return must validate IC Token
 //!
 //! # Test Matrix
 //!
@@ -13,21 +14,28 @@
 //! |-----------|----------|-------------|-------------------|
 //! | `test_handshake_expired_ic_token` | /handshake | Expired | 401 Unauthorized |
 //! | `test_refresh_expired_ic_token` | /refresh | Expired | 401 Unauthorized |
-//!
-//! # Note
-//! The /report endpoint does NOT require IC Token authentication. It uses `lease_id`
-//! as the authentication credential. IC Token expiration testing is not applicable.
+//! | `test_report_rejects_missing_ic_token` | /report | Missing field | 400 Bad Request |
+//! | `test_report_rejects_invalid_ic_token` | /report | Bad signature | 401 Unauthorized |
+//! | `test_report_rejects_revoked_ic_token` | /report | Hash NULL | 401 Unauthorized |
+//! | `test_report_rejects_cross_tenant_lease` | /report | Valid but wrong agent | 403 Forbidden |
+//! | `test_return_rejects_missing_ic_token` | /return | Missing field | 400 Bad Request |
+//! | `test_return_rejects_invalid_ic_token` | /return | Bad signature | 401 Unauthorized |
+//! | `test_return_rejects_revoked_ic_token` | /return | Hash NULL | 401 Unauthorized |
+//! | `test_return_rejects_cross_tenant_lease` | /return | Valid but wrong agent | 403 Forbidden |
 
 mod common;
 
 use axum::{
-  body::Body,
+  body::{Body},
   http::{Request, StatusCode},
 };
 use common::budget::{
   create_budget_router, create_test_budget_state, seed_agent_with_budget, setup_test_db,
 };
-use iron_control_api::ic_token::{sha256_hash, IcTokenClaims, IcTokenManager};
+use iron_control_api::{
+  ic_token::{sha256_hash, IcTokenClaims, IcTokenManager},
+  routes::budget::BudgetState,
+};
 use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tower::ServiceExt;
@@ -593,5 +601,413 @@ async fn test_revoke_then_reissue_old_token_stays_dead() {
     response.status(),
     StatusCode::OK,
     "LOUD FAILURE: New Token B must be accepted"
+  );
+}
+
+/// Helper: Create a lease via handshake for a test agent.
+///
+/// Returns the `lease_id` string.
+async fn create_lease_via_handshake(
+  agent_id: i64,
+  ic_token: &str,
+  state: &BudgetState,
+) -> String {
+  let router = create_budget_router(state.clone()).await;
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "provider": "openai",
+            "provider_key_id": agent_id * 1000
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::OK,
+    "LOUD FAILURE: Handshake must succeed to create lease for test setup"
+  );
+
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+  json["lease_id"]
+    .as_str()
+    .expect("LOUD FAILURE: Handshake must return lease_id")
+    .to_string()
+}
+
+/// R-1: POST /api/budget/report rejects request with missing `ic_token` field
+///
+/// ## Root Cause
+/// Before H-2 fix, /report used only `lease_id` for auth. A revoked agent could
+/// continue reporting usage indefinitely using an old `lease_id`.
+///
+/// ## Why Not Caught Initially
+/// The endpoint was designed before IC Token runtime validation existed.
+/// Lease-based auth was considered sufficient.
+///
+/// ## Fix Applied
+/// Added `ic_token` field to `UsageReportRequest` with validation.
+///
+/// ## Prevention
+/// All Protocol 005 runtime endpoints must require IC Token as auth credential,
+/// not just resource identifiers (`lease_id` is a resource handle, not a credential).
+///
+/// ## Pitfall to Avoid
+/// Never treat resource IDs (`lease_id`, `request_id`) as authentication credentials.
+/// Always require a cryptographic token for auth, even when the resource ID is secret.
+#[tokio::test]
+async fn test_report_rejects_missing_ic_token() {
+  let pool = setup_test_db().await;
+  let agent_id = 600i64;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+  let router = create_budget_router(state).await;
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": "some-lease-id",
+            "request_id": "req-001",
+            "tokens": 100,
+            "cost_microdollars": 500,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::BAD_REQUEST,
+    "LOUD FAILURE: /report must return 400 when ic_token field is missing"
+  );
+}
+
+/// R-2: POST /api/budget/report rejects request with invalid IC Token signature
+#[tokio::test]
+async fn test_report_rejects_invalid_ic_token() {
+  let pool = setup_test_db().await;
+  let agent_id = 601i64;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+  let router = create_budget_router(state).await;
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": "not.a.valid.jwt",
+            "lease_id": "some-lease-id",
+            "request_id": "req-001",
+            "tokens": 100,
+            "cost_microdollars": 500,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "LOUD FAILURE: /report must return 401 for IC Token with invalid signature"
+  );
+}
+
+/// R-3: POST /api/budget/report rejects request with revoked IC Token (NULL hash)
+#[tokio::test]
+async fn test_report_rejects_revoked_ic_token() {
+  let pool = setup_test_db().await;
+  let agent_id = 602i64;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+
+  // Store token hash, then revoke it
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  sqlx::query("UPDATE agents SET ic_token_hash = NULL WHERE id = ?")
+    .bind(agent_id)
+    .execute(&pool)
+    .await
+    .expect("LOUD FAILURE: Should revoke IC token");
+
+  let router = create_budget_router(state).await;
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "lease_id": "some-lease-id",
+            "request_id": "req-001",
+            "tokens": 100,
+            "cost_microdollars": 500,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "LOUD FAILURE: /report must return 401 for revoked IC Token (NULL hash)"
+  );
+}
+
+/// R-4: POST /api/budget/report rejects cross-tenant lease access
+///
+/// The intruder agent cannot report usage for a lease that belongs to the lease owner,
+/// even if the intruder has a valid IC Token.
+#[tokio::test]
+async fn test_report_rejects_cross_tenant_lease() {
+  let pool = setup_test_db().await;
+  let lease_owner_id = 603i64;
+  let intruder_id = 604i64;
+  seed_agent_with_budget(&pool, lease_owner_id, 100_000_000).await;
+  seed_agent_with_budget(&pool, intruder_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+
+  // Create valid IC tokens for both agents
+  let owner_token =
+    common::budget::create_ic_token(&pool, lease_owner_id, &state.ic_token_manager).await;
+  let intruder_token =
+    common::budget::create_ic_token(&pool, intruder_id, &state.ic_token_manager).await;
+
+  // Lease owner does handshake to get a lease
+  let lease_id = create_lease_via_handshake(lease_owner_id, &owner_token, &state).await;
+
+  // Intruder tries to report usage on the owner's lease
+  let router = create_budget_router(state).await;
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/report")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": intruder_token,
+            "lease_id": lease_id,
+            "request_id": "req-001",
+            "tokens": 100,
+            "cost_microdollars": 500,
+            "model": "gpt-4",
+            "provider": "openai"
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "LOUD FAILURE: /report must return 403 when IC Token agent does not own the lease"
+  );
+}
+
+/// RT-1: POST /api/budget/return rejects request with missing `ic_token` field
+#[tokio::test]
+async fn test_return_rejects_missing_ic_token() {
+  let pool = setup_test_db().await;
+  let agent_id = 610i64;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+  let router = create_budget_router(state).await;
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/return")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "lease_id": "some-lease-id",
+            "spent_microdollars": 500
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::BAD_REQUEST,
+    "LOUD FAILURE: /return must return 400 when ic_token field is missing"
+  );
+}
+
+/// RT-2: POST /api/budget/return rejects request with invalid IC Token signature
+#[tokio::test]
+async fn test_return_rejects_invalid_ic_token() {
+  let pool = setup_test_db().await;
+  let agent_id = 611i64;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+  let router = create_budget_router(state).await;
+
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/return")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": "not.a.valid.jwt",
+            "lease_id": "some-lease-id",
+            "spent_microdollars": 500
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "LOUD FAILURE: /return must return 401 for IC Token with invalid signature"
+  );
+}
+
+/// RT-3: POST /api/budget/return rejects request with revoked IC Token (NULL hash)
+#[tokio::test]
+async fn test_return_rejects_revoked_ic_token() {
+  let pool = setup_test_db().await;
+  let agent_id = 612i64;
+  seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  sqlx::query("UPDATE agents SET ic_token_hash = NULL WHERE id = ?")
+    .bind(agent_id)
+    .execute(&pool)
+    .await
+    .expect("LOUD FAILURE: Should revoke IC token");
+
+  let router = create_budget_router(state).await;
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/return")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": ic_token,
+            "lease_id": "some-lease-id",
+            "spent_microdollars": 500
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::UNAUTHORIZED,
+    "LOUD FAILURE: /return must return 401 for revoked IC Token (NULL hash)"
+  );
+}
+
+/// RT-4: POST /api/budget/return rejects cross-tenant lease access
+///
+/// The intruder agent cannot return a lease that belongs to the lease owner.
+#[tokio::test]
+async fn test_return_rejects_cross_tenant_lease() {
+  let pool = setup_test_db().await;
+  let lease_owner_id = 613i64;
+  let intruder_id = 614i64;
+  seed_agent_with_budget(&pool, lease_owner_id, 100_000_000).await;
+  seed_agent_with_budget(&pool, intruder_id, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+
+  let owner_token =
+    common::budget::create_ic_token(&pool, lease_owner_id, &state.ic_token_manager).await;
+  let intruder_token =
+    common::budget::create_ic_token(&pool, intruder_id, &state.ic_token_manager).await;
+
+  // Lease owner does handshake to get a lease
+  let lease_id = create_lease_via_handshake(lease_owner_id, &owner_token, &state).await;
+
+  // Intruder tries to return the owner's lease
+  let router = create_budget_router(state).await;
+  let response = router
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/api/budget/return")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          json!({
+            "ic_token": intruder_token,
+            "lease_id": lease_id,
+            "spent_microdollars": 500
+          })
+          .to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    response.status(),
+    StatusCode::FORBIDDEN,
+    "LOUD FAILURE: /return must return 403 when IC Token agent does not own the lease"
   );
 }

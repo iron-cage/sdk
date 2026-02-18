@@ -172,7 +172,7 @@ async fn test_budget_invariant_after_report() {
         .uri("/api/budget/handshake")
         .header("content-type", "application/json")
         .body(Body::from(
-          json!({ "ic_token": ic_token, "provider": "openai" }).to_string(),
+          json!({ "ic_token": ic_token.clone(), "provider": "openai" }).to_string(),
         ))
         .unwrap(),
     )
@@ -196,6 +196,7 @@ async fn test_budget_invariant_after_report() {
   // Report usage
   let cost_microdollars = 2_000_000i64; // $2 USD
   let request_body = json!({
+    "ic_token": ic_token,
     "lease_id": lease_id,
     "request_id": "req_invariant_test",
     "tokens": 1000,

@@ -158,7 +158,7 @@ async fn test_concurrent_usage_reports_on_same_lease() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
-        "ic_token": ic_token,
+        "ic_token": ic_token.clone(),
         "provider": "openai"
       })
       .to_string(),
@@ -179,6 +179,7 @@ async fn test_concurrent_usage_reports_on_same_lease() {
   for _ in 0..2 {
     let app_clone = app.clone();
     let lease_id_clone = lease_id.clone();
+    let ic_token_clone = ic_token.clone();
 
     let handle = tokio::spawn(async move {
       let request = Request::builder()
@@ -187,6 +188,7 @@ async fn test_concurrent_usage_reports_on_same_lease() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token_clone,
             "lease_id": lease_id_clone,
             "request_id": "req_test_001",
             "tokens": 1000,
@@ -282,6 +284,7 @@ async fn test_concurrent_report_and_refresh() {
   // Launch concurrent report and refresh
   let app_report = app.clone();
   let lease_id_report = lease_id.clone();
+  let ic_token_report = ic_token.clone();
   let report_handle = tokio::spawn(async move {
     let request = Request::builder()
       .method("POST")
@@ -289,6 +292,7 @@ async fn test_concurrent_report_and_refresh() {
       .header("content-type", "application/json")
       .body(Body::from(
         json!({
+          "ic_token": ic_token_report,
           "lease_id": lease_id_report,
           "request_id": "req_test_concurrent",
           "tokens": 500,

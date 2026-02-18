@@ -121,6 +121,7 @@ fn test_handshake_request_validation() {
 fn test_usage_report_request_validation() {
   // Valid request
   let valid_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
@@ -132,6 +133,7 @@ fn test_usage_report_request_validation() {
 
   // Empty lease_id
   let empty_lease_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: String::new(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
@@ -143,6 +145,7 @@ fn test_usage_report_request_validation() {
 
   // Negative tokens
   let negative_tokens_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: -100,
@@ -154,6 +157,7 @@ fn test_usage_report_request_validation() {
 
   // Zero tokens
   let zero_tokens_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 0,
@@ -165,6 +169,7 @@ fn test_usage_report_request_validation() {
 
   // Negative cost
   let negative_cost_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,

@@ -558,6 +558,7 @@ async fn test_revoked_lease_usage_reporting() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
+        "ic_token": ic_token,
         "lease_id": lease_id,
         "request_id": "req_test_001",
         "tokens": 150,
@@ -634,6 +635,7 @@ async fn test_sql_injection_in_model_name() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
+        "ic_token": ic_token,
         "lease_id": lease_id,
         "request_id": "req_test_sql_injection",
         "tokens": 150,
@@ -948,6 +950,7 @@ async fn test_return_on_revoked_lease() {
     .header("content-type", "application/json")
     .body(Body::from(
       json!({
+        "ic_token": ic_token,
         "lease_id": lease_id,
         "spent_usd": 5.0
       })
@@ -1111,6 +1114,7 @@ async fn test_sql_injection_in_lease_id() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": malicious_lease_id,
             "request_id": "req_sql_injection_test",
             "tokens": 1000,
@@ -1207,6 +1211,7 @@ async fn test_xss_in_model_parameter() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_xss_test",
             "tokens": 1000,
