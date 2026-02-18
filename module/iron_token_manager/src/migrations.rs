@@ -40,7 +40,7 @@ use crate::error::Result;
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-013, skipping 007).
+/// Migrations are applied in order (001-023, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -326,7 +326,6 @@ async fn apply_migration_008( pool: &SqlitePool ) -> Result< () >
 
 
 /// Migration 009: Budget leases (Protocol 005)
-#[ allow( dead_code ) ]
 async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -350,7 +349,6 @@ async fn apply_migration_009( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 010: Agent budgets (Protocol 005)
-#[ allow( dead_code ) ]
 async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -374,7 +372,6 @@ async fn apply_migration_010( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 011: Budget requests (Protocol 012)
-#[ allow( dead_code ) ]
 async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -398,7 +395,6 @@ async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 012: Budget history (Protocol 012)
-#[ allow( dead_code ) ]
 async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -421,11 +417,10 @@ async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 013: Add FK constraint from `api_tokens` to users (Protocol 014)
+/// Migration 013: Budget modification history table (Protocol 017)
 ///
-/// Rebuilds `api_tokens` table with foreign key constraint to users table.
-/// Implements IMPOSSIBLE STATE: "Cannot create token without valid `user_id` (FK constraint fails)"
-#[ allow( dead_code ) ]
+/// Creates `budget_modification_history` table for tracking all budget changes.
+/// Records who changed what budget, by how much, and why.
 async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -448,11 +443,10 @@ async fn apply_migration_013( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 014: Add `owner_id` to agents table
+/// Migration 014: Add FK constraint from `api_tokens` to users (Protocol 014)
 ///
-/// Adds user ownership to agents table for multi-tenant isolation.
-/// Implements authorization requirement: users can only access their own agents.
-#[ allow( dead_code ) ]
+/// Rebuilds `api_tokens` table with foreign key constraint to users table.
+/// Implements IMPOSSIBLE STATE: "Cannot create token without valid `user_id` (FK constraint fails)"
 async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -475,15 +469,10 @@ async fn apply_migration_014( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 015: Add `revoked_at` timestamp to `api_tokens`
+/// Migration 015: Add `owner_id` to agents table
 ///
-/// Adds timestamp to distinguish explicit revocations from rotations.
-/// Fixes concurrency race condition where revoke returns wrong status code.
-///
-/// Fix(issue-TBD): Enable distinguishing revoked (409) vs rotated (404) tokens
-/// Root cause: `is_active` flag alone cannot distinguish revocation reason
-/// Pitfall: Without this field, concurrent rotate+revoke returns wrong status
-#[ allow( dead_code ) ]
+/// Adds user ownership to agents table for multi-tenant isolation.
+/// Implements authorization requirement: users can only access their own agents.
 async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -506,13 +495,14 @@ async fn apply_migration_015( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 016: Add lease return columns (Protocol 005)
+/// Migration 016: Add `revoked_at` timestamp to `api_tokens`
 ///
-/// Adds columns to `budget_leases` for tracking lease returns:
-/// - `returned_amount`: USD returned when lease closed
-/// - `closed_at`: Timestamp when lease was closed
-/// - `updated_at`: Last activity timestamp for stale detection
-#[ allow( dead_code ) ]
+/// Adds timestamp to distinguish explicit revocations from rotations.
+/// Fixes concurrency race condition where revoke returns wrong status code.
+///
+/// Fix(issue-TBD): Enable distinguishing revoked (409) vs rotated (404) tokens
+/// Root cause: `is_active` flag alone cannot distinguish revocation reason
+/// Pitfall: Without this field, concurrent rotate+revoke returns wrong status
 async fn apply_migration_016( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -535,8 +525,12 @@ async fn apply_migration_016( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 017: Create `system_config` table and seed development data
-#[ allow( dead_code ) ]
+/// Migration 017: Add lease return columns (Protocol 005)
+///
+/// Adds columns to `budget_leases` for tracking lease returns:
+/// - `returned_amount`: USD returned when lease closed
+/// - `closed_at`: Timestamp when lease was closed
+/// - `updated_at`: Last activity timestamp for stale detection
 async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
 {
   // Check if migration has already run using the guard table pattern
@@ -564,7 +558,6 @@ async fn apply_migration_017( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 018: Create `system_config` table and seed development data
-#[ allow( dead_code ) ]
 async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
 {
   // Check if migration has already run using the guard table pattern
@@ -594,7 +587,6 @@ async fn apply_migration_018( pool: &SqlitePool ) -> Result< () >
 }
 
 /// Migration 019: Convert budget columns from REAL (USD) to INTEGER (microdollars)
-#[ allow( dead_code ) ]
 async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
 {
   // Check if migration has already run using the guard table pattern
@@ -628,7 +620,6 @@ async fn apply_migration_019( pool: &SqlitePool ) -> Result< () >
 ///
 /// Adds FK from agents to `ai_provider_keys` for provider key assignment.
 /// Each agent can have one assigned provider key.
-#[ allow( dead_code ) ]
 async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -661,7 +652,6 @@ async fn apply_migration_020( pool: &SqlitePool ) -> Result< () >
 /// - `failed_login_count`: Counter for consecutive failed login attempts
 /// - `last_failed_login`: Timestamp of most recent failed login
 /// - `locked_until`: Timestamp when account lockout expires
-#[ allow( dead_code ) ]
 async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -722,7 +712,6 @@ async fn apply_migration_021( pool: &SqlitePool ) -> Result< () >
 /// Adds columns for IC token storage metadata:
 /// - `ic_token_hash` (TEXT)
 /// - `ic_token_created_at` (INTEGER)
-#[ allow( dead_code ) ]
 async fn apply_migration_022( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
@@ -753,7 +742,6 @@ async fn apply_migration_022( pool: &SqlitePool ) -> Result< () >
 ///
 /// Sets `ic_token_hash`/`ic_token_created_at` for `agent_1` using the pre-generated dev IC token
 /// from migration 018. Safe to run multiple times (only updates when hash is NULL).
-#[ allow( dead_code ) ]
 async fn apply_migration_023( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
