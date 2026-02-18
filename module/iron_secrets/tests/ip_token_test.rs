@@ -186,3 +186,95 @@ fn empty_key_returns_error() {
   let err = IpTokenCrypto::new(&[]).unwrap_err();
   assert_eq!(err, IpTokenError::InvalidKeyLength);
 }
+
+/// Reproduces Bug: encrypted IP Token passed verbatim as provider API key (issue-001).
+///
+/// ## Root Cause
+/// `key_fetcher.rs` had `None => data.ip_token` in the decryption match arm.
+/// When `IP_TOKEN_KEY` env var was absent, `ip_token_crypto` was `None`, causing the
+/// `AES256:{IV}:{ciphertext}:{tag}` string to be forwarded directly to OpenAI/Anthropic
+/// as the provider API key.
+///
+/// ## Why Not Caught Initially
+/// The encryption and decryption paths were tested in isolation via unit tests.
+/// No test verified the shape of an encrypted token against valid provider key formats,
+/// so the silent fallback (`None => raw_ciphertext`) went undetected.
+///
+/// ## Fix Applied
+/// The `None` arm in `key_fetcher.rs` now returns `Err(LlmRouterError::KeyFetch(...))`.
+/// See `key_fetcher.rs` Fix(issue-001) comment at the match site.
+///
+/// ## Prevention
+/// Any conditional decryption path must fail-loud when the key is absent.
+/// Never use `None => raw_value` for security-critical data — use `None => Err(...)`.
+///
+/// ## Pitfall to Avoid
+/// `Option<Crypto>` with a `None => value` fallback is a fail-open pattern.
+/// The encrypted string is syntactically valid UTF-8, so the compiler will not warn —
+/// the bug produces a runtime 401, not a type error.
+// test_kind: bug_reproducer(issue-001)
+#[test]
+fn encrypted_token_is_not_a_valid_provider_api_key() {
+  let crypto = IpTokenCrypto::new(&test_key()).unwrap();
+  let ip_token = crypto.encrypt("sk-proj-real-openai-key").unwrap();
+
+  // The ciphertext starts with "AES256:" — not a valid provider key format.
+  // Before the fix this string was sent to OpenAI/Anthropic, causing 401.
+  assert!(
+    ip_token.starts_with("AES256:"),
+    "Encrypted token must have AES256: prefix, confirming it is ciphertext, not an API key"
+  );
+  assert!(
+    !ip_token.starts_with("sk-"),
+    "Encrypted token must NOT look like a provider API key"
+  );
+
+  // The only correct action is to decrypt — never use the raw token as a key.
+  let plaintext = crypto.decrypt(&ip_token).unwrap();
+  assert_eq!(plaintext.as_str(), "sk-proj-real-openai-key");
+}
+
+/// Reproduces Bug: missing `IP_TOKEN_KEY` caused silent ciphertext passthrough (issue-002).
+///
+/// ## Root Cause
+/// `budget_client.rs` had `None => data.ip_token` in the decryption match arm.
+/// When `IP_TOKEN_KEY` was absent, the handshake appeared to succeed but the agent
+/// received `AES256:{IV}:{ciphertext}:{tag}` as its API key, failing every LLM call.
+///
+/// ## Why Not Caught Initially
+/// The handshake returned HTTP 200 — the failure only surfaced on the first LLM request
+/// (401 from the provider). No test verified that the decrypted key is structurally
+/// different from the encrypted token, so the ticking-time-bomb went undetected.
+///
+/// ## Fix Applied
+/// The `None` arm in `budget_client.rs` now returns `Err(BudgetClientError::IpTokenDecrypt(...))`.
+/// See `budget_client.rs` Fix(issue-002) comment at the match site.
+///
+/// ## Prevention
+/// Validate that the decrypted result does not contain the encryption prefix.
+/// Fail at startup (or at handshake time) — not silently at the first LLM call.
+///
+/// ## Pitfall to Avoid
+/// A successful handshake HTTP 200 does not guarantee the API key is usable.
+/// Decrypt and validate the key format immediately after receiving it.
+// test_kind: bug_reproducer(issue-002)
+#[test]
+fn decrypted_key_does_not_contain_ciphertext_prefix() {
+  let crypto = IpTokenCrypto::new(&test_key()).unwrap();
+  let original_key = "sk-ant-api03-real-anthropic-key";
+
+  let ip_token = crypto.encrypt(original_key).unwrap();
+  let decrypted = crypto.decrypt(&ip_token).unwrap();
+
+  // After correct decryption — no AES256: prefix, the plaintext key is recovered.
+  // Before the fix, the `None` fallback arm bypassed this step entirely.
+  assert!(
+    !decrypted.as_str().starts_with("AES256:"),
+    "Decrypted key must NOT contain the ciphertext prefix — it must be the plaintext key"
+  );
+  assert_eq!(
+    decrypted.as_str(),
+    original_key,
+    "Decrypted key must exactly match the original plaintext key"
+  );
+}
