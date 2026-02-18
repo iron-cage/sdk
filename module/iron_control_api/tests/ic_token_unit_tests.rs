@@ -22,9 +22,14 @@
 //! - Different tokens are rate-limited independently
 //! - Mutex poisoning is recovered gracefully
 //!
+//! ## `IcTokenManager` Debug redaction (C-1)
+//! - `{:?}` output must not contain the actual HMAC signing secret
+//! - `{:?}` output must contain `<redacted>` in place of the secret field
+//!
 //! # Authority
 //! - PR #44 review findings: H4, M2, M6
 //! - PR review findings: GAP-1
+//! - PR review finding: C-1 (HMAC secret leak via auto-derived Debug)
 
 mod common;
 
@@ -40,8 +45,6 @@ use uuid::Uuid;
 use iron_control_api::ic_token::{
   sha256_hash, IcTokenClaims, IcTokenManager, IcTokenRateLimiter, IcTokenRuntimeError,
 };
-
-// Helpers
 
 /// Minimal agents table — columns needed by `validate_ic_token_runtime` + required NOT NULL columns
 async fn setup_minimal_db() -> SqlitePool {
@@ -159,8 +162,6 @@ async fn test_validate_runtime_invalid_jwt() {
   );
 }
 
-// validate_ic_token_runtime: InvalidAgentId
-//
 // Note: agent_id without "agent_" prefix is caught by verify_token → claims.validate()
 // and surfaces as InvalidToken (defense in depth — validate() checks format first).
 // InvalidAgentId is reachable only for agent_id that passes prefix check but fails
@@ -208,8 +209,6 @@ async fn test_validate_runtime_invalid_agent_id_negative() {
     "LOUD FAILURE: Negative agent_id must return InvalidAgentId, got: {result:?}"
   );
 }
-
-// validate_ic_token_runtime: TokenInactive
 
 #[tokio::test]
 async fn test_validate_runtime_agent_not_found() {
@@ -265,8 +264,6 @@ async fn test_validate_runtime_token_rotated() {
   );
 }
 
-// validate_ic_token_runtime: DatabaseError (H4)
-
 #[tokio::test]
 async fn test_validate_runtime_database_error() {
   let pool = setup_minimal_db().await;
@@ -284,8 +281,6 @@ async fn test_validate_runtime_database_error() {
     "LOUD FAILURE: Closed database pool must return DatabaseError, got: {result:?}"
   );
 }
-
-// validate_ic_token_runtime: success (happy path)
 
 #[tokio::test]
 async fn test_validate_runtime_success() {
@@ -413,9 +408,6 @@ fn test_rate_limiter_different_tokens_are_independent() {
   );
 }
 
-// ── concurrent access ─────────────────────────────────────────────────────────
-
-// Note: testing mutex poisoning recovery directly requires access to the private
 // `failures: Arc<Mutex<...>>` field, which is only possible in a unit test inside
 // the same source module. The recovery path (`unwrap_or_else(|e| e.into_inner())`
 // in `lock_and_sweep`) is exercised indirectly here: if concurrent access were
@@ -446,5 +438,51 @@ fn test_rate_limiter_concurrent_access_is_safe() {
   assert!(
     limiter.check(OTHER_TOKEN).is_err(),
     "LOUD FAILURE: OTHER_TOKEN must be rate-limited after concurrent failures"
+  );
+}
+
+/// HMAC signing secret must not appear in `Debug` output of `IcTokenManager`.
+///
+/// ## Root Cause
+/// `#[derive(Debug)]` auto-generates a `Debug` impl that prints every field,
+/// including `secret: String`. Any `{:?}` formatting — in tracing macros,
+/// `unwrap()`/`expect()` panics, or test output — leaked the raw HMAC-SHA256
+/// key, allowing an attacker who reads logs to forge arbitrary IC Tokens.
+///
+/// ## Why Not Caught Initially
+/// `#[derive(Debug)]` is the default Rust idiom and feels harmless on plain
+/// structs. The risk is non-obvious unless the struct holds a cryptographic
+/// secret. No linter catches this automatically.
+///
+/// ## Fix Applied
+/// Removed `#[derive(Debug)]` from `IcTokenManager` and replaced it with a
+/// manual `impl core::fmt::Debug` that substitutes the `secret` field value
+/// with the literal string `"<redacted>"`.
+///
+/// ## Prevention
+/// Any struct with a field that holds a key, password, or token must use a
+/// manual `Debug` impl (or a wrapper type like `secrecy::Secret<T>`) rather
+/// than the auto-derived one.
+///
+/// ## Pitfall to Avoid
+/// Do not restore `#[derive(Debug)]` on `IcTokenManager` — even for
+/// "debugging convenience". Use targeted logging of non-sensitive fields
+/// instead, e.g. `tracing::debug!(agent_id = %..., "IcTokenManager used")`.
+#[test]
+fn test_ic_token_manager_debug_redacts_secret() {
+  let secret = "super_secret_hmac_key_for_test";
+  let manager = IcTokenManager::new(secret.to_string());
+
+  let debug_output = format!("{manager:?}");
+
+  assert!(
+    !debug_output.contains(secret),
+    "LOUD FAILURE: IcTokenManager Debug output must NOT contain the raw secret. \
+     Got: {debug_output}"
+  );
+  assert!(
+    debug_output.contains("<redacted>"),
+    "LOUD FAILURE: IcTokenManager Debug output must contain '<redacted>' in place of secret. \
+     Got: {debug_output}"
   );
 }

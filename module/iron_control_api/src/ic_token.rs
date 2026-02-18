@@ -14,7 +14,7 @@
 use crate::error::ValidationError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json};
-use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::fmt::{Display, Debug, Formatter, Result as FmtResult};
 use core::time::Duration;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -187,9 +187,16 @@ impl IcTokenClaims {
 }
 
 /// IC Token manager for generating and validating IC Tokens
-#[derive(Debug)]
 pub struct IcTokenManager {
   secret: String,
+}
+
+impl Debug for IcTokenManager {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    f.debug_struct("IcTokenManager")
+      .field("secret", &"<redacted>")
+      .finish()
+  }
 }
 
 impl IcTokenManager {

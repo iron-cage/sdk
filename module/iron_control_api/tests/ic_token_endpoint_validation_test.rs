@@ -14,7 +14,7 @@
 //! | Valid token                      | `Ok(agent_id)`  | no                |
 //!
 //! Database errors must NOT increment the rate limiter — the failure is on
-//! the server side, not the client's fault. Counting them would allow a DoS
+//! the server side, not the client's fault. Counting them would allow a `DoS`
 //! attack via error amplification.
 //!
 //! # Authority
