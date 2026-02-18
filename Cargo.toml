@@ -380,6 +380,14 @@ version = "0.18"
 [workspace.dependencies.subtle]
 version = "2.6"
 
+## Build Dependencies
+
+[workspace.dependencies.vergen]
+version = "9.1"
+
+[workspace.dependencies.vergen-gitcl]
+version = "9.1"
+
 ## Dev Dependencies
 
 [workspace.dependencies.tempfile]
@@ -403,3 +411,6 @@ version = "0.6.5"
 
 [workspace.dependencies.tokio-test]
 version = "0.4"
+
+[workspace.dependencies.walkdir]
+version = "2.4"
