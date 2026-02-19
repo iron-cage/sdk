@@ -12,7 +12,7 @@
 //! | `test_production_schema_matches_test_schema` | Schema consistency | Compare production vs test | Identical table/index structure | ✅ |
 //! | `test_seed_data_is_idempotent` | Multiple seed runs | Run seed script 3x | Same data, no duplicates | ✅ |
 //! | `test_temp_databases_cleanup` | Resource cleanup | Create test DB, drop handle | Database file deleted | ✅ |
-//! | `test_all_migrations_have_guards` | Migration safety | Check migrations 002-008 | All have guard tables | ✅ |
+//! | `test_all_migrations_have_guards` | Migration safety | Check migrations 002-023 | All have guard tables | ✅ |
 //! | `test_foreign_keys_enabled` | Schema enforcement | Create test DB | PRAGMA `foreign_keys` = ON | ✅ |
 //! | `test_seed_data_token_hashes_valid` | Token hash validation | Run seed script | Token hashes match SHA-256 | ✅ |
 //!

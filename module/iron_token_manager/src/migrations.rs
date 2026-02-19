@@ -394,7 +394,7 @@ async fn apply_migration_011( pool: &SqlitePool ) -> Result< () >
   Ok( () )
 }
 
-/// Migration 012: Budget history (Protocol 012)
+/// Migration 012: Analytics events table (Protocol 012)
 async fn apply_migration_012( pool: &SqlitePool ) -> Result< () >
 {
   let completed: i64 = query_scalar(
