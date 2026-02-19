@@ -29,6 +29,34 @@ const TAG_SIZE: usize = 16;
 /// Key size for AES-256 (256 bits = 32 bytes)
 const KEY_SIZE: usize = 32;
 
+/// Provider API key returned after IP Token decryption.
+///
+/// Canonical definition shared by `iron_runtime` (`KeyFetcher`) and `iron_cost` (`BudgetClient`).
+/// Defined here because IP Token decryption is the only source of `ProviderKey` values.
+#[derive(Clone, Debug)]
+pub struct ProviderKey {
+  /// Provider type: "openai" or "anthropic"
+  pub provider: String,
+  /// The actual API key (zeroed on drop)
+  pub api_key: Zeroizing<String>,
+  /// Optional custom base URL for the provider
+  pub base_url: Option<String>,
+}
+
+impl ProviderKey {
+  /// Detect provider type from API key format.
+  ///
+  /// `sk-ant-*` keys identify Anthropic; all other formats default to `OpenAI`.
+  #[must_use]
+  pub fn detect_provider_from_key(api_key: &str) -> &'static str {
+    if api_key.starts_with("sk-ant-") {
+      "anthropic"
+    } else {
+      "openai"
+    }
+  }
+}
+
 /// IP Token crypto manager
 ///
 /// Encrypts and decrypts provider API keys using AES-256-GCM.

@@ -6,15 +6,16 @@
 //! - Refresh: Request more budget when running low
 //! - Return: Return unused budget on shutdown
 
-use crate::budget::{CostController, Reservation};
-use crate::error::CostError;
-use iron_secrets::ip_token::IpTokenCrypto;
+use core::time::Duration;
+use std::sync::Arc;
+
+use iron_secrets::ip_token::{IpTokenCrypto, ProviderKey};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::RwLock;
-use zeroize::Zeroizing;
+
+use crate::budget::{CostController, Reservation};
+use crate::error::CostError;
 
 /// Errors that can occur in budget client operations
 #[derive(Debug)]
@@ -78,17 +79,6 @@ impl From<serde_json::Error> for BudgetClientError {
   fn from(e: serde_json::Error) -> Self {
     Self::JsonError(e)
   }
-}
-
-/// Provider API key information
-#[derive(Debug, Clone)]
-pub struct ProviderKey {
-  /// Provider type: "openai" or "anthropic"
-  pub provider: String,
-  /// The actual API key (decrypted)
-  pub api_key: Zeroizing<String>,
-  /// Optional custom base URL for the provider
-  pub base_url: Option<String>,
 }
 
 /// Lease state from dashboard

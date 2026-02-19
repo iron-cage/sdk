@@ -1,34 +1,14 @@
 //! Fetch and cache provider API keys from Iron Cage server
 
-use crate::llm_router::error::LlmRouterError;
-use iron_secrets::ip_token::IpTokenCrypto;
-use reqwest::Client;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use reqwest::Client;
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-/// Provider key information returned from Iron Cage server
-#[derive(Clone, Debug)]
-pub struct ProviderKey {
-  /// Provider type: "openai" or "anthropic"
-  pub provider: String,
-  /// The actual API key (e.g., sk-xxx for OpenAI)
-  pub api_key: Zeroizing<String>,
-  /// Optional custom base URL for the provider
-  pub base_url: Option<String>,
-}
-
-impl ProviderKey {
-  /// Auto-detect provider from API key format
-  pub fn detect_provider_from_key(api_key: &str) -> &'static str {
-    if api_key.starts_with("sk-ant-") {
-      "anthropic"
-    } else {
-      "openai" // Default to OpenAI for sk-* and other formats
-    }
-  }
-}
+use crate::llm_router::error::LlmRouterError;
+use iron_secrets::ip_token::{IpTokenCrypto, ProviderKey};
 
 /// Cached key entry
 struct CachedKey {
