@@ -391,7 +391,7 @@ version = "9.1"
 ## Dev Dependencies
 
 [workspace.dependencies.tempfile]
-version = "3.0"
+version = "3.8"
 
 [workspace.dependencies.hyper]
 version = "1.5"
@@ -412,5 +412,11 @@ version = "0.6.5"
 [workspace.dependencies.tokio-test]
 version = "0.4"
 
+[workspace.dependencies.serial_test]
+version = "3.2"
+
 [workspace.dependencies.walkdir]
 version = "2.4"
+
+[workspace.dependencies.criterion]
+version = "0.8"

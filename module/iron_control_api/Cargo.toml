@@ -123,8 +123,8 @@ hyper = { workspace = true }
 http-body-util = { workspace = true }
 sha2 = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
-serial_test = "3.2.0"
-tempfile = "3.8"
+serial_test = { workspace = true }
+tempfile = { workspace = true }
 reqwest = { workspace = true }
 walkdir = { workspace = true }
 
