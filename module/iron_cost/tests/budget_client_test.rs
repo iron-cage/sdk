@@ -8,7 +8,7 @@
 //! | Test | Scenario | Expected |
 //! |------|----------|----------|
 //! | `budget_client_handshake_decrypts_encrypted_ip_token` | Server returns encrypted token, key present | Decrypted plaintext key in `get_provider_key()` |
-//! | `budget_client_handshake_fails_loudly_when_ip_token_key_absent` | Server returns encrypted token, key absent | `Err` with clear message |
+//! | `budget_client_build_fails_loudly_when_ip_token_key_absent` | Key absent, no server needed | `Err` at `build()` with clear message |
 
 #![cfg(feature = "budget-client")]
 #![allow(missing_docs)]
@@ -86,39 +86,34 @@ async fn budget_client_handshake_decrypts_encrypted_ip_token() {
 /// directly, bypassing the `handshake()` decryption arm entirely.
 ///
 /// ## Fix Applied
-/// The `None` arm in `budget_client.rs:handshake()` now returns
-/// `Err(BudgetClientError::IpTokenDecrypt("IP_TOKEN_KEY not configured ..."))`,
-/// surfacing misconfiguration at handshake time instead of at the first LLM call.
+/// `BudgetClient::new()` now returns `Err(BudgetClientError::IpTokenDecrypt(...))` immediately
+/// when `ip_token_key` is absent, catching misconfiguration at construction time before the
+/// proxy binds its port or accepts any traffic.
 ///
 /// ## Prevention
-/// Every `BudgetClientBuilder` must set `ip_token_key`. Tests must cover both `Some(key)`
-/// and `None` paths through `handshake()`. A successful handshake must not be trusted
-/// without verifying that the decrypted API key is structurally valid.
+/// Every `BudgetClientBuilder` must set `ip_token_key`. The error is surfaced at `build()`,
+/// not at `handshake()` or at the first LLM call. Tests must assert `build()` fails, not `handshake()`.
 ///
 /// ## Pitfall to Avoid
-/// HTTP 200 from `handshake()` does not guarantee the provider key is usable.
-/// Before the fix, the handshake succeeded while storing an unusable ciphertext as the API key —
-/// the failure only appeared on the first LLM request as a 401 from the provider.
+/// The previous guard was in `handshake()` — the client could be constructed successfully and
+/// take a request before the misconfiguration was detected. Moving the check to `new()` ensures
+/// zero requests are accepted before the error surfaces.
 // test_kind: bug_reproducer(issue-002)
-#[tokio::test]
-async fn budget_client_handshake_fails_loudly_when_ip_token_key_absent() {
-  let crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
-  let encrypted = crypto.encrypt("sk-secret-key").unwrap();
+#[test]
+fn budget_client_build_fails_loudly_when_ip_token_key_absent() {
+  let result = BudgetClientBuilder::new()
+    .server_url("http://not-used") // build() fails before any network I/O
+    .ic_token("test-ic-token")
+    .provider("openai")
+    // No ip_token_key — must fail loudly at build, not silently at LLM call
+    .build();
 
-  let server_url = start_mock_handshake_server(encrypted).await;
-
-  let client = BudgetClientBuilder::new()
-    .server_url(server_url)
-    .ic_token("test-ic-token".to_string())
-    .provider("openai".to_string())
-    // No ip_token_key — must fail loudly at handshake, not silently at LLM call
-    .build()
-    .unwrap();
-
-  let result = client.handshake().await;
-  assert!(result.is_err(), "Handshake must fail when IP_TOKEN_KEY is absent");
+  let err = match result {
+    Err(e) => e,
+    Ok(_) => panic!("BudgetClient::new() must fail when IP_TOKEN_KEY is absent"),
+  };
   assert!(
-    result.unwrap_err().to_string().contains("IP_TOKEN_KEY not configured"),
+    err.to_string().contains("IP_TOKEN_KEY not configured"),
     "Error message must identify the missing IP_TOKEN_KEY"
   );
 }

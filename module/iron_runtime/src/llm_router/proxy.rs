@@ -74,6 +74,13 @@ pub async fn run_proxy(
   config: ProxyConfig,
   shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), LlmRouterError> {
+  // Startup validation: IP_TOKEN_KEY is required when not using a static provider key
+  if config.provider_key.is_none() && config.ip_token_key.is_none() {
+    return Err(LlmRouterError::ServerStart(
+      "IP_TOKEN_KEY must be configured when using Iron Cage server key fetching".into(),
+    ));
+  }
+
   // Create key fetcher - static if provider_key given, otherwise fetch from server
   let key_fetcher = Arc::new(if let Some(ref pk) = config.provider_key {
     KeyFetcher::new_static(pk.clone(), None)

@@ -220,6 +220,14 @@ pub struct BudgetClient {
 impl BudgetClient {
   /// Create a new budget client (does not perform handshake)
   pub fn new(config: BudgetClientConfig) -> Result<Self, BudgetClientError> {
+    // Startup validation: IP_TOKEN_KEY is required — without it every handshake will fail.
+    // Catching this at construction time prevents taking traffic before the error surfaces.
+    if config.ip_token_key.is_none() {
+      return Err(BudgetClientError::IpTokenDecrypt(
+        "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),
+      ));
+    }
+
     let http_client = Client::builder().timeout(config.timeout).build()?;
 
     // Start with 0 budget - will be set after handshake
