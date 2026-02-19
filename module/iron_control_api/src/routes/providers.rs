@@ -3,11 +3,11 @@
 //! Endpoints:
 //! - POST /api/providers - Create new provider key
 //! - GET /api/providers - List all provider keys for user
-//! - GET /api/providers/{id} - Get specific provider key details
-//! - PUT /api/providers/{id} - Update provider key
-//! - DELETE /api/providers/{id} - Delete provider key
-//! - POST /api/providers/{id}/balance - Fetch balance from provider API
-//! - POST /api/projects/{project_id}/provider - Assign provider key to project
+//! - GET /api/providers/:id - Get specific provider key details
+//! - PUT /api/providers/:id - Update provider key
+//! - DELETE /api/providers/:id - Delete provider key
+//! - POST /api/providers/:id/balance - Fetch balance from provider API
+//! - POST /api/projects/:project_id/provider - Assign provider key to project
 
 use axum::{
   extract::{ Path, State },
@@ -389,7 +389,7 @@ pub async fn list_provider_keys(
   ( StatusCode::OK, Json( responses ) ).into_response()
 }
 
-/// GET /api/providers/{id}
+/// GET /api/providers/:id
 ///
 /// Get specific provider key details
 pub async fn get_provider_key(
@@ -437,7 +437,7 @@ pub async fn get_provider_key(
   } ) ).into_response()
 }
 
-/// PUT /api/providers/{id}
+/// PUT /api/providers/:id
 ///
 /// Update provider key (description, base_url, is_enabled)
 pub async fn update_provider_key(
@@ -530,7 +530,7 @@ pub async fn update_provider_key(
   } ) ).into_response()
 }
 
-/// DELETE /api/providers/{id}
+/// DELETE /api/providers/:id
 ///
 /// Delete provider key
 pub async fn delete_provider_key(
@@ -571,7 +571,7 @@ pub async fn delete_provider_key(
   }
 }
 
-/// POST /api/projects/{project_id}/provider
+/// POST /api/projects/:project_id/provider
 ///
 /// Assign provider key to project
 pub async fn assign_provider_to_project(
@@ -613,7 +613,7 @@ pub async fn assign_provider_to_project(
   }
 }
 
-/// DELETE /api/projects/{project_id}/provider
+/// DELETE /api/projects/:project_id/provider
 ///
 /// Unassign provider key from project
 pub async fn unassign_provider_from_project(

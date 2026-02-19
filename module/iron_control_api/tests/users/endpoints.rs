@@ -6,12 +6,12 @@
 //! |----------|--------|------------|----------------------|
 //! | /api/users | POST | Valid, duplicate username, invalid email/password/role | 201, 400, 500 |
 //! | /api/users | GET | No filters, role filter, search, pagination | 200 |
-//! | /api/users/{id} | GET | Valid ID, non-existent ID | 200, 404 |
-//! | /api/users/{id}/suspend | PUT | Valid, with reason | 200 |
-//! | /api/users/{id}/activate | PUT | Valid | 200 |
-//! | /api/users/{id} | DELETE | Valid, self-deletion prevention | 200, 500 |
-//! | /api/users/{id}/role | PUT | Valid, invalid role, self-modification prevention | 200, 400, 500 |
-//! | /api/users/{id}/reset-password | POST | Valid, with force_change | 200 |
+//! | /api/users/:id | GET | Valid ID, non-existent ID | 200, 404 |
+//! | /api/users/:id/suspend | PUT | Valid, with reason | 200 |
+//! | /api/users/:id/activate | PUT | Valid | 200 |
+//! | /api/users/:id | DELETE | Valid, self-deletion prevention | 200, 500 |
+//! | /api/users/:id/role | PUT | Valid, invalid role, self-modification prevention | 200, 400, 500 |
+//! | /api/users/:id/reset-password | POST | Valid, with force_change | 200 |
 //!
 //! Coverage:
 //! - Request validation (username, email, password, role limits)
@@ -33,14 +33,14 @@
 //! | `test_create_user_invalid_role_rejected` | Create user with invalid role | POST with role="superadmin" | 400 Bad Request | ✅ |
 //! | `test_list_users_no_filters` | List all users without filters | GET /api/users | 200 OK, all users returned | ✅ |
 //! | `test_list_users_with_role_filter` | List users filtered by role | GET /api/users?role=admin | 200 OK, only admin users | ✅ |
-//! | `test_get_user_valid_id` | Get user by valid ID | GET /api/users/{id} with existing user | 200 OK, user details | ✅ |
+//! | `test_get_user_valid_id` | Get user by valid ID | GET /api/users/:id with existing user | 200 OK, user details | ✅ |
 //! | `test_get_user_nonexistent_id` | Get user by nonexistent ID | GET /api/users/nonexistent | 404 Not Found | ✅ |
-//! | `test_suspend_user_valid` | Suspend user with reason | PUT /api/users/{id}/suspend with reason | 200 OK, user suspended, audit log created | ✅ |
-//! | `test_activate_user_valid` | Activate suspended user | PUT /api/users/{id}/activate | 200 OK, user activated, audit log created | ✅ |
-//! | `test_delete_user_valid` | Delete user | DELETE /api/users/{id} | 200 OK, user soft-deleted, audit log created | ✅ |
-//! | `test_change_user_role_valid` | Change user role | PUT /api/users/{id}/role with new role | 200 OK, role updated, audit log created | ✅ |
-//! | `test_change_user_role_invalid_rejected` | Change user to invalid role | PUT /api/users/{id}/role with role="invalid" | 400 Bad Request | ✅ |
-//! | `test_reset_password_valid` | Reset user password | POST /api/users/{id}/reset-password with new password | 200 OK, password reset, audit log created | ✅ |
+//! | `test_suspend_user_valid` | Suspend user with reason | PUT /api/users/:id/suspend with reason | 200 OK, user suspended, audit log created | ✅ |
+//! | `test_activate_user_valid` | Activate suspended user | PUT /api/users/:id/activate | 200 OK, user activated, audit log created | ✅ |
+//! | `test_delete_user_valid` | Delete user | DELETE /api/users/:id | 200 OK, user soft-deleted, audit log created | ✅ |
+//! | `test_change_user_role_valid` | Change user role | PUT /api/users/:id/role with new role | 200 OK, role updated, audit log created | ✅ |
+//! | `test_change_user_role_invalid_rejected` | Change user to invalid role | PUT /api/users/:id/role with role="invalid" | 400 Bad Request | ✅ |
+//! | `test_reset_password_valid` | Reset user password | POST /api/users/:id/reset-password with new password | 200 OK, password reset, audit log created | ✅ |
 //! | `test_reset_password_short_rejected` | Reset password too short | POST with password <8 chars | 400 Bad Request | ✅ |
 
 use crate::common::extract_json_response;
@@ -115,12 +115,12 @@ async fn create_test_router() -> Router
   Router::new()
     .route( "/api/users", post( iron_control_api::routes::users::create_user ) )
     .route( "/api/users", get( iron_control_api::routes::users::list_users ) )
-    .route( "/api/users/{id}", get( iron_control_api::routes::users::get_user ) )
-    .route( "/api/users/{id}/suspend", put( iron_control_api::routes::users::suspend_user ) )
-    .route( "/api/users/{id}/activate", put( iron_control_api::routes::users::activate_user ) )
-    .route( "/api/users/{id}", delete( iron_control_api::routes::users::delete_user ) )
-    .route( "/api/users/{id}/role", put( iron_control_api::routes::users::change_user_role ) )
-    .route( "/api/users/{id}/reset-password", post( iron_control_api::routes::users::reset_password ) )
+    .route( "/api/users/:id", get( iron_control_api::routes::users::get_user ) )
+    .route( "/api/users/:id/suspend", put( iron_control_api::routes::users::suspend_user ) )
+    .route( "/api/users/:id/activate", put( iron_control_api::routes::users::activate_user ) )
+    .route( "/api/users/:id", delete( iron_control_api::routes::users::delete_user ) )
+    .route( "/api/users/:id/role", put( iron_control_api::routes::users::change_user_role ) )
+    .route( "/api/users/:id/reset-password", post( iron_control_api::routes::users::reset_password ) )
     .route( "/api/auth/login", post( iron_control_api::routes::auth::login ) )
     .layer(axum::Extension(ConnectInfo(test_addr)))
     .with_state( state )
@@ -437,7 +437,7 @@ async fn test_list_users_with_role_filter()
 // Get User Tests
 //
 
-/// Test GET /api/users/{id} with valid ID returns user
+/// Test GET /api/users/:id with valid ID returns user
 #[ tokio::test ]
 async fn test_get_user_valid_id()
 {
@@ -491,7 +491,7 @@ async fn test_get_user_valid_id()
   assert_eq!( body.username, "getuser" );
 }
 
-/// Test GET /api/users/{id} with non-existent ID returns 404
+/// Test GET /api/users/:id with non-existent ID returns 404
 #[ tokio::test ]
 async fn test_get_user_nonexistent_id()
 {
@@ -519,7 +519,7 @@ async fn test_get_user_nonexistent_id()
 // Suspend User Tests
 //
 
-/// Test PUT /api/users/{id}/suspend suspends user
+/// Test PUT /api/users/:id/suspend suspends user
 #[ tokio::test ]
 async fn test_suspend_user_valid()
 {
@@ -603,7 +603,7 @@ async fn get_admin_bearer_token(router: &Router) -> String
 // Activate User Tests
 //
 
-/// Test PUT /api/users/{id}/activate activates user
+/// Test PUT /api/users/:id/activate activates user
 #[ tokio::test ]
 async fn test_activate_user_valid()
 {
@@ -680,7 +680,7 @@ async fn test_activate_user_valid()
 // Delete User Tests
 //
 
-/// Test DELETE /api/users/{id} deletes user (soft delete)
+/// Test DELETE /api/users/:id deletes user (soft delete)
 #[ tokio::test ]
 async fn test_delete_user_valid()
 {
@@ -737,7 +737,7 @@ async fn test_delete_user_valid()
 // Change Role Tests
 //
 
-/// Test PUT /api/users/{id}/role changes user role
+/// Test PUT /api/users/:id/role changes user role
 #[ tokio::test ]
 async fn test_change_user_role_valid()
 {
@@ -795,7 +795,7 @@ async fn test_change_user_role_valid()
   assert_eq!( body.role, "admin", "LOUD FAILURE: User role must be updated to admin" );
 }
 
-/// Test PUT /api/users/{id}/role with invalid role returns 400
+/// Test PUT /api/users/:id/role with invalid role returns 400
 #[ tokio::test ]
 async fn test_change_user_role_invalid_rejected()
 {
@@ -854,7 +854,7 @@ async fn test_change_user_role_invalid_rejected()
 // Reset Password Tests
 //
 
-/// Test POST /api/users/{id}/reset-password resets password
+/// Test POST /api/users/:id/reset-password resets password
 #[ tokio::test ]
 async fn test_reset_password_valid()
 {
@@ -913,7 +913,7 @@ async fn test_reset_password_valid()
   assert_eq!( body.id, user_id );
 }
 
-/// Test POST /api/users/{id}/reset-password with short password returns 400
+/// Test POST /api/users/:id/reset-password with short password returns 400
 #[ tokio::test ]
 async fn test_reset_password_short_rejected()
 {

@@ -12,7 +12,7 @@
 //! | `test_create_token_with_unquoted_keys` | POST /api/v1/api-tokens | Object keys without quotes | 400 Bad Request | ✅ |
 //! | `test_create_token_with_deeply_nested_json` | POST /api/v1/api-tokens | >100 nesting levels (DoS) | 400 Bad Request | ✅ |
 //! | `test_create_token_with_invalid_utf8` | POST /api/v1/api-tokens | Invalid UTF-8 sequences | 400 Bad Request | ✅ |
-//! | `test_rotate_token_with_malformed_body` | POST /api/v1/api-tokens/{id}/rotate | Malformed JSON (if body expected) | 400/204 | ✅ |
+//! | `test_rotate_token_with_malformed_body` | POST /api/v1/api-tokens/:id/rotate | Malformed JSON (if body expected) | 400/204 | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
@@ -57,7 +57,7 @@ async fn create_test_router() -> ( Router, crate::common::test_state::TestAppSta
 
   let router = Router::new()
     .route( "/api/v1/api-tokens", post( iron_control_api::routes::tokens::create_token ) )
-    .route( "/api/v1/api-tokens/{id}/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
+    .route( "/api/v1/api-tokens/:id/rotate", post( iron_control_api::routes::tokens::rotate_token ) )
     .with_state( app_state.clone() );
 
   ( router, app_state )
@@ -227,7 +227,7 @@ async fn test_create_token_with_invalid_utf8()
   );
 }
 
-/// Test POST /api/v1/api-tokens/{id}/rotate with malformed JSON body (if applicable).
+/// Test POST /api/v1/api-tokens/:id/rotate with malformed JSON body (if applicable).
 ///
 /// WHY: The rotate endpoint may accept an empty body (no parameters needed).
 /// This test documents behavior: either accepts empty body (200 OK) or rejects

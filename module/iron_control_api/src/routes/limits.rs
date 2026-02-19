@@ -5,9 +5,9 @@
 //! Endpoints:
 //! - POST /api/limits - Create usage limit
 //! - GET /api/limits - List all limits for user
-//! - GET /api/limits/{id} - Get specific limit
-//! - PUT /api/limits/{id} - Update limit
-//! - DELETE /api/limits/{id} - Delete limit
+//! - GET /api/limits/:id - Get specific limit
+//! - PUT /api/limits/:id - Update limit
+//! - DELETE /api/limits/:id - Delete limit
 
 use axum::{
   extract::State,
@@ -151,7 +151,7 @@ impl CreateLimitRequest
   }
 }
 
-/// Update limit request body (for PUT /api/limits/{id})
+/// Update limit request body (for PUT /api/limits/:id)
 ///
 /// All fields are optional to support partial updates.
 /// user_id cannot be changed via update endpoint.
@@ -394,7 +394,7 @@ pub async fn list_limits( State( state ): State< LimitsState > ) -> impl IntoRes
   ( StatusCode::OK, Json( response ) ).into_response()
 }
 
-/// GET /api/limits/{id}
+/// GET /api/limits/:id
 ///
 /// Get specific usage limit
 ///
@@ -439,7 +439,7 @@ pub async fn get_limit(
   ( StatusCode::OK, Json( response ) ).into_response()
 }
 
-/// PUT /api/limits/{id}
+/// PUT /api/limits/:id
 ///
 /// Update existing usage limit
 ///
@@ -518,7 +518,7 @@ pub async fn update_limit(
   ( StatusCode::OK, Json( response ) ).into_response()
 }
 
-/// DELETE /api/limits/{id}
+/// DELETE /api/limits/:id
 ///
 /// Delete usage limit
 ///

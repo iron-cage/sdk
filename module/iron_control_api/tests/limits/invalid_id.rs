@@ -26,15 +26,15 @@ async fn build_test_app() -> Router
   Router::new()
     .route( "/api/limits", get( iron_control_api::routes::limits::list_limits ) )
     .route( "/api/limits", post( iron_control_api::routes::limits::create_limit ) )
-    .route( "/api/limits/{id}", get( iron_control_api::routes::limits::get_limit ) )
-    .route( "/api/limits/{id}", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
-    .route( "/api/limits/{id}", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
+    .route( "/api/limits/:id", get( iron_control_api::routes::limits::get_limit ) )
+    .route( "/api/limits/:id", axum::routing::put( iron_control_api::routes::limits::update_limit ) )
+    .route( "/api/limits/:id", axum::routing::delete( iron_control_api::routes::limits::delete_limit ) )
     .with_state( limits_state )
 }
 
 /// Reproduces Issue #2: Non-JSON error response for invalid path parameters
 ///
-/// **Bug:** When non-numeric ID is provided to GET /api/limits/{id}, Axum returns
+/// **Bug:** When non-numeric ID is provided to GET /api/limits/:id, Axum returns
 /// plain text error: "Invalid URL: Cannot parse \"abc\" to a `i64`" instead of JSON
 ///
 /// **Spec:** FR-5 requires all error responses to be JSON format with structure:

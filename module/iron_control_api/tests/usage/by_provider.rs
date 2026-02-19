@@ -1,4 +1,4 @@
-//! Endpoint integration tests for GET /api/usage/by-provider/{provider}.
+//! Endpoint integration tests for GET /api/usage/by-provider/:provider.
 //!
 //! ## Purpose
 //! Verify that provider-specific usage endpoint correctly aggregates usage for a specific
@@ -38,7 +38,7 @@ async fn create_test_router() -> Router
 
   Router::new()
     .route(
-      "/api/usage/by-provider/{provider}",
+      "/api/usage/by-provider/:provider",
       get( iron_control_api::routes::usage::get_usage_by_provider )
     )
     .with_state( usage_state )

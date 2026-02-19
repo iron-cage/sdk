@@ -49,7 +49,7 @@ mod common;
 /// **Test Flow:**
 /// 1. Create pending budget request in database
 /// 2. Create JWT token for user "test_admin_user_123"
-/// 3. Call PATCH /api/v1/budget/requests/{id}/approve with JWT auth
+/// 3. Call PATCH /api/v1/budget/requests/:id/approve with JWT auth
 /// 4. Verify response is 200 OK
 /// 5. Query budget_modification_history table
 /// 6. Verify approver_id = "test_admin_user_123" (NOT "system-admin" placeholder)
