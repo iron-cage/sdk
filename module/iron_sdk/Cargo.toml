@@ -19,10 +19,10 @@ crate-type = ["cdylib", "rlib"]
 # Use `maturin develop --features full` to build the actual Python extension.
 default = []
 enabled = [
-	"dep:pyo3",
-	"dep:iron_runtime",
-	"dep:tokio",
-	"dep:serde_json",
+  "dep:pyo3",
+  "dep:iron_runtime",
+  "dep:tokio",
+  "dep:serde_json",
 ]
 analytics = ["iron_runtime/analytics"]
 full = ["analytics", "enabled"]
