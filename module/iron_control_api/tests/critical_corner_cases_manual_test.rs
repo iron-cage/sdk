@@ -175,7 +175,7 @@ async fn test_analytics_sum_empty_dataset()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS test_cost_table (
+    "CREATE TABLE IF NOT EXISTS test_cost_sum_empty (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL
     )"
@@ -185,7 +185,7 @@ async fn test_analytics_sum_empty_dataset()
   .expect( "LOUD FAILURE: Failed to create table" );
 
   // Query SUM on empty table
-  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_micros) FROM test_cost_table" )
+  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_micros) FROM test_cost_sum_empty" )
     .fetch_one( &pool )
     .await
     .expect( "LOUD FAILURE: Query failed on empty table" );
@@ -200,7 +200,7 @@ async fn test_analytics_sum_empty_dataset()
 
   // Demonstrate correct handling with COALESCE
   let safe_result: (i64,) = sqlx::query_as(
-    "SELECT COALESCE(SUM(cost_micros), 0) FROM test_cost_table"
+    "SELECT COALESCE(SUM(cost_micros), 0) FROM test_cost_sum_empty"
   )
   .fetch_one( &pool )
   .await
@@ -225,7 +225,7 @@ async fn test_analytics_sum_single_record()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS test_cost_table (
+    "CREATE TABLE IF NOT EXISTS test_cost_sum_single (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL
     )"
@@ -235,13 +235,13 @@ async fn test_analytics_sum_single_record()
   .expect( "LOUD FAILURE: Failed to create table" );
 
   let single_value = 12345_i64;
-  sqlx::query( "INSERT INTO test_cost_table (cost_micros) VALUES (?)" )
+  sqlx::query( "INSERT INTO test_cost_sum_single (cost_micros) VALUES (?)" )
     .bind( single_value )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to insert record" );
 
-  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_micros) FROM test_cost_table" )
+  let result: (Option<i64>,) = sqlx::query_as( "SELECT SUM(cost_micros) FROM test_cost_sum_single" )
     .fetch_one( &pool )
     .await
     .expect( "LOUD FAILURE: Query failed" );
@@ -287,7 +287,7 @@ async fn test_analytics_fractional_cents_handling()
   let pool = db.pool().clone();
 
   sqlx::query(
-    "CREATE TABLE IF NOT EXISTS test_cost_table (
+    "CREATE TABLE IF NOT EXISTS test_cost_coalesce (
       id INTEGER PRIMARY KEY,
       cost_micros INTEGER NOT NULL
     )"
@@ -298,14 +298,14 @@ async fn test_analytics_fractional_cents_handling()
 
   // Insert integer value (system uses integer microdollars only)
   let cost_value = 100_i64;
-  sqlx::query( "INSERT INTO test_cost_table (cost_micros) VALUES (?)" )
+  sqlx::query( "INSERT INTO test_cost_coalesce (cost_micros) VALUES (?)" )
     .bind( cost_value )
     .execute( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to insert integer value" );
 
   // Verify stored value is exact integer
-  let stored_value: (i64,) = sqlx::query_as( "SELECT cost_micros FROM test_cost_table" )
+  let stored_value: (i64,) = sqlx::query_as( "SELECT cost_micros FROM test_cost_coalesce" )
     .fetch_one( &pool )
     .await
     .expect( "LOUD FAILURE: Failed to fetch value" );
@@ -489,17 +489,7 @@ async fn test_delete_agent_with_usage_data()
   let db = test_db::create_test_db().await;
   let pool = db.pool().clone();
 
-  // Create tables with FK constraint
-  sqlx::query(
-    "CREATE TABLE IF NOT EXISTS agents (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL
-    )"
-  )
-  .execute( &pool )
-  .await
-  .expect( "LOUD FAILURE: Failed to create agents table" );
-
+  // agents table already exists via apply_all_migrations() in create_test_db()
   sqlx::query(
     "CREATE TABLE IF NOT EXISTS test_analytics_fk (
       id INTEGER PRIMARY KEY,
