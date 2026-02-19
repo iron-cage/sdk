@@ -70,11 +70,29 @@ async fn key_fetcher_decrypts_encrypted_ip_token_from_server() {
   assert_eq!(provider_key.provider, "openai");
 }
 
-/// Regression guard for issue-001: KeyFetcher must fail loudly when `IP_TOKEN_KEY` is absent.
+/// Regression guard for issue-001: `KeyFetcher` must fail loudly when `IP_TOKEN_KEY` is absent.
 ///
-/// Before the fix, `None => data.ip_token` silently used the ciphertext as the API key,
-/// causing 401 errors on every subsequent LLM call. This test ensures the fixed `None` arm
-/// returns `Err` immediately with a message that identifies the misconfiguration.
+/// ## Root Cause
+/// `ip_token_crypto: Option<IpTokenCrypto>` allowed the `None` arm to pass the ciphertext
+/// verbatim as the API key when `IP_TOKEN_KEY` env var was absent.
+///
+/// ## Why Not Caught
+/// No integration test exercised the full `KeyFetcher::new(None)` → `get_key()` path;
+/// `ip_token_e2e_test.rs` called `IpTokenCrypto::decrypt()` directly, bypassing this arm.
+///
+/// ## Fix Applied
+/// The `None` arm now returns `Err(LlmRouterError::KeyFetch("IP_TOKEN_KEY not configured ..."))`,
+/// making misconfiguration visible at the first key fetch, not at the LLM provider response.
+///
+/// ## Prevention
+/// Every `KeyFetcher::new(ip_token_key)` call must specify a 32-byte key or accept that
+/// `get_key()` will fail on first use. Tests must cover both `Some(key)` and `None` paths.
+///
+/// ## Pitfall to Avoid
+/// `Option<IpTokenCrypto>` looks like "optional feature" but is actually a required runtime
+/// secret. Callers that omit `ip_token_key` and don't check the error will silently fail
+/// all LLM requests with 401 and leak ciphertext to the provider.
+// test_kind: bug_reproducer(issue-001)
 #[tokio::test]
 async fn key_fetcher_fails_loudly_when_ip_token_key_absent() {
   let crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();

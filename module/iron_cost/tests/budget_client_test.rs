@@ -73,11 +73,33 @@ async fn budget_client_handshake_decrypts_encrypted_ip_token() {
   );
 }
 
-/// Regression guard for issue-002: BudgetClient must fail loudly when `IP_TOKEN_KEY` is absent.
+/// Regression guard for issue-002: `BudgetClient` must fail loudly when `IP_TOKEN_KEY` is absent.
 ///
-/// Before the fix, `None => data.ip_token` silently stored the ciphertext as the API key —
-/// handshake returned Ok but every subsequent LLM call failed with 401.
-/// This test ensures the fixed `None` arm returns `Err` at handshake time.
+/// ## Root Cause
+/// `ip_token_crypto: Option<IpTokenCrypto>` in `BudgetClient` allowed the `None` arm in
+/// `handshake()` to store the ciphertext verbatim as the provider API key.
+/// The handshake appeared to succeed (HTTP 200) but every subsequent LLM call failed with 401.
+///
+/// ## Why Not Caught
+/// No integration test exercised the full `BudgetClientBuilder` → `handshake()` → `get_provider_key()`
+/// path without `ip_token_key`. The `ip_token_e2e_test.rs` called `IpTokenCrypto::decrypt()`
+/// directly, bypassing the `handshake()` decryption arm entirely.
+///
+/// ## Fix Applied
+/// The `None` arm in `budget_client.rs:handshake()` now returns
+/// `Err(BudgetClientError::IpTokenDecrypt("IP_TOKEN_KEY not configured ..."))`,
+/// surfacing misconfiguration at handshake time instead of at the first LLM call.
+///
+/// ## Prevention
+/// Every `BudgetClientBuilder` must set `ip_token_key`. Tests must cover both `Some(key)`
+/// and `None` paths through `handshake()`. A successful handshake must not be trusted
+/// without verifying that the decrypted API key is structurally valid.
+///
+/// ## Pitfall to Avoid
+/// HTTP 200 from `handshake()` does not guarantee the provider key is usable.
+/// Before the fix, the handshake succeeded while storing an unusable ciphertext as the API key —
+/// the failure only appeared on the first LLM request as a 401 from the provider.
+// test_kind: bug_reproducer(issue-002)
 #[tokio::test]
 async fn budget_client_handshake_fails_loudly_when_ip_token_key_absent() {
   let crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
