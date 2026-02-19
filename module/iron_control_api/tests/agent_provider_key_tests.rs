@@ -28,7 +28,8 @@ use axum::{
   Router,
 };
 use common::budget::{
-  create_ic_token, create_test_budget_state, create_test_budget_state_no_crypto, setup_test_db,
+  create_ic_token, create_ic_token_for_missing_agent, create_test_budget_state,
+  create_test_budget_state_no_crypto, setup_test_db,
 };
 use iron_control_api::routes::agent_provider_key::get_provider_key;
 use iron_secrets::crypto::CryptoService;
@@ -314,8 +315,8 @@ async fn test_get_provider_key_agent_not_found() {
   let state = create_test_budget_state(pool.clone()).await;
   let app = create_provider_key_router(state.clone()).await;
 
-  // Generate IC token for non-existent agent
-  let ic_token = create_ic_token(&pool, 99999, &state.ic_token_manager).await;
+  // Generate IC token for non-existent agent (no hash stored — agent 99999 is never seeded)
+  let ic_token = create_ic_token_for_missing_agent(99999, &state.ic_token_manager);
 
   let request_body = json!({ "ic_token": ic_token });
 

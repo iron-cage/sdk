@@ -137,14 +137,39 @@ pub async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcToken
 
   let token_hash = iron_control_api::ic_token::sha256_hash(&token);
 
-  sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
+  let result = sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
     .bind(&token_hash)
     .bind(agent_id)
     .execute(pool)
     .await
     .expect("LOUD FAILURE: Failed to store ic_token_hash");
 
+  assert!(
+    result.rows_affected() > 0,
+    "LOUD FAILURE: Agent {agent_id} not found — ic_token_hash not stored. Call seed_agent_with_budget first."
+  );
+
   token
+}
+
+/// Helper: Generate IC Token without storing hash in database
+///
+/// Use this for testing scenarios where the agent does NOT exist in the database
+/// (e.g., testing 401 responses for non-existent or revoked agents).
+/// The JWT is valid (signed correctly), but `validate_ic_token_runtime` will
+/// return `TokenInactive` because no hash is stored in `agents.ic_token_hash`.
+#[allow(dead_code)]
+pub fn create_ic_token_for_missing_agent(agent_id: i64, manager: &IcTokenManager) -> String {
+  let claims = IcTokenClaims::new(
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
+    vec!["llm:call".to_string()],
+    None,
+  );
+
+  manager
+    .generate_token(&claims)
+    .expect("LOUD FAILURE: Should generate IC Token")
 }
 
 /// Helper: Seed agent with budget and provider key

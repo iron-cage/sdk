@@ -35,7 +35,8 @@ use axum::{
   http::{Request, StatusCode},
 };
 use common::budget::{
-  create_budget_router, create_ic_token, create_test_budget_state, seed_agent_with_budget,
+  create_budget_router, create_ic_token, create_ic_token_for_missing_agent,
+  create_test_budget_state, seed_agent_with_budget,
   setup_test_db,
 };
 use iron_control_api::ic_token::IcTokenClaims;
@@ -460,8 +461,8 @@ async fn test_error_messages_no_sensitive_data_leak() {
   // Don't seed any agent (agent doesn't exist)
 
   let state = create_test_budget_state(pool.clone()).await;
-  // Create `IC` Token for non-existent agent 999
-  let ic_token = create_ic_token(&pool, 999, &state.ic_token_manager).await;
+  // Create IC Token for non-existent agent 999 (no hash stored — tests info disclosure)
+  let ic_token = create_ic_token_for_missing_agent(999, &state.ic_token_manager);
 
   let app = create_budget_router(state).await;
 

@@ -294,19 +294,21 @@ async fn test_malformed_agent_id_zero() {
   );
 }
 
-/// **Test 6:** Valid `agent_id` must be accepted (positive control)
+/// **Test 6:** Valid `agent_id` with stored token hash must return 200 OK (positive control)
 ///
-/// **Valid Input:** `agent_id="agent_42"` (parses as 42)
-/// **Expected:** NOT 400 (either 200 success or 403 forbidden if no budget)
+/// **Valid Input:** `agent_id="agent_106"` (parses as 106), hash stored in DB
+/// **Expected:** 200 OK (full success: JWT valid + hash matches + budget available)
 ///
-/// This test verifies that the fix doesn't break valid `agent_id` inputs.
+/// Uses `create_ic_token` (not `create_ic_token_with_agent_id`) to store the token hash
+/// in `agents.ic_token_hash`, satisfying the runtime hash-check validation.
 #[tokio::test]
 async fn test_valid_agent_id() {
   let pool = common::budget::setup_test_db().await;
   let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 106, 100_000_000).await;
 
-  let ic_token = create_ic_token_with_agent_id("agent_106", &state.ic_token_manager);
+  // Store token hash in DB — required for validate_ic_token_runtime hash-check
+  let ic_token = common::budget::create_ic_token(&pool, 106, &state.ic_token_manager).await;
   let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
@@ -320,12 +322,10 @@ async fn test_valid_agent_id() {
 
   let response = app.oneshot(request).await.unwrap();
 
-  // Must NOT be 400 Bad Request (valid input)
-  // Acceptable: 200 OK, 403 Forbidden (budget exhausted), 401 Unauthorized (token invalid)
-  assert_ne!(
+  assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Valid agent_id MUST NOT return 400 Bad Request"
+    StatusCode::OK,
+    "Valid agent_id with stored token hash MUST return 200 OK"
   );
 }
 
