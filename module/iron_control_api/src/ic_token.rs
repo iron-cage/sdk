@@ -72,9 +72,11 @@ impl std::error::Error for IcTokenRuntimeError {}
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IcTokenClaims {
   /// Unique token identifier (UUID v4, RFC 7519 §4.1.7)
-  /// Ensures each JWT has a unique signature even when issued in the same second
-  #[serde(rename = "jti")]
-  pub token_id: Uuid,
+  /// Ensures each JWT has a unique signature even when issued in the same second.
+  /// `Option` for backward compatibility: pre-existing tokens without `jti` deserialize
+  /// to `None` instead of failing — avoids silent 401s for all agents on deploy.
+  #[serde(rename = "jti", default, skip_serializing_if = "Option::is_none")]
+  pub token_id: Option<Uuid>,
 
   /// Agent identifier (format: agent_<id>)
   pub agent_id: String,
@@ -129,7 +131,7 @@ impl IcTokenClaims {
       .as_secs();
 
     Self {
-      token_id: Uuid::new_v4(),
+      token_id: Some(Uuid::new_v4()),
       agent_id,
       budget_id,
       issued_at: now,

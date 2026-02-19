@@ -101,7 +101,7 @@ fn create_token_for_agent(manager: &IcTokenManager, agent_id: i64) -> String {
 /// Create token with custom `agent_id` string (for invalid format tests)
 fn create_token_with_agent_id(manager: &IcTokenManager, agent_id: &str) -> String {
   let claims = IcTokenClaims {
-    token_id: Uuid::new_v4(),
+    token_id: Some(Uuid::new_v4()),
     agent_id: agent_id.to_string(),
     budget_id: "budget_1".to_string(),
     issued_at: SystemTime::now()
