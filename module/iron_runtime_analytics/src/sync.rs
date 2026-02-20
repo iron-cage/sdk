@@ -67,6 +67,7 @@ impl SyncConfig {
 }
 
 /// Handle to control a running sync task
+#[derive(Debug)]
 pub struct SyncHandle {
     shutdown_tx: Option<oneshot::Sender<()>>,
 }

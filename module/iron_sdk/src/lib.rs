@@ -1,13 +1,13 @@
 //! Iron SDK - Python bindings for Iron Cage AI agent protection
 //!
-//! This crate provides PyO3 bindings for the `iron_runtime` crate,
-//! exposing LlmRouter and Runtime to Python.
+//! This crate provides `PyO3` bindings for the `iron_runtime` crate,
+//! exposing `LlmRouter` and Runtime to Python.
 //!
 //! # Architecture
 //!
-//! This crate is a thin PyO3 wrapper around `iron_runtime`:
-//! - `iron_runtime` - Pure Rust implementation (no PyO3)
-//! - `iron_sdk` - PyO3 bindings (this crate)
+//! This crate is a thin `PyO3` wrapper around `iron_runtime`:
+//! - `iron_runtime` - Pure Rust implementation (no `PyO3`)
+//! - `iron_sdk` - `PyO3` bindings (this crate)
 //!
 //! See spec.md for architecture details.
 //!
@@ -52,6 +52,7 @@ use iron_runtime::llm_router::LlmRouter as RustLlmRouter;
 /// ```
 #[cfg(feature = "enabled")]
 #[pyclass]
+#[derive(Debug)]
 pub struct LlmRouter {
   inner: Option<RustLlmRouter>,
 }
@@ -59,12 +60,12 @@ pub struct LlmRouter {
 #[cfg(feature = "enabled")]
 #[pymethods]
 impl LlmRouter {
-  /// Create a new LlmRouter instance
+  /// Create a new `LlmRouter` instance
   ///
   /// # Arguments
   ///
-  /// * `api_key` - Iron Cage API token (required unless provider_key is set)
-  /// * `server_url` - Iron Cage server URL (required unless provider_key is set)
+  /// * `api_key` - Iron Cage API token (required unless `provider_key` is set)
+  /// * `server_url` - Iron Cage server URL (required unless `provider_key` is set)
   /// * `cache_ttl_seconds` - How long to cache API keys (default: 300)
   /// * `budget` - Optional budget limit in USD
   /// * `provider_key` - Direct provider API key (bypasses Iron Cage server)
@@ -100,25 +101,26 @@ impl LlmRouter {
     let api_key = api_key.unwrap_or_else(|| "direct".to_string());
     let server_url = server_url.unwrap_or_default();
 
-    let inner = RustLlmRouter::create_full(api_key, server_url, cache_ttl_seconds, budget, provider_key)
-      .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+    let inner =
+      RustLlmRouter::create_full(api_key, server_url, cache_ttl_seconds, budget, provider_key)
+        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
 
     Ok(Self { inner: Some(inner) })
   }
 
-  /// Get the base URL for the OpenAI client
+  /// Get the base URL for the `OpenAI` client
   ///
-  /// Returns URL like "http://127.0.0.1:52431/v1"
+  /// Returns URL like <http://127.0.0.1:52431/v1>
   #[getter]
   fn base_url(&self) -> PyResult<String> {
     self
       .inner
       .as_ref()
-      .map(|r| r.get_base_url())
+      .map(iron_runtime::llm_router::LlmRouter::get_base_url)
       .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Router is stopped"))
   }
 
-  /// Get the API key to use with the OpenAI client
+  /// Get the API key to use with the `OpenAI` client
   #[getter]
   fn api_key(&self) -> PyResult<String> {
     self
@@ -134,7 +136,7 @@ impl LlmRouter {
     self
       .inner
       .as_ref()
-      .map(|r| r.get_port())
+      .map(iron_runtime::llm_router::LlmRouter::get_port)
       .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Router is stopped"))
   }
 
@@ -151,12 +153,18 @@ impl LlmRouter {
   /// Check if the proxy server is running
   #[getter]
   fn is_running(&self) -> bool {
-    self.inner.as_ref().map(|r| r.is_running()).unwrap_or(false)
+    self
+      .inner
+      .as_ref()
+      .is_some_and(iron_runtime::llm_router::LlmRouter::is_running)
   }
 
   /// Get total spent in USD (0.0 if no budget set)
   fn total_spent(&self) -> f64 {
-    self.inner.as_ref().map(|r| r.total_spent()).unwrap_or(0.0)
+    self
+      .inner
+      .as_ref()
+      .map_or(0.0, iron_runtime::llm_router::LlmRouter::total_spent)
   }
 
   /// Set budget limit in USD
@@ -169,13 +177,19 @@ impl LlmRouter {
   /// Get current budget limit in USD (None if no budget set)
   #[getter]
   fn budget(&self) -> Option<f64> {
-    self.inner.as_ref().and_then(|r| r.get_budget())
+    self
+      .inner
+      .as_ref()
+      .and_then(iron_runtime::llm_router::LlmRouter::get_budget)
   }
 
   /// Get budget status as (spent, limit) tuple in USD
   #[getter]
   fn budget_status(&self) -> Option<(f64, f64)> {
-    self.inner.as_ref().and_then(|r| r.get_budget_status())
+    self
+      .inner
+      .as_ref()
+      .and_then(iron_runtime::llm_router::LlmRouter::get_budget_status)
   }
 
   /// Stop the proxy server
@@ -223,6 +237,7 @@ impl Drop for LlmRouter {
 /// ```
 #[cfg(feature = "enabled")]
 #[pyclass]
+#[derive(Debug)]
 pub struct Runtime {
   inner: iron_runtime::AgentRuntime,
 }
@@ -257,20 +272,23 @@ impl Runtime {
   }
 
   /// Start an agent (placeholder - async not yet implemented)
+  #[allow(clippy::unused_self, clippy::unnecessary_wraps)]
   fn start_agent(&self, _script_path: String) -> PyResult<String> {
     // TODO: Implement async bridge with pyo3-asyncio
     Ok("agent_placeholder".to_string())
   }
 
   /// Stop an agent
+  #[allow(clippy::unused_self, clippy::unnecessary_wraps)]
   fn stop_agent(&self, _agent_id: String) -> PyResult<()> {
     // TODO: Implement async bridge
     Ok(())
   }
 
   /// Get agent metrics as JSON string
-  fn get_metrics(&self, agent_id: String) -> PyResult<Option<String>> {
-    match self.inner.get_metrics(&agent_id) {
+  #[allow(clippy::unnecessary_wraps)]
+  fn get_metrics(&self, agent_id: &str) -> PyResult<Option<String>> {
+    match self.inner.get_metrics(agent_id) {
       Some(state) => {
         let json = serde_json::json!({
           "agent_id": state.agent_id.as_str(),

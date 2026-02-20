@@ -470,6 +470,7 @@ mod implementation
   }
 
   /// State manager with multiple backends
+  #[derive(Debug)]
   pub struct StateManager
   {
     memory: Arc<DashMap<String, AgentState>>,

@@ -10,6 +10,9 @@ readme = "readme.md"
 keywords = ["sdk", "python", "pyo3", "ai-agent", "llm"]
 categories = ["api-bindings"]
 
+[lints]
+workspace = true
+
 [lib]
 name = "iron_cage"
 crate-type = ["cdylib", "rlib"]

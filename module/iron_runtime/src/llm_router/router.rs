@@ -56,6 +56,7 @@ use iron_runtime_analytics::{SyncClient, SyncConfig, SyncHandle};
 /// from iron_sdk import LlmRouter
 /// router = LlmRouter(api_key="ic_xxx", server_url="https://...")
 /// ```
+#[derive(Debug)]
 pub struct LlmRouter {
   /// Port the proxy is listening on
   port: u16,

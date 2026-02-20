@@ -146,6 +146,7 @@ mod implementation
   }
 
   /// Main agent runtime
+  #[derive(Debug)]
   pub struct AgentRuntime
   {
     #[allow(dead_code)] // Configuration stored for future use (budget enforcement, etc.)

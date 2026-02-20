@@ -22,6 +22,7 @@ struct GlobalStats
 }
 
 /// Lock-free event store with bounded buffer and atomic counters.
+#[derive(Debug)]
 pub struct EventStore
 {
   // Storage
