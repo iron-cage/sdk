@@ -1,7 +1,8 @@
 //! Fetch and cache provider API keys from Iron Cage server
 
+use core::time::Duration;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use reqwest::Client;
 use tokio::sync::RwLock;
@@ -11,12 +12,14 @@ use crate::llm_router::error::LlmRouterError;
 use iron_secrets::ip_token::{IpTokenCrypto, ProviderKey};
 
 /// Cached key entry
+#[derive(Debug)]
 struct CachedKey {
   key: ProviderKey,
   fetched_at: Instant,
 }
 
 /// Fetches and caches provider API keys from Iron Cage server
+#[derive(Debug)]
 pub struct KeyFetcher {
   server_url: String,
   ic_token: String,
@@ -31,13 +34,18 @@ pub struct KeyFetcher {
 }
 
 impl KeyFetcher {
-  /// Create a new KeyFetcher
+  /// Create a new `KeyFetcher`
   ///
   /// # Arguments
   ///
-  /// * `server_url` - Iron Cage server URL (e.g., "https://api.iron-cage.io")
+  /// * `server_url` - Iron Cage server URL (e.g., `<https://api.iron-cage.io>`)
   /// * `ic_token` - Iron Cage API token
   /// * `cache_ttl_seconds` - How long to cache the key (in seconds)
+  ///
+  /// # Panics
+  ///
+  /// Panics if the HTTP client cannot be built, or if `ip_token_key` contains an invalid key.
+  #[must_use]
   pub fn new(
     server_url: String,
     ic_token: String,
@@ -63,12 +71,13 @@ impl KeyFetcher {
     }
   }
 
-  /// Create a KeyFetcher with a static API key (bypasses server)
+  /// Create a `KeyFetcher` with a static API key (bypasses server)
   ///
   /// # Arguments
   ///
-  /// * `api_key` - The provider API key (e.g., sk-xxx for OpenAI, sk-ant-xxx for Anthropic)
+  /// * `api_key` - The provider API key (e.g., sk-xxx for `OpenAI`, sk-ant-xxx for Anthropic)
   /// * `base_url` - Optional custom base URL for the provider
+  #[must_use]
   pub fn new_static(api_key: String, base_url: Option<String>) -> Self {
     let provider = ProviderKey::detect_provider_from_key(&api_key).to_string();
     let static_key = ProviderKey {
@@ -89,7 +98,13 @@ impl KeyFetcher {
   }
 
   /// Get provider key (from cache or fetch from server)
-  /// Provider is auto-detected from API key format
+  ///
+  /// Provider is auto-detected from API key format.
+  ///
+  /// # Errors
+  ///
+  /// Returns `LlmRouterError::KeyFetch` if the server request fails, the response cannot be
+  /// parsed, or `IP_TOKEN_KEY` is not configured.
   pub async fn get_key(&self) -> Result<ProviderKey, LlmRouterError> {
     // Return static key if set (bypass server)
     if let Some(ref key) = self.static_key {
@@ -154,9 +169,9 @@ impl KeyFetcher {
             .get("code")
             .and_then(|v| v.as_str())
             .unwrap_or("UNKNOWN");
-          format!("{}: {} ({})", status, error, code)
+          format!("{status}: {error} ({code})")
         }
-        Err(_) => format!("Server returned status {}", status),
+        Err(_) => format!("Server returned status {status}"),
       };
       return Err(LlmRouterError::KeyFetch(error_msg));
     }
@@ -181,7 +196,7 @@ impl KeyFetcher {
     let api_key = match &self.ip_token_crypto {
       Some(crypto) => crypto
         .decrypt(&data.ip_token)
-        .map_err(|e| LlmRouterError::KeyFetch(format!("IP Token decryption failed: {}", e)))?,
+        .map_err(|e| LlmRouterError::KeyFetch(format!("IP Token decryption failed: {e}")))?,
       None => {
         return Err(LlmRouterError::KeyFetch(
           "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),

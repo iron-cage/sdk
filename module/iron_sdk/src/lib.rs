@@ -102,7 +102,7 @@ impl LlmRouter {
     let server_url = server_url.unwrap_or_default();
 
     let inner =
-      RustLlmRouter::create_full(api_key, server_url, cache_ttl_seconds, budget, provider_key)
+      RustLlmRouter::create_full(api_key, server_url, cache_ttl_seconds, budget, provider_key.as_ref())
         .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
 
     Ok(Self { inner: Some(inner) })

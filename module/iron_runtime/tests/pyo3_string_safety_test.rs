@@ -1,4 +1,4 @@
-//! PyO3 buffer overflow vulnerability fix verification
+//! `PyO3` buffer overflow vulnerability fix verification
 //!
 //! # Security Context
 //!
@@ -43,19 +43,17 @@
 //!
 //! # References
 //!
-//! - Advisory: https://github.com/PyO3/pyo3/issues/5005
-//! - RUSTSEC: https://rustsec.org/advisories/RUSTSEC-2025-0020
+//! - Advisory: <https://github.com/PyO3/pyo3/issues/5005>
+//! - RUSTSEC: <https://rustsec.org/advisories/RUSTSEC-2025-0020>
 
 #[cfg(feature = "enabled")]
-mod pyo3_version_verification
-{
+mod pyo3_version_verification {
   /// Verify pyo3 version is >= 0.24.1 (fix for RUSTSEC-2025-0020)
   ///
   /// This test ensures the dependency is correctly specified in Cargo.toml
   /// and prevents regression to vulnerable versions.
   #[test]
-  fn test_pyo3_version_is_patched()
-  {
+  fn test_pyo3_version_is_patched() {
     // Extract pyo3 version at compile time
     // This will fail compilation if pyo3 < 0.24.1
     const _: () = {
@@ -67,7 +65,7 @@ mod pyo3_version_verification
 
     // Runtime verification using pyo3 crate version
     let version = env!("CARGO_PKG_VERSION_MAJOR");
-    println!("pyo3 major version: {}", version);
+    println!("pyo3 major version: {version}");
 
     // Note: This test serves as documentation. The real protection is
     // Cargo.toml version constraint: version = "0.24.1"
@@ -85,8 +83,7 @@ mod pyo3_version_verification
   /// 2. Cargo.lock pinned version: pyo3 0.24.2
   /// 3. cargo audit detecting vulnerable versions
   #[test]
-  fn test_cargo_toml_pyo3_version_constraint()
-  {
+  fn test_cargo_toml_pyo3_version_constraint() {
     // This test serves as documentation that pyo3 >= 0.24.1 is required.
     // If pyo3 is downgraded below 0.24.1:
     // 1. cargo audit will fail with RUSTSEC-2025-0020
@@ -98,12 +95,10 @@ mod pyo3_version_verification
 }
 
 #[cfg(not(feature = "enabled"))]
-mod stub_when_disabled
-{
+mod stub_when_disabled {
   /// Placeholder test when pyo3 feature is disabled
   #[test]
-  fn test_pyo3_disabled()
-  {
+  fn test_pyo3_disabled() {
     // iron_runtime compiled without pyo3 support
     // Security verification skipped (no Python bindings)
   }

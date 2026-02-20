@@ -1,6 +1,6 @@
-//! Request/Response translation between OpenAI and Anthropic formats
+//! Request/Response translation between `OpenAI` and Anthropic formats
 //!
-//! Enables using OpenAI client SDK with Claude models by translating
+//! Enables using `OpenAI` client SDK with Claude models by translating
 //! request/response formats transparently.
 
 mod request;

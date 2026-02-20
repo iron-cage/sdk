@@ -26,16 +26,16 @@
 //! ## Integration Layer
 //!
 //! Runtime coordinates between modules:
-//! - **iron_cost**: Budget validation before LLM requests
-//! - **iron_safety**: PII scanning on LLM responses
-//! - **iron_runtime_analytics**: Event tracking for dashboard
-//! - **iron_reliability**: Circuit breakers for provider failures
-//! - **iron_runtime_state**: Agent state persistence
+//! - **`iron_cost`**: Budget validation before LLM requests
+//! - **`iron_safety`**: PII scanning on LLM responses
+//! - **`iron_runtime_analytics`**: Event tracking for dashboard
+//! - **`iron_reliability`**: Circuit breakers for provider failures
+//! - **`iron_runtime_state`**: Agent state persistence
 //!
 //! ## Python Bindings
 //!
 //! Python bindings are provided by the `iron_sdk` crate (see ADR-010).
-//! This crate (`iron_runtime`) is pure Rust with no PyO3 dependencies.
+//! This crate (`iron_runtime`) is pure Rust with no `PyO3` dependencies.
 //!
 //! # Key Types
 //!
@@ -64,7 +64,7 @@
 //!   let runtime = AgentRuntime::new(config);
 //!
 //!   // Start agent from Python script
-//!   let handle = runtime.start_agent(Path::new("agent.py")).await?;
+//!   let handle = runtime.start_agent(Path::new("agent.py"))?;
 //!   println!("Agent started: {}", handle.agent_id.as_str());
 //!
 //!   // Monitor metrics
@@ -74,7 +74,7 @@
 //!   }
 //!
 //!   // Stop agent
-//!   runtime.stop_agent(handle.agent_id.as_str()).await?;
+//!   runtime.stop_agent(handle.agent_id.as_str())?;
 //!   Ok(())
 //! }
 //! ```
@@ -107,7 +107,7 @@
 //! # Feature Flags
 //!
 //! - `enabled` - Enable full runtime (disabled for library-only builds)
-//! - `analytics` - Enable analytics recording via iron_runtime_analytics
+//! - `analytics` - Enable analytics recording via `iron_runtime_analytics`
 //!
 //! # Performance
 //!
@@ -127,38 +127,37 @@
 pub mod llm_router;
 
 #[cfg(feature = "enabled")]
-mod implementation
-{
+mod implementation {
   use std::sync::Arc;
 
   /// Runtime configuration
   #[derive(Debug, Clone)]
-  pub struct RuntimeConfig
-  {
+  pub struct RuntimeConfig {
+    /// Maximum spending budget in USD
     pub budget: f64,
+    /// Enable verbose logging
     pub verbose: bool,
   }
 
   /// Agent runtime handle
-  pub struct AgentHandle
-  {
+  #[derive(Debug)]
+  pub struct AgentHandle {
+    /// Unique identifier for the agent
     pub agent_id: iron_types::AgentId,
   }
 
   /// Main agent runtime
   #[derive(Debug)]
-  pub struct AgentRuntime
-  {
+  pub struct AgentRuntime {
     #[allow(dead_code)] // Configuration stored for future use (budget enforcement, etc.)
     config: RuntimeConfig,
     state: Arc<iron_runtime_state::StateManager>,
   }
 
-  impl AgentRuntime
-  {
+  impl AgentRuntime {
     /// Create new runtime with configuration
-    pub fn new(config: RuntimeConfig) -> Self
-    {
+    #[must_use]
+    pub fn new(config: RuntimeConfig) -> Self {
       Self {
         config,
         state: Arc::new(iron_runtime_state::StateManager::new()),
@@ -166,14 +165,20 @@ mod implementation
     }
 
     /// Get the runtime configuration
-    pub fn config(&self) -> &RuntimeConfig
-    {
+    #[must_use]
+    pub fn config(&self) -> &RuntimeConfig {
       &self.config
     }
 
     /// Start an agent from Python script path
-    pub async fn start_agent(&self, _script_path: &std::path::Path) -> Result<AgentHandle, anyhow::Error>
-    {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent cannot be started.
+    pub fn start_agent(
+      &self,
+      _script_path: &std::path::Path,
+    ) -> Result<AgentHandle, anyhow::Error> {
       let agent_id = iron_types::AgentId::generate();
 
       iron_telemetry::log_agent_event(agent_id.as_str(), "agent_started");
@@ -190,12 +195,14 @@ mod implementation
     }
 
     /// Stop a running agent
-    pub async fn stop_agent(&self, agent_id: &str) -> Result<(), anyhow::Error>
-    {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent cannot be stopped.
+    pub fn stop_agent(&self, agent_id: &str) -> Result<(), anyhow::Error> {
       iron_telemetry::log_agent_event(agent_id, "agent_stopped");
 
-      if let Some(mut state) = self.state.get_agent_state(agent_id)
-      {
+      if let Some(mut state) = self.state.get_agent_state(agent_id) {
         state.status = iron_runtime_state::AgentStatus::Stopped;
         self.state.save_agent_state(state);
       }
@@ -204,8 +211,8 @@ mod implementation
     }
 
     /// Get agent metrics
-    pub fn get_metrics(&self, agent_id: &str) -> Option<iron_runtime_state::AgentState>
-    {
+    #[must_use]
+    pub fn get_metrics(&self, agent_id: &str) -> Option<iron_runtime_state::AgentState> {
       self.state.get_agent_state(agent_id)
     }
   }
@@ -215,56 +222,46 @@ mod implementation
 pub use implementation::*;
 
 #[cfg(not(feature = "enabled"))]
-mod stub
-{
+mod stub {
   use std::path::Path;
 
   /// Stub runtime config
   #[derive(Debug, Clone)]
-  pub struct RuntimeConfig
-  {
+  pub struct RuntimeConfig {
     pub budget: f64,
     pub verbose: bool,
   }
 
   /// Stub agent handle
-  pub struct AgentHandle
-  {
+  pub struct AgentHandle {
     pub agent_id: iron_types::AgentId,
   }
 
   /// Stub runtime
-  pub struct AgentRuntime
-  {
+  pub struct AgentRuntime {
     config: RuntimeConfig,
   }
 
-  impl AgentRuntime
-  {
-    pub fn new(config: RuntimeConfig) -> Self
-    {
+  impl AgentRuntime {
+    pub fn new(config: RuntimeConfig) -> Self {
       Self { config }
     }
 
-    pub fn config(&self) -> &RuntimeConfig
-    {
+    pub fn config(&self) -> &RuntimeConfig {
       &self.config
     }
 
-    pub async fn start_agent(&self, _script_path: &Path) -> Result<AgentHandle, anyhow::Error>
-    {
+    pub fn start_agent(&self, _script_path: &Path) -> Result<AgentHandle, anyhow::Error> {
       Ok(AgentHandle {
         agent_id: iron_types::AgentId::generate(),
       })
     }
 
-    pub async fn stop_agent(&self, _agent_id: &str) -> Result<(), anyhow::Error>
-    {
+    pub fn stop_agent(&self, _agent_id: &str) -> Result<(), anyhow::Error> {
       Ok(())
     }
 
-    pub fn get_metrics(&self, _agent_id: &str) -> Option<iron_runtime_state::AgentState>
-    {
+    pub fn get_metrics(&self, _agent_id: &str) -> Option<iron_runtime_state::AgentState> {
       None
     }
   }

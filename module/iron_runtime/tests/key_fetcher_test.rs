@@ -1,4 +1,4 @@
-//! Integration tests for KeyFetcher IP Token decryption path.
+//! Integration tests for `KeyFetcher` IP Token decryption path.
 //!
 //! Covers the production path that had zero test coverage before the fix:
 //! `KeyFetcher::new(ip_token_key)` → `get_key()` → `fetch_from_server()` → `decrypt()` → plaintext.
@@ -108,9 +108,15 @@ async fn key_fetcher_fails_loudly_when_ip_token_key_absent() {
   );
 
   let result = fetcher.get_key().await;
-  assert!(result.is_err(), "KeyFetcher must fail when IP_TOKEN_KEY is absent");
   assert!(
-    result.unwrap_err().to_string().contains("IP_TOKEN_KEY not configured"),
+    result.is_err(),
+    "KeyFetcher must fail when IP_TOKEN_KEY is absent"
+  );
+  assert!(
+    result
+      .unwrap_err()
+      .to_string()
+      .contains("IP_TOKEN_KEY not configured"),
     "Error message must identify the missing IP_TOKEN_KEY"
   );
 }

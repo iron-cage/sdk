@@ -1,4 +1,4 @@
-//! LlmRouter - Core Rust implementation for LLM proxy
+//! `LlmRouter` - Core Rust implementation for LLM proxy
 //!
 //! Python bindings are provided by the `iron_sdk` crate (see ADR-010).
 
@@ -60,7 +60,7 @@ use iron_runtime_analytics::{SyncClient, SyncConfig, SyncHandle};
 pub struct LlmRouter {
   /// Port the proxy is listening on
   port: u16,
-  /// API key (IC_TOKEN)
+  /// API key (`IC_TOKEN`)
   api_key: String,
   /// Iron Cage server URL
   #[allow(dead_code)]
@@ -94,7 +94,7 @@ pub struct LlmRouter {
 }
 
 impl LlmRouter {
-  /// Create a new LlmRouter instance
+  /// Create a new `LlmRouter` instance
   ///
   /// # Arguments
   ///
@@ -104,7 +104,11 @@ impl LlmRouter {
   ///
   /// # Returns
   ///
-  /// Result with LlmRouter instance or error string
+  /// Result with `LlmRouter` instance or error string
+  ///
+  /// # Errors
+  ///
+  /// Returns an error string if no free port can be found or the Tokio runtime fails to start.
   pub fn create(
     api_key: String,
     server_url: String,
@@ -113,7 +117,7 @@ impl LlmRouter {
     Self::create_inner(api_key, server_url, cache_ttl_seconds, None, None)
   }
 
-  /// Create a new LlmRouter instance with budget
+  /// Create a new `LlmRouter` instance with budget
   ///
   /// # Arguments
   ///
@@ -121,6 +125,10 @@ impl LlmRouter {
   /// * `server_url` - Iron Cage server URL
   /// * `cache_ttl_seconds` - How long to cache API keys
   /// * `budget` - Budget limit in USD
+  ///
+  /// # Errors
+  ///
+  /// Returns an error string if no free port can be found or the Tokio runtime fails to start.
   pub fn create_with_budget(
     api_key: String,
     server_url: String,
@@ -130,7 +138,7 @@ impl LlmRouter {
     Self::create_inner(api_key, server_url, cache_ttl_seconds, Some(budget), None)
   }
 
-  /// Create a new LlmRouter instance with direct provider key
+  /// Create a new `LlmRouter` instance with direct provider key
   ///
   /// Bypasses Iron Cage server - useful for testing or direct provider access
   ///
@@ -138,10 +146,11 @@ impl LlmRouter {
   ///
   /// * `provider_key` - Direct provider API key (e.g., "sk-...")
   /// * `budget` - Optional budget limit in USD
-  pub fn create_with_provider_key(
-    provider_key: String,
-    budget: Option<f64>,
-  ) -> Result<Self, String> {
+  ///
+  /// # Errors
+  ///
+  /// Returns an error string if no free port can be found or the Tokio runtime fails to start.
+  pub fn create_with_provider_key(provider_key: &str, budget: Option<f64>) -> Result<Self, String> {
     Self::create_inner(
       "direct".to_string(),
       String::new(),
@@ -160,19 +169,29 @@ impl LlmRouter {
   /// * `cache_ttl_seconds` - How long to cache API keys
   /// * `budget` - Optional budget limit in USD
   /// * `provider_key` - Optional direct provider API key
+  ///
+  /// # Errors
+  ///
+  /// Returns an error string if no free port can be found or the Tokio runtime fails to start.
   pub fn create_full(
     api_key: String,
     server_url: String,
     cache_ttl_seconds: u64,
     budget: Option<f64>,
-    provider_key: Option<String>,
+    provider_key: Option<&String>,
   ) -> Result<Self, String> {
-    Self::create_inner(api_key, server_url, cache_ttl_seconds, budget, provider_key)
+    Self::create_inner(
+      api_key,
+      server_url,
+      cache_ttl_seconds,
+      budget,
+      provider_key.map(String::as_str),
+    )
   }
 
-  /// Get the base URL for the OpenAI client
+  /// Get the base URL for the `OpenAI` client
   ///
-  /// Returns URL like "http://127.0.0.1:52431/v1"
+  /// Returns URL like `<http://127.0.0.1:52431/v1>`
   pub fn get_base_url(&self) -> String {
     format!("http://127.0.0.1:{}/v1", self.port)
   }
@@ -202,8 +221,7 @@ impl LlmRouter {
     self
       .cost_controller
       .as_ref()
-      .map(|c| c.total_spent() as f64 / 1_000_000.0)
-      .unwrap_or(0.0)
+      .map_or(0.0, |c| c.total_spent() as f64 / 1_000_000.0)
   }
 
   /// Set budget limit in USD
@@ -212,6 +230,7 @@ impl LlmRouter {
   /// * `amount_usd` - New budget limit in USD (e.g., 10.0 for $10)
   pub fn set_budget(&self, amount_usd: f64) {
     if let Some(ref controller) = self.cost_controller {
+      #[allow(clippy::cast_possible_truncation)]
       let budget_micros = (amount_usd * 1_000_000.0) as i64;
       controller.set_budget(budget_micros);
     }
@@ -248,37 +267,41 @@ impl LlmRouter {
     server_url: String,
     cache_ttl_seconds: u64,
     budget: Option<f64>,
-    provider_key: Option<String>,
+    provider_key: Option<&str>,
   ) -> Result<Self, String> {
     // Initialize logging
     ensure_logging();
 
     // Find free port
-    let port = find_free_port().map_err(|e| format!("Failed to find free port: {}", e))?;
+    let port = find_free_port().map_err(|e| format!("Failed to find free port: {e}"))?;
 
     // Create tokio runtime
     let runtime = tokio::runtime::Builder::new_multi_thread()
       .worker_threads(2)
       .enable_all()
       .build()
-      .map_err(|e| format!("Failed to create runtime: {}", e))?;
+      .map_err(|e| format!("Failed to create runtime: {e}"))?;
 
     // Parse IP_TOKEN_KEY from environment for provider key decryption
     let ip_token_key = parse_ip_token_key_from_env();
 
     // Create key fetcher - static if provider_key given, otherwise fetch from server
-    let key_fetcher = Arc::new(if let Some(ref pk) = provider_key {
-      KeyFetcher::new_static(pk.clone(), None)
+    let key_fetcher = Arc::new(if let Some(pk) = provider_key {
+      KeyFetcher::new_static(pk.to_string(), None)
     } else {
-      KeyFetcher::new(server_url.clone(), api_key.clone(), cache_ttl_seconds, ip_token_key)
+      KeyFetcher::new(
+        server_url.clone(),
+        api_key.clone(),
+        cache_ttl_seconds,
+        ip_token_key,
+      )
     });
 
     let provider = runtime.block_on(async {
       key_fetcher
         .get_key()
         .await
-        .map(|k| k.provider)
-        .unwrap_or_else(|_| "unknown".to_string())
+        .map_or_else(|_| "unknown".to_string(), |k| k.provider)
     });
 
     // Create shutdown channel
@@ -289,7 +312,9 @@ impl LlmRouter {
     // Note: API accepts dollars (f64), server returns microdollars (i64)
     let (effective_budget_micros, lease_id): (i64, Option<String>) = if let Some(b) = budget {
       // Convert dollars to microdollars
-      ((b * 1_000_000.0) as i64, None)
+      #[allow(clippy::cast_possible_truncation)]
+      let micros = (b * 1_000_000.0) as i64;
+      (micros, None)
     } else if !server_url.is_empty() {
       // Fetch budget from server handshake (Protocol 005) - already in microdollars
       match runtime.block_on(async { fetch_budget_from_handshake(&server_url, &api_key).await }) {
@@ -322,7 +347,7 @@ impl LlmRouter {
       server_url: server_url.clone(),
       cache_ttl_seconds,
       cost_controller: cost_controller.clone(),
-      provider_key: provider_key.clone(),
+      provider_key: provider_key.map(str::to_string),
       ip_token_key,
       #[cfg(feature = "analytics")]
       event_store: event_store.clone(),
@@ -341,16 +366,16 @@ impl LlmRouter {
 
     // Start analytics sync (if server_url is provided)
     #[cfg(feature = "analytics")]
-    let sync_handle = if !server_url.is_empty() {
+    let sync_handle = if server_url.is_empty() {
+      None
+    } else {
       let sync_config = SyncConfig::new(&server_url, &api_key);
       let sync_client = SyncClient::new(event_store.clone(), sync_config);
       Some(sync_client.start(runtime.handle()))
-    } else {
-      None
     };
 
     // Wait for server to start
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(core::time::Duration::from_millis(50));
 
     Ok(Self {
       port,
@@ -381,12 +406,11 @@ impl LlmRouter {
           let spent_microdollars = self
             .cost_controller
             .as_ref()
-            .map(|cc| cc.total_spent())
-            .unwrap_or(0);
+            .map_or(0, |cc| cc.total_spent());
 
           let url = format!("{}/api/v1/budget/return", self.server_url);
           let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
+            .timeout(core::time::Duration::from_secs(5))
             .build();
 
           match client {
@@ -399,7 +423,7 @@ impl LlmRouter {
               {
                 Ok(resp) if resp.status().is_success() => {
                   if let Ok(body) = resp.json::<serde_json::Value>() {
-                    if let Some(returned) = body.get("returned").and_then(|v| v.as_i64()) {
+                    if let Some(returned) = body.get("returned").and_then(serde_json::Value::as_i64) {
                       tracing::info!(
                         "Budget returned to server: ${:.6} (spent: ${:.6})",
                         returned as f64 / 1_000_000.0,
@@ -431,7 +455,7 @@ impl LlmRouter {
       if let Some(handle) = self.sync_handle.take() {
         handle.stop(); // This triggers flush
                        // Give sync task time to complete flush
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(core::time::Duration::from_millis(500));
       }
 
       let _ = tx.send(());
@@ -474,7 +498,10 @@ fn parse_ip_token_key_from_env() -> Option<[u8; 32]> {
       None
     }
     Err(e) => {
-      tracing::warn!("IP_TOKEN_KEY contains invalid hex — IP Token decryption disabled: {}", e);
+      tracing::warn!(
+        "IP_TOKEN_KEY contains invalid hex — IP Token decryption disabled: {}",
+        e
+      );
       None
     }
   }
@@ -489,11 +516,11 @@ struct HandshakeResult {
 /// Fetch budget from server handshake (Protocol 005)
 async fn fetch_budget_from_handshake(server_url: &str, ic_token: &str) -> Option<HandshakeResult> {
   let client = reqwest::Client::new();
-  let url = format!("{}/api/v1/budget/handshake", server_url);
+  let url = format!("{server_url}/api/v1/budget/handshake");
 
   let response = match client
     .post(&url)
-    .header("Authorization", format!("Bearer {}", ic_token))
+    .header("Authorization", format!("Bearer {ic_token}"))
     .json(&serde_json::json!({
       "ic_token": ic_token,
       "provider": "openai"

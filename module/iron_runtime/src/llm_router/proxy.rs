@@ -25,7 +25,7 @@ use iron_runtime_analytics::{EventStore, Provider};
 /// Shared state for proxy handlers
 #[derive(Clone)]
 pub struct ProxyState {
-  /// IC_TOKEN for validating incoming requests
+  /// `IC_TOKEN` for validating incoming requests
   pub ic_token: String,
   /// Key fetcher for getting real API keys
   pub key_fetcher: Arc<KeyFetcher>,
@@ -56,7 +56,7 @@ pub struct ProxyConfig {
   pub cost_controller: Option<Arc<CostController>>,
   /// Direct provider API key (bypasses Iron Cage server when set)
   pub provider_key: Option<String>,
-  /// IP Token encryption key for decrypting provider keys in transit (from IP_TOKEN_KEY env var)
+  /// IP Token encryption key for decrypting provider keys in transit (from `IP_TOKEN_KEY` env var)
   pub ip_token_key: Option<[u8; 32]>,
   /// Analytics event store
   #[cfg(feature = "analytics")]
@@ -94,7 +94,7 @@ pub async fn run_proxy(
   });
 
   let http_client = Client::builder()
-    .timeout(std::time::Duration::from_secs(300)) // 5 min timeout for LLM requests
+    .timeout(core::time::Duration::from_secs(300)) // 5 min timeout for LLM requests
     .build()
     .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;
 
@@ -172,7 +172,7 @@ fn create_openai_error_response(
     })
 }
 
-/// Check if budget limit is exceeded using CostController
+/// Check if budget limit is exceeded using `CostController`
 fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   // Skip check if no budget is set
   let Some(ref controller) = state.cost_controller else {
@@ -193,9 +193,8 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
       Err(Box::new(create_openai_error_response(
         StatusCode::PAYMENT_REQUIRED, // 402 - distinct from 429 rate limit
         &format!(
-          "Iron Cage budget limit exceeded. Spent: ${:.2}, Reserved: ${:.2}, Limit: ${:.2}. \
-           Increase budget with router.set_budget() or check your pricing calculations.",
-          spent_usd, reserved_usd, limit_usd
+          "Iron Cage budget limit exceeded. Spent: ${spent_usd:.2}, Reserved: ${reserved_usd:.2}, Limit: ${limit_usd:.2}. \
+           Increase budget with router.set_budget() or check your pricing calculations."
         ),
         "iron_cage_budget_exceeded", // Unique type - never from OpenAI
         "budget_exceeded",
@@ -210,9 +209,8 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
       Err(Box::new(create_openai_error_response(
         StatusCode::PAYMENT_REQUIRED,
         &format!(
-          "Iron Cage insufficient budget. Available: ${:.2}, Requested: ${:.2}. \
-           Wait for in-flight requests to complete or increase budget.",
-          available_usd, requested_usd
+          "Iron Cage insufficient budget. Available: ${available_usd:.2}, Requested: ${requested_usd:.2}. \
+           Wait for in-flight requests to complete or increase budget."
         ),
         "iron_cage_insufficient_budget",
         "insufficient_budget",
@@ -223,7 +221,7 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
       tracing::error!("Unexpected cost error: {}", e);
       Err(Box::new(create_openai_error_response(
         StatusCode::INTERNAL_SERVER_ERROR,
-        &format!("Internal error: {}", e),
+        &format!("Internal error: {e}"),
         "internal_error",
         "internal_error",
       )))
@@ -231,7 +229,8 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   }
 }
 
-/// Strip provider prefix from path if present, returns (clean_path, requested_provider)
+/// Strip provider prefix from path if present, returns (`clean_path`, `requested_provider`)
+#[must_use]
 pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
   if path.starts_with("/anthropic/") || path.starts_with("/anthropic") {
     let clean = path.strip_prefix("/anthropic").unwrap_or(path);
@@ -255,6 +254,7 @@ pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
 }
 
 /// Detect requested provider from model name in body
+#[must_use]
 pub fn detect_provider_from_model(body: &[u8]) -> Option<&'static str> {
   if let Ok(json) = serde_json::from_slice::<serde_json::Value>(body) {
     if let Some(model) = json.get("model").and_then(|m| m.as_str()) {
@@ -307,12 +307,12 @@ async fn handle_proxy(
   let query = request
     .uri()
     .query()
-    .map(|q| format!("?{}", q))
+    .map(|q| format!("?{q}"))
     .unwrap_or_default();
 
   let body_bytes = axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024) // 10MB limit
     .await
-    .map_err(|e| (StatusCode::BAD_REQUEST, format!("Body read error: {}", e)))?;
+    .map_err(|e| (StatusCode::BAD_REQUEST, format!("Body read error: {e}")))?;
 
   // 2.5 Reserve budget for this request (prevents concurrent overspend)
   let reservation: Option<Reservation> = if let Some(ref controller) = state.cost_controller {
@@ -328,9 +328,8 @@ async fn handle_proxy(
           return Ok(create_openai_error_response(
             StatusCode::PAYMENT_REQUIRED,
             &format!(
-              "Iron Cage insufficient budget for request. Available: ${:.4}, Estimated max cost: ${:.4}. \
-               Reduce max_tokens or wait for in-flight requests to complete.",
-              available_usd, requested_usd
+              "Iron Cage insufficient budget for request. Available: ${available_usd:.4}, Estimated max cost: ${requested_usd:.4}. \
+               Reduce max_tokens or wait for in-flight requests to complete."
             ),
             "iron_cage_insufficient_budget",
             "insufficient_budget",
@@ -368,7 +367,7 @@ async fn handle_proxy(
   // 6. Prepare request body (translate if needed)
   let (request_body, request_path) = if needs_translation {
     let translated = translate_openai_to_anthropic(&body_bytes)
-      .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {}", e)))?;
+      .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {e}")))?;
     (translated, "/v1/messages".to_string())
   } else {
     (body_bytes.to_vec(), clean_path)
@@ -383,7 +382,7 @@ async fn handle_proxy(
       _ => "https://api.openai.com",
     });
 
-  let target_url = format!("{}{}{}", base_url, request_path, query);
+  let target_url = format!("{base_url}{request_path}{query}");
 
   // 8. Build forwarded request with real API key
   let mut req_builder = state
@@ -408,24 +407,22 @@ async fn handle_proxy(
     .body(request_body)
     .send()
     .await
-    .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Forward error: {}", e)))?;
+    .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Forward error: {e}")))?;
 
   // 10. Read and translate response if needed
   let status = provider_response.status();
   let resp_headers = provider_response.headers().clone();
-  let resp_body = provider_response.bytes().await.map_err(|e| {
-    (
-      StatusCode::BAD_GATEWAY,
-      format!("Response read error: {}", e),
-    )
-  })?;
+  let resp_body = provider_response
+    .bytes()
+    .await
+    .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Response read error: {e}")))?;
 
   // Translate response back to OpenAI format if we translated the request
   let final_body = if needs_translation && status.is_success() {
     translate_anthropic_to_openai(&resp_body).map_err(|e| {
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        format!("Response translation error: {}", e),
+        format!("Response translation error: {e}"),
       )
     })?
   } else {
@@ -443,7 +440,7 @@ async fn handle_proxy(
           controller.commit(res, cost_info.cost_micros);
         } else {
           // No reservation was made, add directly (fallback for unknown models)
-          controller.add_spend(cost_info.cost_micros as i64);
+          controller.add_spend(i64::try_from(cost_info.cost_micros).unwrap_or(i64::MAX));
         }
       }
 
@@ -546,12 +543,12 @@ fn calculate_request_cost(
   let input_tokens = usage
     .get("prompt_tokens")
     .or_else(|| usage.get("input_tokens"))
-    .and_then(|v| v.as_u64())?;
+    .and_then(serde_json::Value::as_u64)?;
 
   let output_tokens = usage
     .get("completion_tokens")
     .or_else(|| usage.get("output_tokens"))
-    .and_then(|v| v.as_u64())?;
+    .and_then(serde_json::Value::as_u64)?;
 
   // Get pricing and calculate cost in microdollars (integer arithmetic)
   let pricing = pricing_manager.get(model)?;
