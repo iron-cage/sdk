@@ -32,23 +32,23 @@ jobs:
         GCP_CREDS_B64: ${{ secrets.SECRET_GCP_CREDENTIALS }}
       run: |
         echo "::add-mask::${GCP_CREDS_B64}"
-        printf '%s' "${GCP_CREDS_B64}" | base64 --decode > "${{ secrets.GOOGLE_SE_CREDS_PATH }}"
-        if [ ! -s "${{ secrets.GOOGLE_SE_CREDS_PATH }}" ]; then
+        printf '%s' "${GCP_CREDS_B64}" | base64 --decode > "./.secret/gcp_creds.json"
+        if [ ! -s "./.secret/gcp_creds.json" ]; then
           echo "ERROR: Failed to decode service account credentials"
           exit 1
         fi
-        chmod 600 "${{ secrets.GOOGLE_SE_CREDS_PATH }}"
+        chmod 600 "./.secret/gcp_creds.json"
 
     - name: Create key files
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SECRET_RSA_PRIVATE_KEY }}
         SSH_PUBLIC_KEY: ${{ secrets.SECRET_RSA_PUBLIC_KEY }}
       run: |
-        install -m 600 /dev/null "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
-        printf '%s\n' "${SSH_PRIVATE_KEY}" > "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
+        install -m 600 /dev/null "./.secret/ssh_key"
+        printf '%s\n' "${SSH_PRIVATE_KEY}" > "./.secret/ssh_key"
 
-        install -m 644 /dev/null "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
-        printf '%s\n' "${SSH_PUBLIC_KEY}" > "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
+        install -m 644 /dev/null "./.secret/ssh_key.pub"
+        printf '%s\n' "${SSH_PUBLIC_KEY}" > "./.secret/ssh_key.pub"
 
     - name: Create secret.sh file
       env:
@@ -77,12 +77,12 @@ jobs:
       run: |
         install -m 600 /dev/null .secret/-secret.sh
         cat > .secret/-secret.sh <<EOF
-        GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}
+        GOOGLE_APPLICATION_CREDENTIALS=./.secret/gcp_creds.json
         GOOGLE_APPLICATION_PROJECT_ID=${GOOGLE_APPLICATION_PROJECT_ID}
         GOOGLE_APPLICATION_REGION=${GOOGLE_APPLICATION_REGION}
         GOOGLE_ENCRYPTION_KEY=${GOOGLE_ENCRYPTION_KEY}
-        SSH_PRIVATE_KEY_PATH=${SSH_PRIVATE_KEY_PATH}
-        SSH_PUBLIC_KEY_PATH=${SSH_PUBLIC_KEY_PATH}
+        SSH_PRIVATE_KEY_PATH=./.secret/ssh_key
+        SSH_PUBLIC_KEY_PATH=./.secret/ssh_key.pub
         HOST_SERVER_NAME=${HOST_SERVER_NAME}
         HOST_SERVER_IP=${HOST_SERVER_IP}
         HETZNER_CLOUD_TOKEN=${HETZNER_CLOUD_TOKEN}
@@ -114,12 +114,12 @@ jobs:
         if [ -f .secret/-secret.sh ]; then
           shred -vfz -n 3 .secret/-secret.sh
         fi
-        if [ -f "${{ secrets.GOOGLE_SE_CREDS_PATH }}" ]; then
-          shred -vfz -n 3 "${{ secrets.GOOGLE_SE_CREDS_PATH }}"
+        if [ -f "./.secret/gcp_creds.json" ]; then
+          shred -vfz -n 3 "./.secret/gcp_creds.json"
         fi
-        if [ -f "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}" ]; then
-          shred -vfz -n 3 "${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
+        if [ -f "./.secret/ssh_key" ]; then
+          shred -vfz -n 3 "./.secret/ssh_key"
         fi
-        if [ -f "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}" ]; then
-          shred -vfz -n 3 "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
+        if [ -f "./.secret/ssh_key.pub" ]; then
+          shred -vfz -n 3 "./.secret/ssh_key.pub"
         fi
