@@ -2,8 +2,6 @@
 //!
 //! Error types for token management operations.
 
-// qqq : implement proper error types using error_tools
-
 /// Token management error type
 ///
 /// Fix(issue-001): Added Database variant to preserve underlying sqlx errors

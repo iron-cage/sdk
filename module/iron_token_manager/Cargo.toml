@@ -36,9 +36,6 @@ workspace_tools = { workspace = true }
 # api_claude = { workspace = true }
 # api_gemini = { workspace = true }
 
-# Error handling (per rulebook)
-error_tools = { workspace = true }
-
 # Crypto for token generation
 rand = { workspace = true }
 sha2 = { workspace = true }

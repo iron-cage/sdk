@@ -10,14 +10,14 @@
 
 ## Responsibility
 
-Foundation types, errors, and Result types shared across all Iron Cage modules. Provides common error hierarchy using error_tools, standard Result aliases, core domain types.
+Foundation types, errors, and Result types shared across all Iron Cage modules. Provides common error hierarchy using thiserror, standard Result aliases, core domain types.
 
 ---
 
 ## Scope
 
 **In Scope:**
-- Error type hierarchy (using error_tools per rulebook)
+- Error type hierarchy (using thiserror)
 - Result type aliases for convenience
 - Core domain types (AgentId, TokenId, LeaseId, etc.)
 - Common traits and interfaces
@@ -31,7 +31,7 @@ Foundation types, errors, and Result types shared across all Iron Cage modules. 
 ## Dependencies
 
 **Required External:**
-- error_tools - Error handling per rulebook
+- thiserror - Error handling
 - serde - Serialization
 
 **Optional:**
@@ -42,7 +42,7 @@ Foundation types, errors, and Result types shared across all Iron Cage modules. 
 ## Core Concepts
 
 **Key Components:**
-- **Error Hierarchy:** Unified error types using error_tools
+- **Error Hierarchy:** Unified error types using thiserror
 - **Result Aliases:** Convenient Result<T> wrappers
 - **Domain Types:** Core identifiers (AgentId, TokenId, etc.)
 

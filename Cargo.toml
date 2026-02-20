@@ -57,7 +57,7 @@ default-members = [
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.85"
 authors = ["iron_cage contributors"]
 license = "MIT"
 
@@ -122,11 +122,6 @@ mod_module_files = "allow"
 missing_docs_in_private_items = "allow"
 # Don't require inline in public items (too restrictive for this use case)
 missing_inline_in_public_items = "allow"
-
-## Error Handling - MUST use error_tools per rulebook
-
-[workspace.dependencies.error_tools]
-version = "0.37"
 
 ## Serialization
 

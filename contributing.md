@@ -877,7 +877,7 @@ Close issue referencing commit with reproducer test.
 
 #### Round 1: Critical Rules
 
-- [ ] Error handling uses `error_tools` crate (NOT anyhow/thiserror)
+- [ ] Error handling uses `thiserror` crate (NOT anyhow)
 - [ ] No mocking in tests (uses real implementations)
 - [ ] All temp files prefixed with hyphen (`-*.md`)
 - [ ] No backup files (`*_old`, `*_backup`, `*_v1`)
@@ -923,7 +923,7 @@ Examples:
 feat(token-manager): Add token expiration enforcement
 fix(control-api): Resolve BCrypt non-determinism in token lookup
 docs(contributing): Add manual testing procedures
-refactor(runtime): Consolidate error handling to error_tools
+refactor(runtime): Consolidate error handling to thiserror
 ```
 
 ### Commit Message Format

@@ -1785,7 +1785,7 @@ Iron Cage Runtime is a production-grade Rust-based infrastructure layer for depl
 ### NFR-2.5.3: Dependency Management
 - **Requirement:** All dependencies declared in workspace Cargo.toml
 - **Constraints:**
-  - Use wTools absorption crates (error_tools, unilang, macro_tools)
+  - Use wTools absorption crates (unilang, macro_tools)
   - Pin major versions, allow minor/patch updates
   - Security audits via `cargo audit` weekly
 - **Validation:** Run `cargo deny check`, verify zero vulnerabilities
