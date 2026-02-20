@@ -10,6 +10,9 @@ readme = "readme.md"
 keywords = ["config", "configuration", "environment", "toml"]
 categories = ["config"]
 
+[lints]
+workspace = true
+
 [features]
 default = ["enabled"]
 enabled = [
