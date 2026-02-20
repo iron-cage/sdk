@@ -74,6 +74,7 @@ jobs:
         SERVER_PORT: ${{ secrets.SERVER_PORT }}
         IRON_DEPLOYMENT_MODE: ${{ secrets.IRON_DEPLOYMENT_MODE }}
         ENABLE_DEMO_SEED: ${{ secrets.ENABLE_DEMO_SEED }}
+        RUST_LOG: ${{ vars.RUST_LOG }}
       run: |
         install -m 600 /dev/null .secret/-secret.sh
         cat > .secret/-secret.sh <<EOF
@@ -99,6 +100,7 @@ jobs:
         SERVER_PORT=${SERVER_PORT}
         IRON_DEPLOYMENT_MODE=${IRON_DEPLOYMENT_MODE}
         ENABLE_DEMO_SEED=${ENABLE_DEMO_SEED}
+        RUST_LOG=${RUST_LOG}
         EOF
 
     - name: 'Build the image, push and deploy' 
@@ -106,7 +108,7 @@ jobs:
 
     - name: 'Verify deployment health'
       run: |
-        timeout 300 bash -c 'until curl -f https://${{ vars.PROJECT_DOMAIN }}; do sleep 5; done'
+        timeout 20 bash -c 'until curl -f "https://${{ vars.PROJECT_DOMAIN }}/login"; do sleep 5; done'
 
     - name: Cleanup secrets
       if: always()
