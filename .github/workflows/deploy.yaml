@@ -1,35 +1,3 @@
-
-    - name: Create secret.sh file
-      run: |
-        {
-          echo "SECRET_STATE_ARCHIVE_KEY=${{ secrets.SECRET_STATE_ARCHIVE_KEY }}"
-          echo "GOOGLE_SE_CREDS_PATH=${{ secrets.GOOGLE_SE_CREDS_PATH }}"
-          echo "SECRET_RSA_PRIVATE_KEY_PATH=${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}"
-          echo "SECRET_RSA_PUBLIC_KEY_PATH=${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
-          echo "CSP=${{ secrets.CSP }}"
-          echo "PROJECT_NAME=${{ secrets.PROJECT_NAME }}"
-          echo "SECRET_HETZNER_CLOUD_TOKEN=${{ secrets.SECRET_HETZNER_CLOUD_TOKEN }}"
-          echo "TF_VAR_PROJECT_ID=${{ secrets.TF_VAR_PROJECT_ID }}"
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
-          echo "IC_TOKEN_SECRET=${{ secrets.IC_TOKEN_SECRET }}"
-          echo "IP_TOKEN_KEY=${{ secrets.IP_TOKEN_KEY }}"
-          echo "IRON_SECRETS_MASTER_KEY=${{ secrets.IRON_SECRETS_MASTER_KEY }}"
-          echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}"
-          echo "SERVER_PORT=${{ secrets.SERVER_PORT }}"
-          echo "IRON_DEPLOYMENT_MODE=${{ secrets.IRON_DEPLOYMENT_MODE }}"
-          echo "ENABLE_DEMO_SEED=${{ secrets.ENABLE_DEMO_SEED }}"
-        } > secret/-secret.sh
-
-    - name: Create key files
-      run: |
-        echo "${{ secrets.SECRET_GCP_CREDENTIALS }}" | base64 --decode > ${{ secrets.GOOGLE_SE_CREDS_PATH }}
-        echo "${{ secrets.SECRET_RSA_PRIVATE_KEY }}"  > ${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}
-        echo "${{ secrets.SECRET_RSA_PUBLIC_KEY }}"   > ${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}
-
-    - name: 'Build the image, push and deploy'
-      run: 'make -f ./deploy/Makefile.deploy deploy'
-
 name: Deploy CI
 
 on:
@@ -49,6 +17,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ${{ vars.GH_RUNNER_DEPLOY }}
+    timeout-minutes: 45
     environment: >
       ${{
         github.event_name == 'push'
@@ -96,9 +65,15 @@ jobs:
         PROJECT_NAME: ${{ vars.PROJECT_NAME }}
         PROJECT_DOMAIN: ${{ vars.PROJECT_DOMAIN }}
         PROJECT_CERT_EMAIL: ${{ vars.PROJECT_CERT_EMAIL }}
-        HOST_SERVER_IMAGE: ${{ vars.HOST_SERVER_IMAGE }}
-        HOST_SERVER_LOCATION: ${{ vars.HOST_SERVER_LOCATION }}
-        HOST_SERVER_TYPE: ${{ vars.HOST_SERVER_TYPE }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        IC_TOKEN_SECRET: ${{ secrets.IC_TOKEN_SECRET }}
+        IP_TOKEN_KEY: ${{ secrets.IP_TOKEN_KEY }}
+        IRON_SECRETS_MASTER_KEY: ${{ secrets.IRON_SECRETS_MASTER_KEY }}
+        ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+        SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        IRON_DEPLOYMENT_MODE: ${{ secrets.IRON_DEPLOYMENT_MODE }}
+        ENABLE_DEMO_SEED: ${{ secrets.ENABLE_DEMO_SEED }}
       run: |
         install -m 600 /dev/null .secret/-secret.sh
         cat > .secret/-secret.sh <<EOF
@@ -115,9 +90,15 @@ jobs:
         PROJECT_NAME=${PROJECT_NAME}
         PROJECT_DOMAIN=${PROJECT_DOMAIN}
         PROJECT_CERT_EMAIL=${PROJECT_CERT_EMAIL}
-        HOST_SERVER_IMAGE=${HOST_SERVER_IMAGE}
-        HOST_SERVER_LOCATION=${HOST_SERVER_LOCATION}
-        HOST_SERVER_TYPE=${HOST_SERVER_TYPE}
+        DATABASE_URL=${DATABASE_URL}
+        JWT_SECRET=${JWT_SECRET}
+        IC_TOKEN_SECRET=${IC_TOKEN_SECRET}
+        IP_TOKEN_KEY=${IP_TOKEN_KEY}
+        IRON_SECRETS_MASTER_KEY=${IRON_SECRETS_MASTER_KEY}
+        ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+        SERVER_PORT=${SERVER_PORT}
+        IRON_DEPLOYMENT_MODE=${IRON_DEPLOYMENT_MODE}
+        ENABLE_DEMO_SEED=${ENABLE_DEMO_SEED}
         EOF
 
     - name: 'Build the image, push and deploy' 
@@ -125,8 +106,7 @@ jobs:
 
     - name: 'Verify deployment health'
       run: |
-        # /#/health is the actual route — the app uses hash-based routing
-        timeout 300 bash -c 'until curl -f -k https://${{ vars.PROJECT_DOMAIN }}/#/health; do sleep 5; done'
+        timeout 300 bash -c 'until curl -f https://${{ vars.PROJECT_DOMAIN }}; do sleep 5; done'
 
     - name: Cleanup secrets
       if: always()
@@ -143,4 +123,3 @@ jobs:
         if [ -f "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}" ]; then
           shred -vfz -n 3 "${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}"
         fi
-
