@@ -91,10 +91,10 @@ lint: ## Run clippy in strict mode
 	@echo "[*] Running clippy..."
 	@cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-lint-docs: ## Check documentation ID format compliance
+lint-docs: ## [STUB] Check documentation ID format compliance (not enforced)
 	@scripts/lint_id_formats.sh
 
-lint-python: ## Check Python tooling compliance
+lint-python: ## [STUB] Check Python tooling compliance (not enforced)
 	@scripts/lint_python_tooling.sh
 
 check: fmt-check lint ## Quick code quality check
