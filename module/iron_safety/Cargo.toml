@@ -10,13 +10,16 @@ readme = "readme.md"
 keywords = ["safety", "moderation", "content-filtering", "ai"]
 categories = ["algorithms"]
 
+[lints]
+workspace = true
+
 [features]
 default = ["enabled"]
 enabled = ["dep:iron_types", "dep:regex", "dep:tracing", "dep:serde"]
 full = ["enabled"]
 
 [dependencies]
-iron_types = { workspace = true, features = ["full"], optional = true }
+iron_types = { workspace = true, optional = true, features = ["full"] }
 regex = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
-serde = { workspace = true, features = ["derive"], optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
