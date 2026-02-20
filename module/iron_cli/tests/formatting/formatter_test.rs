@@ -14,7 +14,7 @@
 //!
 //! See tests/formatting/-test_matrix.md for complete coverage plan.
 
-use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
+use iron_cli::formatting::{OutputFormat, TreeFmtFormatter};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -22,32 +22,28 @@ use std::collections::HashMap;
 // ============================================================================
 
 #[test]
-fn test_output_format_from_str_table()
-{
+fn test_output_format_from_str_table() {
   let format: Result<OutputFormat, _> = "table".parse();
   assert!(format.is_ok());
   assert!(matches!(format.unwrap(), OutputFormat::Table));
 }
 
 #[test]
-fn test_output_format_from_str_json()
-{
+fn test_output_format_from_str_json() {
   let format: Result<OutputFormat, _> = "json".parse();
   assert!(format.is_ok());
   assert!(matches!(format.unwrap(), OutputFormat::Json));
 }
 
 #[test]
-fn test_output_format_from_str_yaml()
-{
+fn test_output_format_from_str_yaml() {
   let format: Result<OutputFormat, _> = "yaml".parse();
   assert!(format.is_ok());
   assert!(matches!(format.unwrap(), OutputFormat::Yaml));
 }
 
 #[test]
-fn test_output_format_from_str_invalid()
-{
+fn test_output_format_from_str_invalid() {
   let format: Result<OutputFormat, _> = "invalid".parse();
   assert!(format.is_err());
 }
@@ -57,8 +53,7 @@ fn test_output_format_from_str_invalid()
 // ============================================================================
 
 #[test]
-fn test_format_single_item_table()
-{
+fn test_format_single_item_table() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
   let mut data = HashMap::new();
@@ -74,8 +69,7 @@ fn test_format_single_item_table()
 }
 
 #[test]
-fn test_format_single_item_expanded()
-{
+fn test_format_single_item_expanded() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Expanded);
 
   let mut data = HashMap::new();
@@ -91,8 +85,7 @@ fn test_format_single_item_expanded()
 }
 
 #[test]
-fn test_format_single_item_json()
-{
+fn test_format_single_item_json() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
   let mut data = HashMap::new();
@@ -107,8 +100,7 @@ fn test_format_single_item_json()
 }
 
 #[test]
-fn test_format_single_item_yaml()
-{
+fn test_format_single_item_yaml() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
 
   let mut data = HashMap::new();
@@ -127,8 +119,7 @@ fn test_format_single_item_yaml()
 // ============================================================================
 
 #[test]
-fn test_format_multiple_items_table()
-{
+fn test_format_multiple_items_table() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
   let items = vec![
@@ -155,8 +146,7 @@ fn test_format_multiple_items_table()
 }
 
 #[test]
-fn test_format_multiple_items_expanded()
-{
+fn test_format_multiple_items_expanded() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Expanded);
 
   let items = vec![
@@ -181,8 +171,7 @@ fn test_format_multiple_items_expanded()
 }
 
 #[test]
-fn test_format_multiple_items_json()
-{
+fn test_format_multiple_items_json() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
   let items = vec![
@@ -207,8 +196,7 @@ fn test_format_multiple_items_json()
 }
 
 #[test]
-fn test_format_multiple_items_yaml()
-{
+fn test_format_multiple_items_yaml() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
 
   let items = vec![
@@ -237,8 +225,7 @@ fn test_format_multiple_items_yaml()
 // ============================================================================
 
 #[test]
-fn test_format_empty_list_table()
-{
+fn test_format_empty_list_table() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
   let items: Vec<HashMap<String, String>> = vec![];
 
@@ -248,8 +235,7 @@ fn test_format_empty_list_table()
 }
 
 #[test]
-fn test_format_empty_list_expanded()
-{
+fn test_format_empty_list_expanded() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Expanded);
   let items: Vec<HashMap<String, String>> = vec![];
 
@@ -259,8 +245,7 @@ fn test_format_empty_list_expanded()
 }
 
 #[test]
-fn test_format_empty_list_json()
-{
+fn test_format_empty_list_json() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Json);
   let items: Vec<HashMap<String, String>> = vec![];
 
@@ -271,8 +256,7 @@ fn test_format_empty_list_json()
 }
 
 #[test]
-fn test_format_empty_list_yaml()
-{
+fn test_format_empty_list_yaml() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
   let items: Vec<HashMap<String, String>> = vec![];
 
@@ -289,8 +273,7 @@ fn test_format_empty_list_yaml()
 use iron_cli::handlers::CliError;
 
 #[test]
-fn test_format_error_table()
-{
+fn test_format_error_table() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
   let error = CliError::MissingParameter("username");
 
@@ -301,22 +284,21 @@ fn test_format_error_table()
 }
 
 #[test]
-fn test_format_error_json()
-{
+fn test_format_error_json() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Json);
   let error = CliError::ValidationError("Invalid input".to_string());
 
   let result = formatter.format_error(&error);
 
   // Should be valid JSON with error field
-  let parsed: serde_json::Result<HashMap<String, serde_json::Value>> = serde_json::from_str(&result);
+  let parsed: serde_json::Result<HashMap<String, serde_json::Value>> =
+    serde_json::from_str(&result);
   assert!(parsed.is_ok());
   assert!(parsed.unwrap().contains_key("error"));
 }
 
 #[test]
-fn test_format_error_yaml()
-{
+fn test_format_error_yaml() {
   let formatter = TreeFmtFormatter::new(OutputFormat::Yaml);
   let error = CliError::InvalidParameter {
     param: "token_id",
@@ -326,6 +308,7 @@ fn test_format_error_yaml()
   let result = formatter.format_error(&error);
 
   // Should be valid YAML with error field
-  let parsed: serde_yaml::Result<HashMap<String, serde_yaml::Value>> = serde_yaml::from_str(&result);
+  let parsed: serde_yaml::Result<HashMap<String, serde_yaml::Value>> =
+    serde_yaml::from_str(&result);
   assert!(parsed.is_ok());
 }

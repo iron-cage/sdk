@@ -30,4 +30,4 @@ mod config;
 mod http_client;
 
 pub use config::TokenApiConfig;
-pub use http_client::{ TokenApiClient, TokenApiError };
+pub use http_client::{TokenApiClient, TokenApiError};

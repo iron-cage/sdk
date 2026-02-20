@@ -5,16 +5,15 @@
 //! Covers list, get, create, update, delete limits handlers.
 //! Total: 15 test cases
 
+use iron_cli::handlers::{limits_handlers::*, CliError};
 use std::collections::HashMap;
-use iron_cli::handlers::{ limits_handlers::*, CliError };
 
 // ============================================================================
 // .limits.list tests (3 tests)
 // ============================================================================
 
 #[test]
-fn test_list_limits_handler_success()
-{
+fn test_list_limits_handler_success() {
   let params = HashMap::new();
 
   let result = list_limits_handler(&params);
@@ -23,8 +22,7 @@ fn test_list_limits_handler_success()
 }
 
 #[test]
-fn test_list_limits_handler_empty()
-{
+fn test_list_limits_handler_empty() {
   let params = HashMap::new();
 
   let result = list_limits_handler(&params);
@@ -33,12 +31,10 @@ fn test_list_limits_handler_empty()
 }
 
 #[test]
-fn test_list_limits_handler_all_formats()
-{
+fn test_list_limits_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("format".into(), format.into());
 
@@ -53,8 +49,7 @@ fn test_list_limits_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_get_limit_handler_success()
-{
+fn test_get_limit_handler_success() {
   let mut params = HashMap::new();
   params.insert("limit_id".into(), "lim_abc123".into());
 
@@ -64,27 +59,23 @@ fn test_get_limit_handler_success()
 }
 
 #[test]
-fn test_get_limit_handler_missing_limit_id()
-{
+fn test_get_limit_handler_missing_limit_id() {
   let params = HashMap::new();
 
   let result = get_limit_handler(&params);
 
   assert!(result.is_err(), "Should fail without limit_id");
-  match result.unwrap_err()
-  {
+  match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "limit_id"),
     other => panic!("Wrong error type: {:?}", other),
   }
 }
 
 #[test]
-fn test_get_limit_handler_all_formats()
-{
+fn test_get_limit_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("limit_id".into(), "lim_abc123".into());
     params.insert("format".into(), format.into());
@@ -100,8 +91,7 @@ fn test_get_limit_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_create_limit_handler_success()
-{
+fn test_create_limit_handler_success() {
   let mut params = HashMap::new();
   params.insert("resource_type".into(), "requests".into());
   params.insert("limit_value".into(), "1000".into());
@@ -112,8 +102,7 @@ fn test_create_limit_handler_success()
 }
 
 #[test]
-fn test_create_limit_handler_missing_required_fields()
-{
+fn test_create_limit_handler_missing_required_fields() {
   let mut params = HashMap::new();
   params.insert("resource_type".into(), "requests".into());
 
@@ -123,8 +112,7 @@ fn test_create_limit_handler_missing_required_fields()
 }
 
 #[test]
-fn test_create_limit_handler_invalid_limit_value()
-{
+fn test_create_limit_handler_invalid_limit_value() {
   let mut params = HashMap::new();
   params.insert("resource_type".into(), "requests".into());
   params.insert("limit_value".into(), "-100".into());
@@ -139,8 +127,7 @@ fn test_create_limit_handler_invalid_limit_value()
 // ============================================================================
 
 #[test]
-fn test_update_limit_handler_success()
-{
+fn test_update_limit_handler_success() {
   let mut params = HashMap::new();
   params.insert("limit_id".into(), "lim_abc123".into());
   params.insert("limit_value".into(), "2000".into());
@@ -151,8 +138,7 @@ fn test_update_limit_handler_success()
 }
 
 #[test]
-fn test_update_limit_handler_missing_limit_id()
-{
+fn test_update_limit_handler_missing_limit_id() {
   let mut params = HashMap::new();
   params.insert("limit_value".into(), "2000".into());
 
@@ -162,8 +148,7 @@ fn test_update_limit_handler_missing_limit_id()
 }
 
 #[test]
-fn test_update_limit_handler_invalid_update_fields()
-{
+fn test_update_limit_handler_invalid_update_fields() {
   let mut params = HashMap::new();
   params.insert("limit_id".into(), "lim_abc123".into());
   params.insert("limit_value".into(), "-100".into());
@@ -178,8 +163,7 @@ fn test_update_limit_handler_invalid_update_fields()
 // ============================================================================
 
 #[test]
-fn test_delete_limit_handler_success()
-{
+fn test_delete_limit_handler_success() {
   let mut params = HashMap::new();
   params.insert("limit_id".into(), "lim_abc123".into());
 
@@ -189,8 +173,7 @@ fn test_delete_limit_handler_success()
 }
 
 #[test]
-fn test_delete_limit_handler_missing_limit_id()
-{
+fn test_delete_limit_handler_missing_limit_id() {
   let params = HashMap::new();
 
   let result = delete_limit_handler(&params);
@@ -199,8 +182,7 @@ fn test_delete_limit_handler_missing_limit_id()
 }
 
 #[test]
-fn test_delete_limit_handler_confirmation()
-{
+fn test_delete_limit_handler_confirmation() {
   let mut params = HashMap::new();
   params.insert("limit_id".into(), "lim_abc123".into());
 

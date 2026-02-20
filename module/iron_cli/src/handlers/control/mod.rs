@@ -48,10 +48,10 @@
 //! - All handlers return placeholder strings; actual data loading happens in adapter layer
 
 pub mod agent_handlers;
-pub mod provider_handlers;
 pub mod analytics_handlers;
-pub mod budget_limit_handlers;
 pub mod api_token_handlers;
-pub mod project_handlers;
 pub mod budget_handlers;
+pub mod budget_limit_handlers;
 pub mod control_user_handlers;
+pub mod project_handlers;
+pub mod provider_handlers;

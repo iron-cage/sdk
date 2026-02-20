@@ -36,13 +36,12 @@
 //! - Auth errors: 401 responses trigger token refresh flow
 
 use super::TokenApiConfig;
-use reqwest::{ Client, Response };
+use reqwest::{Client, Response};
 use serde_json::Value;
 use std::collections::HashMap;
 
 /// HTTP client for Token Manager API
-pub struct TokenApiClient
-{
+pub struct TokenApiClient {
   /// HTTP client (reqwest)
   client: Client,
 
@@ -50,15 +49,13 @@ pub struct TokenApiClient
   config: TokenApiConfig,
 }
 
-impl TokenApiClient
-{
+impl TokenApiClient {
   /// Create new Token API client
-  pub fn new( config: TokenApiConfig ) -> Self
-  {
+  pub fn new(config: TokenApiConfig) -> Self {
     let client = Client::builder()
-      .timeout( config.timeout )
+      .timeout(config.timeout)
       .build()
-      .expect( "LOUD FAILURE: Failed to create HTTP client" );
+      .expect("LOUD FAILURE: Failed to create HTTP client");
 
     Self { client, config }
   }
@@ -79,28 +76,27 @@ impl TokenApiClient
     path: &str,
     query_params: Option<HashMap<String, String>>,
     access_token: Option<&str>,
-  ) -> Result<Value, TokenApiError>
-  {
-    let url = format!( "{}{}", self.config.base_url, path );
+  ) -> Result<Value, TokenApiError> {
+    let url = format!("{}{}", self.config.base_url, path);
 
-    let mut request = self.client.get( &url );
+    let mut request = self.client.get(&url);
 
     // Add authorization header if token provided
-    if let Some( token ) = access_token
-    {
-      request = request.header( "Authorization", format!( "Bearer {}", token ) );
+    if let Some(token) = access_token {
+      request = request.header("Authorization", format!("Bearer {}", token));
     }
 
     // Add query parameters
-    if let Some( params ) = query_params
-    {
-      request = request.query( &params );
+    if let Some(params) = query_params {
+      request = request.query(&params);
     }
 
-    let response = request.send().await
-      .map_err( |e| TokenApiError::NetworkError( e.to_string() ) )?;
+    let response = request
+      .send()
+      .await
+      .map_err(|e| TokenApiError::NetworkError(e.to_string()))?;
 
-    self.handle_response( response ).await
+    self.handle_response(response).await
   }
 
   /// Make POST request
@@ -119,23 +115,22 @@ impl TokenApiClient
     path: &str,
     body: Value,
     access_token: Option<&str>,
-  ) -> Result<Value, TokenApiError>
-  {
-    let url = format!( "{}{}", self.config.base_url, path );
+  ) -> Result<Value, TokenApiError> {
+    let url = format!("{}{}", self.config.base_url, path);
 
-    let mut request = self.client.post( &url )
-      .json( &body );
+    let mut request = self.client.post(&url).json(&body);
 
     // Add authorization header if token provided
-    if let Some( token ) = access_token
-    {
-      request = request.header( "Authorization", format!( "Bearer {}", token ) );
+    if let Some(token) = access_token {
+      request = request.header("Authorization", format!("Bearer {}", token));
     }
 
-    let response = request.send().await
-      .map_err( |e| TokenApiError::NetworkError( e.to_string() ) )?;
+    let response = request
+      .send()
+      .await
+      .map_err(|e| TokenApiError::NetworkError(e.to_string()))?;
 
-    self.handle_response( response ).await
+    self.handle_response(response).await
   }
 
   /// Make PUT request
@@ -154,23 +149,22 @@ impl TokenApiClient
     path: &str,
     body: Value,
     access_token: Option<&str>,
-  ) -> Result<Value, TokenApiError>
-  {
-    let url = format!( "{}{}", self.config.base_url, path );
+  ) -> Result<Value, TokenApiError> {
+    let url = format!("{}{}", self.config.base_url, path);
 
-    let mut request = self.client.put( &url )
-      .json( &body );
+    let mut request = self.client.put(&url).json(&body);
 
     // Add authorization header if token provided
-    if let Some( token ) = access_token
-    {
-      request = request.header( "Authorization", format!( "Bearer {}", token ) );
+    if let Some(token) = access_token {
+      request = request.header("Authorization", format!("Bearer {}", token));
     }
 
-    let response = request.send().await
-      .map_err( |e| TokenApiError::NetworkError( e.to_string() ) )?;
+    let response = request
+      .send()
+      .await
+      .map_err(|e| TokenApiError::NetworkError(e.to_string()))?;
 
-    self.handle_response( response ).await
+    self.handle_response(response).await
   }
 
   /// Make DELETE request
@@ -187,89 +181,80 @@ impl TokenApiClient
     &self,
     path: &str,
     access_token: Option<&str>,
-  ) -> Result<Value, TokenApiError>
-  {
-    let url = format!( "{}{}", self.config.base_url, path );
+  ) -> Result<Value, TokenApiError> {
+    let url = format!("{}{}", self.config.base_url, path);
 
-    let mut request = self.client.delete( &url );
+    let mut request = self.client.delete(&url);
 
     // Add authorization header if token provided
-    if let Some( token ) = access_token
-    {
-      request = request.header( "Authorization", format!( "Bearer {}", token ) );
+    if let Some(token) = access_token {
+      request = request.header("Authorization", format!("Bearer {}", token));
     }
 
-    let response = request.send().await
-      .map_err( |e| TokenApiError::NetworkError( e.to_string() ) )?;
+    let response = request
+      .send()
+      .await
+      .map_err(|e| TokenApiError::NetworkError(e.to_string()))?;
 
-    self.handle_response( response ).await
+    self.handle_response(response).await
   }
 
   /// Handle HTTP response
   ///
   /// Checks status code and parses JSON body.
-  async fn handle_response(
-    &self,
-    response: Response,
-  ) -> Result<Value, TokenApiError>
-  {
+  async fn handle_response(&self, response: Response) -> Result<Value, TokenApiError> {
     let status = response.status();
 
     // Check for HTTP errors
-    if status.is_client_error() || status.is_server_error()
-    {
-      let error_body = response.text().await
-        .unwrap_or_else( |_| "Unknown error".to_string() );
+    if status.is_client_error() || status.is_server_error() {
+      let error_body = response
+        .text()
+        .await
+        .unwrap_or_else(|_| "Unknown error".to_string());
 
-      return Err( TokenApiError::ApiError {
+      return Err(TokenApiError::ApiError {
         status_code: status.as_u16(),
         message: error_body,
       });
     }
 
     // Parse JSON response
-    let json = response.json::<Value>().await
-      .map_err( |e| TokenApiError::ParseError( e.to_string() ) )?;
+    let json = response
+      .json::<Value>()
+      .await
+      .map_err(|e| TokenApiError::ParseError(e.to_string()))?;
 
-    Ok( json )
+    Ok(json)
   }
 }
 
 /// Token API errors
 #[derive(Debug)]
-pub enum TokenApiError
-{
+pub enum TokenApiError {
   /// Network error (connection failure, timeout)
-  NetworkError( String ),
+  NetworkError(String),
 
   /// API error (4xx, 5xx status codes)
-  ApiError
-  {
-    status_code: u16,
-    message: String,
-  },
+  ApiError { status_code: u16, message: String },
 
   /// JSON parse error
-  ParseError( String ),
+  ParseError(String),
 }
 
-impl std::fmt::Display for TokenApiError
-{
-  fn fmt( &self, f: &mut std::fmt::Formatter<'_> ) -> std::fmt::Result
-  {
-    match self
-    {
-      Self::NetworkError( msg ) =>
-      {
-        write!( f, "Network error: {}", msg )
+impl std::fmt::Display for TokenApiError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::NetworkError(msg) => {
+        write!(f, "Network error: {}", msg)
       }
-      Self::ApiError { status_code, message } =>
-      {
-        write!( f, "API error ({}): {}", status_code, message )
+      Self::ApiError {
+        status_code,
+        message,
+      } => {
+        write!(f, "API error ({}): {}", status_code, message)
       }
-      Self::ParseError( msg ) =>
-      {
-        write!( f, "Parse error: {}", msg )
+      Self::ParseError(msg) => {
+        write!(f, "Parse error: {}", msg)
       }
     }
   }

@@ -24,25 +24,32 @@
 //! REFACTOR: Pending
 
 #[cfg(test)]
-mod tests
-{
-  use crate::fixtures::{ IntegrationTestHarness, TestServer };
+mod tests {
+  use crate::fixtures::{IntegrationTestHarness, TestServer};
 
   /// Test valid HTTPS endpoint
   #[tokio::test]
-  async fn test_endpoint_https()
-  {
+  async fn test_endpoint_https() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::https://api.example.com" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".config.set", "endpoint::https://api.example.com"],
+      )
+      .await;
 
     // Should succeed or fail with business logic, not URL validation
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
-        "Should not fail with endpoint format error. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint")
+          || !result.stderr.contains("invalid")
+          || !result.stderr.contains("format"),
+        "Should not fail with endpoint format error. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -50,18 +57,21 @@ mod tests
 
   /// Test valid HTTP endpoint
   #[tokio::test]
-  async fn test_endpoint_http()
-  {
+  async fn test_endpoint_http() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::http://localhost:8080" ] ).await;
+    let result = harness
+      .run("iron", &[".config.set", "endpoint::http://localhost:8080"])
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ),
-        "Should not fail with endpoint format error. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint") || !result.stderr.contains("invalid"),
+        "Should not fail with endpoint format error. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -69,37 +79,45 @@ mod tests
 
   /// Test empty endpoint (should fail)
   #[tokio::test]
-  async fn test_endpoint_empty()
-  {
+  async fn test_endpoint_empty() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::" ] ).await;
+    let result = harness.run("iron", &[".config.set", "endpoint::"]).await;
 
-    assert!( !result.success(), "Empty endpoint should fail" );
-    assert!( result.stderr.contains( "endpoint" ) || result.stderr.contains( "empty" ) || result.stderr.contains( "required" ),
-      "Error should mention empty endpoint. Stderr: {}", result.stderr );
+    assert!(!result.success(), "Empty endpoint should fail");
+    assert!(
+      result.stderr.contains("endpoint")
+        || result.stderr.contains("empty")
+        || result.stderr.contains("required"),
+      "Error should mention empty endpoint. Stderr: {}",
+      result.stderr
+    );
 
     server.shutdown().await;
   }
 
   /// Test endpoint without protocol (should fail)
   #[tokio::test]
-  async fn test_endpoint_no_protocol()
-  {
+  async fn test_endpoint_no_protocol() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::api.example.com" ] ).await;
+    let result = harness
+      .run("iron", &[".config.set", "endpoint::api.example.com"])
+      .await;
 
     // Missing protocol should fail
     if !result.success() {
-      assert!( result.stderr.contains( "endpoint" ) || result.stderr.contains( "protocol" ) || result.stderr.contains( "invalid" ),
-        "Should reject endpoint without protocol. Stderr: {}", result.stderr );
+      assert!(
+        result.stderr.contains("endpoint")
+          || result.stderr.contains("protocol")
+          || result.stderr.contains("invalid"),
+        "Should reject endpoint without protocol. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -107,18 +125,24 @@ mod tests
 
   /// Test endpoint with port
   #[tokio::test]
-  async fn test_endpoint_with_port()
-  {
+  async fn test_endpoint_with_port() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::https://api.example.com:8443" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".config.set", "endpoint::https://api.example.com:8443"],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ),
-        "Should accept endpoint with port. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint") || !result.stderr.contains("invalid"),
+        "Should accept endpoint with port. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -126,18 +150,24 @@ mod tests
 
   /// Test endpoint with path
   #[tokio::test]
-  async fn test_endpoint_with_path()
-  {
+  async fn test_endpoint_with_path() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::https://api.example.com/v1/api" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".config.set", "endpoint::https://api.example.com/v1/api"],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ),
-        "Should accept endpoint with path. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint") || !result.stderr.contains("invalid"),
+        "Should accept endpoint with path. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -145,18 +175,24 @@ mod tests
 
   /// Test endpoint with trailing slash
   #[tokio::test]
-  async fn test_endpoint_trailing_slash()
-  {
+  async fn test_endpoint_trailing_slash() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::https://api.example.com/" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".config.set", "endpoint::https://api.example.com/"],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ),
-        "Should accept endpoint with trailing slash. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint") || !result.stderr.contains("invalid"),
+        "Should accept endpoint with trailing slash. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -164,18 +200,24 @@ mod tests
 
   /// Test endpoint with IP address
   #[tokio::test]
-  async fn test_endpoint_ip_address()
-  {
+  async fn test_endpoint_ip_address() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::http://192.168.1.100:8080" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".config.set", "endpoint::http://192.168.1.100:8080"],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ),
-        "Should accept IP address endpoint. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint") || !result.stderr.contains("invalid"),
+        "Should accept IP address endpoint. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -183,18 +225,21 @@ mod tests
 
   /// Test endpoint with localhost
   #[tokio::test]
-  async fn test_endpoint_localhost()
-  {
+  async fn test_endpoint_localhost() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron", &[ ".config.set", "endpoint::http://localhost:3000" ] ).await;
+    let result = harness
+      .run("iron", &[".config.set", "endpoint::http://localhost:3000"])
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "endpoint" ) || !result.stderr.contains( "invalid" ),
-        "Should accept localhost endpoint. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("endpoint") || !result.stderr.contains("invalid"),
+        "Should accept localhost endpoint. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;

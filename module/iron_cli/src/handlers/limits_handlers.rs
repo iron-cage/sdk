@@ -3,9 +3,9 @@
 //! Pure functions for limits list, get, create, update, delete operations.
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
+use super::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
-use super::validation::{ validate_non_empty, validate_non_negative_integer };
+use std::collections::HashMap;
 
 /// Handle .limits.list command
 ///
@@ -15,10 +15,7 @@ use super::validation::{ validate_non_empty, validate_non_negative_integer };
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_limits_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn list_limits_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
 
   Ok(format!("List limits\nFormat: {}", format))
@@ -35,10 +32,7 @@ pub fn list_limits_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_limit_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn get_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let limit_id = params
     .get("limit_id")
@@ -68,10 +62,7 @@ pub fn get_limit_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn create_limit_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn create_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let resource_type = params
     .get("resource_type")
@@ -108,10 +99,7 @@ pub fn create_limit_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn update_limit_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn update_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let limit_id = params
     .get("limit_id")
@@ -147,10 +135,7 @@ pub fn update_limit_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn delete_limit_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn delete_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let limit_id = params
     .get("limit_id")

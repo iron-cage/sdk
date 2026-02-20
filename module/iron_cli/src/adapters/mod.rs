@@ -27,28 +27,31 @@
 //! Status: GREEN phase (implementing adapters and InMemoryAdapter)
 //! Progress: Auth adapters (3/22), InMemoryAdapter complete
 
-pub mod error;
-pub mod services;
-pub mod implementations;
 pub mod auth;
-pub mod tokens;
-pub mod usage;
-pub mod limits;
-pub mod traces;
+pub mod error;
 pub mod health;
+pub mod implementations;
+pub mod limits;
+pub mod services;
+pub mod tokens;
+pub mod traces;
+pub mod usage;
 
 // Control API adapters (for iron binary)
 pub mod control;
 
 // Token API adapters (for iron-token binary)
-pub mod token;
-pub mod keyring;
 pub mod auth_adapters;
-pub mod token_adapters;
-pub mod usage_adapters;
-pub mod limits_adapters;
-pub mod traces_adapters;
 pub mod health_adapters;
+pub mod keyring;
+pub mod limits_adapters;
+pub mod token;
+pub mod token_adapters;
+pub mod traces_adapters;
+pub mod usage_adapters;
 
-pub use error::{ AdapterError, ServiceError };
-pub use services::{ AuthService, TokenService, UsageService, LimitsService, TracesService, HealthService, StorageService, Services, Tokens, Token, UsageRecord, Limit, Trace, HealthStatus };
+pub use error::{AdapterError, ServiceError};
+pub use services::{
+  AuthService, HealthService, HealthStatus, Limit, LimitsService, Services, StorageService, Token,
+  TokenService, Tokens, Trace, TracesService, UsageRecord, UsageService,
+};

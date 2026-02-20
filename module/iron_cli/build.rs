@@ -10,150 +10,141 @@
 
 use std::env;
 use std::fs::File;
-use std::io::{ Write, BufWriter };
-use std::path::{ Path, PathBuf };
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
 
 /// Recursively register YAML files for rebuild detection
-fn register_yaml_files_recursive( dir: &Path )
-{
-  if let Ok( entries ) = std::fs::read_dir( dir )
-  {
-    for entry in entries.flatten()
-    {
+fn register_yaml_files_recursive(dir: &Path) {
+  if let Ok(entries) = std::fs::read_dir(dir) {
+    for entry in entries.flatten() {
       let path = entry.path();
 
-      if path.is_dir()
-      {
+      if path.is_dir() {
         // Recurse into subdirectories
-        register_yaml_files_recursive( &path );
-      }
-      else if path.extension().is_some_and( | e | e == "yaml" || e == "yml" )
-      {
-        println!( "cargo:rerun-if-changed={}", path.display() );
+        register_yaml_files_recursive(&path);
+      } else if path.extension().is_some_and(|e| e == "yaml" || e == "yml") {
+        println!("cargo:rerun-if-changed={}", path.display());
       }
     }
   }
 }
 
 /// Recursively discover all YAML files in directory
-fn discover_yaml_files_recursive( dir: &Path, files: &mut Vec<PathBuf> )
-{
-  if let Ok( entries ) = std::fs::read_dir( dir )
-  {
-    for entry in entries.flatten()
-    {
+fn discover_yaml_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) {
+  if let Ok(entries) = std::fs::read_dir(dir) {
+    for entry in entries.flatten() {
       let path = entry.path();
 
-      if path.is_dir()
-      {
+      if path.is_dir() {
         // Recurse into subdirectories
-        discover_yaml_files_recursive( &path, files );
-      }
-      else if path.extension().is_some_and( | e | e == "yaml" || e == "yml" )
-      {
-        files.push( path );
+        discover_yaml_files_recursive(&path, files);
+      } else if path.extension().is_some_and(|e| e == "yaml" || e == "yml") {
+        files.push(path);
       }
     }
   }
 }
 
-fn main()
-{
-  println!( "cargo:rerun-if-changed=build.rs" );
-  println!( "cargo:rerun-if-changed=commands" );
+fn main() {
+  println!("cargo:rerun-if-changed=build.rs");
+  println!("cargo:rerun-if-changed=commands");
 
   // Discover and register all YAML files in commands/ directory
-  let manifest_dir = PathBuf::from( env::var( "CARGO_MANIFEST_DIR" ).unwrap() );
-  let commands_dir = manifest_dir.join( "commands" );
+  let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+  let commands_dir = manifest_dir.join("commands");
 
-  if commands_dir.exists()
-  {
+  if commands_dir.exists() {
     // Register each YAML file for rebuild detection (recursively)
-    register_yaml_files_recursive( &commands_dir );
+    register_yaml_files_recursive(&commands_dir);
 
     // Generate static commands registry
-    generate_static_commands( &commands_dir );
-  }
-  else
-  {
+    generate_static_commands(&commands_dir);
+  } else {
     // No commands directory - generate empty registry
     generate_empty_registry();
   }
 }
 
-fn generate_static_commands( commands_dir : &Path )
-{
-  let out_dir = env::var( "OUT_DIR" ).unwrap();
-  let dest_path = PathBuf::from( &out_dir ).join( "static_commands.rs" );
+fn generate_static_commands(commands_dir: &Path) {
+  let out_dir = env::var("OUT_DIR").unwrap();
+  let dest_path = PathBuf::from(&out_dir).join("static_commands.rs");
 
   // Collect all command definitions from YAML files (recursively)
   let mut all_commands = Vec::new();
   let mut yaml_files = Vec::new();
 
   // Discover all YAML files recursively
-  discover_yaml_files_recursive( commands_dir, &mut yaml_files );
+  discover_yaml_files_recursive(commands_dir, &mut yaml_files);
 
   // Parse each YAML file and collect commands
-  for path in yaml_files
-  {
+  for path in yaml_files {
     // Parse YAML file
-    if let Ok( contents ) = std::fs::read_to_string( &path )
-    {
-      match serde_yaml::from_str::< serde_yaml::Value >( &contents )
-      {
-        Ok( yaml ) =>
-        {
+    if let Ok(contents) = std::fs::read_to_string(&path) {
+      match serde_yaml::from_str::<serde_yaml::Value>(&contents) {
+        Ok(yaml) => {
           // Extract commands from YAML
           // Supports both:
           // - Format A: Root-level array (unilang spec compliant)
           // - Format B: Legacy format with `commands:` wrapper
-          let commands_seq = yaml.as_sequence()
+          let commands_seq = yaml
+            .as_sequence()
             // Format A: Root-level array (CORRECT)
-            .or_else( ||
-            {
+            .or_else(|| {
               // Format B: Legacy with wrapper (DEPRECATED)
-              yaml.get( "commands" ).and_then( | v | v.as_sequence() )
+              yaml.get("commands").and_then(|v| v.as_sequence())
             });
 
-          if let Some( commands ) = commands_seq
-          {
-            for cmd in commands
-            {
-              all_commands.push( cmd.clone() );
+          if let Some(commands) = commands_seq {
+            for cmd in commands {
+              all_commands.push(cmd.clone());
             }
           }
         }
-        Err( e ) =>
-        {
-          eprintln!( "Warning: Failed to parse {}: {}", path.display(), e );
+        Err(e) => {
+          eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
         }
       }
     }
   }
 
   // Generate Rust code
-  let mut f = BufWriter::new( File::create( &dest_path ).unwrap() );
+  let mut f = BufWriter::new(File::create(&dest_path).unwrap());
 
-  writeln!( f, "// Generated static commands from YAML definitions" ).unwrap();
-  writeln!( f, "// DO NOT EDIT - Generated by build.rs" ).unwrap();
-  writeln!( f ).unwrap();
-  writeln!( f, "// Command count from YAML definitions" ).unwrap();
-  writeln!( f, "pub const YAML_COMMAND_COUNT : usize = {};", all_commands.len() ).unwrap();
-  writeln!( f ).unwrap();
-  writeln!( f, "// Future phases will add PHF-based command registry here" ).unwrap();
-  writeln!( f, "// Phase 2-3: Full unilang Pipeline integration with handlers" ).unwrap();
+  writeln!(f, "// Generated static commands from YAML definitions").unwrap();
+  writeln!(f, "// DO NOT EDIT - Generated by build.rs").unwrap();
+  writeln!(f).unwrap();
+  writeln!(f, "// Command count from YAML definitions").unwrap();
+  writeln!(
+    f,
+    "pub const YAML_COMMAND_COUNT : usize = {};",
+    all_commands.len()
+  )
+  .unwrap();
+  writeln!(f).unwrap();
+  writeln!(
+    f,
+    "// Future phases will add PHF-based command registry here"
+  )
+  .unwrap();
+  writeln!(
+    f,
+    "// Phase 2-3: Full unilang Pipeline integration with handlers"
+  )
+  .unwrap();
 
-  println!( "cargo:warning=Discovered {} commands in YAML files", all_commands.len() );
+  println!(
+    "cargo:warning=Discovered {} commands in YAML files",
+    all_commands.len()
+  );
 }
 
-fn generate_empty_registry()
-{
-  let out_dir = env::var( "OUT_DIR" ).unwrap();
-  let dest_path = PathBuf::from( &out_dir ).join( "static_commands.rs" );
+fn generate_empty_registry() {
+  let out_dir = env::var("OUT_DIR").unwrap();
+  let dest_path = PathBuf::from(&out_dir).join("static_commands.rs");
 
-  let mut f = BufWriter::new( File::create( &dest_path ).unwrap() );
+  let mut f = BufWriter::new(File::create(&dest_path).unwrap());
 
-  writeln!( f, "// No static commands - commands/ directory not found" ).unwrap();
-  writeln!( f ).unwrap();
-  writeln!( f, "pub const YAML_COMMAND_COUNT : usize = 0;" ).unwrap();
+  writeln!(f, "// No static commands - commands/ directory not found").unwrap();
+  writeln!(f).unwrap();
+  writeln!(f, "pub const YAML_COMMAND_COUNT : usize = 0;").unwrap();
 }

@@ -5,16 +5,15 @@
 //! Covers health and version handlers.
 //! Total: 3 test cases
 
-use std::collections::HashMap;
 use iron_cli::handlers::health_handlers::*;
+use std::collections::HashMap;
 
 // ============================================================================
 // .health tests (2 tests)
 // ============================================================================
 
 #[test]
-fn test_health_handler_success()
-{
+fn test_health_handler_success() {
   let params = HashMap::new();
 
   let result = health_handler(&params);
@@ -25,8 +24,7 @@ fn test_health_handler_success()
 }
 
 #[test]
-fn test_health_handler_format_json()
-{
+fn test_health_handler_format_json() {
   let mut params = HashMap::new();
   params.insert("format".into(), "json".into());
 
@@ -40,8 +38,7 @@ fn test_health_handler_format_json()
 // ============================================================================
 
 #[test]
-fn test_version_handler_success()
-{
+fn test_version_handler_success() {
   let params = HashMap::new();
 
   let result = version_handler(&params);

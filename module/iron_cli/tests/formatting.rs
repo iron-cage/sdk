@@ -5,6 +5,6 @@
 //! Total: 15 test cases (TreeFmtFormatter)
 
 mod formatting {
-    pub mod formatter_test;
-    pub mod tree_formatter_test;
+  pub mod formatter_test;
+  pub mod tree_formatter_test;
 }

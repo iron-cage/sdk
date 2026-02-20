@@ -53,10 +53,9 @@ use std::path::PathBuf;
 /// - Dead code indicators: 0 (target)
 /// - Parameter mismatches: 0 (target)
 /// - API violations: 0 (target)
-#[ test ]
-fn test_migration_metrics_at_target()
-{
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+#[test]
+fn test_migration_metrics_at_target() {
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
   // M1: Adapter counts
   let adapter_files = [
@@ -70,15 +69,14 @@ fn test_migration_metrics_at_target()
 
   let mut total_adapters = 0;
 
-  for file_path_str in &adapter_files
-  {
-    let file_path = manifest_dir.join( file_path_str );
-    let content = std::fs::read_to_string( &file_path )
-      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
+  for file_path_str in &adapter_files {
+    let file_path = manifest_dir.join(file_path_str);
+    let content = std::fs::read_to_string(&file_path)
+      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
 
     let count = content
       .lines()
-      .filter( |line| line.starts_with( "pub async fn " ) && line.contains( "_adapter(" ) )
+      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
       .count();
 
     total_adapters += count;
@@ -87,33 +85,30 @@ fn test_migration_metrics_at_target()
   // M1: Verify adapter metrics
   let orphaned_adapters = 0; // No orphaned adapters exist
   let correct_adapters = total_adapters;
-  let orphaned_ratio = ( orphaned_adapters as f64 / total_adapters as f64 ) * 100.0;
+  let orphaned_ratio = (orphaned_adapters as f64 / total_adapters as f64) * 100.0;
 
   assert_eq!(
-    orphaned_adapters,
-    0,
+    orphaned_adapters, 0,
     "M1 failed: Orphaned adapters = {} (target 0)",
     orphaned_adapters
   );
 
   assert_eq!(
-    correct_adapters,
-    22,
+    correct_adapters, 22,
     "M1 failed: Correct adapters = {} (target 22)",
     correct_adapters
   );
 
   assert_eq!(
-    orphaned_ratio,
-    0.0,
+    orphaned_ratio, 0.0,
     "M1 failed: Orphaned ratio = {:.1}% (target 0%)",
     orphaned_ratio
   );
 
   // M2: Routing counts
-  let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
-  let routing_content = std::fs::read_to_string( &routing_file )
-    .expect("LOUD FAILURE: Failed to read routing file");
+  let routing_file = manifest_dir.join("src/bin/iron_token_unilang.rs");
+  let routing_content =
+    std::fs::read_to_string(&routing_file).expect("LOUD FAILURE: Failed to read routing file");
 
   // List of orphaned adapters that should NOT appear in routing
   let orphaned_adapter_names = [
@@ -127,30 +122,27 @@ fn test_migration_metrics_at_target()
 
   let broken_routes = orphaned_adapter_names
     .iter()
-    .filter( |name| routing_content.contains( *name ) )
+    .filter(|name| routing_content.contains(*name))
     .count();
 
   let total_routes = 22; // Expected number of commands
   let correct_routes = total_routes - broken_routes;
-  let broken_ratio = ( broken_routes as f64 / total_routes as f64 ) * 100.0;
+  let broken_ratio = (broken_routes as f64 / total_routes as f64) * 100.0;
 
   assert_eq!(
-    broken_routes,
-    0,
+    broken_routes, 0,
     "M2 failed: Broken routes = {} (target 0)",
     broken_routes
   );
 
   assert_eq!(
-    correct_routes,
-    22,
+    correct_routes, 22,
     "M2 failed: Correct routes = {} (target 22)",
     correct_routes
   );
 
   assert_eq!(
-    broken_ratio,
-    0.0,
+    broken_ratio, 0.0,
     "M2 failed: Broken ratio = {:.1}% (target 0%)",
     broken_ratio
   );
@@ -159,16 +151,13 @@ fn test_migration_metrics_at_target()
   let mut dead_code_indicators = 0;
 
   // Check for orphaned adapter function definitions
-  for file_path_str in &adapter_files
-  {
-    let file_path = manifest_dir.join( file_path_str );
-    let content = std::fs::read_to_string( &file_path )
-      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
+  for file_path_str in &adapter_files {
+    let file_path = manifest_dir.join(file_path_str);
+    let content = std::fs::read_to_string(&file_path)
+      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
 
-    for orphaned_name in &orphaned_adapter_names
-    {
-      if content.contains( orphaned_name )
-      {
+    for orphaned_name in &orphaned_adapter_names {
+      if content.contains(orphaned_name) {
         dead_code_indicators += 1;
       }
     }
@@ -178,22 +167,19 @@ fn test_migration_metrics_at_target()
   let api_violations = 0; // No API violations expected
 
   assert_eq!(
-    dead_code_indicators,
-    0,
+    dead_code_indicators, 0,
     "M3 failed: Dead code indicators = {} (target 0)",
     dead_code_indicators
   );
 
   assert_eq!(
-    parameter_mismatches,
-    0,
+    parameter_mismatches, 0,
     "M3 failed: Parameter mismatches = {} (target 0)",
     parameter_mismatches
   );
 
   assert_eq!(
-    api_violations,
-    0,
+    api_violations, 0,
     "M3 failed: API violations = {} (target 0)",
     api_violations
   );
@@ -212,10 +198,9 @@ fn test_migration_metrics_at_target()
 /// - Initial state (before migration)
 /// - Final state (after migration)
 /// - Delta (change magnitude and direction)
-#[ test ]
-fn test_migration_trajectory_correctness()
-{
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+#[test]
+fn test_migration_trajectory_correctness() {
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
   // Count current adapters
   let adapter_files = [
@@ -229,15 +214,14 @@ fn test_migration_trajectory_correctness()
 
   let mut current_total = 0;
 
-  for file_path_str in &adapter_files
-  {
-    let file_path = manifest_dir.join( file_path_str );
-    let content = std::fs::read_to_string( &file_path )
-      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
+  for file_path_str in &adapter_files {
+    let file_path = manifest_dir.join(file_path_str);
+    let content = std::fs::read_to_string(&file_path)
+      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
 
     let count = content
       .lines()
-      .filter( |line| line.starts_with( "pub async fn " ) && line.contains( "_adapter(" ) )
+      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
       .count();
 
     current_total += count;
@@ -262,33 +246,26 @@ fn test_migration_trajectory_correctness()
   let actual_pct_delta = final_orphaned_pct - initial_orphaned_pct;
 
   assert_eq!(
-    actual_orphaned_delta,
-    expected_orphaned_delta,
+    actual_orphaned_delta, expected_orphaned_delta,
     "Orphaned trajectory: expected Δ {}, got Δ {}",
-    expected_orphaned_delta,
-    actual_orphaned_delta
+    expected_orphaned_delta, actual_orphaned_delta
   );
 
   assert_eq!(
-    actual_correct_delta,
-    expected_correct_delta,
+    actual_correct_delta, expected_correct_delta,
     "Correct trajectory: expected Δ {}, got Δ {}",
-    expected_correct_delta,
-    actual_correct_delta
+    expected_correct_delta, actual_correct_delta
   );
 
   assert_eq!(
-    actual_pct_delta,
-    expected_pct_delta,
+    actual_pct_delta, expected_pct_delta,
     "Percentage trajectory: expected Δ {:.1}%, got Δ {:.1}%",
-    expected_pct_delta,
-    actual_pct_delta
+    expected_pct_delta, actual_pct_delta
   );
 
   // Verify current state matches final state
   assert_eq!(
-    current_total,
-    22,
+    current_total, 22,
     "Current adapter count = {} (expected 22 in final state)",
     current_total
   );
@@ -305,10 +282,9 @@ fn test_migration_trajectory_correctness()
 /// ## Negative Criterion: NC-M.3
 ///
 /// All ratios must match targets
-#[ test ]
-fn test_ratios_at_target()
-{
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+#[test]
+fn test_ratios_at_target() {
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
   // Count adapters
   let adapter_files = [
@@ -322,15 +298,14 @@ fn test_ratios_at_target()
 
   let mut total_adapters = 0;
 
-  for file_path_str in &adapter_files
-  {
-    let file_path = manifest_dir.join( file_path_str );
-    let content = std::fs::read_to_string( &file_path )
-      .unwrap_or_else( |_| panic!( "Failed to read {}", file_path_str ) );
+  for file_path_str in &adapter_files {
+    let file_path = manifest_dir.join(file_path_str);
+    let content = std::fs::read_to_string(&file_path)
+      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
 
     let count = content
       .lines()
-      .filter( |line| line.starts_with( "pub async fn " ) && line.contains( "_adapter(" ) )
+      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
       .count();
 
     total_adapters += count;
@@ -340,13 +315,13 @@ fn test_ratios_at_target()
   let orphaned_count = 0;
   let correct_adapter_count = total_adapters;
 
-  let orphaned_pct = ( orphaned_count as f64 / total_adapters as f64 ) * 100.0;
-  let correct_adapter_pct = ( correct_adapter_count as f64 / total_adapters as f64 ) * 100.0;
+  let orphaned_pct = (orphaned_count as f64 / total_adapters as f64) * 100.0;
+  let correct_adapter_pct = (correct_adapter_count as f64 / total_adapters as f64) * 100.0;
 
   // Check routing
-  let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
-  let routing_content = std::fs::read_to_string( &routing_file )
-    .expect("LOUD FAILURE: Failed to read routing file");
+  let routing_file = manifest_dir.join("src/bin/iron_token_unilang.rs");
+  let routing_content =
+    std::fs::read_to_string(&routing_file).expect("LOUD FAILURE: Failed to read routing file");
 
   let orphaned_adapter_names = [
     "show_agent_usage_adapter",
@@ -359,40 +334,36 @@ fn test_ratios_at_target()
 
   let broken_route_count = orphaned_adapter_names
     .iter()
-    .filter( |name| routing_content.contains( *name ) )
+    .filter(|name| routing_content.contains(*name))
     .count();
 
   let total_routes = 22;
   let correct_route_count = total_routes - broken_route_count;
 
-  let broken_route_pct = ( broken_route_count as f64 / total_routes as f64 ) * 100.0;
-  let correct_route_pct = ( correct_route_count as f64 / total_routes as f64 ) * 100.0;
+  let broken_route_pct = (broken_route_count as f64 / total_routes as f64) * 100.0;
+  let correct_route_pct = (correct_route_count as f64 / total_routes as f64) * 100.0;
 
   // Verify all ratios at target
   assert_eq!(
-    orphaned_pct,
-    0.0,
+    orphaned_pct, 0.0,
     "NC-M.3 violated: Orphaned % = {:.1}% (target 0%)",
     orphaned_pct
   );
 
   assert_eq!(
-    broken_route_pct,
-    0.0,
+    broken_route_pct, 0.0,
     "NC-M.3 violated: Broken route % = {:.1}% (target 0%)",
     broken_route_pct
   );
 
   assert_eq!(
-    correct_adapter_pct,
-    100.0,
+    correct_adapter_pct, 100.0,
     "NC-M.3 violated: Correct adapter % = {:.1}% (target 100%)",
     correct_adapter_pct
   );
 
   assert_eq!(
-    correct_route_pct,
-    100.0,
+    correct_route_pct, 100.0,
     "NC-M.3 violated: Correct route % = {:.1}% (target 100%)",
     correct_route_pct
   );

@@ -48,18 +48,18 @@
 //! Phase 3: Will implement all 46 adapter functions
 //! Phase 4: Will add comprehensive error handling and retries
 
-pub mod http_client;
+pub mod agent_adapters;
+pub mod analytics_adapters;
+pub mod api_token_adapters;
+pub mod budget_adapters;
+pub mod budget_limit_adapters;
 pub mod config;
 pub mod formatter;
-pub mod agent_adapters;
-pub mod provider_adapters;
-pub mod analytics_adapters;
-pub mod budget_limit_adapters;
-pub mod api_token_adapters;
+pub mod http_client;
 pub mod project_adapters;
-pub mod budget_adapters;
+pub mod provider_adapters;
 pub mod user_adapters;
 
-pub use http_client::ControlApiClient;
 pub use config::ControlApiConfig;
 pub use formatter::format_output;
+pub use http_client::ControlApiClient;

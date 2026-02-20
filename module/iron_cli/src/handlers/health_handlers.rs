@@ -3,8 +3,8 @@
 //! Pure functions for health and version check operations.
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
 use crate::handlers::CliError;
+use std::collections::HashMap;
 
 /// Handle .health command
 ///
@@ -14,16 +14,10 @@ use crate::handlers::CliError;
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn health_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn health_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
 
-  Ok(format!(
-    "Health status: OK\nFormat: {}",
-    format
-  ))
+  Ok(format!("Health status: OK\nFormat: {}", format))
 }
 
 /// Handle .version command
@@ -34,15 +28,9 @@ pub fn health_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn version_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn version_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
   let version = env!("CARGO_PKG_VERSION");
 
-  Ok(format!(
-    "iron-cli version: {}\nFormat: {}",
-    version, format
-  ))
+  Ok(format!("iron-cli version: {}\nFormat: {}", version, format))
 }

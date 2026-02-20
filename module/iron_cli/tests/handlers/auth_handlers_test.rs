@@ -19,16 +19,15 @@
 //! All handlers accept `&HashMap<String, String>` and return `Result<String, CliError>`.
 //! Tests verify both success paths and all error conditions.
 
+use iron_cli::handlers::{auth_handlers::*, CliError};
 use std::collections::HashMap;
-use iron_cli::handlers::{ auth_handlers::*, CliError };
 
 // ============================================================================
 // .auth.login tests (9 tests)
 // ============================================================================
 
 #[test]
-fn test_login_handler_success()
-{
+fn test_login_handler_success() {
   let mut params = HashMap::new();
   params.insert("email".into(), "alice@example.com".into());
   params.insert("password".into(), "secret123".into());
@@ -46,8 +45,7 @@ fn test_login_handler_success()
 }
 
 #[test]
-fn test_login_handler_missing_email()
-{
+fn test_login_handler_missing_email() {
   let mut params = HashMap::new();
   params.insert("password".into(), "secret123".into());
 
@@ -55,10 +53,8 @@ fn test_login_handler_missing_email()
 
   assert!(result.is_err(), "Should fail without email");
 
-  match result.unwrap_err()
-  {
-    CliError::MissingParameter(name) =>
-    {
+  match result.unwrap_err() {
+    CliError::MissingParameter(name) => {
       assert_eq!(name, "email", "Error should mention 'email'");
     }
     other => panic!("Wrong error type: {:?}", other),
@@ -66,8 +62,7 @@ fn test_login_handler_missing_email()
 }
 
 #[test]
-fn test_login_handler_missing_password()
-{
+fn test_login_handler_missing_password() {
   let mut params = HashMap::new();
   params.insert("email".into(), "alice@example.com".into());
 
@@ -75,10 +70,8 @@ fn test_login_handler_missing_password()
 
   assert!(result.is_err(), "Should fail without password");
 
-  match result.unwrap_err()
-  {
-    CliError::MissingParameter(name) =>
-    {
+  match result.unwrap_err() {
+    CliError::MissingParameter(name) => {
       assert_eq!(name, "password", "Error should mention 'password'");
     }
     other => panic!("Wrong error type: {:?}", other),
@@ -86,8 +79,7 @@ fn test_login_handler_missing_password()
 }
 
 #[test]
-fn test_login_handler_empty_email()
-{
+fn test_login_handler_empty_email() {
   let mut params = HashMap::new();
   params.insert("email".into(), "".into());
   params.insert("password".into(), "secret123".into());
@@ -96,10 +88,8 @@ fn test_login_handler_empty_email()
 
   assert!(result.is_err(), "Should fail with empty email");
 
-  match result.unwrap_err()
-  {
-    CliError::InvalidParameter { param, reason } =>
-    {
+  match result.unwrap_err() {
+    CliError::InvalidParameter { param, reason } => {
       assert_eq!(param, "email");
       assert!(
         reason.contains("empty"),
@@ -112,8 +102,7 @@ fn test_login_handler_empty_email()
 }
 
 #[test]
-fn test_login_handler_email_too_short()
-{
+fn test_login_handler_email_too_short() {
   let mut params = HashMap::new();
   params.insert("email".into(), "ab".into()); // Only 2 chars
   params.insert("password".into(), "secret123".into());
@@ -122,10 +111,8 @@ fn test_login_handler_email_too_short()
 
   assert!(result.is_err(), "Should fail with email < 3 chars");
 
-  match result.unwrap_err()
-  {
-    CliError::InvalidParameter { param, reason } =>
-    {
+  match result.unwrap_err() {
+    CliError::InvalidParameter { param, reason } => {
       assert_eq!(param, "email");
       assert!(
         reason.contains("3") || reason.contains("least"),
@@ -138,8 +125,7 @@ fn test_login_handler_email_too_short()
 }
 
 #[test]
-fn test_login_handler_email_too_long()
-{
+fn test_login_handler_email_too_long() {
   let mut params = HashMap::new();
   let long_email = "a".repeat(101); // 101 chars (max is 100)
   params.insert("email".into(), long_email);
@@ -149,10 +135,8 @@ fn test_login_handler_email_too_long()
 
   assert!(result.is_err(), "Should fail with email > 100 chars");
 
-  match result.unwrap_err()
-  {
-    CliError::InvalidParameter { param, reason } =>
-    {
+  match result.unwrap_err() {
+    CliError::InvalidParameter { param, reason } => {
       assert_eq!(param, "email");
       assert!(
         reason.contains("100") || reason.contains("most"),
@@ -165,8 +149,7 @@ fn test_login_handler_email_too_long()
 }
 
 #[test]
-fn test_login_handler_invalid_email_pattern()
-{
+fn test_login_handler_invalid_email_pattern() {
   let mut params = HashMap::new();
   params.insert("email".into(), "alice!@#$%^&*()".into()); // Invalid chars
   params.insert("password".into(), "secret123".into());
@@ -175,10 +158,8 @@ fn test_login_handler_invalid_email_pattern()
 
   assert!(result.is_err(), "Should fail with invalid email pattern");
 
-  match result.unwrap_err()
-  {
-    CliError::InvalidParameter { param, reason } =>
-    {
+  match result.unwrap_err() {
+    CliError::InvalidParameter { param, reason } => {
       assert_eq!(param, "email");
       assert!(
         reason.contains("pattern") || reason.contains("format"),
@@ -191,8 +172,7 @@ fn test_login_handler_invalid_email_pattern()
 }
 
 #[test]
-fn test_login_handler_empty_password()
-{
+fn test_login_handler_empty_password() {
   let mut params = HashMap::new();
   params.insert("email".into(), "alice@example.com".into());
   params.insert("password".into(), "".into());
@@ -201,10 +181,8 @@ fn test_login_handler_empty_password()
 
   assert!(result.is_err(), "Should fail with empty password");
 
-  match result.unwrap_err()
-  {
-    CliError::InvalidParameter { param, reason } =>
-    {
+  match result.unwrap_err() {
+    CliError::InvalidParameter { param, reason } => {
       assert_eq!(param, "password");
       assert!(
         reason.contains("empty"),
@@ -217,13 +195,11 @@ fn test_login_handler_empty_password()
 }
 
 #[test]
-fn test_login_handler_all_formats()
-{
+fn test_login_handler_all_formats() {
   // Test that handler respects format parameter
   let formats = vec!["table", "expanded", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("email".into(), "alice@example.com".into());
     params.insert("password".into(), "secret123".into());
@@ -248,8 +224,7 @@ fn test_login_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_refresh_handler_success_default_format()
-{
+fn test_refresh_handler_success_default_format() {
   let params = HashMap::new(); // No params required for refresh
 
   let result = refresh_handler(&params);
@@ -258,8 +233,7 @@ fn test_refresh_handler_success_default_format()
 }
 
 #[test]
-fn test_refresh_handler_format_table()
-{
+fn test_refresh_handler_format_table() {
   let mut params = HashMap::new();
   params.insert("format".into(), "table".into());
 
@@ -269,8 +243,7 @@ fn test_refresh_handler_format_table()
 }
 
 #[test]
-fn test_refresh_handler_format_expanded()
-{
+fn test_refresh_handler_format_expanded() {
   let mut params = HashMap::new();
   params.insert("format".into(), "expanded".into());
 
@@ -280,8 +253,7 @@ fn test_refresh_handler_format_expanded()
 }
 
 #[test]
-fn test_refresh_handler_format_json()
-{
+fn test_refresh_handler_format_json() {
   let mut params = HashMap::new();
   params.insert("format".into(), "json".into());
 
@@ -291,8 +263,7 @@ fn test_refresh_handler_format_json()
 }
 
 #[test]
-fn test_refresh_handler_format_yaml()
-{
+fn test_refresh_handler_format_yaml() {
   let mut params = HashMap::new();
   params.insert("format".into(), "yaml".into());
 
@@ -306,8 +277,7 @@ fn test_refresh_handler_format_yaml()
 // ============================================================================
 
 #[test]
-fn test_logout_handler_success()
-{
+fn test_logout_handler_success() {
   let params = HashMap::new();
 
   let result = logout_handler(&params);
@@ -316,12 +286,10 @@ fn test_logout_handler_success()
 }
 
 #[test]
-fn test_logout_handler_all_formats()
-{
+fn test_logout_handler_all_formats() {
   let formats = vec!["table", "expanded", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("format".into(), format.into());
 
@@ -337,8 +305,7 @@ fn test_logout_handler_all_formats()
 }
 
 #[test]
-fn test_logout_handler_confirmation_message()
-{
+fn test_logout_handler_confirmation_message() {
   let params = HashMap::new();
 
   let result = logout_handler(&params);

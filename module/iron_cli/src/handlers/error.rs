@@ -6,14 +6,12 @@
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CliError
-{
+pub enum CliError {
   /// Required parameter missing from input
   MissingParameter(&'static str),
 
   /// Parameter present but invalid
-  InvalidParameter
-  {
+  InvalidParameter {
     param: &'static str,
     reason: &'static str,
   },
@@ -25,26 +23,19 @@ pub enum CliError
   FormattingError(String),
 }
 
-impl fmt::Display for CliError
-{
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
-  {
-    match self
-    {
-      Self::MissingParameter(param) =>
-      {
+impl fmt::Display for CliError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::MissingParameter(param) => {
         write!(f, "Missing required parameter: {}", param)
       }
-      Self::InvalidParameter { param, reason } =>
-      {
+      Self::InvalidParameter { param, reason } => {
         write!(f, "Invalid parameter '{}': {}", param, reason)
       }
-      Self::ValidationError(msg) =>
-      {
+      Self::ValidationError(msg) => {
         write!(f, "Validation error: {}", msg)
       }
-      Self::FormattingError(msg) =>
-      {
+      Self::FormattingError(msg) => {
         write!(f, "Formatting error: {}", msg)
       }
     }

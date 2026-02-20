@@ -49,15 +49,15 @@ const REFRESH_TOKEN_KEY: &str = "refresh_token";
 /// ## Returns
 ///
 /// Ok if stored successfully, Err on keyring failure
-pub fn set_access_token( token: &str ) -> Result<(), KeyringError>
-{
-  let entry = Entry::new( SERVICE_NAME, ACCESS_TOKEN_KEY )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+pub fn set_access_token(token: &str) -> Result<(), KeyringError> {
+  let entry = Entry::new(SERVICE_NAME, ACCESS_TOKEN_KEY)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  entry.set_password( token )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+  entry
+    .set_password(token)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  Ok( () )
+  Ok(())
 }
 
 /// Retrieve access token from keyring
@@ -65,26 +65,21 @@ pub fn set_access_token( token: &str ) -> Result<(), KeyringError>
 /// ## Returns
 ///
 /// Access token string if found, error if missing or keyring failure
-pub fn get_access_token() -> Result<String, KeyringError>
-{
-  let entry = Entry::new( SERVICE_NAME, ACCESS_TOKEN_KEY )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+pub fn get_access_token() -> Result<String, KeyringError> {
+  let entry = Entry::new(SERVICE_NAME, ACCESS_TOKEN_KEY)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  entry.get_password()
-    .map_err( |e|
+  entry.get_password().map_err(|e| {
+    let error_msg = e.to_string();
+    if error_msg.contains("NoEntry")
+      || error_msg.contains("not found")
+      || error_msg.contains("No matching entry")
     {
-      let error_msg = e.to_string();
-      if error_msg.contains( "NoEntry" )
-        || error_msg.contains( "not found" )
-        || error_msg.contains( "No matching entry" )
-      {
-        KeyringError::NotFound( "Access token not found. Please login first.".to_string() )
-      }
-      else
-      {
-        KeyringError::StorageError( error_msg )
-      }
-    })
+      KeyringError::NotFound("Access token not found. Please login first.".to_string())
+    } else {
+      KeyringError::StorageError(error_msg)
+    }
+  })
 }
 
 /// Store refresh token in keyring
@@ -96,15 +91,15 @@ pub fn get_access_token() -> Result<String, KeyringError>
 /// ## Returns
 ///
 /// Ok if stored successfully, Err on keyring failure
-pub fn set_refresh_token( token: &str ) -> Result<(), KeyringError>
-{
-  let entry = Entry::new( SERVICE_NAME, REFRESH_TOKEN_KEY )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+pub fn set_refresh_token(token: &str) -> Result<(), KeyringError> {
+  let entry = Entry::new(SERVICE_NAME, REFRESH_TOKEN_KEY)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  entry.set_password( token )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+  entry
+    .set_password(token)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  Ok( () )
+  Ok(())
 }
 
 /// Retrieve refresh token from keyring
@@ -112,26 +107,21 @@ pub fn set_refresh_token( token: &str ) -> Result<(), KeyringError>
 /// ## Returns
 ///
 /// Refresh token string if found, error if missing or keyring failure
-pub fn get_refresh_token() -> Result<String, KeyringError>
-{
-  let entry = Entry::new( SERVICE_NAME, REFRESH_TOKEN_KEY )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+pub fn get_refresh_token() -> Result<String, KeyringError> {
+  let entry = Entry::new(SERVICE_NAME, REFRESH_TOKEN_KEY)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  entry.get_password()
-    .map_err( |e|
+  entry.get_password().map_err(|e| {
+    let error_msg = e.to_string();
+    if error_msg.contains("NoEntry")
+      || error_msg.contains("not found")
+      || error_msg.contains("No matching entry")
     {
-      let error_msg = e.to_string();
-      if error_msg.contains( "NoEntry" )
-        || error_msg.contains( "not found" )
-        || error_msg.contains( "No matching entry" )
-      {
-        KeyringError::NotFound( "Refresh token not found. Please login first.".to_string() )
-      }
-      else
-      {
-        KeyringError::StorageError( error_msg )
-      }
-    })
+      KeyringError::NotFound("Refresh token not found. Please login first.".to_string())
+    } else {
+      KeyringError::StorageError(error_msg)
+    }
+  })
 }
 
 /// Clear all stored tokens from keyring
@@ -141,65 +131,54 @@ pub fn get_refresh_token() -> Result<String, KeyringError>
 /// ## Returns
 ///
 /// Ok if cleared successfully (or already empty), Err on keyring failure
-pub fn clear_tokens() -> Result<(), KeyringError>
-{
+pub fn clear_tokens() -> Result<(), KeyringError> {
   // Clear access token
-  let access_entry = Entry::new( SERVICE_NAME, ACCESS_TOKEN_KEY )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+  let access_entry = Entry::new(SERVICE_NAME, ACCESS_TOKEN_KEY)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
   // Ignore NotFound errors (already cleared)
-  match access_entry.delete_password()
-  {
-    Ok( () ) => {},
-    Err( e ) =>
-    {
+  match access_entry.delete_password() {
+    Ok(()) => {}
+    Err(e) => {
       let error_msg = e.to_string();
-      if !error_msg.contains( "NoEntry" ) && !error_msg.contains( "not found" )
-      {
-        return Err( KeyringError::StorageError( error_msg ) );
+      if !error_msg.contains("NoEntry") && !error_msg.contains("not found") {
+        return Err(KeyringError::StorageError(error_msg));
       }
     }
   }
 
   // Clear refresh token
-  let refresh_entry = Entry::new( SERVICE_NAME, REFRESH_TOKEN_KEY )
-    .map_err( |e| KeyringError::StorageError( e.to_string() ) )?;
+  let refresh_entry = Entry::new(SERVICE_NAME, REFRESH_TOKEN_KEY)
+    .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  match refresh_entry.delete_password()
-  {
-    Ok( () ) => {},
-    Err( e ) =>
-    {
+  match refresh_entry.delete_password() {
+    Ok(()) => {}
+    Err(e) => {
       let error_msg = e.to_string();
-      if !error_msg.contains( "NoEntry" ) && !error_msg.contains( "not found" )
-      {
-        return Err( KeyringError::StorageError( error_msg ) );
+      if !error_msg.contains("NoEntry") && !error_msg.contains("not found") {
+        return Err(KeyringError::StorageError(error_msg));
       }
     }
   }
 
-  Ok( () )
+  Ok(())
 }
 
 /// Keyring errors
 #[derive(Debug)]
-pub enum KeyringError
-{
+pub enum KeyringError {
   /// Credential not found in keyring
-  NotFound( String ),
+  NotFound(String),
 
   /// Keyring storage error
-  StorageError( String ),
+  StorageError(String),
 }
 
-impl std::fmt::Display for KeyringError
-{
-  fn fmt( &self, f: &mut std::fmt::Formatter<'_> ) -> std::fmt::Result
-  {
-    match self
-    {
-      Self::NotFound( msg ) => write!( f, "Not found: {}", msg ),
-      Self::StorageError( msg ) => write!( f, "Storage error: {}", msg ),
+impl std::fmt::Display for KeyringError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::NotFound(msg) => write!(f, "Not found: {}", msg),
+      Self::StorageError(msg) => write!(f, "Storage error: {}", msg),
     }
   }
 }

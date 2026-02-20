@@ -5,16 +5,15 @@
 //! Covers list, get, export traces handlers.
 //! Total: 10 test cases
 
+use iron_cli::handlers::{traces_handlers::*, CliError};
 use std::collections::HashMap;
-use iron_cli::handlers::{ traces_handlers::*, CliError };
 
 // ============================================================================
 // .traces.list tests (4 tests)
 // ============================================================================
 
 #[test]
-fn test_list_traces_handler_success()
-{
+fn test_list_traces_handler_success() {
   let params = HashMap::new();
 
   let result = list_traces_handler(&params);
@@ -23,8 +22,7 @@ fn test_list_traces_handler_success()
 }
 
 #[test]
-fn test_list_traces_handler_with_filters()
-{
+fn test_list_traces_handler_with_filters() {
   let mut params = HashMap::new();
   params.insert("filter".into(), "status=success".into());
 
@@ -34,8 +32,7 @@ fn test_list_traces_handler_with_filters()
 }
 
 #[test]
-fn test_list_traces_handler_with_pagination()
-{
+fn test_list_traces_handler_with_pagination() {
   let mut params = HashMap::new();
   params.insert("limit".into(), "10".into());
 
@@ -45,12 +42,10 @@ fn test_list_traces_handler_with_pagination()
 }
 
 #[test]
-fn test_list_traces_handler_all_formats()
-{
+fn test_list_traces_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("format".into(), format.into());
 
@@ -65,8 +60,7 @@ fn test_list_traces_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_get_trace_handler_success()
-{
+fn test_get_trace_handler_success() {
   let mut params = HashMap::new();
   params.insert("trace_id".into(), "trace_abc123".into());
 
@@ -76,27 +70,23 @@ fn test_get_trace_handler_success()
 }
 
 #[test]
-fn test_get_trace_handler_missing_trace_id()
-{
+fn test_get_trace_handler_missing_trace_id() {
   let params = HashMap::new();
 
   let result = get_trace_handler(&params);
 
   assert!(result.is_err(), "Should fail without trace_id");
-  match result.unwrap_err()
-  {
+  match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "trace_id"),
     other => panic!("Wrong error type: {:?}", other),
   }
 }
 
 #[test]
-fn test_get_trace_handler_all_formats()
-{
+fn test_get_trace_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("trace_id".into(), "trace_abc123".into());
     params.insert("format".into(), format.into());
@@ -112,8 +102,7 @@ fn test_get_trace_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_export_traces_handler_success()
-{
+fn test_export_traces_handler_success() {
   let mut params = HashMap::new();
   params.insert("output".into(), "/tmp/traces.json".into());
 
@@ -123,8 +112,7 @@ fn test_export_traces_handler_success()
 }
 
 #[test]
-fn test_export_traces_handler_missing_output()
-{
+fn test_export_traces_handler_missing_output() {
   let params = HashMap::new();
 
   let result = export_traces_handler(&params);
@@ -133,8 +121,7 @@ fn test_export_traces_handler_missing_output()
 }
 
 #[test]
-fn test_export_traces_handler_format_json()
-{
+fn test_export_traces_handler_format_json() {
   let mut params = HashMap::new();
   params.insert("output".into(), "/tmp/traces.json".into());
   params.insert("format".into(), "json".into());

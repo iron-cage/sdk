@@ -5,15 +5,13 @@
 //!
 //! Note: Named `control_user_handlers` to distinguish from token CLI's user_handlers.
 
-use std::collections::HashMap;
+use crate::handlers::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
-use crate::handlers::validation::{ validate_non_empty, validate_non_negative_integer };
+use std::collections::HashMap;
 
 /// Validates email format
-fn validate_email(email: &str, param_name: &'static str) -> Result<(), CliError>
-{
-  if !email.contains('@') || !email.contains('.')
-  {
+fn validate_email(email: &str, param_name: &'static str) -> Result<(), CliError> {
+  if !email.contains('@') || !email.contains('.') {
     return Err(CliError::InvalidParameter {
       param: param_name,
       reason: "must be valid email format",
@@ -24,13 +22,11 @@ fn validate_email(email: &str, param_name: &'static str) -> Result<(), CliError>
 }
 
 /// Validates username pattern (alphanumeric, underscore, hyphen)
-fn validate_username_pattern(username: &str) -> Result<(), CliError>
-{
+fn validate_username_pattern(username: &str) -> Result<(), CliError> {
   let username_pattern = regex::Regex::new(r"^[a-zA-Z0-9_-]+$")
     .map_err(|_| CliError::ValidationError("regex compilation failed".into()))?;
 
-  if !username_pattern.is_match(username)
-  {
+  if !username_pattern.is_match(username) {
     return Err(CliError::InvalidParameter {
       param: "username",
       reason: "must contain only alphanumeric characters, underscores, and hyphens",
@@ -48,16 +44,10 @@ fn validate_username_pattern(username: &str) -> Result<(), CliError>
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_users_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
 
-  Ok(format!(
-    "User list parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("User list parameters valid\nFormat: {}", format))
 }
 
 /// Handle .user.create command
@@ -74,10 +64,7 @@ pub fn list_users_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn create_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let username = params
     .get("username")
@@ -94,16 +81,14 @@ pub fn create_user_handler(
   // Validate username
   validate_non_empty(username, "username")?;
 
-  if username.len() < 3
-  {
+  if username.len() < 3 {
     return Err(CliError::InvalidParameter {
       param: "username",
       reason: "must be at least 3 characters",
     });
   }
 
-  if username.len() > 50
-  {
+  if username.len() > 50 {
     return Err(CliError::InvalidParameter {
       param: "username",
       reason: "cannot exceed 50 characters",
@@ -117,21 +102,20 @@ pub fn create_user_handler(
   validate_email(email, "email")?;
 
   // Validate role
-  match role.as_str()
-  {
-    "user" | "admin" => {},
-    _ => return Err(CliError::InvalidParameter {
-      param: "role",
-      reason: "must be either 'user' or 'admin'",
-    }),
+  match role.as_str() {
+    "user" | "admin" => {}
+    _ => {
+      return Err(CliError::InvalidParameter {
+        param: "role",
+        reason: "must be either 'user' or 'admin'",
+      })
+    }
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -158,14 +142,9 @@ pub fn create_user_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
@@ -190,30 +169,22 @@ pub fn get_user_handler(
 /// - email: String (valid email format)
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn update_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn update_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
   // Validate optional email
-  if let Some(email) = params.get("email")
-  {
+  if let Some(email) = params.get("email") {
     validate_non_empty(email, "email")?;
     validate_email(email, "email")?;
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -241,23 +212,16 @@ pub fn update_user_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn delete_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -286,14 +250,9 @@ pub fn delete_user_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn set_user_role_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn set_user_role_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   let role = params
     .get("role")
@@ -302,21 +261,20 @@ pub fn set_user_role_handler(
   validate_non_empty(id, "id")?;
 
   // Validate role
-  match role.as_str()
-  {
-    "user" | "admin" => {},
-    _ => return Err(CliError::InvalidParameter {
-      param: "role",
-      reason: "must be either 'user' or 'admin'",
-    }),
+  match role.as_str() {
+    "user" | "admin" => {}
+    _ => {
+      return Err(CliError::InvalidParameter {
+        param: "role",
+        reason: "must be either 'user' or 'admin'",
+      })
+    }
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -344,23 +302,16 @@ pub fn set_user_role_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn reset_password_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -387,14 +338,9 @@ pub fn reset_password_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_user_permissions_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn get_user_permissions_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 

@@ -5,43 +5,37 @@
 //! Tests for 2 health adapters: health, version
 //! Total: 10 tests (5 per adapter)
 
-use iron_cli::adapters::implementations::InMemoryAdapter;
 use iron_cli::adapters::auth::HasParams;
-use iron_cli::formatting::{ TreeFmtFormatter, OutputFormat };
+use iron_cli::adapters::implementations::InMemoryAdapter;
+use iron_cli::formatting::{OutputFormat, TreeFmtFormatter};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-fn create_test_adapter() -> Arc<InMemoryAdapter>
-{
-  Arc::new( InMemoryAdapter::new() )
+fn create_test_adapter() -> Arc<InMemoryAdapter> {
+  Arc::new(InMemoryAdapter::new())
 }
 
-fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerifiedCommand
-{
+fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerifiedCommand {
   let mut params = HashMap::new();
-  for (key, value) in args
-  {
-    params.insert( key.to_string(), value.to_string() );
+  for (key, value) in args {
+    params.insert(key.to_string(), value.to_string());
   }
 
   MockVerifiedCommand {
-    #[ allow( dead_code ) ]
+    #[allow(dead_code)]
     command: command.to_string(),
     params,
   }
 }
 
-struct MockVerifiedCommand
-{
-  #[ allow( dead_code ) ]
+struct MockVerifiedCommand {
+  #[allow(dead_code)]
   command: String,
   params: HashMap<String, String>,
 }
 
-impl HasParams for MockVerifiedCommand
-{
-  fn get_params(&self) -> HashMap<String, String>
-  {
+impl HasParams for MockVerifiedCommand {
+  fn get_params(&self) -> HashMap<String, String> {
     self.params.clone()
   }
 }
@@ -50,75 +44,53 @@ impl HasParams for MockVerifiedCommand
 // .health adapter tests (5 tests)
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_health_adapter_success()
-{
+#[tokio::test]
+async fn test_health_adapter_success() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
-  let command = create_verified_command( ".health", &[] );
+  let command = create_verified_command(".health", &[]);
 
-  let result = iron_cli::adapters::health::health_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::health_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_ok(), "Should succeed with no params" );
+  assert!(result.is_ok(), "Should succeed with no params");
 
   let output = result.unwrap();
   assert!(
-    output.contains( "health" ) || output.contains( "Health" ),
+    output.contains("health") || output.contains("Health"),
     "Output should contain health information"
   );
 }
 
-#[ tokio::test ]
-async fn test_health_adapter_json_format()
-{
+#[tokio::test]
+async fn test_health_adapter_json_format() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
-  let command = create_verified_command(
-    ".health",
-    &[(  "format", "json" )],
-  );
+  let command = create_verified_command(".health", &[("format", "json")]);
 
-  let result = iron_cli::adapters::health::health_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::health_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_ok(), "Should succeed with JSON format" );
+  assert!(result.is_ok(), "Should succeed with JSON format");
 }
 
-#[ tokio::test ]
-async fn test_health_adapter_all_formats()
-{
+#[tokio::test]
+async fn test_health_adapter_all_formats() {
   let adapter = create_test_adapter();
 
   let formats = vec!["table", "json", "yaml"];
 
-  for format_str in formats
-  {
-    let formatter = TreeFmtFormatter::new( match format_str
-    {
+  for format_str in formats {
+    let formatter = TreeFmtFormatter::new(match format_str {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
       _ => OutputFormat::Table,
     });
 
-    let command = create_verified_command(
-      ".health",
-      &[(  "format", format_str )],
-    );
+    let command = create_verified_command(".health", &[("format", format_str)]);
 
-    let result = iron_cli::adapters::health::health_adapter(
-      &command,
-      adapter.clone(),
-      &formatter,
-    ).await;
+    let result =
+      iron_cli::adapters::health::health_adapter(&command, adapter.clone(), &formatter).await;
 
     assert!(
       result.is_ok(),
@@ -128,118 +100,83 @@ async fn test_health_adapter_all_formats()
   }
 }
 
-#[ tokio::test ]
-async fn test_health_adapter_storage_error()
-{
+#[tokio::test]
+async fn test_health_adapter_storage_error() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
-  adapter.set_failure_mode( "storage_error" );
+  adapter.set_failure_mode("storage_error");
 
-  let command = create_verified_command( ".health", &[] );
+  let command = create_verified_command(".health", &[]);
 
-  let result = iron_cli::adapters::health::health_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::health_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_err(), "Should fail with storage error" );
+  assert!(result.is_err(), "Should fail with storage error");
 }
 
-#[ tokio::test ]
-async fn test_health_adapter_with_details()
-{
+#[tokio::test]
+async fn test_health_adapter_with_details() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
-  let command = create_verified_command(
-    ".health",
-    &[(  "verbose", "true" )],
-  );
+  let command = create_verified_command(".health", &[("verbose", "true")]);
 
-  let result = iron_cli::adapters::health::health_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::health_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_ok(), "Should succeed with verbose flag" );
+  assert!(result.is_ok(), "Should succeed with verbose flag");
 }
 
 // ============================================================================
 // .version adapter tests (5 tests)
 // ============================================================================
 
-#[ tokio::test ]
-async fn test_version_adapter_success()
-{
+#[tokio::test]
+async fn test_version_adapter_success() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
-  let command = create_verified_command( ".version", &[] );
+  let command = create_verified_command(".version", &[]);
 
-  let result = iron_cli::adapters::health::version_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::version_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_ok(), "Should succeed with no params" );
+  assert!(result.is_ok(), "Should succeed with no params");
 
   let output = result.unwrap();
   assert!(
-    output.contains( "version" ) || output.contains( "Version" ),
+    output.contains("version") || output.contains("Version"),
     "Output should contain version information"
   );
 }
 
-#[ tokio::test ]
-async fn test_version_adapter_json_format()
-{
+#[tokio::test]
+async fn test_version_adapter_json_format() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
-  let command = create_verified_command(
-    ".version",
-    &[(  "format", "json" )],
-  );
+  let command = create_verified_command(".version", &[("format", "json")]);
 
-  let result = iron_cli::adapters::health::version_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::version_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_ok(), "Should succeed with JSON format" );
+  assert!(result.is_ok(), "Should succeed with JSON format");
 }
 
-#[ tokio::test ]
-async fn test_version_adapter_all_formats()
-{
+#[tokio::test]
+async fn test_version_adapter_all_formats() {
   let adapter = create_test_adapter();
 
   let formats = vec!["table", "json", "yaml"];
 
-  for format_str in formats
-  {
-    let formatter = TreeFmtFormatter::new( match format_str
-    {
+  for format_str in formats {
+    let formatter = TreeFmtFormatter::new(match format_str {
       "json" => OutputFormat::Json,
       "yaml" => OutputFormat::Yaml,
       _ => OutputFormat::Table,
     });
 
-    let command = create_verified_command(
-      ".version",
-      &[(  "format", format_str )],
-    );
+    let command = create_verified_command(".version", &[("format", format_str)]);
 
-    let result = iron_cli::adapters::health::version_adapter(
-      &command,
-      adapter.clone(),
-      &formatter,
-    ).await;
+    let result =
+      iron_cli::adapters::health::version_adapter(&command, adapter.clone(), &formatter).await;
 
     assert!(
       result.is_ok(),
@@ -249,44 +186,34 @@ async fn test_version_adapter_all_formats()
   }
 }
 
-#[ tokio::test ]
-async fn test_version_adapter_storage_error()
-{
+#[tokio::test]
+async fn test_version_adapter_storage_error() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
-  adapter.set_failure_mode( "storage_error" );
+  adapter.set_failure_mode("storage_error");
 
-  let command = create_verified_command( ".version", &[] );
+  let command = create_verified_command(".version", &[]);
 
-  let result = iron_cli::adapters::health::version_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::version_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_err(), "Should fail with storage error" );
+  assert!(result.is_err(), "Should fail with storage error");
 }
 
-#[ tokio::test ]
-async fn test_version_adapter_includes_version_number()
-{
+#[tokio::test]
+async fn test_version_adapter_includes_version_number() {
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Table );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
-  let command = create_verified_command( ".version", &[] );
+  let command = create_verified_command(".version", &[]);
 
-  let result = iron_cli::adapters::health::version_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::version_adapter(&command, adapter, &formatter).await;
 
-  assert!( result.is_ok(), "Should succeed" );
+  assert!(result.is_ok(), "Should succeed");
 
   let output = result.unwrap();
   assert!(
-    output.contains( "version" ) || output.contains( "Version" ),
+    output.contains("version") || output.contains("Version"),
     "Output should contain version string"
   );
 }
@@ -343,46 +270,38 @@ async fn test_version_adapter_includes_version_number()
 /// **Specific lesson**: When adapter makes HTTP call, ask: "Does this command
 /// still make sense if the API is down?" If yes, make the call optional with
 /// graceful degradation.
-#[ tokio::test ]
-async fn bug_reproducer_issue_002_version_requires_api()
-{
+#[tokio::test]
+async fn bug_reproducer_issue_002_version_requires_api() {
   // This test verifies the fix for Issue 2 using the service-pattern adapter.
   // The actual bug was in health_adapters.rs (old HTTP-based adapter), but
   // this test ensures the service-pattern adapter also handles offline scenarios.
 
   let adapter = create_test_adapter();
-  let formatter = TreeFmtFormatter::new( OutputFormat::Json );
+  let formatter = TreeFmtFormatter::new(OutputFormat::Json);
 
   // Simulate offline/API unavailable scenario
-  adapter.set_failure_mode( "network_error" );
+  adapter.set_failure_mode("network_error");
 
-  let command = create_verified_command( ".version", &[] );
+  let command = create_verified_command(".version", &[]);
 
-  let result = iron_cli::adapters::health::version_adapter(
-    &command,
-    adapter,
-    &formatter,
-  ).await;
+  let result = iron_cli::adapters::health::version_adapter(&command, adapter, &formatter).await;
 
   // The fix ensures version command works even when API/storage fails
   // Service pattern handles this through HealthService implementation
-  match result
-  {
-    Ok( output ) =>
-    {
+  match result {
+    Ok(output) => {
       // If service returns version despite failure mode, that's correct behavior
       assert!(
-        output.contains( "version" ),
+        output.contains("version"),
         "Should contain version information even when API unavailable"
       );
     }
-    Err( e ) =>
-    {
+    Err(e) => {
       // Current implementation may still fail with service error
       // This documents expected behavior until offline support is added
       // to service-pattern adapters (currently in health_adapters.rs only)
       assert!(
-        e.to_string().contains( "network" ) || e.to_string().contains( "storage" ),
+        e.to_string().contains("network") || e.to_string().contains("storage"),
         "Should fail with network/storage error when offline: {}",
         e
       );

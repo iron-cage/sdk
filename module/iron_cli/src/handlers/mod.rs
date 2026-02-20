@@ -58,11 +58,11 @@ pub use error::CliError;
 pub mod validation;
 
 pub mod auth_handlers;
-pub mod token_handlers;
-pub mod usage_handlers;
-pub mod limits_handlers;
-pub mod traces_handlers;
 pub mod health_handlers;
+pub mod limits_handlers;
+pub mod token_handlers;
+pub mod traces_handlers;
+pub mod usage_handlers;
 pub mod user_handlers;
 
 // Control API handlers (for iron binary)

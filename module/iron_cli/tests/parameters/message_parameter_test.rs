@@ -24,29 +24,32 @@
 //! REFACTOR: Pending
 
 #[cfg(test)]
-mod tests
-{
-  use crate::fixtures::{ IntegrationTestHarness, TestData, TestServer };
+mod tests {
+  use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
   /// Test message with simple text
   #[tokio::test]
-  async fn test_message_simple()
-  {
+  async fn test_message_simple() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
-    let result = harness.run( "iron", &[ ".test.with_message", "message::Hello World" ] ).await;
+    let result = harness
+      .run("iron", &[".test.with_message", "message::Hello World"])
+      .await;
 
     // Should succeed with simple message
     if !result.success() {
-      assert!( !result.stderr.contains( "message" ) || !result.stderr.contains( "invalid" ),
-        "Should accept simple message. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("message") || !result.stderr.contains("invalid"),
+        "Should accept simple message. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -54,22 +57,29 @@ mod tests
 
   /// Test message with special characters
   #[tokio::test]
-  async fn test_message_special_characters()
-  {
+  async fn test_message_special_characters() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
-    let result = harness.run( "iron", &[ ".test.with_message", "message::Test-message_123!@#" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".test.with_message", "message::Test-message_123!@#"],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "message" ) || !result.stderr.contains( "invalid" ),
-        "Should accept special characters. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("message") || !result.stderr.contains("invalid"),
+        "Should accept special characters. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -77,22 +87,29 @@ mod tests
 
   /// Test message with spaces
   #[tokio::test]
-  async fn test_message_with_spaces()
-  {
+  async fn test_message_with_spaces() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
-    let result = harness.run( "iron", &[ ".test.with_message", "message::This is a test message" ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".test.with_message", "message::This is a test message"],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "message" ) || !result.stderr.contains( "invalid" ),
-        "Should accept message with spaces. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("message") || !result.stderr.contains("invalid"),
+        "Should accept message with spaces. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -100,23 +117,30 @@ mod tests
 
   /// Test long message
   #[tokio::test]
-  async fn test_message_long()
-  {
+  async fn test_message_long() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
     let long_message = "This is a very long test message that contains multiple words and should be handled correctly by the parameter validation system";
-    let result = harness.run( "iron", &[ ".test.with_message", &format!( "message::{}", long_message ) ] ).await;
+    let result = harness
+      .run(
+        "iron",
+        &[".test.with_message", &format!("message::{}", long_message)],
+      )
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "message" ) || !result.stderr.contains( "invalid" ),
-        "Should accept long message. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("message") || !result.stderr.contains("invalid"),
+        "Should accept long message. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -124,22 +148,23 @@ mod tests
 
   /// Test empty message
   #[tokio::test]
-  async fn test_message_empty()
-  {
+  async fn test_message_empty() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
-    let result = harness.run( "iron", &[ ".test.with_message", "message::" ] ).await;
+    let result = harness
+      .run("iron", &[".test.with_message", "message::"])
+      .await;
 
     // Empty message might be rejected or treated as missing
-    if !result.success() && result.stderr.contains( "message" ) {
-      println!( "Empty message behavior: {}", result.stderr );
+    if !result.success() && result.stderr.contains("message") {
+      println!("Empty message behavior: {}", result.stderr);
     }
 
     server.shutdown().await;
@@ -147,23 +172,25 @@ mod tests
 
   /// Test missing optional message
   #[tokio::test]
-  async fn test_message_missing_optional()
-  {
+  async fn test_message_missing_optional() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
-    let result = harness.run( "iron", &[ ".test.with_message" ] ).await;
+    let result = harness.run("iron", &[".test.with_message"]).await;
 
     // Should succeed without optional message
     if !result.success() {
-      assert!( !result.stderr.contains( "message" ) || !result.stderr.contains( "required" ),
-        "Should not require optional message parameter. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("message") || !result.stderr.contains("required"),
+        "Should not require optional message parameter. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -171,22 +198,26 @@ mod tests
 
   /// Test message with unicode characters
   #[tokio::test]
-  async fn test_message_unicode()
-  {
+  async fn test_message_unicode() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
-    let user_id = data.create_user( "test@example.com" ).await;
-    let api_key = data.create_api_key( user_id, "test-key" ).await;
+    let user_id = data.create_user("test@example.com").await;
+    let api_key = data.create_api_key(user_id, "test-key").await;
 
     let harness = IntegrationTestHarness::new()
-      .server_url( server.url() )
-      .api_key( &api_key );
+      .server_url(server.url())
+      .api_key(&api_key);
 
-    let result = harness.run( "iron", &[ ".test.with_message", "message::Hello 世界 🌍" ] ).await;
+    let result = harness
+      .run("iron", &[".test.with_message", "message::Hello 世界 🌍"])
+      .await;
 
     if !result.success() {
-      assert!( !result.stderr.contains( "message" ) || !result.stderr.contains( "invalid" ),
-        "Should accept unicode characters. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("message") || !result.stderr.contains("invalid"),
+        "Should accept unicode characters. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;

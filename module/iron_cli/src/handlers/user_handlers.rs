@@ -4,9 +4,9 @@
 //! role change, and password reset operations.
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
+use super::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
-use super::validation::{ validate_non_empty, validate_non_negative_integer };
+use std::collections::HashMap;
 
 /// Handle .users.create command
 ///
@@ -19,10 +19,7 @@ use super::validation::{ validate_non_empty, validate_non_negative_integer };
 /// - password: String (min 8 chars, max 1000 chars)
 /// - email: String (non-empty, contains @, max 255 chars)
 /// - role: String (viewer|user|admin)
-pub fn create_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let username = params
     .get("username")
@@ -42,8 +39,7 @@ pub fn create_user_handler(
 
   // Validate username
   validate_non_empty(username, "username")?;
-  if username.len() > 255
-  {
+  if username.len() > 255 {
     return Err(CliError::InvalidParameter {
       param: "username",
       reason: "cannot exceed 255 characters",
@@ -51,15 +47,13 @@ pub fn create_user_handler(
   }
 
   // Validate password
-  if password.len() < 8
-  {
+  if password.len() < 8 {
     return Err(CliError::InvalidParameter {
       param: "password",
       reason: "must be at least 8 characters",
     });
   }
-  if password.len() > 1000
-  {
+  if password.len() > 1000 {
     return Err(CliError::InvalidParameter {
       param: "password",
       reason: "cannot exceed 1000 characters",
@@ -68,15 +62,13 @@ pub fn create_user_handler(
 
   // Validate email
   validate_non_empty(email, "email")?;
-  if !email.contains('@')
-  {
+  if !email.contains('@') {
     return Err(CliError::InvalidParameter {
       param: "email",
       reason: "must contain @ symbol",
     });
   }
-  if email.len() > 255
-  {
+  if email.len() > 255 {
     return Err(CliError::InvalidParameter {
       param: "email",
       reason: "cannot exceed 255 characters",
@@ -105,28 +97,21 @@ pub fn create_user_handler(
 /// - search: String (username or email search)
 /// - page: String (integer, default 1)
 /// - page_size: String (integer, 1-100, default 20)
-pub fn list_users_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate optional role filter
-  if let Some(role) = params.get("role")
-  {
+  if let Some(role) = params.get("role") {
     validate_user_role(role)?;
   }
 
   // Validate optional is_active filter
-  if let Some(is_active) = params.get("is_active")
-  {
+  if let Some(is_active) = params.get("is_active") {
     validate_boolean(is_active, "is_active")?;
   }
 
   // Validate optional page
-  if let Some(page_str) = params.get("page")
-  {
+  if let Some(page_str) = params.get("page") {
     let page = validate_non_negative_integer(page_str, "page")?;
-    if page < 1
-    {
+    if page < 1 {
       return Err(CliError::InvalidParameter {
         param: "page",
         reason: "must be at least 1",
@@ -135,11 +120,9 @@ pub fn list_users_handler(
   }
 
   // Validate optional page_size
-  if let Some(page_size_str) = params.get("page_size")
-  {
+  if let Some(page_size_str) = params.get("page_size") {
     let page_size = validate_non_negative_integer(page_size_str, "page_size")?;
-    if !(1..=100).contains(&page_size)
-    {
+    if !(1..=100).contains(&page_size) {
       return Err(CliError::InvalidParameter {
         param: "page_size",
         reason: "must be between 1 and 100",
@@ -159,10 +142,7 @@ pub fn list_users_handler(
 ///
 /// Required:
 /// - user_id: String (integer)
-pub fn get_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -185,10 +165,7 @@ pub fn get_user_handler(
 ///
 /// Optional:
 /// - reason: String (suspension reason)
-pub fn suspend_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn suspend_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -208,10 +185,7 @@ pub fn suspend_user_handler(
 ///
 /// Required:
 /// - user_id: String (integer)
-pub fn activate_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn activate_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -231,10 +205,7 @@ pub fn activate_user_handler(
 ///
 /// Required:
 /// - user_id: String (integer)
-pub fn delete_user_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -255,10 +226,7 @@ pub fn delete_user_handler(
 /// Required:
 /// - user_id: String (integer)
 /// - role: String (viewer|user|admin)
-pub fn change_user_role_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn change_user_role_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -274,7 +242,10 @@ pub fn change_user_role_handler(
   validate_user_role(role)?;
 
   // Placeholder response - actual API call handled by adapter
-  Ok(format!("User {} role changed to '{}' successfully", user_id, role))
+  Ok(format!(
+    "User {} role changed to '{}' successfully",
+    user_id, role
+  ))
 }
 
 /// Handle .users.reset_password command
@@ -287,10 +258,7 @@ pub fn change_user_role_handler(
 /// - user_id: String (integer)
 /// - new_password: String (min 8 chars, max 1000 chars)
 /// - force_change: String (true|false)
-pub fn reset_password_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -303,15 +271,13 @@ pub fn reset_password_handler(
     .get("new_password")
     .ok_or(CliError::MissingParameter("new_password"))?;
 
-  if new_password.len() < 8
-  {
+  if new_password.len() < 8 {
     return Err(CliError::InvalidParameter {
       param: "new_password",
       reason: "must be at least 8 characters",
     });
   }
-  if new_password.len() > 1000
-  {
+  if new_password.len() > 1000 {
     return Err(CliError::InvalidParameter {
       param: "new_password",
       reason: "cannot exceed 1000 characters",
@@ -332,33 +298,23 @@ pub fn reset_password_handler(
 // Helper validation functions
 
 /// Validates that role is one of: viewer, user, admin
-fn validate_user_role(role: &str) -> Result<(), CliError>
-{
-  match role
-  {
+fn validate_user_role(role: &str) -> Result<(), CliError> {
+  match role {
     "viewer" | "user" | "admin" => Ok(()),
-    _ =>
-    {
-      Err(CliError::InvalidParameter {
-        param: "role",
-        reason: "must be one of: viewer, user, admin",
-      })
-    }
+    _ => Err(CliError::InvalidParameter {
+      param: "role",
+      reason: "must be one of: viewer, user, admin",
+    }),
   }
 }
 
 /// Validates that a string is a boolean (true|false)
-fn validate_boolean(value: &str, param_name: &'static str) -> Result<(), CliError>
-{
-  match value
-  {
+fn validate_boolean(value: &str, param_name: &'static str) -> Result<(), CliError> {
+  match value {
     "true" | "false" => Ok(()),
-    _ =>
-    {
-      Err(CliError::InvalidParameter {
-        param: param_name,
-        reason: "must be 'true' or 'false'",
-      })
-    }
+    _ => Err(CliError::InvalidParameter {
+      param: param_name,
+      reason: "must be 'true' or 'false'",
+    }),
   }
 }

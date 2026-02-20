@@ -3,9 +3,9 @@
 //! Pure functions for token generate, list, get, rotate, revoke operations.
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
+use super::validation::{validate_non_empty, validate_token_id};
 use crate::handlers::CliError;
-use super::validation::{ validate_token_id, validate_non_empty };
+use std::collections::HashMap;
 
 /// Handle .tokens.generate command
 ///
@@ -20,10 +20,7 @@ use super::validation::{ validate_token_id, validate_non_empty };
 /// Optional:
 /// - ttl: String (integer seconds, 60-31536000)
 /// - format: String (table|expanded|json|yaml, default: table)
-pub fn generate_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn generate_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let name = params
     .get("name")
@@ -37,8 +34,7 @@ pub fn generate_token_handler(
   validate_non_empty(name, "name")?;
 
   // Validate scope format (must contain ':')
-  if !scope.contains(':')
-  {
+  if !scope.contains(':') {
     return Err(CliError::InvalidParameter {
       param: "scope",
       reason: "must match format 'action:resource' (e.g., 'read:tokens')",
@@ -46,29 +42,23 @@ pub fn generate_token_handler(
   }
 
   // Validate optional TTL
-  if let Some(ttl_str) = params.get("ttl")
-  {
-    match ttl_str.parse::<i64>()
-    {
-      Ok(ttl) =>
-      {
-        if ttl < 60
-        {
+  if let Some(ttl_str) = params.get("ttl") {
+    match ttl_str.parse::<i64>() {
+      Ok(ttl) => {
+        if ttl < 60 {
           return Err(CliError::InvalidParameter {
             param: "ttl",
             reason: "must be at least 60 seconds",
           });
         }
-        if ttl > 31536000
-        {
+        if ttl > 31536000 {
           return Err(CliError::InvalidParameter {
             param: "ttl",
             reason: "must be at most 31536000 seconds (1 year)",
           });
         }
       }
-      Err(_) =>
-      {
+      Err(_) => {
         return Err(CliError::InvalidParameter {
           param: "ttl",
           reason: "must be a valid integer",
@@ -96,10 +86,7 @@ pub fn generate_token_handler(
 /// - filter: String (filter criteria)
 /// - sort: String (sort field)
 /// - format: String (table|json|yaml, default: table)
-pub fn list_tokens_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn list_tokens_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
   let filter = params.get("filter").map(|s| s.as_str()).unwrap_or("none");
   let sort = params.get("sort").map(|s| s.as_str()).unwrap_or("default");
@@ -121,10 +108,7 @@ pub fn list_tokens_handler(
 ///
 /// Optional:
 /// - format: String (table|expanded|json|yaml, default: table)
-pub fn get_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn get_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let token_id = params
     .get("token_id")
@@ -154,10 +138,7 @@ pub fn get_token_handler(
 /// Optional:
 /// - ttl: String (integer seconds)
 /// - format: String (table|json|yaml, default: table)
-pub fn rotate_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn rotate_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let token_id = params
     .get("token_id")
@@ -167,10 +148,8 @@ pub fn rotate_token_handler(
   validate_token_id(token_id, "token_id")?;
 
   // Validate optional TTL
-  if let Some(ttl_str) = params.get("ttl")
-  {
-    if ttl_str.parse::<i64>().is_err()
-    {
+  if let Some(ttl_str) = params.get("ttl") {
+    if ttl_str.parse::<i64>().is_err() {
       return Err(CliError::InvalidParameter {
         param: "ttl",
         reason: "must be a valid integer",
@@ -199,18 +178,14 @@ pub fn rotate_token_handler(
 /// Optional:
 /// - reason: String (revocation reason, can be empty)
 /// - format: String (table|json|yaml, default: table)
-pub fn revoke_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+pub fn revoke_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let token_id = params
     .get("token_id")
     .ok_or(CliError::MissingParameter("token_id"))?;
 
   // Validate token_id format
-  if token_id.is_empty()
-  {
+  if token_id.is_empty() {
     return Err(CliError::InvalidParameter {
       param: "token_id",
       reason: "cannot be empty",

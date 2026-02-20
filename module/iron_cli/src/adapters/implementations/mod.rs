@@ -10,10 +10,10 @@
 
 pub mod http;
 
-#[ cfg( any( test, feature = "test-adapter" ) ) ]
+#[cfg(any(test, feature = "test-adapter"))]
 pub mod in_memory;
 
 pub use http::HttpAdapter;
 
-#[ cfg( any( test, feature = "test-adapter" ) ) ]
+#[cfg(any(test, feature = "test-adapter"))]
 pub use in_memory::InMemoryAdapter;

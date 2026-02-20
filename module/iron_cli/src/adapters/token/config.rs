@@ -32,8 +32,7 @@ use std::time::Duration;
 
 /// Token API configuration
 #[derive(Debug, Clone)]
-pub struct TokenApiConfig
-{
+pub struct TokenApiConfig {
   /// Base URL for Token Manager API
   pub base_url: String,
 
@@ -41,20 +40,16 @@ pub struct TokenApiConfig
   pub timeout: Duration,
 }
 
-impl Default for TokenApiConfig
-{
-  fn default() -> Self
-  {
-    Self
-    {
+impl Default for TokenApiConfig {
+  fn default() -> Self {
+    Self {
       base_url: "http://localhost:8081".to_string(),
-      timeout: Duration::from_secs( 30 ),
+      timeout: Duration::from_secs(30),
     }
   }
 }
 
-impl TokenApiConfig
-{
+impl TokenApiConfig {
   /// Load configuration using `iron_config_loader` with 5-layer precedence
   ///
   /// Environment variables: `IRON_TOKEN_API_URL`, `IRON_TOKEN_API_TIMEOUT`
@@ -62,42 +57,37 @@ impl TokenApiConfig
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
-  pub fn load() -> Self
-  {
+  pub fn load() -> Self {
     let defaults = r#"
 url = "http://localhost:8081"
 timeout = 30
 "#;
 
-    let loader = ConfigLoader::with_defaults( "iron_token_api", defaults )
-      .expect( "Failed to create token API config loader" );
+    let loader = ConfigLoader::with_defaults("iron_token_api", defaults)
+      .expect("Failed to create token API config loader");
 
-    let base_url = loader.get::< String >( "url" )
-      .unwrap_or_else( |_| "http://localhost:8081".to_string() );
+    let base_url = loader
+      .get::<String>("url")
+      .unwrap_or_else(|_| "http://localhost:8081".to_string());
 
-    let timeout_secs = loader.get::< u64 >( "timeout" )
-      .unwrap_or( 30 );
+    let timeout_secs = loader.get::<u64>("timeout").unwrap_or(30);
 
-    Self
-    {
+    Self {
       base_url,
-      timeout: Duration::from_secs( timeout_secs ),
+      timeout: Duration::from_secs(timeout_secs),
     }
   }
 
   /// Create configuration with explicit values
-  pub fn new( base_url: String ) -> Self
-  {
-    Self
-    {
+  pub fn new(base_url: String) -> Self {
+    Self {
       base_url,
-      timeout: Duration::from_secs( 30 ),
+      timeout: Duration::from_secs(30),
     }
   }
 
   /// Set timeout
-  pub fn with_timeout( mut self, timeout: Duration ) -> Self
-  {
+  pub fn with_timeout(mut self, timeout: Duration) -> Self {
     self.timeout = timeout;
     self
   }

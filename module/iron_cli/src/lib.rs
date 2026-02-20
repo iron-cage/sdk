@@ -210,7 +210,7 @@
 //! - Response time: <200ms for typical operations
 //! - Memory usage: <10MB resident set size
 
-pub mod handlers;
-pub mod formatting;
 pub mod adapters;
 pub mod config;
+pub mod formatting;
+pub mod handlers;
