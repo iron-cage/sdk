@@ -7,13 +7,12 @@
 //!
 //! Budget Invariant: `total_allocated` = `total_spent` + `budget_remaining`
 
-use sqlx::{ SqlitePool, Row };
-use std::time::{ SystemTime, UNIX_EPOCH };
+use sqlx::{Row, SqlitePool};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Agent budget record
-#[ derive( Debug, Clone ) ]
-pub struct AgentBudget
-{
+#[derive(Debug, Clone)]
+pub struct AgentBudget {
   /// Agent database ID (1:1 relationship with agents table)
   pub agent_id: i64,
   /// Total microdollars budget allocated to this agent
@@ -29,22 +28,19 @@ pub struct AgentBudget
 }
 
 /// Agent budget manager for budget CRUD operations
-#[ derive( Debug, Clone ) ]
-pub struct AgentBudgetManager
-{
+#[derive(Debug, Clone)]
+pub struct AgentBudgetManager {
   pool: SqlitePool,
 }
 
-impl AgentBudgetManager
-{
+impl AgentBudgetManager {
   /// Create new agent budget manager from existing pool
   ///
   /// # Arguments
   ///
   /// * `pool` - Existing database connection pool
-  #[ must_use ]
-  pub fn from_pool( pool: SqlitePool ) -> Self
-  {
+  #[must_use]
+  pub fn from_pool(pool: SqlitePool) -> Self {
     Self { pool }
   }
 
@@ -62,28 +58,31 @@ impl AgentBudgetManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn create_budget( &self, agent_id: i64, total_allocated: i64 ) -> Result< (), sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  pub async fn create_budget(
+    &self,
+    agent_id: i64,
+    total_allocated: i64,
+  ) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     sqlx::query(
       "INSERT INTO agent_budgets
       (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-      VALUES (?, ?, 0, ?, ?, ?)"
+      VALUES (?, ?, 0, ?, ?, ?)",
     )
-    .bind( agent_id )
-    .bind( total_allocated )
-    .bind( total_allocated )  // budget_remaining = total_allocated initially
-    .bind( now )
-    .bind( now )
-    .execute( &self.pool )
+    .bind(agent_id)
+    .bind(total_allocated)
+    .bind(total_allocated) // budget_remaining = total_allocated initially
+    .bind(now)
+    .bind(now)
+    .execute(&self.pool)
     .await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Get agent budget status
@@ -95,24 +94,23 @@ impl AgentBudgetManager
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_budget_status( &self, agent_id: i64 ) -> Result< Option< AgentBudget >, sqlx::Error >
-  {
+  pub async fn get_budget_status(&self, agent_id: i64) -> Result<Option<AgentBudget>, sqlx::Error> {
     let row = sqlx::query(
       "SELECT agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at
-      FROM agent_budgets WHERE agent_id = ?"
+      FROM agent_budgets WHERE agent_id = ?",
     )
-    .bind( agent_id )
-    .fetch_optional( &self.pool )
+    .bind(agent_id)
+    .fetch_optional(&self.pool)
     .await?;
 
-    Ok( row.map( | r | AgentBudget {
-      agent_id: r.get( "agent_id" ),
-      total_allocated: r.get( "total_allocated" ),
-      total_spent: r.get( "total_spent" ),
-      budget_remaining: r.get( "budget_remaining" ),
-      created_at: r.get( "created_at" ),
-      updated_at: r.get( "updated_at" ),
-    } ) )
+    Ok(row.map(|r| AgentBudget {
+      agent_id: r.get("agent_id"),
+      total_allocated: r.get("total_allocated"),
+      total_spent: r.get("total_spent"),
+      budget_remaining: r.get("budget_remaining"),
+      created_at: r.get("created_at"),
+      updated_at: r.get("updated_at"),
+    }))
   }
 
   /// Record spending against agent budget
@@ -142,12 +140,15 @@ impl AgentBudgetManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn record_spending( &self, agent_id: i64, cost_microdollars: i64 ) -> Result< (), sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  pub async fn record_spending(
+    &self,
+    agent_id: i64,
+    cost_microdollars: i64,
+  ) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     // Use explicit transaction with IMMEDIATE locking for atomic updates
@@ -158,18 +159,18 @@ impl AgentBudgetManager
       SET total_spent = total_spent + ?,
           budget_remaining = budget_remaining - ?,
           updated_at = ?
-      WHERE agent_id = ?"
+      WHERE agent_id = ?",
     )
-    .bind( cost_microdollars )
-    .bind( cost_microdollars )
-    .bind( now )
-    .bind( agent_id )
-    .execute( &mut *tx )
+    .bind(cost_microdollars)
+    .bind(cost_microdollars)
+    .bind(now)
+    .bind(agent_id)
+    .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Atomically check and reserve budget for a request
@@ -214,77 +215,74 @@ impl AgentBudgetManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn check_and_reserve_budget( &self, agent_id: i64, requested_amount: i64 ) -> Result< i64, sqlx::Error >
-  {
+  pub async fn check_and_reserve_budget(
+    &self,
+    agent_id: i64,
+    requested_amount: i64,
+  ) -> Result<i64, sqlx::Error> {
     // Retry logic for SQLite database busy/locked/deadlocked errors under high concurrency
     const MAX_RETRIES: u32 = 50;
 
-    for attempt in 0..MAX_RETRIES
-    {
+    for attempt in 0..MAX_RETRIES {
       // Exponential backoff on retries
-      if attempt > 0
-      {
-        let backoff_ms = 2_u64.pow( attempt.min( 8 ) ); // Cap at 256ms
-        tokio::time::sleep( tokio::time::Duration::from_millis( backoff_ms ) ).await;
+      if attempt > 0 {
+        let backoff_ms = 2_u64.pow(attempt.min(8)); // Cap at 256ms
+        tokio::time::sleep(tokio::time::Duration::from_millis(backoff_ms)).await;
       }
 
-      match self.try_reserve_budget_once( agent_id, requested_amount ).await
+      match self
+        .try_reserve_budget_once(agent_id, requested_amount)
+        .await
       {
-        Ok( granted ) => return Ok( granted ),
-        Err( e ) =>
-        {
+        Ok(granted) => return Ok(granted),
+        Err(e) => {
           // Check if error is database busy/locked/deadlocked - retry if so
           let err_msg = e.to_string().to_lowercase();
-          let is_retryable = err_msg.contains( "database is locked" )
-            || err_msg.contains( "database is busy" )
-            || err_msg.contains( "deadlock" );
+          let is_retryable = err_msg.contains("database is locked")
+            || err_msg.contains("database is busy")
+            || err_msg.contains("deadlock");
 
-          if is_retryable && attempt < MAX_RETRIES - 1
-          {
+          if is_retryable && attempt < MAX_RETRIES - 1 {
             // Retry on busy/deadlock error
-          }
-          else
-          {
+          } else {
             // Not a retryable error, or max retries reached
-            return Err( e );
+            return Err(e);
           }
         }
       }
     }
 
     // Should never reach here
-    Ok( 0 )
+    Ok(0)
   }
 
   /// Single attempt to reserve budget (internal helper)
-  async fn try_reserve_budget_once( &self, agent_id: i64, requested_amount: i64 ) -> Result< i64, sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  async fn try_reserve_budget_once(
+    &self,
+    agent_id: i64,
+    requested_amount: i64,
+  ) -> Result<i64, sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     // Use explicit transaction for atomic check-and-reserve
     let mut tx = self.pool.begin().await?;
 
     // Read total_spent BEFORE update to calculate granted amount later
-    let row = sqlx::query(
-      "SELECT total_spent FROM agent_budgets WHERE agent_id = ?"
-    )
-    .bind( agent_id )
-    .fetch_optional( &mut *tx )
-    .await?;
+    let row = sqlx::query("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_optional(&mut *tx)
+      .await?;
 
-    let spent_before = if let Some( r ) = row
-    {
-      r.get::< i64, _ >( "total_spent" )
-    }
-    else
-    {
+    let spent_before = if let Some(r) = row {
+      r.get::<i64, _>("total_spent")
+    } else {
       // Agent doesnt exist
       tx.rollback().await?;
-      return Ok( 0 );
+      return Ok(0);
     };
 
     // Single atomic UPDATE that calculates partial grant inline using CASE expression
@@ -301,41 +299,36 @@ impl AgentBudgetManager
           budget_remaining = budget_remaining -
         CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
           updated_at = ?
-      WHERE agent_id = ? AND budget_remaining > 0"
+      WHERE agent_id = ? AND budget_remaining > 0",
     )
-    .bind( requested_amount )
-    .bind( requested_amount )
-    .bind( requested_amount )
-    .bind( requested_amount )
-    .bind( now )
-    .bind( agent_id )
-    .execute( &mut *tx )
+    .bind(requested_amount)
+    .bind(requested_amount)
+    .bind(requested_amount)
+    .bind(requested_amount)
+    .bind(now)
+    .bind(agent_id)
+    .execute(&mut *tx)
     .await?;
 
     // Calculate granted amount from change in total_spent
-    let granted_amount = if result.rows_affected() == 1
-    {
+    let granted_amount = if result.rows_affected() == 1 {
       // Read total_spent AFTER update
-      let row = sqlx::query(
-        "SELECT total_spent FROM agent_budgets WHERE agent_id = ?"
-      )
-      .bind( agent_id )
-      .fetch_one( &mut *tx )
-      .await?;
+      let row = sqlx::query("SELECT total_spent FROM agent_budgets WHERE agent_id = ?")
+        .bind(agent_id)
+        .fetch_one(&mut *tx)
+        .await?;
 
-      let spent_after: i64 = row.get( "total_spent" );
+      let spent_after: i64 = row.get("total_spent");
 
       // Granted = difference in total_spent
       spent_after - spent_before
-    }
-    else
-    {
+    } else {
       // UPDATE failed - no budget available
       0
     };
 
     tx.commit().await?;
-    Ok( granted_amount )
+    Ok(granted_amount)
   }
 
   /// Add budget to agent allocation
@@ -354,12 +347,11 @@ impl AgentBudgetManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn add_budget( &self, agent_id: i64, additional_budget: i64 ) -> Result< (), sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  pub async fn add_budget(&self, agent_id: i64, additional_budget: i64) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     sqlx::query(
@@ -367,16 +359,16 @@ impl AgentBudgetManager
       SET total_allocated = total_allocated + ?,
           budget_remaining = budget_remaining + ?,
           updated_at = ?
-      WHERE agent_id = ?"
+      WHERE agent_id = ?",
     )
-    .bind( additional_budget )
-    .bind( additional_budget )
-    .bind( now )
-    .bind( agent_id )
-    .execute( &self.pool )
+    .bind(additional_budget)
+    .bind(additional_budget)
+    .bind(now)
+    .bind(agent_id)
+    .execute(&self.pool)
     .await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Check if agent has sufficient budget
@@ -389,14 +381,16 @@ impl AgentBudgetManager
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn has_sufficient_budget( &self, agent_id: i64, required_amount: i64 ) -> Result< bool, sqlx::Error >
-  {
-    let budget = self.get_budget_status( agent_id ).await?;
+  pub async fn has_sufficient_budget(
+    &self,
+    agent_id: i64,
+    required_amount: i64,
+  ) -> Result<bool, sqlx::Error> {
+    let budget = self.get_budget_status(agent_id).await?;
 
-    match budget
-    {
-      Some( b ) => Ok( b.budget_remaining >= required_amount ),
-      None => Ok( false ),
+    match budget {
+      Some(b) => Ok(b.budget_remaining >= required_amount),
+      None => Ok(false),
     }
   }
 
@@ -420,12 +414,15 @@ impl AgentBudgetManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn restore_reserved_budget( &self, agent_id: i64, returned_amount: i64 ) -> Result< (), sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  pub async fn restore_reserved_budget(
+    &self,
+    agent_id: i64,
+    returned_amount: i64,
+  ) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     // Use explicit transaction for atomic updates
@@ -436,17 +433,17 @@ impl AgentBudgetManager
       SET total_spent = total_spent - ?,
           budget_remaining = budget_remaining + ?,
           updated_at = ?
-      WHERE agent_id = ?"
+      WHERE agent_id = ?",
     )
-    .bind( returned_amount )
-    .bind( returned_amount )
-    .bind( now )
-    .bind( agent_id )
-    .execute( &mut *tx )
+    .bind(returned_amount)
+    .bind(returned_amount)
+    .bind(now)
+    .bind(agent_id)
+    .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
 
-    Ok( () )
+    Ok(())
   }
 }

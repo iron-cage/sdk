@@ -67,12 +67,11 @@
 //!
 //! Always prefer structural detection (proximity, context) over exact matching.
 #[test]
-fn test_pattern_detection_catches_variations()
-{
+fn test_pattern_detection_catches_variations() {
   // This test verifies the fix by ensuring detection works with common variations
 
   // Simulate source with various formatting of env::var
-    let test_cases = [
+  let test_cases = [
     // Case 1: With .ok()
     r#"
       fn load() {
@@ -93,29 +92,28 @@ fn test_pattern_detection_catches_variations()
     "#,
   ];
 
-  for ( idx, test_source ) in test_cases.iter().enumerate()
-  {
+  for (idx, test_source) in test_cases.iter().enumerate() {
     // The detection logic from old_way_manual_env_var_is_deleted
     // Handle both "env::var(" and "env::var (" (with space before paren)
-    let has_env_var_call = test_source.contains( "env::var" );
-    assert!( has_env_var_call, "Test case {idx} should have env::var call" );
+    let has_env_var_call = test_source.contains("env::var");
+    assert!(
+      has_env_var_call,
+      "Test case {idx} should have env::var call"
+    );
 
     let var_name = "DATABASE_URL";
-    let pattern = format!( "\"{var_name}\"" );
+    let pattern = format!("\"{var_name}\"");
 
-    let lines: Vec< &str > = test_source.lines().collect();
+    let lines: Vec<&str> = test_source.lines().collect();
     let mut found_in_proximity = false;
 
-    for ( line_idx, line ) in lines.iter().enumerate()
-    {
-      if line.contains( &pattern )
-      {
-        let start = line_idx.saturating_sub( 2 );
-        let end = ( line_idx + 3 ).min( lines.len() );
-        let context = lines[ start..end ].join( " " );
+    for (line_idx, line) in lines.iter().enumerate() {
+      if line.contains(&pattern) {
+        let start = line_idx.saturating_sub(2);
+        let end = (line_idx + 3).min(lines.len());
+        let context = lines[start..end].join(" ");
 
-        if context.contains( "env::var" )
-        {
+        if context.contains("env::var") {
           found_in_proximity = true;
           break;
         }
@@ -130,57 +128,41 @@ fn test_pattern_detection_catches_variations()
 }
 
 #[test]
-fn old_way_manual_env_var_is_deleted()
-{
+fn old_way_manual_env_var_is_deleted() {
   // Fix(issue-001): Use proximity-based pattern detection to catch formatting variations.
   // Root cause: Initial exact string matching missed .ok(), .unwrap(), whitespace variations.
   // Pitfall: Always test pattern detection with multiple code formatting styles.
 
-  let source = std::fs::read_to_string( "src/config.rs" )
-    .expect( "config.rs should exist" );
+  let source = std::fs::read_to_string("src/config.rs").expect("config.rs should exist");
 
   // Check for manual env::var usage with config-related variables
   // Use two-part check: presence of env::var + presence of variable name
   // This catches variations like env::var("X").ok(), env::var ( "X" ), etc.
 
-  let config_var_names = [
-    "DATABASE_URL",
-    "API_URL",
-    "TOKEN",
-    "TIMEOUT",
-  ];
+  let config_var_names = ["DATABASE_URL", "API_URL", "TOKEN", "TIMEOUT"];
 
   // First, check if env::var is used at all
-  let has_env_var_call = source.contains( "env::var(" );
+  let has_env_var_call = source.contains("env::var(");
 
-  if has_env_var_call
-  {
+  if has_env_var_call {
     // If env::var is used, verify it's not for config variables
-    for var_name in &config_var_names
-    {
+    for var_name in &config_var_names {
       // Check if the variable name appears near env::var
       // Look for the variable name in quotes (any quote style)
-      let patterns_to_check = [
-        format!( "\"{var_name}\"" ),
-        format!( "'{var_name}'" ),
-      ];
+      let patterns_to_check = [format!("\"{var_name}\""), format!("'{var_name}'")];
 
-      for pattern in &patterns_to_check
-      {
-        if source.contains( pattern.as_str() )
-        {
+      for pattern in &patterns_to_check {
+        if source.contains(pattern.as_str()) {
           // Variable name in quotes found - now verify it's not used with env::var
           // Check for env::var anywhere in the same general area
-          let lines: Vec< &str > = source.lines().collect();
+          let lines: Vec<&str> = source.lines().collect();
 
-          for ( idx, line ) in lines.iter().enumerate()
-          {
-            if line.contains( pattern.as_str() )
-            {
+          for (idx, line) in lines.iter().enumerate() {
+            if line.contains(pattern.as_str()) {
               // Check this line and nearby lines for env::var
-              let start = idx.saturating_sub( 2 );
-              let end = ( idx + 3 ).min( lines.len() );
-              let context = lines[ start..end ].join( " " );
+              let start = idx.saturating_sub(2);
+              let end = (idx + 3).min(lines.len());
+              let context = lines[start..end].join(" ");
 
               assert!(
                 !context.contains( "env::var" ),
@@ -198,67 +180,55 @@ fn old_way_manual_env_var_is_deleted()
 }
 
 #[test]
-fn old_way_direct_toml_parsing_is_deleted()
-{
-  let source = std::fs::read_to_string( "src/config.rs" )
-    .expect( "config.rs should exist" );
+fn old_way_direct_toml_parsing_is_deleted() {
+  let source = std::fs::read_to_string("src/config.rs").expect("config.rs should exist");
 
-  let forbidden_patterns = [
-    "toml::from_str",
-    "toml::from_slice",
-    "toml::de::from_str",
-  ];
+  let forbidden_patterns = ["toml::from_str", "toml::from_slice", "toml::de::from_str"];
 
-  for pattern in &forbidden_patterns
-  {
+  for pattern in &forbidden_patterns {
     assert!(
-      !source.contains( pattern ),
+      !source.contains(pattern),
       "REGRESSION: Direct TOML parsing '{pattern}' found - must use ConfigLoader"
     );
   }
 }
 
 #[test]
-fn new_way_is_required()
-{
-  let source = std::fs::read_to_string( "src/config.rs" )
-    .expect( "config.rs should exist" );
+fn new_way_is_required() {
+  let source = std::fs::read_to_string("src/config.rs").expect("config.rs should exist");
 
   // New pattern that MUST exist
   assert!(
-    source.contains( "ConfigLoader::with_defaults" ),
+    source.contains("ConfigLoader::with_defaults"),
     "FAILURE: ConfigLoader::with_defaults not found - new config loading missing"
   );
 
   assert!(
-    source.contains( "use iron_config_loader" ) || source.contains( "iron_config_loader::" ),
+    source.contains("use iron_config_loader") || source.contains("iron_config_loader::"),
     "FAILURE: iron_config_loader import not found - new way missing"
   );
 }
 
 #[test]
-fn iron_config_loader_dependency_is_required()
-{
-  let cargo_toml = std::fs::read_to_string( "Cargo.toml" )
-    .expect( "Cargo.toml should exist" );
+fn iron_config_loader_dependency_is_required() {
+  let cargo_toml = std::fs::read_to_string("Cargo.toml").expect("Cargo.toml should exist");
 
   assert!(
-    cargo_toml.contains( "iron_config_loader" ),
+    cargo_toml.contains("iron_config_loader"),
     "FAILURE: iron_config_loader dependency missing from Cargo.toml"
   );
 
   // Verify it's a workspace dependency (not optional, not dev-only)
   assert!(
-    cargo_toml.contains( "iron_config_loader = { workspace = true }" ) ||
-    cargo_toml.contains( "iron_config_loader = {workspace = true}" ) ||
-    cargo_toml.contains( "iron_config_loader={workspace=true}" ),
+    cargo_toml.contains("iron_config_loader = { workspace = true }")
+      || cargo_toml.contains("iron_config_loader = {workspace = true}")
+      || cargo_toml.contains("iron_config_loader={workspace=true}"),
     "FAILURE: iron_config_loader must be a workspace dependency in [dependencies]"
   );
 }
 
 #[test]
-fn no_backup_files_exist()
-{
+fn no_backup_files_exist() {
   // Check for common backup file patterns
   let backup_patterns = [
     "src/config.rs.backup",
@@ -268,31 +238,26 @@ fn no_backup_files_exist()
     "src/legacy_config.rs",
   ];
 
-  for path in &backup_patterns
-  {
+  for path in &backup_patterns {
     assert!(
-      !std::path::Path::new( path ).exists(),
+      !std::path::Path::new(path).exists(),
       "FAILURE: Backup file exists: {path} - old code not fully deleted"
     );
   }
 }
 
 #[test]
-fn no_commented_out_old_code()
-{
-  let source = std::fs::read_to_string( "src/config.rs" )
-    .expect( "config.rs should exist" );
+fn no_commented_out_old_code() {
+  let source = std::fs::read_to_string("src/config.rs").expect("config.rs should exist");
 
   // Check for commented-out old patterns
-  let lines: Vec< &str > = source.lines().collect();
+  let lines: Vec<&str> = source.lines().collect();
 
-  for line in &lines
-  {
+  for line in &lines {
     let trimmed = line.trim();
 
     // Skip if not a comment
-    if !trimmed.starts_with( "//" )
-    {
+    if !trimmed.starts_with("//") {
       continue;
     }
 
@@ -304,8 +269,7 @@ fn no_commented_out_old_code()
       "toml::from_str",
     ];
 
-    for pattern in &forbidden_in_comments
-    {
+    for pattern in &forbidden_in_comments {
       assert!(
         !trimmed.contains( pattern ),
         "REGRESSION: Commented-out old code found: '{trimmed}' - delete completely, don't comment out"
@@ -315,10 +279,8 @@ fn no_commented_out_old_code()
 }
 
 #[test]
-fn no_todo_markers_about_migration()
-{
-  let source = std::fs::read_to_string( "src/config.rs" )
-    .expect( "config.rs should exist" );
+fn no_todo_markers_about_migration() {
+  let source = std::fs::read_to_string("src/config.rs").expect("config.rs should exist");
 
   let todo_patterns = [
     "TODO: migrate",
@@ -328,10 +290,9 @@ fn no_todo_markers_about_migration()
     "HACK: temporary",
   ];
 
-  for pattern in &todo_patterns
-  {
+  for pattern in &todo_patterns {
     assert!(
-      !source.to_lowercase().contains( &pattern.to_lowercase() ),
+      !source.to_lowercase().contains(&pattern.to_lowercase()),
       "FAILURE: TODO marker found: '{pattern}' - migration should be complete"
     );
   }

@@ -61,44 +61,52 @@
 
 mod common;
 
-use iron_token_manager::token_generator::TokenGenerator;
 use common::create_test_storage;
+use iron_token_manager::token_generator::TokenGenerator;
 
-#[ tokio::test ]
-async fn test_create_token_stores_hash_not_plaintext()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_create_token_stores_hash_not_plaintext() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let plaintext_token = generator.generate();
 
   // Store token
   let token_id = storage
-    .create_token( &plaintext_token, "user_001", Some( "project_123" ), Some( "Test Token" ), None, None )
+    .create_token(
+      &plaintext_token,
+      "user_001",
+      Some("project_123"),
+      Some("Test Token"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
-  assert!( token_id > 0, "Token ID should be positive" );
+  assert!(token_id > 0, "Token ID should be positive");
 
   // Verify hash is stored (not plaintext)
   let stored_hash = storage
-    .get_token_hash( token_id )
+    .get_token_hash(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get token hash");
 
-  let expected_hash = generator.hash_token( &plaintext_token );
-  assert_eq!( stored_hash, expected_hash, "Stored hash should match computed hash" );
+  let expected_hash = generator.hash_token(&plaintext_token);
+  assert_eq!(
+    stored_hash, expected_hash,
+    "Stored hash should match computed hash"
+  );
 
   // Verify plaintext is NOT stored
-  let result = storage.verify_token( &plaintext_token ).await;
-  assert!( result.is_ok(), "Token verification should succeed" );
+  let result = storage.verify_token(&plaintext_token).await;
+  assert!(result.is_ok(), "Token verification should succeed");
 }
 
-#[ tokio::test ]
-async fn test_create_token_with_metadata()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_create_token_with_metadata() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
@@ -106,8 +114,8 @@ async fn test_create_token_with_metadata()
     .create_token(
       &token,
       "user_002",
-      Some( "project_456" ),
-      Some( "Development Token" ),
+      Some("project_456"),
+      Some("Development Token"),
       None,
       None,
     )
@@ -116,203 +124,250 @@ async fn test_create_token_with_metadata()
 
   // Retrieve token metadata
   let metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get metadata");
 
-  assert_eq!( metadata.user_id, "user_002", "Metadata should preserve user_id as stored" );
-  assert_eq!( metadata.project_id, Some( "project_456".to_string() ), "Metadata should preserve project_id as stored" );
-  assert_eq!( metadata.name, Some( "Development Token".to_string() ), "Metadata should preserve token name as stored" );
-  assert!( metadata.is_active, "Newly created token should be active by default" );
+  assert_eq!(
+    metadata.user_id, "user_002",
+    "Metadata should preserve user_id as stored"
+  );
+  assert_eq!(
+    metadata.project_id,
+    Some("project_456".to_string()),
+    "Metadata should preserve project_id as stored"
+  );
+  assert_eq!(
+    metadata.name,
+    Some("Development Token".to_string()),
+    "Metadata should preserve token name as stored"
+  );
+  assert!(
+    metadata.is_active,
+    "Newly created token should be active by default"
+  );
 }
 
-#[ tokio::test ]
-async fn test_verify_token_returns_token_id()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_verify_token_returns_token_id() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   let created_id = storage
-    .create_token( &token, "user_003", None, None, None, None )
+    .create_token(&token, "user_003", None, None, None, None)
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Verify token returns the ID
   let verified_id = storage
-    .verify_token( &token )
+    .verify_token(&token)
     .await
     .expect("LOUD FAILURE: Failed to verify token");
 
-  assert_eq!( verified_id, created_id, "Verified ID should match created ID" );
+  assert_eq!(
+    verified_id, created_id,
+    "Verified ID should match created ID"
+  );
 }
 
-#[ tokio::test ]
-async fn test_verify_token_fails_for_invalid_token()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_verify_token_fails_for_invalid_token() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
 
   // Create valid token
   storage
-    .create_token( &generator.generate(), "user_004", None, None, None, None )
+    .create_token(&generator.generate(), "user_004", None, None, None, None)
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Try to verify non-existent token
   let invalid_token = generator.generate();
-  let result = storage.verify_token( &invalid_token ).await;
+  let result = storage.verify_token(&invalid_token).await;
 
-  assert!( result.is_err(), "Verification should fail for invalid token" );
+  assert!(
+    result.is_err(),
+    "Verification should fail for invalid token"
+  );
 }
 
-#[ tokio::test ]
-async fn test_deactivate_token()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_deactivate_token() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_005", None, None, None, None )
+    .create_token(&token, "user_005", None, None, None, None)
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Deactivate token
   storage
-    .deactivate_token( token_id )
+    .deactivate_token(token_id)
     .await
     .expect("LOUD FAILURE: Failed to deactivate token");
 
   // Verify token is now inactive
-  let result = storage.verify_token( &token ).await;
-  assert!( result.is_err(), "Deactivated token should fail verification" );
+  let result = storage.verify_token(&token).await;
+  assert!(
+    result.is_err(),
+    "Deactivated token should fail verification"
+  );
 }
 
-#[ tokio::test ]
-async fn test_list_user_tokens()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_list_user_tokens() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
 
   // Create multiple tokens for same user
   storage
-    .create_token( &generator.generate(), "user_006", None, Some( "Token 1" ), None, None )
+    .create_token(
+      &generator.generate(),
+      "user_006",
+      None,
+      Some("Token 1"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create token 1");
 
   storage
-    .create_token( &generator.generate(), "user_006", None, Some( "Token 2" ), None, None )
+    .create_token(
+      &generator.generate(),
+      "user_006",
+      None,
+      Some("Token 2"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create token 2");
 
   storage
-    .create_token( &generator.generate(), "user_007", None, Some( "Other User Token" ), None, None )
+    .create_token(
+      &generator.generate(),
+      "user_007",
+      None,
+      Some("Other User Token"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create token 3");
 
   // List tokens for user_006
   let tokens = storage
-    .list_user_tokens( "user_006" )
+    .list_user_tokens("user_006")
     .await
     .expect("LOUD FAILURE: Failed to list tokens");
 
-  assert_eq!( tokens.len(), 2, "Should return 2 tokens for user_006" );
+  assert_eq!(tokens.len(), 2, "Should return 2 tokens for user_006");
 }
 
-#[ tokio::test ]
-async fn test_update_last_used_timestamp()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_update_last_used_timestamp() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_008", None, None, None, None )
+    .create_token(&token, "user_008", None, None, None, None)
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Initially last_used_at should be None
   let metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get metadata");
-  assert!( metadata.last_used_at.is_none(), "last_used_at should initially be None" );
+  assert!(
+    metadata.last_used_at.is_none(),
+    "last_used_at should initially be None"
+  );
 
   // Update last used
   storage
-    .update_last_used( token_id )
+    .update_last_used(token_id)
     .await
     .expect("LOUD FAILURE: Failed to update last_used");
 
   // Verify timestamp was set
   let updated_metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get updated metadata");
-  assert!( updated_metadata.last_used_at.is_some(), "last_used_at should now be set" );
+  assert!(
+    updated_metadata.last_used_at.is_some(),
+    "last_used_at should now be set"
+  );
 }
 
-#[ tokio::test ]
-async fn test_delete_token()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_delete_token() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   let token_id = storage
-    .create_token( &token, "user_009", None, None, None, None )
+    .create_token(&token, "user_009", None, None, None, None)
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Delete token
   storage
-    .delete_token( token_id )
+    .delete_token(token_id)
     .await
     .expect("LOUD FAILURE: Failed to delete token");
 
   // Verify token no longer exists
-  let result = storage.verify_token( &token ).await;
-  assert!( result.is_err(), "Deleted token should not verify" );
+  let result = storage.verify_token(&token).await;
+  assert!(result.is_err(), "Deleted token should not verify");
 }
 
-#[ tokio::test ]
-#[ allow( clippy::cast_possible_truncation ) ]
-async fn test_token_with_expiration()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+#[allow(clippy::cast_possible_truncation)]
+async fn test_token_with_expiration() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   // Create token that expired 1 hour ago
   let now_ms = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
+    .duration_since(std::time::UNIX_EPOCH)
     .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64;
-  let expired_time = now_ms - ( 3_600_000 ); // -1 hour
+  let expired_time = now_ms - (3_600_000); // -1 hour
 
   let token_id = storage
-    .create_token_with_expiry( &token, "user_010", None, None, Some( expired_time ) )
+    .create_token_with_expiry(&token, "user_010", None, None, Some(expired_time))
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Verify expired token fails
-  let result = storage.verify_token( &token ).await;
-  assert!( result.is_err(), "Expired token should fail verification" );
+  let result = storage.verify_token(&token).await;
+  assert!(result.is_err(), "Expired token should fail verification");
 
   // Metadata should still be retrievable
   let metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Should still retrieve metadata for expired token");
-  assert_eq!( metadata.expires_at, Some( expired_time ), "Metadata should preserve expiration timestamp even for expired tokens" );
+  assert_eq!(
+    metadata.expires_at,
+    Some(expired_time),
+    "Metadata should preserve expiration timestamp even for expired tokens"
+  );
 }
 
 /// Protocol 014 integration test: verify new token format works end-to-end
@@ -322,63 +377,92 @@ async fn test_token_with_expiration()
 /// 2. Store successfully in database
 /// 3. Verify correctly with prefix stripping
 /// 4. Complete full lifecycle (create → verify → use)
-#[ tokio::test ]
-async fn test_protocol_014_token_format_integration()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_protocol_014_token_format_integration() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
 
   // Generate token in Protocol 014 format
   let token = generator.generate();
 
   // Verify token has correct format
-  assert!( token.starts_with( "apitok_" ), "Token should start with apitok_ prefix" );
-  assert_eq!( token.len(), 71, "Token should be exactly 71 characters" );
+  assert!(
+    token.starts_with("apitok_"),
+    "Token should start with apitok_ prefix"
+  );
+  assert_eq!(token.len(), 71, "Token should be exactly 71 characters");
 
-  let body = &token[ 7.. ];
-  assert_eq!( body.len(), 64, "Token body should be 64 characters" );
-  assert!( body.chars().all( |c| c.is_ascii_alphanumeric() ), "Token body should be Base62" );
+  let body = &token[7..];
+  assert_eq!(body.len(), 64, "Token body should be 64 characters");
+  assert!(
+    body.chars().all(|c| c.is_ascii_alphanumeric()),
+    "Token body should be Base62"
+  );
 
   // Create token in database (uses user_001 from seed_test_users)
   let token_id = storage
-    .create_token( &token, "user_001", Some( "project_014" ), Some( "Protocol 014 Token" ), None, None )
+    .create_token(
+      &token,
+      "user_001",
+      Some("project_014"),
+      Some("Protocol 014 Token"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create Protocol 014 token");
 
-  assert!( token_id > 0, "Token ID should be positive" );
+  assert!(token_id > 0, "Token ID should be positive");
 
   // Verify token works end-to-end
   let verified_id = storage
-    .verify_token( &token )
+    .verify_token(&token)
     .await
     .expect("LOUD FAILURE: Failed to verify Protocol 014 token");
 
-  assert_eq!( verified_id, token_id, "Verified ID should match created ID" );
+  assert_eq!(verified_id, token_id, "Verified ID should match created ID");
 
   // Verify metadata retrievable
   let metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get Protocol 014 token metadata");
 
-  assert_eq!( metadata.user_id, "user_001", "Protocol 014 token should preserve user_id" );
-  assert_eq!( metadata.project_id, Some( "project_014".to_string() ), "Protocol 014 token should preserve project_id" );
-  assert_eq!( metadata.name, Some( "Protocol 014 Token".to_string() ), "Protocol 014 token should preserve token name" );
-  assert!( metadata.is_active, "Protocol 014 token should be active after creation" );
+  assert_eq!(
+    metadata.user_id, "user_001",
+    "Protocol 014 token should preserve user_id"
+  );
+  assert_eq!(
+    metadata.project_id,
+    Some("project_014".to_string()),
+    "Protocol 014 token should preserve project_id"
+  );
+  assert_eq!(
+    metadata.name,
+    Some("Protocol 014 Token".to_string()),
+    "Protocol 014 token should preserve token name"
+  );
+  assert!(
+    metadata.is_active,
+    "Protocol 014 token should be active after creation"
+  );
 
   // Update last used
   storage
-    .update_last_used( token_id )
+    .update_last_used(token_id)
     .await
     .expect("LOUD FAILURE: Failed to update last_used for Protocol 014 token");
 
   let updated_metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get updated metadata");
 
-  assert!( updated_metadata.last_used_at.is_some(), "Last used timestamp should be set" );
+  assert!(
+    updated_metadata.last_used_at.is_some(),
+    "Last used timestamp should be set"
+  );
 }
 
 /// Backward compatibility test: verify old tokens (without apitok_ prefix) still work
@@ -389,11 +473,10 @@ async fn test_protocol_014_token_format_integration()
 /// 3. Continue to work during migration period
 ///
 /// This ensures zero downtime during Protocol 014 rollout.
-#[ tokio::test ]
-async fn test_backward_compatibility_old_token_format()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_backward_compatibility_old_token_format() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
 
   // Simulate old token format (no apitok_ prefix, random Base64-like string)
@@ -402,39 +485,66 @@ async fn test_backward_compatibility_old_token_format()
 
   // Create old token in database (uses user_002 from seed_test_users)
   let token_id = storage
-    .create_token( old_token, "user_002", Some( "legacy_project" ), Some( "Old Format Token" ), None, None )
+    .create_token(
+      old_token,
+      "user_002",
+      Some("legacy_project"),
+      Some("Old Format Token"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create old format token");
 
-  assert!( token_id > 0, "Token ID should be positive" );
+  assert!(token_id > 0, "Token ID should be positive");
 
   // Verify old token still works (hash_token should NOT strip prefix from old tokens)
   let verified_id = storage
-    .verify_token( old_token )
+    .verify_token(old_token)
     .await
     .expect("LOUD FAILURE: Failed to verify old format token");
 
-  assert_eq!( verified_id, token_id, "Old format token should verify successfully" );
+  assert_eq!(
+    verified_id, token_id,
+    "Old format token should verify successfully"
+  );
 
   // Verify metadata retrievable
   let metadata = storage
-    .get_token_metadata( token_id )
+    .get_token_metadata(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get old format token metadata");
 
-  assert_eq!( metadata.user_id, "user_002", "Old format token should have correct user_id" );
-  assert_eq!( metadata.project_id, Some( "legacy_project".to_string() ), "Old format token should have correct project_id" );
-  assert_eq!( metadata.name, Some( "Old Format Token".to_string() ), "Old format token should have correct name" );
-  assert!( metadata.is_active, "Old format token should be active by default" );
+  assert_eq!(
+    metadata.user_id, "user_002",
+    "Old format token should have correct user_id"
+  );
+  assert_eq!(
+    metadata.project_id,
+    Some("legacy_project".to_string()),
+    "Old format token should have correct project_id"
+  );
+  assert_eq!(
+    metadata.name,
+    Some("Old Format Token".to_string()),
+    "Old format token should have correct name"
+  );
+  assert!(
+    metadata.is_active,
+    "Old format token should be active by default"
+  );
 
   // Verify hash stored correctly (entire token, no prefix stripping)
   let stored_hash = storage
-    .get_token_hash( token_id )
+    .get_token_hash(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get old token hash");
 
-  let expected_hash = generator.hash_token( old_token );
-  assert_eq!( stored_hash, expected_hash, "Old token hash should match (no prefix stripping)" );
+  let expected_hash = generator.hash_token(old_token);
+  assert_eq!(
+    stored_hash, expected_hash,
+    "Old token hash should match (no prefix stripping)"
+  );
 }
 
 /// Integration test: verify prefix is stripped before hashing
@@ -448,42 +558,57 @@ async fn test_backward_compatibility_old_token_format()
 /// - Database stores hash of token body (64 chars)
 /// - Not hash of full token (71 chars including prefix)
 /// - Enables future prefix changes without breaking existing hashes
-#[ tokio::test ]
-async fn test_prefix_stripped_before_hashing_integration()
-{
-  let ( storage, db ) = create_test_storage().await;
-  core::mem::forget( db );
+#[tokio::test]
+async fn test_prefix_stripped_before_hashing_integration() {
+  let (storage, db) = create_test_storage().await;
+  core::mem::forget(db);
   let generator = TokenGenerator::new();
 
   // Generate token with apitok_ prefix
   let token = generator.generate();
-  let body = &token[ 7.. ]; // Extract body (64 chars)
+  let body = &token[7..]; // Extract body (64 chars)
 
   // Create token in database (uses user_003 from seed_test_users)
   let token_id = storage
-    .create_token( &token, "user_003", None, Some( "Prefix Strip Test" ), None, None )
+    .create_token(
+      &token,
+      "user_003",
+      None,
+      Some("Prefix Strip Test"),
+      None,
+      None,
+    )
     .await
     .expect("LOUD FAILURE: Failed to create token");
 
   // Get stored hash
   let stored_hash = storage
-    .get_token_hash( token_id )
+    .get_token_hash(token_id)
     .await
     .expect("LOUD FAILURE: Failed to get stored hash");
 
   // Hash should be of body only (not including prefix)
-  let expected_hash_body = generator.hash_token( body );
-  let expected_hash_full = generator.hash_token( &token );
+  let expected_hash_body = generator.hash_token(body);
+  let expected_hash_full = generator.hash_token(&token);
 
   // These should be EQUAL because hash_token strips prefix
-  assert_eq!( stored_hash, expected_hash_body, "Stored hash should match hash of body only" );
-  assert_eq!( stored_hash, expected_hash_full, "hash_token should strip prefix before hashing" );
+  assert_eq!(
+    stored_hash, expected_hash_body,
+    "Stored hash should match hash of body only"
+  );
+  assert_eq!(
+    stored_hash, expected_hash_full,
+    "hash_token should strip prefix before hashing"
+  );
 
   // Verify token verification works (uses same prefix-stripping logic)
   let verified_id = storage
-    .verify_token( &token )
+    .verify_token(&token)
     .await
     .expect("LOUD FAILURE: Failed to verify token with prefix");
 
-  assert_eq!( verified_id, token_id, "Token should verify successfully with prefix stripping" );
+  assert_eq!(
+    verified_id, token_id,
+    "Token should verify successfully with prefix stripping"
+  );
 }

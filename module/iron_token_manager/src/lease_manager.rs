@@ -15,13 +15,12 @@
 //! **State Machine**: See `docs/state_machine/001_budget_lease_lifecycle.md`
 //! for complete state transition documentation (ACTIVE → EXPIRED → CLOSED lifecycle)
 
-use sqlx::{ SqlitePool, Row };
-use std::time::{ SystemTime, UNIX_EPOCH };
+use sqlx::{Row, SqlitePool};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Budget lease record
-#[ derive( Debug, Clone ) ]
-pub struct BudgetLease
-{
+#[derive(Debug, Clone)]
+pub struct BudgetLease {
   /// Lease ID (format: lease_<uuid>)
   pub id: String,
   /// Agent database ID
@@ -37,26 +36,23 @@ pub struct BudgetLease
   /// Creation timestamp (milliseconds since epoch)
   pub created_at: i64,
   /// Expiration timestamp (milliseconds since epoch, None for no expiration)
-  pub expires_at: Option< i64 >,
+  pub expires_at: Option<i64>,
 }
 
 /// Lease manager for budget lease CRUD operations
-#[ derive( Debug, Clone ) ]
-pub struct LeaseManager
-{
+#[derive(Debug, Clone)]
+pub struct LeaseManager {
   pool: SqlitePool,
 }
 
-impl LeaseManager
-{
+impl LeaseManager {
   /// Create new lease manager from existing pool
   ///
   /// # Arguments
   ///
   /// * `pool` - Existing database connection pool
-  #[ must_use ]
-  pub fn from_pool( pool: SqlitePool ) -> Self
-  {
+  #[must_use]
+  pub fn from_pool(pool: SqlitePool) -> Self {
     Self { pool }
   }
 
@@ -83,30 +79,29 @@ impl LeaseManager
     agent_id: i64,
     budget_id: i64,
     budget_granted: i64,
-    expires_at: Option< i64 >,
-  ) -> Result< (), sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+    expires_at: Option<i64>,
+  ) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     sqlx::query(
       "INSERT INTO budget_leases
       (id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at)
-      VALUES (?, ?, ?, ?, 0, 'active', ?, ?)"
+      VALUES (?, ?, ?, ?, 0, 'active', ?, ?)",
     )
-    .bind( lease_id )
-    .bind( agent_id )
-    .bind( budget_id )
-    .bind( budget_granted )
-    .bind( now )
-    .bind( expires_at )
-    .execute( &self.pool )
+    .bind(lease_id)
+    .bind(agent_id)
+    .bind(budget_id)
+    .bind(budget_granted)
+    .bind(now)
+    .bind(expires_at)
+    .execute(&self.pool)
     .await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Get lease by ID
@@ -118,8 +113,7 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_lease( &self, lease_id: &str ) -> Result< Option< BudgetLease >, sqlx::Error >
-  {
+  pub async fn get_lease(&self, lease_id: &str) -> Result<Option<BudgetLease>, sqlx::Error> {
     let row = sqlx::query(
       "SELECT id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at
       FROM budget_leases WHERE id = ?"
@@ -128,16 +122,16 @@ impl LeaseManager
     .fetch_optional( &self.pool )
     .await?;
 
-    Ok( row.map( | r | BudgetLease {
-      id: r.get( "id" ),
-      agent_id: r.get( "agent_id" ),
-      budget_id: r.get( "budget_id" ),
-      budget_granted: r.get( "budget_granted" ),
-      budget_spent: r.get( "budget_spent" ),
-      lease_status: r.get( "lease_status" ),
-      created_at: r.get( "created_at" ),
-      expires_at: r.get( "expires_at" ),
-    } ) )
+    Ok(row.map(|r| BudgetLease {
+      id: r.get("id"),
+      agent_id: r.get("agent_id"),
+      budget_id: r.get("budget_id"),
+      budget_granted: r.get("budget_granted"),
+      budget_spent: r.get("budget_spent"),
+      lease_status: r.get("lease_status"),
+      created_at: r.get("created_at"),
+      expires_at: r.get("expires_at"),
+    }))
   }
 
   /// Record usage for a lease
@@ -167,20 +161,23 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn record_usage( &self, lease_id: &str, cost_microdollars: i64 ) -> Result< (), sqlx::Error >
-  {
+  pub async fn record_usage(
+    &self,
+    lease_id: &str,
+    cost_microdollars: i64,
+  ) -> Result<(), sqlx::Error> {
     // Use explicit transaction with IMMEDIATE locking for atomic updates
     let mut tx = self.pool.begin().await?;
 
-    sqlx::query( "UPDATE budget_leases SET budget_spent = budget_spent + ? WHERE id = ?" )
-      .bind( cost_microdollars )
-      .bind( lease_id )
-      .execute( &mut *tx )
+    sqlx::query("UPDATE budget_leases SET budget_spent = budget_spent + ? WHERE id = ?")
+      .bind(cost_microdollars)
+      .bind(lease_id)
+      .execute(&mut *tx)
       .await?;
 
     tx.commit().await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Update lease budget (for budget refresh)
@@ -195,15 +192,18 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn add_budget( &self, lease_id: &str, additional_budget: i64 ) -> Result< (), sqlx::Error >
-  {
-    sqlx::query( "UPDATE budget_leases SET budget_granted = budget_granted + ? WHERE id = ?" )
-      .bind( additional_budget )
-      .bind( lease_id )
-      .execute( &self.pool )
+  pub async fn add_budget(
+    &self,
+    lease_id: &str,
+    additional_budget: i64,
+  ) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE budget_leases SET budget_granted = budget_granted + ? WHERE id = ?")
+      .bind(additional_budget)
+      .bind(lease_id)
+      .execute(&self.pool)
       .await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Expire a lease (set status to 'expired')
@@ -215,14 +215,13 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn expire_lease( &self, lease_id: &str ) -> Result< (), sqlx::Error >
-  {
-    sqlx::query( "UPDATE budget_leases SET lease_status = 'expired' WHERE id = ?" )
-      .bind( lease_id )
-      .execute( &self.pool )
+  pub async fn expire_lease(&self, lease_id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE budget_leases SET lease_status = 'expired' WHERE id = ?")
+      .bind(lease_id)
+      .execute(&self.pool)
       .await?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Get all active leases for an agent
@@ -234,8 +233,7 @@ impl LeaseManager
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_agent_leases( &self, agent_id: i64 ) -> Result< Vec< BudgetLease >, sqlx::Error >
-  {
+  pub async fn get_agent_leases(&self, agent_id: i64) -> Result<Vec<BudgetLease>, sqlx::Error> {
     let rows = sqlx::query(
       "SELECT id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at
       FROM budget_leases WHERE agent_id = ? AND lease_status = 'active'"
@@ -244,16 +242,21 @@ impl LeaseManager
     .fetch_all( &self.pool )
     .await?;
 
-    Ok( rows.into_iter().map( | r | BudgetLease {
-      id: r.get( "id" ),
-      agent_id: r.get( "agent_id" ),
-      budget_id: r.get( "budget_id" ),
-      budget_granted: r.get( "budget_granted" ),
-      budget_spent: r.get( "budget_spent" ),
-      lease_status: r.get( "lease_status" ),
-      created_at: r.get( "created_at" ),
-      expires_at: r.get( "expires_at" ),
-    } ).collect() )
+    Ok(
+      rows
+        .into_iter()
+        .map(|r| BudgetLease {
+          id: r.get("id"),
+          agent_id: r.get("agent_id"),
+          budget_id: r.get("budget_id"),
+          budget_granted: r.get("budget_granted"),
+          budget_spent: r.get("budget_spent"),
+          lease_status: r.get("lease_status"),
+          created_at: r.get("created_at"),
+          expires_at: r.get("expires_at"),
+        })
+        .collect(),
+    )
   }
 
   /// Close a lease and record returned amount
@@ -276,12 +279,11 @@ impl LeaseManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn close_lease( &self, lease_id: &str ) -> Result< i64, sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  pub async fn close_lease(&self, lease_id: &str) -> Result<i64, sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
     // Use transaction for atomic read-modify-write
@@ -295,16 +297,16 @@ impl LeaseManager
     .fetch_optional( &mut *tx )
     .await?;
 
-    let ( granted, spent ): ( i64, i64 ) = match row {
-      Some( r ) => ( r.get( "budget_granted" ), r.get( "budget_spent" ) ),
+    let (granted, spent): (i64, i64) = match row {
+      Some(r) => (r.get("budget_granted"), r.get("budget_spent")),
       None => {
         // Lease not found or not active
-        return Ok( 0 );
+        return Ok(0);
       }
     };
 
     // Calculate returned amount
-    let returned = ( granted - spent ).max( 0 );
+    let returned = (granted - spent).max(0);
 
     // Update lease to closed state
     sqlx::query(
@@ -313,18 +315,18 @@ impl LeaseManager
            returned_amount = ?,
            closed_at = ?,
            updated_at = ?
-       WHERE id = ?"
+       WHERE id = ?",
     )
-    .bind( returned )
-    .bind( now )
-    .bind( now )
-    .bind( lease_id )
-    .execute( &mut *tx )
+    .bind(returned)
+    .bind(now)
+    .bind(now)
+    .bind(lease_id)
+    .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
 
-    Ok( returned )
+    Ok(returned)
   }
 
   /// Update the `updated_at` timestamp for a lease (keeps lease alive)
@@ -342,20 +344,19 @@ impl LeaseManager
   /// # Panics
   ///
   /// Panics if system time is before UNIX epoch (should never happen on modern systems)
-  pub async fn touch_lease( &self, lease_id: &str ) -> Result< (), sqlx::Error >
-  {
-    #[ allow( clippy::cast_possible_truncation ) ]
+  pub async fn touch_lease(&self, lease_id: &str) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
-      .duration_since( UNIX_EPOCH )
-      .expect( "LOUD FAILURE: Time went backwards" )
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
-    sqlx::query( "UPDATE budget_leases SET updated_at = ? WHERE id = ?" )
-      .bind( now )
-      .bind( lease_id )
-      .execute( &self.pool )
+    sqlx::query("UPDATE budget_leases SET updated_at = ? WHERE id = ?")
+      .bind(now)
+      .bind(lease_id)
+      .execute(&self.pool)
       .await?;
 
-    Ok( () )
+    Ok(())
   }
 }

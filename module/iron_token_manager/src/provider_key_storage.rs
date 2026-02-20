@@ -2,27 +2,23 @@
 //!
 //! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`).
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions, Row };
 use crate::error::Result;
+use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
 
 /// Provider type enum
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum ProviderType
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderType {
   /// `OpenAI` provider
   OpenAI,
   /// `Anthropic` provider
   Anthropic,
 }
 
-impl ProviderType
-{
+impl ProviderType {
   /// Convert to database string representation
-  #[ must_use ]
-  pub fn as_str( &self ) -> &'static str
-  {
-    match self
-    {
+  #[must_use]
+  pub fn as_str(&self) -> &'static str {
+    match self {
       Self::OpenAI => "openai",
       Self::Anthropic => "anthropic",
     }
@@ -31,77 +27,68 @@ impl ProviderType
   /// Parse from database string
   ///
   /// Note: Named `parse_str` instead of `from_str` to avoid confusion with `FromStr` trait
-  #[ must_use ]
-  pub fn parse_str( s : &str ) -> Option< Self >
-  {
-    match s
-    {
-      "openai" => Some( Self::OpenAI ),
-      "anthropic" => Some( Self::Anthropic ),
+  #[must_use]
+  pub fn parse_str(s: &str) -> Option<Self> {
+    match s {
+      "openai" => Some(Self::OpenAI),
+      "anthropic" => Some(Self::Anthropic),
       _ => None,
     }
   }
 }
 
-impl core::fmt::Display for ProviderType
-{
-  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    write!( f, "{}", self.as_str() )
+impl core::fmt::Display for ProviderType {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    write!(f, "{}", self.as_str())
   }
 }
 
 /// Provider key metadata (excludes encrypted key)
-#[ derive( Debug, Clone ) ]
-pub struct ProviderKeyMetadata
-{
+#[derive(Debug, Clone)]
+pub struct ProviderKeyMetadata {
   /// Database ID
-  pub id : i64,
+  pub id: i64,
   /// Provider type
-  pub provider : ProviderType,
+  pub provider: ProviderType,
   /// Optional custom base URL
-  pub base_url : Option< String >,
+  pub base_url: Option<String>,
   /// Human-friendly description
-  pub description : Option< String >,
+  pub description: Option<String>,
   /// Whether key is enabled
-  pub is_enabled : bool,
+  pub is_enabled: bool,
   /// Creation timestamp (milliseconds since epoch)
-  pub created_at : i64,
+  pub created_at: i64,
   /// Last used timestamp (milliseconds since epoch)
-  pub last_used_at : Option< i64 >,
+  pub last_used_at: Option<i64>,
   /// Balance in cents
-  pub balance_cents : Option< i64 >,
+  pub balance_cents: Option<i64>,
   /// When balance was last updated
-  pub balance_updated_at : Option< i64 >,
+  pub balance_updated_at: Option<i64>,
   /// User ID who owns this key
-  pub user_id : String,
+  pub user_id: String,
 }
 
 /// Full provider key record (includes encrypted data)
-#[ derive( Debug, Clone ) ]
-pub struct ProviderKeyRecord
-{
+#[derive(Debug, Clone)]
+pub struct ProviderKeyRecord {
   /// Metadata
-  pub metadata : ProviderKeyMetadata,
+  pub metadata: ProviderKeyMetadata,
   /// Encrypted API key (base64)
-  pub encrypted_api_key : String,
+  pub encrypted_api_key: String,
   /// Encryption nonce (base64)
-  pub encryption_nonce : String,
+  pub encryption_nonce: String,
 }
 
 /// Provider key storage layer
-#[ derive( Debug, Clone ) ]
-pub struct ProviderKeyStorage
-{
-  pool : SqlitePool,
+#[derive(Debug, Clone)]
+pub struct ProviderKeyStorage {
+  pool: SqlitePool,
 }
 
-impl ProviderKeyStorage
-{
+impl ProviderKeyStorage {
   /// Create new provider key storage from existing pool
-  #[ must_use ]
-  pub fn new( pool : SqlitePool ) -> Self
-  {
+  #[must_use]
+  pub fn new(pool: SqlitePool) -> Self {
     Self { pool }
   }
 
@@ -114,38 +101,35 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database connection or migration fails
-  pub async fn connect( database_url : &str ) -> Result< Self >
-  {
+  pub async fn connect(database_url: &str) -> Result<Self> {
     let pool = SqlitePoolOptions::new()
-      .max_connections( 5 )
-      .connect( database_url )
+      .max_connections(5)
+      .connect(database_url)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| crate::error::TokenError::Generic)?;
 
     // Run migration 004 if not already applied
-    let migration_004_completed : i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_004_completed'"
+    let migration_004_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_004_completed'",
     )
-    .fetch_one( &pool )
+    .fetch_one(&pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| crate::error::TokenError::Generic)?;
 
-    if migration_004_completed == 0
-    {
-      let migration_004 = include_str!( "../migrations/004_create_ai_provider_keys.sql" );
-      sqlx::raw_sql( migration_004 )
-        .execute( &pool )
+    if migration_004_completed == 0 {
+      let migration_004 = include_str!("../migrations/004_create_ai_provider_keys.sql");
+      sqlx::raw_sql(migration_004)
+        .execute(&pool)
         .await
-        .map_err( |_| crate::error::TokenError::Generic )?;
+        .map_err(|_| crate::error::TokenError::Generic)?;
     }
 
-    Ok( Self { pool } )
+    Ok(Self { pool })
   }
 
   /// Get the underlying pool for sharing with other storage types
-  #[ must_use ]
-  pub fn pool( &self ) -> &SqlitePool
-  {
+  #[must_use]
+  pub fn pool(&self) -> &SqlitePool {
     &self.pool
   }
 
@@ -169,14 +153,13 @@ impl ProviderKeyStorage
   /// Returns error if database insert fails
   pub async fn create_key(
     &self,
-    provider : ProviderType,
-    encrypted_api_key : &str,
-    encryption_nonce : &str,
-    base_url : Option< &str >,
-    description : Option< &str >,
-    user_id : &str,
-  ) -> Result< i64 >
-  {
+    provider: ProviderType,
+    encrypted_api_key: &str,
+    encryption_nonce: &str,
+    base_url: Option<&str>,
+    description: Option<&str>,
+    user_id: &str,
+  ) -> Result<i64> {
     let now_ms = current_time_ms();
 
     let result = sqlx::query(
@@ -195,7 +178,7 @@ impl ProviderKeyStorage
     .await
     .map_err( |_| crate::error::TokenError::Generic )?;
 
-    Ok( result.last_insert_rowid() )
+    Ok(result.last_insert_rowid())
   }
 
   /// Get a provider key by ID (includes encrypted data)
@@ -211,23 +194,21 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if key not found or database query fails
-  pub async fn get_key( &self, key_id : i64 ) -> Result< ProviderKeyRecord >
-  {
+  pub async fn get_key(&self, key_id: i64) -> Result<ProviderKeyRecord> {
     let row = sqlx::query(
       "SELECT id, provider, encrypted_api_key, encryption_nonce, base_url, \
        description, is_enabled, created_at, last_used_at, balance_cents, \
        balance_updated_at, user_id \
-       FROM ai_provider_keys WHERE id = ?"
+       FROM ai_provider_keys WHERE id = ?",
     )
-    .bind( key_id )
-    .fetch_optional( &self.pool )
+    .bind(key_id)
+    .fetch_optional(&self.pool)
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .map_err(crate::error::TokenError::Database)?;
 
-    match row
-    {
-      Some( row ) => Ok( row_to_record( &row ) ),
-      None => Err( crate::error::TokenError::Database( sqlx::Error::RowNotFound ) ),
+    match row {
+      Some(row) => Ok(row_to_record(&row)),
+      None => Err(crate::error::TokenError::Database(sqlx::Error::RowNotFound)),
     }
   }
 
@@ -236,22 +217,20 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if key not found or database query fails
-  pub async fn get_key_metadata( &self, key_id : i64 ) -> Result< ProviderKeyMetadata >
-  {
+  pub async fn get_key_metadata(&self, key_id: i64) -> Result<ProviderKeyMetadata> {
     let row = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, encrypted_api_key, balance_updated_at, user_id \
-       FROM ai_provider_keys WHERE id = ?"
+       FROM ai_provider_keys WHERE id = ?",
     )
-    .bind( key_id )
-    .fetch_optional( &self.pool )
+    .bind(key_id)
+    .fetch_optional(&self.pool)
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .map_err(crate::error::TokenError::Database)?;
 
-    match row
-    {
-      Some( row ) => Ok( row_to_metadata( &row ) ),
-      None => Err( crate::error::TokenError::Database( sqlx::Error::RowNotFound ) ),
+    match row {
+      Some(row) => Ok(row_to_metadata(&row)),
+      None => Err(crate::error::TokenError::Database(sqlx::Error::RowNotFound)),
     }
   }
 
@@ -268,19 +247,18 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn list_keys( &self, user_id : &str ) -> Result< Vec< ProviderKeyMetadata > >
-  {
+  pub async fn list_keys(&self, user_id: &str) -> Result<Vec<ProviderKeyMetadata>> {
     let rows = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, balance_updated_at, user_id \
-       FROM ai_provider_keys WHERE user_id = $1 ORDER BY created_at DESC"
+       FROM ai_provider_keys WHERE user_id = $1 ORDER BY created_at DESC",
     )
-    .bind( user_id )
-    .fetch_all( &self.pool )
+    .bind(user_id)
+    .fetch_all(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| crate::error::TokenError::Generic)?;
 
-    Ok( rows.iter().map( row_to_metadata ).collect() )
+    Ok(rows.iter().map(row_to_metadata).collect())
   }
 
   /// Set key enabled/disabled status
@@ -288,15 +266,14 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn set_enabled( &self, key_id : i64, enabled : bool ) -> Result< () >
-  {
-    sqlx::query( "UPDATE ai_provider_keys SET is_enabled = $1 WHERE id = $2" )
-      .bind( enabled )
-      .bind( key_id )
-      .execute( &self.pool )
+  pub async fn set_enabled(&self, key_id: i64, enabled: bool) -> Result<()> {
+    sqlx::query("UPDATE ai_provider_keys SET is_enabled = $1 WHERE id = $2")
+      .bind(enabled)
+      .bind(key_id)
+      .execute(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+      .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Update description
@@ -304,15 +281,14 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn update_description( &self, key_id : i64, description : Option< &str > ) -> Result< () >
-  {
-    sqlx::query( "UPDATE ai_provider_keys SET description = $1 WHERE id = $2" )
-      .bind( description )
-      .bind( key_id )
-      .execute( &self.pool )
+  pub async fn update_description(&self, key_id: i64, description: Option<&str>) -> Result<()> {
+    sqlx::query("UPDATE ai_provider_keys SET description = $1 WHERE id = $2")
+      .bind(description)
+      .bind(key_id)
+      .execute(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+      .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Update base URL
@@ -320,15 +296,14 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn update_base_url( &self, key_id : i64, base_url : Option< &str > ) -> Result< () >
-  {
-    sqlx::query( "UPDATE ai_provider_keys SET base_url = $1 WHERE id = $2" )
-      .bind( base_url )
-      .bind( key_id )
-      .execute( &self.pool )
+  pub async fn update_base_url(&self, key_id: i64, base_url: Option<&str>) -> Result<()> {
+    sqlx::query("UPDATE ai_provider_keys SET base_url = $1 WHERE id = $2")
+      .bind(base_url)
+      .bind(key_id)
+      .execute(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+      .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Update balance
@@ -336,19 +311,18 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn update_balance( &self, key_id : i64, balance_cents : i64 ) -> Result< () >
-  {
+  pub async fn update_balance(&self, key_id: i64, balance_cents: i64) -> Result<()> {
     let now_ms = current_time_ms();
     sqlx::query(
-      "UPDATE ai_provider_keys SET balance_cents = $1, balance_updated_at = $2 WHERE id = $3"
+      "UPDATE ai_provider_keys SET balance_cents = $1, balance_updated_at = $2 WHERE id = $3",
     )
-    .bind( balance_cents )
-    .bind( now_ms )
-    .bind( key_id )
-    .execute( &self.pool )
+    .bind(balance_cents)
+    .bind(now_ms)
+    .bind(key_id)
+    .execute(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+    .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Update last used timestamp
@@ -356,16 +330,15 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn update_last_used( &self, key_id : i64 ) -> Result< () >
-  {
+  pub async fn update_last_used(&self, key_id: i64) -> Result<()> {
     let now_ms = current_time_ms();
-    sqlx::query( "UPDATE ai_provider_keys SET last_used_at = $1 WHERE id = $2" )
-      .bind( now_ms )
-      .bind( key_id )
-      .execute( &self.pool )
+    sqlx::query("UPDATE ai_provider_keys SET last_used_at = $1 WHERE id = $2")
+      .bind(now_ms)
+      .bind(key_id)
+      .execute(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+      .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Delete a key
@@ -373,19 +346,17 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if key not found or database delete fails
-  pub async fn delete_key( &self, key_id : i64 ) -> Result< () >
-  {
-    let result = sqlx::query( "DELETE FROM ai_provider_keys WHERE id = $1" )
-      .bind( key_id )
-      .execute( &self.pool )
+  pub async fn delete_key(&self, key_id: i64) -> Result<()> {
+    let result = sqlx::query("DELETE FROM ai_provider_keys WHERE id = $1")
+      .bind(key_id)
+      .execute(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| crate::error::TokenError::Generic)?;
 
-    if result.rows_affected() == 0
-    {
-      return Err( crate::error::TokenError::Generic );
+    if result.rows_affected() == 0 {
+      return Err(crate::error::TokenError::Generic);
     }
-    Ok( () )
+    Ok(())
   }
 
   /// Assign a key to a project
@@ -393,20 +364,19 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database insert fails
-  pub async fn assign_to_project( &self, key_id : i64, project_id : &str ) -> Result< () >
-  {
+  pub async fn assign_to_project(&self, key_id: i64, project_id: &str) -> Result<()> {
     let now_ms = current_time_ms();
     sqlx::query(
       "INSERT OR REPLACE INTO project_provider_key_assignments \
-       ( project_id, provider_key_id, assigned_at ) VALUES ( $1, $2, $3 )"
+       ( project_id, provider_key_id, assigned_at ) VALUES ( $1, $2, $3 )",
     )
-    .bind( project_id )
-    .bind( key_id )
-    .bind( now_ms )
-    .execute( &self.pool )
+    .bind(project_id)
+    .bind(key_id)
+    .bind(now_ms)
+    .execute(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+    .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Remove key assignment from a project
@@ -414,18 +384,17 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database delete fails
-  pub async fn unassign_from_project( &self, key_id : i64, project_id : &str ) -> Result< () >
-  {
+  pub async fn unassign_from_project(&self, key_id: i64, project_id: &str) -> Result<()> {
     sqlx::query(
       "DELETE FROM project_provider_key_assignments \
-       WHERE project_id = $1 AND provider_key_id = $2"
+       WHERE project_id = $1 AND provider_key_id = $2",
     )
-    .bind( project_id )
-    .bind( key_id )
-    .execute( &self.pool )
+    .bind(project_id)
+    .bind(key_id)
+    .execute(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( () )
+    .map_err(|_| crate::error::TokenError::Generic)?;
+    Ok(())
   }
 
   /// Get key assigned to a project
@@ -433,17 +402,16 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_project_key( &self, project_id : &str ) -> Result< Option< i64 > >
-  {
-    let row : Option< ( i64, ) > = sqlx::query_as(
-      "SELECT provider_key_id FROM project_provider_key_assignments WHERE project_id = $1"
+  pub async fn get_project_key(&self, project_id: &str) -> Result<Option<i64>> {
+    let row: Option<(i64,)> = sqlx::query_as(
+      "SELECT provider_key_id FROM project_provider_key_assignments WHERE project_id = $1",
     )
-    .bind( project_id )
-    .fetch_optional( &self.pool )
+    .bind(project_id)
+    .fetch_optional(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| crate::error::TokenError::Generic)?;
 
-    Ok( row.map( |r| r.0 ) )
+    Ok(row.map(|r| r.0))
   }
 
   /// Get all project assignments for a key
@@ -451,17 +419,16 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_key_projects( &self, key_id : i64 ) -> Result< Vec< String > >
-  {
-    let rows : Vec< ( String, ) > = sqlx::query_as(
-      "SELECT project_id FROM project_provider_key_assignments WHERE provider_key_id = $1"
+  pub async fn get_key_projects(&self, key_id: i64) -> Result<Vec<String>> {
+    let rows: Vec<(String,)> = sqlx::query_as(
+      "SELECT project_id FROM project_provider_key_assignments WHERE provider_key_id = $1",
     )
-    .bind( key_id )
-    .fetch_all( &self.pool )
+    .bind(key_id)
+    .fetch_all(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| crate::error::TokenError::Generic)?;
 
-    Ok( rows.into_iter().map( |r| r.0 ).collect() )
+    Ok(rows.into_iter().map(|r| r.0).collect())
   }
 
   /// Get all keys of provider
@@ -469,17 +436,14 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_keys_by_provider( &self, provider : ProviderType ) -> Result< Vec< i64 > >
-  {
-    let rows : Vec< ( i64, ) > = sqlx::query_as(
-      "SELECT id FROM ai_provider_keys WHERE provider = $1"
-    )
-    .bind( provider.as_str() )
-    .fetch_all( &self.pool )
-    .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+  pub async fn get_keys_by_provider(&self, provider: ProviderType) -> Result<Vec<i64>> {
+    let rows: Vec<(i64,)> = sqlx::query_as("SELECT id FROM ai_provider_keys WHERE provider = $1")
+      .bind(provider.as_str())
+      .fetch_all(&self.pool)
+      .await
+      .map_err(|_| crate::error::TokenError::Generic)?;
 
-    Ok( rows.into_iter().map( |r| r.0 ).collect() )
+    Ok(rows.into_iter().map(|r| r.0).collect())
   }
 
   /// Update key
@@ -487,9 +451,17 @@ impl ProviderKeyStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  #[ allow( clippy::too_many_arguments ) ]
-  pub async fn update_key( &self, key_id : i64, provider : ProviderType, encrypted_api_key : &str, encryption_nonce : &str, base_url : Option< &str >, description : Option< &str >, user_id : &str ) -> Result< i64 >
-  {
+  #[allow(clippy::too_many_arguments)]
+  pub async fn update_key(
+    &self,
+    key_id: i64,
+    provider: ProviderType,
+    encrypted_api_key: &str,
+    encryption_nonce: &str,
+    base_url: Option<&str>,
+    description: Option<&str>,
+    user_id: &str,
+  ) -> Result<i64> {
     sqlx::query(
       "UPDATE ai_provider_keys \
        SET provider = $1, encrypted_api_key = $2, encryption_nonce = $3, base_url = $4, description = $5, user_id = $6 \
@@ -505,57 +477,51 @@ impl ProviderKeyStorage
     .execute( &self.pool )
     .await
     .map_err( |_| crate::error::TokenError::Generic )?;
-    Ok( key_id )
+    Ok(key_id)
   }
 }
 
 /// Get current time in milliseconds since UNIX epoch
-#[ allow( clippy::cast_possible_truncation ) ]
-fn current_time_ms() -> i64
-{
+#[allow(clippy::cast_possible_truncation)]
+fn current_time_ms() -> i64 {
   std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect( "LOUD FAILURE: Time went backwards" )
+    .duration_since(std::time::UNIX_EPOCH)
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64
 }
 
-fn row_to_metadata( row : &sqlx::sqlite::SqliteRow ) -> ProviderKeyMetadata
-{
-  let provider_str : String = row.get( "provider" );
-  ProviderKeyMetadata
-  {
-    id : row.get( "id" ),
-    provider : ProviderType::parse_str( &provider_str ).unwrap_or( ProviderType::OpenAI ),
-    base_url : row.get( "base_url" ),
-    description : row.get( "description" ),
-    is_enabled : row.get( "is_enabled" ),
-    created_at : row.get( "created_at" ),
-    last_used_at : row.get( "last_used_at" ),
-    balance_cents : row.get( "balance_cents" ),
-    balance_updated_at : row.get( "balance_updated_at" ),
-    user_id : row.get( "user_id" ),
+fn row_to_metadata(row: &sqlx::sqlite::SqliteRow) -> ProviderKeyMetadata {
+  let provider_str: String = row.get("provider");
+  ProviderKeyMetadata {
+    id: row.get("id"),
+    provider: ProviderType::parse_str(&provider_str).unwrap_or(ProviderType::OpenAI),
+    base_url: row.get("base_url"),
+    description: row.get("description"),
+    is_enabled: row.get("is_enabled"),
+    created_at: row.get("created_at"),
+    last_used_at: row.get("last_used_at"),
+    balance_cents: row.get("balance_cents"),
+    balance_updated_at: row.get("balance_updated_at"),
+    user_id: row.get("user_id"),
   }
 }
 
-fn row_to_record( row : &sqlx::sqlite::SqliteRow ) -> ProviderKeyRecord
-{
-  let provider_str : String = row.get( "provider" );
-  ProviderKeyRecord
-  {
-    metadata : ProviderKeyMetadata
-    {
-      id : row.get( "id" ),
-      provider : ProviderType::parse_str( &provider_str ).unwrap_or( ProviderType::OpenAI ),
-      base_url : row.get( "base_url" ),
-      description : row.get( "description" ),
-      is_enabled : row.get( "is_enabled" ),
-      created_at : row.get( "created_at" ),
-      last_used_at : row.get( "last_used_at" ),
-      balance_cents : row.get( "balance_cents" ),
-      balance_updated_at : row.get( "balance_updated_at" ),
-      user_id : row.get( "user_id" ),
+fn row_to_record(row: &sqlx::sqlite::SqliteRow) -> ProviderKeyRecord {
+  let provider_str: String = row.get("provider");
+  ProviderKeyRecord {
+    metadata: ProviderKeyMetadata {
+      id: row.get("id"),
+      provider: ProviderType::parse_str(&provider_str).unwrap_or(ProviderType::OpenAI),
+      base_url: row.get("base_url"),
+      description: row.get("description"),
+      is_enabled: row.get("is_enabled"),
+      created_at: row.get("created_at"),
+      last_used_at: row.get("last_used_at"),
+      balance_cents: row.get("balance_cents"),
+      balance_updated_at: row.get("balance_updated_at"),
+      user_id: row.get("user_id"),
     },
-    encrypted_api_key : row.get( "encrypted_api_key" ),
-    encryption_nonce : row.get( "encryption_nonce" ),
+    encrypted_api_key: row.get("encrypted_api_key"),
+    encryption_nonce: row.get("encryption_nonce"),
   }
 }

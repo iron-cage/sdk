@@ -71,25 +71,23 @@
 //! - ✅ Security (`BCrypt` cost=12, no plaintext passwords)
 //! - ✅ Audit immutability (logs can't be modified)
 
-use iron_token_manager::user_service::{ UserService, CreateUserParams, ListUsersFilters };
+use iron_token_manager::user_service::{CreateUserParams, ListUsersFilters, UserService};
 
 mod common;
 
 /// Diagnostic test to check database schema
 ///
 /// Verifies that required tables exist before testing user creation.
-#[ tokio::test ]
-async fn test_diagnostic_database_schema()
-{
+#[tokio::test]
+async fn test_diagnostic_database_schema() {
   let db = common::create_test_db().await;
 
   // Check if users table exists
-  let users_table_exists: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'"
-  )
-  .fetch_one( db.pool() )
-  .await
-  .expect( "LOUD FAILURE: Failed to query sqlite_master for users table" );
+  let users_table_exists: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'")
+      .fetch_one(db.pool())
+      .await
+      .expect("LOUD FAILURE: Failed to query sqlite_master for users table");
 
   assert_eq!(
     users_table_exists, 1,
@@ -98,11 +96,11 @@ async fn test_diagnostic_database_schema()
 
   // Check if user_audit_log table exists
   let audit_table_exists: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='user_audit_log'"
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='user_audit_log'",
   )
-  .fetch_one( db.pool() )
+  .fetch_one(db.pool())
   .await
-  .expect( "LOUD FAILURE: Failed to query sqlite_master for user_audit_log table" );
+  .expect("LOUD FAILURE: Failed to query sqlite_master for user_audit_log table");
 
   assert_eq!(
     audit_table_exists, 1,
@@ -113,35 +111,32 @@ async fn test_diagnostic_database_schema()
   let now_ms = chrono::Utc::now().timestamp_millis();
   let insert_result = sqlx::query(
     "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ($1, $2, $3, $4, $5, 1, $6)"
+     VALUES ($1, $2, $3, $4, $5, 1, $6)",
   )
-  .bind( "user_test_001" )
-  .bind( "test_user" )
-  .bind( "$2b$12$abcdefghijklmnopqrstuvwxyz1234567890" )  // Fake BCrypt hash
-  .bind( "test@example.com" )
-  .bind( "user" )
-  .bind( now_ms )
-  .execute( db.pool() )
+  .bind("user_test_001")
+  .bind("test_user")
+  .bind("$2b$12$abcdefghijklmnopqrstuvwxyz1234567890") // Fake BCrypt hash
+  .bind("test@example.com")
+  .bind("user")
+  .bind(now_ms)
+  .execute(db.pool())
   .await;
 
-  match insert_result
-  {
-    Ok( _ ) => println!( "✅ Direct SQL insert succeeded" ),
-    Err( e ) => panic!( "LOUD FAILURE: Direct SQL insert failed: {e:?}" ),
+  match insert_result {
+    Ok(_) => println!("✅ Direct SQL insert succeeded"),
+    Err(e) => panic!("LOUD FAILURE: Direct SQL insert failed: {e:?}"),
   }
 }
 
 /// Test successful user creation with valid parameters
 ///
 /// Verifies that user creation works for valid inputs and stores `BCrypt` password hash.
-#[ tokio::test ]
-async fn test_create_user_success()
-{
+#[tokio::test]
+async fn test_create_user_success() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "john_doe".to_string(),
     password: "SecurePass123!".to_string(),
     email: "john@example.com".to_string(),
@@ -149,35 +144,42 @@ async fn test_create_user_success()
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
-  let result = service.create_user( params, "user_001" ).await;
+  let result = service.create_user(params, "user_001").await;
 
   // Print detailed error if creation fails
-  if let Err( ref e ) = result
-  {
-    eprintln!( "❌ User creation failed with error: {e:?}" );
+  if let Err(ref e) = result {
+    eprintln!("❌ User creation failed with error: {e:?}");
   }
 
-  let user = result.expect( "LOUD FAILURE: Failed to create valid user with correct parameters" );
+  let user = result.expect("LOUD FAILURE: Failed to create valid user with correct parameters");
 
-  assert_eq!( user.username, "john_doe", "Username should match input" );
-  assert_eq!( user.email, Some( "john@example.com".to_string() ), "Email should match input" );
-  assert_eq!( user.role, "user", "Role should match input" );
-  assert!( user.is_active, "New user should be active by default" );
-  assert!( user.password_hash.starts_with( "$2b$" ), "Password should be BCrypt hash (starts with $2b$)" );
-  assert_ne!( user.password_hash, "SecurePass123!", "Password should NOT be stored as plaintext" );
+  assert_eq!(user.username, "john_doe", "Username should match input");
+  assert_eq!(
+    user.email,
+    Some("john@example.com".to_string()),
+    "Email should match input"
+  );
+  assert_eq!(user.role, "user", "Role should match input");
+  assert!(user.is_active, "New user should be active by default");
+  assert!(
+    user.password_hash.starts_with("$2b$"),
+    "Password should be BCrypt hash (starts with $2b$)"
+  );
+  assert_ne!(
+    user.password_hash, "SecurePass123!",
+    "Password should NOT be stored as plaintext"
+  );
 }
 
 /// Test user creation with empty username
 ///
 /// Verifies that empty username is rejected with clear error message.
-#[ tokio::test ]
-async fn test_create_user_empty_username()
-{
+#[tokio::test]
+async fn test_create_user_empty_username() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: String::new(),
     password: "SecurePass123!".to_string(),
     email: "john@example.com".to_string(),
@@ -185,7 +187,7 @@ async fn test_create_user_empty_username()
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
-  let result = service.create_user( params, "user_001" ).await;
+  let result = service.create_user(params, "user_001").await;
 
   assert!(
     result.is_err(),
@@ -194,7 +196,7 @@ async fn test_create_user_empty_username()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.contains( "username" ) || error_msg.contains( "empty" ) || error_msg.contains( "required" ),
+    error_msg.contains("username") || error_msg.contains("empty") || error_msg.contains("required"),
     "LOUD FAILURE: Error message should mention username issue. Got: {error_msg}"
   );
 }
@@ -202,14 +204,12 @@ async fn test_create_user_empty_username()
 /// Test user creation with empty password
 ///
 /// Verifies that empty password is rejected with clear error message.
-#[ tokio::test ]
-async fn test_create_user_empty_password()
-{
+#[tokio::test]
+async fn test_create_user_empty_password() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "john_doe".to_string(),
     password: String::new(),
     email: "john@example.com".to_string(),
@@ -217,7 +217,7 @@ async fn test_create_user_empty_password()
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
-  let result = service.create_user( params, "user_001" ).await;
+  let result = service.create_user(params, "user_001").await;
 
   assert!(
     result.is_err(),
@@ -226,7 +226,7 @@ async fn test_create_user_empty_password()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.contains( "password" ) || error_msg.contains( "empty" ) || error_msg.contains( "required" ),
+    error_msg.contains("password") || error_msg.contains("empty") || error_msg.contains("required"),
     "LOUD FAILURE: Error message should mention password issue. Got: {error_msg}"
   );
 }
@@ -234,14 +234,12 @@ async fn test_create_user_empty_password()
 /// Test user creation with empty email
 ///
 /// Verifies that empty email is rejected with clear error message.
-#[ tokio::test ]
-async fn test_create_user_empty_email()
-{
+#[tokio::test]
+async fn test_create_user_empty_email() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "john_doe".to_string(),
     password: "SecurePass123!".to_string(),
     email: String::new(),
@@ -249,7 +247,7 @@ async fn test_create_user_empty_email()
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
-  let result = service.create_user( params, "user_001" ).await;
+  let result = service.create_user(params, "user_001").await;
 
   assert!(
     result.is_err(),
@@ -258,7 +256,7 @@ async fn test_create_user_empty_email()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.contains( "email" ) || error_msg.contains( "empty" ) || error_msg.contains( "required" ),
+    error_msg.contains("email") || error_msg.contains("empty") || error_msg.contains("required"),
     "LOUD FAILURE: Error message should mention email issue. Got: {error_msg}"
   );
 }
@@ -266,14 +264,12 @@ async fn test_create_user_empty_email()
 /// Test user creation with invalid role
 ///
 /// Verifies that invalid role (not admin/user/viewer) is rejected.
-#[ tokio::test ]
-async fn test_create_user_invalid_role()
-{
+#[tokio::test]
+async fn test_create_user_invalid_role() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "john_doe".to_string(),
     password: "SecurePass123!".to_string(),
     email: "john@example.com".to_string(),
@@ -281,7 +277,7 @@ async fn test_create_user_invalid_role()
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
-  let result = service.create_user( params, "user_001" ).await;
+  let result = service.create_user(params, "user_001").await;
 
   assert!(
     result.is_err(),
@@ -290,7 +286,7 @@ async fn test_create_user_invalid_role()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.contains( "role" ) || error_msg.contains( "invalid" ),
+    error_msg.contains("role") || error_msg.contains("invalid"),
     "LOUD FAILURE: Error message should mention role issue. Got: {error_msg}"
   );
 }
@@ -330,34 +326,34 @@ async fn test_create_user_invalid_role()
 /// security features (password hashing, encryption, key derivation), ALWAYS specify
 /// security parameters explicitly. Never rely on library defaults - they may be weak
 /// for current security standards. `DEFAULT_COST=10` is 4x weaker than cost=12.
-#[ tokio::test ]
-async fn test_password_bcrypt_cost_12()
-{
+#[tokio::test]
+async fn test_password_bcrypt_cost_12() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "john_doe".to_string(),
     password: "SecurePass123!".to_string(),
     email: "john@example.com".to_string(),
     role: "user".to_string(),
   };
 
-  let user = service.create_user( params, "user_001" ).await
-    .expect( "Failed to create user" );
+  let user = service
+    .create_user(params, "user_001")
+    .await
+    .expect("Failed to create user");
 
   // BCrypt hash format: $2b$12$...
   // Extract cost factor (between second and third $)
-  let parts: Vec< &str > = user.password_hash.split( '$' ).collect();
+  let parts: Vec<&str> = user.password_hash.split('$').collect();
   assert!(
     parts.len() >= 4,
     "LOUD FAILURE: BCrypt hash should have format $2b$cost$salt$hash. Got: {}",
     user.password_hash
   );
 
-  let cost_str = parts[ 2 ];
-  let cost: u32 = cost_str.parse().expect( "Failed to parse BCrypt cost" );
+  let cost_str = parts[2];
+  let cost: u32 = cost_str.parse().expect("Failed to parse BCrypt cost");
 
   assert_eq!(
     cost, 12,
@@ -369,14 +365,12 @@ async fn test_password_bcrypt_cost_12()
 /// Test SQL injection attempt in username
 ///
 /// Verifies that SQL injection attempts are safely rejected or escaped.
-#[ tokio::test ]
-async fn test_sql_injection_username()
-{
+#[tokio::test]
+async fn test_sql_injection_username() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "'; DROP TABLE users;--".to_string(),
     password: "SecurePass123!".to_string(),
     email: "attacker@example.com".to_string(),
@@ -385,17 +379,16 @@ async fn test_sql_injection_username()
 
   // Should either reject SQL injection OR escape it safely
   // Use user_001 as admin (pre-seeded by common::create_test_db)
-  let result = service.create_user( params, "user_001" ).await;
+  let result = service.create_user(params, "user_001").await;
 
   // Verify users table still exists by querying it
-  let users_exist: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
-    .fetch_one( db.pool() )
+  let users_exist: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+    .fetch_one(db.pool())
     .await
-    .expect( "LOUD FAILURE: users table should still exist after SQL injection attempt" );
+    .expect("LOUD FAILURE: users table should still exist after SQL injection attempt");
 
   // If user was created, verify username was escaped (not executed as SQL)
-  if let Ok( user ) = result
-  {
+  if let Ok(user) = result {
     assert_eq!(
       user.username, "'; DROP TABLE users;--",
       "LOUD FAILURE: SQL injection should be stored as literal string, not executed"
@@ -411,34 +404,38 @@ async fn test_sql_injection_username()
 /// Test that deleted user doesn't appear in `list_users`
 ///
 /// Verifies soft delete properly filters deleted users from listing.
-#[ tokio::test ]
-async fn test_deleted_user_not_in_list()
-{
+#[tokio::test]
+async fn test_deleted_user_not_in_list() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
   // Create user
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "john_doe".to_string(),
     password: "SecurePass123!".to_string(),
     email: "john@example.com".to_string(),
     role: "user".to_string(),
   };
 
-  let user = service.create_user( params, "user_001" ).await
-    .expect( "Failed to create user" );
+  let user = service
+    .create_user(params, "user_001")
+    .await
+    .expect("Failed to create user");
 
   // Delete user
-  service.delete_user( &user.id, "user_001" ).await
-    .expect( "Failed to delete user" );
+  service
+    .delete_user(&user.id, "user_001")
+    .await
+    .expect("Failed to delete user");
 
   // List users - deleted user should NOT appear
-  let ( users, total ) = service.list_users( ListUsersFilters::default() ).await
-    .expect( "Failed to list users" );
+  let (users, total) = service
+    .list_users(ListUsersFilters::default())
+    .await
+    .expect("Failed to list users");
 
   assert!(
-    !users.iter().any( | u | u.id == user.id ),
+    !users.iter().any(|u| u.id == user.id),
     "LOUD FAILURE: Deleted user should not appear in list_users. Found user: {users:?}"
   );
 
@@ -498,28 +495,27 @@ async fn test_deleted_user_not_in_list()
 /// user input. Even "safe-looking" values like role enums can be injection vectors if not
 /// properly validated. `SQLx` parameterized queries are the ONLY safe way to include user
 /// input in SQL. The performance difference is negligible compared to the security risk.
-#[ tokio::test ]
-async fn test_sql_injection_search()
-{
+#[tokio::test]
+async fn test_sql_injection_search() {
   let db = common::create_test_db().await;
-  let service = UserService::new( db.pool().clone() );
+  let service = UserService::new(db.pool().clone());
 
   // Create a normal user for reference
-  let params = CreateUserParams
-  {
+  let params = CreateUserParams {
     username: "normal_user".to_string(),
     password: "SecurePass123!".to_string(),
     email: "normal@example.com".to_string(),
     role: "user".to_string(),
   };
 
-  service.create_user( params, "user_001" ).await
-    .expect( "Failed to create normal user" );
+  service
+    .create_user(params, "user_001")
+    .await
+    .expect("Failed to create normal user");
 
   // Attempt SQL injection via search parameter
-  let filters = ListUsersFilters
-  {
-    search: Some( "'; DROP TABLE users;--".to_string() ),
+  let filters = ListUsersFilters {
+    search: Some("'; DROP TABLE users;--".to_string()),
     role: None,
     is_active: None,
     limit: None,
@@ -527,7 +523,7 @@ async fn test_sql_injection_search()
   };
 
   // Should NOT error - parameterized queries prevent SQL injection
-  let result = service.list_users( filters ).await;
+  let result = service.list_users(filters).await;
 
   assert!(
     result.is_ok(),
@@ -535,10 +531,10 @@ async fn test_sql_injection_search()
   );
 
   // Verify users table still exists and contains data
-  let users_exist: i64 = sqlx::query_scalar( "SELECT COUNT(*) FROM users" )
-    .fetch_one( db.pool() )
+  let users_exist: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+    .fetch_one(db.pool())
     .await
-    .expect( "LOUD FAILURE: users table should still exist after SQL injection attempt" );
+    .expect("LOUD FAILURE: users table should still exist after SQL injection attempt");
 
   assert!(
     users_exist > 0,
@@ -546,7 +542,7 @@ async fn test_sql_injection_search()
   );
 
   // Verify search was treated as literal string (no results for malicious pattern)
-  let ( users, _total ) = result.unwrap();
+  let (users, _total) = result.unwrap();
   assert!(
     users.is_empty(),
     "LOUD FAILURE: SQL injection string should not match any users (treated as literal). Found: {users:?}"
