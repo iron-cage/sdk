@@ -108,7 +108,7 @@ jobs:
 
     - name: 'Verify deployment health'
       run: |
-        timeout 20 bash -c 'until curl -f "https://${{ vars.PROJECT_DOMAIN }}/login"; do sleep 5; done'
+        timeout 60 bash -c 'until curl -f "https://${{ vars.PROJECT_DOMAIN }}/login"; do sleep 5; done'
 
     - name: Cleanup secrets
       if: always()
