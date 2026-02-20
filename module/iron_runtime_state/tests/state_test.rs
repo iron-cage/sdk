@@ -1,16 +1,16 @@
+//! Integration tests for [`iron_runtime_state`].
+
 use iron_runtime_state::*;
 use iron_types::AgentId;
 
 #[test]
-fn test_state_manager_creation()
-{
+fn test_state_manager_creation() {
   let manager = StateManager::new();
   assert_eq!(manager.list_agents().len(), 0);
 }
 
 #[test]
-fn test_save_and_get_agent_state()
-{
+fn test_save_and_get_agent_state() {
   let manager = StateManager::new();
 
   let agent_id = AgentId::parse("agent_550e8400-e29b-41d4-a716-446655440000").unwrap();
@@ -29,13 +29,12 @@ fn test_save_and_get_agent_state()
 
   let retrieved = retrieved.unwrap();
   assert_eq!(retrieved.agent_id, agent_id);
-  assert_eq!(retrieved.budget_spent, 10.5);
+  assert!((retrieved.budget_spent - 10.5_f64).abs() < f64::EPSILON);
   assert_eq!(retrieved.pii_detections, 3);
 }
 
 #[test]
-fn test_list_agents()
-{
+fn test_list_agents() {
   let manager = StateManager::new();
 
   let agent_id_1 = AgentId::parse("agent_550e8400-e29b-41d4-a716-446655440001").unwrap();
@@ -62,8 +61,7 @@ fn test_list_agents()
 }
 
 #[test]
-fn test_audit_log()
-{
+fn test_audit_log() {
   let manager = StateManager::new();
 
   let agent_id = AgentId::parse("agent_550e8400-e29b-41d4-a716-446655440000").unwrap();
@@ -71,10 +69,10 @@ fn test_audit_log()
   let event = AuditEvent {
     agent_id,
     event_type: "pii_detected".to_string(),
-    timestamp: 1234567890,
+    timestamp: 1_234_567_890,
     details: "Email found in output".to_string(),
   };
 
   // Should not panic
-  manager.save_audit_log(event);
+  manager.save_audit_log(&event);
 }

@@ -80,9 +80,9 @@
 //! **Performance:**
 //! - Read: O(1) average, lock-free for reads
 //! - Write: O(1) average, fine-grained locking
-//! - Thread-safe: Yes (concurrent HashMap)
+//! - Thread-safe: Yes (concurrent `HashMap`)
 //!
-//! ## SQLite (Optional)
+//! ## `SQLite` (Optional)
 //!
 //! Enable with `sqlite` feature for persistent audit logs:
 //!
@@ -178,7 +178,7 @@
 //! let agent_id = AgentId::generate();
 //!
 //! // Log PII detection
-//! manager.save_audit_log(AuditEvent {
+//! manager.save_audit_log(&AuditEvent {
 //!   agent_id: agent_id.clone(),
 //!   event_type: "pii_detected".to_string(),
 //!   timestamp: 1234567890,
@@ -186,7 +186,7 @@
 //! });
 //!
 //! // Log budget threshold exceeded
-//! manager.save_audit_log(AuditEvent {
+//! manager.save_audit_log(&AuditEvent {
 //!   agent_id,
 //!   event_type: "budget_exceeded".to_string(),
 //!   timestamp: 1234567900,
@@ -197,11 +197,11 @@
 //!
 //! **Current Implementation:**
 //! - Events logged via `tracing::debug!`
-//! - SQLite persistence planned (see TODO in implementation)
+//! - `SQLite` persistence planned (see TODO in implementation)
 //!
 //! # Design Rationale
 //!
-//! ## Why Type-Safe AgentId?
+//! ## Why Type-Safe `AgentId`?
 //!
 //! **Before (v0.2.0):**
 //! ```ignore
@@ -243,14 +243,14 @@
 //! 4. **Self-Documenting**: Function signatures clearly show ID requirements
 //! 5. **Security**: Prevents injection attacks and format confusion
 //!
-//! ## Why DashMap for Storage?
+//! ## Why `DashMap` for Storage?
 //!
 //! 1. **Lock-Free Reads**: Multiple readers don't block each other
 //! 2. **Fine-Grained Locking**: Writers only lock specific shards
 //! 3. **Production-Ready**: Battle-tested in high-concurrency environments
-//! 4. **API Simplicity**: Drop-in replacement for RwLock<HashMap>
+//! 4. **API Simplicity**: Drop-in replacement for `RwLock<HashMap>`
 //!
-//! ## Why String Keys in DashMap?
+//! ## Why String Keys in `DashMap`?
 //!
 //! ```rust,ignore
 //! // Internal storage uses String for HashMap efficiency
@@ -258,8 +258,8 @@
 //! ```
 //!
 //! **Rationale:**
-//! - DashMap requires `Hash + Eq` keys (AgentId is not Copy)
-//! - String keys avoid cloning AgentId on every lookup
+//! - `DashMap` requires `Hash + Eq` keys (`AgentId` is not Copy)
+//! - String keys avoid cloning `AgentId` on every lookup
 //! - Conversion happens only at storage boundary
 //! - Public API still type-safe (accepts `&str`, stores `AgentId`)
 //!
@@ -273,11 +273,11 @@
 //! | `save_audit_log` | O(1) | Lock-free | Tracing overhead only |
 //!
 //! **Memory Usage:**
-//! - Per-agent overhead: ~200 bytes (AgentState + DashMap entry)
+//! - Per-agent overhead: ~200 bytes (`AgentState` + `DashMap` entry)
 //! - 1M agents: ~200 MB memory
 //!
 //! **Scalability:**
-//! - DashMap sharding: 64 shards by default
+//! - `DashMap` sharding: 64 shards by default
 //! - Concurrent readers: Unlimited (lock-free)
 //! - Concurrent writers: Up to 64 (one per shard)
 //!
@@ -327,7 +327,7 @@
 //! | Feature | Default | Description |
 //! |---------|---------|-------------|
 //! | `enabled` | ✅ Yes | Full state management implementation |
-//! | `sqlite` | ❌ No | SQLite persistence for audit logs |
+//! | `sqlite` | ❌ No | `SQLite` persistence for audit logs |
 //! | `redis` | ❌ No | Redis backend for distributed state |
 //! | `full` | ❌ No | Enables all features (enabled + sqlite + redis) |
 //!
@@ -369,7 +369,7 @@
 //! ```
 //!
 //! **Compiler-Guided Migration:**
-//! - Type errors at every String → AgentId usage
+//! - Type errors at every String → `AgentId` usage
 //! - No runtime surprises
 //! - Incremental migration possible
 //!
@@ -377,7 +377,7 @@
 //!
 //! ## Memory Management
 //!
-//! StateManager keeps all agent states in memory. For long-running systems:
+//! `StateManager` keeps all agent states in memory. For long-running systems:
 //!
 //! ```ignore
 //! // Remove stopped agents periodically
@@ -434,56 +434,62 @@
 #![cfg_attr(not(feature = "enabled"), allow(unused_variables, dead_code))]
 
 #[cfg(feature = "enabled")]
-mod implementation
-{
+mod implementation {
   use dashmap::DashMap;
   use serde::{Deserialize, Serialize};
   use std::sync::Arc;
 
   /// Agent state stored in memory
   #[derive(Debug, Clone, Serialize, Deserialize)]
-  pub struct AgentState
-  {
+  pub struct AgentState {
+    /// Unique identifier of the agent.
     pub agent_id: iron_types::AgentId,
+    /// Current execution status of the agent.
     pub status: AgentStatus,
+    /// Total budget consumed by the agent in USD.
     pub budget_spent: f64,
+    /// Number of PII detections recorded for the agent.
     pub pii_detections: usize,
   }
 
   /// Agent execution status
   #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-  pub enum AgentStatus
-  {
+  pub enum AgentStatus {
+    /// Agent is actively processing requests.
     Running,
+    /// Agent has been gracefully stopped.
     Stopped,
+    /// Agent terminated due to an error.
     Failed,
   }
 
   /// Audit log event
   #[derive(Debug, Clone, Serialize, Deserialize)]
-  pub struct AuditEvent
-  {
+  pub struct AuditEvent {
+    /// Identifier of the agent that generated this event.
     pub agent_id: iron_types::AgentId,
+    /// Type of the event (e.g. `"agent_started"`, `"pii_detected"`).
     pub event_type: String,
+    /// Unix timestamp in milliseconds when the event occurred.
     pub timestamp: i64,
+    /// Human-readable details about the event.
     pub details: String,
   }
 
   /// State manager with multiple backends
   #[derive(Debug)]
-  pub struct StateManager
-  {
+  pub struct StateManager {
     memory: Arc<DashMap<String, AgentState>>,
     #[cfg(feature = "sqlite")]
-    #[allow(dead_code)] // SQLite backend field, set via with_sqlite() but operations not yet implemented
+    #[allow(dead_code)]
+    // SQLite backend field, set via with_sqlite() but operations not yet implemented
     db: Option<sqlx::SqlitePool>,
   }
 
-  impl StateManager
-  {
+  impl StateManager {
     /// Create new state manager (in-memory only)
-    pub fn new() -> Self
-    {
+    #[must_use]
+    pub fn new() -> Self {
       Self {
         memory: Arc::new(DashMap::new()),
         #[cfg(feature = "sqlite")]
@@ -492,20 +498,20 @@ mod implementation
     }
 
     /// Get agent state from memory
-    pub fn get_agent_state(&self, agent_id: &str) -> Option<AgentState>
-    {
+    #[must_use]
+    pub fn get_agent_state(&self, agent_id: &str) -> Option<AgentState> {
       self.memory.get(agent_id).map(|entry| entry.value().clone())
     }
 
     /// Save agent state to memory
-    pub fn save_agent_state(&self, state: AgentState)
-    {
-      self.memory.insert(state.agent_id.as_str().to_string(), state);
+    pub fn save_agent_state(&self, state: AgentState) {
+      self
+        .memory
+        .insert(state.agent_id.as_str().to_string(), state);
     }
 
     /// Save audit log event (memory only for now)
-    pub fn save_audit_log(&self, event: AuditEvent)
-    {
+    pub fn save_audit_log(&self, event: &AuditEvent) {
       // TODO: Implement SQLite persistence when feature enabled
       tracing::debug!(
         agent_id = %event.agent_id.as_str(),
@@ -515,26 +521,30 @@ mod implementation
     }
 
     /// List all agent IDs
-    pub fn list_agents(&self) -> Vec<String>
-    {
-      self.memory.iter().map(|entry| entry.key().clone()).collect()
+    #[must_use]
+    pub fn list_agents(&self) -> Vec<String> {
+      self
+        .memory
+        .iter()
+        .map(|entry| entry.key().clone())
+        .collect()
     }
   }
 
-  impl Default for StateManager
-  {
-    fn default() -> Self
-    {
+  impl Default for StateManager {
+    fn default() -> Self {
       Self::new()
     }
   }
 
   #[cfg(feature = "sqlite")]
-  impl StateManager
-  {
-    /// Create state manager with SQLite backend
-    pub async fn with_sqlite(db_path: &str) -> Result<Self, sqlx::Error>
-    {
+  impl StateManager {
+    /// Create state manager with `SQLite` backend
+    ///
+    /// # Errors
+    ///
+    /// Returns `sqlx::Error` if the connection to the `SQLite` database at `db_path` fails.
+    pub async fn with_sqlite(db_path: &str) -> Result<Self, sqlx::Error> {
       let pool = sqlx::SqlitePool::connect(db_path).await?;
 
       Ok(Self {
@@ -549,12 +559,10 @@ mod implementation
 pub use implementation::*;
 
 #[cfg(not(feature = "enabled"))]
-mod stub
-{
+mod stub {
   /// Stub agent state
   #[derive(Debug, Clone)]
-  pub struct AgentState
-  {
+  pub struct AgentState {
     pub agent_id: iron_types::AgentId,
     pub status: AgentStatus,
     pub budget_spent: f64,
@@ -563,8 +571,7 @@ mod stub
 
   /// Stub status
   #[derive(Debug, Clone, Copy)]
-  pub enum AgentStatus
-  {
+  pub enum AgentStatus {
     Running,
     Stopped,
     Failed,
@@ -572,8 +579,7 @@ mod stub
 
   /// Stub audit event
   #[derive(Debug, Clone)]
-  pub struct AuditEvent
-  {
+  pub struct AuditEvent {
     pub agent_id: iron_types::AgentId,
     pub event_type: String,
     pub timestamp: i64,
@@ -583,15 +589,12 @@ mod stub
   /// Stub state manager
   pub struct StateManager;
 
-  impl StateManager
-  {
-    pub fn new() -> Self
-    {
+  impl StateManager {
+    pub fn new() -> Self {
       Self
     }
 
-    pub fn get_agent_state(&self, _agent_id: &str) -> Option<AgentState>
-    {
+    pub fn get_agent_state(&self, _agent_id: &str) -> Option<AgentState> {
       None
     }
 
@@ -599,16 +602,13 @@ mod stub
 
     pub fn save_audit_log(&self, _event: AuditEvent) {}
 
-    pub fn list_agents(&self) -> Vec<String>
-    {
+    pub fn list_agents(&self) -> Vec<String> {
       vec![]
     }
   }
 
-  impl Default for StateManager
-  {
-    fn default() -> Self
-    {
+  impl Default for StateManager {
+    fn default() -> Self {
       Self::new()
     }
   }
