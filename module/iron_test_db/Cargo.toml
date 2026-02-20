@@ -7,6 +7,9 @@ description = "Test database infrastructure for Iron Runtime crates"
 license.workspace = true
 publish = false
 
+[lints]
+workspace = true
+
 [features]
 enabled = []
 full = ["enabled"]
