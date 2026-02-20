@@ -1,10 +1,9 @@
 //! Test that readme.md examples compile and work correctly
 
-use iron_types::{Config, SafetyConfig, CostConfig};
+use iron_types::{Config, CostConfig, ReliabilityConfig, SafetyConfig};
 
 #[test]
-fn readme_example_compiles()
-{
+fn readme_example_compiles() {
   // Example from readme.md - verify it compiles
   let config = Config {
     safety: SafetyConfig {
@@ -15,20 +14,19 @@ fn readme_example_compiles()
       budget_usd: 100.0,
       alert_threshold: 0.8,
     },
-    reliability: Default::default(),
+    reliability: ReliabilityConfig::default(),
   };
 
   // Verify values
   assert!(config.safety.pii_detection_enabled);
-  assert_eq!(config.cost.budget_usd, 100.0);
-  assert_eq!(config.cost.alert_threshold, 0.8);
+  assert!((config.cost.budget_usd - 100.0_f64).abs() < f64::EPSILON);
+  assert!((config.cost.alert_threshold - 0.8_f64).abs() < f64::EPSILON);
   assert!(!config.reliability.circuit_breaker_enabled);
   assert_eq!(config.reliability.failure_threshold, 0);
 }
 
 #[test]
-fn config_serialization_works()
-{
+fn config_serialization_works() {
   // Verify serde integration mentioned in readme
   let config = Config {
     safety: SafetyConfig {
@@ -39,7 +37,7 @@ fn config_serialization_works()
       budget_usd: 50.0,
       alert_threshold: 0.9,
     },
-    reliability: Default::default(),
+    reliability: ReliabilityConfig::default(),
   };
 
   // Serialize to JSON
@@ -49,5 +47,5 @@ fn config_serialization_works()
 
   // Deserialize back
   let deserialized: Config = serde_json::from_str(&json).unwrap();
-  assert_eq!(deserialized.cost.budget_usd, 50.0);
+  assert!((deserialized.cost.budget_usd - 50.0_f64).abs() < f64::EPSILON);
 }
