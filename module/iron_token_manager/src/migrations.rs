@@ -447,8 +447,7 @@ async fn apply_migration_014(pool: &SqlitePool) -> Result<()> {
 ///
 /// Adds user ownership to agents table for multi-tenant isolation.
 /// Implements authorization requirement: users can only access their own agents.
-async fn apply_migration_015(pool: &SqlitePool) -> Result<()>
-{
+async fn apply_migration_015(pool: &SqlitePool) -> Result<()> {
   let completed: i64 = query_scalar(
     "SELECT COUNT(*) FROM sqlite_master
      WHERE type='table' AND name='_migration_015_completed'",
@@ -635,14 +634,14 @@ async fn apply_migration_021(pool: &SqlitePool) -> Result<()> {
     } else {
       // Columns already exist, just create guard table
       sqlx::query(
-        "CREATE TABLE IF NOT EXISTS _migration_021_completed (applied_at INTEGER NOT NULL)"
+        "CREATE TABLE IF NOT EXISTS _migration_021_completed (applied_at INTEGER NOT NULL)",
       )
-          .execute( pool )
-          .await
-          .map_err( |_| crate::error::TokenError::Generic )?;
+      .execute(pool)
+      .await
+      .map_err(|_| crate::error::TokenError::Generic)?;
 
       sqlx::query(
-        "INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000)"
+        "INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000)",
       )
       .execute(pool)
       .await

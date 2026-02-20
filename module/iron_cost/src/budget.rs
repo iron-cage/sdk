@@ -92,9 +92,10 @@ impl CostController {
 
   /// Add cost after a request finishes (in microdollars)
   pub fn add_spend(&self, cost_micros: i64) {
-    self
-      .total_spent_micros
-      .fetch_add(u64::try_from(cost_micros.max(0)).unwrap_or(0), Ordering::Relaxed);
+    self.total_spent_micros.fetch_add(
+      u64::try_from(cost_micros.max(0)).unwrap_or(0),
+      Ordering::Relaxed,
+    );
   }
 
   /// Get total spent in microdollars
@@ -109,9 +110,10 @@ impl CostController {
 
   /// Update the budget limit (in microdollars)
   pub fn set_budget(&self, budget_micros: i64) {
-    self
-      .budget_limit_micros
-      .store(u64::try_from(budget_micros.max(0)).unwrap_or(0), Ordering::Relaxed);
+    self.budget_limit_micros.store(
+      u64::try_from(budget_micros.max(0)).unwrap_or(0),
+      Ordering::Relaxed,
+    );
   }
 
   /// Get current status

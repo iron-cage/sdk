@@ -68,9 +68,7 @@ impl MigrationRegistry {
       sqlx::raw_sql(migration.sql)
         .execute(pool)
         .await
-        .map_err(|e| {
-          TestDbError::Migration(format!("Failed to apply migration {version}: {e}"))
-        })?;
+        .map_err(|e| TestDbError::Migration(format!("Failed to apply migration {version}: {e}")))?;
 
       // Mark as applied
       self.mark_applied(pool, *version, &migration.name).await?;
@@ -103,11 +101,13 @@ impl MigrationRegistry {
   }
 
   async fn mark_applied(&self, pool: &SqlitePool, version: u32, name: &str) -> Result<()> {
-    let now_ms = i64::try_from(std::time::SystemTime::now()
-      .duration_since(std::time::UNIX_EPOCH)
-      .unwrap()
-      .as_millis())
-      .unwrap_or(i64::MAX);
+    let now_ms = i64::try_from(
+      std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis(),
+    )
+    .unwrap_or(i64::MAX);
 
     sqlx::query(
       "INSERT INTO _schema_version ( version, name, applied_at )

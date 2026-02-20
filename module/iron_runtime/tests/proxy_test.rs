@@ -71,7 +71,10 @@ async fn run_proxy_fails_loudly_when_ip_token_key_absent() {
     "run_proxy must fail when both provider_key and ip_token_key are absent"
   );
   assert!(
-    result.unwrap_err().to_string().contains("IP_TOKEN_KEY must be configured"),
+    result
+      .unwrap_err()
+      .to_string()
+      .contains("IP_TOKEN_KEY must be configured"),
     "Error must identify the missing IP_TOKEN_KEY"
   );
 }

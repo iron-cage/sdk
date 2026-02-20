@@ -342,10 +342,7 @@ fn test_streaming_nonblocking_when_channel_full() {
   }
 
   let elapsed = start.elapsed();
-  assert!(
-    elapsed.as_millis() < 100,
-    "Streaming blocked: {elapsed:?}"
-  );
+  assert!(elapsed.as_millis() < 100, "Streaming blocked: {elapsed:?}");
 
   assert_eq!(store.len(), 100);
 }

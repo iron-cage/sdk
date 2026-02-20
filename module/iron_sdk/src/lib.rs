@@ -83,6 +83,8 @@ impl LlmRouter {
   /// ```
   #[new]
   #[pyo3(signature = (api_key=None, server_url=None, cache_ttl_seconds=300, budget=None, provider_key=None))]
+  // PyO3 requires owned String for Python string arguments; &str has GIL lifetime issues.
+  #[allow(clippy::needless_pass_by_value)]
   fn new(
     api_key: Option<String>,
     server_url: Option<String>,
@@ -101,9 +103,14 @@ impl LlmRouter {
     let api_key = api_key.unwrap_or_else(|| "direct".to_string());
     let server_url = server_url.unwrap_or_default();
 
-    let inner =
-      RustLlmRouter::create_full(api_key, server_url, cache_ttl_seconds, budget, provider_key.as_ref())
-        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
+    let inner = RustLlmRouter::create_full(
+      api_key,
+      server_url,
+      cache_ttl_seconds,
+      budget,
+      provider_key.as_deref(),
+    )
+    .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
 
     Ok(Self { inner: Some(inner) })
   }

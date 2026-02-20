@@ -1,8 +1,8 @@
 //! Utility functions and types for analytics.
 
+use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use core::str::FromStr;
 use std::sync::Arc;
 
 /// Get current Unix timestamp in milliseconds.

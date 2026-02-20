@@ -57,4 +57,4 @@ impl core::fmt::Display for CostError {
   }
 }
 
-impl std::error::Error for CostError {}
+impl core::error::Error for CostError {}

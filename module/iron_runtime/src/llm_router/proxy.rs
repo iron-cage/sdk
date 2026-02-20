@@ -47,10 +47,15 @@ pub struct ProxyState {
 }
 
 /// Proxy server configuration
+#[derive(Debug)]
 pub struct ProxyConfig {
+  /// Port to bind the local proxy server on
   pub port: u16,
+  /// IC Token for authenticating outbound requests to the Iron Cage server
   pub ic_token: String,
+  /// Iron Cage server URL for fetching provider keys
   pub server_url: String,
+  /// How long to cache fetched provider keys (seconds)
   pub cache_ttl_seconds: u64,
   /// Cost controller for budget enforcement and spending tracking (None = no budget)
   pub cost_controller: Option<Arc<CostController>>,
@@ -70,6 +75,11 @@ pub struct ProxyConfig {
 }
 
 /// Run the proxy server
+///
+/// # Errors
+///
+/// Returns [`LlmRouterError::ServerStart`] if `IP_TOKEN_KEY` is absent when no
+/// static `provider_key` is configured, or if the TCP listener fails to bind.
 pub async fn run_proxy(
   config: ProxyConfig,
   shutdown_rx: oneshot::Receiver<()>,
@@ -120,7 +130,7 @@ pub async fn run_proxy(
     .route("/*path", any(handle_proxy))
     .with_state(state);
 
-  let addr = std::net::SocketAddr::from(([127, 0, 0, 1], config.port));
+  let addr = core::net::SocketAddr::from(([127, 0, 0, 1], config.port));
   let listener = tokio::net::TcpListener::bind(addr)
     .await
     .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?;

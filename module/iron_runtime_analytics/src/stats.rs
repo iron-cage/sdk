@@ -1,9 +1,9 @@
 //! Statistics types for analytics aggregation.
 
+use core::sync::atomic::{AtomicU64, Ordering};
 use iron_cost::converter::micros_to_usd;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Atomic per-model statistics (lock-free).
 #[derive(Debug, Default)]

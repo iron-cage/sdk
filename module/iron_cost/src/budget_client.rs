@@ -57,8 +57,8 @@ impl core::fmt::Display for BudgetClientError {
   }
 }
 
-impl std::error::Error for BudgetClientError {
-  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for BudgetClientError {
+  fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
     match self {
       Self::HttpError(e) => Some(e),
       Self::BudgetError(e) => Some(e),

@@ -27,4 +27,4 @@ impl core::fmt::Display for LlmRouterError {
   }
 }
 
-impl std::error::Error for LlmRouterError {}
+impl core::error::Error for LlmRouterError {}

@@ -9,11 +9,11 @@
 
 #![cfg(feature = "sync")]
 
+use core::time::Duration;
 use iron_runtime_analytics::event::*;
 use iron_runtime_analytics::event_storage::EventStore;
 use iron_runtime_analytics::sync::{SyncClient, SyncConfig};
 use std::sync::Arc;
-use core::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

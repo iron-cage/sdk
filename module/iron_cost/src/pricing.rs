@@ -161,10 +161,7 @@ impl Model {
   #[must_use]
   pub fn calculate_max_cost(&self, input_len: u32, request_max_output: Option<u32>) -> f64 {
     micros_to_usd(
-      self.calculate_max_cost_micros(
-        u64::from(input_len),
-        request_max_output.map(u64::from),
-      ),
+      self.calculate_max_cost_micros(u64::from(input_len), request_max_output.map(u64::from)),
     )
   }
 }

@@ -601,14 +601,13 @@ fn test_verify_token_constant_time() {
   let mut total_early = core::time::Duration::ZERO;
   let mut total_late = core::time::Duration::ZERO;
 
-  for _ in 0..iterations
-  {
+  for _ in 0..iterations {
     let t = std::time::Instant::now();
-    let _ = generator.verify_token( &wrong_early, &correct_hash );
+    let _ = generator.verify_token(&wrong_early, &correct_hash);
     total_early += t.elapsed();
 
     let t = std::time::Instant::now();
-    let _ = generator.verify_token( &wrong_late, &correct_hash );
+    let _ = generator.verify_token(&wrong_late, &correct_hash);
     total_late += t.elapsed();
   }
 

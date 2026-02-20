@@ -2,11 +2,11 @@
 
 use crate::event::{AnalyticsEvent, EventId, EventPayload};
 use crate::stats::{AtomicModelStats, ComputedStats};
+use core::iter;
+use core::sync::atomic::{AtomicU64, Ordering};
 use crossbeam::channel::{self, Receiver, Sender};
 use crossbeam::queue::ArrayQueue;
 use dashmap::DashMap;
-use core::iter;
-use core::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 const DEFAULT_CAPACITY: usize = 10_000;

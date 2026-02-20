@@ -301,13 +301,12 @@ async fn test_seed_data_creates_expected_records() {
     .expect("LOUD FAILURE: Failed to connect to seeded database");
 
   // Verify 3 users created
-  let user_count: i64 = query_scalar(
-    "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer')"
-  )
-  .fetch_one( &pool )
-  .await
-  .expect("LOUD FAILURE: Failed to count users");
-  assert_eq!( user_count, 3, "Should have 3 test users" );
+  let user_count: i64 =
+    query_scalar("SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer')")
+      .fetch_one(&pool)
+      .await
+      .expect("LOUD FAILURE: Failed to count users");
+  assert_eq!(user_count, 3, "Should have 3 test users");
 
   // Verify 3 tokens created
   let token_count: i64 =

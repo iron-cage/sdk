@@ -38,7 +38,7 @@ use iron_runtime_analytics::{SyncClient, SyncConfig, SyncHandle};
 /// ```rust,no_run
 /// use iron_runtime::llm_router::LlmRouter;
 ///
-/// let router = LlmRouter::create(
+/// let mut router = LlmRouter::create(
 ///     "ic_xxx".to_string(),
 ///     "https://api.iron-cage.io".to_string(),
 ///     300,
@@ -178,15 +178,9 @@ impl LlmRouter {
     server_url: String,
     cache_ttl_seconds: u64,
     budget: Option<f64>,
-    provider_key: Option<&String>,
+    provider_key: Option<&str>,
   ) -> Result<Self, String> {
-    Self::create_inner(
-      api_key,
-      server_url,
-      cache_ttl_seconds,
-      budget,
-      provider_key.map(String::as_str),
-    )
+    Self::create_inner(api_key, server_url, cache_ttl_seconds, budget, provider_key)
   }
 
   /// Get the base URL for the `OpenAI` client

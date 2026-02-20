@@ -269,12 +269,7 @@ impl TestData {
   pub async fn wipe(&self) -> Result<(), sqlx::Error> {
     iron_test_db::wipe_all_tables(&self.pool)
       .await
-      .map_err(|e| {
-        sqlx::Error::Io(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          e.to_string(),
-        ))
-      })
+      .map_err(|e| sqlx::Error::Io(std::io::Error::other(e.to_string())))
   }
 }
 

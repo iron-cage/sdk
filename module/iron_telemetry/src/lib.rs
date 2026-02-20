@@ -227,7 +227,7 @@ mod implementation {
   /// # Errors
   ///
   /// Returns an error if a global tracing subscriber has already been set.
-  pub fn init_logging(level: LogLevel) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn init_logging(level: LogLevel) -> Result<(), Box<dyn core::error::Error>> {
     use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
     // Honor RUST_LOG if set; otherwise default to provided level.
