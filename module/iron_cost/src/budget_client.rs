@@ -23,8 +23,13 @@ pub enum BudgetClientError {
   /// HTTP request failed
   HttpError(reqwest::Error),
   /// Server returned error
-  ServerError { status: u16, message: String },
-  /// No active lease - call handshake() first
+  ServerError {
+    /// HTTP status code
+    status: u16,
+    /// Error message from server
+    message: String,
+  },
+  /// No active lease - call `handshake()` first
   NoLease,
   /// Handshake failed
   HandshakeFailed(String),
@@ -36,18 +41,18 @@ pub enum BudgetClientError {
   IpTokenDecrypt(String),
 }
 
-impl std::fmt::Display for BudgetClientError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for BudgetClientError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match self {
-      Self::HttpError(e) => write!(f, "HTTP request failed: {}", e),
+      Self::HttpError(e) => write!(f, "HTTP request failed: {e}"),
       Self::ServerError { status, message } => {
-        write!(f, "Server returned error: {} - {}", status, message)
+        write!(f, "Server returned error: {status} - {message}")
       }
       Self::NoLease => write!(f, "No active lease - call handshake() first"),
-      Self::HandshakeFailed(msg) => write!(f, "Handshake failed: {}", msg),
-      Self::BudgetError(e) => write!(f, "Budget operation failed: {}", e),
-      Self::JsonError(e) => write!(f, "JSON parse error: {}", e),
-      Self::IpTokenDecrypt(e) => write!(f, "IP Token decryption failed: {}", e),
+      Self::HandshakeFailed(msg) => write!(f, "Handshake failed: {msg}"),
+      Self::BudgetError(e) => write!(f, "Budget operation failed: {e}"),
+      Self::JsonError(e) => write!(f, "JSON parse error: {e}"),
+      Self::IpTokenDecrypt(e) => write!(f, "IP Token decryption failed: {e}"),
     }
   }
 }
@@ -126,7 +131,9 @@ struct ReportRequest {
 /// Usage report response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct ReportResponse {
+  /// Whether the report was accepted
   pub success: bool,
+  /// Remaining budget in microdollars
   pub budget_remaining: i64,
 }
 
@@ -142,10 +149,15 @@ struct RefreshRequest {
 /// Budget refresh response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct RefreshResponse {
+  /// Approval status ("approved" / "denied")
   pub status: String,
+  /// Budget granted in microdollars, if approved
   pub budget_granted: Option<i64>,
+  /// Remaining budget in microdollars
   pub budget_remaining: i64,
+  /// New lease ID, if approved
   pub lease_id: Option<String>,
+  /// Denial reason, if denied
   pub reason: Option<String>,
 }
 
@@ -158,13 +170,16 @@ struct ReturnRequest {
 /// Budget return response from dashboard
 #[derive(Debug, Deserialize)]
 pub struct ReturnResponse {
+  /// Whether the return was accepted
   pub success: bool,
+  /// Amount returned in microdollars
   pub returned: i64,
 }
 
 /// Budget client configuration
+#[derive(Debug)]
 pub struct BudgetClientConfig {
-  /// Iron Cage server URL (e.g., "http://localhost:3000")
+  /// Iron Cage server URL (e.g., `<http://localhost:3000>`)
   pub server_url: String,
   /// IC Token for authentication
   pub ic_token: String,
@@ -202,6 +217,7 @@ impl Default for BudgetClientConfig {
 /// 3. Report: Async report to dashboard (non-blocking)
 /// 4. Refresh: Get more budget when low
 /// 5. Return: Return unused on shutdown
+#[allow(missing_debug_implementations)]
 pub struct BudgetClient {
   /// Configuration
   config: BudgetClientConfig,
@@ -219,6 +235,11 @@ pub struct BudgetClient {
 
 impl BudgetClient {
   /// Create a new budget client (does not perform handshake)
+  ///
+  /// # Errors
+  ///
+  /// Returns [`BudgetClientError::IpTokenDecrypt`] if `ip_token_key` is not set.
+  /// Returns [`BudgetClientError::HttpError`] if the HTTP client cannot be built.
   pub fn new(config: BudgetClientConfig) -> Result<Self, BudgetClientError> {
     // Startup validation: IP_TOKEN_KEY is required — without it every handshake will fail.
     // Catching this at construction time prevents taking traffic before the error surfaces.
@@ -252,6 +273,12 @@ impl BudgetClient {
   /// Perform handshake with dashboard to get lease and API key.
   ///
   /// Must be called before using the client for requests.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`BudgetClientError::HttpError`] on network failure.
+  /// Returns [`BudgetClientError::ServerError`] if server responds with an error.
+  /// Returns [`BudgetClientError::IpTokenDecrypt`] if the IP token cannot be decrypted.
   pub async fn handshake(&self) -> Result<(), BudgetClientError> {
     let url = format!("{}/api/budget/handshake", self.config.server_url);
 
@@ -318,6 +345,12 @@ impl BudgetClient {
   ///
   /// This is meant to be called after each LLM request completes.
   /// The report is non-blocking to avoid adding latency.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`BudgetClientError::NoLease`] if handshake was not completed.
+  /// Returns [`BudgetClientError::HttpError`] on network failure.
+  /// Returns [`BudgetClientError::ServerError`] if server responds with an error.
   pub async fn report(
     &self,
     cost_microdollars: i64,
@@ -354,6 +387,12 @@ impl BudgetClient {
   /// Request more budget when running low (in microdollars).
   ///
   /// If approved, updates the local cost controller with new budget.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`BudgetClientError::NoLease`] if handshake was not completed.
+  /// Returns [`BudgetClientError::HttpError`] on network failure.
+  /// Returns [`BudgetClientError::ServerError`] if server responds with an error.
   pub async fn refresh(
     &self,
     requested_budget: Option<i64>,
@@ -403,6 +442,12 @@ impl BudgetClient {
   /// Return unused budget to dashboard on shutdown.
   ///
   /// Should be called when the LLM router is stopping.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`BudgetClientError::NoLease`] if handshake was not completed.
+  /// Returns [`BudgetClientError::HttpError`] on network failure.
+  /// Returns [`BudgetClientError::ServerError`] if server responds with an error.
   pub async fn return_unused(&self) -> Result<ReturnResponse, BudgetClientError> {
     let lease = self.lease.read().await;
     let lease = lease.as_ref().ok_or(BudgetClientError::NoLease)?;
@@ -432,6 +477,10 @@ impl BudgetClient {
   /// Reserve budget atomically before an LLM call.
   ///
   /// This must be called before making an LLM request to prevent concurrent overspend.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`CostError::InsufficientBudget`] if not enough budget is available.
   pub fn reserve(&self, max_cost_micros: u64) -> Result<Reservation, CostError> {
     self.cost_controller.reserve(max_cost_micros)
   }
@@ -451,6 +500,10 @@ impl BudgetClient {
   }
 
   /// Check if budget is available (includes reserved amounts).
+  ///
+  /// # Errors
+  ///
+  /// Returns [`CostError::BudgetExceeded`] if spent + reserved >= limit.
   pub fn check_budget(&self) -> Result<(), CostError> {
     self.cost_controller.check_budget()
   }
@@ -476,12 +529,12 @@ impl BudgetClient {
     self.lease.read().await.as_ref().map(|l| l.lease_id.clone())
   }
 
-  /// Get budget status: (spent_microdollars, limit_microdollars).
+  /// Get budget status: (`spent_microdollars`, `limit_microdollars`).
   pub fn get_status(&self) -> (i64, i64) {
     self.cost_controller.get_status()
   }
 
-  /// Get full budget status: (spent_microdollars, reserved_microdollars, limit_microdollars).
+  /// Get full budget status: (`spent_microdollars`, `reserved_microdollars`, `limit_microdollars`).
   pub fn get_full_status(&self) -> (i64, i64, i64) {
     self.cost_controller.get_full_status()
   }
@@ -512,53 +565,76 @@ impl BudgetClient {
   }
 }
 
-/// Builder for BudgetClient configuration
+/// Builder for `BudgetClient` configuration
+#[allow(missing_debug_implementations)]
 pub struct BudgetClientBuilder {
   config: BudgetClientConfig,
 }
 
 impl BudgetClientBuilder {
+  /// Create a new builder with default configuration.
+  #[must_use]
   pub fn new() -> Self {
     Self {
       config: BudgetClientConfig::default(),
     }
   }
 
+  /// Set the Iron Cage server URL.
+  #[must_use]
   pub fn server_url(mut self, url: impl Into<String>) -> Self {
     self.config.server_url = url.into();
     self
   }
 
+  /// Set the IC Token for authentication.
+  #[must_use]
   pub fn ic_token(mut self, token: impl Into<String>) -> Self {
     self.config.ic_token = token.into();
     self
   }
 
+  /// Set the provider (openai, anthropic, etc.).
+  #[must_use]
   pub fn provider(mut self, provider: impl Into<String>) -> Self {
     self.config.provider = provider.into();
     self
   }
 
+  /// Set the optional provider key ID.
+  #[must_use]
   pub fn provider_key_id(mut self, id: i64) -> Self {
     self.config.provider_key_id = Some(id);
     self
   }
 
+  /// Set the initial budget in microdollars.
+  #[must_use]
   pub fn initial_budget(mut self, budget_micros: i64) -> Self {
     self.config.initial_budget = budget_micros;
     self
   }
 
+  /// Set the HTTP request timeout.
+  #[must_use]
   pub fn timeout(mut self, timeout: Duration) -> Self {
     self.config.timeout = timeout;
     self
   }
 
+  /// Set the 32-byte IP Token decryption key.
+  #[must_use]
   pub fn ip_token_key(mut self, key: [u8; 32]) -> Self {
     self.config.ip_token_key = Some(key);
     self
   }
 
+  /// Build the [`BudgetClient`].
+  ///
+  /// # Errors
+  ///
+  /// Returns [`BudgetClientError::IpTokenDecrypt`] if `ip_token_key` is not set.
+  /// Returns [`BudgetClientError::HttpError`] if the HTTP client cannot be built.
   pub fn build(self) -> Result<BudgetClient, BudgetClientError> {
     BudgetClient::new(self.config)
   }
@@ -573,6 +649,7 @@ impl Default for BudgetClientBuilder {
 /// Create a static budget client that doesn't connect to dashboard.
 ///
 /// Useful for testing or standalone mode.
+#[must_use]
 pub fn create_static_client(budget_micros: i64) -> Arc<CostController> {
   Arc::new(CostController::new(budget_micros))
 }

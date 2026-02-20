@@ -1,4 +1,4 @@
-//! Integration tests for BudgetClient IP Token decryption path.
+//! Integration tests for `BudgetClient` IP Token decryption path.
 //!
 //! Covers the production path through `BudgetClient::handshake()` → `get_provider_key()`,
 //! which was previously bypassed in e2e tests that called `IpTokenCrypto::decrypt()` directly.
@@ -108,9 +108,8 @@ fn budget_client_build_fails_loudly_when_ip_token_key_absent() {
     // No ip_token_key — must fail loudly at build, not silently at LLM call
     .build();
 
-  let err = match result {
-    Err(e) => e,
-    Ok(_) => panic!("BudgetClient::new() must fail when IP_TOKEN_KEY is absent"),
+  let Err(err) = result else {
+    panic!("BudgetClient::new() must fail when IP_TOKEN_KEY is absent")
   };
   assert!(
     err.to_string().contains("IP_TOKEN_KEY not configured"),
