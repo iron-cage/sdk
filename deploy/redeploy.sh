@@ -1,12 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ================== INIT ======================================================================
 
 # set -x # for debug
-set -o errexit
-set -o nounset
-set -o pipefail
-
+set -euo pipefail
 
 # Color codes
 RED="\e[31m"
