@@ -12,7 +12,7 @@
 
 use axum::Router;
 use iron_control_api::{
-  ic_token::{IcTokenClaims, IcTokenManager},
+  ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
   routes::budget::{handshake, refresh_budget, report_usage, return_budget, BudgetState},
 };
 use iron_token_manager::lease_manager::LeaseManager;
@@ -43,7 +43,8 @@ pub async fn setup_test_db() -> SqlitePool {
 /// - Provider key storage (API key management)
 /// - JWT secret (user authentication)
 #[allow(dead_code)]
-pub fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
+#[allow(clippy::unused_async)]
+pub async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key for provider keys
@@ -74,6 +75,7 @@ pub fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
     db_pool: pool,
     jwt_secret,
     crypto_service: Some(crypto_service),
+    ic_token_rate_limiter: IcTokenRateLimiter::new(),
   }
 }
 
@@ -81,7 +83,8 @@ pub fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
 ///
 /// Use this for testing crypto unavailable scenarios.
 #[allow(dead_code)]
-pub fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState {
+#[allow(clippy::unused_async)]
+pub async fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
   let provider_key_master: [u8; 32] = [42u8; 32];
@@ -110,14 +113,53 @@ pub fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState {
     db_pool: pool,
     jwt_secret,
     crypto_service: None,
+    ic_token_rate_limiter: IcTokenRateLimiter::new(),
   }
 }
 
-/// Helper: Generate IC Token for test agent
+/// Helper: Generate IC Token for test agent and store its hash in the database
 ///
-/// Creates IC Token with standard claims for testing.
+/// Creates IC Token with standard claims and stores SHA-256 hash in
+/// `agents.ic_token_hash` so that `validate_ic_token_runtime` accepts it.
+/// Agent must already exist in the database.
 #[allow(dead_code)]
-pub fn create_ic_token(agent_id: i64, manager: &IcTokenManager) -> String {
+pub async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager) -> String {
+  let claims = IcTokenClaims::new(
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
+    vec!["llm:call".to_string()],
+    None,
+  );
+
+  let token = manager
+    .generate_token(&claims)
+    .expect("LOUD FAILURE: Should generate IC Token");
+
+  let token_hash = iron_control_api::ic_token::sha256_hash(&token);
+
+  let result = sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
+    .bind(&token_hash)
+    .bind(agent_id)
+    .execute(pool)
+    .await
+    .expect("LOUD FAILURE: Failed to store ic_token_hash");
+
+  assert!(
+    result.rows_affected() > 0,
+    "LOUD FAILURE: Agent {agent_id} not found — ic_token_hash not stored. Call seed_agent_with_budget first."
+  );
+
+  token
+}
+
+/// Helper: Generate IC Token without storing hash in database
+///
+/// Use this for testing scenarios where the agent does NOT exist in the database
+/// (e.g., testing 401 responses for non-existent or revoked agents).
+/// The JWT is valid (signed correctly), but `validate_ic_token_runtime` will
+/// return `TokenInactive` because no hash is stored in `agents.ic_token_hash`.
+#[allow(dead_code)]
+pub fn create_ic_token_for_missing_agent(agent_id: i64, manager: &IcTokenManager) -> String {
   let claims = IcTokenClaims::new(
     format!("agent_{agent_id}"),
     format!("budget_{agent_id}"),
@@ -140,7 +182,7 @@ pub fn create_ic_token(agent_id: i64, manager: &IcTokenManager) -> String {
 /// - Usage limits
 ///
 /// # Fix(issue-concurrency-001)
-/// Root cause: Hardcoded `agent_id`=1 and `provider_key` id=1 conflicted with migration 017 seeded data
+/// Root cause: Hardcoded `agent_id=1` and `provider_key` id=1 conflicted with migration 017 seeded data
 /// Pitfall: Always use unique IDs for test data; use `agent_id` > 100 and `provider_key` id = `agent_id` * 1000 to avoid conflicts
 #[allow(dead_code)]
 pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdollars: i64) {
@@ -234,7 +276,8 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
 ///
 /// Builds Axum router with all budget endpoints mounted for testing.
 #[allow(dead_code)]
-pub fn create_budget_router(state: BudgetState) -> Router {
+#[allow(clippy::unused_async)]
+pub async fn create_budget_router(state: BudgetState) -> Router {
   use iron_control_api::routes::budget::request_workflow::{
     approve_budget_request, reject_budget_request,
   };

@@ -16,9 +16,9 @@
 //! | `test_get_token_negative_id_returns_404` | GET with negative ID | GET /api/v1/api-tokens/-1 | 404 Not Found | ✅ |
 //! | `test_get_token_zero_id_returns_404` | GET with zero ID | GET /api/v1/api-tokens/0 | 404 Not Found | ✅ |
 //! | `test_get_token_very_large_id_handles_gracefully` | GET with overflow ID | GET /api/v1/api-tokens/999999999999 | 404 Not Found (no crash) | ✅ |
-//! | `test_unicode_in_user_id` | Unicode characters in user_id | POST with `user_id` containing emoji/CJK | 201 Created, stored correctly | ✅ |
-//! | `test_sql_injection_in_user_id` | SQL injection attempt in user_id | `user_id`="'; DROP TABLE api_tokens; --" | 201 Created, stored safely | ✅ |
-//! | `test_sql_injection_in_project_id` | SQL injection attempt in project_id | `project_id` with SQL injection payload | 201 Created, stored safely | ✅ |
+//! | `test_unicode_in_user_id` | Unicode characters in user_id | POST with user_id containing emoji/CJK | 201 Created, stored correctly | ✅ |
+//! | `test_sql_injection_in_user_id` | SQL injection attempt in user_id | user_id="'; DROP TABLE api_tokens; --" | 201 Created, stored safely | ✅ |
+//! | `test_sql_injection_in_project_id` | SQL injection attempt in project_id | project_id with SQL injection payload | 201 Created, stored safely | ✅ |
 //! | `test_xss_in_description_stored_as_literal` | XSS attempt in description | description="<script>alert('xss')</script>" | 201 Created, stored as literal string | ✅ |
 
 use crate::common::extract_json_response;

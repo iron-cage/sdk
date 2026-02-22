@@ -3,7 +3,7 @@
 //! Cost tracking and unused budget return
 
 use super::state::BudgetState;
-use crate::error::ValidationError;
+use crate::{error::ValidationError, ic_token};
 use axum::{
   extract::State,
   http::StatusCode,
@@ -18,6 +18,9 @@ use serde::{Deserialize, Serialize};
 /// Usage report request (Step 2: Cost Tracking)
 #[derive(Debug, Deserialize)]
 pub struct UsageReportRequest {
+  /// IC Token for authentication
+  #[serde(default)]
+  pub ic_token: String,
   /// Budget lease identifier
   pub lease_id: String,
   /// Unique LLM request identifier
@@ -33,6 +36,9 @@ pub struct UsageReportRequest {
 }
 
 impl UsageReportRequest {
+  /// Maximum IC Token length (JWT tokens can be long)
+  const MAX_IC_TOKEN_LENGTH: usize = 2000;
+
   /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
@@ -51,6 +57,18 @@ impl UsageReportRequest {
   ///
   /// Returns error if validation fails
   pub fn validate(&self) -> Result<(), ValidationError> {
+    // Validate ic_token
+    if self.ic_token.trim().is_empty() {
+      return Err(ValidationError::MissingField("ic_token".to_string()));
+    }
+
+    if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH {
+      return Err(ValidationError::TooLong {
+        field: "ic_token".to_string(),
+        max_length: Self::MAX_IC_TOKEN_LENGTH,
+      });
+    }
+
     // Validate lease_id
     if self.lease_id.trim().is_empty() {
       return Err(ValidationError::MissingField("lease_id".to_string()));
@@ -141,6 +159,8 @@ pub struct UsageReportResponse {
 ///
 /// - 200 OK if usage recorded successfully
 /// - 400 Bad Request if validation fails
+/// - 401 Unauthorized if IC Token invalid or revoked
+/// - 403 Forbidden if lease does not belong to this agent
 /// - 404 Not Found if lease doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn report_usage(
@@ -158,6 +178,19 @@ pub async fn report_usage(
     )
       .into_response();
   }
+
+  // Verify IC Token (JWT signature + hash-check against database)
+  let (token_agent_id, _claims) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager,
+    &request.ic_token,
+    &state.db_pool,
+    &state.ic_token_rate_limiter,
+  )
+  .await
+  {
+    Ok(result) => result,
+    Err(response) => return response,
+  };
 
   // Get lease
   let lease = match state.lease_manager.get_lease(&request.lease_id).await {
@@ -178,6 +211,15 @@ pub async fn report_usage(
         .into_response();
     }
   };
+
+  // Verify lease belongs to the authenticated agent (cross-tenant prevention)
+  if token_agent_id != lease.agent_id {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": "Lease does not belong to this agent" })),
+    )
+      .into_response();
+  }
 
   // Fix(issue-budget-001): Missing lease expiry validation
   //
@@ -301,6 +343,9 @@ pub async fn report_usage(
 /// Budget return request (Step 4: Return Unused Budget)
 #[derive(Debug, Deserialize)]
 pub struct BudgetReturnRequest {
+  /// IC Token for authentication
+  #[serde(default)]
+  pub ic_token: String,
   /// Budget lease identifier to close
   pub lease_id: String,
   /// Amount spent by client (microdollars) - from `iron_cost` `CostController`
@@ -309,6 +354,9 @@ pub struct BudgetReturnRequest {
 }
 
 impl BudgetReturnRequest {
+  /// Maximum IC Token length (JWT tokens can be long)
+  const MAX_IC_TOKEN_LENGTH: usize = 2000;
+
   /// Maximum `lease_id` length
   const MAX_LEASE_ID_LENGTH: usize = 100;
 
@@ -316,9 +364,21 @@ impl BudgetReturnRequest {
   ///
   /// # Errors
   ///
-  /// Returns [`ValidationError`] if `lease_id` is empty or too long,
+  /// Returns [`ValidationError`] if `ic_token` or `lease_id` is empty or too long,
   /// or if `spent_microdollars` is negative.
   pub fn validate(&self) -> Result<(), ValidationError> {
+    // Validate ic_token
+    if self.ic_token.trim().is_empty() {
+      return Err(ValidationError::MissingField("ic_token".to_string()));
+    }
+
+    if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH {
+      return Err(ValidationError::TooLong {
+        field: "ic_token".to_string(),
+        max_length: Self::MAX_IC_TOKEN_LENGTH,
+      });
+    }
+
     if self.lease_id.trim().is_empty() {
       return Err(ValidationError::MissingField("lease_id".to_string()));
     }
@@ -366,6 +426,8 @@ pub struct BudgetReturnResponse {
 ///
 /// - 200 OK with returned amount if successful
 /// - 400 Bad Request if validation fails
+/// - 401 Unauthorized if IC Token invalid or revoked
+/// - 403 Forbidden if lease does not belong to this agent
 /// - 404 Not Found if lease doesn't exist
 /// - 500 Internal Server Error if database fails
 pub async fn return_budget(
@@ -383,6 +445,19 @@ pub async fn return_budget(
     )
       .into_response();
   }
+
+  // Verify IC Token (JWT signature + hash-check against database)
+  let (token_agent_id, _claims) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager,
+    &request.ic_token,
+    &state.db_pool,
+    &state.ic_token_rate_limiter,
+  )
+  .await
+  {
+    Ok(result) => result,
+    Err(response) => return response,
+  };
 
   // Get lease to find agent_id
   let lease = match state.lease_manager.get_lease(&request.lease_id).await {
@@ -403,6 +478,15 @@ pub async fn return_budget(
         .into_response();
     }
   };
+
+  // Verify lease belongs to the authenticated agent (cross-tenant prevention)
+  if token_agent_id != lease.agent_id {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": "Lease does not belong to this agent" })),
+    )
+      .into_response();
+  }
 
   // Check if lease is already closed
   if lease.lease_status != "active" {

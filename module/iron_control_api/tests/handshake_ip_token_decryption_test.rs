@@ -73,7 +73,7 @@ mod common;
 async fn test_handshake_decrypts_provider_key() {
   // Setup: Create test database and state
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   // Setup: Create agent with budget
   let agent_id = 200i64;
@@ -111,11 +111,11 @@ async fn test_handshake_decrypts_provider_key() {
   .await
   .expect( "LOUD FAILURE: Should insert encrypted provider key" );
 
-  // Setup: Create IC Token
-  let ic_token = common::budget::create_ic_token(agent_id, &state.ic_token_manager);
+  // Setup: Create IC Token and store hash for runtime validation
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Execute: Call handshake endpoint
-  let app = common::budget::create_budget_router(state.clone());
+  let app = common::budget::create_budget_router(state.clone()).await;
 
   let request = Request::builder()
     .method("POST")
@@ -147,20 +147,20 @@ async fn test_handshake_decrypts_provider_key() {
   let body: Value =
     serde_json::from_slice(&body_bytes).expect("LOUD FAILURE: Response should be valid JSON");
 
-  let ip_token_str = body["ip_token"]
+  let provider_token = body["ip_token"]
     .as_str()
     .expect("LOUD FAILURE: Response should contain ip_token field");
 
   // Verify: IP Token should NOT be the placeholder
   assert!(
-    !ip_token_str.contains("STUB"),
-    "IP Token should not contain STUB placeholder: {ip_token_str}"
+    !provider_token.contains("STUB"),
+    "IP Token should not contain STUB placeholder: {provider_token}"
   );
 
   // Verify: Decrypt IP Token to recover provider key
   let decrypted_provider_key = state
     .ip_token_crypto
-    .decrypt(ip_token_str)
+    .decrypt(provider_token)
     .expect("LOUD FAILURE: Should decrypt IP Token");
 
   // Verify: Decrypted provider key matches original
@@ -184,7 +184,7 @@ async fn test_handshake_decrypts_provider_key() {
 #[tokio::test]
 async fn test_handshake_handles_decryption_failure() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 201i64;
   common::budget::seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
@@ -208,8 +208,8 @@ async fn test_handshake_handles_decryption_failure() {
   .await
   .unwrap();
 
-  let ic_token = common::budget::create_ic_token(agent_id, &state.ic_token_manager);
-  let app = common::budget::create_budget_router(state);
+  let ic_token = common::budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")

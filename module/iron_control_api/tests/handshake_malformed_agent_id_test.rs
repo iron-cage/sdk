@@ -17,7 +17,7 @@
 //! // VULNERABLE CODE (before fix):
 //! let agent_id: i64 = match agent_id_str.strip_prefix("agent_") {
 //!   Some(id_part) => {
-//!     id_part.parse::<i64>().unwrap_or(1)  // CRITICAL: defaults to 1
+//!     id_part.parse::<i64>().unwrap_or(1)  // ← CRITICAL: defaults to 1
 //!   }
 //!   None => return BadRequest
 //! };
@@ -27,8 +27,8 @@
 //!
 //! 1. Create IC Token with `agent_id = "agent_INVALID"` (non-numeric)
 //! 2. Send handshake request with this IC Token
-//! 3. Parsing fails -- defaults to `agent_id=1`
-//! 4. Attacker now uses `agent_id=1` budget (authorization bypass)
+//! 3. Parsing fails → defaults to `agent_id=1`
+//! 4. Attacker now uses `agent_id=1`'s budget (authorization bypass)
 //!
 //! ### Impact
 //!
@@ -63,14 +63,14 @@
 //!
 //! ### Test Matrix
 //!
-//! | Test | `agent_id` Value | Parse Result | Expected HTTP | Expected `agent_id` |
+//! | Test | agent_id Value | Parse Result | Expected HTTP | Expected agent_id |
 //! |------|----------------|--------------|---------------|-------------------|
-//! | alphabetic | `agent_INVALID` | Parse error | 400 | None (rejected) |
-//! | special chars | `agent_!!!@@@###` | Parse error | 400 | None (rejected) |
-//! | overflow | `agent_99999999999999999999` | Parse error | 400 | None (rejected) |
-//! | negative | `agent_-1` | Parse success (negative) | 400 | None (rejected) |
-//! | zero | `agent_0` | Parse success (zero) | 400 | None (rejected) |
-//! | valid | `agent_42` | Parse success (positive) | 200/403 | 42 (accepted) |
+//! | alphabetic | agent_INVALID | Parse error | 400 | None (rejected) |
+//! | special chars | agent_!!!@@@### | Parse error | 400 | None (rejected) |
+//! | overflow | agent_99999999999999999999 | Parse error | 400 | None (rejected) |
+//! | negative | agent_-1 | Parse success (negative) | 400 | None (rejected) |
+//! | zero | agent_0 | Parse success (zero) | 400 | None (rejected) |
+//! | valid | agent_42 | Parse success (positive) | 200/403 | 42 (accepted) |
 
 use axum::{
   body::Body,
@@ -112,7 +112,7 @@ fn create_ic_token_with_agent_id(
 #[tokio::test]
 async fn test_malformed_agent_id_alphabetic() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
 
   // Create agent_id=101 with budget (the target of bypass)
   // Note: Use agent_id > 100 to avoid conflicts with seeded data (per Fix(issue-concurrency-001))
@@ -121,7 +121,7 @@ async fn test_malformed_agent_id_alphabetic() {
   // Create IC Token with MALFORMED agent_id (alphabetic)
   let ic_token = create_ic_token_with_agent_id("agent_INVALID", &state.ic_token_manager);
 
-  let app = common::budget::create_budget_router(state);
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")
@@ -139,10 +139,11 @@ async fn test_malformed_agent_id_alphabetic() {
   let response = app.oneshot(request).await.unwrap();
 
   // CRITICAL: Must reject, NOT default to agent_id=1
+  // After hash-check standardization: all auth failures return 401 (prevents info leakage)
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Malformed agent_id (alphabetic) MUST return 400 Bad Request, not default to agent_id=1",
+    StatusCode::UNAUTHORIZED,
+    "Malformed agent_id (alphabetic) MUST return 401 Unauthorized, not default to agent_id=1"
   );
 
   let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -151,8 +152,8 @@ async fn test_malformed_agent_id_alphabetic() {
   let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
-    body_text.contains("numeric") || body_text.contains("Invalid agent_id"),
-    "Error message should indicate numeric requirement: {body_text}"
+    body_text.contains("Invalid IC Token"),
+    "Error message should be generic 'Invalid IC Token': {body_text}"
   );
 }
 
@@ -163,11 +164,11 @@ async fn test_malformed_agent_id_alphabetic() {
 #[tokio::test]
 async fn test_malformed_agent_id_special_chars() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 102, 100_000_000).await;
 
   let ic_token = create_ic_token_with_agent_id("agent_!!!@@@###", &state.ic_token_manager);
-  let app = common::budget::create_budget_router(state);
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")
@@ -182,8 +183,8 @@ async fn test_malformed_agent_id_special_chars() {
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Malformed agent_id (special chars) MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Malformed agent_id (special chars) MUST return 401 Unauthorized"
   );
 }
 
@@ -194,14 +195,14 @@ async fn test_malformed_agent_id_special_chars() {
 #[tokio::test]
 async fn test_malformed_agent_id_overflow() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 103, 100_000_000).await;
 
   // i64::MAX is 9223372036854775807 (19 digits)
   // This value has 20 digits and will overflow
   let ic_token =
     create_ic_token_with_agent_id("agent_99999999999999999999", &state.ic_token_manager);
-  let app = common::budget::create_budget_router(state);
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")
@@ -216,8 +217,8 @@ async fn test_malformed_agent_id_overflow() {
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Overflow agent_id MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Overflow agent_id MUST return 401 Unauthorized"
   );
 }
 
@@ -228,11 +229,11 @@ async fn test_malformed_agent_id_overflow() {
 #[tokio::test]
 async fn test_malformed_agent_id_negative() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 104, 100_000_000).await;
 
   let ic_token = create_ic_token_with_agent_id("agent_-1", &state.ic_token_manager);
-  let app = common::budget::create_budget_router(state);
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")
@@ -247,8 +248,8 @@ async fn test_malformed_agent_id_negative() {
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Negative agent_id MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Negative agent_id MUST return 401 Unauthorized"
   );
 
   let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -257,8 +258,8 @@ async fn test_malformed_agent_id_negative() {
   let body_text = String::from_utf8(body_bytes.to_vec()).unwrap();
 
   assert!(
-    body_text.contains("positive") || body_text.contains("Invalid agent_id"),
-    "Error message should indicate positive requirement: {body_text}"
+    body_text.contains("Invalid IC Token"),
+    "Error message should be generic 'Invalid IC Token': {body_text}"
   );
 }
 
@@ -269,11 +270,11 @@ async fn test_malformed_agent_id_negative() {
 #[tokio::test]
 async fn test_malformed_agent_id_zero() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 105, 100_000_000).await;
 
   let ic_token = create_ic_token_with_agent_id("agent_0", &state.ic_token_manager);
-  let app = common::budget::create_budget_router(state);
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")
@@ -288,25 +289,27 @@ async fn test_malformed_agent_id_zero() {
 
   assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Zero agent_id MUST return 400 Bad Request"
+    StatusCode::UNAUTHORIZED,
+    "Zero agent_id MUST return 401 Unauthorized"
   );
 }
 
-/// **Test 6:** Valid `agent_id` must be accepted (positive control)
+/// **Test 6:** Valid `agent_id` with stored token hash must return 200 OK (positive control)
 ///
-/// **Valid Input:** `agent_id="agent_42"` (parses as 42)
-/// **Expected:** NOT 400 (either 200 success or 403 forbidden if no budget)
+/// **Valid Input:** `agent_id="agent_106"` (parses as 106), hash stored in DB
+/// **Expected:** 200 OK (full success: JWT valid + hash matches + budget available)
 ///
-/// This test verifies that the fix doesn't break valid `agent_id` inputs.
+/// Uses `create_ic_token` (not `create_ic_token_with_agent_id`) to store the token hash
+/// in `agents.ic_token_hash`, satisfying the runtime hash-check validation.
 #[tokio::test]
 async fn test_valid_agent_id() {
   let pool = common::budget::setup_test_db().await;
-  let state = common::budget::create_test_budget_state(pool.clone());
+  let state = common::budget::create_test_budget_state(pool.clone()).await;
   common::budget::seed_agent_with_budget(&pool, 106, 100_000_000).await;
 
-  let ic_token = create_ic_token_with_agent_id("agent_106", &state.ic_token_manager);
-  let app = common::budget::create_budget_router(state);
+  // Store token hash in DB — required for validate_ic_token_runtime hash-check
+  let ic_token = common::budget::create_ic_token(&pool, 106, &state.ic_token_manager).await;
+  let app = common::budget::create_budget_router(state).await;
 
   let request = Request::builder()
     .method("POST")
@@ -319,12 +322,10 @@ async fn test_valid_agent_id() {
 
   let response = app.oneshot(request).await.unwrap();
 
-  // Must NOT be 400 Bad Request (valid input)
-  // Acceptable: 200 OK, 403 Forbidden (budget exhausted), 401 Unauthorized (token invalid)
-  assert_ne!(
+  assert_eq!(
     response.status(),
-    StatusCode::BAD_REQUEST,
-    "Valid agent_id MUST NOT return 400 Bad Request"
+    StatusCode::OK,
+    "Valid agent_id with stored token hash MUST return 200 OK"
   );
 }
 

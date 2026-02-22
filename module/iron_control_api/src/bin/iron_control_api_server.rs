@@ -540,11 +540,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     permission_checker,
   );
 
+  // Shared IC Token manager — one instance for budget, analytics, and ic_token routes.
+  // All three use the same secret, so sharing via Arc avoids redundant allocations.
+  let ic_token_manager = std::sync::Arc::new(iron_control_api::ic_token::IcTokenManager::new(
+    ic_token_secret,
+  ));
+
+  // Shared IC Token rate limiter — one instance across all endpoint groups.
+  // Cloning shares the inner `Arc<Mutex<...>>`, so budget and analytics endpoints
+  // draw from the same failure counter and cannot be bypassed by mixing endpoints.
+  let ic_token_rate_limiter = iron_control_api::ic_token::IcTokenRateLimiter::new();
+
   // Initialize analytics state (Protocol 012)
   // Uses same IC_TOKEN_SECRET as budget module for consistent agent authentication
   let analytics_state = iron_control_api::routes::analytics::AnalyticsState::new(
     &database_url,
-    ic_token_secret.clone(),
+    ic_token_manager.clone(),
+    ic_token_rate_limiter.clone(),
   )
   .await
   .expect("LOUD FAILURE: Failed to initialize analytics state");
@@ -553,12 +565,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let agents_pool = token_state.storage.pool().clone();
 
   // Initialize IC token state for agent IC token management
-  let ic_token_manager = std::sync::Arc::new(iron_control_api::ic_token::IcTokenManager::new(
-    ic_token_secret.clone(),
-  ));
   let ic_token_state = iron_control_api::routes::ic_token::IcTokenState {
     pool: agents_pool.clone(),
-    ic_token_manager,
+    ic_token_manager: ic_token_manager.clone(),
   };
 
   // Seed database with test data if empty (development convenience)
@@ -582,12 +591,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   // Initialize budget state (Protocol 005: Budget Control Protocol)
   // crypto_service_for_budget enables Feature 014: Agent Provider Key retrieval
   let budget_state = iron_control_api::routes::budget::BudgetState::new(
-    ic_token_secret,
+    ic_token_manager,
     &ip_token_key,
     &provider_key_master_bytes,
     auth_state.jwt_secret.clone(),
     &database_url,
     Some(crypto_service_for_budget),
+    ic_token_rate_limiter,
   )
   .await
   .expect("LOUD FAILURE: Failed to initialize budget state");

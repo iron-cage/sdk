@@ -3,7 +3,7 @@
 //! Contains common types, enums, query parameters, response structures,
 //! and database state used across all analytics endpoints.
 
-use crate::ic_token::IcTokenManager;
+use crate::ic_token::{IcTokenManager, IcTokenRateLimiter};
 use chrono::{DateTime, Datelike, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqlitePoolOptions, FromRow, SqlitePool};
@@ -13,13 +13,13 @@ use std::sync::Arc;
 // Type Aliases (for complex query result types)
 // ============================================================================
 
-/// Row type for spending by agent: (`agent_id`, `agent_name`, `spending_micros`, `request_count`, `budget`)
+/// Row type for spending by agent: (`agent_id`, `agent_name`, `spending_micros`, `request_count`, budget)
 pub type SpendingByAgentRow = (i64, Option<String>, i64, i64, Option<f64>);
 
 /// Row type for token usage by agent: (`agent_id`, `agent_name`, `input_tokens`, `output_tokens`, `request_count`)
 pub type TokensByAgentRow = (i64, Option<String>, i64, i64, i64);
 
-/// Row type for model usage: (`model`, `provider`, `request_count`, `spending_micros`, `input_tokens`, `output_tokens`)
+/// Row type for model usage: (model, provider, `request_count`, `spending_micros`, `input_tokens`, `output_tokens`)
 pub type ModelUsageRow = (String, String, i64, i64, i64, i64);
 
 // ============================================================================
@@ -32,17 +32,17 @@ pub type ModelUsageRow = (String, String, i64, i64, i64, i64);
 pub enum Period {
   /// Current day from midnight
   Today,
-  /// Previous day
+  /// Previous day (midnight to midnight)
   Yesterday,
-  /// Rolling last 7 days
+  /// Last 7 days from now
   Last7Days,
-  /// Rolling last 30 days
+  /// Last 30 days from now
   Last30Days,
-  /// Current calendar month
+  /// Current calendar month from 1st
   ThisMonth,
   /// Previous calendar month
   LastMonth,
-  /// All recorded history
+  /// All time (no date filter)
   #[default]
   AllTime,
 }
@@ -52,7 +52,8 @@ impl Period {
   ///
   /// # Panics
   ///
-  /// Panics if midnight `NaiveDateTime` construction fails (should never happen).
+  /// May panic if time calculations produce invalid dates, which should never
+  /// happen in practice (e.g., midnight is always valid, day 1 always exists).
   #[must_use]
   pub fn to_range(&self) -> (i64, i64) {
     let now = Utc::now();
@@ -145,10 +146,10 @@ pub struct AnalyticsQuery {
 /// Pagination parameters
 #[derive(Debug, Clone, Deserialize)]
 pub struct PaginationQuery {
-  /// Page number (starts at 1)
+  /// Current page number (1-indexed)
   #[serde(default = "default_page")]
   pub page: u32,
-  /// Items per page
+  /// Number of items per page
   #[serde(default = "default_per_page")]
   pub per_page: u32,
 }
@@ -172,16 +173,16 @@ impl Default for PaginationQuery {
 /// Budget status query parameters
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct BudgetStatusQuery {
-  /// Budget usage threshold percentage
+  /// Filter by budget usage threshold percentage
   pub threshold: Option<u32>,
-  /// Filter by budget status
+  /// Filter by budget status (e.g., "active", "exhausted")
   pub status: Option<String>,
   /// Optional agent ID filter
   pub agent_id: Option<i64>,
-  /// Page number (starts at 1)
+  /// Current page number (1-indexed)
   #[serde(default = "default_page")]
   pub page: u32,
-  /// Items per page
+  /// Number of items per page
   #[serde(default = "default_per_page")]
   pub per_page: u32,
 }
@@ -199,11 +200,11 @@ pub struct AnalyticsEventRequest {
   pub event_id: String,
   /// Event timestamp in milliseconds
   pub timestamp_ms: i64,
-  /// Type of analytics event
+  /// Type of event (e.g., `llm_call`, `error`)
   pub event_type: String,
-  /// Model name used in request
+  /// Model name used
   pub model: String,
-  /// Provider name (e.g. `OpenAI`, `Anthropic`)
+  /// Provider name (e.g., "openai", "anthropic")
   pub provider: String,
   /// Number of input tokens consumed
   #[serde(default)]
@@ -211,17 +212,17 @@ pub struct AnalyticsEventRequest {
   /// Number of output tokens generated
   #[serde(default)]
   pub output_tokens: Option<i64>,
-  /// Cost in microdollars
+  /// Cost in microdollars ($0.000001)
   #[serde(default)]
   pub cost_micros: Option<i64>,
+  /// Optional provider-specific identifier
   // agent_id is derived from ic_token claims, not provided by caller
-  /// Optional provider identifier
   #[serde(default)]
   pub provider_id: Option<String>,
-  /// Error code if request failed
+  /// Error code if event represents an error
   #[serde(default)]
   pub error_code: Option<String>,
-  /// Error description if request failed
+  /// Error message if event represents an error
   #[serde(default)]
   pub error_message: Option<String>,
 }
@@ -229,25 +230,25 @@ pub struct AnalyticsEventRequest {
 /// POST /api/v1/analytics/events - Response
 #[derive(Debug, Serialize)]
 pub struct EventResponse {
-  /// Recorded event identifier
+  /// Event identifier echoed back
   pub event_id: String,
-  /// Ingestion result status
+  /// Processing status (e.g., "recorded")
   pub status: String,
 }
 
 /// Filter info in response
 #[derive(Debug, Clone, Serialize)]
 pub struct Filters {
-  /// Applied agent ID filter
+  /// Agent ID filter applied
   pub agent_id: Option<i64>,
-  /// Applied provider ID filter
+  /// Provider ID filter applied
   pub provider_id: Option<String>,
 }
 
 /// Pagination info in response
 #[derive(Debug, Clone, Serialize)]
 pub struct Pagination {
-  /// Current page number
+  /// Current page number (1-indexed)
   pub page: u32,
   /// Items per page
   pub per_page: u32,
@@ -258,7 +259,7 @@ pub struct Pagination {
 }
 
 impl Pagination {
-  /// Create pagination from page, size, and total count
+  /// Create new pagination info
   #[must_use]
   pub fn new(page: u32, per_page: u32, total: u32) -> Self {
     let total_pages = (total + per_page - 1) / per_page;
@@ -274,139 +275,139 @@ impl Pagination {
 /// GET /api/v1/analytics/spending/total - Response
 #[derive(Debug, Serialize)]
 pub struct SpendingTotalResponse {
-  /// Total spending amount
+  /// Total spending in dollars
   pub total_spend: f64,
-  /// Currency code (e.g. USD)
+  /// Currency code (e.g., "USD")
   pub currency: String,
-  /// Queried time period
+  /// Period description (e.g., "last-7-days")
   pub period: String,
-  /// Applied query filters
+  /// Filters applied to query
   pub filters: Filters,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
 /// Agent spending record
 #[derive(Debug, Serialize)]
 pub struct AgentSpending {
-  /// Agent identifier
+  /// Agent database ID
   pub agent_id: i64,
   /// Agent display name
   pub agent_name: String,
-  /// Total spending amount
+  /// Total spending in dollars
   pub spending: f64,
-  /// Allocated budget amount
+  /// Allocated budget in dollars
   pub budget: f64,
-  /// Budget usage percentage
+  /// Percentage of budget used
   pub percent_used: f64,
-  /// Total number of requests
+  /// Number of API requests made
   pub request_count: i64,
 }
 
 /// GET /api/v1/analytics/spending/by-agent - Response
 #[derive(Debug, Serialize)]
 pub struct SpendingByAgentResponse {
-  /// Per-agent spending records
+  /// List of agent spending records
   pub data: Vec<AgentSpending>,
-  /// Aggregated spending summary
+  /// Aggregated summary statistics
   pub summary: SpendingSummary,
-  /// Pagination metadata
+  /// Pagination information
   pub pagination: Pagination,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
 /// Spending summary
 #[derive(Debug, Serialize)]
 pub struct SpendingSummary {
-  /// Total spending across all agents
+  /// Total spending across all agents in dollars
   pub total_spend: f64,
-  /// Total budget across all agents
+  /// Total budget allocated across all agents in dollars
   pub total_budget: f64,
-  /// Number of agents
+  /// Number of agents included
   pub total_agents: u32,
 }
 
 /// Provider spending record
 #[derive(Debug, Serialize)]
 pub struct ProviderSpending {
-  /// Provider name
+  /// Provider name (e.g., "openai", "anthropic")
   pub provider: String,
-  /// Total spending for provider
+  /// Total spending in dollars
   pub spending: f64,
-  /// Number of requests to provider
+  /// Number of API requests made
   pub request_count: i64,
-  /// Average cost per request
+  /// Average cost per request in dollars
   pub avg_cost_per_request: f64,
-  /// Number of agents using provider
+  /// Number of agents using this provider
   pub agent_count: i64,
 }
 
 /// GET /api/v1/analytics/spending/by-provider - Response
 #[derive(Debug, Serialize)]
 pub struct SpendingByProviderResponse {
-  /// Per-provider spending records
+  /// List of provider spending records
   pub data: Vec<ProviderSpending>,
-  /// Aggregated provider spending summary
+  /// Aggregated summary statistics
   pub summary: ProviderSpendingSummary,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
 /// Provider spending summary
 #[derive(Debug, Serialize)]
 pub struct ProviderSpendingSummary {
-  /// Total spending across all providers
+  /// Total spending across all providers in dollars
   pub total_spend: f64,
-  /// Total request count across providers
+  /// Total requests across all providers
   pub total_requests: i64,
-  /// Number of distinct providers
+  /// Number of unique providers
   pub providers_count: u32,
 }
 
 /// GET /api/v1/analytics/spending/avg-per-request - Response
 #[derive(Debug, Serialize)]
 pub struct AvgCostResponse {
-  /// Average cost per request
+  /// Average cost per request in dollars
   pub average_cost_per_request: f64,
   /// Total number of requests
   pub total_requests: i64,
-  /// Total spending amount
+  /// Total spending in dollars
   pub total_spend: f64,
-  /// Minimum single-request cost
+  /// Minimum cost per request in dollars
   pub min_cost_per_request: f64,
-  /// Maximum single-request cost
+  /// Maximum cost per request in dollars
   pub max_cost_per_request: f64,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Applied query filters
+  /// Filters applied to query
   pub filters: Filters,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
 /// Budget status record
 #[derive(Debug, Serialize)]
 pub struct BudgetStatus {
-  /// Agent identifier
+  /// Agent database ID
   pub agent_id: i64,
   /// Agent display name
   pub agent_name: String,
-  /// Allocated budget amount
+  /// Allocated budget in dollars
   pub budget: f64,
-  /// Amount already spent
+  /// Amount spent in dollars
   pub spent: f64,
-  /// Remaining budget amount
+  /// Remaining budget in dollars
   pub remaining: f64,
-  /// Budget usage percentage
+  /// Percentage of budget used
   pub percent_used: f64,
-  /// Current budget status label
+  /// Status label (e.g., "active", "exhausted")
   pub status: String,
-  /// Risk level classification
+  /// Risk level (e.g., "low", "medium", "high", "critical")
   pub risk_level: String,
 }
 
@@ -415,56 +416,56 @@ pub struct BudgetStatus {
 pub struct BudgetSummary {
   /// Total number of agents
   pub total_agents: u32,
-  /// Agents with active budget
+  /// Number of active agents (budget remaining)
   pub active: u32,
-  /// Agents with exhausted budget
+  /// Number of exhausted agents (budget depleted)
   pub exhausted: u32,
-  /// Agents at critical usage level
+  /// Number of agents at critical risk level (>90% used)
   pub critical: u32,
-  /// Agents at high usage level
+  /// Number of agents at high risk level (75-90% used)
   pub high: u32,
-  /// Agents at medium usage level
+  /// Number of agents at medium risk level (50-75% used)
   pub medium: u32,
-  /// Agents at low usage level
+  /// Number of agents at low risk level (<50% used)
   pub low: u32,
 }
 
 /// GET /api/v1/analytics/budget/status - Response
 #[derive(Debug, Serialize)]
 pub struct BudgetStatusResponse {
-  /// Per-agent budget status records
+  /// List of budget status records
   pub data: Vec<BudgetStatus>,
-  /// Aggregated budget summary
+  /// Aggregated summary statistics
   pub summary: BudgetSummary,
-  /// Pagination metadata
+  /// Pagination information
   pub pagination: Pagination,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
 /// GET /api/v1/analytics/usage/requests - Response
 #[derive(Debug, Serialize)]
 pub struct RequestUsageResponse {
-  /// Total number of requests
+  /// Total number of API requests
   pub total_requests: i64,
-  /// Count of successful requests
+  /// Number of successful requests
   pub successful_requests: i64,
-  /// Count of failed requests
+  /// Number of failed requests
   pub failed_requests: i64,
-  /// Success rate as percentage
+  /// Success rate as percentage (0.0-1.0)
   pub success_rate: f64,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Applied query filters
+  /// Filters applied to query
   pub filters: Filters,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
 /// Agent token usage record
 #[derive(Debug, Serialize)]
 pub struct AgentTokenUsage {
-  /// Agent identifier
+  /// Agent database ID
   pub agent_id: i64,
   /// Agent display name
   pub agent_name: String,
@@ -472,9 +473,9 @@ pub struct AgentTokenUsage {
   pub input_tokens: i64,
   /// Total output tokens generated
   pub output_tokens: i64,
-  /// Combined input and output tokens
+  /// Total tokens (input + output)
   pub total_tokens: i64,
-  /// Total number of requests
+  /// Number of API requests made
   pub request_count: i64,
   /// Average tokens per request
   pub avg_tokens_per_request: i64,
@@ -487,22 +488,22 @@ pub struct TokenUsageSummary {
   pub total_input_tokens: i64,
   /// Total output tokens across all agents
   pub total_output_tokens: i64,
-  /// Combined total tokens
+  /// Total tokens (input + output) across all agents
   pub total_tokens: i64,
 }
 
 /// GET /api/v1/analytics/usage/tokens/by-agent - Response
 #[derive(Debug, Serialize)]
 pub struct TokenUsageResponse {
-  /// Per-agent token usage records
+  /// List of agent token usage records
   pub data: Vec<AgentTokenUsage>,
-  /// Aggregated token usage summary
+  /// Aggregated summary statistics
   pub summary: TokenUsageSummary,
-  /// Pagination metadata
+  /// Pagination information
   pub pagination: Pagination,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
@@ -511,41 +512,41 @@ pub struct TokenUsageResponse {
 pub struct ModelUsage {
   /// Model name
   pub model: String,
-  /// Provider name
+  /// Provider name (e.g., "openai", "anthropic")
   pub provider: String,
-  /// Number of requests using this model
+  /// Number of API requests made
   pub request_count: i64,
-  /// Total spending for this model
+  /// Total spending in dollars
   pub spending: f64,
-  /// Total input tokens for this model
+  /// Total input tokens consumed
   pub input_tokens: i64,
-  /// Total output tokens for this model
+  /// Total output tokens generated
   pub output_tokens: i64,
 }
 
 /// Model usage summary
 #[derive(Debug, Serialize)]
 pub struct ModelUsageSummary {
-  /// Number of distinct models used
+  /// Number of unique models used
   pub unique_models: u32,
-  /// Total request count across models
+  /// Total requests across all models
   pub total_requests: i64,
-  /// Total spending across models
+  /// Total spending across all models in dollars
   pub total_spend: f64,
 }
 
 /// GET /api/v1/analytics/usage/models - Response
 #[derive(Debug, Serialize)]
 pub struct ModelUsageResponse {
-  /// Per-model usage records
+  /// List of model usage records
   pub data: Vec<ModelUsage>,
-  /// Aggregated model usage summary
+  /// Aggregated summary statistics
   pub summary: ModelUsageSummary,
-  /// Pagination metadata
+  /// Pagination information
   pub pagination: Pagination,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
@@ -557,10 +558,10 @@ pub struct EventsListQuery {
   pub period: Period,
   /// Optional agent ID filter
   pub agent_id: Option<i64>,
-  /// Page number (starts at 1)
+  /// Current page number (1-indexed)
   #[serde(default = "default_page")]
   pub page: u32,
-  /// Events per page
+  /// Number of items per page
   #[serde(default = "default_events_per_page")]
   pub per_page: u32,
 }
@@ -572,13 +573,13 @@ fn default_events_per_page() -> u32 {
 /// GET /api/v1/analytics/events - Response
 #[derive(Debug, Serialize)]
 pub struct EventsListResponse {
-  /// List of analytics events
+  /// List of analytics events with agent information
   pub data: Vec<AnalyticsEventWithAgent>,
-  /// Pagination metadata
+  /// Pagination information
   pub pagination: Pagination,
-  /// Queried time period
+  /// Period description
   pub period: String,
-  /// Response calculation timestamp
+  /// ISO 8601 timestamp when calculated
   pub calculated_at: String,
 }
 
@@ -589,25 +590,25 @@ pub struct AnalyticsEventWithAgent {
   pub event_id: String,
   /// Event timestamp in milliseconds
   pub timestamp_ms: i64,
-  /// Type of analytics event
+  /// Type of event (e.g., `llm_call`, `error`)
   pub event_type: String,
-  /// Model name used in request
+  /// Model name used
   pub model: String,
-  /// Provider name
+  /// Provider name (e.g., "openai", "anthropic")
   pub provider: String,
   /// Number of input tokens consumed
   pub input_tokens: i64,
   /// Number of output tokens generated
   pub output_tokens: i64,
-  /// Cost in microdollars
+  /// Cost in microdollars ($0.000001)
   pub cost_micros: i64,
-  /// Agent identifier
+  /// Agent database ID
   pub agent_id: i64,
   /// Agent display name
   pub agent_name: String,
-  /// Error code if request failed
+  /// Error code if event represents an error
   pub error_code: Option<String>,
-  /// Error description if request failed
+  /// Error message if event represents an error
   pub error_message: Option<String>,
 }
 
@@ -616,12 +617,14 @@ pub struct AnalyticsEventWithAgent {
 // ============================================================================
 
 /// Analytics state containing database pool and IC token manager
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct AnalyticsState {
-  /// `SQLite` connection pool
+  /// `SQLite` database connection pool
   pub pool: SqlitePool,
-  /// Shared IC token manager
+  /// IC token manager for authentication
   pub ic_token_manager: Arc<IcTokenManager>,
+  /// Rate limiter for IC token validation
+  pub ic_token_rate_limiter: IcTokenRateLimiter,
 }
 
 impl AnalyticsState {
@@ -633,10 +636,13 @@ impl AnalyticsState {
   ///
   /// # Errors
   ///
-  /// Returns an error if the database connection or migration fails.
+  /// Returns error if:
+  /// - Database connection fails
+  /// - Migration execution fails
   pub async fn new(
     database_url: &str,
-    ic_token_secret: String,
+    ic_token_manager: Arc<IcTokenManager>,
+    ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn std::error::Error>> {
     let pool = SqlitePoolOptions::new()
       .max_connections(5)
@@ -647,11 +653,10 @@ impl AnalyticsState {
     let migration = include_str!("../../../migrations/011_create_analytics_events.sql");
     sqlx::raw_sql(migration).execute(&pool).await?;
 
-    let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
-
     Ok(Self {
       pool,
       ic_token_manager,
+      ic_token_rate_limiter,
     })
   }
 }
@@ -660,17 +665,11 @@ impl AnalyticsState {
 // Database Row Types
 // ============================================================================
 
-/// Database row for agent budget data
 #[derive(Debug, FromRow)]
 pub struct AgentBudgetRow {
-  /// Agent identifier
   pub agent_id: i64,
-  /// Agent display name
   pub agent_name: String,
-  /// Total allocated budget in microdollars
   pub total_allocated: i64,
-  /// Total spent in microdollars
   pub total_spent: i64,
-  /// Remaining budget in microdollars
   pub budget_remaining: i64,
 }

@@ -22,6 +22,7 @@
 //! | `test_usage_report_response_serialization` | UsageReportResponse JSON serialization | Serialize UsageReportResponse to JSON | Valid JSON with required fields | ✅ |
 //! | `test_budget_refresh_response_serialization` | BudgetRefreshResponse JSON serialization | Serialize BudgetRefreshResponse to JSON | Valid JSON with required fields | ✅ |
 
+use iron_control_api::ic_token::IcTokenRateLimiter;
 use iron_control_api::{
   ic_token::{IcTokenClaims, IcTokenManager},
   ip_token::IpTokenCrypto,
@@ -120,6 +121,7 @@ fn test_handshake_request_validation() {
 fn test_usage_report_request_validation() {
   // Valid request
   let valid_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
@@ -131,6 +133,7 @@ fn test_usage_report_request_validation() {
 
   // Empty lease_id
   let empty_lease_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: String::new(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
@@ -142,6 +145,7 @@ fn test_usage_report_request_validation() {
 
   // Negative tokens
   let negative_tokens_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: -100,
@@ -153,6 +157,7 @@ fn test_usage_report_request_validation() {
 
   // Zero tokens
   let zero_tokens_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 0,
@@ -164,6 +169,7 @@ fn test_usage_report_request_validation() {
 
   // Negative cost
   let negative_cost_req = UsageReportRequest {
+    ic_token: "valid_ic_token".to_string(),
     lease_id: "lease_abc123".to_string(),
     request_id: "req_xyz789".to_string(),
     tokens: 1000,
@@ -373,12 +379,13 @@ async fn test_budget_state_creation() {
   let database_url = "sqlite::memory:";
 
   let state = BudgetState::new(
-    ic_token_secret,
+    std::sync::Arc::new(IcTokenManager::new(ic_token_secret)),
     &ip_token_key,
     &provider_key_master,
     jwt_secret,
     database_url,
     None,
+    IcTokenRateLimiter::new(),
   )
   .await;
   assert!(state.is_ok(), "Should create budget state");

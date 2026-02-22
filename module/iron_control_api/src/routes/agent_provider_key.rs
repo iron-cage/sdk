@@ -4,8 +4,7 @@
 //!
 //! POST /api/v1/agents/provider-key
 
-use crate::error::ValidationError;
-use crate::routes::budget::BudgetState;
+use crate::{error::ValidationError, ic_token, routes::budget::BudgetState};
 use axum::{
   extract::State,
   http::StatusCode,
@@ -17,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Provider key request
 #[derive(Debug, Deserialize)]
 pub struct GetProviderKeyRequest {
-  /// IC authentication token
+  /// IC Token for authentication
   pub ic_token: String,
 }
 
@@ -29,8 +28,9 @@ impl GetProviderKeyRequest {
   ///
   /// # Errors
   ///
-  /// Returns [`ValidationError::MissingField`] if `ic_token` is empty,
-  /// or [`ValidationError::TooLong`] if it exceeds the maximum length.
+  /// Returns `ValidationError` if:
+  /// - `ic_token` is empty
+  /// - `ic_token` exceeds maximum length
   pub fn validate(&self) -> Result<(), ValidationError> {
     if self.ic_token.trim().is_empty() {
       return Err(ValidationError::MissingField("ic_token".to_string()));
@@ -79,10 +79,14 @@ pub struct GetProviderKeyResponse {
 ///
 /// - 200 OK with provider key
 /// - 400 Bad Request if validation fails (`INVALID_TOKEN`)
-/// - 401 Unauthorized if IC Token invalid (`UNAUTHORIZED`)
+/// - 401 Unauthorized if IC Token invalid (UNAUTHORIZED)
 /// - 403 Forbidden if no provider assigned (`NO_PROVIDER_ASSIGNED`)
 /// - 404 Not Found if provider key not found (`PROVIDER_NOT_FOUND`)
 /// - 503 Service Unavailable if crypto not configured (`CRYPTO_UNAVAILABLE`)
+///
+/// # Panics
+///
+/// May panic if system time goes backwards (which should never happen in practice).
 pub async fn get_provider_key(
   State(state): State<BudgetState>,
   Json(request): Json<GetProviderKeyRequest>,
@@ -99,43 +103,17 @@ pub async fn get_provider_key(
       .into_response();
   }
 
-  // 2. Verify IC Token
-  let Ok(claims) = state.ic_token_manager.verify_token(&request.ic_token) else {
-    return (
-      StatusCode::UNAUTHORIZED,
-      Json(serde_json::json!({
-        "error": "Invalid IC Token",
-        "code": "UNAUTHORIZED"
-      })),
-    )
-      .into_response();
-  };
-
-  // 3. Parse agent_id from claims (format: agent_<id>)
-  let agent_id: i64 = match claims.agent_id.strip_prefix("agent_") {
-    Some(id_part) => match id_part.parse() {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json(serde_json::json!({
-            "error": "Invalid agent_id format in token",
-            "code": "INVALID_TOKEN"
-          })),
-        )
-          .into_response();
-      }
-    },
-    None => {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json(serde_json::json!({
-          "error": "Invalid agent_id format in token",
-          "code": "INVALID_TOKEN"
-        })),
-      )
-        .into_response();
-    }
+  // 2-3. Verify IC Token (JWT signature + hash-check against database)
+  let (agent_id, claims) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager,
+    &request.ic_token,
+    &state.db_pool,
+    &state.ic_token_rate_limiter,
+  )
+  .await
+  {
+    Ok(result) => result,
+    Err(response) => return response,
   };
 
   // 4. Query agent's provider_key_id
@@ -261,7 +239,13 @@ pub async fn get_provider_key(
   };
 
   // 11. Log audit entry (fire and forget)
-  let now_ms = chrono::Utc::now().timestamp_millis();
+  let now_ms = i64::try_from(
+    std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
+      .as_millis(),
+  )
+  .unwrap_or(i64::MAX);
 
   let changes = serde_json::json!({
     "agent_id": agent_id,
