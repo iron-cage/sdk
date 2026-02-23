@@ -28,7 +28,8 @@ use axum::{
   Router,
 };
 use common::budget::{
-  create_ic_token, create_test_budget_state, create_test_budget_state_no_crypto, setup_test_db,
+  create_ic_token, create_ic_token_for_missing_agent, create_test_budget_state,
+  create_test_budget_state_no_crypto, setup_test_db,
 };
 use iron_control_api::routes::agent_provider_key::get_provider_key;
 use iron_secrets::crypto::CryptoService;
@@ -36,7 +37,10 @@ use serde_json::json;
 use tower::ServiceExt;
 
 /// Create router for agent provider key endpoint
-fn create_provider_key_router(state: iron_control_api::routes::budget::BudgetState) -> Router {
+#[allow(clippy::unused_async)]
+async fn create_provider_key_router(
+  state: iron_control_api::routes::budget::BudgetState,
+) -> Router {
   Router::new()
     .route("/api/v1/agents/provider-key", post(get_provider_key))
     .with_state(state)
@@ -102,7 +106,7 @@ async fn seed_agent_with_encrypted_key(
     "INSERT INTO agents (id, name, providers, created_at, owner_id, provider_key_id) VALUES (?, ?, ?, ?, ?, ?)"
   )
   .bind( agent_id )
-  .bind( format!( "test_agent_{agent_id}" ) )
+  .bind( format!( "test_agent_{agent_id}") )
   .bind( serde_json::to_string( &vec![ provider ] ).unwrap() )
   .bind( now_ms )
   .bind( "test_user" )
@@ -153,16 +157,16 @@ async fn seed_agent_without_provider_key(pool: &sqlx::SqlitePool, agent_id: i64)
 #[tokio::test]
 async fn test_get_provider_key_success() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool.clone());
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Seed agent with encrypted provider key
   let crypto = state.crypto_service.as_ref().unwrap();
   seed_agent_with_encrypted_key(&pool, 101, crypto, "sk-test-openai-key-12345", "openai").await;
 
-  let app = create_provider_key_router(state.clone());
+  let app = create_provider_key_router(state.clone()).await;
 
-  // Generate IC token for agent_101
-  let ic_token = create_ic_token(101, &state.ic_token_manager);
+  // Generate IC token for agent_101 and store hash for runtime validation
+  let ic_token = create_ic_token(&pool, 101, &state.ic_token_manager).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -199,8 +203,8 @@ async fn test_get_provider_key_success() {
 #[tokio::test]
 async fn test_get_provider_key_empty_token() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool);
-  let app = create_provider_key_router(state);
+  let state = create_test_budget_state(pool).await;
+  let app = create_provider_key_router(state).await;
 
   let request_body = json!({ "ic_token": "" });
 
@@ -233,8 +237,8 @@ async fn test_get_provider_key_empty_token() {
 #[tokio::test]
 async fn test_get_provider_key_invalid_token() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool);
-  let app = create_provider_key_router(state);
+  let state = create_test_budget_state(pool).await;
+  let app = create_provider_key_router(state).await;
 
   let request_body = json!({ "ic_token": "invalid.jwt.token" });
 
@@ -261,21 +265,21 @@ async fn test_get_provider_key_invalid_token() {
     .unwrap();
   let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
-  assert_eq!(body["code"].as_str().unwrap(), "UNAUTHORIZED");
+  assert_eq!(body["error"].as_str().unwrap(), "Invalid IC Token");
 }
 
 #[tokio::test]
 async fn test_get_provider_key_no_provider_assigned() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool.clone());
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Seed agent WITHOUT provider key
   seed_agent_without_provider_key(&pool, 102).await;
 
-  let app = create_provider_key_router(state.clone());
+  let app = create_provider_key_router(state.clone()).await;
 
-  // Generate IC token for agent_102
-  let ic_token = create_ic_token(102, &state.ic_token_manager);
+  // Generate IC token for agent_102 and store hash for runtime validation
+  let ic_token = create_ic_token(&pool, 102, &state.ic_token_manager).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -308,11 +312,11 @@ async fn test_get_provider_key_no_provider_assigned() {
 #[tokio::test]
 async fn test_get_provider_key_agent_not_found() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool);
-  let app = create_provider_key_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let app = create_provider_key_router(state.clone()).await;
 
-  // Generate IC token for non-existent agent
-  let ic_token = create_ic_token(99999, &state.ic_token_manager);
+  // Generate IC token for non-existent agent (no hash stored — agent 99999 is never seeded)
+  let ic_token = create_ic_token_for_missing_agent(99999, &state.ic_token_manager);
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -328,17 +332,18 @@ async fn test_get_provider_key_agent_not_found() {
     .await
     .unwrap();
 
+  // After hash-check validation: non-existent agent returns 401 (prevents agent enumeration)
   assert_eq!(
     response.status(),
-    StatusCode::NOT_FOUND,
-    "Non-existent agent should return 404"
+    StatusCode::UNAUTHORIZED,
+    "Non-existent agent should return 401"
   );
 }
 
 #[tokio::test]
 async fn test_get_provider_key_crypto_unavailable() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state_no_crypto(pool.clone());
+  let state = create_test_budget_state_no_crypto(pool.clone()).await;
 
   // We need to seed with raw data since we don't have crypto service
   let now_ms = chrono::Utc::now().timestamp_millis();
@@ -364,7 +369,7 @@ async fn test_get_provider_key_crypto_unavailable() {
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 103_000i64 )
+  .bind( 103_000_i64 )
   .bind( "openai" )
   .bind( "fake_encrypted_data" )
   .bind( "fake_nonce" )
@@ -384,15 +389,15 @@ async fn test_get_provider_key_crypto_unavailable() {
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
-  .bind( 103_000i64 )
+  .bind( 103_000_i64 )
   .execute( &pool )
   .await
   .unwrap();
 
-  let app = create_provider_key_router(state.clone());
+  let app = create_provider_key_router(state.clone()).await;
 
-  // Generate IC token for agent_103
-  let ic_token = create_ic_token(103, &state.ic_token_manager);
+  // Generate IC token for agent_103 and store hash for runtime validation
+  let ic_token = create_ic_token(&pool, 103, &state.ic_token_manager).await;
 
   let request_body = json!({ "ic_token": ic_token });
 
@@ -425,7 +430,7 @@ async fn test_get_provider_key_crypto_unavailable() {
 #[tokio::test]
 async fn test_get_provider_key_disabled_key() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool.clone());
+  let state = create_test_budget_state(pool.clone()).await;
 
   let now_ms = chrono::Utc::now().timestamp_millis();
   let crypto = state.crypto_service.as_ref().unwrap();
@@ -458,7 +463,7 @@ async fn test_get_provider_key_disabled_key() {
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 104_000i64 )
+  .bind( 104_000_i64 )
   .bind( "openai" )
   .bind( ciphertext_b64 )
   .bind( nonce_b64 )
@@ -478,14 +483,14 @@ async fn test_get_provider_key_disabled_key() {
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
-  .bind( 104_000i64 )
+  .bind( 104_000_i64 )
   .execute( &pool )
   .await
   .unwrap();
 
-  let app = create_provider_key_router(state.clone());
+  let app = create_provider_key_router(state.clone()).await;
 
-  let ic_token = create_ic_token(104, &state.ic_token_manager);
+  let ic_token = create_ic_token(&pool, 104, &state.ic_token_manager).await;
   let request_body = json!({ "ic_token": ic_token });
 
   let response = app

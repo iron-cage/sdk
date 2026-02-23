@@ -137,8 +137,7 @@ fn bug_reproducer_issue_003_documentation_exists() {
 
   // Report current state
   println!("\n=== ENFORCEMENT DOCUMENTATION STATUS ===");
-  let docs_display = docs_dir.display();
-  println!("Expected directory: {docs_display}");
+  println!("Expected directory: {}", docs_dir.display());
   println!("\nExisting files ({}):", existing_files.len());
   for file in &existing_files {
     println!("  ✓ {file}");

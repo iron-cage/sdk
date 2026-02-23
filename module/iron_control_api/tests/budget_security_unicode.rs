@@ -44,9 +44,9 @@ async fn test_emoji_in_model_name() {
   let agent_id = 600i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
@@ -74,7 +74,7 @@ async fn test_emoji_in_model_name() {
   let lease_id = handshake_json["lease_id"].as_str().unwrap();
 
   // Report with emoji in model name
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -83,6 +83,7 @@ async fn test_emoji_in_model_name() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_emoji_test",
             "tokens": 1000,
@@ -138,9 +139,9 @@ async fn test_non_latin_characters() {
   let agent_id = 601i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
@@ -168,7 +169,7 @@ async fn test_non_latin_characters() {
   let lease_id = handshake_json["lease_id"].as_str().unwrap();
 
   // Report with Chinese characters in model name
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -177,6 +178,7 @@ async fn test_non_latin_characters() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_chinese_test",
             "tokens": 1000,
@@ -205,7 +207,7 @@ async fn test_non_latin_characters() {
 ///
 /// # Security Risk
 /// HIGH - Zero-width characters (U+200B) can create homograph attacks
-/// Example: `lease_​123` looks identical to `lease_123` but is different
+/// Example: `"lease_​123"` looks identical to `"lease_123"` but is different
 ///
 /// # Expected Behavior
 /// - Normalize (strip zero-width chars) OR
@@ -217,9 +219,9 @@ async fn test_zero_width_characters() {
   let agent_id = 602i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
@@ -248,7 +250,7 @@ async fn test_zero_width_characters() {
 
   // Report with zero-width space (U+200B) in request_id
   // "req_​test" contains invisible zero-width space between _ and test
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -257,6 +259,7 @@ async fn test_zero_width_characters() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_\u{200B}test", // U+200B = zero-width space
             "tokens": 1000,
@@ -312,9 +315,9 @@ async fn test_rtl_override_attack() {
   let agent_id = 603i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
@@ -343,7 +346,7 @@ async fn test_rtl_override_attack() {
 
   // Report with RTL override in provider name
   // U+202E (RIGHT-TO-LEFT OVERRIDE) causes text to display reversed
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -352,6 +355,7 @@ async fn test_rtl_override_attack() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_rtl_test",
             "tokens": 1000,

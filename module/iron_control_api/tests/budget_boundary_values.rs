@@ -33,7 +33,7 @@ use tower::ServiceExt;
 /// B1: Maximum i64 value for `cost_microdollars`
 ///
 /// # Corner Case
-/// POST /api/budget/report with `cost_microdollars = i64::MAX`
+/// POST /api/budget/report with `cost_microdollars` = `i64::MAX`
 ///
 /// # Expected Behavior
 /// - Request handled safely (either accepted with overflow protection or rejected with validation error)
@@ -48,9 +48,9 @@ async fn test_cost_i64_max() {
   let agent_id = 400i64;
   seed_agent_with_budget(&pool, agent_id, i64::MAX).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create lease
   let handshake_response = router
@@ -91,6 +91,7 @@ async fn test_cost_i64_max() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_i64_max_test",
             "tokens": 1000,
@@ -131,7 +132,7 @@ async fn test_cost_i64_max() {
 /// B2: Zero cost for cached responses
 ///
 /// # Corner Case
-/// POST /api/budget/report with `cost_microdollars = 0`
+/// POST /api/budget/report with `cost_microdollars` = 0
 ///
 /// # Expected Behavior
 /// - Request accepted (200 OK) - zero cost is valid for cached responses
@@ -146,9 +147,9 @@ async fn test_cost_zero() {
   let agent_id = 401i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create lease
   let handshake_response = router
@@ -189,6 +190,7 @@ async fn test_cost_zero() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_zero_cost_test",
             "tokens": 1000,
@@ -243,9 +245,9 @@ async fn test_budget_exactly_at_limit() {
   let total_budget = 50_000_000i64; // $50 USD
   seed_agent_with_budget(&pool, agent_id, total_budget).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Request handshake with exact remaining budget
   let response = router
@@ -308,12 +310,12 @@ async fn test_multiple_leases_equal_total_budget() {
   let lease_size = 10_000_000i64; // $10 USD per lease
   seed_agent_with_budget(&pool, agent_id, total_budget).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Create 5 leases of $10 each ($50 total)
   for i in 0..5 {
-    let router = create_budget_router(state.clone());
+    let router = create_budget_router(state.clone()).await;
     let response = router
       .oneshot(
         Request::builder()
@@ -355,7 +357,7 @@ async fn test_multiple_leases_equal_total_budget() {
   );
 
   // Attempt 6th lease (should fail - insufficient budget)
-  let router = create_budget_router(state);
+  let router = create_budget_router(state).await;
   let response = router
     .oneshot(
       Request::builder()
@@ -396,7 +398,7 @@ async fn test_multiple_leases_equal_total_budget() {
 /// B3: Maximum i64 value for tokens field
 ///
 /// # Corner Case
-/// POST /api/budget/report with `tokens = i64::MAX`
+/// POST /api/budget/report with tokens = `i64::MAX`
 ///
 /// # Expected Behavior
 /// - Request handled safely (either accepted or rejected with validation error)
@@ -411,9 +413,9 @@ async fn test_tokens_i64_max() {
   let agent_id = 404i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease
   let handshake_response = router_handshake
@@ -445,7 +447,7 @@ async fn test_tokens_i64_max() {
     .expect("LOUD FAILURE: Should have lease_id");
 
   // Attempt to report with i64::MAX tokens
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -454,6 +456,7 @@ async fn test_tokens_i64_max() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_tokens_max_test",
             "tokens": i64::MAX,
@@ -515,9 +518,9 @@ async fn test_lease_expiration_exact_timestamp() {
   let agent_id = 405i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease
   let handshake_response = router_handshake
@@ -554,7 +557,7 @@ async fn test_lease_expiration_exact_timestamp() {
     .expect("LOUD FAILURE: Should update lease expiration to current timestamp");
 
   // Attempt to report usage at exact expiration time
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -563,6 +566,7 @@ async fn test_lease_expiration_exact_timestamp() {
         .header("content-type", "application/json")
         .body(Body::from(
           json!({
+            "ic_token": ic_token,
             "lease_id": lease_id,
             "request_id": "req_edge_timestamp_test",
             "tokens": 1000,

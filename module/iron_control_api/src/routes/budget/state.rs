@@ -4,7 +4,10 @@
 //! for budget protocol endpoints.
 
 use crate::{
-  ic_token::IcTokenManager, ip_token::IpTokenCrypto, jwt_auth::JwtSecret, routes::auth::AuthState,
+  ic_token::{IcTokenManager, IcTokenRateLimiter},
+  ip_token::IpTokenCrypto,
+  jwt_auth::JwtSecret,
+  routes::auth::AuthState,
 };
 use axum::extract::FromRef;
 use iron_secrets::crypto::CryptoService;
@@ -16,45 +19,28 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 
 /// Budget protocol shared state
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BudgetState {
-  /// IC Token manager for JWT signing/verification
+  /// IC token manager for authentication
   pub ic_token_manager: Arc<IcTokenManager>,
-  /// IP Token encryption service
+  /// Crypto service for IP token encryption
   pub ip_token_crypto: Arc<IpTokenCrypto>,
-  /// Budget lease lifecycle manager
+  /// Manager for budget leases
   pub lease_manager: Arc<LeaseManager>,
-  /// Agent budget allocation manager
+  /// Manager for agent budgets
   pub agent_budget_manager: Arc<AgentBudgetManager>,
-  /// Provider API key storage
+  /// Storage for provider API keys
   pub provider_key_storage: Arc<ProviderKeyStorage>,
-  /// Crypto service for provider key encryption
+  /// Crypto service for provider key encryption/decryption
   pub provider_key_crypto: Arc<CryptoService>,
   /// `SQLite` database connection pool
   pub db_pool: SqlitePool,
-  /// JWT secret for access token auth
+  /// JWT secret for access token verification
   pub jwt_secret: Arc<JwtSecret>,
   /// Crypto service for decrypting provider keys (Feature 014)
   pub crypto_service: Option<Arc<CryptoService>>,
-}
-
-impl core::fmt::Debug for BudgetState {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-    f.debug_struct("BudgetState")
-      .field("ic_token_manager", &"<IcTokenManager>")
-      .field("ip_token_crypto", &"<IpTokenCrypto>")
-      .field("lease_manager", &"<LeaseManager>")
-      .field("agent_budget_manager", &"<AgentBudgetManager>")
-      .field("provider_key_storage", &"<ProviderKeyStorage>")
-      .field("provider_key_crypto", &"<CryptoService>")
-      .field("db_pool", &"<SqlitePool>")
-      .field("jwt_secret", &"<JwtSecret>")
-      .field(
-        "crypto_service",
-        &self.crypto_service.as_ref().map(|_| "<CryptoService>"),
-      )
-      .finish()
-  }
+  /// Rate limiter for IC Token validation (H2)
+  pub ic_token_rate_limiter: IcTokenRateLimiter,
 }
 
 /// Enable `AuthState` extraction from `BudgetState`
@@ -75,26 +61,27 @@ impl BudgetState {
   ///
   /// # Arguments
   ///
-  /// * `ic_token_secret` - Secret key for IC Token JWT signing
+  /// * `ic_token_manager` - Shared IC token manager for authentication
   /// * `ip_token_key` - 32-byte encryption key for IP Token AES-256-GCM
   /// * `provider_key_master` - 32-byte master key for provider key encryption/decryption
   /// * `jwt_secret` - Secret key for JWT access token signing/verification
   /// * `database_url` - Database connection string
   /// * `crypto_service` - Optional crypto service for provider key decryption
+  /// * `ic_token_rate_limiter` - Shared rate limiter for IC token validation
   ///
   /// # Errors
   ///
   /// Returns error if database connection or crypto initialization fails
   pub async fn new(
-    ic_token_secret: String,
+    ic_token_manager: Arc<IcTokenManager>,
     ip_token_key: &[u8],
     provider_key_master: &[u8],
     jwt_secret: Arc<JwtSecret>,
     database_url: &str,
     crypto_service: Option<Arc<CryptoService>>,
+    ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn core::error::Error>> {
     let db_pool = SqlitePool::connect(database_url).await?;
-    let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
     let ip_token_crypto = Arc::new(IpTokenCrypto::new(ip_token_key)?);
     let provider_key_crypto = Arc::new(CryptoService::new(provider_key_master)?);
     let lease_manager = Arc::new(LeaseManager::from_pool(db_pool.clone()));
@@ -111,6 +98,7 @@ impl BudgetState {
       db_pool,
       jwt_secret,
       crypto_service,
+      ic_token_rate_limiter,
     })
   }
 }

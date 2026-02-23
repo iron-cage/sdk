@@ -473,7 +473,7 @@ async fn test_sql_injection_in_project_id() {
 /// # Pitfall
 /// Validation must reject `<` and `>` characters to prevent stored XSS.
 #[tokio::test]
-async fn test_xss_in_description_rejected() {
+async fn test_xss_in_description_stored_as_literal() {
   let (router, state) = create_test_router().await;
 
   // Generate JWT for the user

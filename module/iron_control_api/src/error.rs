@@ -68,6 +68,61 @@ impl IntoResponse for ErrorResponse {
   }
 }
 
+/// API error enum for route handlers.
+///
+/// Each variant maps to a specific HTTP status code. The `IntoResponse` impl
+/// converts the variant into a JSON `ErrorResponse` automatically.
+#[derive(Debug)]
+pub enum ApiError {
+  /// 400 Bad Request — invalid input from the client
+  BadRequest(String),
+  /// 403 Forbidden — user lacks permission
+  Forbidden(String),
+  /// 404 Not Found — resource does not exist
+  NotFound(String),
+  /// 409 Conflict — resource already exists
+  Conflict(String),
+  /// 500 Internal Server Error — database query failed
+  Database(sqlx::Error),
+  /// 500 Internal Server Error — generic internal failure
+  Internal(String),
+}
+
+impl IntoResponse for ApiError {
+  fn into_response(self) -> Response {
+    let (status, body) = match self {
+      ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, ErrorResponse::new(msg)),
+      ApiError::Forbidden(msg) => (
+        StatusCode::FORBIDDEN,
+        ErrorResponse::with_code(msg, "ACCESS_DENIED"),
+      ),
+      ApiError::NotFound(msg) => (
+        StatusCode::NOT_FOUND,
+        ErrorResponse::with_code(msg, "NOT_FOUND"),
+      ),
+      ApiError::Conflict(msg) => (StatusCode::CONFLICT, ErrorResponse::new(msg)),
+      ApiError::Database(err) => {
+        tracing::error!("Database error: {:?}", err);
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          ErrorResponse::new("An internal server error occurred"),
+        )
+      }
+      ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse::new(msg)),
+    };
+    (status, Json(body)).into_response()
+  }
+}
+
+impl From<sqlx::Error> for ApiError {
+  fn from(err: sqlx::Error) -> Self {
+    ApiError::Database(err)
+  }
+}
+
+/// Convenience type alias for route handler results.
+pub type ApiResult<T> = Result<T, ApiError>;
+
 /// Custom extractor wrapper that provides JSON error responses for Path parameter failures
 ///
 /// **Fix for Issue #2:** Axum's default `Path<T>` extractor returns plain text errors when

@@ -7,6 +7,7 @@ use super::shared::{
   AnalyticsEventRequest, AnalyticsEventWithAgent, AnalyticsState, EventResponse, EventsListQuery,
   EventsListResponse, Pagination,
 };
+use crate::ic_token;
 use axum::{
   extract::{Query, State},
   http::StatusCode,
@@ -23,47 +24,17 @@ pub async fn post_event(
   State(state): State<AnalyticsState>,
   Json(event): Json<AnalyticsEventRequest>,
 ) -> impl IntoResponse {
-  // Verify IC Token and extract agent identity
-  let claims = match state.ic_token_manager.verify_token(&event.ic_token) {
-    Ok(claims) => claims,
-    Err(e) => {
-      tracing::warn!("IC Token verification failed: {}", e);
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(serde_json::json!({
-          "error": "UNAUTHORIZED",
-          "message": "Invalid or expired IC token"
-        })),
-      )
-        .into_response();
-    }
-  };
-
-  // Extract agent_id from token claims (format: "agent_<id>")
-  let agent_id: i64 = match claims.agent_id.strip_prefix("agent_") {
-    Some(id_str) => match id_str.parse() {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json(serde_json::json!({
-            "error": "INVALID_TOKEN",
-            "message": "Invalid agent_id format in token"
-          })),
-        )
-          .into_response();
-      }
-    },
-    None => {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json(serde_json::json!({
-          "error": "INVALID_TOKEN",
-          "message": "Invalid agent_id format in token"
-        })),
-      )
-        .into_response();
-    }
+  // Verify IC Token and extract agent identity (JWT signature + hash-check against database)
+  let (agent_id, _claims) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager,
+    &event.ic_token,
+    &state.pool,
+    &state.ic_token_rate_limiter,
+  )
+  .await
+  {
+    Ok(result) => result,
+    Err(response) => return response,
   };
 
   // Validate event_type
