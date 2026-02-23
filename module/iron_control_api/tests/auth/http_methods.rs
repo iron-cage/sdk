@@ -34,8 +34,8 @@ use axum::{
   routing::post,
   Router,
 };
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use iron_control_api::routes::auth;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower::ServiceExt;
 
 /// Create test router with auth routes.

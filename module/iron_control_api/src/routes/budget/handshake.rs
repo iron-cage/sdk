@@ -3,7 +3,7 @@
 //! IC Token → IP Token exchange with budget lease creation
 
 use super::state::BudgetState;
-use crate::error::ValidationError;
+use crate::{error::ValidationError, ic_token};
 use axum::{
   extract::State,
   http::StatusCode,
@@ -18,13 +18,13 @@ use uuid::Uuid;
 /// Budget handshake request (Step 1: Token Exchange)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HandshakeRequest {
-  /// JWT token for agent authentication
+  /// IC Token for authentication
   pub ic_token: String,
-  /// AI provider name (e.g. "openai")
+  /// Provider name (e.g., "openai", "anthropic")
   pub provider: String,
-  /// Optional specific provider key ID
+  /// Optional provider key ID to use
   pub provider_key_id: Option<i64>,
-  /// Optional budget amount in microdollars
+  /// Optional requested budget in microdollars
   pub requested_budget: Option<i64>,
 }
 
@@ -52,7 +52,7 @@ impl HandshakeRequest {
       return Err(ValidationError::MissingField("ic_token".to_string()));
     }
 
-    // Validate ic_token length (`DoS` prevention)
+    // Validate ic_token length (DoS prevention)
     if self.ic_token.len() > Self::MAX_IC_TOKEN_LENGTH {
       return Err(ValidationError::TooLong {
         field: "ic_token".to_string(),
@@ -101,15 +101,15 @@ impl HandshakeRequest {
 /// Budget handshake response
 #[derive(Debug, Serialize)]
 pub struct HandshakeResponse {
-  /// Encrypted provider API key token
+  /// Encrypted IP Token containing provider credentials
   pub ip_token: String,
-  /// Unique budget lease identifier
+  /// Unique lease identifier
   pub lease_id: String,
-  /// Budget granted in microdollars
+  /// Budget granted for this lease in microdollars
   pub budget_granted: i64,
-  /// Remaining agent budget in microdollars
+  /// Remaining budget for agent in microdollars
   pub budget_remaining: i64,
-  /// Optional lease expiration timestamp (ms)
+  /// Optional lease expiration timestamp in milliseconds
   pub expires_at: Option<i64>,
 }
 
@@ -145,13 +145,17 @@ pub async fn handshake(
       .into_response();
   }
 
-  // Verify IC Token
-  let Ok(claims) = state.ic_token_manager.verify_token(&request.ic_token) else {
-    return (
-      StatusCode::UNAUTHORIZED,
-      Json(serde_json::json!({ "error": "Invalid IC Token" })),
-    )
-      .into_response();
+  // Verify IC Token (JWT signature + hash-check against database)
+  let (agent_id, _claims) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager,
+    &request.ic_token,
+    &state.db_pool,
+    &state.ic_token_rate_limiter,
+  )
+  .await
+  {
+    Ok(result) => result,
+    Err(response) => return response,
   };
 
   // Helper: create a dev placeholder provider key for agent_1 if missing
@@ -191,50 +195,6 @@ pub async fn handshake(
 
     Ok(result.last_insert_rowid())
   }
-
-  // Get agent_id from IC Token claims
-  let agent_id_str = &claims.agent_id;
-
-  // Fix(authorization-bypass-handshake): Reject malformed agent_id instead of defaulting to 1
-  // Root cause: Code used .unwrap_or(1) when parsing agent_id from IC Token,
-  //             defaulting to agent_id=1 on parse failure. This allowed attackers to bypass
-  //             authorization by sending malformed agent_id values (alphabetic, special chars,
-  //             overflow, etc.), which would parse fail and default to using agent_id=1's budget.
-  // Pitfall: Never use fallback values for security-critical parsing. Always reject invalid
-  //          input with explicit error responses. Using .unwrap_or() for authorization data
-  //          is a critical anti-pattern - silently accepts malformed input, creates authorization
-  //          bypass when fallback is privileged, enables billing fraud.
-  // Test coverage: See tests/handshake_malformed_agent_id_test.rs
-  //
-  // Parse agent_id (format: agent_<id>) to get database ID
-  let agent_id: i64 = match agent_id_str.strip_prefix("agent_") {
-    Some(id_part) => {
-      match id_part.parse::<i64>() {
-        Ok(id) if id > 0 => id, // Valid positive ID
-        Ok(_) => {
-          return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Invalid agent_id - must be positive" })),
-          )
-            .into_response();
-        }
-        Err(_) => {
-          return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Invalid agent_id - must be numeric" })),
-          )
-            .into_response();
-        }
-      }
-    }
-    None => {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json(serde_json::json!({ "error": "Invalid agent_id format" })),
-      )
-        .into_response();
-    }
-  };
 
   // Get agent's owner_id to look up usage_limits
   let owner_id: Option<String> =
@@ -301,9 +261,9 @@ pub async fn handshake(
       Some((limit_max_opt, current_cost_opt)) => {
         let current_cost = current_cost_opt.unwrap_or(0);
         match limit_max_opt {
-          None | Some(0) => 0, // No/zero max_cost configured - block
           Some(limit_max) if limit_max > current_cost => limit_max - current_cost,
-          Some(_) => 0, // Limit exhausted - block
+          // No max_cost configured, explicit zero limit, or limit exhausted - all block
+          None | Some(0 | _) => 0,
         }
       }
     };

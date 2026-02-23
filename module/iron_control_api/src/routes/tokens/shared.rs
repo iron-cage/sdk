@@ -32,7 +32,7 @@ impl TokenState {
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+  pub async fn new(database_url: &str) -> Result<Self, Box<dyn core::error::Error>> {
     let storage = TokenStorage::new(database_url).await?;
     Ok(Self {
       storage: Arc::new(storage),

@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS budget_change_requests
 );
 CREATE INDEX IF NOT EXISTS idx_budget_requests_status ON budget_change_requests( status );
 CREATE INDEX IF NOT EXISTS idx_budget_requests_agent ON budget_change_requests( agent_id );
-CREATE TABLE _migration_011_completed ( id INTEGER PRIMARY KEY );
+CREATE TABLE IF NOT EXISTS _migration_011_completed ( id INTEGER PRIMARY KEY );
 INSERT INTO _migration_011_completed ( id ) VALUES ( 1 );

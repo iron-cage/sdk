@@ -53,9 +53,9 @@ async fn test_refresh_invalid_jwt_signature() {
   let agent_id = 200i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state.clone()).await;
 
   // Create initial lease
   let handshake_response = router
@@ -190,9 +190,9 @@ async fn test_refresh_missing_jwt() {
   let agent_id = 201i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state.clone()).await;
 
   // Create initial lease
   let handshake_response = router
@@ -276,9 +276,9 @@ async fn test_refresh_malformed_jwt() {
   let agent_id = 202i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state.clone()).await;
 
   // Create initial lease
   let handshake_response = router

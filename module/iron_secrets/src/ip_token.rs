@@ -248,4 +248,4 @@ impl Display for IpTokenError {
   }
 }
 
-impl std::error::Error for IpTokenError {}
+impl core::error::Error for IpTokenError {}

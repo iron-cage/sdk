@@ -15,9 +15,9 @@ use axum::{
   routing::post,
   Router,
 };
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use iron_control_api::routes::auth::{login, logout, refresh, validate, AuthState};
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 /// Setup in-memory `SQLite` database with auth schema for testing

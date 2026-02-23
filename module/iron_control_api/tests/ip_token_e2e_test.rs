@@ -81,14 +81,14 @@ async fn seed_encrypted_provider_key(pool: &sqlx::SqlitePool, agent_id: i64, api
 async fn e2e_handshake_server_encrypts_client_decrypts() {
   // --- Server side ---
   let pool = budget::setup_test_db().await;
-  let state = budget::create_test_budget_state(pool.clone());
+  let state = budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 300i64;
   let original_key = "sk-proj-real-openai-key-e2e-test";
   seed_encrypted_provider_key(&pool, agent_id, original_key).await;
 
-  let ic_token = budget::create_ic_token(agent_id, &state.ic_token_manager);
-  let app = budget::create_budget_router(state);
+  let ic_token = budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = budget::create_budget_router(state).await;
 
   let response = app
     .oneshot(
@@ -139,13 +139,13 @@ async fn e2e_handshake_server_encrypts_client_decrypts() {
 async fn e2e_provider_key_server_encrypts_client_decrypts() {
   // --- Server side ---
   let pool = budget::setup_test_db().await;
-  let state = budget::create_test_budget_state(pool.clone());
+  let state = budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 301i64;
   let original_key = "sk-ant-api03-real-anthropic-key-e2e";
   seed_encrypted_provider_key(&pool, agent_id, original_key).await;
 
-  let ic_token = budget::create_ic_token(agent_id, &state.ic_token_manager);
+  let ic_token = budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   let app = Router::new()
     .route(
@@ -201,13 +201,13 @@ async fn e2e_provider_key_server_encrypts_client_decrypts() {
 async fn e2e_corrupted_ip_token_client_handles_gracefully() {
   // Get a real IP Token from server
   let pool = budget::setup_test_db().await;
-  let state = budget::create_test_budget_state(pool.clone());
+  let state = budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 302i64;
   seed_encrypted_provider_key(&pool, agent_id, "sk-test-key").await;
 
-  let ic_token = budget::create_ic_token(agent_id, &state.ic_token_manager);
-  let app = budget::create_budget_router(state);
+  let ic_token = budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let app = budget::create_budget_router(state).await;
 
   let response = app
     .oneshot(
@@ -254,16 +254,16 @@ async fn e2e_corrupted_ip_token_client_handles_gracefully() {
 #[tokio::test]
 async fn e2e_same_key_decrypts_both_flows() {
   let pool = budget::setup_test_db().await;
-  let state = budget::create_test_budget_state(pool.clone());
+  let state = budget::create_test_budget_state(pool.clone()).await;
 
   let agent_id = 303i64;
   let original_key = "sk-proj-shared-key-both-flows";
   seed_encrypted_provider_key(&pool, agent_id, original_key).await;
 
-  let ic_token = budget::create_ic_token(agent_id, &state.ic_token_manager);
+  let ic_token = budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Flow 1: Handshake
-  let app1 = budget::create_budget_router(state.clone());
+  let app1 = budget::create_budget_router(state.clone()).await;
   let resp1 = app1
     .oneshot(
       Request::builder()
@@ -285,7 +285,7 @@ async fn e2e_same_key_decrypts_both_flows() {
   let body1: Value = parse_body(resp1).await;
 
   // Flow 2: Provider Key
-  let ic_token2 = budget::create_ic_token(agent_id, &state.ic_token_manager);
+  let ic_token2 = budget::create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
   let app2 = Router::new()
     .route(
       "/api/v1/agents/provider-key",

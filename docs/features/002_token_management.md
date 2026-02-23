@@ -323,7 +323,7 @@ impl RateLimiter
 - `iron_types` - Shared type definitions
 - `iron_runtime_state` - Database access
 - `iron_cost` - Cost calculation (reuse existing)
-- `error_tools` - Error handling (per rulebook)
+- `thiserror` - Error handling
 - `rand` - Cryptographic randomness
 - `sha2` - SHA-256 hashing
 - `blake3` - BLAKE3 hashing (fast)
@@ -1451,7 +1451,7 @@ ab -n 5000 -c 50 -H "Authorization: Bearer <jwt>" \
 
 This architecture design provides a complete, production-ready blueprint for implementing the LLM Token Management Dashboard and Backend. The design:
 
-✅ **Follows existing patterns** - Layered monolith, `error_tools`, async-first
+✅ **Follows existing patterns** - Layered monolith, `thiserror`, async-first
 ✅ **Comprehensive** - Backend + frontend + security + testing + deployment
 ✅ **Secure** - JWT + RBAC, token hashing, audit logging, encryption
 ✅ **Performant** - Async, connection pooling, caching, indexing

@@ -114,7 +114,7 @@ impl LimitEnforcer
   /// * `project_id` - Optional project ID
   /// * `max_tokens_per_day` - Max tokens per day (None = unlimited)
   /// * `max_requests_per_minute` - Max requests per minute (None = unlimited)
-  /// * `max_cost_microdollars_per_month` - Max cost in cents per month (None = unlimited)
+  /// * `max_cost_microdollars_per_month` - Max cost in microdollars per month (None = unlimited)
   ///
   /// # Errors
   ///
@@ -450,7 +450,7 @@ impl LimitEnforcer
   /// * `project_id` - Optional project ID
   /// * `max_tokens_per_day` - Max tokens per day (None = unlimited)
   /// * `max_requests_per_minute` - Max requests per minute (None = unlimited)
-  /// * `max_cost_microdollars_per_month` - Max cost in cents per month (None = unlimited)
+  /// * `max_cost_microdollars_per_month` - Max cost in microdollars per month (None = unlimited)
   ///
   /// # Errors
   ///
@@ -577,7 +577,7 @@ impl LimitEnforcer
   /// * `id` - Limit ID
   /// * `max_tokens_per_day` - Max tokens per day (None = unlimited)
   /// * `max_requests_per_minute` - Max requests per minute (None = unlimited)
-  /// * `max_cost_microdollars_per_month` - Max cost in cents per month (None = unlimited)
+  /// * `max_cost_microdollars_per_month` - Max cost in microdollars per month (None = unlimited)
   ///
   /// # Errors
   ///

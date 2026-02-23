@@ -32,9 +32,9 @@ async fn test_report_on_expired_lease() {
   let agent_id = 300i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Step 1: Handshake to create lease
   let handshake_response = router
@@ -87,6 +87,7 @@ async fn test_report_on_expired_lease() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_expired_test",
           "tokens": 1000,
@@ -142,9 +143,9 @@ async fn test_report_on_revoked_lease() {
   let agent_id = 310i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Step 1: Handshake to create lease
   let handshake_response = router
@@ -193,6 +194,7 @@ async fn test_report_on_revoked_lease() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_revoked_test",
           "tokens": 1000,
@@ -261,9 +263,9 @@ async fn test_multiple_reports_same_lease() {
   let agent_id = 320i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Step 1: Handshake to create lease with $10 budget
   let handshake_response = router
@@ -307,6 +309,7 @@ async fn test_multiple_reports_same_lease() {
           .body(Body::from(
             json!(
           {
+            "ic_token": ic_token.clone(),
             "lease_id": lease_id,
             "request_id": format!( "req_multi_{}", i ),
             "tokens": 500,
@@ -324,7 +327,7 @@ async fn test_multiple_reports_same_lease() {
     assert_eq!(
       report_response.status(),
       StatusCode::OK,
-      "LOUD FAILURE: Report {i} should succeed"
+      "LOUD FAILURE: Report {i} should succeed",
     );
   }
 
@@ -350,6 +353,7 @@ async fn test_multiple_reports_same_lease() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_multi_6",
           "tokens": 500,
@@ -394,9 +398,9 @@ async fn test_lease_budget_exhaustion() {
   let agent_id = 330i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Step 1: Handshake to create lease with $10 budget
   let handshake_response = router
@@ -439,6 +443,7 @@ async fn test_lease_budget_exhaustion() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_exhaustion_1",
           "tokens": 4500,
@@ -474,6 +479,7 @@ async fn test_lease_budget_exhaustion() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_id,
           "request_id": "req_exhaustion_2",
           "tokens": 1000,
@@ -530,9 +536,9 @@ async fn test_lease_renewal_workflow() {
   let agent_id = 340i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Create JWT access token for refresh endpoint
   let access_token =
@@ -579,6 +585,7 @@ async fn test_lease_renewal_workflow() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token.clone(),
           "lease_id": lease_1,
           "request_id": "req_renewal_1",
           "tokens": 2500,
@@ -720,6 +727,7 @@ async fn test_lease_renewal_workflow() {
         .body(Body::from(
           json!(
         {
+          "ic_token": ic_token,
           "lease_id": lease_1,
           "request_id": "req_old_lease_test",
           "tokens": 500,

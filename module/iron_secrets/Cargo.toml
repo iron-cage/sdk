@@ -19,9 +19,6 @@ workspace = true
 iron_types = { workspace = true }
 iron_runtime_state = { workspace = true }
 
-# Error handling (per rulebook)
-error_tools = { workspace = true }
-
 # Crypto
 aes-gcm = { workspace = true }
 argon2 = { workspace = true }

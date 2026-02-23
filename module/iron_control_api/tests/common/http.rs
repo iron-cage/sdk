@@ -5,7 +5,7 @@
 //! server port configuration, and end-to-end request handling.
 
 use axum::Router;
-use std::net::SocketAddr;
+use core::net::SocketAddr;
 use tokio::net::TcpListener;
 
 /// Create test HTTP server for integration testing.

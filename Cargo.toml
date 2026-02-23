@@ -57,7 +57,7 @@ default-members = [
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.85"
 authors = ["iron_cage contributors"]
 license = "MIT"
 
@@ -124,11 +124,6 @@ missing_docs_in_private_items = "allow"
 missing_inline_in_public_items = "allow"
 # Allow long functions - API handlers naturally exceed 100 lines due to validation, auth, SQL
 too_many_lines = "allow"
-
-## Error Handling - MUST use error_tools per rulebook
-
-[workspace.dependencies.error_tools]
-version = "0.37"
 
 ## Serialization
 
@@ -382,10 +377,18 @@ version = "0.18"
 [workspace.dependencies.subtle]
 version = "2.6"
 
+## Build Dependencies
+
+[workspace.dependencies.vergen]
+version = "9.1"
+
+[workspace.dependencies.vergen-gitcl]
+version = "9.1"
+
 ## Dev Dependencies
 
 [workspace.dependencies.tempfile]
-version = "3.0"
+version = "3.8"
 
 [workspace.dependencies.hyper]
 version = "1.5"
@@ -405,6 +408,12 @@ version = "0.6.5"
 
 [workspace.dependencies.tokio-test]
 version = "0.4"
+
+[workspace.dependencies.serial_test]
+version = "3.2"
+
+[workspace.dependencies.walkdir]
+version = "2.4"
 
 [workspace.dependencies.criterion]
 version = "0.8"

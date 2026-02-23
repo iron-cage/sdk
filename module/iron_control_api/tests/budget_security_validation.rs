@@ -28,8 +28,8 @@
 //! ## E8: Long String Handling
 //! | Test Case | Scenario | Expected Response |
 //! |-----------|----------|-------------------|
-//! | `ic_token` > 2000 chars | Oversized token | 400/422 validation error |
-//! | `lease_id` > 100 chars | Oversized ID | 400/422 validation error |
+//! | ic_token > 2000 chars | Oversized token | 400/422 validation error |
+//! | lease_id > 100 chars | Oversized ID | 400/422 validation error |
 //! | model > 1000 chars | Oversized model name | 400/422 validation error |
 
 mod common;
@@ -60,8 +60,8 @@ async fn test_malformed_json_syntax() {
   let agent_id = 500i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send malformed JSON to /api/budget/report
   let response = router
@@ -84,23 +84,23 @@ async fn test_malformed_json_syntax() {
   );
 }
 
-/// E3.2: Missing `content-type` header
+/// E3.2: Missing content-type header
 ///
 /// # Security Risk
-/// Missing `content-type` could bypass validation or trigger unintended parsers
+/// Missing content-type could bypass validation or trigger unintended parsers
 ///
 /// # Expected Behavior
 /// - 415 Unsupported Media Type OR 400 Bad Request
-/// - Clear error about missing/invalid `content-type`
+/// - Clear error about missing/invalid content-type
 #[tokio::test]
 async fn test_missing_content_type() {
   let pool = setup_test_db().await;
   let agent_id = 501i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Send valid JSON but no content-type header
   let response = router
@@ -146,8 +146,8 @@ async fn test_empty_request_body() {
   let agent_id = 502i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send empty JSON object
   let response = router
@@ -185,8 +185,8 @@ async fn test_handshake_missing_ic_token() {
   let agent_id = 503i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send handshake without ic_token
   let response = router
@@ -229,9 +229,9 @@ async fn test_handshake_missing_provider() {
   let agent_id = 504i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router = create_budget_router(state).await;
 
   // Send handshake without provider
   let response = router
@@ -274,8 +274,8 @@ async fn test_report_missing_lease_id() {
   let agent_id = 505i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Send report without lease_id
   let response = router
@@ -322,9 +322,9 @@ async fn test_report_missing_cost() {
   let agent_id = 506i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
@@ -352,7 +352,7 @@ async fn test_report_missing_cost() {
   let lease_id = handshake_json["lease_id"].as_str().unwrap();
 
   // Send report without cost_microdollars
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()
@@ -397,10 +397,10 @@ async fn test_refresh_missing_ic_token() {
   let agent_id = 507i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
+  let state = create_test_budget_state(pool).await;
   let access_token =
     common::create_test_access_token("user_123", "test@example.com", "admin", "test_jwt_secret");
-  let router = create_budget_router(state);
+  let router = create_budget_router(state).await;
 
   // Send refresh without ic_token
   let response = router
@@ -445,11 +445,11 @@ async fn test_refresh_missing_current_lease_id() {
   let agent_id = 508i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
   let access_token =
     common::create_test_access_token("user_123", "test@example.com", "admin", "test_jwt_secret");
-  let router = create_budget_router(state);
+  let router = create_budget_router(state).await;
 
   // Send refresh without current_lease_id
   let response = router
@@ -494,8 +494,8 @@ async fn test_oversized_ic_token() {
   let agent_id = 509i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Create 2001-character ic_token
   let oversized_token = "a".repeat(2001);
@@ -541,8 +541,8 @@ async fn test_oversized_lease_id() {
   let agent_id = 510i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool);
-  let router = create_budget_router(state);
+  let state = create_test_budget_state(pool).await;
+  let router = create_budget_router(state).await;
 
   // Create 101-character lease_id
   let oversized_lease_id = format!("lease_{}", "a".repeat(95));
@@ -594,9 +594,9 @@ async fn test_oversized_model_name() {
   let agent_id = 511i64;
   seed_agent_with_budget(&pool, agent_id, 100_000_000).await;
 
-  let state = create_test_budget_state(pool.clone());
-  let ic_token = create_ic_token(agent_id, &state.ic_token_manager);
-  let router_handshake = create_budget_router(state.clone());
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+  let router_handshake = create_budget_router(state.clone()).await;
 
   // Create lease first
   let handshake_response = router_handshake
@@ -626,7 +626,7 @@ async fn test_oversized_model_name() {
   // Create 10000-character model name
   let oversized_model = "a".repeat(10_000);
 
-  let router_report = create_budget_router(state);
+  let router_report = create_budget_router(state).await;
   let response = router_report
     .oneshot(
       Request::builder()

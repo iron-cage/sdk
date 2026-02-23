@@ -71,8 +71,8 @@
 #[tokio::test]
 async fn bug_reproducer_login_requires_connect_info() {
   use axum::{routing::post, Router};
+  use core::net::SocketAddr;
   use iron_control_api::routes::auth::AuthState;
-  use std::net::SocketAddr;
 
   // Create in-memory database for testing (same pattern as common/auth.rs)
   let database_url = "sqlite::memory:?cache=shared";

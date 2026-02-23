@@ -33,8 +33,8 @@ use axum::{
   http::{Request, StatusCode},
   Router,
 };
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use serde_json::json;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower::ServiceExt;
 
 mod common;

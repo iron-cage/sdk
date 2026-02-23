@@ -15,10 +15,9 @@
 //!
 //! Post-pilot: Replace with Redis for distributed deployment
 
-use core::time::Duration;
+use core::{net::IpAddr, time::Duration};
 use std::{
   collections::HashMap,
-  net::IpAddr,
   sync::{Arc, Mutex},
   time::Instant,
 };

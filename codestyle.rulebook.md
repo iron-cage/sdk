@@ -78,13 +78,13 @@ The formatter handles brace placement, spacing, line width, and all other format
 
 ### Imports & Modules : Centralized Workspace Dependency Manifest
 
-**Description:** In a Cargo workspace, the root `Cargo.toml` **must** serve as the single source of truth for all dependency definitions. All dependencies — including their versions and sources — **must** be declared in the `[workspace.dependencies]` table. Feature flags **must not** be specified in this central manifest.
+**Description:** In a Cargo workspace, the root `Cargo.toml` **must** serve as the single source of truth for all dependency definitions. All dependencies — including their versions and sources — **must** be declared in the `[workspace.dependencies]` table. Feature flags **should not** be specified in this central manifest unless the feature is required by all consuming crates, or omitting it would force every crate to repeat the same feature list.
 
 Member crates **must** inherit all dependencies from the workspace using the `workspace = true` syntax. A crate may specify the features it requires for an inherited dependency, but it is **strictly forbidden** from defining a dependency's version or source.
 
 Only the workspace root `Cargo.toml` is allowed to import dependencies. Crate `Cargo.toml` files must reuse what the workspace imported. No exceptions.
 
-**Rationale:** This approach ensures consistent versions across the entire workspace, simplifies dependency management, reduces redundancy, and allows each crate to enable only the specific features it needs.
+**Rationale:** This approach ensures consistent versions across the entire workspace, simplifies dependency management, reduces redundancy, and allows each crate to enable only the specific features it needs. Specifying universally-required features in the workspace manifest avoids repetition across all crates; specifying crate-specific features in the workspace manifest forces unwanted features on crates that do not need them.
 
 > Bad (Dependencies defined directly in crate `Cargo.toml`)
 
@@ -95,30 +95,32 @@ Only the workspace root `Cargo.toml` is allowed to import dependencies. Crate `C
 rand = "0.8"
 ```
 
-> Bad (Features specified in the workspace manifest)
+> Bad (Crate-specific features specified in the workspace manifest)
 
 ```toml
 # workspace_root/Cargo.toml
 [workspace.dependencies]
-# FORBIDDEN: Features must be specified in the consuming crate, not here.
-serde = { version = "1.0", features = ["derive", "rc"] }
+# FORBIDDEN: "rc" is only needed by some crates — specify it in the consuming crate.
+serde = { version = "1.0", features = ["rc"] }
 ```
 
-> Good (Dependencies defined in workspace; features specified in crate)
+> Good (Universal feature in workspace; crate-specific feature in crate)
 
 ```toml
 # workspace_root/Cargo.toml
 [workspace.dependencies]
-serde = { version = "1.0" }
+# OK: "derive" is required by all consuming crates.
+serde = { version = "1.0", features = ["derive"] }
 rand = { version = "0.8" }
 
 # my_crate_a/Cargo.toml
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 rand = { workspace = true }
 
 # my_crate_b/Cargo.toml
 [dependencies]
+# Adds crate-specific "rc" on top of the workspace-provided "derive".
 serde = { workspace = true, features = ["rc"] }
 ```
 

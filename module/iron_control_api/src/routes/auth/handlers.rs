@@ -12,7 +12,7 @@ use axum_extra::{
   headers::{authorization::Bearer, Authorization},
   TypedHeader,
 };
-use std::net::SocketAddr;
+use core::net::SocketAddr;
 
 // ============================================================================
 // Login Endpoint - POST /api/v1/auth/login

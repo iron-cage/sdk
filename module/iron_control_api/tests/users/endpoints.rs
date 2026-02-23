@@ -64,7 +64,7 @@ use serde_json::json;
 use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions };
 
 use std::sync::Arc;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::extract::FromRef;
 use iron_control_api::routes::auth::AuthState;
 use iron_control_api::jwt_auth::JwtSecret;

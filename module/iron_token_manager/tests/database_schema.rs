@@ -15,14 +15,14 @@
 //! | `test_usage_limits_unique_constraint` | UNIQUE constraint on `user_id`+`project_id` | Insert duplicate `user_id`+`project_id` pair | Second insert fails | ✅ |
 //! | `test_api_tokens_user_fk_constraint` | FK constraint `api_tokens`→users | Insert token with invalid `user_id` | Insert fails with foreign key error | ✅ |
 //! | `test_api_tokens_cascade_delete_on_user_deletion` | CASCADE DELETE `api_tokens`→users | Delete user with tokens | Tokens automatically deleted | ✅ |
-//! | `test_all_indexes_created` | All performance indexes exist | Run migration | 39 indexes created (idx_* pattern) | ✅ |
+//! | `test_all_indexes_created` | All performance indexes exist | Run migration | 51 indexes created (idx_* pattern) | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
 //! **Happy Path:**
 //! - ✅ Schema migration creates all 5 tables
 //! - ✅ `api_tokens` table accepts valid data
-//! - ✅ All 15 indexes created for query performance
+//! - ✅ All 51 indexes created for query performance
 //!
 //! **Boundary Conditions:**
 //! - ✅ Empty database → Schema created
@@ -41,7 +41,7 @@
 //! - ✅ Index naming pattern (all `idx_*` for discoverability)
 //!
 //! **State Transitions:**
-//! - ✅ Empty database → Migrated database (5 tables, 39 indexes)
+//! - ✅ Empty database → Migrated database (5 tables, 51 indexes)
 //! - ✅ Token with usage → Token deleted → Usage deleted (cascade)
 //! - ✅ User with tokens → User deleted → Tokens deleted (cascade)
 //!

@@ -66,5 +66,5 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_project_id ON api_tokens( project_id )
 CREATE INDEX IF NOT EXISTS idx_api_tokens_is_active ON api_tokens( is_active );
 
 -- Create guard table to mark migration as completed
-CREATE TABLE _migration_002_completed (applied_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS _migration_002_completed (applied_at INTEGER NOT NULL);
 INSERT INTO _migration_002_completed (applied_at) VALUES (1733600000000); -- 2025-12-07

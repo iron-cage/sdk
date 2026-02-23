@@ -42,6 +42,7 @@ enabled = [
   "dep:uuid",
   "dep:hex",
   "dep:sha2",
+  "dep:subtle",
 ]
 full = ["enabled"]
 
@@ -83,7 +84,7 @@ jsonwebtoken = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 
 # Database (Phase 4 Day 29)
-sqlx = { workspace = true, features = ["sqlite", "runtime-tokio"], optional = true }
+sqlx = { workspace = true, optional = true, features = ["sqlite", "runtime-tokio"] }
 
 # Async trait support
 async-trait = { workspace = true, optional = true }
@@ -102,14 +103,17 @@ aes-gcm = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
-uuid = { workspace = true, features = ["v4"], optional = true }
+uuid = { workspace = true, optional = true , features = ["v4"]}
 hex = { workspace = true, optional = true }
 
 # SHA-256 hashing for IC token storage (only hash is stored, not token)
 sha2 = { workspace = true, optional = true }
 
+# Constant-time comparison for hash validation (timing attack prevention)
+subtle = { workspace = true, optional = true }
+
 [build-dependencies]
-vergen = { version = "8.0", features = ["build", "git", "gitcl"] }
+vergen-gitcl = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
 axum = { workspace = true, features = ["ws"] }
@@ -119,10 +123,11 @@ tokio = { workspace = true, features = ["full"] }
 hyper = { workspace = true }
 http-body-util = { workspace = true }
 sha2 = { workspace = true }
-serial_test = "3.2.0"
-tempfile = "3.8"
+uuid = { workspace = true, features = ["v4"] }
+serial_test = { workspace = true }
+tempfile = { workspace = true }
 reqwest = { workspace = true }
-walkdir = "2.4"
+walkdir = { workspace = true }
 
 [[bin]]
 name = "iron_control_api_server"

@@ -3,7 +3,7 @@
 //! Request additional budget allocation
 
 use super::state::BudgetState;
-use crate::error::ValidationError;
+use crate::{error::ValidationError, ic_token};
 use axum::{
   extract::State,
   http::StatusCode,
@@ -15,11 +15,11 @@ use uuid::Uuid;
 /// Budget refresh request (Step 3: Request More Budget)
 #[derive(Debug, Deserialize)]
 pub struct BudgetRefreshRequest {
-  /// JWT token for agent authentication
+  /// IC Token for authentication
   pub ic_token: String,
-  /// Active lease ID to refresh
+  /// Current active lease identifier
   pub current_lease_id: String,
-  /// Optional budget amount in microdollars
+  /// Optional requested budget amount in microdollars
   pub requested_budget: Option<i64>,
 }
 
@@ -100,15 +100,15 @@ impl BudgetRefreshRequest {
 /// Budget refresh response (approved)
 #[derive(Debug, Serialize)]
 pub struct BudgetRefreshResponse {
-  /// Approval status ("approved" or "denied")
+  /// Status of refresh request ("approved" or "denied")
   pub status: String,
-  /// Budget granted in microdollars if approved
+  /// Budget amount granted in microdollars (if approved)
   pub budget_granted: Option<i64>,
-  /// Remaining agent budget in microdollars
+  /// Total remaining budget in microdollars
   pub budget_remaining: i64,
-  /// New lease ID if approved
+  /// New lease identifier (if approved)
   pub lease_id: Option<String>,
-  /// Denial reason if rejected
+  /// Reason for denial (if denied)
   pub reason: Option<String>,
 }
 
@@ -153,44 +153,17 @@ pub async fn refresh_budget(
       .into_response();
   }
 
-  // Verify IC Token
-  let Ok(claims) = state.ic_token_manager.verify_token(&request.ic_token) else {
-    return (
-      StatusCode::UNAUTHORIZED,
-      Json(serde_json::json!(
-    {
-      "error": "Invalid IC Token"
-    } )),
-    )
-      .into_response();
-  };
-
-  // Extract agent_id from IC Token claims
-  // Claims.agent_id format: "agent_<id>"
-  let agent_id = match claims.agent_id.strip_prefix("agent_") {
-    Some(id_str) => match id_str.parse::<i64>() {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::UNAUTHORIZED,
-          Json(serde_json::json!(
-        {
-          "error": "Invalid agent ID in IC Token"
-        } )),
-        )
-          .into_response();
-      }
-    },
-    None => {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(serde_json::json!(
-      {
-        "error": "Invalid IC Token agent_id format"
-      } )),
-      )
-        .into_response();
-    }
+  // Verify IC Token (JWT signature + hash-check against database)
+  let (agent_id, _claims) = match ic_token::validate_ic_token_for_endpoint(
+    &state.ic_token_manager,
+    &request.ic_token,
+    &state.db_pool,
+    &state.ic_token_rate_limiter,
+  )
+  .await
+  {
+    Ok(result) => result,
+    Err(response) => return response,
   };
 
   // Get current lease

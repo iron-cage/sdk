@@ -219,8 +219,9 @@ mod implementation {
     routing::{get, post},
     Router,
   };
+  use core::net::SocketAddr;
   use serde::{Deserialize, Serialize};
-  use std::{net::SocketAddr, sync::Arc};
+  use std::sync::Arc;
   use tower_http::cors::CorsLayer;
 
   /// API server state
@@ -376,7 +377,8 @@ pub use implementation::*;
 
 #[cfg(not(feature = "enabled"))]
 mod stub {
-  use std::{net::SocketAddr, sync::Arc};
+  use core::net::SocketAddr;
+  use std::sync::Arc;
 
   #[derive(Clone)]
   pub struct ApiState {

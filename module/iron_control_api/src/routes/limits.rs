@@ -40,7 +40,7 @@ impl LimitsState {
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+  pub async fn new(database_url: &str) -> Result<Self, Box<dyn core::error::Error>> {
     let enforcer = LimitEnforcer::new(database_url).await?;
     Ok(Self {
       enforcer: Arc::new(enforcer),

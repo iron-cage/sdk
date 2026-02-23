@@ -102,7 +102,7 @@ impl UsageState {
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+  pub async fn new(database_url: &str) -> Result<Self, Box<dyn core::error::Error>> {
     let tracker = UsageTracker::new(database_url).await?;
     Ok(Self {
       tracker: Arc::new(tracker),

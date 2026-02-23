@@ -52,6 +52,14 @@ EOF
   tr -d '\r' < "$TEST_DIR/bin/docker" > "$TEST_DIR/bin/docker.tmp"
   mv "$TEST_DIR/bin/docker.tmp" "$TEST_DIR/bin/docker"
   chmod +x "$TEST_DIR/bin/docker"
+
+  # stub ufw (requires root on real systems)
+  cat > "$TEST_DIR/bin/ufw" <<'EOF'
+#!/bin/bash
+exit 0
+EOF
+  chmod +x "$TEST_DIR/bin/ufw"
+
   PATH="$TEST_DIR/bin:$PATH"
 }
 
