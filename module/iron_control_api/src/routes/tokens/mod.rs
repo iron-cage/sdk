@@ -20,37 +20,26 @@
 //! # Protocol 014 Compliance
 //!
 //! Token creation follows Protocol 014:
-//! - JWT authentication required (user_id from claims, not request body)
+//! - JWT authentication required (`user_id` from claims, not request body)
 //! - Rate limiting: 10 creates/min per user
 //! - Token limit: Max 10 active tokens per user
 //! - Audit logging for all operations
 //!
 //! # Backward Compatibility
 //!
-//! Supports legacy request format with user_id in request body for existing tests.
+//! Supports legacy request format with `user_id` in request body for existing tests.
 //! Once tests are migrated, legacy support can be removed.
 
-mod shared;
 mod handlers;
+mod shared;
 
 // Re-export shared types and state
 pub use shared::{
-  TokenState,
-  CreateTokenRequest,
-  UpdateTokenRequest,
-  ValidateTokenRequest,
-  CreateTokenResponse,
-  TokenListItem,
-  ValidateTokenResponse,
+  CreateTokenRequest, CreateTokenResponse, TokenListItem, TokenState, UpdateTokenRequest,
+  ValidateTokenRequest, ValidateTokenResponse,
 };
 
 // Re-export all handler functions
 pub use handlers::{
-  create_token,
-  list_tokens,
-  get_token,
-  update_token,
-  rotate_token,
-  revoke_token,
-  validate_token,
+  create_token, get_token, list_tokens, revoke_token, rotate_token, update_token, validate_token,
 };

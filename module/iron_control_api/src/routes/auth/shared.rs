@@ -9,11 +9,25 @@ use std::sync::Arc;
 /// Shared authentication state
 #[derive(Clone)]
 pub struct AuthState {
+  /// Shared JWT signing secret
   pub jwt_secret: Arc<JwtSecret>,
+  /// `SQLite` database connection pool
   pub db_pool: Pool<Sqlite>,
+  /// Login attempt rate limiter
   pub rate_limiter: crate::rate_limiter::LoginRateLimiter,
   /// Whether rate limiting is enabled (only in production mode)
   pub rate_limiting_enabled: bool,
+}
+
+impl core::fmt::Debug for AuthState {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("AuthState")
+      .field("jwt_secret", &"<JwtSecret>")
+      .field("db_pool", &"<SqlitePool>")
+      .field("rate_limiter", &"<LoginRateLimiter>")
+      .field("rate_limiting_enabled", &self.rate_limiting_enabled)
+      .finish()
+  }
 }
 
 impl AuthState {
@@ -28,7 +42,11 @@ impl AuthState {
   /// # Errors
   ///
   /// Returns error if database connection fails
-  pub async fn new(jwt_secret_key: String, database_url: &str, rate_limiting_enabled: bool) -> Result<Self, sqlx::Error> {
+  pub async fn new(
+    jwt_secret_key: String,
+    database_url: &str,
+    rate_limiting_enabled: bool,
+  ) -> Result<Self, sqlx::Error> {
     let db_pool = SqlitePool::connect(database_url).await?;
 
     // Run migration 003 (users table) if not already applied
@@ -39,8 +57,7 @@ impl AuthState {
     .await?;
 
     if migration_003_completed == 0 {
-      let migration_003 =
-        include_str!("../../../migrations/003_create_users_table.sql");
+      let migration_003 = include_str!("../../../migrations/003_create_users_table.sql");
       sqlx::raw_sql(migration_003).execute(&db_pool).await?;
     }
 
@@ -52,8 +69,7 @@ impl AuthState {
     .await?;
 
     if migration_006_completed == 0 {
-      let migration_006 =
-        include_str!("../../../migrations/006_create_user_audit_log.sql");
+      let migration_006 = include_str!("../../../migrations/006_create_user_audit_log.sql");
       sqlx::raw_sql(migration_006).execute(&db_pool).await?;
     }
 
@@ -65,8 +81,7 @@ impl AuthState {
     .await?;
 
     if migration_007_completed == 0 {
-      let migration_007 =
-        include_str!("../../../migrations/007_create_blacklist_table.sql");
+      let migration_007 = include_str!("../../../migrations/007_create_blacklist_table.sql");
       sqlx::raw_sql(migration_007).execute(&db_pool).await?;
     }
 
@@ -78,8 +93,7 @@ impl AuthState {
     .await?;
 
     if migration_020_completed == 0 {
-      let migration_020 =
-        include_str!("../../../migrations/020_add_account_lockout_fields.sql");
+      let migration_020 = include_str!("../../../migrations/020_add_account_lockout_fields.sql");
       sqlx::raw_sql(migration_020).execute(&db_pool).await?;
     }
 
@@ -103,15 +117,17 @@ impl AuthState {
 /// ```
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
+  /// User email address
   pub email: String,
+  /// User password
   pub password: String,
 }
 
 impl LoginRequest {
-  /// Maximum email length for DoS prevention
+  /// Maximum email length for `DoS` prevention
   const MAX_EMAIL_LENGTH: usize = 255;
 
-  /// Maximum password length for DoS prevention
+  /// Maximum password length for `DoS` prevention
   const MAX_PASSWORD_LENGTH: usize = 1000;
 
   /// Validate login request parameters
@@ -165,45 +181,53 @@ impl LoginRequest {
 ///   "name": "John Doe"
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize )]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserInfo {
+  /// Unique user identifier
   pub id: String,
+  /// User email address
   pub email: String,
+  /// User role (e.g. developer, admin)
   pub role: String,
+  /// User display name
   pub name: String,
 }
 
 impl UserInfo {
-  /// Create UserInfo from JWT claims and database user
+  /// Create `UserInfo` from JWT claims and database user
   ///
   /// # Arguments
   ///
   /// * `claims` - JWT access token claims
   /// * `user` - Database user record
-  pub fn from_claims_and_user(claims: &crate::jwt_auth::AccessTokenClaims, user: &crate::user_auth::User) -> Self {
+  #[must_use]
+  pub fn from_claims_and_user(
+    claims: &crate::jwt_auth::AccessTokenClaims,
+    user: &crate::user_auth::User,
+  ) -> Self {
     Self {
-      id: user.id.to_string(),
+      id: user.id.clone(),
       email: user.username.clone(),
       role: claims.role.clone(),
-      name: user.name.clone().unwrap_or_else( || user.username.clone() ),
+      name: user.name.clone().unwrap_or_else(|| user.username.clone()),
     }
   }
 
-  /// Create UserInfo from database user only
+  /// Create `UserInfo` from database user only
   ///
   /// # Arguments
   ///
   /// * `user` - Database user record
+  #[must_use]
   pub fn from_user(user: &crate::user_auth::User) -> Self {
     Self {
-      id: user.id.to_string(),
+      id: user.id.clone(),
       email: user.email.clone(),
       role: user.role.clone(),
-      name: user.name.clone().unwrap_or_else( || user.username.clone() ),
+      name: user.name.clone().unwrap_or_else(|| user.username.clone()),
     }
   }
 }
-
 
 /// Login response body
 ///
@@ -218,14 +242,20 @@ impl UserInfo {
 ///   "user": { ... }
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize )]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
+  /// JWT access token
   pub user_token: String,
+  /// Token type, always "Bearer"
   pub token_type: String,
+  /// Token lifetime in seconds
   pub expires_in: u64,
+  /// Token expiration timestamp (ISO 8601)
   pub expires_at: String,
+  /// Optional refresh token
   #[serde(skip_serializing_if = "Option::is_none")]
   pub refresh_token: Option<String>,
+  /// Authenticated user information
   pub user: UserInfo,
 }
 
@@ -243,13 +273,18 @@ pub struct LoginResponse {
 /// ```
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
+  /// Error detail payload
   pub error: ErrorDetail,
 }
 
+/// Structured error detail
 #[derive(Debug, Serialize)]
 pub struct ErrorDetail {
+  /// Machine-readable error code
   pub code: String,
+  /// Human-readable error message
   pub message: String,
+  /// Optional additional error context
   #[serde(skip_serializing_if = "Option::is_none")]
   pub details: Option<serde_json::Value>,
 }
@@ -268,12 +303,18 @@ pub struct ErrorDetail {
 /// ```
 #[derive(Debug, Serialize)]
 pub struct RefreshResponse {
+  /// New JWT access token
   pub user_token: String,
+  /// Token type, always "Bearer"
   pub token_type: String,
+  /// Token lifetime in seconds
   pub expires_in: u64,
+  /// Token expiration timestamp (ISO 8601)
   pub expires_at: String,
+  /// Optional rotated refresh token
   #[serde(skip_serializing_if = "Option::is_none")]
   pub refresh_token: Option<String>,
+  /// Authenticated user information
   pub user: UserInfo,
 }
 
@@ -300,17 +341,27 @@ pub struct RefreshResponse {
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum ValidateResponse {
+  /// Token is valid
   Valid {
+    /// Always true for valid tokens
     valid: bool,
+    /// Authenticated user information
     user: UserInfo,
+    /// Token expiration timestamp (ISO 8601)
     expires_at: String,
+    /// Remaining token lifetime in seconds
     expires_in: u64,
   },
+  /// Token is invalid or expired
   Invalid {
+    /// Always false for invalid tokens
     valid: bool,
+    /// Reason code for invalidation
     reason: String,
+    /// When the token expired, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
     expired_at: Option<String>,
+    /// When the token was revoked, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
     revoked_at: Option<String>,
   },

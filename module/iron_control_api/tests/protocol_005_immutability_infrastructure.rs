@@ -76,7 +76,6 @@
 //! | `bug_reproducer_issue_003_enforcement_coverage` | Verify all 16 enforcement mechanisms active | Count active enforcement actions | 16/16 (100%) | ❌ FAIL |
 //! | `bug_reproducer_issue_003_script_validates_working_directory` | Verify scripts fail loudly when run from wrong directory | Execute script from wrong location | Script fails with clear error | ❌ FAIL |
 
-
 /// ## Bug Reproducer: Missing Enforcement Documentation
 ///
 /// ### Root Cause
@@ -107,17 +106,16 @@
 /// Enforcement documentation specifically prevents rollback by documenting WHY
 /// changes are immutable and WHAT would break if rolled back.
 // test_kind: bug_reproducer(issue-003)
-#[ test ]
-fn bug_reproducer_issue_003_documentation_exists()
-{
+#[test]
+fn bug_reproducer_issue_003_documentation_exists() {
   // Get repository root (navigate up from module directory)
   let module_dir = std::env::current_dir().unwrap();
   let repo_root = module_dir
     .ancestors()
-    .find( | p | p.join( ".git" ).exists() )
-    .expect( "Could not find repository root" );
+    .find(|p| p.join(".git").exists())
+    .expect("Could not find repository root");
 
-  let docs_dir = repo_root.join( "dev/docs/enforcement" );
+  let docs_dir = repo_root.join("dev/docs/enforcement");
 
   let required_files = [
     "migration_complete.md",
@@ -128,33 +126,28 @@ fn bug_reproducer_issue_003_documentation_exists()
   let mut missing_files = Vec::new();
   let mut existing_files = Vec::new();
 
-  for file in &required_files
-  {
-    let file_path = docs_dir.join( file );
-    if file_path.exists()
-    {
-      existing_files.push( file.to_string() );
-    }
-    else
-    {
-      missing_files.push( file.to_string() );
+  for file in &required_files {
+    let file_path = docs_dir.join(file);
+    if file_path.exists() {
+      existing_files.push(file.to_owned());
+    } else {
+      missing_files.push(file.to_owned());
     }
   }
 
   // Report current state
-  println!( "\n=== ENFORCEMENT DOCUMENTATION STATUS ===" );
-  println!( "Expected directory: {}", docs_dir.display() );
-  println!( "\nExisting files ({}):", existing_files.len() );
-  for file in &existing_files
-  {
-    println!( "  ✓ {}", file );
+  println!("\n=== ENFORCEMENT DOCUMENTATION STATUS ===");
+  let docs_display = docs_dir.display();
+  println!("Expected directory: {docs_display}");
+  println!("\nExisting files ({}):", existing_files.len());
+  for file in &existing_files {
+    println!("  ✓ {file}");
   }
-  println!( "\nMissing files ({}):", missing_files.len() );
-  for file in &missing_files
-  {
-    println!( "  ✗ {}", file );
+  println!("\nMissing files ({}):", missing_files.len());
+  for file in &missing_files {
+    println!("  ✗ {file}");
   }
-  println!( "========================================\n" );
+  println!("========================================\n");
 
   // CRITICAL ASSERTION: All documentation files must exist
   assert!(
@@ -173,7 +166,7 @@ fn bug_reproducer_issue_003_documentation_exists()
      - immutability_contract.md: Formal contract preventing rollback",
     missing_files.len(),
     required_files.len(),
-    missing_files.join( "\n     " )
+    missing_files.join("\n     ")
   );
 }
 

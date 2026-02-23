@@ -86,7 +86,7 @@
 //! | Documentation test 1 | Production | All defaults | BLOCKED (panic) |
 //! | Documentation test 2 | Production | Secure secrets | ALLOWED (starts) |
 //! | Documentation test 3 | Pilot | All defaults | ALLOWED (dev mode) |
-//! | Documentation test 4 | ProductionUnconfirmed | JWT default only | BLOCKED (partial defaults) |
+//! | Documentation test 4 | `ProductionUnconfirmed` | JWT default only | BLOCKED (partial defaults) |
 //!
 //! **Note:** Actual server startup tests are not possible in unit tests (require
 //! full async runtime + database + network binding). These tests document the
@@ -111,8 +111,7 @@
 /// # Expected: Panic with "Production deployment blocked: 3 insecure default secret(s) detected"
 /// ```
 #[test]
-fn test_production_with_all_defaults_blocked_documented()
-{
+fn test_production_with_all_defaults_blocked_documented() {
   // This test documents that production deployment with default secrets
   // must panic before server initialization. The validation code at
   // iron_control_api_server.rs:395-452 checks:
@@ -149,8 +148,7 @@ fn test_production_with_all_defaults_blocked_documented()
 /// # Expected: Server starts with "✓ Production secret validation passed"
 /// ```
 #[test]
-fn test_production_with_secure_secrets_allowed_documented()
-{
+fn test_production_with_secure_secrets_allowed_documented() {
   // This test documents that production deployment with secure secrets
   // is allowed to start. The validation at iron_control_api_server.rs:395-452
   // checks each secret against defaults and only blocks if matches found.
@@ -182,8 +180,7 @@ fn test_production_with_secure_secrets_allowed_documented()
 /// # Expected: Server starts with "✓ Pilot mode (localhost only)"
 /// ```
 #[test]
-fn test_pilot_with_defaults_allowed_documented()
-{
+fn test_pilot_with_defaults_allowed_documented() {
   // This test documents that pilot/development mode allows default secrets.
   // The validation at iron_control_api_server.rs:395-452 only runs for:
   //
@@ -197,12 +194,12 @@ fn test_pilot_with_defaults_allowed_documented()
   // env vars, observe successful startup in pilot mode.
 }
 
-/// **Test 4 (Documentation):** ProductionUnconfirmed with partial defaults blocked
+/// **Test 4 (Documentation):** `ProductionUnconfirmed` with partial defaults blocked
 ///
 /// **Expected:** Server panics if ANY secret uses default (not all or nothing)
 ///
 /// **Environment:**
-/// - Release build (triggers ProductionUnconfirmed)
+/// - Release build (triggers `ProductionUnconfirmed`)
 /// - `JWT_SECRET=dev-secret-change-in-production` (default - INSECURE)
 /// - `IC_TOKEN_SECRET=$(openssl rand -hex 32)` (secure)
 /// - `IP_TOKEN_KEY=$(openssl rand -hex 32)` (secure)
@@ -218,8 +215,7 @@ fn test_pilot_with_defaults_allowed_documented()
 /// # Expected: Error lists "JWT_SECRET" as insecure
 /// ```
 #[test]
-fn test_production_unconfirmed_partial_defaults_blocked_documented()
-{
+fn test_production_unconfirmed_partial_defaults_blocked_documented() {
   // This test documents that even a single insecure default is sufficient
   // to block production deployment. The validation accumulates ALL insecure
   // secrets:
@@ -242,7 +238,7 @@ fn test_production_unconfirmed_partial_defaults_blocked_documented()
 
 /// **Test 5 (Documentation):** Development mode with database wiping
 ///
-/// **Expected:** Server wipes SQLite database before startup
+/// **Expected:** Server wipes `SQLite` database before startup
 ///
 /// **Environment:**
 /// - `IRON_DEPLOYMENT_MODE=development`
@@ -258,8 +254,7 @@ fn test_production_unconfirmed_partial_defaults_blocked_documented()
 /// # Expected: Fresh database created with migrations
 /// ```
 #[test]
-fn test_development_mode_database_wiping_documented()
-{
+fn test_development_mode_database_wiping_documented() {
   // This test documents that development mode wipes the database for clean
   // state. The logic at iron_control_api_server.rs:333-360 extracts the
   // SQLite path and deletes it:

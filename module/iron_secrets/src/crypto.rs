@@ -233,7 +233,7 @@ impl core::fmt::Display for CryptoError
   }
 }
 
-impl std::error::Error for CryptoError {}
+impl core::error::Error for CryptoError {}
 
 /// Mask an API key for display (never show full key)
 ///

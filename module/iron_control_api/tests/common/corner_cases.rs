@@ -33,47 +33,43 @@ pub const PATH_TRAVERSAL: &[&str] = &[
 ];
 
 /// Command injection attack vectors
-pub const COMMAND_INJECTION: &[&str] = &[
-  "; ls -la",
-  "| cat /etc/passwd",
-  "`whoami`",
-  "$(rm -rf /)",
-];
+pub const COMMAND_INJECTION: &[&str] =
+  &["; ls -la", "| cat /etc/passwd", "`whoami`", "$(rm -rf /)"];
 
 /// Unicode test strings (various languages and special characters)
 pub const UNICODE_STRINGS: &[&str] = &[
-  "用户-user-123",           // Chinese
-  "пользователь",            // Russian (Cyrillic)
-  "مستخدم",                  // Arabic (RTL)
-  "ユーザー",                // Japanese
-  "👤user🔑token",          // Emoji
-  "café_résumé",             // Accents
-  "user\u{200B}hidden",      // Zero-width space
-  "user\nwith\nnewlines",    // Embedded newlines
+  "用户-user-123",        // Chinese
+  "пользователь",         // Russian (Cyrillic)
+  "مستخدم",               // Arabic (RTL)
+  "ユーザー",             // Japanese
+  "👤user🔑token",        // Emoji
+  "café_résumé",          // Accents
+  "user\u{200B}hidden",   // Zero-width space
+  "user\nwith\nnewlines", // Embedded newlines
 ];
 
-/// Very long strings for DoS testing
+/// Very long strings for `DoS` testing
 pub fn long_string(length: usize) -> String {
   "A".repeat(length)
 }
 
 /// Empty and whitespace strings
 pub const EMPTY_WHITESPACE: &[&str] = &[
-  "",                // Empty
-  " ",               // Single space
-  "   ",             // Multiple spaces
-  "\t",              // Tab
-  "\n",              // Newline
-  "\r\n",            // CRLR
-  " \t\n\r ",        // Mixed whitespace
+  "",         // Empty
+  " ",        // Single space
+  "   ",      // Multiple spaces
+  "\t",       // Tab
+  "\n",       // Newline
+  "\r\n",     // CRLR
+  " \t\n\r ", // Mixed whitespace
 ];
 
 /// Control characters
 pub const CONTROL_CHARS: &[&str] = &[
-  "\x00",            // Null byte
-  "\x01\x02\x03",    // SOH, STX, ETX
-  "\x1B",            // ESC
-  "\x7F",            // DEL
+  "\x00",         // Null byte
+  "\x01\x02\x03", // SOH, STX, ETX
+  "\x1B",         // ESC
+  "\x7F",         // DEL
 ];
 
 /// Special characters that might break parsing
@@ -88,15 +84,15 @@ pub const SPECIAL_CHARS: &[&str] = &[
 
 /// URL encoding edge cases
 pub const URL_ENCODING: &[&str] = &[
-  "%20",             // Space
-  "%3C%3E",          // <>
-  "%00",             // Null byte
-  "user%2Btest",     // +
+  "%20",         // Space
+  "%3C%3E",      // <>
+  "%00",         // Null byte
+  "user%2Btest", // +
 ];
 
 /// Numeric boundary test values for i64
 pub const I64_BOUNDARIES: &[i64] = &[
-  i64::MIN,          // -9223372036854775808
+  i64::MIN, // -9223372036854775808
   i64::MIN + 1,
   -1_000_000,
   -1,
@@ -104,7 +100,7 @@ pub const I64_BOUNDARIES: &[i64] = &[
   1,
   1_000_000,
   i64::MAX - 1,
-  i64::MAX,          // 9223372036854775807
+  i64::MAX, // 9223372036854775807
 ];
 
 /// Numeric boundary test values for Option<i64> (cost fields)
@@ -119,13 +115,13 @@ pub const OPTIONAL_I64_BOUNDARIES: &[Option<i64>] = &[
 
 /// Invalid JSON payloads
 pub const INVALID_JSON: &[&str] = &[
-  "{",               // Incomplete
-  "}",               // No opening
-  "{{}",             // Malformed
+  "{",                // Incomplete
+  "}",                // No opening
+  "{{}",              // Malformed
   "{'key': 'value'}", // Single quotes
-  "{key: value}",    // Unquoted keys
-  "null",            // Valid JSON but wrong type
-  "[]",              // Array instead of object
+  "{key: value}",     // Unquoted keys
+  "null",             // Valid JSON but wrong type
+  "[]",               // Array instead of object
 ];
 
 /// Content-Type header test values
@@ -135,20 +131,12 @@ pub const CONTENT_TYPES: &[&str] = &[
   "text/plain",
   "application/xml",
   "multipart/form-data",
-  "",                // Missing
+  "", // Missing
 ];
 
 /// HTTP methods for testing unsupported methods
 pub const HTTP_METHODS: &[&str] = &[
-  "GET",
-  "POST",
-  "PUT",
-  "DELETE",
-  "PATCH",
-  "HEAD",
-  "OPTIONS",
-  "TRACE",
-  "CONNECT",
+  "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "CONNECT",
 ];
 
 /// Helper function to generate SQL injection test for string field
@@ -161,7 +149,7 @@ pub const HTTP_METHODS: &[&str] = &[
 pub fn sql_injection_cases(field_name: &str) -> Vec<(String, &'static str)> {
   SQL_INJECTIONS
     .iter()
-    .map(|injection| (format!("{}: {}", field_name, injection), *injection))
+    .map(|injection| (format!("{field_name}: {injection}"), *injection))
     .collect()
 }
 
@@ -169,7 +157,7 @@ pub fn sql_injection_cases(field_name: &str) -> Vec<(String, &'static str)> {
 pub fn xss_cases(field_name: &str) -> Vec<(String, &'static str)> {
   XSS_VECTORS
     .iter()
-    .map(|xss| (format!("{}: {}", field_name, xss), *xss))
+    .map(|xss| (format!("{field_name}: {xss}"), *xss))
     .collect()
 }
 
@@ -177,7 +165,7 @@ pub fn xss_cases(field_name: &str) -> Vec<(String, &'static str)> {
 pub fn unicode_cases(field_name: &str) -> Vec<(String, &'static str)> {
   UNICODE_STRINGS
     .iter()
-    .map(|unicode| (format!("{}: {}", field_name, unicode), *unicode))
+    .map(|unicode| (format!("{field_name}: {unicode}"), *unicode))
     .collect()
 }
 
@@ -185,7 +173,7 @@ pub fn unicode_cases(field_name: &str) -> Vec<(String, &'static str)> {
 pub fn empty_whitespace_cases(field_name: &str) -> Vec<(String, &'static str)> {
   EMPTY_WHITESPACE
     .iter()
-    .map(|ws| (format!("{}: '{}'", field_name, ws), *ws))
+    .map(|ws| (format!("{field_name}: '{ws}'"), *ws))
     .collect()
 }
 
@@ -263,7 +251,7 @@ mod tests {
     let cases = cost_boundary_cases();
     assert_eq!(cases.len(), 8);
     assert!(!cases[0].expected_valid); // i64::MIN invalid
-    assert!(cases[4].expected_valid);  // 1 cent valid
+    assert!(cases[4].expected_valid); // 1 cent valid
   }
 
   #[test]

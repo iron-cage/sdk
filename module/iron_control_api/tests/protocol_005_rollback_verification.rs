@@ -16,7 +16,7 @@
 //! ## Why Rollback Is Impossible
 //!
 //! **Cannot Remove API Enforcement:**
-//! - Removing the agent_id check in keys.rs would re-enable the bypass
+//! - Removing the `agent_id` check in keys.rs would re-enable the bypass
 //! - This would allow agents to access credentials without budget control
 //! - Budget control protocol guarantee would be violated
 //!
@@ -39,42 +39,45 @@
 //! | `test_rollback_impossibility_is_documented` | Verify rollback impossibility is documented | Check test file contains "Why Rollback Is Impossible" section | Documentation exists explaining why rollback breaks security | ✅ |
 //! | `test_enforcement_code_exists_in_keys_endpoint` | Verify enforcement code in /api/keys | Check keys.rs source code for agent token blocking | keys.rs contains "Agent tokens cannot use this endpoint" | ✅ |
 
-use iron_token_manager::{ agent_budget::AgentBudgetManager, lease_manager::LeaseManager, migrations::apply_all_migrations };
+use iron_token_manager::{
+  agent_budget::AgentBudgetManager, lease_manager::LeaseManager, migrations::apply_all_migrations,
+};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 
 /// Setup test database with all migrations applied
-async fn setup_test_db() -> SqlitePool
-{
-  let pool = SqlitePool::connect( ":memory:" ).await.unwrap();
-  apply_all_migrations( &pool ).await.unwrap();
+async fn setup_test_db() -> SqlitePool {
+  let pool = SqlitePool::connect(":memory:").await.unwrap();
+  apply_all_migrations(&pool).await.unwrap();
   pool
 }
 
 /// Create test agent and tokens for rollback verification
-async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
-{
-  let now_ms = std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .unwrap()
-    .as_millis() as i64;
+async fn create_test_agent_and_tokens(pool: &SqlitePool) -> (i64, i64, i64) {
+  let now_ms = i64::try_from(
+    std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap()
+      .as_millis(),
+  )
+  .unwrap();
 
   // Create test user with explicit ID
-  let password_hash = bcrypt::hash( "test_password", bcrypt::DEFAULT_COST ).unwrap();
+  let password_hash = bcrypt::hash("test_password", bcrypt::DEFAULT_COST).unwrap();
   let user_id = "test_user";
 
   sqlx::query(
     "INSERT INTO users ( id, username, password_hash, role, email, is_active, created_at )
-     VALUES ( $1, $2, $3, $4, $5, $6, $7 )"
+     VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
   )
-  .bind( user_id )
-  .bind( "test_user" )
-  .bind( &password_hash )
-  .bind( "developer" )
-  .bind( "test@example.com" )
-  .bind( true )
-  .bind( now_ms )
-  .execute( pool )
+  .bind(user_id)
+  .bind("test_user")
+  .bind(&password_hash)
+  .bind("developer")
+  .bind("test@example.com")
+  .bind(true)
+  .bind(now_ms)
+  .execute(pool)
   .await
   .unwrap();
 
@@ -82,13 +85,13 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
   let agent_id: i64 = sqlx::query_scalar(
     "INSERT INTO agents ( name, providers, created_at, owner_id )
      VALUES ( $1, $2, $3, $4 )
-     RETURNING id"
+     RETURNING id",
   )
-  .bind( "test_agent" )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( user_id )
-  .fetch_one( pool )
+  .bind("test_agent")
+  .bind(serde_json::to_string(&vec!["openai"]).unwrap())
+  .bind(now_ms)
+  .bind(user_id)
+  .fetch_one(pool)
   .await
   .unwrap();
 
@@ -96,14 +99,14 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
   let user_token_id: i64 = sqlx::query_scalar(
     "INSERT INTO api_tokens ( token_hash, user_id, is_active, created_at, agent_id )
      VALUES ( $1, $2, $3, $4, $5 )
-     RETURNING id"
+     RETURNING id",
   )
-  .bind( "hash_user_token" )
-  .bind( user_id )
-  .bind( true )
-  .bind( now_ms )
-  .bind( Option::< i64 >::None )
-  .fetch_one( pool )
+  .bind("hash_user_token")
+  .bind(user_id)
+  .bind(true)
+  .bind(now_ms)
+  .bind(Option::<i64>::None)
+  .fetch_one(pool)
   .await
   .unwrap();
 
@@ -111,18 +114,18 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
   let agent_token_id: i64 = sqlx::query_scalar(
     "INSERT INTO api_tokens ( token_hash, user_id, is_active, created_at, agent_id )
      VALUES ( $1, $2, $3, $4, $5 )
-     RETURNING id"
+     RETURNING id",
   )
-  .bind( "hash_agent_token" )
-  .bind( user_id )
-  .bind( true )
-  .bind( now_ms )
-  .bind( Some( agent_id ) )
-  .fetch_one( pool )
+  .bind("hash_agent_token")
+  .bind(user_id)
+  .bind(true)
+  .bind(now_ms)
+  .bind(Some(agent_id))
+  .fetch_one(pool)
   .await
   .unwrap();
 
-  ( agent_id, user_token_id, agent_token_id )
+  (agent_id, user_token_id, agent_token_id)
 }
 
 /// ## TEST 1: Verify Token Distinguishability (Enforcement Foundation)
@@ -131,20 +134,18 @@ async fn create_test_agent_and_tokens( pool: &SqlitePool ) -> ( i64, i64, i64 )
 /// at the database level. This is the foundation for API-level enforcement.
 ///
 /// **Why This Matters:** Without distinguishability, enforcement is impossible.
-#[ tokio::test ]
-async fn test_token_distinguishability_enables_enforcement()
-{
+#[tokio::test]
+async fn test_token_distinguishability_enables_enforcement() {
   let pool = setup_test_db().await;
-  let ( agent_id, user_token_id, agent_token_id ) = create_test_agent_and_tokens( &pool ).await;
+  let (agent_id, user_token_id, agent_token_id) = create_test_agent_and_tokens(&pool).await;
 
   // Verify user token has NULL agent_id
-  let user_token_agent_id: Option< i64 > = sqlx::query_scalar(
-    "SELECT agent_id FROM api_tokens WHERE id = ?"
-  )
-  .bind( user_token_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let user_token_agent_id: Option<i64> =
+    sqlx::query_scalar("SELECT agent_id FROM api_tokens WHERE id = ?")
+      .bind(user_token_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   assert!(
     user_token_agent_id.is_none(),
@@ -152,17 +153,16 @@ async fn test_token_distinguishability_enables_enforcement()
   );
 
   // Verify agent token has non-NULL agent_id
-  let agent_token_agent_id: Option< i64 > = sqlx::query_scalar(
-    "SELECT agent_id FROM api_tokens WHERE id = ?"
-  )
-  .bind( agent_token_id )
-  .fetch_one( &pool )
-  .await
-  .unwrap();
+  let agent_token_agent_id: Option<i64> =
+    sqlx::query_scalar("SELECT agent_id FROM api_tokens WHERE id = ?")
+      .bind(agent_token_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
 
   assert_eq!(
     agent_token_agent_id,
-    Some( agent_id ),
+    Some(agent_id),
     "Agent tokens MUST have agent_id = <agent_id>. This blocks them from /api/keys."
   );
 
@@ -178,17 +178,16 @@ async fn test_token_distinguishability_enables_enforcement()
 /// 3. Track usage
 ///
 /// **Why This Matters:** The new path must be functional for enforcement to be viable.
-#[ tokio::test ]
-async fn test_protocol_005_budget_flow_works()
-{
+#[tokio::test]
+async fn test_protocol_005_budget_flow_works() {
   let pool = setup_test_db().await;
-  let ( agent_id, _user_token_id, _agent_token_id ) = create_test_agent_and_tokens( &pool ).await;
+  let (agent_id, _user_token_id, _agent_token_id) = create_test_agent_and_tokens(&pool).await;
 
   // Verify agent_budgets table exists
   let table_exists: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='agent_budgets'"
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='agent_budgets'",
   )
-  .fetch_one( &pool )
+  .fetch_one(&pool)
   .await
   .unwrap();
 
@@ -198,69 +197,87 @@ async fn test_protocol_005_budget_flow_works()
   );
 
   // Step 1: Create agent budget
-  let budget_manager = Arc::new( AgentBudgetManager::from_pool( pool.clone() ) );
+  let budget_manager = Arc::new(AgentBudgetManager::from_pool(pool.clone()));
   budget_manager
-    .create_budget( agent_id, 100_000_000 )
+    .create_budget(agent_id, 100_000_000)
     .await
     .unwrap();
 
   // Verify budget was created
   let budget = budget_manager
-    .get_budget_status( agent_id )
+    .get_budget_status(agent_id)
     .await
     .unwrap()
     .expect("LOUD FAILURE: Budget should exist");
 
-  assert_eq!( budget.total_allocated, 100_000_000, "Total allocated should be $100" );
-  assert_eq!( budget.budget_remaining, 100_000_000, "Budget remaining should be $100" );
+  assert_eq!(
+    budget.total_allocated, 100_000_000,
+    "Total allocated should be $100"
+  );
+  assert_eq!(
+    budget.budget_remaining, 100_000_000,
+    "Budget remaining should be $100"
+  );
 
   // Step 2: Create budget lease
-  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let lease_id = format!( "lease_{}", agent_id );
+  let lease_manager = Arc::new(LeaseManager::from_pool(pool.clone()));
+  let lease_id = format!("lease_{agent_id}");
   let budget_id = agent_id; // budget_id = agent_id (1:1 relationship)
 
   lease_manager
-    .create_lease( &lease_id, agent_id, budget_id, 10_000_000, None )
+    .create_lease(&lease_id, agent_id, budget_id, 10_000_000, None)
     .await
     .unwrap();
 
   // Verify lease was created
   let lease = lease_manager
-    .get_lease( &lease_id )
+    .get_lease(&lease_id)
     .await
     .unwrap()
     .expect("LOUD FAILURE: Lease should exist");
 
-  assert_eq!( lease.budget_granted, 10_000_000, "Lease should have $10 granted" );
-  assert_eq!( lease.budget_spent, 0, "Lease should have $0 spent initially" );
+  assert_eq!(
+    lease.budget_granted, 10_000_000,
+    "Lease should have $10 granted"
+  );
+  assert_eq!(
+    lease.budget_spent, 0,
+    "Lease should have $0 spent initially"
+  );
 
   // Step 3: Record usage
   lease_manager
-    .record_usage( &lease_id, 2_500_000 )
+    .record_usage(&lease_id, 2_500_000)
     .await
     .unwrap();
 
   budget_manager
-    .record_spending( agent_id, 2_500_000 )
+    .record_spending(agent_id, 2_500_000)
     .await
     .unwrap();
 
   // Verify usage was recorded
   let updated_lease = lease_manager
-    .get_lease( &lease_id )
+    .get_lease(&lease_id)
     .await
     .unwrap()
     .expect("LOUD FAILURE: Lease should exist");
 
-  assert_eq!( updated_lease.budget_spent, 2_500_000, "Lease should show $2.50 spent" );
+  assert_eq!(
+    updated_lease.budget_spent, 2_500_000,
+    "Lease should show $2.50 spent"
+  );
 
   let updated_budget = budget_manager
-    .get_budget_status( agent_id )
+    .get_budget_status(agent_id)
     .await
     .unwrap()
     .expect("LOUD FAILURE: Budget should exist");
 
-  assert_eq!( updated_budget.total_spent, 2_500_000, "Budget should show $2.50 total spent" );
+  assert_eq!(
+    updated_budget.total_spent, 2_500_000,
+    "Budget should show $2.50 total spent"
+  );
   assert_eq!(
     updated_budget.budget_remaining, 97_500_000,
     "Budget remaining should be $97.50"
@@ -274,29 +291,28 @@ async fn test_protocol_005_budget_flow_works()
 ///
 /// This test doesn't execute code - it verifies documentation exists
 /// that explains why removing enforcement would break security.
-#[ test ]
-fn test_rollback_impossibility_is_documented()
-{
+#[test]
+fn test_rollback_impossibility_is_documented() {
   // Verify this test file contains rollback impossibility documentation
-  let test_source = include_str!( "protocol_005_rollback_verification.rs" );
+  let test_source = include_str!("protocol_005_rollback_verification.rs");
 
   assert!(
-    test_source.contains( "Why Rollback Is Impossible" ),
+    test_source.contains("Why Rollback Is Impossible"),
     "Test file must document why rollback is impossible"
   );
 
   assert!(
-    test_source.contains( "Cannot Remove API Enforcement" ),
+    test_source.contains("Cannot Remove API Enforcement"),
     "Test file must explain that API enforcement cannot be removed"
   );
 
   assert!(
-    test_source.contains( "Database Constraints Are Insufficient" ),
+    test_source.contains("Database Constraints Are Insufficient"),
     "Test file must explain that database constraints alone are insufficient"
   );
 
   assert!(
-    test_source.contains( "Removing Enforcement = Security Regression" ),
+    test_source.contains("Removing Enforcement = Security Regression"),
     "Test file must explain that rollback would cause security regression"
   );
 }
@@ -306,18 +322,17 @@ fn test_rollback_impossibility_is_documented()
 /// This test verifies that the agent token rejection code exists in the
 /// /api/keys endpoint implementation. If this code is removed, the bypass
 /// path reopens.
-#[ tokio::test ]
-async fn test_enforcement_code_exists_in_keys_endpoint()
-{
+#[tokio::test]
+async fn test_enforcement_code_exists_in_keys_endpoint() {
   // Read the keys.rs source file
-  let keys_source = include_str!( "../src/routes/keys.rs" );
+  let keys_source = include_str!("../src/routes/keys.rs");
 
   // Verify the enforcement check exists
   assert!(
-    keys_source.contains( "let agent_id: Option< i64 >" )
-      && keys_source.contains( "SELECT agent_id FROM api_tokens WHERE id = ?" )
-      && keys_source.contains( "if agent_id.is_some()" )
-      && keys_source.contains( "Agent tokens cannot use this endpoint" ),
+    keys_source.contains("let agent_id: Option<i64>")
+      && keys_source.contains("SELECT agent_id FROM api_tokens WHERE id = ?")
+      && keys_source.contains("if agent_id.is_some()")
+      && keys_source.contains("Agent tokens cannot use this endpoint"),
     "CRITICAL: The agent token enforcement check in keys.rs has been removed! \
      This reopens the bypass path and violates Protocol 005. \
      The check MUST exist at approximately lines 103-136 in keys.rs"
@@ -325,7 +340,7 @@ async fn test_enforcement_code_exists_in_keys_endpoint()
 
   // Verify the error response references Protocol 005
   assert!(
-    keys_source.contains( "\"protocol\": \"005\"" ),
+    keys_source.contains("\"protocol\": \"005\""),
     "Error response must reference Protocol 005 to guide users to correct path"
   );
 }
