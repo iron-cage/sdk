@@ -17,6 +17,10 @@ where
 }
 
 /// List limits adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation or service call fails.
 pub async fn list_limits_adapter<T, S>(
   command: &T,
   limits_service: S,
@@ -41,6 +45,10 @@ where
 }
 
 /// Get limit adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn get_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
@@ -71,6 +79,10 @@ where
 }
 
 /// Create limit adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn create_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
@@ -111,6 +123,10 @@ where
 }
 
 /// Update limit adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn update_limit_adapter<T, S>(
   command: &T,
   limits_service: S,
@@ -148,6 +164,10 @@ where
 }
 
 /// Delete limit adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn delete_limit_adapter<T, S>(
   command: &T,
   limits_service: S,

@@ -198,11 +198,7 @@ async fn test_get_trace_adapter_all_formats() {
     let result =
       iron_cli::adapters::traces::get_trace_adapter(&command, adapter.clone(), &formatter).await;
 
-    assert!(
-      result.is_ok(),
-      "Should succeed with format '{}'",
-      format_str
-    );
+    assert!(result.is_ok(), "Should succeed with format '{format_str}'");
   }
 }
 

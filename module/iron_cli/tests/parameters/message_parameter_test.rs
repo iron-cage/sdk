@@ -8,7 +8,7 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .test.with_message (message parameter)
+//! - `.test.with_message` (message parameter)
 //! - Other test commands that support message parameter
 //!
 //! ## Test Categories
@@ -131,7 +131,7 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".test.with_message", &format!("message::{}", long_message)],
+        &[".test.with_message", &format!("message::{long_message}")],
       )
       .await;
 

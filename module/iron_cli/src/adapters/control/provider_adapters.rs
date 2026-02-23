@@ -5,12 +5,18 @@
 use super::{ControlApiClient, ControlApiConfig};
 use crate::formatting::{OutputFormat, TreeFmtFormatter};
 use crate::handlers::control::provider_handlers;
+use core::str::FromStr;
 use serde_json::json;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 /// List all providers
-pub async fn list_providers_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+pub async fn list_providers_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::list_providers_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -19,16 +25,26 @@ pub async fn list_providers_adapter(params: &HashMap<String, String>) -> Result<
   let response = client
     .get("/api/v1/providers", None)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// Create new provider
-pub async fn create_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if validated `provider` or `api_key` parameters are missing after handler validation.
+pub async fn create_provider_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::create_provider_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -63,37 +79,57 @@ pub async fn create_provider_adapter(params: &HashMap<String, String>) -> Result
   let response = client
     .post("/api/v1/providers", body)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// Get provider by ID
-pub async fn get_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing from the map after handler validation.
+pub async fn get_provider_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::get_provider_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new(config);
 
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/providers/{}", id);
+  let path = format!("/api/v1/providers/{id}");
 
   let response = client
     .get(&path, None)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// Update provider
-pub async fn update_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing from the map after handler validation.
+pub async fn update_provider_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::update_provider_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -125,20 +161,30 @@ pub async fn update_provider_adapter(params: &HashMap<String, String>) -> Result
     body["endpoint"] = json!(endpoint);
   }
 
-  let path = format!("/api/v1/providers/{}", id);
+  let path = format!("/api/v1/providers/{id}");
   let response = client
     .put(&path, body)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// Delete provider
-pub async fn delete_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing from the map after handler validation.
+pub async fn delete_provider_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::delete_provider_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -155,21 +201,31 @@ pub async fn delete_provider_adapter(params: &HashMap<String, String>) -> Result
   let client = ControlApiClient::new(config);
 
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/providers/{}", id);
+  let path = format!("/api/v1/providers/{id}");
 
   let response = client
     .delete(&path)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// Assign agents to provider
-pub async fn assign_agents_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if validated `id` or `agent_ids` parameters are missing after handler validation.
+pub async fn assign_agents_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::assign_agents_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -194,21 +250,29 @@ pub async fn assign_agents_adapter(params: &HashMap<String, String>) -> Result<S
     "agent_ids": ids,
   });
 
-  let path = format!("/api/v1/providers/{}/agents", id);
+  let path = format!("/api/v1/providers/{id}/agents");
   let response = client
     .post(&path, body)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// List agents for provider
-pub async fn list_provider_agents_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing from the map after handler validation.
+pub async fn list_provider_agents_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, String> {
   provider_handlers::list_provider_agents_handler(params).map_err(|e| e.to_string())?;
 
@@ -216,21 +280,31 @@ pub async fn list_provider_agents_adapter(
   let client = ControlApiClient::new(config);
 
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/providers/{}/agents", id);
+  let path = format!("/api/v1/providers/{id}/agents");
 
   let response = client
     .get(&path, None)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)
 }
 
 /// Remove agent from provider
-pub async fn remove_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if validated `id` or `agent_id` parameters are missing after handler validation.
+pub async fn remove_agent_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   provider_handlers::remove_agent_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -249,13 +323,13 @@ pub async fn remove_agent_adapter(params: &HashMap<String, String>) -> Result<St
   let id = params.get("id").unwrap(); // Already validated
   let agent_id = params.get("agent_id").unwrap(); // Already validated
 
-  let path = format!("/api/v1/providers/{}/agents/{}", id, agent_id);
+  let path = format!("/api/v1/providers/{id}/agents/{agent_id}");
   let response = client
     .delete(&path)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)

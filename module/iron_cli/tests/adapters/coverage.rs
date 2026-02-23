@@ -12,12 +12,12 @@
 //! ## Migration Context
 //!
 //! During Phase 2 migration, 6 orphaned adapters were deleted:
-//! - show_agent_usage_adapter (usage_adapters.rs)
-//! - export_agent_usage_adapter (usage_adapters.rs)
-//! - reset_limit_adapter (limits_adapters.rs)
-//! - show_agent_limits_adapter (limits_adapters.rs)
-//! - update_agent_limit_adapter (limits_adapters.rs)
-//! - show_trace_stats_adapter (traces_adapters.rs)
+//! - `show_agent_usage_adapter` (`usage_adapters.rs`)
+//! - `export_agent_usage_adapter` (`usage_adapters.rs`)
+//! - `reset_limit_adapter` (`limits_adapters.rs`)
+//! - `show_agent_limits_adapter` (`limits_adapters.rs`)
+//! - `update_agent_limit_adapter` (`limits_adapters.rs`)
+//! - `show_trace_stats_adapter` (`traces_adapters.rs`)
 //!
 //! After migration:
 //! - Total adapters: 22 (was 28)
@@ -40,12 +40,12 @@ use std::path::PathBuf;
 ///
 /// ## Expected Adapter Count
 ///
-/// - auth_adapters: 3
-/// - token_adapters: 5
-/// - usage_adapters: 4 (was 6, deleted 2)
-/// - limits_adapters: 5 (was 8, deleted 3)
-/// - traces_adapters: 3 (was 4, deleted 1)
-/// - health_adapters: 2
+/// - `auth_adapters`: 3
+/// - `token_adapters`: 5
+/// - `usage_adapters`: 4 (was 6, deleted 2)
+/// - `limits_adapters`: 5 (was 8, deleted 3)
+/// - `traces_adapters`: 3 (was 4, deleted 1)
+/// - `health_adapters`: 2
 ///
 /// Total: 22 adapters
 #[test]
@@ -65,23 +65,25 @@ fn test_all_adapters_have_valid_endpoints() {
   let mut total_adapters = 0;
 
   for (file_name, expected_count) in &adapter_files {
-    let file_path = manifest_dir.join(format!("src/adapters/{}", file_name));
+    let file_path = manifest_dir.join(format!("src/adapters/{file_name}"));
 
-    assert!(file_path.exists(), "Adapter file must exist: {}", file_name);
+    assert!(file_path.exists(), "Adapter file must exist: {file_name}");
 
-    let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_name));
+    let content =
+      std::fs::read_to_string(&file_path).unwrap_or_else(|_| panic!("Failed to read {file_name}"));
 
     // Count public adapter functions
     let adapter_count = content
       .lines()
-      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
+      .filter(|line| {
+        (line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+          && line.contains("_adapter")
+      })
       .count();
 
     assert_eq!(
       adapter_count, *expected_count,
-      "{}: Expected {} adapters, found {}",
-      file_name, expected_count, adapter_count
+      "{file_name}: Expected {expected_count} adapters, found {adapter_count}"
     );
 
     total_adapters += adapter_count;
@@ -105,12 +107,12 @@ fn test_all_adapters_have_valid_endpoints() {
 ///
 /// ## Orphaned Adapters (Deleted)
 ///
-/// - show_agent_usage_adapter
-/// - export_agent_usage_adapter
-/// - reset_limit_adapter
-/// - show_agent_limits_adapter
-/// - update_agent_limit_adapter
-/// - show_trace_stats_adapter
+/// - `show_agent_usage_adapter`
+/// - `export_agent_usage_adapter`
+/// - `reset_limit_adapter`
+/// - `show_agent_limits_adapter`
+/// - `update_agent_limit_adapter`
+/// - `show_trace_stats_adapter`
 ///
 /// ## Verification Method
 ///
@@ -145,15 +147,13 @@ fn test_no_orphaned_adapters_exist() {
     }
 
     let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
+      .unwrap_or_else(|_| panic!("Failed to read {file_path_str}"));
 
     // Check for orphaned adapter references
     for adapter in &orphaned_adapters {
       assert!(
         !content.contains(adapter),
-        "File {} must NOT contain orphaned adapter: {}",
-        file_path_str,
-        adapter
+        "File {file_path_str} must NOT contain orphaned adapter: {adapter}"
       );
     }
   }
@@ -163,8 +163,7 @@ fn test_no_orphaned_adapters_exist() {
 
   assert_eq!(
     orphaned_count, 0,
-    "NC-A.1 violated: Found {} orphaned adapters (expected 0)",
-    orphaned_count
+    "NC-A.1 violated: Found {orphaned_count} orphaned adapters (expected 0)"
   );
 }
 
@@ -210,14 +209,17 @@ fn test_adapter_count_metrics() {
   let mut total_count = 0;
 
   for (file_name, _expected) in &expected_adapters {
-    let file_path = manifest_dir.join(format!("src/adapters/{}", file_name));
+    let file_path = manifest_dir.join(format!("src/adapters/{file_name}"));
 
-    let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_name));
+    let content =
+      std::fs::read_to_string(&file_path).unwrap_or_else(|_| panic!("Failed to read {file_name}"));
 
     let count = content
       .lines()
-      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
+      .filter(|line| {
+        (line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+          && line.contains("_adapter")
+      })
       .count();
 
     total_count += count;
@@ -226,30 +228,26 @@ fn test_adapter_count_metrics() {
   // Verify metrics
   let orphaned_count = 0; // All orphaned adapters deleted
   let correct_count = total_count; // All remaining adapters are correct
-  let orphaned_percentage = (orphaned_count as f64 / total_count as f64) * 100.0;
+  let orphaned_percentage = (f64::from(orphaned_count) / total_count as f64) * 100.0;
 
   assert_eq!(
     total_count, 22,
-    "Total adapters: expected 22, found {}",
-    total_count
+    "Total adapters: expected 22, found {total_count}"
   );
 
   assert_eq!(
     orphaned_count, 0,
-    "Orphaned adapters: expected 0, found {}",
-    orphaned_count
+    "Orphaned adapters: expected 0, found {orphaned_count}"
   );
 
   assert_eq!(
     correct_count, 22,
-    "Correct adapters: expected 22, found {}",
-    correct_count
+    "Correct adapters: expected 22, found {correct_count}"
   );
 
   // NC-A.3: Orphaned percentage must be 0%
-  assert_eq!(
-    orphaned_percentage, 0.0,
-    "NC-A.3 violated: Orphaned percentage is {:.1}% (expected 0%)",
-    orphaned_percentage
+  assert!(
+    orphaned_percentage.abs() < f64::EPSILON,
+    "NC-A.3 violated: Orphaned percentage is {orphaned_percentage:.1}% (expected 0%)"
   );
 }

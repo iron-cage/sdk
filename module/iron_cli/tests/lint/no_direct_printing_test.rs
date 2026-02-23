@@ -2,15 +2,16 @@
 //!
 //! ## Purpose
 //!
-//! After tree_fmt migration, all output must use TreeFmtFormatter.
-//! This test ensures no println!/print!/eprintln! calls exist in src/
+//! After `tree_fmt` migration, all output must use `TreeFmtFormatter`.
+//! This test ensures no `println!`/`print!`/`eprintln!` calls exist in src/
 //! (except in binary entry points).
 //!
 //! ## Test Strategy
 //!
 //! Static analysis of source files to detect violations.
-//! Fails loudly with file:line information if violations found.
+//! Fails loudly with `file:line` information if violations found.
 
+use core::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
@@ -24,10 +25,12 @@ fn test_no_println_in_source() {
     error_msg.push_str("All output must use TreeFmtFormatter. Found:\n\n");
 
     for violation in &violations {
-      error_msg.push_str(&format!(
-        "  {}:{} - {}\n",
+      writeln!(
+        error_msg,
+        "  {}:{} - {}",
         violation.file, violation.line, violation.call
-      ));
+      )
+      .unwrap();
     }
 
     error_msg.push_str("\nFix: Replace with TreeFmtFormatter::format_single() or format_list()\n");
@@ -50,7 +53,7 @@ fn test_no_print_in_source() {
     let mut error_msg = String::from("\n❌ VIOLATION: Direct print! detected in source files\n\n");
 
     for violation in &violations {
-      error_msg.push_str(&format!("  {}:{}\n", violation.file, violation.line));
+      writeln!(error_msg, "  {}:{}", violation.file, violation.line).unwrap();
     }
 
     error_msg.push_str("\nFix: Use TreeFmtFormatter instead\n");
@@ -68,10 +71,12 @@ fn test_adapters_use_tree_fmt_formatter() {
     error_msg.push_str("All adapters must use TreeFmtFormatter. Found:\n\n");
 
     for violation in &violations {
-      error_msg.push_str(&format!(
-        "  {}:{} - {}\n",
+      writeln!(
+        error_msg,
+        "  {}:{} - {}",
         violation.file, violation.line, violation.call
-      ));
+      )
+      .unwrap();
     }
 
     error_msg.push_str("\nFix: Change 'Formatter' to 'TreeFmtFormatter'\n");

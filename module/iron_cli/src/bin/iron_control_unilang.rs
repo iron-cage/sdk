@@ -11,13 +11,13 @@
 //! - Adapters bridge handlers to REST API (I/O layer)
 //!
 //! Commands:
-//! - Agents (12): .agent.{list,create,get,update,delete,assign_providers,list_providers,remove_provider,ic_token.*}
-//! - Providers (8): .provider.{list,create,get,update,delete,assign_agents,list_agents,remove_agent}
-//! - Analytics (8): .analytics.{usage,spending,metrics,usage_by_agent,usage_by_provider,spending_by_period,export_usage,export_spending}
-//! - Budget (3): .budget_limit.{get,set}, .budget.status
-//! - API Tokens (4): .api_token.{list,create,get,revoke}
-//! - Projects (2): .project.{list,get}
-//! - Users (8): .user.{list,create,get,update,delete,set_role,reset_password,get_permissions}
+//! - Agents (12): `.agent.{list,create,get,update,delete,assign_providers,list_providers,remove_provider,ic_token.*}`
+//! - Providers (8): `.provider.{list,create,get,update,delete,assign_agents,list_agents,remove_agent}`
+//! - Analytics (8): `.analytics.{usage,spending,metrics,usage_by_agent,usage_by_provider,spending_by_period,export_usage,export_spending}`
+//! - Budget (3): `.budget_limit.{get,set}`, `.budget.status`
+//! - API Tokens (4): `.api_token.{list,create,get,revoke}`
+//! - Projects (2): `.project.{list,get}`
+//! - Users (8): `.user.{list,create,get,update,delete,set_role,reset_password,get_permissions}`
 //!
 
 // Binary entry points are allowed to use println! for final output
@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use unilang::prelude::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn core::error::Error>> {
   let args: Vec<String> = std::env::args().collect();
 
   if args.len() == 1 {
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
   } else {
     if let Some(error) = result.error {
-      eprintln!("Error: {}", error);
+      eprintln!("Error: {error}");
     } else {
       eprintln!("Command failed");
     }
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Load command registry from YAML files in commands/control/
-fn load_command_registry() -> Result<CommandRegistry, Box<dyn std::error::Error>> {
+fn load_command_registry() -> Result<CommandRegistry, Box<dyn core::error::Error>> {
   // Determine path to commands directory
   let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   let commands_dir = manifest_dir.join("commands").join("control");
@@ -115,7 +115,7 @@ fn load_command_registry() -> Result<CommandRegistry, Box<dyn std::error::Error>
 }
 
 /// Discover all YAML files in directory
-fn discover_yaml_files(dir: &PathBuf) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+fn discover_yaml_files(dir: &PathBuf) -> Result<Vec<PathBuf>, Box<dyn core::error::Error>> {
   let mut files = Vec::new();
 
   for entry in std::fs::read_dir(dir)? {
@@ -156,7 +156,7 @@ fn create_command_routine(command_name: &str) -> CommandRoutine {
         use unilang::data::{ErrorCode, ErrorData};
         Err(ErrorData::new(
           ErrorCode::InternalError,
-          format!("Handler error: {}", e),
+          format!("Handler error: {e}"),
         ))
       }
     }
@@ -181,7 +181,7 @@ fn route_to_handler(
 ) -> Result<String, String> {
   // Create tokio runtime for async adapter calls
   let runtime =
-    tokio::runtime::Runtime::new().map_err(|e| format!("Failed to create async runtime: {}", e))?;
+    tokio::runtime::Runtime::new().map_err(|e| format!("Failed to create async runtime: {e}"))?;
 
   match command_name {
     // Agent commands
@@ -319,17 +319,16 @@ fn route_to_handler(
     ".auth.login" => runtime
       .block_on(iron_cli::adapters::auth_adapters::login_adapter(params))
       .map_err(|e| e.to_string()),
-    ".auth.logout" => runtime
-      .block_on(iron_cli::adapters::auth_adapters::logout_adapter(params))
-      .map_err(|e| e.to_string()),
+    ".auth.logout" => {
+      iron_cli::adapters::auth_adapters::logout_adapter(params).map_err(|e| e.to_string())
+    }
     ".auth.refresh" => runtime
       .block_on(iron_cli::adapters::auth_adapters::refresh_adapter(params))
       .map_err(|e| e.to_string()),
 
     // Default: Command not implemented
     _ => Ok(format!(
-      "Command '{}' recognized but handler not yet implemented",
-      command_name
+      "Command '{command_name}' recognized but handler not yet implemented"
     )),
   }
 }

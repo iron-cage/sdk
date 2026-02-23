@@ -1,6 +1,6 @@
 //! Performance benchmarks for formatting
 //!
-//! Measures TreeFmtFormatter performance across different data sizes
+//! Measures `TreeFmtFormatter` performance across different data sizes
 //! and formats. Used to establish baseline and detect regressions.
 //!
 //! # Running Benchmarks
@@ -8,6 +8,8 @@
 //! ```bash
 //! cargo bench --bench formatting_benchmarks
 //! ```
+
+#![allow(missing_docs)]
 //!
 //! # Expected Results
 //!
@@ -24,7 +26,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use iron_cli::formatting::{OutputFormat, TreeFmtFormatter};
 use std::collections::HashMap;
 
-/// Benchmark format_single with small dataset (2 keys)
+/// Benchmark `format_single` with small dataset (2 keys)
 fn benchmark_format_single_small(c: &mut Criterion) {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
@@ -37,13 +39,13 @@ fn benchmark_format_single_small(c: &mut Criterion) {
   });
 }
 
-/// Benchmark format_single with medium dataset (10 keys)
+/// Benchmark `format_single` with medium dataset (10 keys)
 fn benchmark_format_single_medium(c: &mut Criterion) {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
   let mut data = HashMap::new();
   for i in 0..10 {
-    data.insert(format!("key{}", i), format!("value{}", i));
+    data.insert(format!("key{i}"), format!("value{i}"));
   }
 
   c.bench_function("format_single_medium_10keys", |b| {
@@ -51,13 +53,13 @@ fn benchmark_format_single_medium(c: &mut Criterion) {
   });
 }
 
-/// Benchmark format_single with large dataset (100 keys)
+/// Benchmark `format_single` with large dataset (100 keys)
 fn benchmark_format_single_large(c: &mut Criterion) {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
   let mut data = HashMap::new();
   for i in 0..100 {
-    data.insert(format!("key{}", i), format!("value{}", i));
+    data.insert(format!("key{i}"), format!("value{i}"));
   }
 
   c.bench_function("format_single_large_100keys", |b| {
@@ -65,7 +67,7 @@ fn benchmark_format_single_large(c: &mut Criterion) {
   });
 }
 
-/// Benchmark format_list with small dataset (10 items)
+/// Benchmark `format_list` with small dataset (10 items)
 fn benchmark_format_list_small(c: &mut Criterion) {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
@@ -73,7 +75,7 @@ fn benchmark_format_list_small(c: &mut Criterion) {
     .map(|i| {
       let mut data = HashMap::new();
       data.insert("id".to_string(), i.to_string());
-      data.insert("name".to_string(), format!("Item{}", i));
+      data.insert("name".to_string(), format!("Item{i}"));
       data.insert("status".to_string(), "active".to_string());
       data
     })
@@ -84,7 +86,7 @@ fn benchmark_format_list_small(c: &mut Criterion) {
   });
 }
 
-/// Benchmark format_list with medium dataset (100 items)
+/// Benchmark `format_list` with medium dataset (100 items)
 fn benchmark_format_list_medium(c: &mut Criterion) {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
@@ -92,7 +94,7 @@ fn benchmark_format_list_medium(c: &mut Criterion) {
     .map(|i| {
       let mut data = HashMap::new();
       data.insert("id".to_string(), i.to_string());
-      data.insert("name".to_string(), format!("Item{}", i));
+      data.insert("name".to_string(), format!("Item{i}"));
       data.insert("status".to_string(), "active".to_string());
       data
     })
@@ -103,7 +105,7 @@ fn benchmark_format_list_medium(c: &mut Criterion) {
   });
 }
 
-/// Benchmark format_list with large dataset (1000 items)
+/// Benchmark `format_list` with large dataset (1000 items)
 fn benchmark_format_list_large(c: &mut Criterion) {
   let formatter = TreeFmtFormatter::new(OutputFormat::Table);
 
@@ -111,7 +113,7 @@ fn benchmark_format_list_large(c: &mut Criterion) {
     .map(|i| {
       let mut data = HashMap::new();
       data.insert("id".to_string(), i.to_string());
-      data.insert("name".to_string(), format!("Item{}", i));
+      data.insert("name".to_string(), format!("Item{i}"));
       data.insert("status".to_string(), "active".to_string());
       data
     })
@@ -126,7 +128,7 @@ fn benchmark_format_list_large(c: &mut Criterion) {
 fn benchmark_output_formats(c: &mut Criterion) {
   let mut data = HashMap::new();
   for i in 0..10 {
-    data.insert(format!("key{}", i), format!("value{}", i));
+    data.insert(format!("key{i}"), format!("value{i}"));
   }
 
   // Table format
@@ -178,8 +180,8 @@ fn benchmark_realistic_token_list(c: &mut Criterion) {
   let tokens: Vec<_> = (0..20)
     .map(|i| {
       let mut data = HashMap::new();
-      data.insert("token_id".to_string(), format!("tok_abc{:03}", i));
-      data.insert("name".to_string(), format!("Token-{}", i));
+      data.insert("token_id".to_string(), format!("tok_abc{i:03}"));
+      data.insert("name".to_string(), format!("Token-{i}"));
       data.insert("scope".to_string(), "read:write".to_string());
       data.insert(
         "status".to_string(),

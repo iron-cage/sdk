@@ -1,11 +1,11 @@
 //! Keyring service for secure credential storage
 //!
-//! Stores authentication tokens (access_token, refresh_token) in system keyring.
+//! Stores authentication tokens (`access_token`, `refresh_token`) in system keyring.
 //!
 //! ## Platform Support
 //!
 //! - macOS: Keychain
-//! - Linux: Secret Service API (GNOME Keyring, KWallet)
+//! - Linux: Secret Service API (GNOME Keyring, `KWallet`)
 //! - Windows: Credential Manager
 //!
 //! ## Usage
@@ -49,6 +49,10 @@ const REFRESH_TOKEN_KEY: &str = "refresh_token";
 /// ## Returns
 ///
 /// Ok if stored successfully, Err on keyring failure
+///
+/// # Errors
+///
+/// Returns `Err(KeyringError)` if creating the keyring entry or storing the token fails.
 pub fn set_access_token(token: &str) -> Result<(), KeyringError> {
   let entry = Entry::new(SERVICE_NAME, ACCESS_TOKEN_KEY)
     .map_err(|e| KeyringError::StorageError(e.to_string()))?;
@@ -65,6 +69,11 @@ pub fn set_access_token(token: &str) -> Result<(), KeyringError> {
 /// ## Returns
 ///
 /// Access token string if found, error if missing or keyring failure
+///
+/// # Errors
+///
+/// Returns `Err(KeyringError::NotFound)` if token is absent, or
+/// `Err(KeyringError::StorageError)` on keyring failure.
 pub fn get_access_token() -> Result<String, KeyringError> {
   let entry = Entry::new(SERVICE_NAME, ACCESS_TOKEN_KEY)
     .map_err(|e| KeyringError::StorageError(e.to_string()))?;
@@ -91,6 +100,10 @@ pub fn get_access_token() -> Result<String, KeyringError> {
 /// ## Returns
 ///
 /// Ok if stored successfully, Err on keyring failure
+///
+/// # Errors
+///
+/// Returns `Err(KeyringError)` if creating the keyring entry or storing the token fails.
 pub fn set_refresh_token(token: &str) -> Result<(), KeyringError> {
   let entry = Entry::new(SERVICE_NAME, REFRESH_TOKEN_KEY)
     .map_err(|e| KeyringError::StorageError(e.to_string()))?;
@@ -107,6 +120,11 @@ pub fn set_refresh_token(token: &str) -> Result<(), KeyringError> {
 /// ## Returns
 ///
 /// Refresh token string if found, error if missing or keyring failure
+///
+/// # Errors
+///
+/// Returns `Err(KeyringError::NotFound)` if token is absent, or
+/// `Err(KeyringError::StorageError)` on keyring failure.
 pub fn get_refresh_token() -> Result<String, KeyringError> {
   let entry = Entry::new(SERVICE_NAME, REFRESH_TOKEN_KEY)
     .map_err(|e| KeyringError::StorageError(e.to_string()))?;
@@ -131,6 +149,11 @@ pub fn get_refresh_token() -> Result<String, KeyringError> {
 /// ## Returns
 ///
 /// Ok if cleared successfully (or already empty), Err on keyring failure
+///
+/// # Errors
+///
+/// Returns `Err(KeyringError::StorageError)` if a keyring deletion fails for a reason
+/// other than the entry already being absent.
 pub fn clear_tokens() -> Result<(), KeyringError> {
   // Clear access token
   let access_entry = Entry::new(SERVICE_NAME, ACCESS_TOKEN_KEY)
@@ -174,13 +197,13 @@ pub enum KeyringError {
   StorageError(String),
 }
 
-impl std::fmt::Display for KeyringError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for KeyringError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match self {
-      Self::NotFound(msg) => write!(f, "Not found: {}", msg),
-      Self::StorageError(msg) => write!(f, "Storage error: {}", msg),
+      Self::NotFound(msg) => write!(f, "Not found: {msg}"),
+      Self::StorageError(msg) => write!(f, "Storage error: {msg}"),
     }
   }
 }
 
-impl std::error::Error for KeyringError {}
+impl core::error::Error for KeyringError {}

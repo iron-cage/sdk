@@ -99,9 +99,10 @@ mod tests {
 
     // Command should fail (missing required parameter)
     // If command loading fails, that's a separate infrastructure issue
-    if result.success() {
-      panic!("Command should fail when password is missing");
-    }
+    assert!(
+      !result.success(),
+      "Command should fail when password is missing"
+    );
 
     // If it failed and error mentions password/required, test passes
     // If it failed for other reasons (command not found), skip validation
@@ -181,7 +182,7 @@ mod tests {
         &[
           ".auth.login",
           "username::testuser",
-          &format!("password::{}", long_password),
+          &format!("password::{long_password}"),
         ],
       )
       .await;

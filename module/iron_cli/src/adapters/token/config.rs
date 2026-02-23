@@ -12,7 +12,7 @@
 //!
 //! ## Environment Variables
 //!
-//! - `IRON_TOKEN_API_URL`: Base URL for Token Manager API (default: http://localhost:8081)
+//! - `IRON_TOKEN_API_URL`: Base URL for Token Manager API (default: <http://localhost:8081>)
 //! - `IRON_TOKEN_API_TIMEOUT`: Request timeout in seconds (default: 30)
 //!
 //! ## Config File Format
@@ -27,8 +27,8 @@
 //! Token API uses keyring-stored access tokens, not static API tokens.
 //! See keyring module for auth token management.
 
+use core::time::Duration;
 use iron_config_loader::ConfigLoader;
-use std::time::Duration;
 
 /// Token API configuration
 #[derive(Debug, Clone)]
@@ -57,6 +57,7 @@ impl TokenApiConfig {
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
+  #[must_use]
   pub fn load() -> Self {
     let defaults = r#"
 url = "http://localhost:8081"
@@ -79,6 +80,7 @@ timeout = 30
   }
 
   /// Create configuration with explicit values
+  #[must_use]
   pub fn new(base_url: String) -> Self {
     Self {
       base_url,
@@ -87,6 +89,7 @@ timeout = 30
   }
 
   /// Set timeout
+  #[must_use]
   pub fn with_timeout(mut self, timeout: Duration) -> Self {
     self.timeout = timeout;
     self

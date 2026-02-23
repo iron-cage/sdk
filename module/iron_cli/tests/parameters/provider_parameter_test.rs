@@ -211,7 +211,7 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".provider.get", &format!("provider::{}", long_provider)],
+        &[".provider.get", &format!("provider::{long_provider}")],
       )
       .await;
 

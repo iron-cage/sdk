@@ -7,7 +7,7 @@ use crate::handlers::validation::validate_non_negative_integer;
 use crate::handlers::CliError;
 use std::collections::HashMap;
 
-/// Handle .budget_limit.get command
+/// Handle `.budget_limit.get` command
 ///
 /// Gets current budget limit (admin only).
 ///
@@ -15,16 +15,21 @@ use std::collections::HashMap;
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_budget_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn get_budget_limit_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get budget limit parameters valid\nFormat: {}",
-    format
+    "Get budget limit parameters valid\nFormat: {format}"
   ))
 }
 
-/// Handle .budget_limit.set command
+/// Handle `.budget_limit.set` command
 ///
 /// Sets budget limit (admin only).
 ///
@@ -36,7 +41,13 @@ pub fn get_budget_limit_handler(params: &HashMap<String, String>) -> Result<Stri
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn set_budget_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn set_budget_limit_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let limit_str = params
     .get("limit")
@@ -55,10 +66,9 @@ pub fn set_budget_limit_handler(params: &HashMap<String, String>) -> Result<Stri
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Set budget limit parameters valid\nLimit: {}\nFormat: {}",
-    limit_str, format
+    "Set budget limit parameters valid\nLimit: {limit_str}\nFormat: {format}"
   ))
 }

@@ -8,7 +8,7 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .user.change_password (new_password parameter)
+//! - `.user.change_password` (`new_password` parameter)
 //! - Other user management commands that support password change
 //!
 //! ## Test Categories
@@ -28,7 +28,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid new_password (strong password)
+  /// Test valid `new_password` (strong password)
   #[tokio::test]
   async fn test_new_password_valid_strong() {
     let server = TestServer::start().await;
@@ -61,7 +61,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test new_password too short (should fail)
+  /// Test `new_password` too short (should fail)
   #[tokio::test]
   async fn test_new_password_too_short() {
     let server = TestServer::start().await;
@@ -89,7 +89,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test new_password without special characters
+  /// Test `new_password` without special characters
   #[tokio::test]
   async fn test_new_password_no_special_chars() {
     let server = TestServer::start().await;
@@ -116,7 +116,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test new_password without numbers
+  /// Test `new_password` without numbers
   #[tokio::test]
   async fn test_new_password_no_numbers() {
     let server = TestServer::start().await;
@@ -143,7 +143,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty new_password (should fail)
+  /// Test empty `new_password` (should fail)
   #[tokio::test]
   async fn test_new_password_empty() {
     let server = TestServer::start().await;
@@ -172,7 +172,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing required new_password
+  /// Test missing required `new_password`
   #[tokio::test]
   async fn test_new_password_missing_required() {
     let server = TestServer::start().await;
@@ -201,7 +201,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test very long new_password
+  /// Test very long `new_password`
   #[tokio::test]
   async fn test_new_password_very_long() {
     let server = TestServer::start().await;
@@ -220,7 +220,7 @@ mod tests {
         "iron",
         &[
           ".user.change_password",
-          &format!("new_password::{}", long_password),
+          &format!("new_password::{long_password}"),
         ],
       )
       .await;
@@ -237,7 +237,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test new_password with various special characters
+  /// Test `new_password` with various special characters
   #[tokio::test]
   async fn test_new_password_special_chars_variety() {
     let server = TestServer::start().await;

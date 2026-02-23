@@ -3,7 +3,7 @@
 //! Pure functions for user administration operations.
 //! No I/O - all external operations handled by adapter layer.
 //!
-//! Note: Named `control_user_handlers` to distinguish from token CLI's user_handlers.
+//! Note: Named `control_user_handlers` to distinguish from token CLI's `user_handlers`.
 
 use crate::handlers::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
@@ -44,10 +44,16 @@ fn validate_username_pattern(username: &str) -> Result<(), CliError> {
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn list_users_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!("User list parameters valid\nFormat: {}", format))
+  Ok(format!("User list parameters valid\nFormat: {format}"))
 }
 
 /// Handle .user.create command
@@ -64,7 +70,13 @@ pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, Cl
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn create_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let username = params
     .get("username")
@@ -123,11 +135,10 @@ pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, C
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Create user parameters valid\nUsername: {}\nEmail: {}\nRole: {}\nFormat: {}",
-    username, email, role, format
+    "Create user parameters valid\nUsername: {username}\nEmail: {email}\nRole: {role}\nFormat: {format}"
   ))
 }
 
@@ -142,17 +153,22 @@ pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, C
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get user parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Get user parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
@@ -169,7 +185,13 @@ pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliE
 /// - email: String (valid email format)
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn update_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn update_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -192,11 +214,10 @@ pub fn update_user_handler(params: &HashMap<String, String>) -> Result<String, C
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Update user parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Update user parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
@@ -212,7 +233,13 @@ pub fn update_user_handler(params: &HashMap<String, String>) -> Result<String, C
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn delete_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -229,15 +256,14 @@ pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, C
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Delete user parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Delete user parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .user.set_role command
+/// Handle `.user.set_role` command
 ///
 /// Sets user role (admin/user).
 ///
@@ -250,7 +276,13 @@ pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, C
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn set_user_role_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn set_user_role_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -282,15 +314,14 @@ pub fn set_user_role_handler(params: &HashMap<String, String>) -> Result<String,
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Set user role parameters valid\nID: {}\nRole: {}\nFormat: {}",
-    id, role, format
+    "Set user role parameters valid\nID: {id}\nRole: {role}\nFormat: {format}"
   ))
 }
 
-/// Handle .user.reset_password command
+/// Handle `.user.reset_password` command
 ///
 /// Triggers password reset for user.
 ///
@@ -302,7 +333,13 @@ pub fn set_user_role_handler(params: &HashMap<String, String>) -> Result<String,
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn reset_password_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -319,15 +356,14 @@ pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Reset password parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Reset password parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .user.get_permissions command
+/// Handle `.user.get_permissions` command
 ///
 /// Gets user permissions.
 ///
@@ -338,16 +374,21 @@ pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_user_permissions_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_user_permissions_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get user permissions parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Get user permissions parameters valid\nID: {id}\nFormat: {format}"
   ))
 }

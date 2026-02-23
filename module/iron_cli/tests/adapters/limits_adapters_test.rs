@@ -7,7 +7,7 @@
 //!
 //! ## Testing Strategy
 //!
-//! Uses InMemoryAdapter (real implementation, no mocking)
+//! Uses `InMemoryAdapter` (real implementation, no mocking)
 
 use iron_cli::adapters::auth::HasParams;
 use iron_cli::adapters::implementations::InMemoryAdapter;
@@ -112,7 +112,7 @@ async fn test_list_limits_adapter_with_count() {
 
   let output = result.unwrap();
   assert!(
-    output.contains("3") || output.contains("count"),
+    output.contains('3') || output.contains("count"),
     "Output should show count of limits"
   );
 }
@@ -209,11 +209,7 @@ async fn test_get_limit_adapter_all_formats() {
     let result =
       iron_cli::adapters::limits::get_limit_adapter(&command, adapter.clone(), &formatter).await;
 
-    assert!(
-      result.is_ok(),
-      "Should succeed with format '{}'",
-      format_str
-    );
+    assert!(result.is_ok(), "Should succeed with format '{format_str}'");
   }
 }
 

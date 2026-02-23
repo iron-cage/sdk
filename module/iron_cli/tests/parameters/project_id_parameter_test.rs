@@ -8,9 +8,9 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .project.get (project_id parameter)
-//! - .project.update (project_id parameter)
-//! - .project.delete (project_id parameter)
+//! - `.project.get` (`project_id` parameter)
+//! - `.project.update` (`project_id` parameter)
+//! - `.project.delete` (`project_id` parameter)
 //!
 //! ## Test Categories
 //!
@@ -28,7 +28,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid project_id with UUID
+  /// Test valid `project_id` with UUID
   #[tokio::test]
   async fn test_project_id_valid_uuid() {
     let server = TestServer::start().await;
@@ -64,7 +64,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty project_id (should fail)
+  /// Test empty `project_id` (should fail)
   #[tokio::test]
   async fn test_project_id_empty() {
     let server = TestServer::start().await;
@@ -90,7 +90,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid project_id format (not a UUID)
+  /// Test invalid `project_id` format (not a UUID)
   #[tokio::test]
   async fn test_project_id_invalid_format() {
     let server = TestServer::start().await;
@@ -118,7 +118,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing required project_id
+  /// Test missing required `project_id`
   #[tokio::test]
   async fn test_project_id_missing_required() {
     let server = TestServer::start().await;
@@ -142,7 +142,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test project_id on update command
+  /// Test `project_id` on update command
   #[tokio::test]
   async fn test_project_id_update_command() {
     let server = TestServer::start().await;
@@ -179,7 +179,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test project_id on delete command
+  /// Test `project_id` on delete command
   #[tokio::test]
   async fn test_project_id_delete_command() {
     let server = TestServer::start().await;

@@ -1,6 +1,6 @@
-//! tree_fmt-based formatter implementation
+//! `tree_fmt`-based formatter implementation
 //!
-//! Wrapper around tree_fmt library providing the same API as legacy Formatter.
+//! Wrapper around `tree_fmt` library providing the same API as legacy Formatter.
 //! Supports 4 output formats with improved features:
 //! - Dynamic column widths (vs fixed 15-char)
 //! - ANSI-aware alignment
@@ -12,84 +12,90 @@ use serde_json::Value;
 use std::collections::HashMap;
 use tree_fmt::{RowBuilder, TableView};
 
-/// Universal formatter using tree_fmt library
+/// Universal formatter using `tree_fmt` library
+#[derive(Debug)]
 pub struct TreeFmtFormatter {
   format: OutputFormat,
 }
 
 impl TreeFmtFormatter {
   /// Create new formatter with specified format
+  #[must_use]
   pub fn new(format: OutputFormat) -> Self {
     Self { format }
   }
 
   /// Format a single item (key-value map)
+  #[must_use]
   pub fn format_single(&self, data: &HashMap<String, String>) -> String {
     match self.format {
-      OutputFormat::Table => self.format_single_table(data),
-      OutputFormat::Expanded => self.format_single_expanded(data),
-      OutputFormat::Json => self.format_single_json(data),
-      OutputFormat::Yaml => self.format_single_yaml(data),
+      OutputFormat::Table => Self::format_single_table(data),
+      OutputFormat::Expanded => Self::format_single_expanded(data),
+      OutputFormat::Json => Self::format_single_json(data),
+      OutputFormat::Yaml => Self::format_single_yaml(data),
     }
   }
 
   /// Format a list of items
+  #[must_use]
   pub fn format_list(&self, items: &[HashMap<String, String>]) -> String {
     match self.format {
-      OutputFormat::Table => self.format_list_table(items),
-      OutputFormat::Expanded => self.format_list_expanded(items),
-      OutputFormat::Json => self.format_list_json(items),
-      OutputFormat::Yaml => self.format_list_yaml(items),
+      OutputFormat::Table => Self::format_list_table(items),
+      OutputFormat::Expanded => Self::format_list_expanded(items),
+      OutputFormat::Json => Self::format_list_json(items),
+      OutputFormat::Yaml => Self::format_list_yaml(items),
     }
   }
 
   /// Format an error
+  #[must_use]
   pub fn format_error(&self, error: &CliError) -> String {
     match self.format {
-      OutputFormat::Table | OutputFormat::Expanded => format!("Error: {}", error),
-      OutputFormat::Json => self.format_error_json(error),
-      OutputFormat::Yaml => self.format_error_yaml(error),
+      OutputFormat::Table | OutputFormat::Expanded => format!("Error: {error}"),
+      OutputFormat::Json => Self::format_error_json(error),
+      OutputFormat::Yaml => Self::format_error_yaml(error),
     }
   }
 
-  /// Format a serde_json::Value (auto-detect array vs object)
+  /// Format a `serde_json::Value` (auto-detect array vs object)
+  ///
+  /// # Errors
+  ///
+  /// Returns `Err(String)` if JSON or YAML serialization fails for non-standard types.
   pub fn format_value(&self, value: &Value) -> Result<String, String> {
     match value {
-      Value::Array(items) => self.format_value_array(items),
-      Value::Object(_) => self.format_value_object(value),
+      Value::Array(items) => Ok(self.format_value_array(items)),
+      Value::Object(_) => Ok(self.format_value_object(value)),
       _ => Ok(value.to_string()),
     }
   }
 
   /// Format a JSON object as single item
-  fn format_value_object(&self, obj: &Value) -> Result<String, String> {
-    let obj_map = match obj.as_object() {
-      Some(map) => map,
-      None => {
-        return match self.format {
-          OutputFormat::Json => {
-            Ok(serde_json::to_string_pretty(obj).unwrap_or_else(|_| "{}".to_string()))
-          }
-          OutputFormat::Yaml => Ok(serde_yaml::to_string(obj).unwrap_or_else(|_| "{}".to_string())),
-          _ => Ok(obj.to_string()),
+  fn format_value_object(&self, obj: &Value) -> String {
+    let Some(obj_map) = obj.as_object() else {
+      return match self.format {
+        OutputFormat::Json => {
+          serde_json::to_string_pretty(obj).unwrap_or_else(|_| "{}".to_string())
         }
-      }
+        OutputFormat::Yaml => serde_yaml::to_string(obj).unwrap_or_else(|_| "{}".to_string()),
+        _ => obj.to_string(),
+      };
     };
 
     if obj_map.is_empty() {
-      return Ok("Empty object.".to_string());
+      return "Empty object.".to_string();
     }
 
     // Convert JSON object to HashMap<String, String>
     let data = convert_json_to_hashmap(obj_map);
 
-    Ok(self.format_single(&data))
+    self.format_single(&data)
   }
 
   /// Format a JSON array as list
-  fn format_value_array(&self, items: &[Value]) -> Result<String, String> {
+  fn format_value_array(&self, items: &[Value]) -> String {
     if items.is_empty() {
-      return Ok("No results found.".to_string());
+      return "No results found.".to_string();
     }
 
     // Convert JSON array to Vec<HashMap<String, String>>
@@ -102,21 +108,21 @@ impl TreeFmtFormatter {
       // Array of non-objects, use JSON/YAML
       return match self.format {
         OutputFormat::Json => {
-          Ok(serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string()))
+          serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string())
         }
-        OutputFormat::Yaml => Ok(serde_yaml::to_string(items).unwrap_or_else(|_| "[]".to_string())),
-        _ => Ok(format!("[{} items]", items.len())),
+        OutputFormat::Yaml => serde_yaml::to_string(items).unwrap_or_else(|_| "[]".to_string()),
+        _ => format!("[{} items]", items.len()),
       };
     }
 
-    Ok(self.format_list(&data))
+    self.format_list(&data)
   }
 
   // ============================================================================
   // Table format implementations
   // ============================================================================
 
-  fn format_single_table(&self, data: &HashMap<String, String>) -> String {
+  fn format_single_table(data: &HashMap<String, String>) -> String {
     if data.is_empty() {
       return String::new();
     }
@@ -135,10 +141,10 @@ impl TreeFmtFormatter {
     }
 
     let view = builder.build_view();
-    self.format_table_view(&view)
+    Self::format_table_view(&view)
   }
 
-  fn format_list_table(&self, items: &[HashMap<String, String>]) -> String {
+  fn format_list_table(items: &[HashMap<String, String>]) -> String {
     if items.is_empty() {
       return "No items found".to_string();
     }
@@ -151,26 +157,26 @@ impl TreeFmtFormatter {
       }
     }
 
-    let mut keys: Vec<_> = all_keys.into_iter().collect();
+    let mut keys = all_keys.into_iter().collect::<Vec<_>>();
     keys.sort();
 
     // Build table view with dynamic columns
-    let headers: Vec<String> = keys.iter().map(|k| k.to_string()).collect();
+    let headers: Vec<String> = keys.clone();
     let mut builder = RowBuilder::new(headers);
 
     for item in items {
       let row: Vec<String> = keys
         .iter()
-        .map(|k| item.get(k).map(|s| s.to_string()).unwrap_or_default())
+        .map(|k| item.get(k).cloned().unwrap_or_default())
         .collect();
       builder.add_row_mut(row);
     }
 
     let view = builder.build_view();
-    self.format_table_view(&view)
+    Self::format_table_view(&view)
   }
 
-  fn format_table_view(&self, view: &TableView) -> String {
+  fn format_table_view(view: &TableView) -> String {
     use tree_fmt::{Format, TableConfig, TableFormatter};
 
     let config = TableConfig::plain();
@@ -183,7 +189,7 @@ impl TreeFmtFormatter {
   // Expanded format implementations
   // ============================================================================
 
-  fn format_single_expanded(&self, data: &HashMap<String, String>) -> String {
+  fn format_single_expanded(data: &HashMap<String, String>) -> String {
     if data.is_empty() {
       return String::new();
     }
@@ -196,14 +202,14 @@ impl TreeFmtFormatter {
 
     for key in keys {
       if let Some(value) = data.get(key.as_str()) {
-        lines.push(format!("{}: {}", key, value));
+        lines.push(format!("{key}: {value}"));
       }
     }
 
     lines.join("\n")
   }
 
-  fn format_list_expanded(&self, items: &[HashMap<String, String>]) -> String {
+  fn format_list_expanded(items: &[HashMap<String, String>]) -> String {
     if items.is_empty() {
       return "No items found".to_string();
     }
@@ -219,7 +225,7 @@ impl TreeFmtFormatter {
 
       for key in keys {
         if let Some(value) = item.get(key.as_str()) {
-          lines.push(format!("  {}: {}", key, value));
+          lines.push(format!("  {key}: {value}"));
         }
       }
 
@@ -233,16 +239,16 @@ impl TreeFmtFormatter {
   // JSON format implementations
   // ============================================================================
 
-  fn format_single_json(&self, data: &HashMap<String, String>) -> String {
+  fn format_single_json(data: &HashMap<String, String>) -> String {
     serde_json::to_string_pretty(data).unwrap_or_else(|_| "{}".to_string())
   }
 
-  fn format_list_json(&self, items: &[HashMap<String, String>]) -> String {
+  fn format_list_json(items: &[HashMap<String, String>]) -> String {
     serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string())
   }
 
-  fn format_error_json(&self, error: &CliError) -> String {
-    let error_msg = format!("{}", error);
+  fn format_error_json(error: &CliError) -> String {
+    let error_msg = format!("{error}");
     let error_obj: HashMap<String, String> =
       [("error".to_string(), error_msg)].iter().cloned().collect();
     serde_json::to_string_pretty(&error_obj)
@@ -253,16 +259,16 @@ impl TreeFmtFormatter {
   // YAML format implementations
   // ============================================================================
 
-  fn format_single_yaml(&self, data: &HashMap<String, String>) -> String {
+  fn format_single_yaml(data: &HashMap<String, String>) -> String {
     serde_yaml::to_string(data).unwrap_or_else(|_| "{}".to_string())
   }
 
-  fn format_list_yaml(&self, items: &[HashMap<String, String>]) -> String {
+  fn format_list_yaml(items: &[HashMap<String, String>]) -> String {
     serde_yaml::to_string(items).unwrap_or_else(|_| "[]".to_string())
   }
 
-  fn format_error_yaml(&self, error: &CliError) -> String {
-    let error_msg = format!("{}", error);
+  fn format_error_yaml(error: &CliError) -> String {
+    let error_msg = format!("{error}");
     let error_obj: HashMap<String, String> =
       [("error".to_string(), error_msg)].iter().cloned().collect();
     serde_yaml::to_string(&error_obj).unwrap_or_else(|_| "error: unknown".to_string())
@@ -273,7 +279,7 @@ impl TreeFmtFormatter {
 // Helper functions for JSON conversion
 // ============================================================================
 
-/// Convert serde_json::Map to HashMap<String, String>
+/// Convert `serde_json::Map` to `HashMap`<String, String>
 ///
 /// Handles nested structures by converting them to strings:
 /// - Objects: Convert to JSON string

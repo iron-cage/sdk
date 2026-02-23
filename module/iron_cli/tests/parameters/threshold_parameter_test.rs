@@ -154,7 +154,7 @@ mod tests {
     assert!(
       result.stderr.contains("threshold")
         || result.stderr.contains("invalid")
-        || result.stderr.contains("0")
+        || result.stderr.contains('0')
         || result.stderr.contains("100"),
       "Error should mention invalid threshold. Stderr: {}",
       result.stderr
@@ -183,7 +183,7 @@ mod tests {
     assert!(
       result.stderr.contains("threshold")
         || result.stderr.contains("invalid")
-        || result.stderr.contains("0")
+        || result.stderr.contains('0')
         || result.stderr.contains("100"),
       "Error should mention invalid threshold. Stderr: {}",
       result.stderr

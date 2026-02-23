@@ -1,6 +1,6 @@
 //! Token Manager API adapters
 //!
-//! HTTP adapters for Token Manager API (iron_token_manager).
+//! HTTP adapters for Token Manager API (`iron_token_manager`).
 //!
 //! ## Architecture
 //!

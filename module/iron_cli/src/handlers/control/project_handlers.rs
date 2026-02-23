@@ -15,10 +15,16 @@ use std::collections::HashMap;
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_projects_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn list_projects_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!("Project list parameters valid\nFormat: {}", format))
+  Ok(format!("Project list parameters valid\nFormat: {format}"))
 }
 
 /// Handle .project.get command
@@ -32,16 +38,21 @@ pub fn list_projects_handler(params: &HashMap<String, String>) -> Result<String,
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_project_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_project_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get project parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Get project parameters valid\nID: {id}\nFormat: {format}"
   ))
 }

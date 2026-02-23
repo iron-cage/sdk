@@ -12,12 +12,12 @@
 //! ## Orphaned Adapters (Deleted in Migration)
 //!
 //! The following 6 adapters were deleted because they had no matching API endpoints:
-//! - `show_agent_usage_adapter` (usage_adapters.rs)
-//! - `export_agent_usage_adapter` (usage_adapters.rs)
-//! - `reset_limit_adapter` (limits_adapters.rs)
-//! - `show_agent_limits_adapter` (limits_adapters.rs)
-//! - `update_agent_limit_adapter` (limits_adapters.rs)
-//! - `show_trace_stats_adapter` (traces_adapters.rs)
+//! - `show_agent_usage_adapter` (`usage_adapters.rs`)
+//! - `export_agent_usage_adapter` (`usage_adapters.rs`)
+//! - `reset_limit_adapter` (`limits_adapters.rs`)
+//! - `show_agent_limits_adapter` (`limits_adapters.rs`)
+//! - `update_agent_limit_adapter` (`limits_adapters.rs`)
+//! - `show_trace_stats_adapter` (`traces_adapters.rs`)
 
 use std::path::PathBuf;
 
@@ -30,7 +30,7 @@ use std::path::PathBuf;
 ///
 /// Auth (3): .auth.{login, refresh, logout}
 /// Tokens (5): .tokens.{generate, list, get, rotate, revoke}
-/// Usage (4): .usage.{show, by_project, by_provider, export}
+/// Usage (4): .usage.{show, `by_project`, `by_provider`, export}
 /// Limits (5): .limits.{list, get, create, update, delete}
 /// Traces (3): .traces.{list, get, export}
 /// Health (2): .health, .version
@@ -46,8 +46,7 @@ fn test_all_commands_route_correctly() {
 
   assert!(
     routing_file.exists(),
-    "Routing file must exist: {:?}",
-    routing_file
+    "Routing file must exist: {routing_file:?}"
   );
 
   let routing_content =
@@ -87,11 +86,10 @@ fn test_all_commands_route_correctly() {
 
   // Verify each command has a route entry
   for command in &expected_commands {
-    let pattern = format!("\"{}\"", command);
+    let pattern = format!("\"{command}\"");
     assert!(
       routing_content.contains(&pattern),
-      "Command '{}' must have route entry in routing file",
-      command
+      "Command '{command}' must have route entry in routing file"
     );
   }
 
@@ -111,12 +109,12 @@ fn test_all_commands_route_correctly() {
 ///
 /// ## Orphaned Adapters (6 total)
 ///
-/// - show_agent_usage_adapter
-/// - export_agent_usage_adapter
-/// - reset_limit_adapter
-/// - show_agent_limits_adapter
-/// - update_agent_limit_adapter
-/// - show_trace_stats_adapter
+/// - `show_agent_usage_adapter`
+/// - `export_agent_usage_adapter`
+/// - `reset_limit_adapter`
+/// - `show_agent_limits_adapter`
+/// - `update_agent_limit_adapter`
+/// - `show_trace_stats_adapter`
 ///
 /// ## Verification Method
 ///
@@ -145,8 +143,7 @@ fn test_no_orphaned_adapter_usage() {
   for adapter in &orphaned_adapters {
     assert!(
       !routing_content.contains(adapter),
-      "Routing file must NOT reference orphaned adapter: {}",
-      adapter
+      "Routing file must NOT reference orphaned adapter: {adapter}"
     );
   }
 
@@ -158,8 +155,7 @@ fn test_no_orphaned_adapter_usage() {
 
   assert_eq!(
     orphaned_count, 0,
-    "NC-R.1 violated: Found {} routes calling orphaned adapters (expected 0)",
-    orphaned_count
+    "NC-R.1 violated: Found {orphaned_count} routes calling orphaned adapters (expected 0)"
   );
 }
 
@@ -214,7 +210,7 @@ fn test_routing_compilation_prevents_old_adapters() {
 
   for adapter_file in &adapter_files {
     let path = manifest_dir.join(adapter_file);
-    assert!(path.exists(), "Adapter module must exist: {}", adapter_file);
+    assert!(path.exists(), "Adapter module must exist: {adapter_file}");
   }
 
   // Compilation success proves no orphaned adapter usage (syntactic protection layer)
@@ -236,7 +232,7 @@ fn test_routing_compilation_prevents_old_adapters() {
 ///
 /// 1. **Documentation-Only Issue**: No automated tests verify help text accuracy
 /// 2. **Manual Testing Gap**: Help examples weren't tested during development
-/// 3. **Parser Behavior**: Error comes from unilang library, not iron_cli code
+/// 3. **Parser Behavior**: Error comes from unilang library, not `iron_cli` code
 ///
 /// ## Fix Applied
 ///
@@ -275,7 +271,7 @@ fn bug_reproducer_issue_004_help_syntax_consistency() {
   for binary_file in &binaries {
     let path = manifest_dir.join(binary_file);
 
-    assert!(path.exists(), "Binary source must exist: {}", binary_file);
+    assert!(path.exists(), "Binary source must exist: {binary_file}");
 
     let content =
       std::fs::read_to_string(&path).expect("LOUD FAILURE: Failed to read binary source");
@@ -292,22 +288,19 @@ fn bug_reproducer_issue_004_help_syntax_consistency() {
     for pattern in &invalid_patterns {
       assert!(
         !content.contains(pattern),
-        "File {} contains invalid help syntax '{}'. Only single '?' is valid.",
-        binary_file,
-        pattern
+        "File {binary_file} contains invalid help syntax '{pattern}'. Only single '?' is valid."
       );
     }
 
     // Verify at least one valid single ? help example exists
     assert!(
       content.contains(" ?") && !content.contains(" ??"),
-      "File {} should contain valid single '?' help examples",
-      binary_file
+      "File {binary_file} should contain valid single '?' help examples"
     );
   }
 }
 
-/// Bug reproducer for Issue 7: token_id type mismatch between YAML and handlers
+/// Bug reproducer for Issue 7: `token_id` type mismatch between YAML and handlers
 ///
 /// ## Root Cause
 ///
@@ -353,7 +346,7 @@ fn bug_reproducer_issue_004_help_syntax_consistency() {
 ///    - Updated example: `token_id::456` → `token_id::tok_def456`
 ///
 /// Also updated manual test plan `tests/manual/readme.md` test cases:
-/// TC-3.3, TC-3.4, TC-3.5, TC-7.3 to use string token_id format.
+/// TC-3.3, TC-3.4, TC-3.5, TC-7.3 to use string `token_id` format.
 ///
 /// ## Prevention
 ///
@@ -393,8 +386,7 @@ fn bug_reproducer_issue_007_token_id_type_mismatch() {
 
   assert!(
     yaml_file.exists(),
-    "YAML command definitions must exist: {:?}",
-    yaml_file
+    "YAML command definitions must exist: {yaml_file:?}"
   );
 
   let yaml_content =
@@ -406,11 +398,10 @@ fn bug_reproducer_issue_007_token_id_type_mismatch() {
   // Verify each command declares token_id as String (not Integer)
   for command in &commands_with_token_id {
     // Find command definition section
-    let command_pattern = format!("name: {}", command);
+    let command_pattern = format!("name: {command}");
     assert!(
       yaml_content.contains(&command_pattern),
-      "Command '{}' must exist in YAML",
-      command
+      "Command '{command}' must exist in YAML"
     );
 
     // Extract section for this command (from "name: .tokens.X" to next "- name:" or EOF)
@@ -425,8 +416,7 @@ fn bug_reproducer_issue_007_token_id_type_mismatch() {
     // Verify token_id parameter exists and is String type
     assert!(
       command_section.contains("- name: token_id"),
-      "Command '{}' must have token_id parameter",
-      command
+      "Command '{command}' must have token_id parameter"
     );
 
     // CRITICAL: Verify kind is String, not Integer
@@ -446,30 +436,27 @@ fn bug_reproducer_issue_007_token_id_type_mismatch() {
     // Verify String type (not Integer)
     assert!(
       param_def.contains("kind: String"),
-      "Command '{}' token_id must be 'kind: String' (not Integer). \
-       Handlers expect 'tok_*' format which is a String type.",
-      command
+      "Command '{command}' token_id must be 'kind: String' (not Integer). \
+       Handlers expect 'tok_*' format which is a String type."
     );
 
     // Verify Integer is NOT present (common mistake)
     assert!(
       !param_def.contains("kind: Integer"),
-      "Command '{}' token_id must NOT be 'kind: Integer'. \
-       The 'tok_*' prefix format requires String type.",
-      command
+      "Command '{command}' token_id must NOT be 'kind: Integer'. \
+       The 'tok_*' prefix format requires String type."
     );
 
     // Verify hint mentions the tok_* format
     assert!(
       param_def.contains("tok_"),
-      "Command '{}' token_id hint should document 'tok_*' format requirement",
-      command
+      "Command '{command}' token_id hint should document 'tok_*' format requirement"
     );
   }
 
   // Verify examples use string format (tok_*), not numeric format
   for command in &commands_with_token_id {
-    let command_pattern = format!("name: {}", command);
+    let command_pattern = format!("name: {command}");
     let start_idx = yaml_content
       .find(&command_pattern)
       .expect("LOUD FAILURE: Command must exist");
@@ -484,8 +471,7 @@ fn bug_reproducer_issue_007_token_id_type_mismatch() {
 
       assert!(
         examples_section.contains("token_id::tok_"),
-        "Command '{}' examples must use 'tok_*' string format (not numeric)",
-        command
+        "Command '{command}' examples must use 'tok_*' string format (not numeric)"
       );
 
       // Verify examples don't use old numeric format
@@ -494,8 +480,7 @@ fn bug_reproducer_issue_007_token_id_type_mismatch() {
         !examples_section.contains("token_id::123")
           && !examples_section.contains("token_id::456")
           && !examples_section.contains("token_id::789"),
-        "Command '{}' examples must NOT use numeric format (use tok_* instead)",
-        command
+        "Command '{command}' examples must NOT use numeric format (use tok_* instead)"
       );
     }
   }

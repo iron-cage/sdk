@@ -7,7 +7,7 @@
 //!
 //! ## Test Strategy
 //!
-//! Pure function testing: HashMap → Result<String>
+//! Pure function testing: `HashMap` → `Result<String>`
 //! No mocking - handlers have no I/O to mock.
 //!
 //! ## Test Matrix
@@ -39,8 +39,7 @@ fn test_login_handler_success() {
   let output = result.unwrap();
   assert!(
     output.contains("alice@example.com"),
-    "Output should contain email: {}",
-    output
+    "Output should contain email: {output}"
   );
 }
 
@@ -57,7 +56,7 @@ fn test_login_handler_missing_email() {
     CliError::MissingParameter(name) => {
       assert_eq!(name, "email", "Error should mention 'email'");
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -74,14 +73,14 @@ fn test_login_handler_missing_password() {
     CliError::MissingParameter(name) => {
       assert_eq!(name, "password", "Error should mention 'password'");
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
 fn test_login_handler_empty_email() {
   let mut params = HashMap::new();
-  params.insert("email".into(), "".into());
+  params.insert("email".into(), String::new());
   params.insert("password".into(), "secret123".into());
 
   let result = login_handler(&params);
@@ -93,11 +92,10 @@ fn test_login_handler_empty_email() {
       assert_eq!(param, "email");
       assert!(
         reason.contains("empty"),
-        "Reason should mention 'empty': {}",
-        reason
+        "Reason should mention 'empty': {reason}"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -115,12 +113,11 @@ fn test_login_handler_email_too_short() {
     CliError::InvalidParameter { param, reason } => {
       assert_eq!(param, "email");
       assert!(
-        reason.contains("3") || reason.contains("least"),
-        "Reason should mention minimum length: {}",
-        reason
+        reason.contains('3') || reason.contains("least"),
+        "Reason should mention minimum length: {reason}"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -140,11 +137,10 @@ fn test_login_handler_email_too_long() {
       assert_eq!(param, "email");
       assert!(
         reason.contains("100") || reason.contains("most"),
-        "Reason should mention maximum length: {}",
-        reason
+        "Reason should mention maximum length: {reason}"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -163,11 +159,10 @@ fn test_login_handler_invalid_email_pattern() {
       assert_eq!(param, "email");
       assert!(
         reason.contains("pattern") || reason.contains("format"),
-        "Reason should mention pattern: {}",
-        reason
+        "Reason should mention pattern: {reason}"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -175,7 +170,7 @@ fn test_login_handler_invalid_email_pattern() {
 fn test_login_handler_empty_password() {
   let mut params = HashMap::new();
   params.insert("email".into(), "alice@example.com".into());
-  params.insert("password".into(), "".into());
+  params.insert("password".into(), String::new());
 
   let result = login_handler(&params);
 
@@ -186,11 +181,10 @@ fn test_login_handler_empty_password() {
       assert_eq!(param, "password");
       assert!(
         reason.contains("empty"),
-        "Reason should mention 'empty': {}",
-        reason
+        "Reason should mention 'empty': {reason}"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -209,9 +203,7 @@ fn test_login_handler_all_formats() {
 
     assert!(
       result.is_ok(),
-      "Should succeed with format '{}': {:?}",
-      format,
-      result
+      "Should succeed with format '{format}': {result:?}"
     );
 
     // Note: Actual format validation will happen when formatter is implemented (Phase 3)
@@ -297,9 +289,7 @@ fn test_logout_handler_all_formats() {
 
     assert!(
       result.is_ok(),
-      "Should succeed with format '{}': {:?}",
-      format,
-      result
+      "Should succeed with format '{format}': {result:?}"
     );
   }
 }
@@ -315,7 +305,6 @@ fn test_logout_handler_confirmation_message() {
   let output = result.unwrap();
   assert!(
     output.contains("logout") || output.contains("Logout"),
-    "Output should mention logout: {}",
-    output
+    "Output should mention logout: {output}"
   );
 }

@@ -19,7 +19,13 @@ use std::collections::HashMap;
 /// - password: String (min 8 chars, max 1000 chars)
 /// - email: String (non-empty, contains @, max 255 chars)
 /// - role: String (viewer|user|admin)
-pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn create_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let username = params
     .get("username")
@@ -80,8 +86,7 @@ pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, C
 
   // Placeholder response - actual API call handled by adapter
   Ok(format!(
-    "User '{}' created successfully with role '{}'",
-    username, role
+    "User '{username}' created successfully with role '{role}'"
   ))
 }
 
@@ -93,11 +98,17 @@ pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, C
 ///
 /// All optional:
 /// - role: String (viewer|user|admin)
-/// - is_active: String (true|false)
+/// - `is_active`: String (true|false)
 /// - search: String (username or email search)
 /// - page: String (integer, default 1)
-/// - page_size: String (integer, 1-100, default 20)
-pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// - `page_size`: String (integer, 1-100, default 20)
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn list_users_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional role filter
   if let Some(role) = params.get("role") {
     validate_user_role(role)?;
@@ -141,8 +152,14 @@ pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, Cl
 /// ## Parameters
 ///
 /// Required:
-/// - user_id: String (integer)
-pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// - `user_id`: String (integer)
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -151,7 +168,7 @@ pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliE
   let user_id = validate_non_negative_integer(user_id_str, "user_id")?;
 
   // Placeholder response - actual API call handled by adapter
-  Ok(format!("User {} retrieved successfully", user_id))
+  Ok(format!("User {user_id} retrieved successfully"))
 }
 
 /// Handle .users.suspend command
@@ -161,11 +178,17 @@ pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliE
 /// ## Parameters
 ///
 /// Required:
-/// - user_id: String (integer)
+/// - `user_id`: String (integer)
 ///
 /// Optional:
 /// - reason: String (suspension reason)
-pub fn suspend_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn suspend_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -174,7 +197,7 @@ pub fn suspend_user_handler(params: &HashMap<String, String>) -> Result<String, 
   let user_id = validate_non_negative_integer(user_id_str, "user_id")?;
 
   // Placeholder response - actual API call handled by adapter
-  Ok(format!("User {} suspended successfully", user_id))
+  Ok(format!("User {user_id} suspended successfully"))
 }
 
 /// Handle .users.activate command
@@ -184,8 +207,14 @@ pub fn suspend_user_handler(params: &HashMap<String, String>) -> Result<String, 
 /// ## Parameters
 ///
 /// Required:
-/// - user_id: String (integer)
-pub fn activate_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// - `user_id`: String (integer)
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn activate_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -194,7 +223,7 @@ pub fn activate_user_handler(params: &HashMap<String, String>) -> Result<String,
   let user_id = validate_non_negative_integer(user_id_str, "user_id")?;
 
   // Placeholder response - actual API call handled by adapter
-  Ok(format!("User {} activated successfully", user_id))
+  Ok(format!("User {user_id} activated successfully"))
 }
 
 /// Handle .users.delete command
@@ -204,8 +233,14 @@ pub fn activate_user_handler(params: &HashMap<String, String>) -> Result<String,
 /// ## Parameters
 ///
 /// Required:
-/// - user_id: String (integer)
-pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// - `user_id`: String (integer)
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn delete_user_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -214,19 +249,25 @@ pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, C
   let user_id = validate_non_negative_integer(user_id_str, "user_id")?;
 
   // Placeholder response - actual API call handled by adapter
-  Ok(format!("User {} deleted successfully", user_id))
+  Ok(format!("User {user_id} deleted successfully"))
 }
 
-/// Handle .users.change_role command
+/// Handle .`users.change_role` command
 ///
 /// Validates user role change parameters.
 ///
 /// ## Parameters
 ///
 /// Required:
-/// - user_id: String (integer)
+/// - `user_id`: String (integer)
 /// - role: String (viewer|user|admin)
-pub fn change_user_role_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn change_user_role_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -243,22 +284,27 @@ pub fn change_user_role_handler(params: &HashMap<String, String>) -> Result<Stri
 
   // Placeholder response - actual API call handled by adapter
   Ok(format!(
-    "User {} role changed to '{}' successfully",
-    user_id, role
+    "User {user_id} role changed to '{role}' successfully"
   ))
 }
 
-/// Handle .users.reset_password command
+/// Handle .`users.reset_password` command
 ///
 /// Validates password reset parameters.
 ///
 /// ## Parameters
 ///
 /// Required:
-/// - user_id: String (integer)
-/// - new_password: String (min 8 chars, max 1000 chars)
-/// - force_change: String (true|false)
-pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// - `user_id`: String (integer)
+/// - `new_password`: String (min 8 chars, max 1000 chars)
+/// - `force_change`: String (true|false)
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn reset_password_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -292,7 +338,7 @@ pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String
   validate_boolean(force_change_str, "force_change")?;
 
   // Placeholder response - actual API call handled by adapter
-  Ok(format!("Password reset for user {} successfully", user_id))
+  Ok(format!("Password reset for user {user_id} successfully"))
 }
 
 // Helper validation functions

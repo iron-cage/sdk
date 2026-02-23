@@ -1,4 +1,4 @@
-//! TestServer - Real HTTP server for integration testing
+//! `TestServer` - Real HTTP server for integration testing
 //!
 //! ## Purpose
 //!
@@ -9,8 +9,8 @@
 //!
 //! This is a REAL HTTP server:
 //! - Real Axum server on random port (not mock)
-//! - Real database connection (SQLite via iron_test_db)
-//! - Real production routes from iron_control_api
+//! - Real database connection (`SQLite` via `iron_test_db`)
+//! - Real production routes from `iron_control_api`
 //! - Real request/response handling
 //!
 //! ## Architecture
@@ -32,14 +32,14 @@
 //! - Allows parallel test execution without port conflicts
 //! - More realistic than fixed port
 //!
-//! **Why SQLite not PostgreSQL?**
+//! **Why `SQLite` not `PostgreSQL`?**
 //! - Faster test execution
 //! - No external dependencies
 //! - Still real SQL database with real transactions
-//! - iron_test_db already provides infrastructure
+//! - `iron_test_db` already provides infrastructure
 //!
 //! **Why Axum?**
-//! - Same framework as production (iron_control_api uses Axum)
+//! - Same framework as production (`iron_control_api` uses Axum)
 //! - Real production code paths
 //!
 //! ## Usage Example
@@ -62,7 +62,7 @@
 //! ```
 
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
-use std::net::SocketAddr;
+use core::net::SocketAddr;
 use tokio::sync::oneshot;
 
 /// Server startup delay in milliseconds
@@ -124,12 +124,13 @@ impl TestServer {
     }
   }
 
-  /// Get server URL (e.g., "http://127.0.0.1:12345")
+  /// Get server URL (e.g., <http://127.0.0.1:12345>)
   pub fn url(&self) -> String {
     format!("http://{}", self.addr)
   }
 
   /// Graceful shutdown
+  #[allow(clippy::unused_async)]
   pub async fn shutdown(mut self) {
     if let Some(tx) = self.shutdown_tx.take() {
       let _ = tx.send(());
@@ -157,7 +158,7 @@ mod tests {
 
   /// RED Phase Test: Server starts and accepts requests
   ///
-  /// This test MUST fail until TestServer::start() is implemented.
+  /// This test MUST fail until `TestServer::start()` is implemented.
   #[tokio::test]
   async fn test_server_starts_and_accepts_requests() {
     let server = TestServer::start().await;

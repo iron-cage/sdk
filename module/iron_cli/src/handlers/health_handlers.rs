@@ -14,10 +14,16 @@ use std::collections::HashMap;
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn health_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn health_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!("Health status: OK\nFormat: {}", format))
+  Ok(format!("Health status: OK\nFormat: {format}"))
 }
 
 /// Handle .version command
@@ -28,9 +34,15 @@ pub fn health_handler(params: &HashMap<String, String>) -> Result<String, CliErr
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn version_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn version_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
   let version = env!("CARGO_PKG_VERSION");
 
-  Ok(format!("iron-cli version: {}\nFormat: {}", version, format))
+  Ok(format!("iron-cli version: {version}\nFormat: {format}"))
 }

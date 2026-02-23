@@ -8,9 +8,9 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .provider.get (provider_id parameter)
-//! - .provider.update (provider_id parameter)
-//! - .provider.delete (provider_id parameter)
+//! - `.provider.get` (`provider_id` parameter)
+//! - `.provider.update` (`provider_id` parameter)
+//! - `.provider.delete` (`provider_id` parameter)
 //!
 //! ## Test Categories
 //!
@@ -28,7 +28,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid provider_id with UUID
+  /// Test valid `provider_id` with UUID
   #[tokio::test]
   async fn test_provider_id_valid_uuid() {
     let server = TestServer::start().await;
@@ -64,7 +64,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty provider_id (should fail)
+  /// Test empty `provider_id` (should fail)
   #[tokio::test]
   async fn test_provider_id_empty() {
     let server = TestServer::start().await;
@@ -92,7 +92,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid provider_id format (not a UUID)
+  /// Test invalid `provider_id` format (not a UUID)
   #[tokio::test]
   async fn test_provider_id_invalid_format() {
     let server = TestServer::start().await;
@@ -120,7 +120,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing required provider_id
+  /// Test missing required `provider_id`
   #[tokio::test]
   async fn test_provider_id_missing_required() {
     let server = TestServer::start().await;
@@ -147,7 +147,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test provider_id on update command
+  /// Test `provider_id` on update command
   #[tokio::test]
   async fn test_provider_id_update_command() {
     let server = TestServer::start().await;
@@ -184,7 +184,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test provider_id on delete command
+  /// Test `provider_id` on delete command
   #[tokio::test]
   async fn test_provider_id_delete_command() {
     let server = TestServer::start().await;
@@ -220,7 +220,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test provider_id case sensitivity
+  /// Test `provider_id` case sensitivity
   #[tokio::test]
   async fn test_provider_id_case_sensitivity() {
     let server = TestServer::start().await;

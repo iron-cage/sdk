@@ -8,8 +8,8 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .agent.get, .agent.update, .agent.delete, .agent.add_provider, .agent.remove_provider
-//! - .agent.ic_token.generate, .agent.ic_token.status, .agent.ic_token.regenerate, .agent.ic_token.revoke
+//! - `.agent.get`, `.agent.update`, `.agent.delete`, `.agent.add_provider`, `.agent.remove_provider`
+//! - `.agent.ic_token.generate`, `.agent.ic_token.status`, `.agent.ic_token.regenerate`, `.agent.ic_token.revoke`
 //! - .project.get
 //! - And others...
 //!
@@ -131,12 +131,12 @@ mod tests {
 
     // Test id parameter with agent.get
     let result1 = harness
-      .run("iron", &[".agent.get", &format!("id::{}", test_uuid)])
+      .run("iron", &[".agent.get", &format!("id::{test_uuid}")])
       .await;
 
     // Test id parameter with project.get
     let result2 = harness
-      .run("iron", &[".project.get", &format!("id::{}", test_uuid)])
+      .run("iron", &[".project.get", &format!("id::{test_uuid}")])
       .await;
 
     // All should handle the UUID consistently (succeed or "not found", not format error)
@@ -227,7 +227,7 @@ mod tests {
     let very_long_id =
       "550e8400-e29b-41d4-a716-446655440000-extra-characters-that-make-it-too-long";
     let result = harness
-      .run("iron", &[".agent.get", &format!("id::{}", very_long_id)])
+      .run("iron", &[".agent.get", &format!("id::{very_long_id}")])
       .await;
 
     assert!(!result.success(), "Too long id should fail");
@@ -272,7 +272,7 @@ mod tests {
   // IC Token Command Tests
   // =====================================================
 
-  /// Test .agent.ic_token.generate with valid id
+  /// Test `.agent.ic_token.generate` with valid id
   #[tokio::test]
   async fn test_ic_token_generate_valid_id() {
     let server = TestServer::start().await;
@@ -308,7 +308,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.generate with missing id
+  /// Test `.agent.ic_token.generate` with missing id
   #[tokio::test]
   async fn test_ic_token_generate_missing_id() {
     let server = TestServer::start().await;
@@ -332,7 +332,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.generate with invalid id
+  /// Test `.agent.ic_token.generate` with invalid id
   #[tokio::test]
   async fn test_ic_token_generate_invalid_id() {
     let server = TestServer::start().await;
@@ -360,7 +360,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.status with valid id
+  /// Test `.agent.ic_token.status` with valid id
   #[tokio::test]
   async fn test_ic_token_status_valid_id() {
     let server = TestServer::start().await;
@@ -396,7 +396,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.status with missing id
+  /// Test `.agent.ic_token.status` with missing id
   #[tokio::test]
   async fn test_ic_token_status_missing_id() {
     let server = TestServer::start().await;
@@ -420,7 +420,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.status with invalid id
+  /// Test `.agent.ic_token.status` with invalid id
   #[tokio::test]
   async fn test_ic_token_status_invalid_id() {
     let server = TestServer::start().await;
@@ -448,7 +448,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.regenerate with valid id
+  /// Test `.agent.ic_token.regenerate` with valid id
   #[tokio::test]
   async fn test_ic_token_regenerate_valid_id() {
     let server = TestServer::start().await;
@@ -484,7 +484,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.regenerate with missing id
+  /// Test `.agent.ic_token.regenerate` with missing id
   #[tokio::test]
   async fn test_ic_token_regenerate_missing_id() {
     let server = TestServer::start().await;
@@ -508,7 +508,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.regenerate with invalid id
+  /// Test `.agent.ic_token.regenerate` with invalid id
   #[tokio::test]
   async fn test_ic_token_regenerate_invalid_id() {
     let server = TestServer::start().await;
@@ -536,7 +536,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.revoke with valid id
+  /// Test `.agent.ic_token.revoke` with valid id
   #[tokio::test]
   async fn test_ic_token_revoke_valid_id() {
     let server = TestServer::start().await;
@@ -572,7 +572,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.revoke with missing id
+  /// Test `.agent.ic_token.revoke` with missing id
   #[tokio::test]
   async fn test_ic_token_revoke_missing_id() {
     let server = TestServer::start().await;
@@ -596,7 +596,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test .agent.ic_token.revoke with invalid id
+  /// Test .`agent.ic_token.revoke` with invalid id
   #[tokio::test]
   async fn test_ic_token_revoke_invalid_id() {
     let server = TestServer::start().await;
@@ -648,7 +648,7 @@ mod tests {
 
     for cmd in commands {
       let result = harness
-        .run("iron", &[cmd, &format!("id::{}", test_uuid)])
+        .run("iron", &[cmd, &format!("id::{test_uuid}")])
         .await;
 
       // All should handle the UUID consistently (succeed or "not found", not format error)
@@ -657,8 +657,7 @@ mod tests {
           !result.stderr.contains("id")
             || !result.stderr.contains("invalid")
             || !result.stderr.contains("format"),
-          "Command {} should not fail with id format error. Stderr: {}",
-          cmd,
+          "Command {cmd} should not fail with id format error. Stderr: {}",
           result.stderr
         );
       }

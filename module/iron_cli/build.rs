@@ -1,9 +1,9 @@
-//! Build script for iron_cli - generates static command registry from YAML
+//! Build script for `iron_cli` - generates static command registry from YAML
 //!
 //! Discovers all .yaml files in the commands/ directory and generates
 //! an optimized static command registry using Perfect Hash Functions (PHF).
 //!
-//! This provides O(1) command lookups at ~80ns vs ~4,000ns for runtime HashMaps.
+//! This provides O(1) command lookups at ~80ns vs ~4,000ns for runtime `HashMaps`.
 
 // Build scripts are allowed to use println! for cargo communication
 #![allow(clippy::disallowed_macros)]

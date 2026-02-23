@@ -1,4 +1,4 @@
-//! TestData - Real database fixtures for integration testing
+//! `TestData` - Real database fixtures for integration testing
 //!
 //! ## Purpose
 //!
@@ -8,7 +8,7 @@
 //! ## No Mocking Policy
 //!
 //! This uses REAL database operations:
-//! - Real SQLite database via iron_test_db
+//! - Real `SQLite` database via `iron_test_db`
 //! - Real SQL INSERT statements (not fake data)
 //! - Real database transactions
 //! - Real schema migrations
@@ -33,7 +33,7 @@
 //! - Catches SQL errors that mocks would hide
 //! - Validates foreign key relationships
 //!
-//! **Why SQLite not PostgreSQL?**
+//! **Why `SQLite` not `PostgreSQL`?**
 //! - Faster test execution
 //! - No external dependencies
 //! - Same SQL dialect for most operations
@@ -67,7 +67,7 @@ pub struct TestData {
 impl TestData {
   /// Create new test database with schema
   ///
-  /// Initializes SQLite database with minimal schema for parameter testing.
+  /// Initializes `SQLite` database with minimal schema for parameter testing.
   ///
   /// # Panics
   ///
@@ -157,7 +157,7 @@ impl TestData {
 
   /// Get reference to database pool
   ///
-  /// Used by TestServer to share the same database.
+  /// Used by `TestServer` to share the same database.
   #[allow(dead_code)]
   pub fn pool(&self) -> &SqlitePool {
     &self.pool
@@ -165,14 +165,15 @@ impl TestData {
 
   /// Create test user
   ///
-  /// Returns user_id for creating related records.
+  /// Returns `user_id` for creating related records.
   pub async fn create_user(&self, email: &str) -> i64 {
-    let now = SystemTime::now()
+    let now_secs = SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .expect("LOUD FAILURE: Time went backwards")
-      .as_secs() as i64;
+      .as_secs();
+    let now = i64::try_from(now_secs).expect("timestamp fits in i64");
 
-    let user_id = format!("test-user-{}", now);
+    let user_id = format!("test-user-{now}");
 
     sqlx::query(
       "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at)
@@ -197,14 +198,15 @@ impl TestData {
   ///
   /// Returns the API key string for authentication tests.
   pub async fn create_api_key(&self, user_id: i64, key_name: &str) -> String {
-    let now = SystemTime::now()
+    let now_millis = SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .expect("LOUD FAILURE: Time went backwards")
-      .as_millis() as i64;
+      .as_millis();
+    let now = i64::try_from(now_millis).expect("timestamp fits in i64");
 
-    let api_key = format!("test-key-{}-{}", user_id, now);
-    let token_hash = format!("hash-{}", api_key);
-    let user_id_str = format!("test-user-{}", user_id);
+    let api_key = format!("test-key-{user_id}-{now}");
+    let token_hash = format!("hash-{api_key}");
+    let user_id_str = format!("test-user-{user_id}");
 
     sqlx::query(
       "INSERT INTO api_tokens (token_hash, user_id, name, is_active, created_at)
@@ -224,18 +226,19 @@ impl TestData {
 
   /// Create budget for user
   ///
-  /// Returns budget_id for budget-related tests.
+  /// Returns `budget_id` for budget-related tests.
   pub async fn create_budget(&self, user_id: i64, limit_tokens: i64) -> i64 {
-    let now = SystemTime::now()
+    let now_millis = SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .expect("LOUD FAILURE: Time went backwards")
-      .as_millis() as i64;
+      .as_millis();
+    let now = i64::try_from(now_millis).expect("timestamp fits in i64");
 
     // First create an agent (required for agent_budgets)
     let agent_id: i64 = sqlx::query(
       "INSERT INTO agents (name, providers, created_at) VALUES (?1, ?2, ?3) RETURNING id",
     )
-    .bind(format!("test-agent-{}", user_id))
+    .bind(format!("test-agent-{user_id}"))
     .bind("[]") // Empty providers array
     .bind(now)
     .fetch_one(&self.pool)
@@ -279,7 +282,7 @@ mod tests {
 
   /// RED Phase Test: Database initializes with schema
   ///
-  /// This test MUST fail until TestData::new() is implemented.
+  /// This test MUST fail until `TestData::new()` is implemented.
   #[tokio::test]
   async fn test_database_initializes() {
     let _data = TestData::new().await;

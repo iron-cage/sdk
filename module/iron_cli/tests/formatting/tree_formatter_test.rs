@@ -1,4 +1,4 @@
-//! TreeFmtFormatter tests
+//! `TreeFmtFormatter` tests
 //!
 //! ## Test Coverage
 //!

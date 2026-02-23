@@ -14,13 +14,19 @@ use std::collections::HashMap;
 /// ## Parameters
 ///
 /// Optional:
-/// - agent_id: String (positive integer)
+/// - `agent_id`: String (positive integer)
 /// - threshold: String (0-100)
 /// - status: String (active|exhausted)
 /// - page: String (positive integer)
-/// - per_page: String (positive integer)
+/// - `per_page`: String (positive integer)
 /// - format: String (table|json|yaml, default: table)
-pub fn budget_status_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn budget_status_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional agent_id
   if let Some(agent_id_str) = params.get("agent_id") {
     let agent_id = validate_non_negative_integer(agent_id_str, "agent_id")?;
@@ -65,10 +71,7 @@ pub fn budget_status_handler(params: &HashMap<String, String>) -> Result<String,
     validate_non_negative_integer(per_page_str, "per_page")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "Budget status parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("Budget status parameters valid\nFormat: {format}"))
 }

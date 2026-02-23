@@ -14,7 +14,7 @@
 //!
 //! 1. Extract parameters from command
 //! 2. Call handler for validation (pure, sync)
-//! 3. Perform async I/O via TokenService
+//! 3. Perform async I/O via `TokenService`
 //! 4. Store results (if not dry-run)
 //! 5. Format output
 
@@ -48,9 +48,13 @@ fn is_dry_run(params: &HashMap<String, String>) -> bool {
 /// ## Flow
 ///
 /// 1. Extract name/scope/ttl from command
-/// 2. Call generate_token_handler() for validation
-/// 3. Perform async token generation via TokenService
+/// 2. Call `generate_token_handler()` for validation
+/// 3. Perform async token generation via `TokenService`
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn generate_token_adapter<T, S>(
   command: &T,
   token_service: S,
@@ -114,9 +118,13 @@ where
 /// ## Flow
 ///
 /// 1. Extract filter parameter (optional)
-/// 2. Call list_tokens_handler() for validation
-/// 3. Perform async token listing via TokenService
+/// 2. Call `list_tokens_handler()` for validation
+/// 3. Perform async token listing via `TokenService`
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation or service call fails.
 pub async fn list_tokens_adapter<T, S>(
   command: &T,
   token_service: S,
@@ -133,7 +141,7 @@ where
   let _ = token_handlers::list_tokens_handler(&params)?;
 
   // Extract filter (optional)
-  let filter = params.get("filter").map(|s| s.as_str());
+  let filter = params.get("filter").map(String::as_str);
 
   // Perform async token listing
   let tokens = token_service.list(filter).await?;
@@ -165,10 +173,14 @@ where
 ///
 /// ## Flow
 ///
-/// 1. Extract token_id from command
-/// 2. Call get_token_handler() for validation
-/// 3. Perform async token retrieval via TokenService
+/// 1. Extract `token_id` from command
+/// 2. Call `get_token_handler()` for validation
+/// 3. Perform async token retrieval via `TokenService`
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn get_token_adapter<T, S>(
   command: &T,
   token_service: S,
@@ -210,10 +222,14 @@ where
 ///
 /// ## Flow
 ///
-/// 1. Extract token_id from command
-/// 2. Call rotate_token_handler() for validation
-/// 3. Perform async token rotation via TokenService
+/// 1. Extract `token_id` from command
+/// 2. Call `rotate_token_handler()` for validation
+/// 3. Perform async token rotation via `TokenService`
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn rotate_token_adapter<T, S>(
   command: &T,
   token_service: S,
@@ -269,10 +285,14 @@ where
 ///
 /// ## Flow
 ///
-/// 1. Extract token_id from command
-/// 2. Call revoke_token_handler() for validation
-/// 3. Perform async token revocation via TokenService
+/// 1. Extract `token_id` from command
+/// 2. Call `revoke_token_handler()` for validation
+/// 3. Perform async token revocation via `TokenService`
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn revoke_token_adapter<T, S>(
   command: &T,
   token_service: S,
@@ -306,7 +326,7 @@ where
   }
 
   // Extract optional reason
-  let reason = params.get("reason").map(|s| s.as_str());
+  let reason = params.get("reason").map(String::as_str);
 
   // Perform async token revocation
   token_service.revoke(token_id, reason).await?;

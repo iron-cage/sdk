@@ -8,8 +8,8 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .analytics.export_usage (export_format parameter)
-//! - .analytics.export_spending (export_format parameter)
+//! - `.analytics.export_usage` (`export_format` parameter)
+//! - `.analytics.export_spending` (`export_format` parameter)
 //!
 //! ## Test Categories
 //!
@@ -27,7 +27,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid export_format (csv)
+  /// Test valid `export_format` (csv)
   #[tokio::test]
   async fn test_export_format_csv() {
     let server = TestServer::start().await;
@@ -62,7 +62,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test valid export_format (json)
+  /// Test valid `export_format` (json)
   #[tokio::test]
   async fn test_export_format_json_explicit() {
     let server = TestServer::start().await;
@@ -96,7 +96,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid export_format
+  /// Test invalid `export_format`
   #[tokio::test]
   async fn test_export_format_invalid() {
     let server = TestServer::start().await;
@@ -131,7 +131,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty export_format
+  /// Test empty `export_format`
   #[tokio::test]
   async fn test_export_format_empty() {
     let server = TestServer::start().await;
@@ -164,7 +164,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test export_format case insensitivity
+  /// Test `export_format` case insensitivity
   #[tokio::test]
   async fn test_export_format_lowercase() {
     let server = TestServer::start().await;
@@ -199,7 +199,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test export_format default behavior (missing optional)
+  /// Test `export_format` default behavior (missing optional)
   #[tokio::test]
   async fn test_export_format_default() {
     let server = TestServer::start().await;

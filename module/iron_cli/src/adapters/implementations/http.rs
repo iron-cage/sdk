@@ -6,16 +6,16 @@
 //!
 //! ## Purpose
 //!
-//! Replaces InMemoryAdapter for production use. InMemoryAdapter is now test-only
-//! (enforced via compile_error! guard). HttpAdapter provides real API integration
+//! Replaces `InMemoryAdapter` for production use. `InMemoryAdapter` is now test-only
+//! (enforced via `compile_error`! guard). `HttpAdapter` provides real API integration
 //! for production deployments.
 //!
 //! ## Architecture
 //!
 //! - **HTTP Client**: Uses reqwest for async HTTP communication
-//! - **Authentication**: JWT tokens stored in Arc<RwLock<>> for thread-safe access
+//! - **Authentication**: JWT tokens stored in Arc<`RwLock`<>> for thread-safe access
 //! - **Token Storage**: Persists auth tokens to `~/.iron/tokens.json`
-//! - **Error Mapping**: HTTP status codes → ServiceError variants
+//! - **Error Mapping**: HTTP status codes → `ServiceError` variants
 //!
 //! ## Design Decisions
 //!
@@ -29,26 +29,26 @@
 //! - User can inspect/debug tokens manually
 //! - Alternative considered: keyring (rejected for simplicity)
 //!
-//! **Why Arc<RwLock<>> for auth token?**
+//! **Why Arc<`RwLock`<>> for auth token?**
 //! - Thread-safe token access across async tasks
 //! - Allows token refresh without &mut self
-//! - Matches InMemoryAdapter pattern for consistency
+//! - Matches `InMemoryAdapter` pattern for consistency
 //!
 //! ## Error Handling
 //!
-//! HTTP status codes map to ServiceError:
+//! HTTP status codes map to `ServiceError`:
 //! - 401 → Unauthorized (invalid/expired token)
 //! - 403 → Forbidden (insufficient permissions)
-//! - 404 → NotFound (resource doesn't exist)
+//! - 404 → `NotFound` (resource doesn't exist)
 //! - 409 → Conflict (resource already exists)
-//! - Other → NetworkError (with detailed message)
+//! - Other → `NetworkError` (with detailed message)
 //!
 //! ## Migration Notes
 //!
-//! Migrated from InMemoryAdapter (2025-12-04):
+//! Migrated from `InMemoryAdapter` (2025-12-04):
 //! - All 7 service traits implemented (Auth, Token, Usage, Limits, Traces, Health, Storage)
-//! - InMemoryAdapter now behind compile_error! guard (test-only)
-//! - 272 tests passing with HttpAdapter available
+//! - `InMemoryAdapter` now behind `compile_error`! guard (test-only)
+//! - 272 tests passing with `HttpAdapter` available
 //! - Binary integration pending (stub blocker)
 
 use super::super::error::ServiceError;
@@ -59,6 +59,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
 /// HTTP adapter using reqwest for API communication
+#[derive(Debug)]
 pub struct HttpAdapter {
   client: Client,
   base_url: String,
@@ -67,14 +68,18 @@ pub struct HttpAdapter {
 
 impl HttpAdapter {
   /// Create new HTTP adapter with API base URL
+  ///
+  /// # Errors
+  ///
+  /// Returns [`ServiceError::ValidationError`] if the URL does not start with
+  /// `http://` or `https://`.
   pub fn new(base_url: impl Into<String>) -> Result<Self, ServiceError> {
     let base_url = base_url.into();
 
     // Validate URL format
     if !base_url.starts_with("http://") && !base_url.starts_with("https://") {
       return Err(ServiceError::ValidationError(format!(
-        "Invalid URL: must start with http:// or https://, got: {}",
-        base_url
+        "Invalid URL: must start with http:// or https://, got: {base_url}"
       )));
     }
 
@@ -86,12 +91,20 @@ impl HttpAdapter {
   }
 
   /// Set authentication token for API requests
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
   pub fn set_auth_token(&self, token: String) {
     let mut auth = self.auth_token.write().unwrap();
     *auth = Some(token);
   }
 
   /// Clear authentication token
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
   pub fn clear_auth_token(&self) {
     let mut auth = self.auth_token.write().unwrap();
     *auth = None;
@@ -104,7 +117,7 @@ impl HttpAdapter {
 
     // Add auth header if token is set
     if let Some(token) = self.auth_token.read().unwrap().as_ref() {
-      builder = builder.header("Authorization", format!("Bearer {}", token));
+      builder = builder.header("Authorization", format!("Bearer {token}"));
     }
 
     builder
@@ -120,7 +133,7 @@ impl HttpAdapter {
       200..=299 => response
         .json::<T>()
         .await
-        .map_err(|e| ServiceError::NetworkError(format!("Failed to parse response: {}", e))),
+        .map_err(|e| ServiceError::NetworkError(format!("Failed to parse response: {e}"))),
       401 => Err(ServiceError::Unauthorized),
       403 => Err(ServiceError::Forbidden),
       404 => Err(ServiceError::NotFound),
@@ -131,8 +144,7 @@ impl HttpAdapter {
           .await
           .unwrap_or_else(|_| "Unknown error".to_string());
         Err(ServiceError::NetworkError(format!(
-          "HTTP {}: {}",
-          status, error_text
+          "HTTP {status}: {error_text}"
         )))
       }
     }
@@ -154,8 +166,7 @@ impl HttpAdapter {
           .await
           .unwrap_or_else(|_| "Unknown error".to_string());
         Err(ServiceError::NetworkError(format!(
-          "HTTP {}: {}",
-          status, error_text
+          "HTTP {status}: {error_text}"
         )))
       }
     }
@@ -191,7 +202,7 @@ impl AuthService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Login request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Login request failed: {e}")))?;
 
     let tokens_resp: TokensResponse = Self::handle_response(response).await?;
 
@@ -216,7 +227,7 @@ impl AuthService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Refresh request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Refresh request failed: {e}")))?;
 
     let tokens_resp: TokensResponse = Self::handle_response(response).await?;
 
@@ -241,7 +252,7 @@ impl AuthService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Logout request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Logout request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -298,7 +309,7 @@ impl TokenService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Generate token request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Generate token request failed: {e}")))?;
 
     let token_resp: TokenResponse = Self::handle_response(response).await?;
     Ok(token_resp.into())
@@ -314,19 +325,19 @@ impl TokenService for HttpAdapter {
     let response = req
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("List tokens request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("List tokens request failed: {e}")))?;
 
     let tokens_resp: Vec<TokenResponse> = Self::handle_response(response).await?;
     Ok(tokens_resp.into_iter().map(Token::from).collect())
   }
 
   async fn get(&self, token_id: &str) -> Result<Token, ServiceError> {
-    let path = format!("/api/tokens/{}", token_id);
+    let path = format!("/api/tokens/{token_id}");
     let response = self
       .request(Method::GET, &path)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Get token request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Get token request failed: {e}")))?;
 
     let token_resp: TokenResponse = Self::handle_response(response).await?;
     Ok(token_resp.into())
@@ -339,14 +350,14 @@ impl TokenService for HttpAdapter {
     }
 
     let req_body = RotateRequest { ttl: new_ttl };
-    let path = format!("/api/tokens/{}/rotate", token_id);
+    let path = format!("/api/tokens/{token_id}/rotate");
 
     let response = self
       .request(Method::POST, &path)
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Rotate token request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Rotate token request failed: {e}")))?;
 
     let token_resp: TokenResponse = Self::handle_response(response).await?;
     Ok(token_resp.into())
@@ -359,16 +370,16 @@ impl TokenService for HttpAdapter {
     }
 
     let req_body = RevokeRequest {
-      reason: reason.map(|s| s.to_string()),
+      reason: reason.map(ToString::to_string),
     };
-    let path = format!("/api/tokens/{}/revoke", token_id);
+    let path = format!("/api/tokens/{token_id}/revoke");
 
     let response = self
       .request(Method::POST, &path)
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Revoke token request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Revoke token request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -428,7 +439,7 @@ impl UsageService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Record usage request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Record usage request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -455,7 +466,7 @@ impl UsageService for HttpAdapter {
     let response = req
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Get usage request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Get usage request failed: {e}")))?;
 
     let usage_resp: Vec<UsageRecordResponse> = Self::handle_response(response).await?;
     Ok(usage_resp.into_iter().map(UsageRecord::from).collect())
@@ -466,7 +477,7 @@ impl UsageService for HttpAdapter {
     project_id: &str,
     start_date: Option<&str>,
   ) -> Result<Vec<UsageRecord>, ServiceError> {
-    let path = format!("/api/usage/project/{}", project_id);
+    let path = format!("/api/usage/project/{project_id}");
     let mut req = self.request(Method::GET, &path);
 
     if let Some(start) = start_date {
@@ -474,7 +485,7 @@ impl UsageService for HttpAdapter {
     }
 
     let response = req.send().await.map_err(|e| {
-      ServiceError::NetworkError(format!("Get usage by project request failed: {}", e))
+      ServiceError::NetworkError(format!("Get usage by project request failed: {e}"))
     })?;
 
     let usage_resp: Vec<UsageRecordResponse> = Self::handle_response(response).await?;
@@ -486,7 +497,7 @@ impl UsageService for HttpAdapter {
     provider: &str,
     aggregation: Option<&str>,
   ) -> Result<Vec<UsageRecord>, ServiceError> {
-    let path = format!("/api/usage/provider/{}", provider);
+    let path = format!("/api/usage/provider/{provider}");
     let mut req = self.request(Method::GET, &path);
 
     if let Some(agg) = aggregation {
@@ -494,7 +505,7 @@ impl UsageService for HttpAdapter {
     }
 
     let response = req.send().await.map_err(|e| {
-      ServiceError::NetworkError(format!("Get usage by provider request failed: {}", e))
+      ServiceError::NetworkError(format!("Get usage by provider request failed: {e}"))
     })?;
 
     let usage_resp: Vec<UsageRecordResponse> = Self::handle_response(response).await?;
@@ -518,7 +529,7 @@ impl UsageService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Export usage request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Export usage request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -572,7 +583,7 @@ impl LimitsService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Create limit request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Create limit request failed: {e}")))?;
 
     let limit_resp: LimitResponse = Self::handle_response(response).await?;
     Ok(limit_resp.into())
@@ -583,19 +594,19 @@ impl LimitsService for HttpAdapter {
       .request(Method::GET, "/api/limits")
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("List limits request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("List limits request failed: {e}")))?;
 
     let limits_resp: Vec<LimitResponse> = Self::handle_response(response).await?;
     Ok(limits_resp.into_iter().map(Limit::from).collect())
   }
 
   async fn get_limit(&self, limit_id: &str) -> Result<Limit, ServiceError> {
-    let path = format!("/api/limits/{}", limit_id);
+    let path = format!("/api/limits/{limit_id}");
     let response = self
       .request(Method::GET, &path)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Get limit request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Get limit request failed: {e}")))?;
 
     let limit_resp: LimitResponse = Self::handle_response(response).await?;
     Ok(limit_resp.into())
@@ -610,26 +621,26 @@ impl LimitsService for HttpAdapter {
     let req_body = UpdateLimitRequest {
       limit_value: new_value,
     };
-    let path = format!("/api/limits/{}", limit_id);
+    let path = format!("/api/limits/{limit_id}");
 
     let response = self
       .request(Method::PUT, &path)
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Update limit request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Update limit request failed: {e}")))?;
 
     let limit_resp: LimitResponse = Self::handle_response(response).await?;
     Ok(limit_resp.into())
   }
 
   async fn delete_limit(&self, limit_id: &str) -> Result<(), ServiceError> {
-    let path = format!("/api/limits/{}", limit_id);
+    let path = format!("/api/limits/{limit_id}");
     let response = self
       .request(Method::DELETE, &path)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Delete limit request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Delete limit request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -684,7 +695,7 @@ impl TracesService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Record trace request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Record trace request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -711,19 +722,19 @@ impl TracesService for HttpAdapter {
     let response = req
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("List traces request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("List traces request failed: {e}")))?;
 
     let traces_resp: Vec<TraceResponse> = Self::handle_response(response).await?;
     Ok(traces_resp.into_iter().map(Trace::from).collect())
   }
 
   async fn get_trace(&self, trace_id: &str) -> Result<Trace, ServiceError> {
-    let path = format!("/api/traces/{}", trace_id);
+    let path = format!("/api/traces/{trace_id}");
     let response = self
       .request(Method::GET, &path)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Get trace request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Get trace request failed: {e}")))?;
 
     let trace_resp: TraceResponse = Self::handle_response(response).await?;
     Ok(trace_resp.into())
@@ -746,7 +757,7 @@ impl TracesService for HttpAdapter {
       .json(&req_body)
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Export traces request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Export traces request failed: {e}")))?;
 
     Self::handle_empty_response(response).await
   }
@@ -766,7 +777,7 @@ impl From<HealthStatusResponse> for HealthStatus {
   fn from(resp: HealthStatusResponse) -> Self {
     HealthStatus {
       status: resp.status,
-      uptime_seconds: resp.timestamp as u64,
+      uptime_seconds: u64::try_from(resp.timestamp).unwrap_or(0),
     }
   }
 }
@@ -778,7 +789,7 @@ impl HealthService for HttpAdapter {
       .request(Method::GET, "/api/health")
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Health check request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Health check request failed: {e}")))?;
 
     let health_resp: HealthStatusResponse = Self::handle_response(response).await?;
     Ok(health_resp.into())
@@ -794,7 +805,7 @@ impl HealthService for HttpAdapter {
       .request(Method::GET, "/api/version")
       .send()
       .await
-      .map_err(|e| ServiceError::NetworkError(format!("Version request failed: {}", e)))?;
+      .map_err(|e| ServiceError::NetworkError(format!("Version request failed: {e}")))?;
 
     let version_resp: VersionResponse = Self::handle_response(response).await?;
     Ok(version_resp.current_version)
@@ -813,17 +824,17 @@ impl StorageService for HttpAdapter {
       .ok_or_else(|| ServiceError::StorageError("Could not find home directory".to_string()))?
       .join(".iron");
 
-    tokio::fs::create_dir_all(&tokens_dir).await.map_err(|e| {
-      ServiceError::StorageError(format!("Failed to create .iron directory: {}", e))
-    })?;
+    tokio::fs::create_dir_all(&tokens_dir)
+      .await
+      .map_err(|e| ServiceError::StorageError(format!("Failed to create .iron directory: {e}")))?;
 
     let tokens_path = tokens_dir.join("tokens.json");
     let tokens_json = serde_json::to_string_pretty(tokens)
-      .map_err(|e| ServiceError::StorageError(format!("Failed to serialize tokens: {}", e)))?;
+      .map_err(|e| ServiceError::StorageError(format!("Failed to serialize tokens: {e}")))?;
 
     tokio::fs::write(&tokens_path, tokens_json)
       .await
-      .map_err(|e| ServiceError::StorageError(format!("Failed to write tokens file: {}", e)))?;
+      .map_err(|e| ServiceError::StorageError(format!("Failed to write tokens file: {e}")))?;
 
     Ok(())
   }
@@ -840,10 +851,10 @@ impl StorageService for HttpAdapter {
 
     let tokens_json = tokio::fs::read_to_string(&tokens_path)
       .await
-      .map_err(|e| ServiceError::StorageError(format!("Failed to read tokens file: {}", e)))?;
+      .map_err(|e| ServiceError::StorageError(format!("Failed to read tokens file: {e}")))?;
 
     let tokens: Tokens = serde_json::from_str(&tokens_json)
-      .map_err(|e| ServiceError::StorageError(format!("Failed to parse tokens file: {}", e)))?;
+      .map_err(|e| ServiceError::StorageError(format!("Failed to parse tokens file: {e}")))?;
 
     Ok(Some(tokens))
   }
@@ -857,7 +868,7 @@ impl StorageService for HttpAdapter {
     if tokens_path.exists() {
       tokio::fs::remove_file(&tokens_path)
         .await
-        .map_err(|e| ServiceError::StorageError(format!("Failed to remove tokens file: {}", e)))?;
+        .map_err(|e| ServiceError::StorageError(format!("Failed to remove tokens file: {e}")))?;
     }
 
     Ok(())

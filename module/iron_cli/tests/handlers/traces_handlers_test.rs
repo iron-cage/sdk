@@ -51,7 +51,7 @@ fn test_list_traces_handler_all_formats() {
 
     let result = list_traces_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -78,7 +78,7 @@ fn test_get_trace_handler_missing_trace_id() {
   assert!(result.is_err(), "Should fail without trace_id");
   match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "trace_id"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -93,7 +93,7 @@ fn test_get_trace_handler_all_formats() {
 
     let result = get_trace_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 

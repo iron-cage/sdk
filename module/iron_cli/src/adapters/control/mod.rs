@@ -21,8 +21,8 @@
 //! ## HTTP Client
 //!
 //! Uses reqwest for async HTTP calls to Control API endpoints.
-//! Base URL configured via environment variable: IRON_CONTROL_API_URL
-//! Default: http://localhost:8080
+//! Base URL configured via environment variable: `IRON_CONTROL_API_URL`
+//! Default: <http://localhost:8080>
 //!
 //! ## Authentication
 //!
@@ -32,12 +32,12 @@
 //! ## Error Handling
 //!
 //! - Validation errors: Returned from handlers before HTTP call
-//! - Network errors: Wrapped in AdapterError::NetworkError
-//! - API errors: Parsed from response, wrapped in AdapterError::ApiError
+//! - Network errors: Wrapped in `AdapterError::NetworkError`
+//! - API errors: Parsed from response, wrapped in `AdapterError::ApiError`
 //!
 //! ## Dry Run Mode
 //!
-//! When dry::1 is set:
+//! When `dry::1` is set:
 //! - Handler validation runs normally
 //! - HTTP request is NOT made
 //! - Simulated response returned to user

@@ -9,11 +9,11 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .agent.get (agent_id parameter - UUID)
-//! - .agent.update (agent_id parameter - UUID)
-//! - .agent.delete (agent_id parameter - UUID)
-//! - .analytics.usage_by_agent (agent_id filter - UUID)
-//! - .budget.status (agent_id filter - positive integer)
+//! - `.agent.get` (`agent_id` parameter - UUID)
+//! - `.agent.update` (`agent_id` parameter - UUID)
+//! - `.agent.delete` (`agent_id` parameter - UUID)
+//! - `.analytics.usage_by_agent` (`agent_id` filter - UUID)
+//! - `.budget.status` (`agent_id` filter - positive integer)
 //!
 //! ## Test Categories
 //!
@@ -31,7 +31,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid agent_id with UUID
+  /// Test valid `agent_id` with UUID
   #[tokio::test]
   async fn test_agent_id_valid_uuid() {
     let server = TestServer::start().await;
@@ -67,7 +67,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty agent_id (should fail)
+  /// Test empty `agent_id` (should fail)
   #[tokio::test]
   async fn test_agent_id_empty() {
     let server = TestServer::start().await;
@@ -93,7 +93,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid agent_id format (not a UUID)
+  /// Test invalid `agent_id` format (not a UUID)
   #[tokio::test]
   async fn test_agent_id_invalid_format() {
     let server = TestServer::start().await;
@@ -121,7 +121,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing required agent_id
+  /// Test missing required `agent_id`
   #[tokio::test]
   async fn test_agent_id_missing_required() {
     let server = TestServer::start().await;
@@ -145,7 +145,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test agent_id on update command
+  /// Test `agent_id` on update command
   #[tokio::test]
   async fn test_agent_id_update_command() {
     let server = TestServer::start().await;
@@ -182,7 +182,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test agent_id on delete command
+  /// Test `agent_id` on delete command
   #[tokio::test]
   async fn test_agent_id_delete_command() {
     let server = TestServer::start().await;
@@ -218,7 +218,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test agent_id in analytics filtering
+  /// Test `agent_id` in analytics filtering
   #[tokio::test]
   async fn test_agent_id_analytics_filter() {
     let server = TestServer::start().await;
@@ -256,7 +256,7 @@ mod tests {
   // Budget Status Command Tests (agent_id as Integer)
   // =====================================================
 
-  /// Test valid agent_id in budget.status (positive integer)
+  /// Test valid `agent_id` in budget.status (positive integer)
   #[tokio::test]
   async fn test_budget_status_agent_id_valid() {
     let server = TestServer::start().await;
@@ -283,7 +283,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test valid agent_id in budget.status (larger positive integer)
+  /// Test valid `agent_id` in budget.status (larger positive integer)
   #[tokio::test]
   async fn test_budget_status_agent_id_valid_large() {
     let server = TestServer::start().await;
@@ -310,7 +310,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid agent_id in budget.status (zero)
+  /// Test invalid `agent_id` in budget.status (zero)
   #[tokio::test]
   async fn test_budget_status_agent_id_invalid_zero() {
     let server = TestServer::start().await;
@@ -338,7 +338,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid agent_id in budget.status (negative)
+  /// Test invalid `agent_id` in budget.status (negative)
   #[tokio::test]
   async fn test_budget_status_agent_id_invalid_negative() {
     let server = TestServer::start().await;
@@ -366,7 +366,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid agent_id in budget.status (non-integer)
+  /// Test invalid `agent_id` in budget.status (non-integer)
   #[tokio::test]
   async fn test_budget_status_agent_id_invalid_non_integer() {
     let server = TestServer::start().await;
@@ -394,7 +394,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing optional agent_id in budget.status
+  /// Test missing optional `agent_id` in budget.status
   #[tokio::test]
   async fn test_budget_status_agent_id_missing_optional() {
     let server = TestServer::start().await;
@@ -420,7 +420,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test agent_id combined with other filters in budget.status
+  /// Test `agent_id` combined with other filters in budget.status
   #[tokio::test]
   async fn test_budget_status_agent_id_combined() {
     let server = TestServer::start().await;

@@ -51,8 +51,14 @@ fn validate_date(date_str: &str, param_name: &'static str) -> Result<(), CliErro
   Ok(())
 }
 
-/// Handle .analytics.usage command
-pub fn usage_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.usage` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if date parameters are invalid.
+pub fn usage_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional date range
   if let Some(start_date) = params.get("start_date") {
     validate_date(start_date, "start_date")?;
@@ -62,16 +68,21 @@ pub fn usage_handler(params: &HashMap<String, String>) -> Result<String, CliErro
     validate_date(end_date, "end_date")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Usage statistics parameters valid\nFormat: {}",
-    format
+    "Usage statistics parameters valid\nFormat: {format}"
   ))
 }
 
-/// Handle .analytics.spending command
-pub fn spending_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.spending` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if date parameters are invalid.
+pub fn spending_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional date range
   if let Some(start_date) = params.get("start_date") {
     validate_date(start_date, "start_date")?;
@@ -81,16 +92,21 @@ pub fn spending_handler(params: &HashMap<String, String>) -> Result<String, CliE
     validate_date(end_date, "end_date")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Spending statistics parameters valid\nFormat: {}",
-    format
+    "Spending statistics parameters valid\nFormat: {format}"
   ))
 }
 
-/// Handle .analytics.metrics command
-pub fn metrics_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.metrics` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if date parameters are invalid.
+pub fn metrics_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional date range
   if let Some(start_date) = params.get("start_date") {
     validate_date(start_date, "start_date")?;
@@ -100,16 +116,21 @@ pub fn metrics_handler(params: &HashMap<String, String>) -> Result<String, CliEr
     validate_date(end_date, "end_date")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Performance metrics parameters valid\nFormat: {}",
-    format
+    "Performance metrics parameters valid\nFormat: {format}"
   ))
 }
 
-/// Handle .analytics.usage_by_agent command
-pub fn usage_by_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.usage_by_agent` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if date or limit parameters are invalid.
+pub fn usage_by_agent_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional date range
   if let Some(start_date) = params.get("start_date") {
     validate_date(start_date, "start_date")?;
@@ -124,16 +145,19 @@ pub fn usage_by_agent_handler(params: &HashMap<String, String>) -> Result<String
     validate_non_negative_integer(limit_str, "limit")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "Usage by agent parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("Usage by agent parameters valid\nFormat: {format}"))
 }
 
-/// Handle .analytics.usage_by_provider command
-pub fn usage_by_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.usage_by_provider` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if date or limit parameters are invalid.
+pub fn usage_by_provider_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional date range
   if let Some(start_date) = params.get("start_date") {
     validate_date(start_date, "start_date")?;
@@ -148,16 +172,21 @@ pub fn usage_by_provider_handler(params: &HashMap<String, String>) -> Result<Str
     validate_non_negative_integer(limit_str, "limit")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Usage by provider parameters valid\nFormat: {}",
-    format
+    "Usage by provider parameters valid\nFormat: {format}"
   ))
 }
 
-/// Handle .analytics.spending_by_period command
-pub fn spending_by_period_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.spending_by_period` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if period or date parameters are invalid.
+pub fn spending_by_period_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional period
   if let Some(period) = params.get("period") {
     match period.as_str() {
@@ -180,16 +209,21 @@ pub fn spending_by_period_handler(params: &HashMap<String, String>) -> Result<St
     validate_date(end_date, "end_date")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Spending by period parameters valid\nFormat: {}",
-    format
+    "Spending by period parameters valid\nFormat: {format}"
   ))
 }
 
-/// Handle .analytics.export_usage command
-pub fn export_usage_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.export_usage` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn export_usage_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required output_format
   let output_format = params
     .get("output_format")
@@ -214,16 +248,21 @@ pub fn export_usage_handler(params: &HashMap<String, String>) -> Result<String, 
     validate_date(end_date, "end_date")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Export usage parameters valid\nOutput format: {}\nFormat: {}",
-    output_format, format
+    "Export usage parameters valid\nOutput format: {output_format}\nFormat: {format}"
   ))
 }
 
-/// Handle .analytics.export_spending command
-pub fn export_spending_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+/// Handle `.analytics.export_spending` command
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn export_spending_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required output_format
   let output_format = params
     .get("output_format")
@@ -248,10 +287,9 @@ pub fn export_spending_handler(params: &HashMap<String, String>) -> Result<Strin
     validate_date(end_date, "end_date")?;
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Export spending parameters valid\nOutput format: {}\nFormat: {}",
-    output_format, format
+    "Export spending parameters valid\nOutput format: {output_format}\nFormat: {format}"
   ))
 }

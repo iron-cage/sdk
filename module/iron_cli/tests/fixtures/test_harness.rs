@@ -1,4 +1,4 @@
-//! IntegrationTestHarness - Real CLI execution for integration testing
+//! `IntegrationTestHarness` - Real CLI execution for integration testing
 //!
 //! ## Purpose
 //!
@@ -8,7 +8,7 @@
 //! ## No Mocking Policy
 //!
 //! This uses REAL CLI execution:
-//! - Real process spawn via std::process::Command
+//! - Real process spawn via `std::process::Command`
 //! - Real CLI binary execution (not mocked functions)
 //! - Real stdout/stderr capture
 //! - Real exit codes
@@ -115,6 +115,7 @@ impl IntegrationTestHarness {
   ///
   /// Panics if CLI binary cannot be executed.
   /// This is acceptable for test infrastructure.
+  #[allow(clippy::unused_async)]
   pub async fn run(&self, binary: &str, args: &[&str]) -> CliResult {
     // Execute via cargo run to ensure binary is up-to-date
     let mut cmd = Command::new("cargo");

@@ -1,4 +1,4 @@
-//! InMemoryAdapter - Fast, predictable implementation for tests
+//! `InMemoryAdapter` - Fast, predictable implementation for tests
 //!
 //! ## Purpose
 //!
@@ -16,42 +16,42 @@
 //!
 //! ## Thread Safety
 //!
-//! Uses RwLock for concurrent access (same as production would use).
+//! Uses `RwLock` for concurrent access (same as production would use).
 //!
 //! ## Obsolescence Guard Pattern
 //!
 //! This module demonstrates the obsolescence proof pattern for enforcing
 //! test-only code. The pattern combines three mechanisms:
 //!
-//! **1. compile_error! Guard** (below):
+//! **1. `compile_error`! Guard** (below):
 //! ```rust,ignore
 //! #[cfg(not(any(test, feature = "test-adapter")))]
 //! compile_error!("InMemoryAdapter is only for tests...");
 //! ```
-//! Prevents production code from compiling if it tries to use InMemoryAdapter.
+//! Prevents production code from compiling if it tries to use `InMemoryAdapter`.
 //!
 //! **2. Cfg Guards on Module Export** (in mod.rs):
 //! ```rust,ignore
 //! #[cfg(any(test, feature = "test-adapter"))]
 //! pub use in_memory::InMemoryAdapter;
 //! ```
-//! Makes InMemoryAdapter unavailable to production code at module level.
+//! Makes `InMemoryAdapter` unavailable to production code at module level.
 //!
 //! **3. Feature Flag for Integration Tests**:
 //! Integration tests in tests/ directory compile as separate crates and don't
 //! get automatic cfg(test). They need feature = "test-adapter" to access
-//! InMemoryAdapter. Production builds never enable this feature.
+//! `InMemoryAdapter`. Production builds never enable this feature.
 //!
 //! **Why This Pattern Works:**
-//! - compile_error! provides hard enforcement (compile failure)
+//! - `compile_error`! provides hard enforcement (compile failure)
 //! - Cfg guards make the type unavailable in production
 //! - Feature flag solves integration test problem without weakening enforcement
 //! - Combined, they make rollback/workarounds impossible without explicit action
 //!
 //! **Migration Context** (2025-12-04):
-//! - Replaced by HttpAdapter for production use
-//! - 272 tests continue passing using InMemoryAdapter
-//! - Production code MUST use HttpAdapter (enforced at compile time)
+//! - Replaced by `HttpAdapter` for production use
+//! - 272 tests continue passing using `InMemoryAdapter`
+//! - Production code MUST use `HttpAdapter` (enforced at compile time)
 
 // OBSOLESCENCE GUARD: InMemoryAdapter is test-only
 // Production code must use HttpAdapter for real API integration
@@ -71,6 +71,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 /// In-memory adapter for testing
+#[derive(Debug)]
 pub struct InMemoryAdapter {
   users: Arc<RwLock<HashMap<String, String>>>, // username -> password
   tokens: Arc<RwLock<Option<Tokens>>>,         // current user's tokens
@@ -90,6 +91,7 @@ impl Default for InMemoryAdapter {
 
 impl InMemoryAdapter {
   /// Create new empty adapter
+  #[must_use]
   pub fn new() -> Self {
     Self {
       users: Arc::new(RwLock::new(HashMap::new())),
@@ -104,30 +106,52 @@ impl InMemoryAdapter {
   }
 
   /// Test helper: Pre-seed a user (for tests)
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
   pub fn seed_user(&self, username: &str, password: &str) {
     let mut users = self.users.write().unwrap();
     users.insert(username.to_string(), password.to_string());
   }
 
   /// Test helper: Simulate failure modes
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
   pub fn set_failure_mode(&self, mode: &str) {
     let mut failure = self.failure_mode.write().unwrap();
     *failure = Some(mode.to_string());
   }
 
   /// Test helper: Check if tokens exist
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
+  #[must_use]
   pub fn has_tokens(&self) -> bool {
     let tokens = self.tokens.read().unwrap();
     tokens.is_some()
   }
 
   /// Test helper: Get current tokens
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
+  #[must_use]
   pub fn get_tokens(&self) -> Option<Tokens> {
     let tokens = self.tokens.read().unwrap();
     tokens.clone()
   }
 
   /// Test helper: Expire tokens
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal `RwLock` is poisoned.
   pub fn expire_tokens(&self) {
     let mut expired = self.expired.write().unwrap();
     *expired = true;
@@ -136,7 +160,7 @@ impl InMemoryAdapter {
   /// Check for simulated failures
   fn check_failure(&self) -> Result<(), ServiceError> {
     let failure = self.failure_mode.read().unwrap();
-    match failure.as_ref().map(|s| s.as_str()) {
+    match failure.as_ref().map(String::as_str) {
       Some("network_error") => Err(ServiceError::NetworkError(
         "Simulated network error".to_string(),
       )),
@@ -165,8 +189,8 @@ impl AuthService for InMemoryAdapter {
 
     // Generate tokens
     let tokens = Tokens {
-      access_token: format!("access_token_{}", username),
-      refresh_token: format!("refresh_token_{}", username),
+      access_token: format!("access_token_{username}"),
+      refresh_token: format!("refresh_token_{username}"),
     };
 
     // Store tokens
@@ -199,8 +223,8 @@ impl AuthService for InMemoryAdapter {
       .ok_or(ServiceError::Unauthorized)?;
 
     let new_tokens = Tokens {
-      access_token: format!("access_token_new_{}", username),
-      refresh_token: format!("refresh_token_new_{}", username),
+      access_token: format!("access_token_new_{username}"),
+      refresh_token: format!("refresh_token_new_{username}"),
     };
 
     // Store new tokens
@@ -232,7 +256,7 @@ impl TokenService for InMemoryAdapter {
   ) -> Result<Token, ServiceError> {
     self.check_failure()?;
 
-    let token_id = format!("tok_{}", name.replace(" ", "_"));
+    let token_id = format!("tok_{}", name.replace(' ', "_"));
 
     let token = Token {
       id: token_id.clone(),
@@ -494,7 +518,7 @@ impl LimitsService for InMemoryAdapter {
   ) -> Result<Limit, ServiceError> {
     self.check_failure()?;
 
-    let limit_id = format!("lim_{}", resource_type);
+    let limit_id = format!("lim_{resource_type}");
     let timestamp = "2025-01-01T00:00:00Z".to_string();
 
     let limit = Limit {

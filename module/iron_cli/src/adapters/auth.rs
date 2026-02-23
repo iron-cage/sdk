@@ -24,9 +24,9 @@ use crate::formatting::TreeFmtFormatter;
 use crate::handlers::auth_handlers;
 use std::collections::HashMap;
 
-/// Extract parameters from mock VerifiedCommand
+/// Extract parameters from mock `VerifiedCommand`
 ///
-/// TODO: Replace with real unilang VerifiedCommand when available
+/// TODO: Replace with real unilang `VerifiedCommand` when available
 fn extract_params<T>(command: &T) -> HashMap<String, String>
 where
   T: HasParams,
@@ -36,6 +36,7 @@ where
 
 /// Temporary trait for parameter extraction (until unilang types available)
 pub trait HasParams {
+  /// Get parameters as a key-value map
   fn get_params(&self) -> HashMap<String, String>;
 }
 
@@ -54,9 +55,14 @@ fn is_dry_run(params: &HashMap<String, String>) -> bool {
 /// ## Flow
 ///
 /// 1. Extract username/password from command
-/// 2. Call login_handler() for validation
-/// 3. Perform async login via AuthService (stores tokens internally)
+/// 2. Call `login_handler()` for validation
+/// 3. Perform async login via `AuthService` (stores tokens internally)
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if parameter extraction, handler validation,
+/// or authentication service fails.
 pub async fn login_adapter<T, A>(
   command: &T,
   auth_service: A,
@@ -102,10 +108,15 @@ where
 /// ## Flow
 ///
 /// 1. Load refresh token from storage
-/// 2. Call refresh_handler() for validation
-/// 3. Perform async refresh via AuthService
+/// 2. Call `refresh_handler()` for validation
+/// 3. Perform async refresh via `AuthService`
 /// 4. Store new tokens (if not dry-run)
 /// 5. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if parameter extraction, handler validation,
+/// storage load, or token refresh fails.
 pub async fn refresh_adapter<T, A, S>(
   command: &T,
   auth_service: A,
@@ -166,11 +177,16 @@ where
 ///
 /// ## Flow
 ///
-/// 1. Call logout_handler() for validation
+/// 1. Call `logout_handler()` for validation
 /// 2. Load tokens (if any)
-/// 3. Perform async logout via AuthService (if logged in)
+/// 3. Perform async logout via `AuthService` (if logged in)
 /// 4. Clear storage (if not dry-run)
 /// 5. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if parameter extraction, handler validation,
+/// storage operations, or logout service call fails.
 pub async fn logout_adapter<T, A, S>(
   command: &T,
   auth_service: A,

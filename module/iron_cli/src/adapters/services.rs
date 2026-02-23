@@ -2,8 +2,8 @@
 //!
 //! These traits define the interfaces for async I/O operations.
 //! Implementations include:
-//! - InMemoryAdapter: Fast, predictable, for tests
-//! - SqlxAdapter: Real PostgreSQL, for production
+//! - `InMemoryAdapter`: Fast, predictable, for tests
+//! - `SqlxAdapter`: Real `PostgreSQL`, for production
 
 use super::error::ServiceError;
 use async_trait::async_trait;
@@ -11,17 +11,24 @@ use async_trait::async_trait;
 /// Authentication tokens
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tokens {
+  /// Short-lived JWT used to authenticate API requests
   pub access_token: String,
+  /// Long-lived token used to obtain new access tokens
   pub refresh_token: String,
 }
 
 /// Token metadata
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Token {
+  /// Unique token identifier
   pub id: String,
+  /// Human-readable token name
   pub name: String,
+  /// Permission scope (e.g., `read:tokens`)
   pub scope: String,
+  /// ISO 8601 creation timestamp
   pub created_at: String,
+  /// ISO 8601 expiry timestamp, or `None` if the token never expires
   pub expires_at: Option<String>,
 }
 
@@ -65,10 +72,15 @@ pub trait TokenService: Send + Sync {
 /// Usage data record
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UsageRecord {
+  /// Project that incurred the usage
   pub project_id: String,
+  /// Provider that served the request
   pub provider: String,
+  /// Number of tokens consumed
   pub tokens_used: u64,
+  /// Cost in the smallest currency unit (e.g., micro-cents)
   pub cost: u64,
+  /// ISO 8601 timestamp of the usage event
   pub timestamp: String,
 }
 
@@ -112,10 +124,15 @@ pub trait UsageService: Send + Sync {
 /// Limit record
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limit {
+  /// Unique limit identifier
   pub id: String,
+  /// Resource category this limit applies to (e.g., `tokens`, `cost`)
   pub resource_type: String,
+  /// Maximum allowed value for the resource
   pub limit_value: u64,
+  /// ISO 8601 creation timestamp
   pub created_at: String,
+  /// ISO 8601 last-update timestamp
   pub updated_at: String,
 }
 
@@ -145,9 +162,13 @@ pub trait LimitsService: Send + Sync {
 /// Trace record
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Trace {
+  /// Unique trace identifier
   pub id: String,
+  /// Serialized request payload or summary
   pub request: String,
+  /// End-to-end request duration in milliseconds
   pub duration_ms: u64,
+  /// ISO 8601 timestamp when the trace was recorded
   pub timestamp: String,
 }
 
@@ -179,10 +200,12 @@ pub trait TracesService: Send + Sync {
 /// Health check data
 ///
 /// Note: Version information moved to dedicated /api/version endpoint.
-/// Use HealthService::get_version() for version data.
+/// Use `HealthService::get_version()` for version data.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HealthStatus {
+  /// Service health status (e.g., `ok`, `degraded`, `down`)
   pub status: String,
+  /// Seconds elapsed since the service started
   pub uptime_seconds: u64,
 }
 
@@ -211,12 +234,27 @@ pub trait StorageService: Send + Sync {
 
 /// Combined services (all service traits in one)
 pub struct Services {
+  /// Authentication service (login, refresh, logout)
   pub auth: Box<dyn AuthService>,
+  /// Token management service (generate, list, get, rotate, revoke)
   pub tokens: Box<dyn TokenService>,
+  /// Storage service (credentials, config, cache)
   pub storage: Box<dyn StorageService>,
 }
 
+impl core::fmt::Debug for Services {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("Services")
+      .field("auth", &"<dyn AuthService>")
+      .field("tokens", &"<dyn TokenService>")
+      .field("storage", &"<dyn StorageService>")
+      .finish()
+  }
+}
+
 impl Services {
+  /// Create new `Services` instance with the given service implementations
+  #[must_use]
   pub fn new(
     auth: Box<dyn AuthService>,
     tokens: Box<dyn TokenService>,

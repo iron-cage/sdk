@@ -29,7 +29,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid token_id with standard UUID format
+  /// Test valid `token_id` with standard UUID format
   #[tokio::test]
   async fn test_token_id_valid_uuid() {
     let server = TestServer::start().await;
@@ -65,7 +65,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty token_id value (should fail)
+  /// Test empty `token_id` value (should fail)
   #[tokio::test]
   async fn test_token_id_empty() {
     let server = TestServer::start().await;
@@ -93,7 +93,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test invalid token_id (not a UUID)
+  /// Test invalid `token_id` (not a UUID)
   #[tokio::test]
   async fn test_token_id_invalid_format() {
     let server = TestServer::start().await;
@@ -121,7 +121,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test token_id with missing required parameter
+  /// Test `token_id` with missing required parameter
   #[tokio::test]
   async fn test_token_id_missing_required() {
     let server = TestServer::start().await;
@@ -145,7 +145,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test token_id on .tokens.rotate command
+  /// Test `token_id` on .tokens.rotate command
   #[tokio::test]
   async fn test_token_id_rotate_command() {
     let server = TestServer::start().await;
@@ -181,7 +181,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test token_id on .tokens.revoke command
+  /// Test `token_id` on .tokens.revoke command
   #[tokio::test]
   async fn test_token_id_revoke_command() {
     let server = TestServer::start().await;
@@ -217,7 +217,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test token_id with uppercase UUID (case normalization)
+  /// Test `token_id` with uppercase UUID (case normalization)
   #[tokio::test]
   async fn test_token_id_uppercase() {
     let server = TestServer::start().await;
@@ -253,7 +253,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test token_id with whitespace (should fail or be trimmed)
+  /// Test `token_id` with whitespace (should fail or be trimmed)
   #[tokio::test]
   async fn test_token_id_with_whitespace() {
     let server = TestServer::start().await;

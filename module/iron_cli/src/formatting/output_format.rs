@@ -1,7 +1,7 @@
 //! Output format enum and parsing
 
-use std::fmt;
-use std::str::FromStr;
+use core::fmt;
+use core::str::FromStr;
 
 /// Output format for CLI responses
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -45,4 +45,4 @@ impl fmt::Display for InvalidFormat {
   }
 }
 
-impl std::error::Error for InvalidFormat {}
+impl core::error::Error for InvalidFormat {}

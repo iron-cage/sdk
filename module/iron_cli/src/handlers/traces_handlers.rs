@@ -16,14 +16,19 @@ use std::collections::HashMap;
 /// - filter: String (filter criteria)
 /// - limit: String (pagination limit)
 /// - format: String (table|json|yaml, default: table)
-pub fn list_traces_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
-  let filter = params.get("filter").map(|s| s.as_str()).unwrap_or("none");
-  let limit = params.get("limit").map(|s| s.as_str()).unwrap_or("default");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn list_traces_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
+  let filter = params.get("filter").map_or("none", String::as_str);
+  let limit = params.get("limit").map_or("default", String::as_str);
 
   Ok(format!(
-    "List traces\nFilter: {}\nLimit: {}\nFormat: {}",
-    filter, limit, format
+    "List traces\nFilter: {filter}\nLimit: {limit}\nFormat: {format}"
   ))
 }
 
@@ -34,11 +39,17 @@ pub fn list_traces_handler(params: &HashMap<String, String>) -> Result<String, C
 /// ## Parameters
 ///
 /// Required:
-/// - trace_id: String (non-empty)
+/// - `trace_id`: String (non-empty)
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_trace_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_trace_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let trace_id = params
     .get("trace_id")
@@ -53,12 +64,9 @@ pub fn get_trace_handler(params: &HashMap<String, String>) -> Result<String, Cli
   }
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "Get trace\nTrace ID: {}\nFormat: {}",
-    trace_id, format
-  ))
+  Ok(format!("Get trace\nTrace ID: {trace_id}\nFormat: {format}"))
 }
 
 /// Handle .traces.export command
@@ -72,7 +80,13 @@ pub fn get_trace_handler(params: &HashMap<String, String>) -> Result<String, Cli
 ///
 /// Optional:
 /// - format: String (json, default: json)
-pub fn export_traces_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn export_traces_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let output = params
     .get("output")
@@ -87,10 +101,7 @@ pub fn export_traces_handler(params: &HashMap<String, String>) -> Result<String,
   }
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
-  Ok(format!(
-    "Export traces\nOutput: {}\nFormat: {}",
-    output, format
-  ))
+  Ok(format!("Export traces\nOutput: {output}\nFormat: {format}"))
 }

@@ -9,6 +9,11 @@ use crate::handlers::CliError;
 // Fix(corner-case-token-id): Added check for content after "tok_" prefix
 // Root cause: Only validated prefix existence, not that there's actual ID content after it
 // Pitfall: Format validation should verify both structure AND meaningful content
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if the token ID is empty, does not start with `tok_`,
+/// is too short, or has a whitespace-only suffix.
 pub fn validate_token_id(token_id: &str, param_name: &'static str) -> Result<(), CliError> {
   if token_id.is_empty() {
     return Err(CliError::InvalidParameter {
@@ -48,6 +53,10 @@ pub fn validate_token_id(token_id: &str, param_name: &'static str) -> Result<(),
 // Fix(corner-case-whitespace): Added trim() check to reject whitespace-only strings
 // Root cause: is_empty() returns false for strings containing only whitespace
 // Pitfall: Always validate that strings contain meaningful content, not just non-zero length
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if the value is empty or contains only whitespace.
 pub fn validate_non_empty(value: &str, param_name: &'static str) -> Result<(), CliError> {
   if value.trim().is_empty() {
     return Err(CliError::InvalidParameter {
@@ -60,6 +69,10 @@ pub fn validate_non_empty(value: &str, param_name: &'static str) -> Result<(), C
 }
 
 /// Validates that a string can be parsed as a non-negative integer
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if the value cannot be parsed as an integer or is negative.
 pub fn validate_non_negative_integer(
   value_str: &str,
   param_name: &'static str,
@@ -82,6 +95,10 @@ pub fn validate_non_negative_integer(
 }
 
 /// Validates that a date string matches YYYY-MM-DD format
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if the date does not match the `YYYY-MM-DD` format.
 pub fn validate_date_format(date: &str, param_name: &'static str) -> Result<(), CliError> {
   if !is_valid_date_format(date) {
     return Err(CliError::InvalidParameter {

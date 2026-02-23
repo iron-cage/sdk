@@ -36,15 +36,21 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 /// ```bash
 /// iron-token .limits.show
 /// ```
-pub async fn show_limits_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+pub async fn show_limits_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::list_limits_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -58,13 +64,12 @@ pub async fn show_limits_adapter(params: &HashMap<String, String>) -> Result<Str
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get limits: {}",
-        e
+        "Failed to get limits: {e}"
       )))
     })?;
 
   // 5. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -75,7 +80,7 @@ pub async fn show_limits_adapter(params: &HashMap<String, String>) -> Result<Str
 ///
 /// ## Parameters
 ///
-/// - limit_type: Type of limit (daily|monthly|total)
+/// - `limit_type`: Type of limit (daily|monthly|total)
 /// - value: New limit value
 /// - dry: Dry run flag (0|1)
 /// - format: Output format (table|json|yaml)
@@ -85,8 +90,18 @@ pub async fn show_limits_adapter(params: &HashMap<String, String>) -> Result<Str
 /// ```bash
 /// iron-token .limits.update limit_type::daily value::1000
 /// ```
-pub async fn update_limit_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if validated `limit_type` or `value` parameters are missing after handler validation,
+/// or if `value` cannot be parsed as `i64` (validated by handler).
+pub async fn update_limit_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::update_limit_handler(params)?;
@@ -99,13 +114,13 @@ pub async fn update_limit_adapter(
     == 1;
 
   if dry_run {
-    let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+    let format = params.get("format").map_or("json", String::as_str);
 
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would update token limit",
-      "limit_type": params.get( "limit_type" ).unwrap(), // Already validated
-      "value": params.get( "value" ).unwrap(), // Already validated
+      "limit_type": params.get("limit_type").unwrap(), // Already validated
+      "value": params.get("value").unwrap(), // Already validated
     });
 
     return format_response(&dry_data, format);
@@ -114,8 +129,7 @@ pub async fn update_limit_adapter(
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -125,8 +139,8 @@ pub async fn update_limit_adapter(
 
   // 5. Build request body
   let body = json!({
-    "limit_type": params.get( "limit_type" ).unwrap(), // Already validated
-    "value": params.get( "value" ).unwrap().parse::<i64>().expect( "value parameter validated by handler" ),
+    "limit_type": params.get("limit_type").unwrap(), // Already validated
+    "value": params.get("value").unwrap().parse::<i64>().expect("value parameter validated by handler"),
   });
 
   // 6. Make HTTP call
@@ -135,13 +149,12 @@ pub async fn update_limit_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to update limit: {}",
-        e
+        "Failed to update limit: {e}"
       )))
     })?;
 
   // 7. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -152,7 +165,7 @@ pub async fn update_limit_adapter(
 ///
 /// ## Parameters
 ///
-/// - limit_id: Limit ID to retrieve
+/// - `limit_id`: Limit ID to retrieve
 /// - format: Output format (table|json|yaml)
 ///
 /// ## Example
@@ -161,15 +174,21 @@ pub async fn update_limit_adapter(
 /// iron-token .limits.get limit_id::789
 /// iron-token .limits.get limit_id::123 format::json
 /// ```
-pub async fn get_limit_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, `limit_id` is missing,
+/// keyring access fails, or the HTTP request fails.
+pub async fn get_limit_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::get_limit_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -181,7 +200,7 @@ pub async fn get_limit_adapter(params: &HashMap<String, String>) -> Result<Strin
   let limit_id = params
     .get("limit_id")
     .ok_or_else(|| AdapterError::ExtractionError("limit_id parameter is required".to_string()))?;
-  let path = format!("/api/v1/limits/{}", limit_id);
+  let path = format!("/api/v1/limits/{limit_id}");
 
   // 5. Make HTTP call
   let response = client
@@ -189,13 +208,12 @@ pub async fn get_limit_adapter(params: &HashMap<String, String>) -> Result<Strin
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get limit {}: {}",
-        limit_id, e
+        "Failed to get limit {limit_id}: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -207,9 +225,9 @@ pub async fn get_limit_adapter(params: &HashMap<String, String>) -> Result<Strin
 /// ## Parameters
 ///
 /// - project: Optional project ID
-/// - max_tokens: Max tokens per day
-/// - max_requests: Max requests per minute
-/// - max_cost: Max cost per month (cents)
+/// - `max_tokens`: Max tokens per day
+/// - `max_requests`: Max requests per minute
+/// - `max_cost`: Max cost per month (cents)
 /// - format: Output format (table|json|yaml)
 ///
 /// ## Example
@@ -219,8 +237,13 @@ pub async fn get_limit_adapter(params: &HashMap<String, String>) -> Result<Strin
 /// iron-token .limits.create max_requests::100 max_cost::10000
 /// iron-token .limits.create project::myproject max_tokens::500000
 /// ```
-pub async fn create_limit_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, numeric parameters cannot be
+/// parsed, keyring access fails, or the HTTP request fails.
+pub async fn create_limit_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::create_limit_handler(params)?;
@@ -228,8 +251,7 @@ pub async fn create_limit_adapter(
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -282,13 +304,12 @@ pub async fn create_limit_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to create limit: {}",
-        e
+        "Failed to create limit: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -299,7 +320,7 @@ pub async fn create_limit_adapter(
 ///
 /// ## Parameters
 ///
-/// - limit_id: Limit ID to delete
+/// - `limit_id`: Limit ID to delete
 /// - format: Output format (table|json|yaml)
 ///
 /// ## Example
@@ -308,8 +329,13 @@ pub async fn create_limit_adapter(
 /// iron-token .limits.delete limit_id::789
 /// iron-token .limits.delete limit_id::123 format::json
 /// ```
-pub async fn delete_limit_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, `limit_id` is missing,
+/// keyring access fails, or the HTTP request fails.
+pub async fn delete_limit_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::delete_limit_handler(params)?;
@@ -317,8 +343,7 @@ pub async fn delete_limit_adapter(
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -330,7 +355,7 @@ pub async fn delete_limit_adapter(
   let limit_id = params
     .get("limit_id")
     .ok_or_else(|| AdapterError::ExtractionError("limit_id parameter is required".to_string()))?;
-  let path = format!("/api/v1/limits/{}", limit_id);
+  let path = format!("/api/v1/limits/{limit_id}");
 
   // 5. Make HTTP call
   let _response = client
@@ -338,17 +363,16 @@ pub async fn delete_limit_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to delete limit {}: {}",
-        limit_id, e
+        "Failed to delete limit {limit_id}: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   let success_data = json!({
     "status": "success",
-    "message": format!( "Limit {} deleted", limit_id ),
+    "message": format!("Limit {limit_id} deleted"),
     "limit_id": limit_id,
   });
 

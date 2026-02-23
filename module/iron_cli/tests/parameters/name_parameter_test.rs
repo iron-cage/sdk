@@ -205,7 +205,7 @@ mod tests {
         "iron-token",
         &[
           ".tokens.generate",
-          &format!("name::{}", long_name),
+          &format!("name::{long_name}"),
           "scope::read:tokens",
         ],
       )

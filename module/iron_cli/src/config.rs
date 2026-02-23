@@ -4,7 +4,7 @@
 //!
 //! ## Configuration Hierarchy (highest to lowest priority)
 //!
-//! 1. CLI arguments (keyword::value parameters, applied after iron_config_loader loading)
+//! 1. CLI arguments (`keyword::value` parameters, applied after `iron_config_loader` loading)
 //! 2. Environment variables (`IRON_CLI_*` format, e.g., `IRON_CLI_API_URL`)
 //! 3. Project config (`{workspace}/config/iron_cli.{env}.toml`)
 //! 4. User config (`~/.config/iron/iron_cli.toml`)
@@ -44,17 +44,17 @@ pub enum ConfigError {
   IoError(String),
 }
 
-impl std::fmt::Display for ConfigError {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for ConfigError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match self {
-      ConfigError::InvalidValue(msg) => write!(f, "Invalid configuration value: {}", msg),
-      ConfigError::MissingRequired(msg) => write!(f, "Missing required configuration: {}", msg),
-      ConfigError::IoError(msg) => write!(f, "Configuration IO error: {}", msg),
+      ConfigError::InvalidValue(msg) => write!(f, "Invalid configuration value: {msg}"),
+      ConfigError::MissingRequired(msg) => write!(f, "Missing required configuration: {msg}"),
+      ConfigError::IoError(msg) => write!(f, "Configuration IO error: {msg}"),
     }
   }
 }
 
-impl std::error::Error for ConfigError {}
+impl core::error::Error for ConfigError {}
 
 /// Configuration container with hierarchical precedence
 #[derive(Debug, Clone)]
@@ -68,11 +68,13 @@ impl Config {
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
+  #[must_use]
   pub fn new() -> Self {
     Self::builder().with_iron_config().build()
   }
 
   /// Create configuration from CLI arguments
+  #[must_use]
   pub fn with_cli_args(cli_args: HashMap<String, String>) -> Self {
     Self::builder()
       .with_iron_config()
@@ -85,21 +87,25 @@ impl Config {
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
+  #[must_use]
   pub fn from_env() -> Self {
     Self::builder().with_iron_config().build()
   }
 
   /// Create configuration builder
+  #[must_use]
   pub fn builder() -> ConfigBuilder {
     ConfigBuilder::new()
   }
 
   /// Get configuration value by key
+  #[must_use]
   pub fn get(&self, key: &str) -> Option<String> {
     self.values.get(key).cloned()
   }
 
   /// Get configuration value with fallback default
+  #[must_use]
   pub fn get_or(&self, key: &str, default: &str) -> String {
     self
       .values
@@ -109,6 +115,7 @@ impl Config {
   }
 
   /// Get all configuration values
+  #[must_use]
   pub fn all(&self) -> &HashMap<String, String> {
     &self.values
   }
@@ -130,6 +137,7 @@ impl Default for Config {
 }
 
 /// Builder for creating configuration with multiple sources
+#[derive(Debug)]
 pub struct ConfigBuilder {
   values: HashMap<String, String>,
   validate: bool,
@@ -137,6 +145,7 @@ pub struct ConfigBuilder {
 
 impl ConfigBuilder {
   /// Create new configuration builder
+  #[must_use]
   pub fn new() -> Self {
     Self {
       values: HashMap::new(),
@@ -149,6 +158,7 @@ impl ConfigBuilder {
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
+  #[must_use]
   pub fn with_iron_config(mut self) -> Self {
     let defaults = Config::get_defaults_toml();
 
@@ -169,7 +179,8 @@ impl ConfigBuilder {
     self
   }
 
-  /// Add CLI arguments (highest priority, overrides iron_config_loader)
+  /// Add CLI arguments (highest priority, overrides `iron_config_loader`)
+  #[must_use]
   pub fn with_cli_args(mut self, cli_args: HashMap<String, String>) -> Self {
     // CLI args override everything, including iron_config
     self.values.extend(cli_args);
@@ -177,12 +188,18 @@ impl ConfigBuilder {
   }
 
   /// Enable validation of configuration values
+  #[must_use]
   pub fn validate(mut self) -> Self {
     self.validate = true;
     self
   }
 
   /// Build configuration (panics on validation error)
+  ///
+  /// # Panics
+  ///
+  /// Panics if `validate()` was called and configuration values are invalid.
+  #[must_use]
   pub fn build(self) -> Config {
     if self.validate {
       self
@@ -196,6 +213,10 @@ impl ConfigBuilder {
   }
 
   /// Build configuration returning Result
+  ///
+  /// # Errors
+  ///
+  /// Returns `Err(ConfigError)` if `validate()` was called and configuration values are invalid.
   pub fn build_result(self) -> Result<Config, ConfigError> {
     if self.validate {
       self.validate_values()?;

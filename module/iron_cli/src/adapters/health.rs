@@ -17,6 +17,10 @@ where
 }
 
 /// Health check adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if the handler validation or health service call fails.
 pub async fn health_adapter<T, S>(
   command: &T,
   health_service: S,
@@ -41,6 +45,10 @@ where
 }
 
 /// Version adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if the handler validation or version service call fails.
 pub async fn version_adapter<T, S>(
   command: &T,
   health_service: S,

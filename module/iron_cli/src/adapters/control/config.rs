@@ -12,7 +12,7 @@
 //!
 //! ## Environment Variables
 //!
-//! - `IRON_CONTROL_API_URL`: Base URL for Control API (default: http://localhost:8080)
+//! - `IRON_CONTROL_API_URL`: Base URL for Control API (default: <http://localhost:8080>)
 //! - `IRON_CONTROL_API_TOKEN`: API authentication token (optional)
 //! - `IRON_CONTROL_API_TIMEOUT`: Request timeout in seconds (default: 30)
 //!
@@ -25,8 +25,8 @@
 //! ```
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use core::time::Duration;
 use iron_config_loader::ConfigLoader;
-use std::time::Duration;
 
 /// Control API configuration
 #[derive(Debug, Clone)]
@@ -59,6 +59,7 @@ impl ControlApiConfig {
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
+  #[must_use]
   pub fn load() -> Self {
     let defaults = r#"
 url = "http://localhost:8080"
@@ -84,6 +85,7 @@ timeout = 30
   }
 
   /// Create configuration with explicit values
+  #[must_use]
   pub fn new(base_url: String, api_token: Option<String>) -> Self {
     Self {
       base_url,
@@ -93,6 +95,7 @@ timeout = 30
   }
 
   /// Set timeout
+  #[must_use]
   pub fn with_timeout(mut self, timeout: Duration) -> Self {
     self.timeout = timeout;
     self
@@ -102,6 +105,7 @@ timeout = 30
   ///
   /// Parses the JWT token payload and extracts the "sub" claim.
   /// Returns None if token is missing or invalid.
+  #[must_use]
   pub fn get_user_id(&self) -> Option<String> {
     let token = self.api_token.as_ref()?;
 
@@ -117,6 +121,6 @@ timeout = 30
 
     // Parse as JSON and extract "sub" claim
     let payload: serde_json::Value = serde_json::from_str(&payload_str).ok()?;
-    payload.get("sub")?.as_str().map(|s| s.to_string())
+    payload.get("sub")?.as_str().map(ToString::to_string)
   }
 }

@@ -195,7 +195,7 @@ mod tests {
         "iron",
         &[
           ".user.create",
-          &format!("email::{}@example.com", long_local),
+          &format!("email::{long_local}@example.com"),
           "role::user",
         ],
       )

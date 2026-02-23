@@ -223,7 +223,7 @@ mod tests {
           ".tokens.generate",
           "name::test-token",
           "scope::read:tokens",
-          &format!("project::{}", long_project),
+          &format!("project::{long_project}"),
         ],
       )
       .await;

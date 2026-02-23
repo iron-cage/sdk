@@ -18,6 +18,7 @@
 //! let output = format_output(&response, "table").unwrap();
 //! ```
 
+use core::fmt::Write;
 use serde_json::Value;
 
 /// Format API response according to requested format
@@ -54,26 +55,41 @@ use serde_json::Value;
 /// // NAME   : Agent One
 /// // BUDGET : 1000
 /// ```
+///
+/// # Errors
+///
+/// Returns `Err(String)` if JSON or YAML serialization fails.
 pub fn format_output(response: &Value, format: &str) -> Result<String, String> {
   match format {
     "json" => format_json(response),
     "yaml" => format_yaml(response),
-    "table" => format_table(response),
     _ => format_table(response),
   }
 }
 
 /// Format response as pretty-printed JSON
+///
+/// # Errors
+///
+/// Returns `Err(String)` if JSON serialization fails.
 pub fn format_json(response: &Value) -> Result<String, String> {
-  serde_json::to_string_pretty(response).map_err(|e| format!("JSON formatting failed: {}", e))
+  serde_json::to_string_pretty(response).map_err(|e| format!("JSON formatting failed: {e}"))
 }
 
 /// Format response as YAML
+///
+/// # Errors
+///
+/// Returns `Err(String)` if YAML serialization fails.
 pub fn format_yaml(response: &Value) -> Result<String, String> {
-  serde_yaml::to_string(response).map_err(|e| format!("YAML formatting failed: {}", e))
+  serde_yaml::to_string(response).map_err(|e| format!("YAML formatting failed: {e}"))
 }
 
 /// Format response as ASCII table
+///
+/// # Errors
+///
+/// Returns `Err(String)` if the fallback JSON serialization fails.
 pub fn format_table(response: &Value) -> Result<String, String> {
   match response {
     Value::Array(items) => {
@@ -91,6 +107,10 @@ pub fn format_table(response: &Value) -> Result<String, String> {
 }
 
 /// Format array of objects as table with rows
+///
+/// # Errors
+///
+/// Returns `Err(String)` if the fallback JSON serialization fails.
 pub fn format_list_table(items: &[Value]) -> Result<String, String> {
   if items.is_empty() {
     return Ok("No results found.".to_string());
@@ -128,10 +148,13 @@ pub fn format_list_table(items: &[Value]) -> Result<String, String> {
 }
 
 /// Format single object as key-value pairs
+///
+/// # Errors
+///
+/// Returns `Err(String)` if the fallback JSON serialization fails.
 pub fn format_object_table(obj: &Value) -> Result<String, String> {
-  let obj_map = match obj.as_object() {
-    Some(map) => map,
-    None => return format_json(obj),
+  let Some(obj_map) = obj.as_object() else {
+    return format_json(obj);
   };
 
   if obj_map.is_empty() {
@@ -139,7 +162,7 @@ pub fn format_object_table(obj: &Value) -> Result<String, String> {
   }
 
   // Calculate max key width for alignment
-  let max_key_width = obj_map.keys().map(|k| k.len()).max().unwrap_or(0);
+  let max_key_width = obj_map.keys().map(String::len).max().unwrap_or(0);
 
   let mut output = String::new();
 
@@ -147,12 +170,8 @@ pub fn format_object_table(obj: &Value) -> Result<String, String> {
     let key_upper = key.to_uppercase();
     let value_str = format_value_for_display(value);
 
-    output.push_str(&format!(
-      "{:width$} : {}\n",
-      key_upper,
-      value_str,
-      width = max_key_width
-    ));
+    writeln!(output, "{key_upper:max_key_width$} : {value_str}")
+      .expect("writing to String is infallible");
   }
 
   Ok(output.trim_end().to_string())
@@ -167,6 +186,7 @@ fn extract_columns(obj: &Value) -> Vec<String> {
 }
 
 /// Calculate column widths based on header and data
+#[must_use]
 pub fn calculate_column_widths(columns: &[String], items: &[Value]) -> Vec<usize> {
   columns
     .iter()
@@ -195,7 +215,7 @@ fn format_header_row(columns: &[String], widths: &[usize]) -> String {
     .zip(widths)
     .map(|(col, width)| {
       let col_upper = col.to_uppercase();
-      format!("{:width$}", col_upper, width = width)
+      format!("{col_upper:width$}")
     })
     .collect::<Vec<_>>()
     .join(" | ")
@@ -211,6 +231,7 @@ fn format_separator_row(widths: &[usize]) -> String {
 }
 
 /// Format data row
+#[must_use]
 pub fn format_data_row(item: &Value, columns: &[String], widths: &[usize]) -> String {
   columns
     .iter()
@@ -227,19 +248,20 @@ pub fn format_data_row(item: &Value, columns: &[String], widths: &[usize]) -> St
         } else {
           // Safe UTF-8 truncation using chars
           let truncated: String = value_str.chars().take(*width - 3).collect();
-          format!("{}...", truncated)
+          format!("{truncated}...")
         }
       } else {
         value_str
       };
 
-      format!("{:width$}", display_str, width = width)
+      format!("{display_str:width$}")
     })
     .collect::<Vec<_>>()
     .join(" | ")
 }
 
 /// Format value for display in table
+#[must_use]
 pub fn format_value_for_display(value: &Value) -> String {
   match value {
     Value::Null => "null".to_string(),

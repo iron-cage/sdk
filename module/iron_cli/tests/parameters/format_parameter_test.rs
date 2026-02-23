@@ -46,7 +46,7 @@ mod tests {
     // Should succeed and output JSON
     if result.success() {
       assert!(
-        result.stdout.contains("{") || result.stdout.contains("["),
+        result.stdout.contains('{') || result.stdout.contains('['),
         "JSON format should produce JSON markers"
       );
     }
@@ -98,7 +98,7 @@ mod tests {
     // Lowercase should work
     if result.success() {
       assert!(
-        result.stdout.contains("{") || result.stdout.contains("["),
+        result.stdout.contains('{') || result.stdout.contains('['),
         "Lowercase 'json' should be accepted"
       );
     }
@@ -213,7 +213,7 @@ mod tests {
     // Should succeed and output JSON
     if result.success() {
       assert!(
-        result.stdout.contains("{") || result.stdout.contains("["),
+        result.stdout.contains('{') || result.stdout.contains('['),
         "JSON format should produce JSON output"
       );
     }
@@ -240,7 +240,7 @@ mod tests {
     // Should succeed and output JSON
     if result.success() {
       assert!(
-        result.stdout.contains("{") || result.stdout.contains("["),
+        result.stdout.contains('{') || result.stdout.contains('['),
         "JSON format should produce JSON output"
       );
     }
@@ -273,9 +273,8 @@ mod tests {
       // All should either succeed with JSON or fail consistently
       if result.success() {
         assert!(
-          result.stdout.contains("{") || result.stdout.contains("["),
-          "Command {:?} should produce JSON output",
-          args
+          result.stdout.contains('{') || result.stdout.contains('['),
+          "Command {args:?} should produce JSON output"
         );
       }
     }

@@ -18,7 +18,13 @@ use std::collections::HashMap;
 /// - limit: String (positive integer)
 /// - v: String (verbosity level 0-5)
 /// - format: String (table|json|yaml, default: table)
-pub fn list_providers_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if pagination or verbosity parameters are invalid.
+pub fn list_providers_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate optional pagination
   if let Some(page_str) = params.get("page") {
     validate_non_negative_integer(page_str, "page")?;
@@ -39,12 +45,9 @@ pub fn list_providers_handler(params: &HashMap<String, String>) -> Result<String
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "Provider list parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("Provider list parameters valid\nFormat: {format}"))
 }
 
 /// Handle .provider.create command
@@ -55,14 +58,20 @@ pub fn list_providers_handler(params: &HashMap<String, String>) -> Result<String
 ///
 /// Required:
 /// - provider: String ("openai" or "anthropic")
-/// - api_key: String (non-empty)
+/// - `api_key`: String (non-empty)
 ///
 /// Optional:
-/// - base_url: String (custom API endpoint)
+/// - `base_url`: String (custom API endpoint)
 /// - description: String (provider key description)
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn create_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn create_provider_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let provider = params
     .get("provider")
@@ -96,11 +105,10 @@ pub fn create_provider_handler(params: &HashMap<String, String>) -> Result<Strin
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Provider creation parameters valid\nProvider: {}\nFormat: {}",
-    provider, format
+    "Provider creation parameters valid\nProvider: {provider}\nFormat: {format}"
   ))
 }
 
@@ -115,17 +123,22 @@ pub fn create_provider_handler(params: &HashMap<String, String>) -> Result<Strin
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_provider_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Provider get parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Provider get parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
@@ -140,10 +153,16 @@ pub fn get_provider_handler(params: &HashMap<String, String>) -> Result<String, 
 ///
 /// Optional:
 /// - name: String (non-empty, max 100 chars)
-/// - api_key: String (non-empty)
+/// - `api_key`: String (non-empty)
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn update_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn update_provider_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -177,11 +196,10 @@ pub fn update_provider_handler(params: &HashMap<String, String>) -> Result<Strin
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Provider update parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Provider update parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
@@ -197,7 +215,13 @@ pub fn update_provider_handler(params: &HashMap<String, String>) -> Result<Strin
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn delete_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn delete_provider_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -214,15 +238,14 @@ pub fn delete_provider_handler(params: &HashMap<String, String>) -> Result<Strin
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Provider delete parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Provider delete parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .provider.assign_agents command
+/// Handle `.provider.assign_agents` command
 ///
 /// Assigns agents to provider.
 ///
@@ -230,12 +253,18 @@ pub fn delete_provider_handler(params: &HashMap<String, String>) -> Result<Strin
 ///
 /// Required:
 /// - id: String (non-empty provider ID)
-/// - agent_ids: String (comma-separated list of agent IDs)
+/// - `agent_ids`: String (comma-separated list of agent IDs)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn assign_agents_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn assign_agents_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -265,15 +294,14 @@ pub fn assign_agents_handler(params: &HashMap<String, String>) -> Result<String,
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Assign agents parameters valid\nProvider ID: {}\nAgent IDs: {}\nFormat: {}",
-    id, agent_ids, format
+    "Assign agents parameters valid\nProvider ID: {id}\nAgent IDs: {agent_ids}\nFormat: {format}"
   ))
 }
 
-/// Handle .provider.list_agents command
+/// Handle `.provider.list_agents` command
 ///
 /// Lists agents assigned to provider.
 ///
@@ -284,21 +312,26 @@ pub fn assign_agents_handler(params: &HashMap<String, String>) -> Result<String,
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_provider_agents_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn list_provider_agents_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "List provider agents parameters valid\nProvider ID: {}\nFormat: {}",
-    id, format
+    "List provider agents parameters valid\nProvider ID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .provider.remove_agent command
+/// Handle `.provider.remove_agent` command
 ///
 /// Removes agent from provider.
 ///
@@ -306,12 +339,18 @@ pub fn list_provider_agents_handler(params: &HashMap<String, String>) -> Result<
 ///
 /// Required:
 /// - id: String (non-empty provider ID)
-/// - agent_id: String (non-empty agent ID)
+/// - `agent_id`: String (non-empty agent ID)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn remove_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn remove_agent_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -333,10 +372,9 @@ pub fn remove_agent_handler(params: &HashMap<String, String>) -> Result<String, 
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Remove agent parameters valid\nProvider ID: {}\nAgent ID: {}\nFormat: {}",
-    id, agent_id, format
+    "Remove agent parameters valid\nProvider ID: {id}\nAgent ID: {agent_id}\nFormat: {format}"
   ))
 }

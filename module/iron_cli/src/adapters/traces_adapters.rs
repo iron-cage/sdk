@@ -31,8 +31,8 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// - page: Page number (optional)
 /// - limit: Results per page (optional)
-/// - start_date: Start date filter (YYYY-MM-DD, optional)
-/// - end_date: End date filter (YYYY-MM-DD, optional)
+/// - `start_date`: Start date filter (YYYY-MM-DD, optional)
+/// - `end_date`: End date filter (YYYY-MM-DD, optional)
 /// - format: Output format (table|json|yaml)
 ///
 /// ## Example
@@ -41,15 +41,21 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 /// iron-token .traces.list
 /// iron-token .traces.list limit::20 page::1
 /// ```
-pub async fn list_traces_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+pub async fn list_traces_adapter<S: ::core::hash::BuildHasher + Default>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   traces_handlers::list_traces_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -58,7 +64,7 @@ pub async fn list_traces_adapter(params: &HashMap<String, String>) -> Result<Str
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::new();
+  let mut query_params = HashMap::default();
 
   if let Some(page) = params.get("page") {
     query_params.insert("page".to_string(), page.clone());
@@ -82,13 +88,12 @@ pub async fn list_traces_adapter(params: &HashMap<String, String>) -> Result<Str
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to list traces: {}",
-        e
+        "Failed to list traces: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -107,15 +112,25 @@ pub async fn list_traces_adapter(params: &HashMap<String, String>) -> Result<Str
 /// ```bash
 /// iron-token .traces.get id::abc123-def456
 /// ```
-pub async fn get_trace_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing after handler validation.
+pub async fn get_trace_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   traces_handlers::get_trace_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -125,7 +140,7 @@ pub async fn get_trace_adapter(params: &HashMap<String, String>) -> Result<Strin
 
   // 4. Build path
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/traces/{}", id);
+  let path = format!("/api/v1/traces/{id}");
 
   // 5. Make HTTP call
   let response = client
@@ -133,13 +148,12 @@ pub async fn get_trace_adapter(params: &HashMap<String, String>) -> Result<Strin
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get trace: {}",
-        e
+        "Failed to get trace: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -150,7 +164,7 @@ pub async fn get_trace_adapter(params: &HashMap<String, String>) -> Result<Strin
 ///
 /// ## Parameters
 ///
-/// - export_format: Export format (json|csv)
+/// - `export_format`: Export format (json|csv)
 /// - output: Output file path (stdout if not provided)
 /// - format: Display format for confirmation message
 ///
@@ -161,8 +175,13 @@ pub async fn get_trace_adapter(params: &HashMap<String, String>) -> Result<Strin
 /// iron-token .traces.export export_format::json output::traces.json
 /// iron-token .traces.export export_format::csv output::traces.csv
 /// ```
-pub async fn export_traces_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// the HTTP request fails, or file write fails.
+pub async fn export_traces_adapter<S: ::core::hash::BuildHasher + Default>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   traces_handlers::export_traces_handler(params)?;
@@ -170,8 +189,7 @@ pub async fn export_traces_adapter(
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -180,7 +198,7 @@ pub async fn export_traces_adapter(
   let client = TokenApiClient::new(config);
 
   // 4. Fetch all traces (up to 1000)
-  let mut query_params = HashMap::new();
+  let mut query_params = HashMap::default();
   query_params.insert("limit".to_string(), "1000".to_string());
 
   let response = client
@@ -188,20 +206,16 @@ pub async fn export_traces_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to fetch traces: {}",
-        e
+        "Failed to fetch traces: {e}"
       )))
     })?;
 
   // 5. Handle export format
-  let export_format = params
-    .get("export_format")
-    .map(|s| s.as_str())
-    .unwrap_or("json");
+  let export_format = params.get("export_format").map_or("json", String::as_str);
 
   let export_data = match export_format {
     "json" => serde_json::to_string_pretty(&response)
-      .map_err(|e| AdapterError::FormattingError(format!("Failed to serialize JSON: {}", e)))?,
+      .map_err(|e| AdapterError::FormattingError(format!("Failed to serialize JSON: {e}")))?,
     "csv" => {
       // For CSV, convert JSON array to CSV format
       // This is a simplified implementation - full CSV support would need proper CSV library
@@ -211,7 +225,7 @@ pub async fn export_traces_adapter(
     }
     _ => {
       return Err(AdapterError::ServiceError(ServiceError::ValidationError(
-        format!("Unsupported export format: {}", export_format),
+        format!("Unsupported export format: {export_format}"),
       )))
     }
   };
@@ -220,17 +234,16 @@ pub async fn export_traces_adapter(
   if let Some(output_file) = params.get("output") {
     std::fs::write(output_file, &export_data).map_err(|e| {
       AdapterError::ServiceError(ServiceError::StorageError(format!(
-        "Failed to write file: {}",
-        e
+        "Failed to write file: {e}"
       )))
     })?;
 
     // Return success message
-    let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+    let format = params.get("format").map_or("json", String::as_str);
 
     let success_data = json!({
       "status": "success",
-      "message": format!( "Traces exported to {}", output_file ),
+      "message": format!("Traces exported to {output_file}"),
       "file": output_file,
       "format": export_format,
     });

@@ -7,7 +7,7 @@
 //!
 //! ## Test Strategy
 //!
-//! Pure function testing: HashMap → Result<String>
+//! Pure function testing: `HashMap` → `Result<String>`
 //! No mocking - handlers have no I/O to mock.
 
 use iron_cli::handlers::{token_handlers::*, CliError};
@@ -38,14 +38,14 @@ fn test_generate_token_handler_missing_name() {
   assert!(result.is_err(), "Should fail without name");
   match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "name"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
 fn test_generate_token_handler_empty_name() {
   let mut params = HashMap::new();
-  params.insert("name".into(), "".into());
+  params.insert("name".into(), String::new());
   params.insert("scope".into(), "read:tokens".into());
 
   let result = generate_token_handler(&params);
@@ -63,7 +63,7 @@ fn test_generate_token_handler_missing_scope() {
   assert!(result.is_err(), "Should fail without scope");
   match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "scope"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -199,14 +199,14 @@ fn test_get_token_handler_missing_token_id() {
   assert!(result.is_err(), "Should fail without token_id");
   match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "token_id"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
 fn test_get_token_handler_empty_token_id() {
   let mut params = HashMap::new();
-  params.insert("token_id".into(), "".into());
+  params.insert("token_id".into(), String::new());
 
   let result = get_token_handler(&params);
 
@@ -282,7 +282,7 @@ fn test_rotate_token_handler_missing_token_id() {
 #[test]
 fn test_rotate_token_handler_empty_token_id() {
   let mut params = HashMap::new();
-  params.insert("token_id".into(), "".into());
+  params.insert("token_id".into(), String::new());
 
   let result = rotate_token_handler(&params);
 
@@ -331,7 +331,7 @@ fn test_rotate_token_handler_all_formats() {
 
     let result = rotate_token_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -361,7 +361,7 @@ fn test_revoke_token_handler_missing_token_id() {
 #[test]
 fn test_revoke_token_handler_empty_token_id() {
   let mut params = HashMap::new();
-  params.insert("token_id".into(), "".into());
+  params.insert("token_id".into(), String::new());
 
   let result = revoke_token_handler(&params);
 
@@ -383,7 +383,7 @@ fn test_revoke_token_handler_with_reason() {
 fn test_revoke_token_handler_empty_reason() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
-  params.insert("reason".into(), "".into());
+  params.insert("reason".into(), String::new());
 
   let result = revoke_token_handler(&params);
 
@@ -413,6 +413,6 @@ fn test_revoke_token_handler_all_formats() {
 
     let result = revoke_token_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }

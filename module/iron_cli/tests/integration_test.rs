@@ -1,36 +1,36 @@
-//! Integration tests for iron_cli
+//! Integration tests for `iron_cli`
 //!
 //! ## Test Coverage
 //!
 //! Tests complete end-to-end workflows:
 //! - Handler validation (pure logic)
 //! - Adapter orchestration (async I/O)
-//! - Service integration (InMemoryAdapter)
+//! - Service integration (`InMemoryAdapter`)
 //! - Configuration integration
 //! - Formatter output
 //!
 //! ## Testing Strategy
 //!
-//! Uses InMemoryAdapter (real implementation, no mocking).
+//! Uses `InMemoryAdapter` (real implementation, no mocking).
 //! Tests verify complete stack integration.
 //!
-//! **Why InMemoryAdapter for Tests?**
+//! **Why `InMemoryAdapter` for Tests?**
 //! - Fast: No network I/O overhead
 //! - Deterministic: Same behavior every run
 //! - Self-contained: No external dependencies (no API server needed)
 
 // Test files are allowed to use println!/eprintln! for debugging
 #![allow(clippy::disallowed_macros)]
-//! - Real implementation: Not a mock - uses actual HashMap storage
+//! - Real implementation: Not a mock - uses actual `HashMap` storage
 //!
 //! **Important: Feature Flag Required**
 //! Integration tests compile as separate crates and don't get automatic cfg(test).
-//! They require `feature = "test-adapter"` to access InMemoryAdapter, which is
-//! enforced via compile_error! in production builds. See:
+//! They require `feature = "test-adapter"` to access `InMemoryAdapter`, which is
+//! enforced via `compile_error`! in production builds. See:
 //! - `module/iron_cli/src/adapters/implementations/in_memory.rs` (obsolescence guard)
 //! - `module/iron_cli/src/adapters/implementations/mod.rs` (cfg guards)
 //!
-//! Production code uses HttpAdapter for real API integration.
+//! Production code uses `HttpAdapter` for real API integration.
 
 use iron_cli::adapters::auth::HasParams;
 use iron_cli::adapters::implementations::InMemoryAdapter;
@@ -193,7 +193,7 @@ async fn test_generate_token_integration() {
     iron_cli::adapters::tokens::generate_token_adapter(&command, adapter, &formatter).await;
 
   if let Err(ref e) = result {
-    eprintln!("Generate token error: {:?}", e);
+    eprintln!("Generate token error: {e:?}");
   }
   assert!(result.is_ok(), "Generate should succeed");
 }

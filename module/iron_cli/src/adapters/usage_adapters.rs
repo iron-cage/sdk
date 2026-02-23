@@ -29,8 +29,8 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// ## Parameters
 ///
-/// - start_date: Optional start date (YYYY-MM-DD)
-/// - end_date: Optional end date (YYYY-MM-DD)
+/// - `start_date`: Optional start date (YYYY-MM-DD)
+/// - `end_date`: Optional end date (YYYY-MM-DD)
 /// - format: Output format (table|json|yaml)
 ///
 /// ## Example
@@ -39,15 +39,21 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 /// iron-token .usage.show
 /// iron-token .usage.show start_date::2025-01-01 end_date::2025-01-31
 /// ```
-pub async fn show_usage_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+pub async fn show_usage_adapter<S: ::core::hash::BuildHasher + Default>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::show_usage_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -56,7 +62,7 @@ pub async fn show_usage_adapter(params: &HashMap<String, String>) -> Result<Stri
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::new();
+  let mut query_params = HashMap::default();
 
   if let Some(start_date) = params.get("start_date") {
     query_params.insert("start_date".to_string(), start_date.clone());
@@ -72,13 +78,12 @@ pub async fn show_usage_adapter(params: &HashMap<String, String>) -> Result<Stri
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get usage: {}",
-        e
+        "Failed to get usage: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -89,10 +94,10 @@ pub async fn show_usage_adapter(params: &HashMap<String, String>) -> Result<Stri
 ///
 /// ## Parameters
 ///
-/// - output_file: File path for export
-/// - export_format: Export format (csv|json)
-/// - start_date: Optional start date (YYYY-MM-DD)
-/// - end_date: Optional end date (YYYY-MM-DD)
+/// - `output_file`: File path for export
+/// - `export_format`: Export format (csv|json)
+/// - `start_date`: Optional start date (YYYY-MM-DD)
+/// - `end_date`: Optional end date (YYYY-MM-DD)
 /// - format: Output format for confirmation message (table|json|yaml)
 ///
 /// ## Example
@@ -100,8 +105,18 @@ pub async fn show_usage_adapter(params: &HashMap<String, String>) -> Result<Stri
 /// ```bash
 /// iron-token .usage.export output_file::usage.csv export_format::csv
 /// ```
-pub async fn export_usage_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// the HTTP request fails, or file write fails.
+///
+/// # Panics
+///
+/// Panics if validated `export_format` or `output_file` parameters are missing
+/// after handler validation.
+pub async fn export_usage_adapter<S: ::core::hash::BuildHasher + Default>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::export_usage_handler(params)?;
@@ -109,8 +124,7 @@ pub async fn export_usage_adapter(
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -119,7 +133,7 @@ pub async fn export_usage_adapter(
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::new();
+  let mut query_params = HashMap::default();
 
   query_params.insert(
     "format".to_string(),
@@ -144,29 +158,27 @@ pub async fn export_usage_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to export usage: {}",
-        e
+        "Failed to export usage: {e}"
       )))
     })?;
 
   // 6. Write to file
   let output_file = params.get("output_file").unwrap(); // Already validated
   let export_data = serde_json::to_string_pretty(&response)
-    .map_err(|e| AdapterError::FormattingError(format!("Failed to serialize data: {}", e)))?;
+    .map_err(|e| AdapterError::FormattingError(format!("Failed to serialize data: {e}")))?;
 
   std::fs::write(output_file, export_data).map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Failed to write file: {}",
-      e
+      "Failed to write file: {e}"
     )))
   })?;
 
   // 7. Format success message
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   let success_data = json!({
     "status": "success",
-    "message": format!( "Usage data exported to {}", output_file ),
+    "message": format!("Usage data exported to {output_file}"),
     "file": output_file,
   });
 
@@ -179,7 +191,7 @@ pub async fn export_usage_adapter(
 ///
 /// ## Parameters
 ///
-/// - project_id: Project ID to query
+/// - `project_id`: Project ID to query
 /// - format: Output format (table|json|yaml)
 ///
 /// ## Example
@@ -188,8 +200,13 @@ pub async fn export_usage_adapter(
 /// iron-token .usage.by_project project_id::myproject
 /// iron-token .usage.by_project project_id::prod format::json
 /// ```
-pub async fn get_usage_by_project_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, `project_id` is missing,
+/// keyring access fails, or the HTTP request fails.
+pub async fn get_usage_by_project_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::usage_by_project_handler(params)?;
@@ -197,8 +214,7 @@ pub async fn get_usage_by_project_adapter(
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -210,7 +226,7 @@ pub async fn get_usage_by_project_adapter(
   let project_id = params
     .get("project_id")
     .ok_or_else(|| AdapterError::ExtractionError("project_id parameter is required".to_string()))?;
-  let path = format!("/api/v1/usage/by-project/{}", project_id);
+  let path = format!("/api/v1/usage/by-project/{project_id}");
 
   // 5. Make HTTP call
   let response = client
@@ -218,13 +234,12 @@ pub async fn get_usage_by_project_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get usage for project {}: {}",
-        project_id, e
+        "Failed to get usage for project {project_id}: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -244,8 +259,13 @@ pub async fn get_usage_by_project_adapter(
 /// iron-token .usage.by_provider provider::openai
 /// iron-token .usage.by_provider provider::anthropic format::json
 /// ```
-pub async fn get_usage_by_provider_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, `provider` is missing,
+/// keyring access fails, or the HTTP request fails.
+pub async fn get_usage_by_provider_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::usage_by_provider_handler(params)?;
@@ -253,8 +273,7 @@ pub async fn get_usage_by_provider_adapter(
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -266,7 +285,7 @@ pub async fn get_usage_by_provider_adapter(
   let provider = params
     .get("provider")
     .ok_or_else(|| AdapterError::ExtractionError("provider parameter is required".to_string()))?;
-  let path = format!("/api/v1/usage/by-provider/{}", provider);
+  let path = format!("/api/v1/usage/by-provider/{provider}");
 
   // 5. Make HTTP call
   let response = client
@@ -274,13 +293,12 @@ pub async fn get_usage_by_provider_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get usage for provider {}: {}",
-        provider, e
+        "Failed to get usage for provider {provider}: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }

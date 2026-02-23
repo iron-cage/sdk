@@ -141,8 +141,8 @@ fn test_format_multiple_items_table() {
 
   assert!(result.contains("id"));
   assert!(result.contains("name"));
-  assert!(result.contains("1"));
-  assert!(result.contains("2"));
+  assert!(result.contains('1'));
+  assert!(result.contains('2'));
 }
 
 #[test]
@@ -166,8 +166,8 @@ fn test_format_multiple_items_expanded() {
 
   // Should have two separate blocks
   assert!(result.contains("id:"));
-  assert!(result.contains("1"));
-  assert!(result.contains("2"));
+  assert!(result.contains('1'));
+  assert!(result.contains('2'));
 }
 
 #[test]

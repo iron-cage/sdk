@@ -8,7 +8,7 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .analytics.usage_by_period (period parameter)
+//! - `.analytics.usage_by_period` (period parameter)
 //! - Other analytics commands that support period grouping
 //!
 //! ## Test Categories

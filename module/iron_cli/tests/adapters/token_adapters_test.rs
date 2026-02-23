@@ -15,10 +15,10 @@
 //!
 //! ## Testing Strategy
 //!
-//! Uses InMemoryAdapter (real implementation, no mocking):
+//! Uses `InMemoryAdapter` (real implementation, no mocking):
 //! - Predictable: HashMap-based token storage
 //! - Fast: No network/DB overhead
-//! - Real: Same interface as SqlxAdapter
+//! - Real: Same interface as `SqlxAdapter`
 //!
 //! ## Test Matrix
 //!
@@ -52,7 +52,7 @@ async fn create_adapter_with_tokens() -> Arc<InMemoryAdapter> {
   adapter
 }
 
-/// Helper: Create VerifiedCommand mock for testing
+/// Helper: Create `VerifiedCommand` mock for testing
 fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerifiedCommand {
   let mut params = HashMap::new();
   for (key, value) in args {
@@ -65,7 +65,7 @@ fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerified
   }
 }
 
-/// Mock VerifiedCommand for testing (until unilang types available)
+/// Mock `VerifiedCommand` for testing (until unilang types available)
 struct MockVerifiedCommand {
   #[allow(dead_code)]
   command: String,
@@ -127,7 +127,7 @@ async fn test_generate_token_adapter_missing_name() {
         "Error should mention missing name"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -153,7 +153,7 @@ async fn test_generate_token_adapter_invalid_scope() {
         "Error should mention scope validation failure"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -178,7 +178,7 @@ async fn test_generate_token_adapter_storage_error() {
     AdapterError::ServiceError(ServiceError::DatabaseError(_)) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -227,7 +227,7 @@ async fn test_list_tokens_adapter_success_empty() {
 
   let output = result.unwrap();
   assert!(
-    output.contains("No tokens") || output.is_empty() || output.contains("0"),
+    output.contains("No tokens") || output.is_empty() || output.contains('0'),
     "Output should indicate empty list"
   );
 }
@@ -279,7 +279,7 @@ async fn test_list_tokens_adapter_storage_error() {
     AdapterError::ServiceError(ServiceError::DatabaseError(_)) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -341,7 +341,7 @@ async fn test_get_token_adapter_missing_id() {
         "Error should mention missing token_id"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -360,7 +360,7 @@ async fn test_get_token_adapter_not_found() {
     AdapterError::ServiceError(ServiceError::NotFound) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -382,7 +382,7 @@ async fn test_get_token_adapter_invalid_format() {
         "Error should mention token_id format requirement"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -440,7 +440,7 @@ async fn test_rotate_token_adapter_not_found() {
     AdapterError::ServiceError(ServiceError::NotFound) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -486,7 +486,7 @@ async fn test_rotate_token_adapter_storage_error() {
     AdapterError::ServiceError(ServiceError::DatabaseError(_)) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -556,7 +556,7 @@ async fn test_revoke_token_adapter_not_found() {
     AdapterError::ServiceError(ServiceError::NotFound) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -605,7 +605,7 @@ async fn test_revoke_token_adapter_already_revoked() {
     AdapterError::ServiceError(ServiceError::NotFound) => {
       // Expected: token already gone
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 

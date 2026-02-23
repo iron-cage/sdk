@@ -3,18 +3,24 @@
 use super::{ControlApiClient, ControlApiConfig};
 use crate::formatting::{OutputFormat, TreeFmtFormatter};
 use crate::handlers::control::budget_handlers;
+use core::str::FromStr;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 /// Get budget status across agents (analytics)
-pub async fn budget_status_adapter(params: &HashMap<String, String>) -> Result<String, String> {
+///
+/// # Errors
+///
+/// Returns `Err(String)` if handler validation or the HTTP request fails.
+pub async fn budget_status_adapter<S: ::core::hash::BuildHasher + Default>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, String> {
   budget_handlers::budget_status_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
   let client = ControlApiClient::new(config);
 
   // Build query parameters
-  let mut query_params = HashMap::new();
+  let mut query_params = HashMap::default();
 
   if let Some(agent_id) = params.get("agent_id") {
     query_params.insert("agent_id".to_string(), agent_id.clone());
@@ -45,9 +51,9 @@ pub async fn budget_status_adapter(params: &HashMap<String, String>) -> Result<S
   let response = client
     .get("/api/v1/analytics/budget/status", query)
     .await
-    .map_err(|e| format!("HTTP request failed: {}", e))?;
+    .map_err(|e| format!("HTTP request failed: {e}"))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let output_format = OutputFormat::from_str(format).unwrap_or_default();
   let formatter = TreeFmtFormatter::new(output_format);
   formatter.format_value(&response)

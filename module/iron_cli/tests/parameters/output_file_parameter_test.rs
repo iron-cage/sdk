@@ -8,13 +8,13 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .analytics.export (output_file parameter)
+//! - `.analytics.export` (`output_file` parameter)
 //! - Other analytics commands that support file export
 //!
 //! ## Test Categories
 //!
 //! 1. **Valid Values**: Relative paths, absolute paths, filenames with extensions
-//! 2. **Optional Behavior**: Commands where output_file is optional (defaults to stdout)
+//! 2. **Optional Behavior**: Commands where `output_file` is optional (defaults to stdout)
 //! 3. **Edge Cases**: Special characters, long paths, directory traversal
 //!
 //! ## TDD Status
@@ -27,7 +27,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid output_file (relative path)
+  /// Test valid `output_file` (relative path)
   #[tokio::test]
   async fn test_output_file_relative_path() {
     let server = TestServer::start().await;
@@ -58,7 +58,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test output_file with absolute path
+  /// Test `output_file` with absolute path
   #[tokio::test]
   async fn test_output_file_absolute_path() {
     let server = TestServer::start().await;
@@ -91,7 +91,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test output_file with subdirectories
+  /// Test `output_file` with subdirectories
   #[tokio::test]
   async fn test_output_file_with_subdirectories() {
     let server = TestServer::start().await;
@@ -124,7 +124,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing optional output_file (defaults to stdout)
+  /// Test missing optional `output_file` (defaults to stdout)
   #[tokio::test]
   async fn test_output_file_missing_optional() {
     let server = TestServer::start().await;
@@ -150,7 +150,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty output_file
+  /// Test empty `output_file`
   #[tokio::test]
   async fn test_output_file_empty() {
     let server = TestServer::start().await;
@@ -174,7 +174,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test output_file with various extensions
+  /// Test `output_file` with various extensions
   #[tokio::test]
   async fn test_output_file_extensions() {
     let server = TestServer::start().await;
@@ -201,7 +201,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test output_file with special characters in filename
+  /// Test `output_file` with special characters in filename
   #[tokio::test]
   async fn test_output_file_special_characters() {
     let server = TestServer::start().await;

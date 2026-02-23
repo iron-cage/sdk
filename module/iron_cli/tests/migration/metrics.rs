@@ -72,37 +72,37 @@ fn test_migration_metrics_at_target() {
   for file_path_str in &adapter_files {
     let file_path = manifest_dir.join(file_path_str);
     let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
+      .unwrap_or_else(|_| panic!("Failed to read {file_path_str}"));
 
     let count = content
       .lines()
-      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
+      .filter(|line| {
+        (line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+          && line.contains("_adapter")
+      })
       .count();
 
     total_adapters += count;
   }
 
   // M1: Verify adapter metrics
-  let orphaned_adapters = 0; // No orphaned adapters exist
+  let orphaned_adapters = 0_i32; // No orphaned adapters exist
   let correct_adapters = total_adapters;
-  let orphaned_ratio = (orphaned_adapters as f64 / total_adapters as f64) * 100.0;
+  let orphaned_ratio = (f64::from(orphaned_adapters) / total_adapters as f64) * 100.0;
 
   assert_eq!(
     orphaned_adapters, 0,
-    "M1 failed: Orphaned adapters = {} (target 0)",
-    orphaned_adapters
+    "M1 failed: Orphaned adapters = {orphaned_adapters} (target 0)"
   );
 
   assert_eq!(
     correct_adapters, 22,
-    "M1 failed: Correct adapters = {} (target 22)",
-    correct_adapters
+    "M1 failed: Correct adapters = {correct_adapters} (target 22)"
   );
 
-  assert_eq!(
-    orphaned_ratio, 0.0,
-    "M1 failed: Orphaned ratio = {:.1}% (target 0%)",
-    orphaned_ratio
+  assert!(
+    orphaned_ratio.abs() < f64::EPSILON,
+    "M1 failed: Orphaned ratio = {orphaned_ratio:.1}% (target 0%)"
   );
 
   // M2: Routing counts
@@ -131,20 +131,17 @@ fn test_migration_metrics_at_target() {
 
   assert_eq!(
     broken_routes, 0,
-    "M2 failed: Broken routes = {} (target 0)",
-    broken_routes
+    "M2 failed: Broken routes = {broken_routes} (target 0)"
   );
 
   assert_eq!(
     correct_routes, 22,
-    "M2 failed: Correct routes = {} (target 22)",
-    correct_routes
+    "M2 failed: Correct routes = {correct_routes} (target 22)"
   );
 
-  assert_eq!(
-    broken_ratio, 0.0,
-    "M2 failed: Broken ratio = {:.1}% (target 0%)",
-    broken_ratio
+  assert!(
+    broken_ratio.abs() < f64::EPSILON,
+    "M2 failed: Broken ratio = {broken_ratio:.1}% (target 0%)"
   );
 
   // M3: Code quality counts
@@ -154,7 +151,7 @@ fn test_migration_metrics_at_target() {
   for file_path_str in &adapter_files {
     let file_path = manifest_dir.join(file_path_str);
     let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
+      .unwrap_or_else(|_| panic!("Failed to read {file_path_str}"));
 
     for orphaned_name in &orphaned_adapter_names {
       if content.contains(orphaned_name) {
@@ -168,20 +165,17 @@ fn test_migration_metrics_at_target() {
 
   assert_eq!(
     dead_code_indicators, 0,
-    "M3 failed: Dead code indicators = {} (target 0)",
-    dead_code_indicators
+    "M3 failed: Dead code indicators = {dead_code_indicators} (target 0)"
   );
 
   assert_eq!(
     parameter_mismatches, 0,
-    "M3 failed: Parameter mismatches = {} (target 0)",
-    parameter_mismatches
+    "M3 failed: Parameter mismatches = {parameter_mismatches} (target 0)"
   );
 
   assert_eq!(
     api_violations, 0,
-    "M3 failed: API violations = {} (target 0)",
-    api_violations
+    "M3 failed: API violations = {api_violations} (target 0)"
   );
 }
 
@@ -217,11 +211,14 @@ fn test_migration_trajectory_correctness() {
   for file_path_str in &adapter_files {
     let file_path = manifest_dir.join(file_path_str);
     let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
+      .unwrap_or_else(|_| panic!("Failed to read {file_path_str}"));
 
     let count = content
       .lines()
-      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
+      .filter(|line| {
+        (line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+          && line.contains("_adapter")
+      })
       .count();
 
     current_total += count;
@@ -236,9 +233,9 @@ fn test_migration_trajectory_correctness() {
   let final_correct = 22;
   let expected_correct_delta = 0;
 
-  let initial_orphaned_pct = 21.0; // 6/28 ≈ 21%
-  let final_orphaned_pct = 0.0;
-  let expected_pct_delta = -21.0;
+  let initial_orphaned_pct = 21.0_f64; // 6/28 ≈ 21%
+  let final_orphaned_pct = 0.0_f64;
+  let expected_pct_delta = -21.0_f64;
 
   // Verify trajectory
   let actual_orphaned_delta = final_orphaned - initial_orphaned;
@@ -247,27 +244,23 @@ fn test_migration_trajectory_correctness() {
 
   assert_eq!(
     actual_orphaned_delta, expected_orphaned_delta,
-    "Orphaned trajectory: expected Δ {}, got Δ {}",
-    expected_orphaned_delta, actual_orphaned_delta
+    "Orphaned trajectory: expected Δ {expected_orphaned_delta}, got Δ {actual_orphaned_delta}"
   );
 
   assert_eq!(
     actual_correct_delta, expected_correct_delta,
-    "Correct trajectory: expected Δ {}, got Δ {}",
-    expected_correct_delta, actual_correct_delta
+    "Correct trajectory: expected Δ {expected_correct_delta}, got Δ {actual_correct_delta}"
   );
 
-  assert_eq!(
-    actual_pct_delta, expected_pct_delta,
-    "Percentage trajectory: expected Δ {:.1}%, got Δ {:.1}%",
-    expected_pct_delta, actual_pct_delta
+  assert!(
+    (actual_pct_delta - expected_pct_delta).abs() < f64::EPSILON,
+    "Percentage trajectory: expected Δ {expected_pct_delta:.1}%, got Δ {actual_pct_delta:.1}%"
   );
 
   // Verify current state matches final state
   assert_eq!(
     current_total, 22,
-    "Current adapter count = {} (expected 22 in final state)",
-    current_total
+    "Current adapter count = {current_total} (expected 22 in final state)"
   );
 }
 
@@ -301,21 +294,24 @@ fn test_ratios_at_target() {
   for file_path_str in &adapter_files {
     let file_path = manifest_dir.join(file_path_str);
     let content = std::fs::read_to_string(&file_path)
-      .unwrap_or_else(|_| panic!("Failed to read {}", file_path_str));
+      .unwrap_or_else(|_| panic!("Failed to read {file_path_str}"));
 
     let count = content
       .lines()
-      .filter(|line| line.starts_with("pub async fn ") && line.contains("_adapter("))
+      .filter(|line| {
+        (line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+          && line.contains("_adapter")
+      })
       .count();
 
     total_adapters += count;
   }
 
   // Calculate ratios
-  let orphaned_count = 0;
+  let orphaned_count = 0_i32;
   let correct_adapter_count = total_adapters;
 
-  let orphaned_pct = (orphaned_count as f64 / total_adapters as f64) * 100.0;
+  let orphaned_pct = (f64::from(orphaned_count) / total_adapters as f64) * 100.0;
   let correct_adapter_pct = (correct_adapter_count as f64 / total_adapters as f64) * 100.0;
 
   // Check routing
@@ -344,27 +340,23 @@ fn test_ratios_at_target() {
   let correct_route_pct = (correct_route_count as f64 / total_routes as f64) * 100.0;
 
   // Verify all ratios at target
-  assert_eq!(
-    orphaned_pct, 0.0,
-    "NC-M.3 violated: Orphaned % = {:.1}% (target 0%)",
-    orphaned_pct
+  assert!(
+    orphaned_pct.abs() < f64::EPSILON,
+    "NC-M.3 violated: Orphaned % = {orphaned_pct:.1}% (target 0%)"
   );
 
-  assert_eq!(
-    broken_route_pct, 0.0,
-    "NC-M.3 violated: Broken route % = {:.1}% (target 0%)",
-    broken_route_pct
+  assert!(
+    broken_route_pct.abs() < f64::EPSILON,
+    "NC-M.3 violated: Broken route % = {broken_route_pct:.1}% (target 0%)"
   );
 
-  assert_eq!(
-    correct_adapter_pct, 100.0,
-    "NC-M.3 violated: Correct adapter % = {:.1}% (target 100%)",
-    correct_adapter_pct
+  assert!(
+    (correct_adapter_pct - 100.0).abs() < f64::EPSILON,
+    "NC-M.3 violated: Correct adapter % = {correct_adapter_pct:.1}% (target 100%)"
   );
 
-  assert_eq!(
-    correct_route_pct, 100.0,
-    "NC-M.3 violated: Correct route % = {:.1}% (target 100%)",
-    correct_route_pct
+  assert!(
+    (correct_route_pct - 100.0).abs() < f64::EPSILON,
+    "NC-M.3 violated: Correct route % = {correct_route_pct:.1}% (target 100%)"
   );
 }

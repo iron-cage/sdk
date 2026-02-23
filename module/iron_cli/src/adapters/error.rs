@@ -15,7 +15,7 @@ pub enum AdapterError {
   /// Error from service operations (I/O, database, API)
   ServiceError(ServiceError),
 
-  /// Error extracting parameters from VerifiedCommand
+  /// Error extracting parameters from `VerifiedCommand`
   ExtractionError(String),
 
   /// Error formatting output
@@ -53,10 +53,10 @@ pub enum ServiceError {
 impl fmt::Display for AdapterError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::HandlerError(e) => write!(f, "Handler error: {}", e),
-      Self::ServiceError(e) => write!(f, "Service error: {}", e),
-      Self::ExtractionError(msg) => write!(f, "Parameter extraction error: {}", msg),
-      Self::FormattingError(msg) => write!(f, "Formatting error: {}", msg),
+      Self::HandlerError(e) => write!(f, "Handler error: {e}"),
+      Self::ServiceError(e) => write!(f, "Service error: {e}"),
+      Self::ExtractionError(msg) => write!(f, "Parameter extraction error: {msg}"),
+      Self::FormattingError(msg) => write!(f, "Formatting error: {msg}"),
     }
   }
 }
@@ -68,16 +68,16 @@ impl fmt::Display for ServiceError {
       Self::Unauthorized => write!(f, "Authentication failed"),
       Self::Forbidden => write!(f, "Permission denied"),
       Self::Conflict => write!(f, "Resource already exists"),
-      Self::NetworkError(msg) => write!(f, "Network error: {}", msg),
-      Self::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-      Self::StorageError(msg) => write!(f, "Storage error: {}", msg),
-      Self::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+      Self::NetworkError(msg) => write!(f, "Network error: {msg}"),
+      Self::DatabaseError(msg) => write!(f, "Database error: {msg}"),
+      Self::StorageError(msg) => write!(f, "Storage error: {msg}"),
+      Self::ValidationError(msg) => write!(f, "Validation error: {msg}"),
     }
   }
 }
 
-impl std::error::Error for AdapterError {}
-impl std::error::Error for ServiceError {}
+impl core::error::Error for AdapterError {}
+impl core::error::Error for ServiceError {}
 
 impl From<CliError> for AdapterError {
   fn from(e: CliError) -> Self {

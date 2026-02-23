@@ -215,7 +215,7 @@ mod tests {
           ".tokens.generate",
           "name::test-token",
           "scope::read:tokens",
-          &format!("description::{}", long_desc),
+          &format!("description::{long_desc}"),
         ],
       )
       .await;

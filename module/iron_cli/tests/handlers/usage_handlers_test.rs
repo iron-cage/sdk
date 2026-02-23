@@ -63,7 +63,7 @@ fn test_show_usage_handler_all_formats() {
 
     let result = show_usage_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -90,14 +90,14 @@ fn test_usage_by_project_handler_missing_project_id() {
   assert!(result.is_err(), "Should fail without project_id");
   match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "project_id"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
 fn test_usage_by_project_handler_empty_project_id() {
   let mut params = HashMap::new();
-  params.insert("project_id".into(), "".into());
+  params.insert("project_id".into(), String::new());
 
   let result = usage_by_project_handler(&params);
 
@@ -126,7 +126,7 @@ fn test_usage_by_project_handler_all_formats() {
 
     let result = usage_by_project_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -185,7 +185,7 @@ fn test_usage_by_provider_handler_all_formats() {
 
     let result = usage_by_provider_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -215,7 +215,7 @@ fn test_export_usage_handler_missing_output() {
 #[test]
 fn test_export_usage_handler_empty_output_path() {
   let mut params = HashMap::new();
-  params.insert("output".into(), "".into());
+  params.insert("output".into(), String::new());
 
   let result = export_usage_handler(&params);
 

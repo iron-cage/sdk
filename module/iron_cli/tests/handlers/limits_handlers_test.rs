@@ -40,7 +40,7 @@ fn test_list_limits_handler_all_formats() {
 
     let result = list_limits_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -67,7 +67,7 @@ fn test_get_limit_handler_missing_limit_id() {
   assert!(result.is_err(), "Should fail without limit_id");
   match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "limit_id"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -82,7 +82,7 @@ fn test_get_limit_handler_all_formats() {
 
     let result = get_limit_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 

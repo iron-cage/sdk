@@ -14,10 +14,16 @@ use std::collections::HashMap;
 /// ## Parameters
 ///
 /// Optional:
-/// - start_date: String (format: YYYY-MM-DD)
-/// - end_date: String (format: YYYY-MM-DD, must be after start_date)
+/// - `start_date`: String (format: YYYY-MM-DD)
+/// - `end_date`: String (format: YYYY-MM-DD, must be after `start_date`)
 /// - format: String (table|expanded|json|yaml, default: table)
-pub fn show_usage_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if date format or ordering is invalid.
+pub fn show_usage_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate date range if provided
   if let (Some(start), Some(end)) = (params.get("start_date"), params.get("end_date")) {
     // Validate date format
@@ -36,16 +42,15 @@ pub fn show_usage_handler(params: &HashMap<String, String>) -> Result<String, Cl
   }
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let date_range = match (params.get("start_date"), params.get("end_date")) {
-    (Some(start), Some(end)) => format!("{} to {}", start, end),
-    (Some(start), None) => format!("from {}", start),
+    (Some(start), Some(end)) => format!("{start} to {end}"),
+    (Some(start), None) => format!("from {start}"),
     _ => "all time".to_string(),
   };
 
   Ok(format!(
-    "Show usage\nDate range: {}\nFormat: {}",
-    date_range, format
+    "Show usage\nDate range: {date_range}\nFormat: {format}"
   ))
 }
 
@@ -56,13 +61,19 @@ pub fn show_usage_handler(params: &HashMap<String, String>) -> Result<String, Cl
 /// ## Parameters
 ///
 /// Required:
-/// - project_id: String (non-empty)
+/// - `project_id`: String (non-empty)
 ///
 /// Optional:
-/// - start_date: String (format: YYYY-MM-DD)
-/// - end_date: String (format: YYYY-MM-DD)
+/// - `start_date`: String (format: YYYY-MM-DD)
+/// - `end_date`: String (format: YYYY-MM-DD)
 /// - format: String (table|json|yaml, default: table)
-pub fn usage_by_project_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn usage_by_project_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let project_id = params
     .get("project_id")
@@ -72,15 +83,14 @@ pub fn usage_by_project_handler(params: &HashMap<String, String>) -> Result<Stri
   validate_non_empty(project_id, "project_id")?;
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
   let date_range = match params.get("start_date") {
-    Some(start) => format!("from {}", start),
+    Some(start) => format!("from {start}"),
     None => "all time".to_string(),
   };
 
   Ok(format!(
-    "Usage by project\nProject ID: {}\nDate range: {}\nFormat: {}",
-    project_id, date_range, format
+    "Usage by project\nProject ID: {project_id}\nDate range: {date_range}\nFormat: {format}"
   ))
 }
 
@@ -96,7 +106,13 @@ pub fn usage_by_project_handler(params: &HashMap<String, String>) -> Result<Stri
 /// Optional:
 /// - aggregation: String (daily, weekly, monthly)
 /// - format: String (table|json|yaml, default: table)
-pub fn usage_by_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn usage_by_provider_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let provider = params
     .get("provider")
@@ -112,15 +128,11 @@ pub fn usage_by_provider_handler(params: &HashMap<String, String>) -> Result<Str
   }
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
-  let aggregation = params
-    .get("aggregation")
-    .map(|s| s.as_str())
-    .unwrap_or("default");
+  let format = params.get("format").map_or("table", String::as_str);
+  let aggregation = params.get("aggregation").map_or("default", String::as_str);
 
   Ok(format!(
-    "Usage by provider\nProvider: {}\nAggregation: {}\nFormat: {}",
-    provider, aggregation, format
+    "Usage by provider\nProvider: {provider}\nAggregation: {aggregation}\nFormat: {format}"
   ))
 }
 
@@ -135,7 +147,13 @@ pub fn usage_by_provider_handler(params: &HashMap<String, String>) -> Result<Str
 ///
 /// Optional:
 /// - format: String (json|csv, default: json)
-pub fn export_usage_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn export_usage_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let output = params
     .get("output")
@@ -145,10 +163,7 @@ pub fn export_usage_handler(params: &HashMap<String, String>) -> Result<String, 
   validate_non_empty(output, "output")?;
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
-  Ok(format!(
-    "Export usage\nOutput: {}\nFormat: {}",
-    output, format
-  ))
+  Ok(format!("Export usage\nOutput: {output}\nFormat: {format}"))
 }

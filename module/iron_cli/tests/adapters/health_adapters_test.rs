@@ -92,11 +92,7 @@ async fn test_health_adapter_all_formats() {
     let result =
       iron_cli::adapters::health::health_adapter(&command, adapter.clone(), &formatter).await;
 
-    assert!(
-      result.is_ok(),
-      "Should succeed with format '{}'",
-      format_str
-    );
+    assert!(result.is_ok(), "Should succeed with format '{format_str}'");
   }
 }
 
@@ -178,11 +174,7 @@ async fn test_version_adapter_all_formats() {
     let result =
       iron_cli::adapters::health::version_adapter(&command, adapter.clone(), &formatter).await;
 
-    assert!(
-      result.is_ok(),
-      "Should succeed with format '{}'",
-      format_str
-    );
+    assert!(result.is_ok(), "Should succeed with format '{format_str}'");
   }
 }
 
@@ -226,15 +218,15 @@ async fn test_version_adapter_includes_version_number() {
 ///
 /// ## Root Cause
 ///
-/// The version_adapter() in health_adapters.rs was making synchronous HTTP calls
-/// to the Token Manager API's /api/v1/version endpoint and failing when the API
+/// The `version_adapter()` in `health_adapters.rs` was making synchronous HTTP calls
+/// to the Token Manager API's `/api/v1/version` endpoint and failing when the API
 /// was unavailable. Users couldn't check CLI version offline, which breaks basic
 /// troubleshooting workflows. The command returned "API error (404): Not found"
 /// instead of showing the embedded CLI version.
 ///
 /// ## Why Not Caught
 ///
-/// 1. **Test Gap**: Unit tests used InMemoryAdapter mocks that don't simulate
+/// 1. **Test Gap**: Unit tests used `InMemoryAdapter` mocks that don't simulate
 ///    actual API connectivity failures
 /// 2. **Integration Gap**: No tests verified offline CLI functionality
 /// 3. **Manual Testing**: Discovered only during comprehensive manual testing
@@ -242,17 +234,17 @@ async fn test_version_adapter_includes_version_number() {
 ///
 /// ## Fix Applied
 ///
-/// Modified version_adapter() in src/adapters/health_adapters.rs (lines 60-114):
-/// 1. Returns embedded CLI version from CARGO_PKG_VERSION (always available)
-/// 2. Made API version optional with graceful degradation using .ok()
-/// 3. Returns structured JSON: {"cli_version": "0.1.0", "api_version": "<unavailable>"}
+/// Modified `version_adapter()` in `src/adapters/health_adapters.rs` (lines 60-114):
+/// 1. Returns embedded CLI version from `CARGO_PKG_VERSION` (always available)
+/// 2. Made API version optional with graceful degradation using `.ok()`
+/// 3. Returns structured JSON: `{"cli_version": "0.1.0", "api_version": "<unavailable>"}`
 /// 4. API version populated when connection available, shows "<unavailable>" when offline
 ///
 /// ## Prevention
 ///
 /// 1. **Offline-First Design**: CLI tools should provide core functionality
 ///    (version, help, validation) without requiring network connectivity
-/// 2. **Graceful Degradation**: Use .ok() and Option handling for optional
+/// 2. **Graceful Degradation**: Use `.ok()` and Option handling for optional
 ///    external resources instead of propagating errors
 /// 3. **Manual Testing**: Include offline testing scenarios in manual test plan
 /// 4. **Integration Tests**: Add tests that simulate network unavailability
@@ -263,7 +255,7 @@ async fn test_version_adapter_includes_version_number() {
 ///
 /// Commands like `.version`, `.help`, and parameter validation should never
 /// depend on external APIs. Users rely on these commands for troubleshooting
-/// when APIs are down. Embed version info at compile time (CARGO_PKG_VERSION)
+/// when APIs are down. Embed version info at compile time (`CARGO_PKG_VERSION`)
 /// and make API data optional. This applies to all CLI tools: basic operations
 /// must work offline.
 ///
@@ -302,8 +294,7 @@ async fn bug_reproducer_issue_002_version_requires_api() {
       // to service-pattern adapters (currently in health_adapters.rs only)
       assert!(
         e.to_string().contains("network") || e.to_string().contains("storage"),
-        "Should fail with network/storage error when offline: {}",
-        e
+        "Should fail with network/storage error when offline: {e}"
       );
     }
   }

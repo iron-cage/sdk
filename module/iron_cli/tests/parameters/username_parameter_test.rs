@@ -176,7 +176,7 @@ mod tests {
         "iron-token",
         &[
           ".auth.login",
-          &format!("username::{}", long_username),
+          &format!("username::{long_username}"),
           "password::testpass123",
         ],
       )

@@ -19,7 +19,13 @@ use std::collections::HashMap;
 ///
 /// Optional:
 /// - format: String (table|expanded|json|yaml, default: table)
-pub fn login_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn login_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
   // Validate required parameters
   let email = params
     .get("email")
@@ -71,28 +77,39 @@ pub fn login_handler(params: &HashMap<String, String>) -> Result<String, CliErro
   }
 
   // Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Login validation successful\nEmail: {}\nFormat: {}",
-    email, format
+    "Login validation successful\nEmail: {email}\nFormat: {format}"
   ))
 }
 
 /// Handle .auth.refresh command
 ///
 /// Refreshes authentication tokens. No parameters required.
-pub fn refresh_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn refresh_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!("Refresh command\nFormat: {}", format))
+  Ok(format!("Refresh command\nFormat: {format}"))
 }
 
 /// Handle .auth.logout command
 ///
 /// Logs out current user. No parameters required.
-pub fn logout_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn logout_handler<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!("Logout successful\nFormat: {}", format))
+  Ok(format!("Logout successful\nFormat: {format}"))
 }

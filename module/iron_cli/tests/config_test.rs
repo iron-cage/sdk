@@ -83,7 +83,7 @@ impl EnvTestGuard {
 
 impl Drop for EnvTestGuard {
   fn drop(&mut self) {
-    std::mem::take(&mut self.snapshot).restore();
+    core::mem::take(&mut self.snapshot).restore();
   }
 }
 
@@ -233,7 +233,7 @@ fn test_config_accepts_valid_format_values() {
       .validate()
       .build_result();
 
-    assert!(result.is_ok(), "Should accept format: {}", format);
+    assert!(result.is_ok(), "Should accept format: {format}");
   }
 }
 

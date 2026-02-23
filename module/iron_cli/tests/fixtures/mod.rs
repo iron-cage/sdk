@@ -1,9 +1,9 @@
 //! Test fixtures module
 //!
 //! Provides real test infrastructure (no mocking):
-//! - TestServer: Real Axum HTTP server
-//! - TestData: Real database fixtures
-//! - IntegrationTestHarness: Real CLI execution
+//! - `TestServer`: Real Axum HTTP server
+//! - `TestData`: Real database fixtures
+//! - `IntegrationTestHarness`: Real CLI execution
 
 pub mod test_data;
 pub mod test_harness;

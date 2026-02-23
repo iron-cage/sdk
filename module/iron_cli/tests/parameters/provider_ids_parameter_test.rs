@@ -8,7 +8,7 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .analytics.usage_by_provider (provider_ids filter)
+//! - `.analytics.usage_by_provider` (`provider_ids` filter)
 //! - Other analytics commands that support provider filtering
 //!
 //! ## Test Categories
@@ -27,7 +27,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test single provider_id in list
+  /// Test single `provider_id` in list
   #[tokio::test]
   async fn test_provider_ids_single() {
     let server = TestServer::start().await;
@@ -61,7 +61,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test multiple provider_ids comma-separated
+  /// Test multiple `provider_ids` comma-separated
   #[tokio::test]
   async fn test_provider_ids_multiple() {
     let server = TestServer::start().await;
@@ -94,7 +94,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test provider_ids with whitespace (should be trimmed)
+  /// Test `provider_ids` with whitespace (should be trimmed)
   #[tokio::test]
   async fn test_provider_ids_whitespace() {
     let server = TestServer::start().await;
@@ -120,7 +120,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty provider_ids
+  /// Test empty `provider_ids`
   #[tokio::test]
   async fn test_provider_ids_empty() {
     let server = TestServer::start().await;
@@ -180,7 +180,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing optional provider_ids
+  /// Test missing optional `provider_ids`
   #[tokio::test]
   async fn test_provider_ids_missing_optional() {
     let server = TestServer::start().await;
@@ -206,7 +206,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test duplicate provider_ids
+  /// Test duplicate `provider_ids`
   #[tokio::test]
   async fn test_provider_ids_duplicates() {
     let server = TestServer::start().await;
@@ -240,7 +240,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test many provider_ids (stress test)
+  /// Test many `provider_ids` (stress test)
   #[tokio::test]
   async fn test_provider_ids_many() {
     let server = TestServer::start().await;
@@ -264,7 +264,7 @@ mod tests {
         "iron",
         &[
           ".analytics.usage_by_provider",
-          &format!("provider_ids::{}", ids),
+          &format!("provider_ids::{ids}"),
         ],
       )
       .await;

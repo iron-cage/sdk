@@ -8,9 +8,9 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .api_key.create (name becomes api_key identifier)
-//! - .api_key.get (api_key parameter)
-//! - .api_key.revoke (api_key parameter)
+//! - `.api_key.create` (name becomes `api_key` identifier)
+//! - `.api_key.get` (`api_key` parameter)
+//! - `.api_key.revoke` (`api_key` parameter)
 //!
 //! ## Test Categories
 //!
@@ -28,7 +28,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test valid api_key identifier
+  /// Test valid `api_key` identifier
   #[tokio::test]
   async fn test_api_key_valid() {
     let server = TestServer::start().await;
@@ -58,7 +58,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty api_key (should fail)
+  /// Test empty `api_key` (should fail)
   #[tokio::test]
   async fn test_api_key_empty() {
     let server = TestServer::start().await;
@@ -84,7 +84,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing required api_key
+  /// Test missing required `api_key`
   #[tokio::test]
   async fn test_api_key_missing_required() {
     let server = TestServer::start().await;
@@ -108,7 +108,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test api_key with hyphens and underscores
+  /// Test `api_key` with hyphens and underscores
   #[tokio::test]
   async fn test_api_key_with_separators() {
     let server = TestServer::start().await;
@@ -135,7 +135,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test api_key with whitespace (should fail)
+  /// Test `api_key` with whitespace (should fail)
   #[tokio::test]
   async fn test_api_key_with_whitespace() {
     let server = TestServer::start().await;
@@ -162,7 +162,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test very long api_key
+  /// Test very long `api_key`
   #[tokio::test]
   async fn test_api_key_very_long() {
     let server = TestServer::start().await;
@@ -176,7 +176,7 @@ mod tests {
 
     let long_key = "a".repeat(500);
     let result = harness
-      .run("iron", &[".api_key.get", &format!("api_key::{}", long_key)])
+      .run("iron", &[".api_key.get", &format!("api_key::{long_key}")])
       .await;
 
     if !result.success() {
@@ -192,7 +192,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test api_key on revoke command
+  /// Test `api_key` on revoke command
   #[tokio::test]
   async fn test_api_key_revoke_command() {
     let server = TestServer::start().await;

@@ -15,10 +15,10 @@
 //!
 //! ## Testing Strategy
 //!
-//! Uses InMemoryAdapter (real implementation, no mocking):
+//! Uses `InMemoryAdapter` (real implementation, no mocking):
 //! - Predictable: HashMap-based storage
 //! - Fast: No network/DB overhead
-//! - Real: Same interface as SqlxAdapter
+//! - Real: Same interface as `SqlxAdapter`
 //!
 //! ## Test Matrix
 //!
@@ -48,7 +48,7 @@ async fn create_adapter_with_usage() -> Arc<InMemoryAdapter> {
   adapter
 }
 
-/// Helper: Create VerifiedCommand mock for testing
+/// Helper: Create `VerifiedCommand` mock for testing
 fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerifiedCommand {
   let mut params = HashMap::new();
   for (key, value) in args {
@@ -62,7 +62,7 @@ fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerified
   }
 }
 
-/// Mock VerifiedCommand for testing (until unilang types available)
+/// Mock `VerifiedCommand` for testing (until unilang types available)
 struct MockVerifiedCommand {
   #[allow(dead_code)]
   command: String,
@@ -194,7 +194,7 @@ async fn test_usage_by_project_adapter_missing_project_id() {
 
   match result.unwrap_err() {
     AdapterError::HandlerError(_) => {} // Expected
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -337,11 +337,7 @@ async fn test_usage_by_provider_adapter_all_formats() {
       iron_cli::adapters::usage::usage_by_provider_adapter(&command, adapter.clone(), &formatter)
         .await;
 
-    assert!(
-      result.is_ok(),
-      "Should succeed with format '{}'",
-      format_str
-    );
+    assert!(result.is_ok(), "Should succeed with format '{format_str}'");
   }
 }
 

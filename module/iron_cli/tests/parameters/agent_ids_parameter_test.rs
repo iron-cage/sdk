@@ -8,7 +8,7 @@
 //! ## Coverage
 //!
 //! Commands tested:
-//! - .analytics.usage_by_agent (agent_ids filter)
+//! - `.analytics.usage_by_agent` (`agent_ids` filter)
 //! - Other analytics commands that support agent filtering
 //!
 //! ## Test Categories
@@ -27,7 +27,7 @@
 mod tests {
   use crate::fixtures::{IntegrationTestHarness, TestData, TestServer};
 
-  /// Test single agent_id in list
+  /// Test single `agent_id` in list
   #[tokio::test]
   async fn test_agent_ids_single() {
     let server = TestServer::start().await;
@@ -61,7 +61,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test multiple agent_ids comma-separated
+  /// Test multiple `agent_ids` comma-separated
   #[tokio::test]
   async fn test_agent_ids_multiple() {
     let server = TestServer::start().await;
@@ -94,7 +94,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test agent_ids with whitespace (should be trimmed)
+  /// Test `agent_ids` with whitespace (should be trimmed)
   #[tokio::test]
   async fn test_agent_ids_whitespace() {
     let server = TestServer::start().await;
@@ -128,7 +128,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test empty agent_ids
+  /// Test empty `agent_ids`
   #[tokio::test]
   async fn test_agent_ids_empty() {
     let server = TestServer::start().await;
@@ -188,7 +188,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test missing optional agent_ids
+  /// Test missing optional `agent_ids`
   #[tokio::test]
   async fn test_agent_ids_missing_optional() {
     let server = TestServer::start().await;
@@ -214,7 +214,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test duplicate agent_ids
+  /// Test duplicate `agent_ids`
   #[tokio::test]
   async fn test_agent_ids_duplicates() {
     let server = TestServer::start().await;
@@ -248,7 +248,7 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test many agent_ids (stress test)
+  /// Test many `agent_ids` (stress test)
   #[tokio::test]
   async fn test_agent_ids_many() {
     let server = TestServer::start().await;
@@ -270,7 +270,7 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".analytics.usage_by_agent", &format!("agent_ids::{}", ids)],
+        &[".analytics.usage_by_agent", &format!("agent_ids::{ids}")],
       )
       .await;
 

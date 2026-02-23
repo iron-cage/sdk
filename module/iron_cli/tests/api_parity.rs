@@ -318,12 +318,12 @@ fn test_count_parity() {
 
   println!("\nAPI Endpoints by Category:");
   for (category, count) in &api_counts {
-    println!("  {}: {}", category, count);
+    println!("  {category}: {count}");
   }
 
   println!("\nCLI Commands by Category (unique API mappings):");
   for (category, count) in &cli_counts {
-    println!("  {}: {}", category, count);
+    println!("  {category}: {count}");
   }
 
   // Verify each category has parity
@@ -331,8 +331,7 @@ fn test_count_parity() {
     let cli_count = cli_counts.get(category).unwrap_or(&0);
     assert_eq!(
       api_count, cli_count,
-      "Category '{}' has {} API endpoints but {} CLI commands",
-      category, api_count, cli_count
+      "Category '{category}' has {api_count} API endpoints but {cli_count} CLI commands"
     );
   }
 
@@ -362,15 +361,14 @@ fn test_operation_parity() {
     }
   }
 
-  println!("\nAPI Operations: {:?}", api_operations);
-  println!("\nCLI Operations: {:?}", cli_operations);
+  println!("\nAPI Operations: {api_operations:?}");
+  println!("\nCLI Operations: {cli_operations:?}");
 
   // Verify all API operations have CLI equivalents
   for operation in &api_operations {
     assert!(
       cli_operations.contains(operation),
-      "API operation '{}' has no CLI equivalent",
-      operation
+      "API operation '{operation}' has no CLI equivalent"
     );
   }
 
@@ -378,8 +376,7 @@ fn test_operation_parity() {
   for operation in &cli_operations {
     assert!(
       api_operations.contains(operation),
-      "CLI operation '{}' has no API equivalent",
-      operation
+      "CLI operation '{operation}' has no API equivalent"
     );
   }
 
@@ -442,11 +439,11 @@ fn test_api_coverage() {
           cmds.len()
         );
         for cmd in cmds {
-          println!("    - {}", cmd);
+          println!("    - {cmd}");
         }
       }
       None => {
-        panic!("API endpoint '{}' has no CLI command mapping", endpoint_key);
+        panic!("API endpoint '{endpoint_key}' has no CLI command mapping");
       }
     }
   }
@@ -467,13 +464,13 @@ fn test_category_completeness() {
   // Verify all expected categories exist in API
   for category in &expected_categories {
     let api_has_category = api_endpoints.iter().any(|e| e.category == *category);
-    assert!(api_has_category, "API missing category: {}", category);
+    assert!(api_has_category, "API missing category: {category}");
   }
 
   // Verify all expected categories exist in CLI
   for category in &expected_categories {
     let cli_has_category = cli_commands.iter().any(|c| c.category == *category);
-    assert!(cli_has_category, "CLI missing category: {}", category);
+    assert!(cli_has_category, "CLI missing category: {category}");
   }
 
   println!(

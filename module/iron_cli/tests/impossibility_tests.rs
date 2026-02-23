@@ -1,4 +1,4 @@
-//! Impossibility Tests for iron_cli Configuration
+//! Impossibility Tests for `iron_cli` Configuration
 //!
 //! These tests verify that old configuration methods are IMPOSSIBLE to use.
 //! They check that old builder methods have been deleted and old env var
@@ -120,8 +120,7 @@ fn no_manual_env_var_in_config_rs() {
   for pattern in &forbidden {
     assert!(
       !source.contains(pattern),
-      "REGRESSION: Found old env var pattern '{}' in config.rs",
-      pattern
+      "REGRESSION: Found old env var pattern '{pattern}' in config.rs"
     );
   }
 }
@@ -148,8 +147,7 @@ fn no_backup_files_exist() {
   for path in &backup_patterns {
     assert!(
       !std::path::Path::new(path).exists(),
-      "FAILURE: Backup file exists: {} - old code not fully deleted",
-      path
+      "FAILURE: Backup file exists: {path} - old code not fully deleted"
     );
   }
 }
@@ -177,8 +175,7 @@ fn no_commented_out_old_code() {
     for pattern in &forbidden_in_comments {
       assert!(
         !trimmed.contains(pattern),
-        "REGRESSION: Commented-out old code found: '{}' - delete completely",
-        trimmed
+        "REGRESSION: Commented-out old code found: '{trimmed}' - delete completely"
       );
     }
   }
@@ -199,7 +196,7 @@ fn all_test_files_use_new_env_var_names() {
     }
 
     let source =
-      std::fs::read_to_string(file_path).unwrap_or_else(|_| panic!("Failed to read {}", file_path));
+      std::fs::read_to_string(file_path).unwrap_or_else(|_| panic!("Failed to read {file_path}"));
 
     // Check for old env var names (without IRON_CLI_ prefix)
     let old_patterns = [
@@ -218,12 +215,10 @@ fn all_test_files_use_new_env_var_names() {
         let is_in_regression_test = source.contains("test_old_env_var_names_are_ignored")
           || source.contains("should.not.work");
 
-        if !is_in_regression_test {
-          panic!(
-            "REGRESSION: Old env var {} found in {} - should use IRON_CLI_* prefix",
-            pattern, file_path
-          );
-        }
+        assert!(
+          is_in_regression_test,
+          "REGRESSION: Old env var {pattern} found in {file_path} - should use IRON_CLI_* prefix"
+        );
       }
     }
   }

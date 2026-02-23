@@ -17,6 +17,10 @@ where
 }
 
 /// List traces adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation or service call fails.
 pub async fn list_traces_adapter<T, S>(
   command: &T,
   traces_service: S,
@@ -29,7 +33,7 @@ where
   let params = extract_params(command);
   let _ = traces_handlers::list_traces_handler(&params)?;
 
-  let filter = params.get("filter").map(|s| s.as_str());
+  let filter = params.get("filter").map(String::as_str);
   let limit = params.get("limit").and_then(|s| s.parse::<u32>().ok());
 
   let traces = traces_service.list_traces(filter, limit).await?;
@@ -44,6 +48,10 @@ where
 }
 
 /// Get trace adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn get_trace_adapter<T, S>(
   command: &T,
   traces_service: S,
@@ -74,6 +82,10 @@ where
 }
 
 /// Export traces adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn export_traces_adapter<T, S>(
   command: &T,
   traces_service: S,
@@ -90,7 +102,7 @@ where
     .get("output")
     .ok_or_else(|| AdapterError::ExtractionError("output missing after validation".to_string()))?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   traces_service.export_traces(output_path, format).await?;
 

@@ -15,10 +15,10 @@
 //!
 //! ## Testing Strategy
 //!
-//! Uses InMemoryAdapter (real implementation, no mocking):
+//! Uses `InMemoryAdapter` (real implementation, no mocking):
 //! - Predictable: HashMap-based storage
 //! - Fast: No network/DB overhead
-//! - Real: Same interface as SqlxAdapter
+//! - Real: Same interface as `SqlxAdapter`
 //!
 //! ## Test Matrix
 //!
@@ -43,7 +43,7 @@ fn create_adapter_with_user() -> Arc<InMemoryAdapter> {
   adapter
 }
 
-/// Helper: Create VerifiedCommand mock for testing
+/// Helper: Create `VerifiedCommand` mock for testing
 fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerifiedCommand {
   let mut params = HashMap::new();
   for (key, value) in args {
@@ -56,7 +56,7 @@ fn create_verified_command(command: &str, args: &[(&str, &str)]) -> MockVerified
   }
 }
 
-/// Mock VerifiedCommand for testing (until unilang types available)
+/// Mock `VerifiedCommand` for testing (until unilang types available)
 struct MockVerifiedCommand {
   #[allow(dead_code)]
   command: String,
@@ -115,7 +115,7 @@ async fn test_login_adapter_missing_username() {
         "Error should mention missing email"
       );
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -140,7 +140,7 @@ async fn test_login_adapter_invalid_credentials() {
     AdapterError::ServiceError(ServiceError::Unauthorized) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 
   // Verify no tokens stored
@@ -170,7 +170,7 @@ async fn test_login_adapter_network_error() {
     AdapterError::ServiceError(ServiceError::NetworkError(_)) => {
       // Expected error type
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -260,7 +260,7 @@ async fn test_refresh_adapter_no_stored_token() {
     AdapterError::ServiceError(ServiceError::NotFound) => {
       // Expected: no token found in storage
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -292,7 +292,7 @@ async fn test_refresh_adapter_expired_token() {
     AdapterError::ServiceError(ServiceError::Unauthorized) => {
       // Expected: expired token = unauthorized
     }
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
@@ -355,7 +355,7 @@ async fn test_refresh_adapter_yaml_format() {
 
   // Verify YAML structure (simple check for YAML markers)
   assert!(
-    output.contains(":") && !output.starts_with("{"),
+    output.contains(':') && !output.starts_with('{'),
     "Output should be YAML format (key: value)"
   );
 }
@@ -522,7 +522,7 @@ async fn test_logout_adapter_table_format() {
 
   // Verify table format (simple text output)
   assert!(
-    !output.starts_with("{") && !output.starts_with("["),
+    !output.starts_with('{') && !output.starts_with('['),
     "Table format should not be JSON"
   );
 }

@@ -32,7 +32,7 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// - name: Token name
 /// - scope: Token scope (action:resource format)
-/// - expires_in: Optional expiration (days)
+/// - `expires_in`: Optional expiration (days)
 /// - dry: Dry run flag (0|1)
 /// - format: Output format (table|json|yaml)
 ///
@@ -41,8 +41,17 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 /// ```bash
 /// iron-token .tokens.generate name::my-token scope::read:tokens
 /// ```
-pub async fn generate_token_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if validated `name` or `scope` parameters are missing after handler validation.
+pub async fn generate_token_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::generate_token_handler(params)?;
@@ -55,13 +64,13 @@ pub async fn generate_token_adapter(
     == 1;
 
   if dry_run {
-    let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+    let format = params.get("format").map_or("json", String::as_str);
 
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would generate new IC token",
-      "name": params.get( "name" ).unwrap(), // Already validated
-      "scope": params.get( "scope" ).unwrap(), // Already validated
+      "name": params.get("name").unwrap(), // Already validated
+      "scope": params.get("scope").unwrap(), // Already validated
     });
 
     return format_response(&dry_data, format);
@@ -70,8 +79,7 @@ pub async fn generate_token_adapter(
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -81,8 +89,8 @@ pub async fn generate_token_adapter(
 
   // 5. Build request body
   let mut body = json!({
-    "name": params.get( "name" ).unwrap(), // Already validated
-    "scope": params.get( "scope" ).unwrap(), // Already validated
+    "name": params.get("name").unwrap(), // Already validated
+    "scope": params.get("scope").unwrap(), // Already validated
   });
 
   if let Some(expires_in) = params.get("expires_in") {
@@ -95,13 +103,12 @@ pub async fn generate_token_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to generate token: {}",
-        e
+        "Failed to generate token: {e}"
       )))
     })?;
 
   // 7. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -122,15 +129,21 @@ pub async fn generate_token_adapter(
 /// iron-token .tokens.list
 /// iron-token .tokens.list limit::10 page::2
 /// ```
-pub async fn list_tokens_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+pub async fn list_tokens_adapter<S: ::core::hash::BuildHasher + Default>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::list_tokens_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -139,7 +152,7 @@ pub async fn list_tokens_adapter(params: &HashMap<String, String>) -> Result<Str
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::new();
+  let mut query_params = HashMap::default();
 
   if let Some(page) = params.get("page") {
     query_params.insert("page".to_string(), page.clone());
@@ -155,13 +168,12 @@ pub async fn list_tokens_adapter(params: &HashMap<String, String>) -> Result<Str
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to list tokens: {}",
-        e
+        "Failed to list tokens: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -180,15 +192,25 @@ pub async fn list_tokens_adapter(params: &HashMap<String, String>) -> Result<Str
 /// ```bash
 /// iron-token .tokens.get id::abc123-def456
 /// ```
-pub async fn get_token_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing after handler validation.
+pub async fn get_token_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::get_token_handler(params)?;
 
   // 2. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -198,7 +220,7 @@ pub async fn get_token_adapter(params: &HashMap<String, String>) -> Result<Strin
 
   // 4. Build path
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/tokens/{}", id);
+  let path = format!("/api/v1/tokens/{id}");
 
   // 5. Make HTTP call
   let response = client
@@ -206,13 +228,12 @@ pub async fn get_token_adapter(params: &HashMap<String, String>) -> Result<Strin
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to get token: {}",
-        e
+        "Failed to get token: {e}"
       )))
     })?;
 
   // 6. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -232,8 +253,17 @@ pub async fn get_token_adapter(params: &HashMap<String, String>) -> Result<Strin
 /// ```bash
 /// iron-token .tokens.rotate id::abc123-def456
 /// ```
-pub async fn rotate_token_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing after handler validation.
+pub async fn rotate_token_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::rotate_token_handler(params)?;
@@ -246,12 +276,12 @@ pub async fn rotate_token_adapter(
     == 1;
 
   if dry_run {
-    let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+    let format = params.get("format").map_or("json", String::as_str);
 
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would rotate IC token",
-      "id": params.get( "id" ).unwrap(), // Already validated
+      "id": params.get("id").unwrap(), // Already validated
     });
 
     return format_response(&dry_data, format);
@@ -260,8 +290,7 @@ pub async fn rotate_token_adapter(
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -271,7 +300,7 @@ pub async fn rotate_token_adapter(
 
   // 5. Build path
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/tokens/{}/rotate", id);
+  let path = format!("/api/v1/tokens/{id}/rotate");
 
   // 6. Make HTTP call
   let response = client
@@ -279,13 +308,12 @@ pub async fn rotate_token_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to rotate token: {}",
-        e
+        "Failed to rotate token: {e}"
       )))
     })?;
 
   // 7. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
@@ -305,8 +333,17 @@ pub async fn rotate_token_adapter(
 /// ```bash
 /// iron-token .tokens.revoke id::abc123-def456
 /// ```
-pub async fn revoke_token_adapter(
-  params: &HashMap<String, String>,
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
+/// or the HTTP request fails.
+///
+/// # Panics
+///
+/// Panics if the validated `id` parameter is missing after handler validation.
+pub async fn revoke_token_adapter<S: ::core::hash::BuildHasher>(
+  params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::revoke_token_handler(params)?;
@@ -319,12 +356,12 @@ pub async fn revoke_token_adapter(
     == 1;
 
   if dry_run {
-    let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+    let format = params.get("format").map_or("json", String::as_str);
 
     let dry_data = json!({
       "status": "dry_run",
       "message": "Would revoke IC token",
-      "id": params.get( "id" ).unwrap(), // Already validated
+      "id": params.get("id").unwrap(), // Already validated
     });
 
     return format_response(&dry_data, format);
@@ -333,8 +370,7 @@ pub async fn revoke_token_adapter(
   // 3. Get access token from keyring
   let access_token = keyring::get_access_token().map_err(|e| {
     AdapterError::ServiceError(ServiceError::StorageError(format!(
-      "Not authenticated: {}. Please run .auth.login first.",
-      e
+      "Not authenticated: {e}. Please run .auth.login first."
     )))
   })?;
 
@@ -344,7 +380,7 @@ pub async fn revoke_token_adapter(
 
   // 5. Build path
   let id = params.get("id").unwrap(); // Already validated
-  let path = format!("/api/v1/tokens/{}", id);
+  let path = format!("/api/v1/tokens/{id}");
 
   // 6. Make HTTP call
   let response = client
@@ -352,13 +388,12 @@ pub async fn revoke_token_adapter(
     .await
     .map_err(|e| {
       AdapterError::ServiceError(ServiceError::NetworkError(format!(
-        "Failed to revoke token: {}",
-        e
+        "Failed to revoke token: {e}"
       )))
     })?;
 
   // 7. Format output
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("json");
+  let format = params.get("format").map_or("json", String::as_str);
 
   format_response(&response, format)
 }
