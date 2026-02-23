@@ -14,9 +14,7 @@ pub use key_fetcher::KeyFetcher;
 pub use router::LlmRouter;
 
 // Re-export proxy utilities for testing
-pub use proxy::detect_provider_from_model;
-pub use proxy::strip_provider_prefix;
+pub use proxy::{detect_provider_from_model, run_proxy, strip_provider_prefix, ProxyConfig};
 
 // Re-export translator functions for testing
-pub use translator::translate_anthropic_to_openai;
-pub use translator::translate_openai_to_anthropic;
+pub use translator::{translate_anthropic_to_openai, translate_openai_to_anthropic};
