@@ -150,13 +150,17 @@ impl LlmRouter {
   /// # Errors
   ///
   /// Returns an error string if no free port can be found or the Tokio runtime fails to start.
-  pub fn create_with_provider_key(provider_key: &str, budget: Option<f64>) -> Result<Self, String> {
+  #[allow(clippy::needless_pass_by_value)]
+  pub fn create_with_provider_key(
+    provider_key: String,
+    budget: Option<f64>,
+  ) -> Result<Self, String> {
     Self::create_inner(
       "direct".to_string(),
       String::new(),
       0,
       budget,
-      Some(provider_key),
+      Some(&provider_key),
     )
   }
 
