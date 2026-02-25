@@ -50,6 +50,7 @@ use axum::{
   body::Body,
   http::{Request, StatusCode},
 };
+use secrecy::ExposeSecret;
 use iron_secrets::crypto::CryptoService;
 use serde_json::{json, Value};
 use tower::ServiceExt;
@@ -165,7 +166,7 @@ async fn test_handshake_decrypts_provider_key() {
 
   // Verify: Decrypted provider key matches original
   assert_eq!(
-    decrypted_provider_key.as_str(),
+    decrypted_provider_key.expose_secret().as_str(),
     original_provider_key,
     "Decrypted provider key should match original key"
   );

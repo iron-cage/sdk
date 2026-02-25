@@ -14,11 +14,16 @@
 #![allow(missing_docs)]
 
 use iron_cost::budget_client::BudgetClientBuilder;
-use iron_secrets::ip_token::IpTokenCrypto;
+use iron_secrets::ip_token::{IpTokenCrypto, IpTokenKey};
+use secrecy::ExposeSecret;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 const TEST_IP_TOKEN_KEY: [u8; 32] = [0x42u8; 32];
+
+fn test_ip_token_key() -> IpTokenKey {
+  IpTokenKey::try_from(TEST_IP_TOKEN_KEY).unwrap()
+}
 
 /// Start a minimal HTTP mock server for `POST /api/budget/handshake`.
 /// Accepts one connection, discards the request body, replies with a JSON handshake response.
@@ -49,7 +54,7 @@ async fn start_mock_handshake_server(encrypted_token: String) -> String {
 /// real path: mock server → HTTP → `handshake()` → `get_provider_key()` → plaintext.
 #[tokio::test]
 async fn budget_client_handshake_decrypts_encrypted_ip_token() {
-  let crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
+  let crypto = IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).unwrap();
   let plaintext_key = "sk-ant-api03-integration-test-key";
   let encrypted = crypto.encrypt(plaintext_key).unwrap();
 
@@ -59,7 +64,7 @@ async fn budget_client_handshake_decrypts_encrypted_ip_token() {
     .server_url(server_url)
     .ic_token("test-ic-token".to_string())
     .provider("anthropic".to_string())
-    .ip_token_key(TEST_IP_TOKEN_KEY)
+    .ip_token_key(test_ip_token_key())
     .build()
     .unwrap();
 
@@ -67,7 +72,7 @@ async fn budget_client_handshake_decrypts_encrypted_ip_token() {
 
   let provider_key = client.get_provider_key().await.unwrap();
   assert_eq!(
-    provider_key.api_key.as_str(),
+    provider_key.api_key.expose_secret().as_str(),
     plaintext_key,
     "BudgetClient must return the decrypted plaintext key, not the raw ciphertext"
   );

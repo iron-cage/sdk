@@ -24,6 +24,7 @@ aes-gcm = { workspace = true }
 argon2 = { workspace = true }
 rand = { workspace = true }
 zeroize = { workspace = true }
+secrecy = { workspace = true }
 base64 = { workspace = true }
 
 # Database

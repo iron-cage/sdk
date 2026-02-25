@@ -27,6 +27,7 @@ use axum::{
   routing::post,
   Router,
 };
+use secrecy::ExposeSecret;
 use common::budget::{
   create_ic_token, create_ic_token_for_missing_agent, create_test_budget_state,
   create_test_budget_state_no_crypto, setup_test_db,
@@ -203,7 +204,7 @@ async fn test_get_provider_key_success() {
     .ip_token_crypto
     .decrypt(ip_token_value)
     .expect("Should decrypt IP Token");
-  assert_eq!(&*decrypted, "sk-test-openai-key-12345");
+  assert_eq!(decrypted.expose_secret(), "sk-test-openai-key-12345");
 
   assert_eq!(body["provider"].as_str().unwrap(), "openai");
 }

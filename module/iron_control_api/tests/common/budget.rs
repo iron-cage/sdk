@@ -15,6 +15,7 @@ use iron_control_api::{
   ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
   routes::budget::{handshake, refresh_budget, report_usage, return_budget, BudgetState},
 };
+use iron_secrets::ip_token::IpTokenKey;
 use iron_token_manager::lease_manager::LeaseManager;
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -47,11 +48,12 @@ pub async fn setup_test_db() -> SqlitePool {
 pub async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
+  let ip_token_key_typed = IpTokenKey::try_from(ip_token_key).unwrap();
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key for provider keys
 
   let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
   let ip_token_crypto =
-    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key).unwrap());
+    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key_typed).unwrap());
   let provider_key_crypto =
     Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
   let crypto_service =
@@ -87,11 +89,12 @@ pub async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
 pub async fn create_test_budget_state_no_crypto(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
+  let ip_token_key_typed = iron_secrets::ip_token::IpTokenKey::try_from(ip_token_key).unwrap();
   let provider_key_master: [u8; 32] = [42u8; 32];
 
   let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
   let ip_token_crypto =
-    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key).unwrap());
+    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key_typed).unwrap());
   let provider_key_crypto =
     Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
   let lease_manager = Arc::new(LeaseManager::from_pool(pool.clone()));

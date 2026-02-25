@@ -26,6 +26,7 @@ use axum::{
 };
 use common::budget;
 use iron_secrets::ip_token::IpTokenCrypto;
+use secrecy::ExposeSecret;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -125,13 +126,13 @@ async fn e2e_handshake_server_encrypts_client_decrypts() {
 
   // --- Client side (separate IpTokenCrypto instance, same key) ---
   let client_crypto =
-    IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).expect("Client should create IpTokenCrypto");
+    IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).expect("Client should create IpTokenCrypto");
 
   let decrypted = client_crypto
     .decrypt(ip_token)
     .expect("Client should decrypt IP Token");
 
-  assert_eq!(decrypted.as_str(), original_key);
+  assert_eq!(decrypted.expose_secret().as_str(), original_key);
 }
 
 #[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
@@ -187,13 +188,13 @@ async fn e2e_provider_key_server_encrypts_client_decrypts() {
 
   // --- Client side ---
   let client_crypto =
-    IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).expect("Client should create IpTokenCrypto");
+    IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).expect("Client should create IpTokenCrypto");
 
   let decrypted = client_crypto
     .decrypt(ip_token)
     .expect("Client should decrypt IP Token");
 
-  assert_eq!(decrypted.as_str(), original_key);
+  assert_eq!(decrypted.expose_secret().as_str(), original_key);
 }
 
 #[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
@@ -235,7 +236,7 @@ async fn e2e_corrupted_ip_token_client_handles_gracefully() {
   let corrupted = format!("{ip_token}CORRUPTED");
 
   // Client should fail gracefully, not panic
-  let client_crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
+  let client_crypto = IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).unwrap();
   let result = client_crypto.decrypt(&corrupted);
   assert!(
     result.is_err(),
@@ -243,7 +244,7 @@ async fn e2e_corrupted_ip_token_client_handles_gracefully() {
   );
 
   // Wrong key should also fail gracefully
-  let wrong_key_crypto = IpTokenCrypto::new(&[0xFFu8; 32]).unwrap();
+  let wrong_key_crypto = IpTokenCrypto::from_slice(&[0xFFu8; 32]).unwrap();
   let result = wrong_key_crypto.decrypt(ip_token);
   assert!(
     result.is_err(),
@@ -306,7 +307,7 @@ async fn e2e_same_key_decrypts_both_flows() {
   let body2: Value = parse_body(resp2).await;
 
   // One client crypto instance decrypts both
-  let client_crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
+  let client_crypto = IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).unwrap();
 
   let decrypted1 = client_crypto
     .decrypt(body1["ip_token"].as_str().unwrap())
@@ -315,8 +316,8 @@ async fn e2e_same_key_decrypts_both_flows() {
     .decrypt(body2["ip_token"].as_str().unwrap())
     .unwrap();
 
-  assert_eq!(decrypted1.as_str(), original_key);
-  assert_eq!(decrypted2.as_str(), original_key);
+  assert_eq!(decrypted1.expose_secret().as_str(), original_key);
+  assert_eq!(decrypted2.expose_secret().as_str(), original_key);
 
   // But the encrypted tokens should be different (different nonce each time)
   assert_ne!(
