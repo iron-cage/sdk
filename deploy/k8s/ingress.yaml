@@ -30,7 +30,7 @@ spec:
         - name: fix-double-api
       services:
         - name: backend
-          port: 3001
+          port: ${port_back}
 
     - match: Host(`${project_domain}`)
       kind: Rule
@@ -62,3 +62,17 @@ spec:
   replacePathRegex:
     regex: "^/api/api/(.*)"
     replacement: "/api/$1"
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: app-tls
+spec:
+  secretName: app-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - ${project_domain}
