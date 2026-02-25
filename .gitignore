@@ -119,3 +119,7 @@ backups/
 !/secret/iron.example.sh
 !/secret/api_keys.example.sh
 # workspace-secrets.sh contains actual secrets - NEVER commit
+
+# Local Cargo config (machine-specific settings like jobs count)
+# Use CI workflow flags (e.g. cargo nextest run -j 4) for per-runner limits
+.cargo/config.toml

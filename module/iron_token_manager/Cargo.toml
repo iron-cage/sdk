@@ -11,6 +11,9 @@ readme = "readme.md"
 keywords = ["tokens", "api-keys", "usage-tracking", "limits"]
 categories = ["authentication"]
 
+[lints]
+workspace = true
+
 [features]
 default = ["enabled"]
 enabled = []
@@ -33,16 +36,13 @@ workspace_tools = { workspace = true }
 # api_claude = { workspace = true }
 # api_gemini = { workspace = true }
 
-# Error handling (per rulebook)
-error_tools = { workspace = true }
-
 # Crypto for token generation
-rand.workspace = true
-sha2 = "0.10"
-hex = "0.4"
+rand = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 base64 = { workspace = true }
-bcrypt = "0.15"
-subtle = "2.6"
+bcrypt = { workspace = true }
+subtle = { workspace = true }
 
 # Database
 sqlx = { workspace = true }
@@ -60,8 +60,8 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 
 # Rate limiting
-governor = "0.7"
-nonzero_ext = "0.3"
+governor = { workspace = true }
+nonzero_ext = { workspace = true }
 
 # Concurrency
 dashmap = { workspace = true }
@@ -75,10 +75,7 @@ mod_interface = { workspace = true }
 [dev-dependencies]
 iron_test_db = { workspace = true }
 tempfile = { workspace = true }
-tokio-test = "0.4"
-regex.workspace = true
+tokio-test = { workspace = true }
+regex = { workspace = true }
 # Enable test utilities for ID types in tests
 iron_types = { workspace = true, features = ["test-helpers"] }
-
-[lints]
-workspace = true

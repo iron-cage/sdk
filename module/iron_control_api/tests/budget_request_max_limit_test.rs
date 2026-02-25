@@ -31,7 +31,7 @@
 //! When protocol specifications define operational limits (pilot $10K) separate from
 //! technical limits (i64 overflow $9.2T), implementation must enforce BOTH constraints.
 //! Test the operational limit with boundary tests, not just the technical limit.
-//! A passing overflow test doesnt validate business requirements.
+//! A passing overflow test doesn't validate business requirements.
 //!
 //! ## Test Coverage
 //!
@@ -54,11 +54,9 @@ use iron_control_api::routes::budget::request_workflow::CreateBudgetRequestReque
 ///
 /// - Request with budget = $10,000 succeeds validation
 /// - Boundary condition - maximum allowed value
-#[ test ]
-fn test_budget_request_at_exact_limit()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_budget_request_at_exact_limit() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 10_000.0, // Exact limit
@@ -69,8 +67,7 @@ fn test_budget_request_at_exact_limit()
 
   assert!(
     result.is_ok(),
-    "Budget request at exact $10K limit should succeed, got: {:?}",
-    result
+    "Budget request at exact $10K limit should succeed, got: {result:?}"
   );
 }
 
@@ -80,11 +77,9 @@ fn test_budget_request_at_exact_limit()
 ///
 /// - Request with budget = $9,999.99 succeeds validation
 /// - Just below boundary - should pass
-#[ test ]
-fn test_budget_request_just_under_limit()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_budget_request_just_under_limit() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 9_999.99, // Just under limit
@@ -95,8 +90,7 @@ fn test_budget_request_just_under_limit()
 
   assert!(
     result.is_ok(),
-    "Budget request at $9,999.99 should succeed, got: {:?}",
-    result
+    "Budget request at $9,999.99 should succeed, got: {result:?}"
   );
 }
 
@@ -106,11 +100,9 @@ fn test_budget_request_just_under_limit()
 ///
 /// - Request with budget = $10,000.01 fails validation
 /// - Error message indicates budget exceeds maximum
-#[ test ]
-fn test_budget_request_just_over_limit()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_budget_request_just_over_limit() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 10_000.01, // Just over limit
@@ -126,9 +118,8 @@ fn test_budget_request_just_over_limit()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.contains( "exceeds maximum" ) || error_msg.contains( "10000" ),
-    "Error message should mention exceeds/maximum/10000, got: {}",
-    error_msg
+    error_msg.contains("exceeds maximum") || error_msg.contains("10000"),
+    "Error message should mention exceeds/maximum/10000, got: {error_msg}"
   );
 }
 
@@ -138,11 +129,9 @@ fn test_budget_request_just_over_limit()
 ///
 /// - Request with budget = $50,000 fails validation
 /// - Error message indicates budget exceeds maximum
-#[ test ]
-fn test_budget_request_significantly_over_limit()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_budget_request_significantly_over_limit() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 50_000.0, // 5x over limit
@@ -158,9 +147,8 @@ fn test_budget_request_significantly_over_limit()
 
   let error_msg = result.unwrap_err().to_string();
   assert!(
-    error_msg.contains( "exceeds maximum" ) && error_msg.contains( "10000" ),
-    "Error should mention 'exceeds maximum' and '10000', got: {}",
-    error_msg
+    error_msg.contains("exceeds maximum") && error_msg.contains("10000"),
+    "Error should mention 'exceeds maximum' and '10000', got: {error_msg}"
   );
 }
 
@@ -170,11 +158,9 @@ fn test_budget_request_significantly_over_limit()
 ///
 /// - Request with budget = $0.01 succeeds validation
 /// - Minimum positive value - should pass
-#[ test ]
-fn test_budget_request_at_minimum()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_budget_request_at_minimum() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 0.01, // Minimum valid
@@ -185,8 +171,7 @@ fn test_budget_request_at_minimum()
 
   assert!(
     result.is_ok(),
-    "Budget request at $0.01 should succeed, got: {:?}",
-    result
+    "Budget request at $0.01 should succeed, got: {result:?}"
   );
 }
 
@@ -196,11 +181,9 @@ fn test_budget_request_at_minimum()
 ///
 /// - Error message includes both "exceeds maximum" and the actual limit value
 /// - Provides actionable information for API clients
-#[ test ]
-fn test_error_message_format()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_error_message_format() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 25_000.0,
@@ -209,27 +192,24 @@ fn test_error_message_format()
 
   let result = request.validate();
 
-  assert!( result.is_err(), "Should fail validation" );
+  assert!(result.is_err(), "Should fail validation");
 
   let error_msg = result.unwrap_err().to_string();
 
   // Error should be specific and actionable
   assert!(
-    error_msg.contains( "requested_budget_usd" ),
-    "Error should mention field name, got: {}",
-    error_msg
+    error_msg.contains("requested_budget_usd"),
+    "Error should mention field name, got: {error_msg}"
   );
 
   assert!(
-    error_msg.contains( "10000" ),
-    "Error should include limit value, got: {}",
-    error_msg
+    error_msg.contains("10000"),
+    "Error should include limit value, got: {error_msg}"
   );
 
   assert!(
-    error_msg.contains( "exceeds" ) || error_msg.contains( "maximum" ),
-    "Error should explain why it failed, got: {}",
-    error_msg
+    error_msg.contains("exceeds") || error_msg.contains("maximum"),
+    "Error should explain why it failed, got: {error_msg}"
   );
 }
 
@@ -239,11 +219,9 @@ fn test_error_message_format()
 ///
 /// - Request with budget = $9,500 succeeds validation
 /// - Common large request amount - should pass
-#[ test ]
-fn test_budget_request_large_but_valid()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_budget_request_large_but_valid() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
     requested_budget_usd: 9_500.0,
@@ -254,8 +232,7 @@ fn test_budget_request_large_but_valid()
 
   assert!(
     result.is_ok(),
-    "Budget request at $9,500 should succeed, got: {:?}",
-    result
+    "Budget request at $9,500 should succeed, got: {result:?}"
   );
 }
 
@@ -265,28 +242,25 @@ fn test_budget_request_large_but_valid()
 ///
 /// - Validation stops at first error (over budget limit)
 /// - Returns budget-specific error, not other validation errors
-#[ test ]
-fn test_validation_fails_on_budget_limit_first()
-{
-  let request = CreateBudgetRequestRequest
-  {
+#[test]
+fn test_validation_fails_on_budget_limit_first() {
+  let request = CreateBudgetRequestRequest {
     agent_id: 1,
     requester_id: "user_001".to_string(),
-    requested_budget_usd: 100_000.0, // Over limit
+    requested_budget_usd: 100_000.0,      // Over limit
     justification: "Invalid".to_string(), // Also too short (< 20 chars)
   };
 
   let result = request.validate();
 
-  assert!( result.is_err(), "Should fail validation" );
+  assert!(result.is_err(), "Should fail validation");
 
   let error_msg = result.unwrap_err().to_string();
 
   // Should fail on budget limit before reaching justification length check
   // (validation order matters for error reporting)
   assert!(
-    error_msg.contains( "budget" ) || error_msg.contains( "exceeds" ) || error_msg.contains( "10000" ),
-    "Should fail on budget limit check first, got: {}",
-    error_msg
+    error_msg.contains("budget") || error_msg.contains("exceeds") || error_msg.contains("10000"),
+    "Should fail on budget limit check first, got: {error_msg}"
   );
 }

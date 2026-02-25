@@ -4,13 +4,12 @@
 
 use super::state::BudgetState;
 use crate::error::ValidationError;
-use axum::
-{
+use axum::{
   extract::State,
   http::StatusCode,
-  response::{ IntoResponse, Json },
+  response::{IntoResponse, Json},
 };
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 // ============================================================================
@@ -18,17 +17,19 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Create budget change request (Protocol 012)
-#[ derive( Debug, Serialize, Deserialize ) ]
-pub struct CreateBudgetRequestRequest
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateBudgetRequestRequest {
+  /// Target agent database ID
   pub agent_id: i64,
+  /// User ID of the requester
   pub requester_id: String,
+  /// Requested budget amount in USD
   pub requested_budget_usd: f64,
+  /// Reason for budget change
   pub justification: String,
 }
 
-impl CreateBudgetRequestRequest
-{
+impl CreateBudgetRequestRequest {
   /// Minimum justification length (database constraint from migration 011)
   const MIN_JUSTIFICATION_LENGTH: usize = 20;
 
@@ -39,15 +40,15 @@ impl CreateBudgetRequestRequest
   ///
   /// Rationale: Pilot phase restricts individual budget requests to $10K to limit
   /// financial exposure during initial validation. This is significantly below the
-  /// technical limit of ~9.2 quintillion microdollars (i64::MAX) which allows for
+  /// technical limit of ~9.2 quintillion microdollars (`i64::MAX`) which allows for
   /// safe production scaling after pilot phase completes.
   ///
-  /// Technical note: Microdollar conversion (×1,000,000) means i64::MAX supports
+  /// Technical note: Microdollar conversion (×1,000,000) means `i64::MAX` supports
   /// up to ~$9.2 trillion USD before overflow. Current $10K limit leaves substantial
   /// headroom for future production use.
   ///
   /// GAP-002: Protocol 012 compliance - max budget lowered from $1T to $10K for pilot.
-  const MAX_BUDGET_USD: f64 = 10_000.0;  // $10K pilot limit
+  const MAX_BUDGET_USD: f64 = 10_000.0; // $10K pilot limit
 
   /// Validate create budget request parameters
   ///
@@ -63,42 +64,34 @@ impl CreateBudgetRequestRequest
   /// # Errors
   ///
   /// Returns error if validation fails
-  pub fn validate( &self ) -> Result< (), ValidationError >
-  {
+  pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate agent_id is positive
-    if self.agent_id <= 0
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.agent_id <= 0 {
+      return Err(ValidationError::InvalidValue {
         field: "agent_id".to_string(),
         reason: "must be positive".to_string(),
-      } );
+      });
     }
 
     // Validate requester_id is not empty
-    if self.requester_id.trim().is_empty()
-    {
-      return Err( ValidationError::MissingField( "requester_id".to_string() ) );
+    if self.requester_id.trim().is_empty() {
+      return Err(ValidationError::MissingField("requester_id".to_string()));
     }
 
     // Validate requested_budget_usd is finite (not NaN or Infinity)
-    if !self.requested_budget_usd.is_finite()
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if !self.requested_budget_usd.is_finite() {
+      return Err(ValidationError::InvalidValue {
         field: "requested_budget_usd".to_string(),
         reason: "must be a valid number".to_string(),
-      } );
+      });
     }
 
     // Validate requested_budget_usd is positive
-    if self.requested_budget_usd <= 0.0
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.requested_budget_usd <= 0.0 {
+      return Err(ValidationError::InvalidValue {
         field: "requested_budget_usd".to_string(),
         reason: "must be positive".to_string(),
-      } );
+      });
     }
 
     // Fix(issue-TBD): Validate requested_budget_usd does not exceed safe maximum
@@ -111,45 +104,44 @@ impl CreateBudgetRequestRequest
     // Pitfall: Floating-point to integer casts with out-of-range values produce
     // undefined behavior in Rust. Always validate numeric bounds before conversion.
     // Don't assume is_finite() is sufficient - finite doesn't mean reasonable.
-    if self.requested_budget_usd > Self::MAX_BUDGET_USD
-    {
-      return Err( ValidationError::InvalidValue
-      {
+    if self.requested_budget_usd > Self::MAX_BUDGET_USD {
+      return Err(ValidationError::InvalidValue {
         field: "requested_budget_usd".to_string(),
-        reason: format!( "exceeds maximum allowed budget of {} USD", Self::MAX_BUDGET_USD ),
-      } );
+        reason: format!(
+          "exceeds maximum allowed budget of {} USD",
+          Self::MAX_BUDGET_USD
+        ),
+      });
     }
 
     // Validate justification length
     let justification_len = self.justification.trim().len();
-    if justification_len < Self::MIN_JUSTIFICATION_LENGTH
-    {
-      return Err( ValidationError::TooShort
-      {
+    if justification_len < Self::MIN_JUSTIFICATION_LENGTH {
+      return Err(ValidationError::TooShort {
         field: "justification".to_string(),
         min_length: Self::MIN_JUSTIFICATION_LENGTH,
-      } );
+      });
     }
 
-    if justification_len > Self::MAX_JUSTIFICATION_LENGTH
-    {
-      return Err( ValidationError::TooLong
-      {
+    if justification_len > Self::MAX_JUSTIFICATION_LENGTH {
+      return Err(ValidationError::TooLong {
         field: "justification".to_string(),
         max_length: Self::MAX_JUSTIFICATION_LENGTH,
-      } );
+      });
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
 /// Create budget request response
-#[ derive( Debug, Serialize ) ]
-pub struct CreateBudgetRequestResponse
-{
+#[derive(Debug, Serialize)]
+pub struct CreateBudgetRequestResponse {
+  /// Unique budget request identifier
   pub request_id: String,
+  /// Request status (e.g. "pending")
   pub status: String,
+  /// Creation timestamp in milliseconds
   pub created_at: i64,
 }
 
@@ -165,67 +157,66 @@ pub struct CreateBudgetRequestResponse
 ///
 /// # Returns
 ///
-/// - 201 Created with request_id if successful
+/// - 201 Created with `request_id` if successful
 /// - 400 Bad Request if validation fails
 /// - 403 Forbidden if user doesn't own agent
 /// - 404 Not Found if agent doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn create_budget_request(
-  State( state ): State< BudgetState >,
+  State(state): State<BudgetState>,
   user: crate::jwt_auth::AuthenticatedUser,
-  Json( request ): Json< CreateBudgetRequestRequest >,
-) -> impl IntoResponse
-{
+  Json(request): Json<CreateBudgetRequestRequest>,
+) -> impl IntoResponse {
   // Validate request
-  if let Err( validation_error ) = request.validate()
-  {
-    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+  if let Err(validation_error) = request.validate() {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(serde_json::json!(
     {
       "error": validation_error.to_string()
-    } ) ) ).into_response();
+    } )),
+    )
+      .into_response();
   }
 
   // Check if agent exists and verify ownership
-  let agent_owner_result = sqlx::query_scalar::<sqlx::Sqlite, String>(
-    "SELECT owner_id FROM agents WHERE id = ?"
-  )
-  .bind( request.agent_id )
-  .fetch_optional( &state.db_pool )
-  .await;
+  let agent_owner_result =
+    sqlx::query_scalar::<sqlx::Sqlite, String>("SELECT owner_id FROM agents WHERE id = ?")
+      .bind(request.agent_id)
+      .fetch_optional(&state.db_pool)
+      .await;
 
-  let agent_owner = match agent_owner_result
-  {
-    Ok( owner ) => owner,
-    Err( err ) =>
-    {
-      tracing::error!( "Database error checking agent: {}", err );
+  let agent_owner = match agent_owner_result {
+    Ok(owner) => owner,
+    Err(err) => {
+      tracing::error!("Database error checking agent: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response();
     }
   };
 
-  match agent_owner
-  {
-    None =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
+  match agent_owner {
+    None => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!(
       {
         "error": "Agent not found"
-      } ) ) ).into_response();
-    }
-    Some( owner_id ) if user.0.role != "admin" && owner_id != user.0.sub =>
-    {
-      return (
-        StatusCode::FORBIDDEN,
-        Json( serde_json::json!({ "error": "You don't own this agent" }) ),
+      } )),
       )
         .into_response();
     }
-    Some( _ ) =>
-    {
+    Some(owner_id) if user.0.role != "admin" && owner_id != user.0.sub => {
+      return (
+        StatusCode::FORBIDDEN,
+        Json(serde_json::json!({ "error": "You don't own this agent" })),
+      )
+        .into_response();
+    }
+    Some(_) => {
       // Authorized - user owns the agent or is admin
     }
   }
@@ -233,28 +224,27 @@ pub async fn create_budget_request(
   // Get current agent budget
   let current_budget_result = state
     .agent_budget_manager
-    .get_budget_status( request.agent_id )
+    .get_budget_status(request.agent_id)
     .await;
 
-  let current_budget_micros = match current_budget_result
-  {
-    Ok( Some( budget ) ) => budget.budget_remaining,
-    Ok( None ) => 0, // No budget record = $0.00
-    Err( err ) =>
-    {
-      tracing::error!( "Database error fetching agent budget: {}", err );
+  let current_budget_micros = match current_budget_result {
+    Ok(Some(budget)) => budget.budget_remaining,
+    Ok(None) => 0, // No budget record = $0.00
+    Err(err) => {
+      tracing::error!("Database error fetching agent budget: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Failed to fetch agent budget" }) ),
+        Json(serde_json::json!({ "error": "Failed to fetch agent budget" })),
       )
         .into_response();
     }
   };
 
   // Generate unique request ID
-  let request_id = format!( "breq_{}", Uuid::new_v4() );
+  let request_id = format!("breq_{}", Uuid::new_v4());
   let now_ms = chrono::Utc::now().timestamp_millis();
-  let requested_budget_micros = ( request.requested_budget_usd * 1_000_000.0 ) as i64;
+  #[allow(clippy::cast_possible_truncation)] // Budget USD values are always within i64 range
+  let requested_budget_micros = (request.requested_budget_usd * 1_000_000.0) as i64;
 
   // Fix(issue-004): Validate requested budget differs from current budget
   //
@@ -264,17 +254,19 @@ pub async fn create_budget_request(
   // Pitfall: Business logic validation belongs in API layer after fetching related data.
   // Validating that operations make logical sense ("budget change must change budget")
   // prevents wasted approval cycles and database clutter.
-  if requested_budget_micros == current_budget_micros
-  {
-    return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+  if requested_budget_micros == current_budget_micros {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(serde_json::json!(
     {
       "error": "requested_budget_usd must differ from current budget"
-    } ) ) ).into_response();
+    } )),
+    )
+      .into_response();
   }
 
   // Create budget request in database using storage layer
-  let budget_request = iron_token_manager::budget_request::BudgetChangeRequest
-  {
+  let budget_request = iron_token_manager::budget_request::BudgetChangeRequest {
     id: request_id.clone(),
     agent_id: request.agent_id,
     requester_id: request.requester_id.clone(),
@@ -286,12 +278,13 @@ pub async fn create_budget_request(
     updated_at: now_ms,
   };
 
-  if let Err( err ) = iron_token_manager::budget_request::create_budget_request( &state.db_pool, &budget_request ).await
+  if let Err(err) =
+    iron_token_manager::budget_request::create_budget_request(&state.db_pool, &budget_request).await
   {
-    tracing::error!( "Database error creating budget request: {}", err );
+    tracing::error!("Database error creating budget request: {}", err);
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to create budget request" }) ),
+      Json(serde_json::json!({ "error": "Failed to create budget request" })),
     )
       .into_response();
   }
@@ -299,32 +292,39 @@ pub async fn create_budget_request(
   // Return success response
   (
     StatusCode::CREATED,
-    Json( CreateBudgetRequestResponse
-    {
+    Json(CreateBudgetRequestResponse {
       request_id,
       status: "pending".to_string(),
       created_at: now_ms,
-    } ),
+    }),
   )
     .into_response()
 }
 
 /// Get budget request response
-#[ derive( Debug, Serialize ) ]
-pub struct GetBudgetRequestResponse
-{
+#[derive(Debug, Serialize)]
+pub struct GetBudgetRequestResponse {
+  /// Unique budget request identifier
   pub id: String,
+  /// Target agent database ID
   pub agent_id: i64,
+  /// User ID of the requester
   pub requester_id: String,
+  /// Current budget in USD
   pub current_budget_usd: f64,
+  /// Requested budget in USD
   pub requested_budget_usd: f64,
+  /// Reason for budget change
   pub justification: String,
+  /// Request status string
   pub status: String,
+  /// Creation timestamp in milliseconds
   pub created_at: i64,
+  /// Last update timestamp in milliseconds
   pub updated_at: i64,
 }
 
-/// GET /api/v1/budget/requests/:id
+/// GET /api/v1/budget/requests/{id}
 ///
 /// Get a budget change request by ID (Protocol 012)
 ///
@@ -339,17 +339,15 @@ pub struct GetBudgetRequestResponse
 /// - 404 Not Found if request doesnt exist
 /// - 500 Internal Server Error if database fails
 pub async fn get_budget_request(
-  State( state ): State< BudgetState >,
-  axum::extract::Path( request_id ): axum::extract::Path< String >,
-) -> impl IntoResponse
-{
+  State(state): State<BudgetState>,
+  axum::extract::Path(request_id): axum::extract::Path<String>,
+) -> impl IntoResponse {
   // Fetch request from database using storage layer
-  let budget_request_result = iron_token_manager::budget_request::get_budget_request( &state.db_pool, &request_id ).await;
+  let budget_request_result =
+    iron_token_manager::budget_request::get_budget_request(&state.db_pool, &request_id).await;
 
-  match budget_request_result
-  {
-    Ok( Some( request ) ) =>
-    {
+  match budget_request_result {
+    Ok(Some(request)) => {
       // Convert microdollars to USD
       let current_budget_usd = request.current_budget_micros as f64 / 1_000_000.0;
       let requested_budget_usd = request.requested_budget_micros as f64 / 1_000_000.0;
@@ -357,8 +355,7 @@ pub async fn get_budget_request(
       // Return success response
       (
         StatusCode::OK,
-        Json( GetBudgetRequestResponse
-        {
+        Json(GetBudgetRequestResponse {
           id: request.id,
           agent_id: request.agent_id,
           requester_id: request.requester_id,
@@ -368,24 +365,26 @@ pub async fn get_budget_request(
           status: request.status.to_db_string().to_string(),
           created_at: request.created_at,
           updated_at: request.updated_at,
-        } ),
+        }),
       )
         .into_response()
     }
-    Ok( None ) =>
-    {
+    Ok(None) => {
       // Request not found
-      ( StatusCode::NOT_FOUND, Json( serde_json::json!(
+      (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!(
       {
         "error": "Budget request not found"
-      } ) ) ).into_response()
+      } )),
+      )
+        .into_response()
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error fetching budget request: {}", err );
+    Err(err) => {
+      tracing::error!("Database error fetching budget request: {}", err);
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response()
     }
@@ -393,18 +392,19 @@ pub async fn get_budget_request(
 }
 
 /// Query parameters for listing budget requests
-#[ derive( Debug, Deserialize ) ]
-pub struct ListBudgetRequestsQuery
-{
-  pub agent_id: Option< i64 >,
-  pub status: Option< String >,
+#[derive(Debug, Deserialize)]
+pub struct ListBudgetRequestsQuery {
+  /// Filter by agent database ID
+  pub agent_id: Option<i64>,
+  /// Filter by request status
+  pub status: Option<String>,
 }
 
 /// List budget requests response
-#[ derive( Debug, Serialize ) ]
-pub struct ListBudgetRequestsResponse
-{
-  pub requests: Vec< GetBudgetRequestResponse >,
+#[derive(Debug, Serialize)]
+pub struct ListBudgetRequestsResponse {
+  /// List of budget change requests
+  pub requests: Vec<GetBudgetRequestResponse>,
 }
 
 /// GET /api/v1/budget/requests
@@ -414,7 +414,7 @@ pub struct ListBudgetRequestsResponse
 /// # Arguments
 ///
 /// * `state` - Budget protocol state (database, managers)
-/// * `query` - Optional query parameters (agent_id, status)
+/// * `query` - Optional query parameters (`agent_id`, status)
 ///
 /// # Query Parameters
 ///
@@ -426,158 +426,151 @@ pub struct ListBudgetRequestsResponse
 /// - 200 OK with array of requests (empty array if no matches)
 /// - 500 Internal Server Error if database fails
 pub async fn list_budget_requests(
-  State( state ): State< BudgetState >,
-  axum::extract::Query( query ): axum::extract::Query< ListBudgetRequestsQuery >,
-) -> impl IntoResponse
-{
+  State(state): State<BudgetState>,
+  axum::extract::Query(query): axum::extract::Query<ListBudgetRequestsQuery>,
+) -> impl IntoResponse {
   // Determine which query to use based on filters
-  let requests_result = match ( query.agent_id, query.status.as_deref() )
-  {
+  let requests_result = match (query.agent_id, query.status.as_deref()) {
     // Filter by both agent_id and status
-    ( Some( agent_id ), Some( status_str ) ) =>
-    {
+    (Some(agent_id), Some(status_str)) => {
       // Parse status
-      let status = match iron_token_manager::budget_request::RequestStatus::from_db_string( status_str )
-      {
-        Ok( s ) => s,
-        Err( err ) =>
-        {
-          return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+      let status =
+        match iron_token_manager::budget_request::RequestStatus::from_db_string(status_str) {
+          Ok(s) => s,
+          Err(err) => {
+            return (
+              StatusCode::BAD_REQUEST,
+              Json(serde_json::json!(
           {
             "error": format!( "Invalid status: {}", err )
-          } ) ) ).into_response();
-        }
-      };
+          } )),
+            )
+              .into_response();
+          }
+        };
 
       // Get by agent first, then filter by status in memory
-      match iron_token_manager::budget_request::list_budget_requests_by_agent( &state.db_pool, agent_id ).await
+      match iron_token_manager::budget_request::list_budget_requests_by_agent(
+        &state.db_pool,
+        agent_id,
+      )
+      .await
       {
-        Ok( all_agent_requests ) =>
-        {
-          let filtered: Vec< _ > = all_agent_requests
+        Ok(all_agent_requests) => {
+          let filtered: Vec<_> = all_agent_requests
             .into_iter()
-            .filter( | r | r.status == status )
+            .filter(|r| r.status == status)
             .collect();
-          Ok( filtered )
+          Ok(filtered)
         }
-        Err( e ) => Err( e ),
+        Err(e) => Err(e),
       }
     }
 
     // Filter by agent_id only
-    ( Some( agent_id ), None ) =>
-    {
-      iron_token_manager::budget_request::list_budget_requests_by_agent( &state.db_pool, agent_id ).await
+    (Some(agent_id), None) => {
+      iron_token_manager::budget_request::list_budget_requests_by_agent(&state.db_pool, agent_id)
+        .await
     }
 
     // Filter by status only
-    ( None, Some( status_str ) ) =>
-    {
+    (None, Some(status_str)) => {
       // Parse status
-      let status = match iron_token_manager::budget_request::RequestStatus::from_db_string( status_str )
-      {
-        Ok( s ) => s,
-        Err( err ) =>
-        {
-          return ( StatusCode::BAD_REQUEST, Json( serde_json::json!(
+      let status =
+        match iron_token_manager::budget_request::RequestStatus::from_db_string(status_str) {
+          Ok(s) => s,
+          Err(err) => {
+            return (
+              StatusCode::BAD_REQUEST,
+              Json(serde_json::json!(
           {
             "error": format!( "Invalid status: {}", err )
-          } ) ) ).into_response();
-        }
-      };
+          } )),
+            )
+              .into_response();
+          }
+        };
 
-      iron_token_manager::budget_request::list_budget_requests_by_status( &state.db_pool, status ).await
+      iron_token_manager::budget_request::list_budget_requests_by_status(&state.db_pool, status)
+        .await
     }
 
     // No filters - fetch all requests
-    ( None, None ) =>
-    {
+    (None, None) => {
       let rows = sqlx::query(
         "SELECT id, agent_id, requester_id, current_budget_micros, requested_budget_micros,
                 justification, status, created_at, updated_at
          FROM budget_change_requests
-         ORDER BY created_at DESC"
+         ORDER BY created_at DESC",
       )
-      .fetch_all( &state.db_pool )
+      .fetch_all(&state.db_pool)
       .await;
 
-      match rows
-      {
-        Ok( rows ) =>
-        {
+      match rows {
+        Ok(rows) => {
           let mut requests = Vec::new();
-          for row in rows
-          {
-            let status_str: String = sqlx::Row::get( &row, "status" );
-            let status = match iron_token_manager::budget_request::RequestStatus::from_db_string( &status_str )
-            {
-              Ok( s ) => s,
-              Err( e ) =>
-              {
-                tracing::error!( "Invalid status in database: {}", e );
+          for row in rows {
+            let status_str: String = sqlx::Row::get(&row, "status");
+            let status = match iron_token_manager::budget_request::RequestStatus::from_db_string(
+              &status_str,
+            ) {
+              Ok(s) => s,
+              Err(e) => {
+                tracing::error!("Invalid status in database: {}", e);
                 continue; // Skip invalid rows
               }
             };
 
-            requests.push( iron_token_manager::budget_request::BudgetChangeRequest
-            {
-              id: sqlx::Row::get( &row, "id" ),
-              agent_id: sqlx::Row::get( &row, "agent_id" ),
-              requester_id: sqlx::Row::get( &row, "requester_id" ),
-              current_budget_micros: sqlx::Row::get( &row, "current_budget_micros" ),
-              requested_budget_micros: sqlx::Row::get( &row, "requested_budget_micros" ),
-              justification: sqlx::Row::get( &row, "justification" ),
+            requests.push(iron_token_manager::budget_request::BudgetChangeRequest {
+              id: sqlx::Row::get(&row, "id"),
+              agent_id: sqlx::Row::get(&row, "agent_id"),
+              requester_id: sqlx::Row::get(&row, "requester_id"),
+              current_budget_micros: sqlx::Row::get(&row, "current_budget_micros"),
+              requested_budget_micros: sqlx::Row::get(&row, "requested_budget_micros"),
+              justification: sqlx::Row::get(&row, "justification"),
               status,
-              created_at: sqlx::Row::get( &row, "created_at" ),
-              updated_at: sqlx::Row::get( &row, "updated_at" ),
-            } );
+              created_at: sqlx::Row::get(&row, "created_at"),
+              updated_at: sqlx::Row::get(&row, "updated_at"),
+            });
           }
-          Ok( requests )
+          Ok(requests)
         }
-        Err( e ) => Err( e ),
+        Err(e) => Err(e),
       }
     }
   };
 
-  match requests_result
-  {
-    Ok( requests ) =>
-    {
+  match requests_result {
+    Ok(requests) => {
       // Convert to response format
-      let response_requests: Vec< GetBudgetRequestResponse > = requests
+      let response_requests: Vec<GetBudgetRequestResponse> = requests
         .into_iter()
-        .map( | r |
-        {
-          GetBudgetRequestResponse
-          {
-            id: r.id,
-            agent_id: r.agent_id,
-            requester_id: r.requester_id,
-            current_budget_usd: r.current_budget_micros as f64 / 1_000_000.0,
-            requested_budget_usd: r.requested_budget_micros as f64 / 1_000_000.0,
-            justification: r.justification,
-            status: r.status.to_db_string().to_string(),
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-          }
-        } )
+        .map(|r| GetBudgetRequestResponse {
+          id: r.id,
+          agent_id: r.agent_id,
+          requester_id: r.requester_id,
+          current_budget_usd: r.current_budget_micros as f64 / 1_000_000.0,
+          requested_budget_usd: r.requested_budget_micros as f64 / 1_000_000.0,
+          justification: r.justification,
+          status: r.status.to_db_string().to_string(),
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        })
         .collect();
 
       (
         StatusCode::OK,
-        Json( ListBudgetRequestsResponse
-        {
+        Json(ListBudgetRequestsResponse {
           requests: response_requests,
-        } ),
+        }),
       )
         .into_response()
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error listing budget requests: {}", err );
+    Err(err) => {
+      tracing::error!("Database error listing budget requests: {}", err);
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response()
     }
@@ -585,15 +578,17 @@ pub async fn list_budget_requests(
 }
 
 /// Approve budget request response
-#[ derive( Debug, Serialize ) ]
-pub struct ApproveBudgetRequestResponse
-{
+#[derive(Debug, Serialize)]
+pub struct ApproveBudgetRequestResponse {
+  /// Unique budget request identifier
   pub request_id: String,
+  /// Updated status ("approved")
   pub status: String,
+  /// Approval timestamp in milliseconds
   pub updated_at: i64,
 }
 
-/// PATCH /api/v1/budget/requests/:id/approve
+/// PATCH /api/v1/budget/requests/{id}/approve
 ///
 /// Approve a budget change request (Protocol 012)
 ///
@@ -609,89 +604,91 @@ pub struct ApproveBudgetRequestResponse
 /// - 409 Conflict if request is not pending
 /// - 500 Internal Server Error if database fails
 pub async fn approve_budget_request(
-  State( state ): State< BudgetState >,
-  axum::extract::Path( request_id ): axum::extract::Path< String >,
-  crate::jwt_auth::AuthenticatedUser( claims ): crate::jwt_auth::AuthenticatedUser,
-) -> impl IntoResponse
-{
+  State(state): State<BudgetState>,
+  axum::extract::Path(request_id): axum::extract::Path<String>,
+  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
+) -> impl IntoResponse {
   // Fetch request from database
-  let request_result = iron_token_manager::budget_request::get_budget_request( &state.db_pool, &request_id ).await;
+  let request_result =
+    iron_token_manager::budget_request::get_budget_request(&state.db_pool, &request_id).await;
 
-  let request = match request_result
-  {
-    Ok( Some( req ) ) => req,
-    Ok( None ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
+  let request = match request_result {
+    Ok(Some(req)) => req,
+    Ok(None) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!(
       {
         "error": "Budget request not found"
-      } ) ) ).into_response();
+      } )),
+      )
+        .into_response();
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error fetching budget request: {}", err );
+    Err(err) => {
+      tracing::error!("Database error fetching budget request: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response();
     }
   };
 
   // Check if request is in pending status
-  if request.status != iron_token_manager::budget_request::RequestStatus::Pending
-  {
-    let error_msg = match request.status
-    {
-      iron_token_manager::budget_request::RequestStatus::Approved =>
-      {
+  if request.status != iron_token_manager::budget_request::RequestStatus::Pending {
+    let error_msg = match request.status {
+      iron_token_manager::budget_request::RequestStatus::Approved => {
         "Budget request is already approved"
       }
-      iron_token_manager::budget_request::RequestStatus::Rejected =>
-      {
+      iron_token_manager::budget_request::RequestStatus::Rejected => {
         "Cannot approve rejected budget request"
       }
-      iron_token_manager::budget_request::RequestStatus::Cancelled =>
-      {
+      iron_token_manager::budget_request::RequestStatus::Cancelled => {
         "Cannot approve cancelled budget request"
       }
-      _ => "Budget request is not pending",
+      iron_token_manager::budget_request::RequestStatus::Pending => "Budget request is not pending",
     };
 
-    return ( StatusCode::CONFLICT, Json( serde_json::json!(
+    return (
+      StatusCode::CONFLICT,
+      Json(serde_json::json!(
     {
       "error": error_msg
-    } ) ) ).into_response();
+    } )),
+    )
+      .into_response();
   }
 
   // Update status to approved and apply budget change
   let now_ms = chrono::Utc::now().timestamp_millis();
   let approver_id = &claims.sub; // Extract user ID from JWT claims
-  let update_result = iron_token_manager::budget_request::approve_budget_request( &state.db_pool, &request_id, approver_id, now_ms ).await;
+  let update_result = iron_token_manager::budget_request::approve_budget_request(
+    &state.db_pool,
+    &request_id,
+    approver_id,
+    now_ms,
+  )
+  .await;
 
-  match update_result
-  {
-    Ok( () ) =>
-    {
+  match update_result {
+    Ok(()) => {
       // Approval succeeded - budget was updated atomically
       // Return success response
       (
         StatusCode::OK,
-        Json( ApproveBudgetRequestResponse
-        {
+        Json(ApproveBudgetRequestResponse {
           request_id,
           status: "approved".to_string(),
           updated_at: now_ms,
-        } ),
+        }),
       )
         .into_response()
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error approving budget request: {}", err );
+    Err(err) => {
+      tracing::error!("Database error approving budget request: {}", err);
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response()
     }
@@ -699,22 +696,24 @@ pub async fn approve_budget_request(
 }
 
 /// Reject budget request response
-#[ derive( Debug, Serialize ) ]
-pub struct RejectBudgetRequestResponse
-{
+#[derive(Debug, Serialize)]
+pub struct RejectBudgetRequestResponse {
+  /// Unique budget request identifier
   pub request_id: String,
+  /// Updated status ("rejected")
   pub status: String,
+  /// Rejection timestamp in milliseconds
   pub updated_at: i64,
 }
 
-/// PATCH /api/v1/budget/requests/:id/reject
+/// PATCH /api/v1/budget/requests/{id}/reject
 ///
 /// Rejects a budget change request (Protocol 012).
 ///
 /// # Request
 ///
 /// - Method: PATCH
-/// - Path: `/api/v1/budget/requests/:id/reject`
+/// - Path: `/api/v1/budget/requests/{id}/reject`
 /// - Path parameter: `id` - Budget request ID
 ///
 /// # Response
@@ -733,75 +732,74 @@ pub struct RejectBudgetRequestResponse
 /// - 409 Conflict: Request is not pending (already approved/rejected/cancelled)
 /// - 500 Internal Server Error: Database error
 pub async fn reject_budget_request(
-  State( state ): State< BudgetState >,
-  axum::extract::Path( request_id ): axum::extract::Path< String >,
-) -> impl IntoResponse
-{
+  State(state): State<BudgetState>,
+  axum::extract::Path(request_id): axum::extract::Path<String>,
+) -> impl IntoResponse {
   // Fetch request from database
-  let request_result = iron_token_manager::budget_request::get_budget_request( &state.db_pool, &request_id ).await;
+  let request_result =
+    iron_token_manager::budget_request::get_budget_request(&state.db_pool, &request_id).await;
 
-  let request = match request_result
-  {
-    Ok( Some( req ) ) => req,
-    Ok( None ) =>
-    {
-      return ( StatusCode::NOT_FOUND, Json( serde_json::json!(
+  let request = match request_result {
+    Ok(Some(req)) => req,
+    Ok(None) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!(
       {
         "error": "Budget request not found"
-      } ) ) ).into_response();
+      } )),
+      )
+        .into_response();
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error fetching budget request: {}", err );
+    Err(err) => {
+      tracing::error!("Database error fetching budget request: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response();
     }
   };
 
   // Check if request is in pending status
-  if request.status != iron_token_manager::budget_request::RequestStatus::Pending
-  {
-    let error_msg = match request.status
-    {
-      iron_token_manager::budget_request::RequestStatus::Rejected =>
-      {
+  if request.status != iron_token_manager::budget_request::RequestStatus::Pending {
+    let error_msg = match request.status {
+      iron_token_manager::budget_request::RequestStatus::Rejected => {
         "Budget request is already rejected"
       }
-      iron_token_manager::budget_request::RequestStatus::Approved =>
-      {
+      iron_token_manager::budget_request::RequestStatus::Approved => {
         "Cannot reject approved budget request"
       }
-      iron_token_manager::budget_request::RequestStatus::Cancelled =>
-      {
+      iron_token_manager::budget_request::RequestStatus::Cancelled => {
         "Cannot reject cancelled budget request"
       }
-      _ => "Budget request is not pending",
+      iron_token_manager::budget_request::RequestStatus::Pending => "Budget request is not pending",
     };
 
-    return ( StatusCode::CONFLICT, Json( serde_json::json!(
+    return (
+      StatusCode::CONFLICT,
+      Json(serde_json::json!(
     {
       "error": error_msg
-    } ) ) ).into_response();
+    } )),
+    )
+      .into_response();
   }
 
   // Update status to rejected
   let now_ms = chrono::Utc::now().timestamp_millis();
-  let update_result = iron_token_manager::budget_request::reject_budget_request( &state.db_pool, &request_id, now_ms ).await;
+  let update_result =
+    iron_token_manager::budget_request::reject_budget_request(&state.db_pool, &request_id, now_ms)
+      .await;
 
-  match update_result
-  {
-    Ok( rows_affected ) =>
-    {
-      if rows_affected == 0
-      {
+  match update_result {
+    Ok(rows_affected) => {
+      if rows_affected == 0 {
         // This shouldnt happen since we just fetched the request
-        tracing::error!( "Failed to update budget request status - no rows affected" );
+        tracing::error!("Failed to update budget request status - no rows affected");
         return (
           StatusCode::INTERNAL_SERVER_ERROR,
-          Json( serde_json::json!({ "error": "Failed to update request status" }) ),
+          Json(serde_json::json!({ "error": "Failed to update request status" })),
         )
           .into_response();
       }
@@ -809,21 +807,19 @@ pub async fn reject_budget_request(
       // Return success response
       (
         StatusCode::OK,
-        Json( RejectBudgetRequestResponse
-        {
+        Json(RejectBudgetRequestResponse {
           request_id,
           status: "rejected".to_string(),
           updated_at: now_ms,
-        } ),
+        }),
       )
         .into_response()
     }
-    Err( err ) =>
-    {
-      tracing::error!( "Database error rejecting budget request: {}", err );
+    Err(err) => {
+      tracing::error!("Database error rejecting budget request: {}", err);
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json( serde_json::json!({ "error": "Database error" }) ),
+        Json(serde_json::json!({ "error": "Database error" })),
       )
         .into_response()
     }

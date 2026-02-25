@@ -39,9 +39,9 @@ hash_token() {
   echo -n "$1" | sha256sum | awk '{print $1}'
 }
 
-# Get current time in milliseconds
+# Get current time in milliseconds (portable: macOS + Linux)
 current_time_ms() {
-  date +%s%3N
+  echo $(( $(date +%s) * 1000 ))
 }
 
 # Check if database exists
@@ -88,9 +88,9 @@ VALUES
     $NOW_MS
   ),
   (
-    'user_developer',
-    'developer',
-    'developer@developer.com',
+    'user_demo',
+    'demo',
+    'demo@ironcage.ai',
     'user',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     1,
@@ -131,9 +131,9 @@ VALUES
   ),
   (
     '$HASH_PM',
-    'user_developer',
+    'user_demo',
     'project_beta',
-    'Developer Development Token',
+    'Demo Development Token',
     1,
     $NOW_MS
   ),
@@ -151,13 +151,14 @@ VALUES
 -- ============================================================================
 
 -- Set generous limits for development (INSERT OR IGNORE for idempotency)
--- Schema: max_tokens_per_day, max_requests_per_minute, max_cost_cents_per_month
+-- Schema: max_tokens_per_day, max_requests_per_minute, max_cost_microdollars_per_month
+-- Note: After migration 019, cost is in microdollars (1 cent = 10,000 microdollars)
 INSERT OR IGNORE INTO usage_limits (
   user_id,
   project_id,
   max_tokens_per_day,
   max_requests_per_minute,
-  max_cost_cents_per_month,
+  max_cost_microdollars_per_month,
   created_at,
   updated_at
 )
@@ -167,16 +168,16 @@ VALUES
     NULL,
     1000000,
     1000,
-    1000000,
+    10000000000,  -- 1,000,000 cents = 10B microdollars (\$10,000)
     $NOW_MS,
     $NOW_MS
   ),
   (
-    'user_developer',
+    'user_demo',
     'project_beta',
     500000,
     500,
-    500000,
+    5000000000,  -- 500,000 cents = 5B microdollars (\$5,000)
     $NOW_MS,
     $NOW_MS
   ),
@@ -185,7 +186,7 @@ VALUES
     'project_beta',
     100000,
     100,
-    100000,
+    1000000000,  -- 100,000 cents = 1B microdollars (\$1,000)
     $NOW_MS,
     $NOW_MS
   );
@@ -248,7 +249,7 @@ SELECT
   'token',
   (SELECT id FROM api_tokens WHERE token_hash = '$HASH_PM' LIMIT 1),
   'created',
-  'user_developer',
+  'user_demo',
   '{"method":"api","reason":"development"}',
   $NOW_MS - 86400000
 UNION ALL
@@ -263,7 +264,7 @@ SELECT
 EOF
 
 # Verify data was inserted
-USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'developer', 'viewer');")
+USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer');")
 TOKEN_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE token_hash IN ('$HASH_ADMIN', '$HASH_PM', '$HASH_VIEWER');")
 USAGE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM token_usage WHERE token_id IN (SELECT id FROM api_tokens WHERE token_hash IN ('$HASH_ADMIN', '$HASH_PM', '$HASH_VIEWER'));")
 
@@ -276,14 +277,14 @@ echo "  Usage records:   $USAGE_COUNT"
 echo ""
 log_info "Test tokens (save these for API testing):"
 echo "  Admin:      $TOKEN_ADMIN"
-echo "  Developer:  $TOKEN_PM"
+echo "  Demo:       $TOKEN_PM"
 echo "  Viewer:     $TOKEN_VIEWER"
 echo ""
 log_info "Test credentials:"
 echo "  Admin:      username=admin, role=admin, is_active=1"
-echo "  Developer:  username=developer, role=user, is_active=1"
+echo "  Demo:       username=demo, role=user, is_active=1"
 echo "  Viewer:     username=viewer, role=user, is_active=0 (INACTIVE)"
 echo ""
 log_info "Projects:"
 echo "  project_alpha (admin)"
-echo "  project_beta (developer + viewer)"
+echo "  project_beta (demo + viewer)"

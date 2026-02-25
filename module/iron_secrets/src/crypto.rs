@@ -5,11 +5,10 @@
 
 use aes_gcm::
 {
-  aead::{ Aead, KeyInit, OsRng },
+  aead::{Aead, KeyInit, OsRng, rand_core::RngCore},
   Aes256Gcm,
   Nonce,
 };
-use rand::RngCore;
 use zeroize::Zeroizing;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)
@@ -234,7 +233,7 @@ impl core::fmt::Display for CryptoError
   }
 }
 
-impl std::error::Error for CryptoError {}
+impl core::error::Error for CryptoError {}
 
 /// Mask an API key for display (never show full key)
 ///

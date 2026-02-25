@@ -33,45 +33,48 @@
 //! **Precondition Violations:** Not applicable
 
 use crate::common::test_state::create_test_auth_state;
-use iron_control_api::routes::auth;
-use axum::{ Router, routing::post, http::{ Request, StatusCode }, extract::ConnectInfo };
 use axum::body::Body;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use axum::{
+  extract::ConnectInfo,
+  http::{Request, StatusCode},
+  routing::post,
+  Router,
+};
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
+use iron_control_api::routes::auth;
 use tower::ServiceExt;
 
 /// Create test router with auth routes.
-async fn create_test_router() -> Router
-{
+async fn create_test_router() -> Router {
   let auth_state = create_test_auth_state().await;
-  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+  let test_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
 
   Router::new()
-    .route( "/api/auth/login", post( auth::login ) )
-    .route( "/api/auth/refresh", post( auth::refresh ) )
-    .route( "/api/auth/logout", post( auth::logout ) )
+    .route("/api/auth/login", post(auth::login))
+    .route("/api/auth/refresh", post(auth::refresh))
+    .route("/api/auth/logout", post(auth::logout))
     .layer(axum::Extension(ConnectInfo(test_addr)))
-    .with_state( auth_state )
+    .with_state(auth_state)
 }
 
 /// Test POST /api/auth/login with invalid JSON syntax (missing closing brace).
 ///
 /// WHY: Axum's JSON extractor should reject syntactically invalid JSON at the
 /// HTTP layer before reaching authentication logic.
-#[ tokio::test ]
-async fn test_login_with_invalid_json_syntax()
-{
+#[tokio::test]
+async fn test_login_with_invalid_json_syntax() {
   let router = create_test_router().await;
 
   let malformed_json = r#"{"email":"user","password":"pass""#; // Missing closing brace
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
+    .method("POST")
+    .uri("/api/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(malformed_json))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),
@@ -83,21 +86,20 @@ async fn test_login_with_invalid_json_syntax()
 /// Test POST /api/auth/login with trailing comma (invalid JSON).
 ///
 /// WHY: JSON spec doesn't allow trailing commas. This tests strict parsing.
-#[ tokio::test ]
-async fn test_login_with_trailing_comma()
-{
+#[tokio::test]
+async fn test_login_with_trailing_comma() {
   let router = create_test_router().await;
 
   let malformed_json = r#"{"email":"user","password":"pass",}"#; // Trailing comma
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/auth/login" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( malformed_json ) )
+    .method("POST")
+    .uri("/api/auth/login")
+    .header("content-type", "application/json")
+    .body(Body::from(malformed_json))
     .unwrap();
 
-  let response = router.oneshot( request ).await.unwrap();
+  let response = router.oneshot(request).await.unwrap();
 
   assert_eq!(
     response.status(),

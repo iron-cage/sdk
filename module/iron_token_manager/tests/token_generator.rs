@@ -548,11 +548,13 @@ fn test_token_randomness_chi_squared()
 /// (e.g., early-exit string comparison would show 10-100x ratio).
 ///
 /// TEST ROBUSTNESS (Flakiness Fix):
-/// Previous version (1000 iterations, 0.5-1.5 threshold) failed under parallel
-/// execution due to CPU scheduling variance (ratio 0.47 observed). Fixed by:
+/// Previous sequential measurement (early block then late block) failed under
+/// CPU thermal throttling: after 5000 early iterations CPU throttled, making
+/// the late block 4x slower (ratio 0.246 observed). Fixed by:
 /// 1. Adding 100 warm-up iterations to stabilize CPU cache/scheduling
-/// 2. Increasing measurement iterations from 1000 to 5000 for stable averages
-/// 3. Widening threshold from 0.5-1.5 to 0.3-3.0 (still detects 10x+ violations)
+/// 2. Interleaved measurement (early/late alternating per iteration) — both
+///    measurements run in the same thermal and scheduler context
+/// 3. Threshold 0.3-3.0 still catches egregious violations (10x+ ratio)
 ///
 /// This maintains security validation while tolerating CI environment variance.
 #[ test ]
@@ -579,21 +581,24 @@ fn test_verify_token_constant_time()
     let _ = generator.verify_token( &wrong_late, &correct_hash );
   }
 
-  // Time verification with early mismatch
-  let start_early = std::time::Instant::now();
-  for _ in 0..iterations
-  {
-    let _ = generator.verify_token( &wrong_early, &correct_hash );
-  }
-  let duration_early = start_early.elapsed();
+  // Interleaved measurement: alternate early/late each iteration to neutralize
+  // CPU thermal throttling and OS scheduler variance (both run in the same thermal context)
+  let mut total_early = core::time::Duration::ZERO;
+  let mut total_late = core::time::Duration::ZERO;
 
-  // Time verification with late mismatch
-  let start_late = std::time::Instant::now();
   for _ in 0..iterations
   {
+    let t = std::time::Instant::now();
+    let _ = generator.verify_token( &wrong_early, &correct_hash );
+    total_early += t.elapsed();
+
+    let t = std::time::Instant::now();
     let _ = generator.verify_token( &wrong_late, &correct_hash );
+    total_late += t.elapsed();
   }
-  let duration_late = start_late.elapsed();
+
+  let duration_early = total_early;
+  let duration_late = total_late;
 
   // Calculate timing ratio
   let ratio = if duration_late.as_nanos() > 0

@@ -1,4 +1,4 @@
--- Migration 014: Add owner_id column to agents table
+-- Migration 015: Add owner_id column to agents table
 --
 -- This migration adds user ownership to agents table for multi-tenant isolation.
 -- All agents must belong to a user who created them.
@@ -21,4 +21,5 @@ UPDATE agents SET owner_id = (SELECT id FROM users LIMIT 1) WHERE owner_id IS NU
 CREATE INDEX IF NOT EXISTS idx_agents_owner_id ON agents(owner_id);
 
 -- Create guard table to prevent re-running this migration
-CREATE TABLE IF NOT EXISTS _migration_014_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS _migration_015_completed (id INTEGER PRIMARY KEY);
+INSERT INTO _migration_015_completed (id) VALUES (1);

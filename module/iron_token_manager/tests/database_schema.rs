@@ -15,14 +15,14 @@
 //! | `test_usage_limits_unique_constraint` | UNIQUE constraint on `user_id`+`project_id` | Insert duplicate `user_id`+`project_id` pair | Second insert fails | ✅ |
 //! | `test_api_tokens_user_fk_constraint` | FK constraint `api_tokens`→users | Insert token with invalid `user_id` | Insert fails with foreign key error | ✅ |
 //! | `test_api_tokens_cascade_delete_on_user_deletion` | CASCADE DELETE `api_tokens`→users | Delete user with tokens | Tokens automatically deleted | ✅ |
-//! | `test_all_indexes_created` | All performance indexes exist | Run migration | 39 indexes created (idx_* pattern) | ✅ |
+//! | `test_all_indexes_created` | All performance indexes exist | Run migration | 51 indexes created (idx_* pattern) | ✅ |
 //!
 //! ## Corner Cases Covered
 //!
 //! **Happy Path:**
 //! - ✅ Schema migration creates all 5 tables
 //! - ✅ `api_tokens` table accepts valid data
-//! - ✅ All 15 indexes created for query performance
+//! - ✅ All 51 indexes created for query performance
 //!
 //! **Boundary Conditions:**
 //! - ✅ Empty database → Schema created
@@ -41,7 +41,7 @@
 //! - ✅ Index naming pattern (all `idx_*` for discoverability)
 //!
 //! **State Transitions:**
-//! - ✅ Empty database → Migrated database (5 tables, 39 indexes)
+//! - ✅ Empty database → Migrated database (5 tables, 51 indexes)
 //! - ✅ Token with usage → Token deleted → Usage deleted (cascade)
 //! - ✅ User with tokens → User deleted → Tokens deleted (cascade)
 //!
@@ -411,20 +411,24 @@ async fn test_all_indexes_created()
   .await
   .expect("LOUD FAILURE: Failed to count indexes");
 
-  // Expected: All migrations create 40 indexes total
+  // Expected: All migrations create 51 indexes total
   // Migration 001: 15 indexes (api_tokens, token_usage, usage_limits, api_call_traces, audit_log)
   // Migration 003: 2 indexes (users, token_blacklist)
-  // Migration 004: 4 indexes (ai_provider_keys, project_key_assignments)
+  // Migration 004: 5 indexes (ai_provider_keys, project_key_assignments)
   // Migration 005: 4 indexes (users enhancements)
   // Migration 006: 4 indexes (user_audit_log)
   // Migration 008: 2 indexes (idx_agents_created_at, idx_api_tokens_agent_id)
   // Migration 009: 3 indexes (budget_leases)
-  // Migration 010: 1 index (agent_budgets)
+  // Migration 010: 1 index (idx_agent_budgets_updated)
   // Migration 011: 2 indexes (budget_change_requests)
-  // Migration 012: 1 index (budget_modification_history)
-  // Migration 013: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
-  // Migration 014: 1 index (idx_agents_owner_id for agents.owner_id)
-  // Migration 018: 1 index (converted budget tables)
-  // Total: 15 + 2 + 4 + 4 + 4 + 2 + 3 + 1 + 2 + 1 + 1 + 1 = 41
-  assert_eq!( index_count, 41, "Expected 41 indexes to be created across all migrations" );
+  // Migration 012: 8 indexes (analytics_events: 6 single + 2 composite)
+  // Migration 013: 1 index (budget_modification_history)
+  // Migration 014: Rebuilds api_tokens with FK (maintains 4 indexes, no net change)
+  // Migration 015: 1 index (idx_agents_owner_id)
+  // Migration 017: 1 index (idx_budget_leases_updated)
+  // Migration 019: Rebuilds budget_leases, agent_budgets, usage_limits (now recreates idx_agent_budgets_updated)
+  // Migration 020: 1 index (idx_agents_provider_key_id)
+  // Migration 022: 1 index (idx_agents_ic_token_hash)
+  // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
+  assert_eq!( index_count, 51, "Expected 51 indexes to be created across all migrations" );
 }

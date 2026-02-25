@@ -9,11 +9,10 @@ This document defines the error handling philosophy across the Iron Cage platfor
 - Fail-fast philosophy with application examples and code patterns
 - Loud failures implementation (logging, tracing, audit, dashboard alerts)
 - Proper fixes requirements (root cause analysis, test documentation, prevention)
-- Error type hierarchy using error_tools crate per rulebook standards
+- Error type hierarchy using thiserror crate
 - Error recovery strategies for different failure scenarios
 
 **Out of scope**:
-- Specific error_tools crate API documentation (see crate documentation)
 - Detailed logging infrastructure implementation (see Observability capability)
 - Test documentation format specifications (see test_organization.rulebook.md)
 - Bug fix workflow details (see code_design.rulebook.md and codebase_hygiene.rulebook.md)
@@ -71,7 +70,7 @@ if error { return Err(Error::BudgetExceeded { spent, limit }); }
 
 **Tools:**
 - Structured logging (tracing crate)
-- Error context (error_tools crate per rulebook)
+- Error context (thiserror crate)
 - Audit trail (iron_runtime_state persistence)
 - Dashboard alerts (WebSocket updates)
 
@@ -93,10 +92,8 @@ if error { return Err(Error::BudgetExceeded { spent, limit }); }
 
 ### Error Type Hierarchy
 
-**Use error_tools per rulebook:**
-
 ```rust
-use error_tools::prelude::*;
+use thiserror::Error;
 
 #[ derive( Error, Debug ) ]
 pub enum RuntimeError
@@ -140,14 +137,14 @@ pub enum RuntimeError
 #### Dependencies
 
 - Principles 001: [Design Philosophy](001_design_philosophy.md) - Foundational Fail-Safe Defaults and Observable Behavior principles
-- **Rulebook Standards:** error_tools crate usage, 5-section test documentation format, 3-field source comment format
+- **Rulebook Standards:** thiserror crate usage, 5-section test documentation format, 3-field source comment format
 - code_design.rulebook.md - Bug fix workflow and root cause analysis requirements
 - test_organization.rulebook.md - Test documentation format (Root Cause, Why Not Caught, Fix Applied, Prevention, Pitfall)
 - codebase_hygiene.rulebook.md - Documentation quality standards (specific, technical, actionable, traceable)
 
 #### Implementation
 
-- Error handling enforced via error_tools crate throughout codebase
+- Error handling enforced via thiserror crate throughout codebase
 - Fail-fast patterns validated via integration tests demonstrating proper error propagation
 - Loud failures implemented via structured logging (tracing crate) and audit trails
 - Proper fixes workflow enforced via bug fix documentation requirements (test + source comments)
