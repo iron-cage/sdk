@@ -17,7 +17,7 @@ workspace = true
 default = ["enabled"]
 enabled = ["dep:iron_types", "dep:tokio", "dep:dashmap", "dep:serde", "dep:serde_json", "dep:tracing", "dep:arc-swap"]
 full = ["enabled", "budget-client"]
-budget-client = ["dep:reqwest", "dep:iron_secrets", "dep:zeroize"]
+budget-client = ["dep:reqwest", "dep:iron_secrets", "dep:zeroize", "dep:secrecy"]
 
 [dependencies]
 iron_types = { workspace = true, optional = true, features = ["full"] }
@@ -32,6 +32,7 @@ iron_secrets = { workspace = true, optional = true }
 
 # Memory-safe secret zeroing (IP Token decryption)
 zeroize = { workspace = true, optional = true }
+secrecy = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Enable test utilities for ID types in tests

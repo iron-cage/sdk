@@ -38,6 +38,7 @@ enabled = [
   "dep:aes-gcm",
   "dep:rand",
   "dep:zeroize",
+  "dep:secrecy",
   "dep:base64",
   "dep:uuid",
   "dep:hex",
@@ -102,6 +103,7 @@ dotenvy = { workspace = true }
 aes-gcm = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }
+secrecy = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true , features = ["v4"]}
 hex = { workspace = true, optional = true }

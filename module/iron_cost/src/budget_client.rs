@@ -9,7 +9,7 @@
 use core::time::Duration;
 use std::sync::Arc;
 
-use iron_secrets::ip_token::{IpTokenCrypto, ProviderKey};
+use iron_secrets::ip_token::{IpTokenCrypto, IpTokenKey, ProviderKey};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -192,21 +192,19 @@ pub struct BudgetClientConfig {
   /// HTTP request timeout
   pub timeout: Duration,
   /// 32-byte IP Token decryption key (required for handshake)
-  pub ip_token_key: Option<[u8; 32]>,
+  pub ip_token_key: IpTokenKey,
 }
 
-impl Default for BudgetClientConfig {
-  fn default() -> Self {
-    Self {
-      server_url: String::new(),
-      ic_token: String::new(),
-      provider: "openai".to_string(),
-      provider_key_id: None,
-      initial_budget: 10_000_000, // $10 in microdollars
-      timeout: Duration::from_secs(30),
-      ip_token_key: None,
-    }
+/// Check HTTP response status, returning `BudgetClientError::ServerError` on non-2xx.
+async fn check_response(
+  response: reqwest::Response,
+) -> Result<reqwest::Response, BudgetClientError> {
+  if !response.status().is_success() {
+    let status = response.status().as_u16();
+    let message = response.text().await.unwrap_or_default();
+    return Err(BudgetClientError::ServerError { status, message });
   }
+  Ok(response)
 }
 
 /// Client for Protocol 005 budget operations.
@@ -230,7 +228,7 @@ pub struct BudgetClient {
   /// Provider API key (set after handshake)
   provider_key: RwLock<Option<ProviderKey>>,
   /// IP Token crypto for decrypting provider keys in transit
-  ip_token_crypto: Option<IpTokenCrypto>,
+  ip_token_crypto: IpTokenCrypto,
 }
 
 impl BudgetClient {
@@ -241,23 +239,12 @@ impl BudgetClient {
   /// Returns [`BudgetClientError::IpTokenDecrypt`] if `ip_token_key` is not set.
   /// Returns [`BudgetClientError::HttpError`] if the HTTP client cannot be built.
   pub fn new(config: BudgetClientConfig) -> Result<Self, BudgetClientError> {
-    // Startup validation: IP_TOKEN_KEY is required — without it every handshake will fail.
-    // Catching this at construction time prevents taking traffic before the error surfaces.
-    if config.ip_token_key.is_none() {
-      return Err(BudgetClientError::IpTokenDecrypt(
-        "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),
-      ));
-    }
-
     let http_client = Client::builder().timeout(config.timeout).build()?;
 
     // Start with 0 budget - will be set after handshake
     let cost_controller = CostController::new(0);
 
-    let ip_token_crypto = config
-      .ip_token_key
-      .map(|key| IpTokenCrypto::new(&key))
-      .transpose()
+    let ip_token_crypto = IpTokenCrypto::new(&config.ip_token_key)
       .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?;
 
     Ok(Self {
@@ -289,30 +276,15 @@ impl BudgetClient {
     };
 
     let response = self.http_client.post(&url).json(&request).send().await?;
-
-    if !response.status().is_success() {
-      let status = response.status().as_u16();
-      let message = response.text().await.unwrap_or_default();
-      return Err(BudgetClientError::ServerError { status, message });
-    }
+    let response = check_response(response).await?;
 
     let data: HandshakeResponse = response.json().await?;
 
     // Decrypt IP Token to get provider API key
-    // Fix(issue-002): None arm previously passed ciphertext verbatim as the API key.
-    // Root cause: Optional ip_token_crypto allowed silent fallback when IP_TOKEN_KEY was absent.
-    // Pitfall: Without this guard, the handshake completes but every subsequent LLM call fails
-    //          with 401 and the ciphertext is transmitted to the provider endpoint.
-    let api_key = match &self.ip_token_crypto {
-      Some(crypto) => crypto
-        .decrypt(&data.ip_token)
-        .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?,
-      None => {
-        return Err(BudgetClientError::IpTokenDecrypt(
-          "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),
-        ))
-      }
-    };
+    let api_key = self
+      .ip_token_crypto
+      .decrypt(&data.ip_token)
+      .map_err(|e| BudgetClientError::IpTokenDecrypt(e.to_string()))?;
 
     let provider_key = ProviderKey {
       provider: self.config.provider.clone(),
@@ -373,12 +345,7 @@ impl BudgetClient {
     };
 
     let response = self.http_client.post(&url).json(&request).send().await?;
-
-    if !response.status().is_success() {
-      let status = response.status().as_u16();
-      let message = response.text().await.unwrap_or_default();
-      return Err(BudgetClientError::ServerError { status, message });
-    }
+    let response = check_response(response).await?;
 
     let data: ReportResponse = response.json().await?;
     Ok(data)
@@ -409,12 +376,7 @@ impl BudgetClient {
     };
 
     let response = self.http_client.post(&url).json(&request).send().await?;
-
-    if !response.status().is_success() {
-      let status = response.status().as_u16();
-      let message = response.text().await.unwrap_or_default();
-      return Err(BudgetClientError::ServerError { status, message });
-    }
+    let response = check_response(response).await?;
 
     let data: RefreshResponse = response.json().await?;
 
@@ -459,12 +421,7 @@ impl BudgetClient {
     };
 
     let response = self.http_client.post(&url).json(&request).send().await?;
-
-    if !response.status().is_success() {
-      let status = response.status().as_u16();
-      let message = response.text().await.unwrap_or_default();
-      return Err(BudgetClientError::ServerError { status, message });
-    }
+    let response = check_response(response).await?;
 
     let data: ReturnResponse = response.json().await?;
     Ok(data)
@@ -568,7 +525,13 @@ impl BudgetClient {
 /// Builder for `BudgetClient` configuration
 #[allow(missing_debug_implementations)]
 pub struct BudgetClientBuilder {
-  config: BudgetClientConfig,
+  server_url: String,
+  ic_token: String,
+  provider: String,
+  provider_key_id: Option<i64>,
+  initial_budget: i64,
+  timeout: Duration,
+  ip_token_key: Option<IpTokenKey>,
 }
 
 impl BudgetClientBuilder {
@@ -576,56 +539,62 @@ impl BudgetClientBuilder {
   #[must_use]
   pub fn new() -> Self {
     Self {
-      config: BudgetClientConfig::default(),
+      server_url: String::new(),
+      ic_token: String::new(),
+      provider: "openai".to_string(),
+      provider_key_id: None,
+      initial_budget: 10_000_000, // $10 in microdollars
+      timeout: Duration::from_secs(30),
+      ip_token_key: None,
     }
   }
 
   /// Set the Iron Cage server URL.
   #[must_use]
   pub fn server_url(mut self, url: impl Into<String>) -> Self {
-    self.config.server_url = url.into();
+    self.server_url = url.into();
     self
   }
 
   /// Set the IC Token for authentication.
   #[must_use]
   pub fn ic_token(mut self, token: impl Into<String>) -> Self {
-    self.config.ic_token = token.into();
+    self.ic_token = token.into();
     self
   }
 
   /// Set the provider (openai, anthropic, etc.).
   #[must_use]
   pub fn provider(mut self, provider: impl Into<String>) -> Self {
-    self.config.provider = provider.into();
+    self.provider = provider.into();
     self
   }
 
   /// Set the optional provider key ID.
   #[must_use]
   pub fn provider_key_id(mut self, id: i64) -> Self {
-    self.config.provider_key_id = Some(id);
+    self.provider_key_id = Some(id);
     self
   }
 
   /// Set the initial budget in microdollars.
   #[must_use]
   pub fn initial_budget(mut self, budget_micros: i64) -> Self {
-    self.config.initial_budget = budget_micros;
+    self.initial_budget = budget_micros;
     self
   }
 
   /// Set the HTTP request timeout.
   #[must_use]
   pub fn timeout(mut self, timeout: Duration) -> Self {
-    self.config.timeout = timeout;
+    self.timeout = timeout;
     self
   }
 
   /// Set the 32-byte IP Token decryption key.
   #[must_use]
-  pub fn ip_token_key(mut self, key: [u8; 32]) -> Self {
-    self.config.ip_token_key = Some(key);
+  pub fn ip_token_key(mut self, key: IpTokenKey) -> Self {
+    self.ip_token_key = Some(key);
     self
   }
 
@@ -636,7 +605,23 @@ impl BudgetClientBuilder {
   /// Returns [`BudgetClientError::IpTokenDecrypt`] if `ip_token_key` is not set.
   /// Returns [`BudgetClientError::HttpError`] if the HTTP client cannot be built.
   pub fn build(self) -> Result<BudgetClient, BudgetClientError> {
-    BudgetClient::new(self.config)
+    let ip_token_key = self.ip_token_key.ok_or_else(|| {
+      BudgetClientError::IpTokenDecrypt(
+        "IP_TOKEN_KEY not configured — cannot decrypt IP Token".into(),
+      )
+    })?;
+
+    let config = BudgetClientConfig {
+      server_url: self.server_url,
+      ic_token: self.ic_token,
+      provider: self.provider,
+      provider_key_id: self.provider_key_id,
+      initial_budget: self.initial_budget,
+      timeout: self.timeout,
+      ip_token_key,
+    };
+
+    BudgetClient::new(config)
   }
 }
 

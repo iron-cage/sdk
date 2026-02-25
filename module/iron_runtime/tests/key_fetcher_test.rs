@@ -13,11 +13,16 @@
 #![allow(missing_docs)]
 
 use iron_runtime::llm_router::KeyFetcher;
-use iron_secrets::ip_token::IpTokenCrypto;
+use iron_secrets::ip_token::{IpTokenCrypto, IpTokenKey};
+use secrecy::ExposeSecret;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 const TEST_IP_TOKEN_KEY: [u8; 32] = [0x42u8; 32];
+
+fn test_ip_token_key() -> IpTokenKey {
+  IpTokenKey::try_from(TEST_IP_TOKEN_KEY).unwrap()
+}
 
 /// Start a minimal HTTP mock server for `POST /api/v1/agents/provider-key`.
 /// Accepts one connection, discards the request body, replies with a JSON provider-key response.
@@ -47,7 +52,7 @@ async fn start_mock_provider_key_server(encrypted_token: String, provider: &str)
 /// This test exercises the real path: mock server → HTTP → `fetch_from_server()` → decrypt.
 #[tokio::test]
 async fn key_fetcher_decrypts_encrypted_ip_token_from_server() {
-  let crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
+  let crypto = IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).unwrap();
   let plaintext_key = "sk-proj-integration-test-api-key";
   let encrypted = crypto.encrypt(plaintext_key).unwrap();
 
@@ -57,13 +62,14 @@ async fn key_fetcher_decrypts_encrypted_ip_token_from_server() {
     server_url,
     "test-ic-token".to_string(),
     300,
-    Some(TEST_IP_TOKEN_KEY),
-  );
+    Some(test_ip_token_key()),
+  )
+  .unwrap();
 
   let provider_key = fetcher.get_key().await.unwrap();
 
   assert_eq!(
-    provider_key.api_key.as_str(),
+    provider_key.api_key.expose_secret().as_str(),
     plaintext_key,
     "KeyFetcher must return the decrypted plaintext key, not the raw ciphertext"
   );
@@ -95,7 +101,7 @@ async fn key_fetcher_decrypts_encrypted_ip_token_from_server() {
 // test_kind: bug_reproducer(issue-001)
 #[tokio::test]
 async fn key_fetcher_fails_loudly_when_ip_token_key_absent() {
-  let crypto = IpTokenCrypto::new(&TEST_IP_TOKEN_KEY).unwrap();
+  let crypto = IpTokenCrypto::from_slice(&TEST_IP_TOKEN_KEY).unwrap();
   let encrypted = crypto.encrypt("sk-proj-secret-key").unwrap();
 
   let server_url = start_mock_provider_key_server(encrypted, "openai").await;
@@ -105,7 +111,8 @@ async fn key_fetcher_fails_loudly_when_ip_token_key_absent() {
     "test-ic-token".to_string(),
     300,
     None, // No IP_TOKEN_KEY — must fail loudly, not silently pass ciphertext
-  );
+  )
+  .unwrap();
 
   let result = fetcher.get_key().await;
   assert!(

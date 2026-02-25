@@ -5,11 +5,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use reqwest::Client;
+use secrecy::SecretBox;
 use tokio::sync::RwLock;
-use zeroize::Zeroizing;
 
 use crate::llm_router::error::LlmRouterError;
-use iron_secrets::ip_token::{IpTokenCrypto, ProviderKey};
+use iron_secrets::ip_token::{IpTokenCrypto, IpTokenKey, ProviderKey};
 
 /// Cached key entry
 #[derive(Debug)]
@@ -42,25 +42,26 @@ impl KeyFetcher {
   /// * `ic_token` - Iron Cage API token
   /// * `cache_ttl_seconds` - How long to cache the key (in seconds)
   ///
-  /// # Panics
+  /// # Errors
   ///
-  /// Panics if the HTTP client cannot be built, or if `ip_token_key` contains an invalid key.
-  #[must_use]
+  /// Returns `LlmRouterError` if HTTP client creation fails or IP Token key is invalid.
   pub fn new(
     server_url: String,
     ic_token: String,
     cache_ttl_seconds: u64,
-    ip_token_key: Option<[u8; 32]>,
-  ) -> Self {
+    ip_token_key: Option<IpTokenKey>,
+  ) -> Result<Self, LlmRouterError> {
     let client = Client::builder()
       .timeout(Duration::from_secs(30))
       .build()
-      .expect("LOUD FAILURE: Failed to create HTTP client");
+      .map_err(|e| LlmRouterError::KeyFetch(format!("Failed to create HTTP client: {e}")))?;
 
-    let ip_token_crypto =
-      ip_token_key.map(|key| IpTokenCrypto::new(&key).expect("LOUD FAILURE: Invalid IP Token key"));
+    let ip_token_crypto = ip_token_key
+      .map(|key| IpTokenCrypto::new(&key))
+      .transpose()
+      .map_err(|e| LlmRouterError::KeyFetch(format!("Invalid IP Token key: {e}")))?;
 
-    Self {
+    Ok(Self {
       server_url,
       ic_token,
       client,
@@ -68,7 +69,7 @@ impl KeyFetcher {
       cache_ttl: Duration::from_secs(cache_ttl_seconds),
       static_key: None,
       ip_token_crypto,
-    }
+    })
   }
 
   /// Create a `KeyFetcher` with a static API key (bypasses server)
@@ -82,7 +83,7 @@ impl KeyFetcher {
     let provider = ProviderKey::detect_provider_from_key(&api_key).to_string();
     let static_key = ProviderKey {
       provider,
-      api_key: Zeroizing::new(api_key),
+      api_key: SecretBox::new(Box::new(api_key)),
       base_url,
     };
 
@@ -190,9 +191,6 @@ impl KeyFetcher {
       .map_err(|e| LlmRouterError::KeyFetch(e.to_string()))?;
 
     // Decrypt IP Token to get plaintext provider API key
-    // Fix(issue-001): None arm previously passed ciphertext verbatim as the API key.
-    // Root cause: Optional ip_token_crypto allowed silent fallback when IP_TOKEN_KEY was absent.
-    // Pitfall: Without this guard, every LLM call fails with 401 and the ciphertext leaks to the provider.
     let api_key = match &self.ip_token_crypto {
       Some(crypto) => crypto
         .decrypt(&data.ip_token)

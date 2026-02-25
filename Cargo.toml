@@ -243,6 +243,9 @@ version = "0.5"
 [workspace.dependencies.zeroize]
 version = "1"
 
+[workspace.dependencies.secrecy]
+version = "0.10"
+
 ## Authentication & Rate Limiting
 
 [workspace.dependencies.jsonwebtoken]

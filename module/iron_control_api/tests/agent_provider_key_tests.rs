@@ -33,6 +33,7 @@ use common::budget::{
 };
 use iron_control_api::routes::agent_provider_key::get_provider_key;
 use iron_secrets::crypto::CryptoService;
+use secrecy::ExposeSecret;
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -203,7 +204,7 @@ async fn test_get_provider_key_success() {
     .ip_token_crypto
     .decrypt(ip_token_value)
     .expect("Should decrypt IP Token");
-  assert_eq!(&*decrypted, "sk-test-openai-key-12345");
+  assert_eq!(decrypted.expose_secret(), "sk-test-openai-key-12345");
 
   assert_eq!(body["provider"].as_str().unwrap(), "openai");
 }

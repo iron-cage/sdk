@@ -291,8 +291,9 @@ impl LlmRouter {
         server_url.clone(),
         api_key.clone(),
         cache_ttl_seconds,
-        ip_token_key,
+        ip_token_key.clone(),
       )
+      .map_err(|e| format!("Failed to create KeyFetcher: {e}"))?
     });
 
     let provider = runtime.block_on(async {
@@ -473,27 +474,26 @@ fn find_free_port() -> std::io::Result<u16> {
   Ok(listener.local_addr()?.port())
 }
 
-/// Parse `IP_TOKEN_KEY` from environment variable (64-char hex string -> 32 bytes)
+/// Parse `IP_TOKEN_KEY` from environment variable (64-char hex string -> `IpTokenKey`)
 ///
 /// Returns None if the env var is not set. Logs a warning on invalid format.
-fn parse_ip_token_key_from_env() -> Option<[u8; 32]> {
+fn parse_ip_token_key_from_env() -> Option<iron_secrets::ip_token::IpTokenKey> {
   let hex_str = match std::env::var("IP_TOKEN_KEY") {
     Ok(v) if !v.is_empty() => v,
     _ => return None,
   };
 
   match hex::decode(&hex_str) {
-    Ok(bytes) if bytes.len() == 32 => {
-      let mut key = [0u8; 32];
-      key.copy_from_slice(&bytes);
-      Some(key)
-    }
     Ok(bytes) => {
-      tracing::warn!(
+      if let Ok(key) = iron_secrets::ip_token::IpTokenKey::try_from(bytes.as_slice()) {
+        Some(key)
+      } else {
+        tracing::warn!(
         "IP_TOKEN_KEY must be 32 bytes (64 hex chars), got {} bytes — IP Token decryption disabled",
         bytes.len()
       );
-      None
+        None
+      }
     }
     Err(e) => {
       tracing::warn!(

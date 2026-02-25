@@ -8,16 +8,18 @@ use axum::{
   routing::any,
   Router,
 };
-use iron_cost::budget::{CostController, Reservation};
-use iron_cost::error::CostError;
-use iron_cost::pricing::PricingManager;
 use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
-use crate::llm_router::error::LlmRouterError;
-use crate::llm_router::key_fetcher::KeyFetcher;
-use crate::llm_router::translator::{translate_anthropic_to_openai, translate_openai_to_anthropic};
+use crate::llm_router::{error::LlmRouterError, key_fetcher::KeyFetcher, translator};
+use iron_cost::{
+  budget::{CostController, Reservation},
+  error::CostError,
+  pricing::PricingManager,
+};
+use iron_secrets::ip_token::IpTokenKey;
+use secrecy::ExposeSecret;
 
 #[cfg(feature = "analytics")]
 use iron_runtime_analytics::{EventStore, Provider};
@@ -62,7 +64,7 @@ pub struct ProxyConfig {
   /// Direct provider API key (bypasses Iron Cage server when set)
   pub provider_key: Option<String>,
   /// IP Token encryption key for decrypting provider keys in transit (from `IP_TOKEN_KEY` env var)
-  pub ip_token_key: Option<[u8; 32]>,
+  pub ip_token_key: Option<IpTokenKey>,
   /// Analytics event store
   #[cfg(feature = "analytics")]
   pub event_store: Arc<EventStore>,
@@ -101,6 +103,7 @@ pub async fn run_proxy(
       config.cache_ttl_seconds,
       config.ip_token_key,
     )
+    .map_err(|e| LlmRouterError::ServerStart(e.to_string()))?
   });
 
   let http_client = Client::builder()
@@ -376,7 +379,7 @@ async fn handle_proxy(
 
   // 6. Prepare request body (translate if needed)
   let (request_body, request_path) = if needs_translation {
-    let translated = translate_openai_to_anthropic(&body_bytes)
+    let translated = translator::translate_openai_to_anthropic(&body_bytes)
       .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {e}")))?;
     (translated, "/v1/messages".to_string())
   } else {
@@ -403,12 +406,12 @@ async fn handle_proxy(
   // Set provider-specific auth headers
   if target_provider == "anthropic" {
     req_builder = req_builder
-      .header("x-api-key", provider_key.api_key.as_str())
+      .header("x-api-key", provider_key.api_key.expose_secret().as_str())
       .header("anthropic-version", "2023-06-01");
   } else {
     req_builder = req_builder.header(
       header::AUTHORIZATION,
-      format!("Bearer {}", provider_key.api_key.as_str()),
+      format!("Bearer {}", provider_key.api_key.expose_secret().as_str()),
     );
   }
 
@@ -429,7 +432,7 @@ async fn handle_proxy(
 
   // Translate response back to OpenAI format if we translated the request
   let final_body = if needs_translation && status.is_success() {
-    translate_anthropic_to_openai(&resp_body).map_err(|e| {
+    translator::translate_anthropic_to_openai(&resp_body).map_err(|e| {
       (
         StatusCode::INTERNAL_SERVER_ERROR,
         format!("Response translation error: {e}"),
