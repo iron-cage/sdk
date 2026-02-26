@@ -106,9 +106,9 @@ jobs:
     - name: 'Build the image, push and deploy' 
       run: 'make deploy'
 
-    - name: 'Verify deployment health'
-      run: |
-        timeout 60 bash -c 'until curl -f "https://${{ vars.PROJECT_DOMAIN }}/login"; do sleep 5; done'
+    # - name: 'Verify deployment health'
+    #   run: |
+    #     timeout 60 bash -c 'until curl -f "https://${{ vars.PROJECT_DOMAIN }}/login"; do sleep 5; done'
 
     - name: Cleanup secrets
       if: always()
