@@ -1,4 +1,7 @@
 //! Local HTTP proxy server for LLM requests
+//!
+//! Handles IC Token validation, budget enforcement, and analytics locally.
+//! Delegates core forwarding logic to `iron_llm_core`.
 
 use axum::{
   body::Body,
@@ -12,14 +15,14 @@ use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
-use crate::llm_router::{error::LlmRouterError, key_fetcher::KeyFetcher, translator};
+use crate::llm_router::{error::LlmRouterError, key_fetcher::KeyFetcher};
 use iron_cost::{
   budget::{CostController, Reservation},
   error::CostError,
   pricing::PricingManager,
 };
+use iron_llm_core::{CostInfo, ForwardRequest, LlmCoreError};
 use iron_secrets::ip_token::IpTokenKey;
-use secrecy::ExposeSecret;
 
 #[cfg(feature = "analytics")]
 use iron_runtime_analytics::{EventStore, Provider};
@@ -163,14 +166,7 @@ fn create_openai_error_response(
   error_type: &str,
   code: &str,
 ) -> Response<Body> {
-  let error_json = serde_json::json!({
-    "error": {
-      "message": message,
-      "type": error_type,
-      "param": serde_json::Value::Null,
-      "code": code
-    }
-  });
+  let error_json = iron_llm_core::create_openai_error_json(message, error_type, code);
 
   Response::builder()
     .status(status)
@@ -242,47 +238,10 @@ fn check_budget(state: &ProxyState) -> Result<(), Box<Response<Body>>> {
   }
 }
 
-/// Strip provider prefix from path if present, returns (`clean_path`, `requested_provider`)
-#[must_use]
-pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
-  if path.starts_with("/anthropic/") || path.starts_with("/anthropic") {
-    let clean = path.strip_prefix("/anthropic").unwrap_or(path);
-    let clean = if clean.is_empty() {
-      "/".to_string()
-    } else {
-      clean.to_string()
-    };
-    (clean, Some("anthropic"))
-  } else if path.starts_with("/openai/") || path.starts_with("/openai") {
-    let clean = path.strip_prefix("/openai").unwrap_or(path);
-    let clean = if clean.is_empty() {
-      "/".to_string()
-    } else {
-      clean.to_string()
-    };
-    (clean, Some("openai"))
-  } else {
-    (path.to_string(), None)
-  }
-}
-
-/// Detect requested provider from model name in body
-#[must_use]
-pub fn detect_provider_from_model(body: &[u8]) -> Option<&'static str> {
-  if let Ok(json) = serde_json::from_slice::<serde_json::Value>(body) {
-    if let Some(model) = json.get("model").and_then(|m| m.as_str()) {
-      if model.starts_with("claude") {
-        return Some("anthropic");
-      }
-      if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") {
-        return Some("openai");
-      }
-    }
-  }
-  None
-}
-
 /// Main proxy handler - forwards requests to LLM provider
+///
+/// Local concerns handled here: IC Token validation, budget reservation/commit,
+/// analytics recording. Core forwarding delegated to `iron_llm_core::forward_request`.
 async fn handle_proxy(
   State(state): State<ProxyState>,
   request: Request,
@@ -367,218 +326,128 @@ async fn handle_proxy(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-  // 4. Detect provider from model name in request
-  let (clean_path, path_provider) = strip_provider_prefix(&orig_path);
-  let model_provider = detect_provider_from_model(&body_bytes);
-  let target_provider = path_provider.or(model_provider).unwrap_or("openai");
-
-  // 5. Detect if translation is needed
-  // OpenAI format (path=/v1/chat/completions) + Claude model → translate
-  let is_openai_format = clean_path.contains("/chat/completions");
-  let needs_translation = is_openai_format && target_provider == "anthropic";
-
-  // 6. Prepare request body (translate if needed)
-  let (request_body, request_path) = if needs_translation {
-    let translated = translator::translate_openai_to_anthropic(&body_bytes)
-      .map_err(|e| (StatusCode::BAD_REQUEST, format!("Translation error: {e}")))?;
-    (translated, "/v1/messages".to_string())
-  } else {
-    (body_bytes.to_vec(), clean_path)
+  // 4. Forward request to LLM provider via iron_llm_core
+  let forward_req = ForwardRequest {
+    method,
+    path: orig_path.clone(),
+    query,
+    body: body_bytes.to_vec(),
   };
 
-  // 7. Build target URL
-  let base_url = provider_key
-    .base_url
-    .as_deref()
-    .unwrap_or(match target_provider {
-      "anthropic" => "https://api.anthropic.com",
-      _ => "https://api.openai.com",
-    });
+  let forward_resp = iron_llm_core::forward_request(
+    &state.http_client,
+    &state.pricing_manager,
+    &provider_key,
+    forward_req,
+  )
+  .await
+  .map_err(|e| match &e {
+    LlmCoreError::Translation(_) => (StatusCode::BAD_REQUEST, e.to_string()),
+    LlmCoreError::Forward(_) => (StatusCode::BAD_GATEWAY, e.to_string()),
+  })?;
 
-  let target_url = format!("{base_url}{request_path}{query}");
+  let status =
+    StatusCode::from_u16(forward_resp.status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+  let resp_body = forward_resp.body;
 
-  // 8. Build forwarded request with real API key
-  let mut req_builder = state
-    .http_client
-    .request(method, &target_url)
-    .header(header::CONTENT_TYPE, "application/json");
-
-  // Set provider-specific auth headers
-  if target_provider == "anthropic" {
-    req_builder = req_builder
-      .header("x-api-key", provider_key.api_key.expose_secret().as_str())
-      .header("anthropic-version", "2023-06-01");
+  // 5. Settle budget reservation
+  let cost_info = if status.is_success() {
+    forward_resp.cost_info
   } else {
-    req_builder = req_builder.header(
-      header::AUTHORIZATION,
-      format!("Bearer {}", provider_key.api_key.expose_secret().as_str()),
-    );
+    None
+  };
+
+  if let Some(ref controller) = state.cost_controller {
+    settle_reservation(controller, reservation, cost_info.as_ref());
   }
 
-  // 9. Send request to provider
-  let provider_response = req_builder
-    .body(request_body)
-    .send()
-    .await
-    .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Forward error: {e}")))?;
+  // 6. Log cost and record analytics
+  if let Some(ref ci) = cost_info {
+    tracing::info!(
+      model = %ci.model,
+      input_tokens = ci.input_tokens,
+      output_tokens = ci.output_tokens,
+      cost_usd = %format!("{:.6}", ci.cost_usd()),
+      "LLM request completed"
+    );
 
-  // 10. Read and translate response if needed
-  let status = provider_response.status();
-  let resp_headers = provider_response.headers().clone();
-  let resp_body = provider_response
-    .bytes()
-    .await
-    .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Response read error: {e}")))?;
-
-  // Translate response back to OpenAI format if we translated the request
-  let final_body = if needs_translation && status.is_success() {
-    translator::translate_anthropic_to_openai(&resp_body).map_err(|e| {
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        format!("Response translation error: {e}"),
-      )
-    })?
-  } else {
-    resp_body.to_vec()
-  };
-
-  // 11. Calculate and log request cost, commit/cancel reservation
-  if status.is_success() {
-    if let Some(cost_info) =
-      calculate_request_cost(&state.pricing_manager, &body_bytes, &final_body)
-    {
-      // Commit reservation with actual cost (or add directly if no reservation)
-      if let Some(ref controller) = state.cost_controller {
-        if let Some(res) = reservation {
-          controller.commit(res, cost_info.cost_micros);
-        } else {
-          // No reservation was made, add directly (fallback for unknown models)
-          controller.add_spend(i64::try_from(cost_info.cost_micros).unwrap_or(i64::MAX));
-        }
-      }
-
-      // Record analytics event
-      #[cfg(feature = "analytics")]
-      {
-        let provider = Provider::from(target_provider);
-        state.event_store.record_llm_completed_with_provider(
-          &state.pricing_manager,
-          &cost_info.model,
-          provider,
-          cost_info.input_tokens,
-          cost_info.output_tokens,
-          state.agent_id.as_deref(),
-          state.provider_id.as_deref(),
-        );
-      }
-
-      tracing::info!(
-        model = %cost_info.model,
-        input_tokens = cost_info.input_tokens,
-        output_tokens = cost_info.output_tokens,
-        cost_usd = %format!("{:.6}", cost_info.cost_usd()),
-        "LLM request completed"
-      );
-    } else if let Some(res) = reservation {
-      // Cost couldn't be calculated, cancel reservation
-      if let Some(ref controller) = state.cost_controller {
-        controller.cancel(res);
-      }
-    }
-  } else {
-    // Request failed - cancel reservation (no cost incurred)
-    if let Some(res) = reservation {
-      if let Some(ref controller) = state.cost_controller {
-        controller.cancel(res);
-      }
-    }
-
-    // Record failed request for non-2xx responses
     #[cfg(feature = "analytics")]
-    if let Some(model) = extract_model_from_body(&body_bytes) {
-      let error_msg = serde_json::from_slice::<serde_json::Value>(&resp_body)
-        .ok()
-        .and_then(|v| v.get("error")?.get("message")?.as_str().map(String::from));
+    record_success_analytics(&state, &orig_path, &body_bytes, ci);
+  }
 
-      state.event_store.record_llm_failed(
-        &model,
-        state.agent_id.as_deref(),
-        state.provider_id.as_deref(),
-        Some(status.as_str()),
-        error_msg.as_deref(),
-      );
-    }
+  if !status.is_success() {
+    #[cfg(feature = "analytics")]
+    record_failure_analytics(&state, status, &body_bytes, &resp_body);
   }
 
   let mut response = Response::builder().status(status);
-
-  // Copy content-type header
-  if let Some(ct) = resp_headers.get(header::CONTENT_TYPE) {
-    response = response.header(header::CONTENT_TYPE, ct);
-  }
+  response = response.header(header::CONTENT_TYPE, "application/json");
 
   response
-    .body(Body::from(final_body))
+    .body(Body::from(resp_body))
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// Cost calculation result
-struct CostInfo {
-  model: String,
-  input_tokens: u64,
-  output_tokens: u64,
-  /// Cost in microdollars (1 USD = 1,000,000 microdollars)
-  cost_micros: u64,
-}
-
-impl CostInfo {
-  /// Returns cost in USD (for logging/display)
-  fn cost_usd(&self) -> f64 {
-    self.cost_micros as f64 / 1_000_000.0
+/// Settle budget reservation based on forwarding result
+fn settle_reservation(
+  controller: &CostController,
+  reservation: Option<Reservation>,
+  cost_info: Option<&CostInfo>,
+) {
+  match (cost_info, reservation) {
+    (Some(ci), Some(res)) => controller.commit(res, ci.cost_micros),
+    (Some(ci), None) => {
+      // No reservation was made, add directly (fallback for unknown models)
+      controller.add_spend(i64::try_from(ci.cost_micros).unwrap_or(i64::MAX));
+    }
+    (None, Some(res)) => controller.cancel(res),
+    (None, None) => {}
   }
 }
 
-/// Calculate request cost from request and response bodies
-fn calculate_request_cost(
-  pricing_manager: &PricingManager,
+/// Record analytics event for a successful LLM request
+#[cfg(feature = "analytics")]
+fn record_success_analytics(
+  state: &ProxyState,
+  orig_path: &str,
   request_body: &[u8],
-  response_body: &[u8],
-) -> Option<CostInfo> {
-  // Extract model from request
-  let request_json: serde_json::Value = serde_json::from_slice(request_body).ok()?;
-  let model = request_json.get("model")?.as_str()?;
+  cost_info: &CostInfo,
+) {
+  let (_, path_provider) = iron_llm_core::strip_provider_prefix(orig_path);
+  let model_provider = iron_llm_core::detect_provider_from_model(request_body);
+  let target_provider = path_provider.or(model_provider).unwrap_or("openai");
 
-  // Extract usage from response (OpenAI format)
-  let response_json: serde_json::Value = serde_json::from_slice(response_body).ok()?;
-  let usage = response_json.get("usage")?;
-
-  // OpenAI: prompt_tokens/completion_tokens, Anthropic: input_tokens/output_tokens
-  let input_tokens = usage
-    .get("prompt_tokens")
-    .or_else(|| usage.get("input_tokens"))
-    .and_then(serde_json::Value::as_u64)?;
-
-  let output_tokens = usage
-    .get("completion_tokens")
-    .or_else(|| usage.get("output_tokens"))
-    .and_then(serde_json::Value::as_u64)?;
-
-  // Get pricing and calculate cost in microdollars (integer arithmetic)
-  let pricing = pricing_manager.get(model)?;
-  let cost_micros = pricing.calculate_cost_micros(input_tokens, output_tokens);
-
-  Some(CostInfo {
-    model: model.to_string(),
-    input_tokens,
-    output_tokens,
-    cost_micros,
-  })
+  let provider = Provider::from(target_provider);
+  state.event_store.record_llm_completed_with_provider(
+    &state.pricing_manager,
+    &cost_info.model,
+    provider,
+    cost_info.input_tokens,
+    cost_info.output_tokens,
+    state.agent_id.as_deref(),
+    state.provider_id.as_deref(),
+  );
 }
 
-/// Extract model name from request body (for error recording)
+/// Record analytics event for a failed LLM request
 #[cfg(feature = "analytics")]
-fn extract_model_from_body(body: &[u8]) -> Option<String> {
-  serde_json::from_slice::<serde_json::Value>(body)
-    .ok()
-    .and_then(|json| json.get("model")?.as_str().map(String::from))
+fn record_failure_analytics(
+  state: &ProxyState,
+  status: StatusCode,
+  request_body: &[u8],
+  response_body: &[u8],
+) {
+  if let Some(model) = iron_llm_core::extract_model_from_body(request_body) {
+    let error_msg = serde_json::from_slice::<serde_json::Value>(response_body)
+      .ok()
+      .and_then(|v| v.get("error")?.get("message")?.as_str().map(String::from));
+
+    state.event_store.record_llm_failed(
+      &model,
+      state.agent_id.as_deref(),
+      state.provider_id.as_deref(),
+      Some(status.as_str()),
+      error_msg.as_deref(),
+    );
+  }
 }

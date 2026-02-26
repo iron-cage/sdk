@@ -1,5 +1,12 @@
 //! Error types for LLM Router
 
+use core::{
+  error::Error,
+  fmt::{Display, Formatter, Result as FmtResult},
+};
+
+use iron_llm_core::LlmCoreError;
+
 /// Errors that can occur in the LLM Router
 #[derive(Debug)]
 pub enum LlmRouterError {
@@ -16,8 +23,8 @@ pub enum LlmRouterError {
   InvalidToken,
 }
 
-impl core::fmt::Display for LlmRouterError {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for LlmRouterError {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     match self {
       Self::ServerStart(msg) => write!(f, "Server start failed: {msg}"),
       Self::KeyFetch(msg) => write!(f, "Key fetch failed: {msg}"),
@@ -27,4 +34,10 @@ impl core::fmt::Display for LlmRouterError {
   }
 }
 
-impl core::error::Error for LlmRouterError {}
+impl Error for LlmRouterError {}
+
+impl From<LlmCoreError> for LlmRouterError {
+  fn from(err: LlmCoreError) -> Self {
+    Self::Forward(err.to_string())
+  }
+}

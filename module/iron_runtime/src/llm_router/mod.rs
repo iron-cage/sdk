@@ -2,19 +2,25 @@
 //!
 //! Provides a local HTTP proxy that intercepts OpenAI/Anthropic API requests,
 //! fetches real API keys from Iron Cage server, and forwards requests to providers.
+//!
+//! Core routing logic (provider detection, format translation, forwarding) is
+//! provided by `iron_llm_core`. This module adds local concerns: port binding,
+//! key fetching, budget handshake, and analytics sync.
 
 mod error;
 mod key_fetcher;
 mod proxy;
 mod router;
-mod translator;
 
 pub use error::LlmRouterError;
 pub use key_fetcher::KeyFetcher;
 pub use router::LlmRouter;
 
-// Re-export proxy utilities for testing
-pub use proxy::{detect_provider_from_model, run_proxy, strip_provider_prefix, ProxyConfig};
+// Re-export proxy config and server entry point
+pub use proxy::{run_proxy, ProxyConfig};
 
-// Re-export translator functions for testing
-pub use translator::{translate_anthropic_to_openai, translate_openai_to_anthropic};
+// Re-export from iron_llm_core for backwards compatibility
+pub use iron_llm_core::{
+  detect_provider_from_model, strip_provider_prefix, translate_anthropic_to_openai,
+  translate_openai_to_anthropic,
+};
