@@ -16,6 +16,9 @@ members = [
   # Configuration
   "module/iron_config_loader",
 
+  # Shared LLM routing core
+  "module/iron_llm_core",
+
   # Feature layer
   "module/iron_safety",
   "module/iron_reliability",
@@ -45,6 +48,7 @@ default-members = [
   "module/iron_runtime_state",
   "module/iron_test_db",
   "module/iron_config_loader",
+  "module/iron_llm_core",
   "module/iron_safety",
   "module/iron_reliability",
   "module/iron_secrets",
@@ -337,6 +341,10 @@ path = "module/iron_test_db"
 [workspace.dependencies.iron_config_loader]
 version = "0.4.0"
 path = "module/iron_config_loader"
+
+[workspace.dependencies.iron_llm_core]
+version = "0.1.0"
+path = "module/iron_llm_core"
 
 [workspace.dependencies.iron_safety]
 version = "0.3.0"
