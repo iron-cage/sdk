@@ -27,7 +27,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 ///
 /// Reservations prevent concurrent overspend by atomically reserving
 /// the maximum possible cost before an LLM request starts.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Reservation {
   /// Reserved amount in microdollars
   amount_micros: u64,
@@ -215,6 +215,7 @@ impl CostController {
   ///
   /// * `reservation` - The reservation to commit (consumes it)
   /// * `actual_cost_micros` - Actual cost incurred (usually less than reserved)
+  #[allow(clippy::needless_pass_by_value)]
   pub fn commit(&self, reservation: Reservation, actual_cost_micros: u64) {
     // Add actual cost to spent FIRST (safe: errs on blocking side)
     self
@@ -229,11 +230,12 @@ impl CostController {
   /// Cancel a reservation without adding any cost.
   ///
   /// Releases the reserved amount. Call this if an LLM request fails
-  /// or is cancelled before completing.
+  /// or is canceled before completing.
   ///
   /// # Arguments
   ///
   /// * `reservation` - The reservation to cancel (consumes it)
+  #[allow(clippy::needless_pass_by_value)]
   pub fn cancel(&self, reservation: Reservation) {
     self
       .reserved_micros

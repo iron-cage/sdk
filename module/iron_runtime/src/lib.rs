@@ -64,7 +64,7 @@
 //!   let runtime = AgentRuntime::new(config);
 //!
 //!   // Start agent from Python script
-//!   let handle = runtime.start_agent(Path::new("agent.py"))?;
+//!   let handle = runtime.start_agent(Path::new("agent.py")).await?;
 //!   println!("Agent started: {}", handle.agent_id.as_str());
 //!
 //!   // Monitor metrics
@@ -74,7 +74,7 @@
 //!   }
 //!
 //!   // Stop agent
-//!   runtime.stop_agent(handle.agent_id.as_str())?;
+//!   runtime.stop_agent(handle.agent_id.as_str()).await?;
 //!   Ok(())
 //! }
 //! ```
@@ -175,7 +175,8 @@ mod implementation {
     /// # Errors
     ///
     /// Returns an error if the agent cannot be started.
-    pub fn start_agent(
+    #[allow(clippy::unused_async)]
+    pub async fn start_agent(
       &self,
       _script_path: &std::path::Path,
     ) -> Result<AgentHandle, anyhow::Error> {
@@ -199,7 +200,8 @@ mod implementation {
     /// # Errors
     ///
     /// Returns an error if the agent cannot be stopped.
-    pub fn stop_agent(&self, agent_id: &str) -> Result<(), anyhow::Error> {
+    #[allow(clippy::unused_async)]
+    pub async fn stop_agent(&self, agent_id: &str) -> Result<(), anyhow::Error> {
       iron_telemetry::log_agent_event(agent_id, "agent_stopped");
 
       if let Some(mut state) = self.state.get_agent_state(agent_id) {

@@ -25,7 +25,7 @@ async fn test_start_agent() {
   let path = Path::new("test_agent.py");
 
   // Start agent (will use stub implementation for now)
-  let handle = runtime.start_agent(path);
+  let handle = runtime.start_agent(path).await;
 
   assert!(handle.is_ok());
   let handle = handle.unwrap();
@@ -43,7 +43,7 @@ async fn test_get_metrics() {
   let path = Path::new("test_agent.py");
 
   // Start agent
-  let handle = runtime.start_agent(path).unwrap();
+  let handle = runtime.start_agent(path).await.unwrap();
 
   // Get metrics
   let metrics = runtime.get_metrics(handle.agent_id.as_str());
@@ -75,10 +75,10 @@ async fn test_stop_agent() {
   let path = Path::new("test_agent.py");
 
   // Start agent
-  let handle = runtime.start_agent(path).unwrap();
+  let handle = runtime.start_agent(path).await.unwrap();
 
   // Stop agent
-  let result = runtime.stop_agent(handle.agent_id.as_str());
+  let result = runtime.stop_agent(handle.agent_id.as_str()).await;
   assert!(result.is_ok());
 
   // Verify state updated
