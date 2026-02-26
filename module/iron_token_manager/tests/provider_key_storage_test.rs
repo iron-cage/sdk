@@ -1,12 +1,11 @@
 #![allow(missing_docs)]
 
-use iron_token_manager::*;
+mod common;
+use iron_token_manager::ProviderType;
 
 #[tokio::test]
 async fn create_and_get_key() {
-  let storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .unwrap();
+  let (storage, _db) = common::create_test_provider_storage().await;
 
   let key_id = storage
     .create_key(
@@ -15,7 +14,7 @@ async fn create_and_get_key() {
       "nonce_base64",
       None,
       Some("Test key"),
-      "user_123",
+      "user_001",
     )
     .await
     .unwrap();
@@ -23,7 +22,7 @@ async fn create_and_get_key() {
   let record = storage.get_key(key_id).await.unwrap();
   assert_eq!(record.metadata.provider, ProviderType::OpenAI);
   assert_eq!(record.metadata.description, Some("Test key".to_string()));
-  assert_eq!(record.metadata.user_id, "user_123");
+  assert_eq!(record.metadata.user_id, "user_001");
   assert!(
     record.metadata.is_enabled,
     "Newly created key should be enabled by default"
@@ -35,9 +34,7 @@ async fn create_and_get_key() {
 #[tokio::test]
 #[allow(clippy::similar_names)]
 async fn list_keys_by_user() {
-  let storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .unwrap();
+  let (storage, _db) = common::create_test_provider_storage().await;
 
   storage
     .create_key(
@@ -46,7 +43,7 @@ async fn list_keys_by_user() {
       "nonce1",
       None,
       Some("Key 1"),
-      "user_a",
+      "user_001",
     )
     .await
     .unwrap();
@@ -57,7 +54,7 @@ async fn list_keys_by_user() {
       "nonce2",
       None,
       Some("Key 2"),
-      "user_a",
+      "user_001",
     )
     .await
     .unwrap();
@@ -68,25 +65,23 @@ async fn list_keys_by_user() {
       "nonce3",
       None,
       Some("Key 3"),
-      "user_b",
+      "user_002",
     )
     .await
     .unwrap();
 
-  let user_a_keys = storage.list_keys("user_a").await.unwrap();
+  let user_a_keys = storage.list_keys("user_001").await.unwrap();
   assert_eq!(user_a_keys.len(), 2);
 
-  let user_b_keys = storage.list_keys("user_b").await.unwrap();
+  let user_b_keys = storage.list_keys("user_002").await.unwrap();
   assert_eq!(user_b_keys.len(), 1);
 }
 
 #[tokio::test]
 async fn enable_disable_key() {
-  let storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .unwrap();
+  let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
     .await
     .unwrap();
 
@@ -116,11 +111,9 @@ async fn enable_disable_key() {
 
 #[tokio::test]
 async fn update_balance() {
-  let storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .unwrap();
+  let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
     .await
     .unwrap();
 
@@ -147,11 +140,9 @@ async fn update_balance() {
 
 #[tokio::test]
 async fn delete_key() {
-  let storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .unwrap();
+  let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
     .await
     .unwrap();
 
@@ -165,11 +156,9 @@ async fn delete_key() {
 
 #[tokio::test]
 async fn project_assignment() {
-  let storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .unwrap();
+  let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
     .await
     .unwrap();
 

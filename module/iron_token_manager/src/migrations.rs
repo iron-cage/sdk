@@ -37,11 +37,11 @@
 
 use sqlx::{query_scalar, SqlitePool};
 
-use crate::error::Result;
+use crate::error::{Result, TokenError};
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-023, skipping 007).
+/// Migrations are applied in order (001-024, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -63,7 +63,7 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
     .await
     .map_err(|e| {
       eprintln!("PRAGMA foreign_keys failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
 
   // Migration 001: Initial schema (5 core tables)
@@ -149,6 +149,9 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
   // Migration 023: Seed dev IC token hash for agent_1 (demo)
   apply_migration_023(pool).await?;
 
+  // Migration 024: Add per-IP-key spending cap columns
+  apply_migration_024(pool).await?;
+
   Ok(())
 }
 
@@ -165,7 +168,7 @@ async fn apply_migration_001(pool: &SqlitePool) -> Result<()> {
   sqlx::raw_sql(migration)
     .execute(pool)
     .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
+    .map_err(|_| TokenError::Generic)?;
   Ok(())
 }
 
@@ -185,14 +188,14 @@ async fn apply_migration_002(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/002_add_length_constraints.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -209,14 +212,14 @@ async fn apply_migration_003(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/003_create_users_table.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -230,14 +233,14 @@ async fn apply_migration_004(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/004_create_ai_provider_keys.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -251,14 +254,14 @@ async fn apply_migration_005(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/005_enhance_users_table.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -272,14 +275,14 @@ async fn apply_migration_006(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/006_create_user_audit_log.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -298,14 +301,14 @@ async fn apply_migration_008(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/008_create_agents_table.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -319,14 +322,14 @@ async fn apply_migration_009(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/009_create_budget_leases.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -340,14 +343,14 @@ async fn apply_migration_010(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/010_create_agent_budgets.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -361,14 +364,14 @@ async fn apply_migration_011(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/011_create_budget_requests.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -382,14 +385,14 @@ async fn apply_migration_012(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/012_create_analytics_events.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -406,14 +409,14 @@ async fn apply_migration_013(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/013_create_budget_history.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -430,14 +433,14 @@ async fn apply_migration_014(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/014_add_api_tokens_fk.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -454,14 +457,14 @@ async fn apply_migration_015(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/015_add_agents_owner_id.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -482,14 +485,14 @@ async fn apply_migration_016(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/016_add_revoked_at.sql");
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -509,7 +512,7 @@ async fn apply_migration_017(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   // Only execute if not previously completed
   if completed == 0 {
@@ -519,7 +522,7 @@ async fn apply_migration_017(pool: &SqlitePool) -> Result<()> {
     sqlx::raw_sql(migration)
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
   }
 
   Ok(())
@@ -534,7 +537,7 @@ async fn apply_migration_018(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   // Only execute if not previously completed
   if completed == 0 {
@@ -542,7 +545,7 @@ async fn apply_migration_018(pool: &SqlitePool) -> Result<()> {
 
     sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
       eprintln!("Migration 018 failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
   }
 
@@ -558,7 +561,7 @@ async fn apply_migration_019(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   // Only execute if not previously completed
   if completed == 0 {
@@ -567,7 +570,7 @@ async fn apply_migration_019(pool: &SqlitePool) -> Result<()> {
 
     sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
       eprintln!("Migration 019 failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
   }
 
@@ -585,14 +588,14 @@ async fn apply_migration_020(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/020_add_agent_provider_key_id.sql");
 
     sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
       eprintln!("Migration 020 failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
   }
 
@@ -612,7 +615,7 @@ async fn apply_migration_021(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     // Check if columns already exist (for idempotency)
@@ -621,7 +624,7 @@ async fn apply_migration_021(pool: &SqlitePool) -> Result<()> {
     )
     .fetch_one(pool)
     .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
+    .map_err(|_| TokenError::Generic)?;
 
     if column_exists == 0 {
       // Columns don't exist, apply migration
@@ -629,7 +632,7 @@ async fn apply_migration_021(pool: &SqlitePool) -> Result<()> {
 
       sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
         eprintln!("Migration 021 failed: {e:?}");
-        crate::error::TokenError::Generic
+        TokenError::Generic
       })?;
     } else {
       // Columns already exist, just create guard table
@@ -638,14 +641,14 @@ async fn apply_migration_021(pool: &SqlitePool) -> Result<()> {
       )
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
       sqlx::query(
         "INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000)",
       )
       .execute(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
     }
   }
 
@@ -664,14 +667,14 @@ async fn apply_migration_022(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/022_add_ic_token_to_agents.sql");
 
     sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
       eprintln!("Migration 022 failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
   }
 
@@ -689,14 +692,39 @@ async fn apply_migration_023(pool: &SqlitePool) -> Result<()> {
   )
   .fetch_one(pool)
   .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+  .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     let migration = include_str!("../migrations/023_seed_agent1_ic_token.sql");
 
     sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
       eprintln!("Migration 023 failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
+    })?;
+  }
+
+  Ok(())
+}
+
+/// Migration 024: Add per-IP-key spending cap columns
+///
+/// Adds `spending_cap_microdollars` (nullable) and `spending_used_microdollars` (default 0)
+/// to `ai_provider_keys` table. NULL cap means unlimited spending.
+async fn apply_migration_024(pool: &SqlitePool) -> Result<()> {
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_024_completed'",
+  )
+  .fetch_one(pool)
+  .await
+  .map_err(|_| TokenError::Generic)?;
+
+  if completed == 0 {
+    let migration = include_str!("../migrations/024_add_ip_key_spending_cap.sql");
+
+    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
+      eprintln!("Migration 024 failed: {e:?}");
+      TokenError::Generic
     })?;
   }
 

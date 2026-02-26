@@ -17,23 +17,26 @@
 //! | Disabled key | Token + Disabled Key + Assignment | 403 Forbidden |
 //! | Rate limit exceeded | Multiple requests | 429 Too Many Requests |
 
-use crate::common::extract_response;
-use axum::body::Body;
+use core::time::Duration;
+use std::sync::Arc;
+
 use axum::{
+  body::Body,
   http::{header, Request, StatusCode},
   routing::get,
   Router,
 };
-use core::time::Duration;
-use std::sync::Arc;
 use tower::ServiceExt;
 
+use crate::common::{self, test_db};
 use iron_control_api::routes::keys::{get_key, KeyResponse, KeysState};
 use iron_secrets::crypto::CryptoService;
-use iron_token_manager::provider_key_storage::{ProviderKeyStorage, ProviderType};
-use iron_token_manager::rate_limiter::RateLimiter;
-use iron_token_manager::storage::TokenStorage;
-use iron_token_manager::token_generator::TokenGenerator;
+use iron_token_manager::{
+  provider_key_storage::{ProviderKeyStorage, ProviderType},
+  rate_limiter::RateLimiter,
+  storage::TokenStorage,
+  token_generator::TokenGenerator,
+};
 
 /// Test master key for cryptographic operations (32 bytes).
 const TEST_MASTER_KEY: [u8; 32] = [
@@ -63,9 +66,7 @@ impl TestState {
       .await
       .expect("LOUD FAILURE: Failed to create token storage");
 
-    let provider_storage = ProviderKeyStorage::connect("sqlite::memory:")
-      .await
-      .expect("LOUD FAILURE: Failed to create provider key storage");
+    let provider_storage = test_db::create_test_provider_storage().await;
 
     let crypto =
       CryptoService::new(&TEST_MASTER_KEY).expect("LOUD FAILURE: Failed to create crypto service");
@@ -257,7 +258,7 @@ async fn test_full_flow_encrypt_store_fetch_decrypt() {
     "LOUD FAILURE: Full flow should return 200 OK"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   let key_response: KeyResponse =
     serde_json::from_str(&body).expect("LOUD FAILURE: Response should be valid KeyResponse JSON");
 
@@ -298,7 +299,7 @@ async fn test_token_without_project_returns_400() {
     "LOUD FAILURE: Token without project_id must return 400 Bad Request"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   assert!(
     body.contains("Token not assigned to a project"),
     "LOUD FAILURE: Error message should indicate missing project, got: {body}"
@@ -332,7 +333,7 @@ async fn test_no_key_assigned_returns_404() {
     "LOUD FAILURE: Project with no key assigned must return 404 Not Found"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   assert!(
     body.contains("No provider key assigned"),
     "LOUD FAILURE: Error message should indicate no key assigned, got: {body}"
@@ -373,7 +374,7 @@ async fn test_disabled_key_returns_403() {
     "LOUD FAILURE: Disabled key must return 403 Forbidden"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   assert!(
     body.contains("disabled"),
     "LOUD FAILURE: Error message should indicate key is disabled, got: {body}"
@@ -433,7 +434,7 @@ async fn test_rate_limit_exceeded_returns_429() {
     "LOUD FAILURE: Request 3 should be rate limited (429)"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   assert!(
     body.contains("Rate limit exceeded"),
     "LOUD FAILURE: Error message should indicate rate limit, got: {body}"
@@ -473,7 +474,7 @@ async fn test_different_projects_have_separate_keys() {
     .unwrap();
 
   let response_a = router_a.oneshot(request_a).await.unwrap();
-  let (_, body_a) = extract_response(response_a).await;
+  let (_, body_a) = common::extract_response(response_a).await;
   let key_response_a: KeyResponse = serde_json::from_str(&body_a).unwrap();
 
   // Fetch key for project B
@@ -486,7 +487,7 @@ async fn test_different_projects_have_separate_keys() {
     .unwrap();
 
   let response_b = router_b.oneshot(request_b).await.unwrap();
-  let (_, body_b) = extract_response(response_b).await;
+  let (_, body_b) = common::extract_response(response_b).await;
   let key_response_b: KeyResponse = serde_json::from_str(&body_b).unwrap();
 
   // Verify isolation

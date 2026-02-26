@@ -9,11 +9,13 @@
 
 #![allow(dead_code)]
 
-use iron_test_db::{TestDatabase, TestDatabaseBuilder};
-use iron_token_manager::limit_enforcer::LimitEnforcer;
-use iron_token_manager::storage::TokenStorage;
-use iron_token_manager::usage_tracker::UsageTracker;
 use sqlx::SqlitePool;
+
+use iron_test_db::{TestDatabase, TestDatabaseBuilder};
+use iron_token_manager::{
+  limit_enforcer::LimitEnforcer, migrations, seed, storage::TokenStorage,
+  usage_tracker::UsageTracker, ProviderKeyStorage,
+};
 
 /// Seed common test users
 ///
@@ -68,7 +70,7 @@ pub async fn create_test_db() -> TestDatabase {
     .expect("LOUD FAILURE: Failed to create test database");
 
   // Apply migrations
-  iron_token_manager::migrations::apply_all_migrations(db.pool())
+  migrations::apply_all_migrations(db.pool())
     .await
     .expect("LOUD FAILURE: Failed to apply migrations");
 
@@ -99,12 +101,12 @@ pub async fn create_test_db_with_seed() -> TestDatabase {
     .expect("LOUD FAILURE: Failed to create test database");
 
   // Apply migrations
-  iron_token_manager::migrations::apply_all_migrations(db.pool())
+  migrations::apply_all_migrations(db.pool())
     .await
     .expect("LOUD FAILURE: Failed to apply migrations");
 
   // Seed database (creates its own users via seed_all)
-  iron_token_manager::seed::seed_all(db.pool())
+  seed::seed_all(db.pool())
     .await
     .expect("LOUD FAILURE: Failed to seed database");
 
@@ -174,6 +176,16 @@ pub async fn create_test_tracker() -> (UsageTracker, TokenStorage, TestDatabase)
   (tracker, storage, db)
 }
 
+/// Create test provider key storage using `iron_test_db`
+///
+/// Returns `ProviderKeyStorage` backed by in-memory database with all migrations applied.
+/// Shares the same migration infrastructure as other test helpers.
+pub async fn create_test_provider_storage() -> (ProviderKeyStorage, TestDatabase) {
+  let db = create_test_db().await;
+  let storage = ProviderKeyStorage::new(db.pool().clone());
+  (storage, db)
+}
+
 /// Seed test agent with budget (for budget management tests)
 ///
 /// Creates test agent and associated budget in the database.
@@ -191,7 +203,7 @@ pub async fn create_test_tracker() -> (UsageTracker, TokenStorage, TestDatabase)
 /// seed_test_agent(db.pool(), 1).await;
 /// // Agent 1 now exists with $100 budget
 /// ```
-pub async fn seed_test_agent(pool: &sqlx::SqlitePool, agent_id: i32) {
+pub async fn seed_test_agent(pool: &SqlitePool, agent_id: i32) {
   sqlx::query("INSERT OR IGNORE INTO agents (id, name, providers, created_at) VALUES (?, ?, ?, ?)")
     .bind(agent_id)
     .bind("test-agent")

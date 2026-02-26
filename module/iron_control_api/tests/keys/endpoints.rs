@@ -21,22 +21,21 @@
 //!
 //! These are tested via manual/E2E tests due to complex state setup requirements.
 
-use crate::common::extract_response;
-use axum::body::Body;
+use core::time::Duration;
+use std::sync::Arc;
+
 use axum::{
+  body::Body,
   http::{Request, StatusCode},
   routing::get,
   Router,
 };
-use core::time::Duration;
-use std::sync::Arc;
 use tower::ServiceExt;
 
+use crate::common::{self, test_db};
 use iron_control_api::routes::keys::{get_key, KeysState};
 use iron_secrets::crypto::CryptoService;
-use iron_token_manager::provider_key_storage::ProviderKeyStorage;
-use iron_token_manager::rate_limiter::RateLimiter;
-use iron_token_manager::storage::TokenStorage;
+use iron_token_manager::{rate_limiter::RateLimiter, storage::TokenStorage};
 
 /// Test master key for cryptographic operations (32 bytes).
 const TEST_MASTER_KEY: [u8; 32] = [
@@ -54,9 +53,7 @@ async fn create_test_router() -> Router {
     .expect("LOUD FAILURE: Failed to create token storage");
 
   // Create provider key storage
-  let provider_storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .expect("LOUD FAILURE: Failed to create provider key storage");
+  let provider_storage = test_db::create_test_provider_storage().await;
 
   // Create crypto service with test key
   let crypto =
@@ -102,7 +99,7 @@ async fn test_missing_auth_header_returns_401() {
     "LOUD FAILURE: Missing Authorization header must return 401 Unauthorized"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   assert!(
     body.contains("Missing Authorization header"),
     "LOUD FAILURE: Error message should indicate missing header, got: {body}"
@@ -177,7 +174,7 @@ async fn test_invalid_token_returns_401() {
     "LOUD FAILURE: Invalid token must return 401 Unauthorized"
   );
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
   assert!(
     body.contains("Invalid or expired token"),
     "LOUD FAILURE: Error message should indicate invalid token, got: {body}"

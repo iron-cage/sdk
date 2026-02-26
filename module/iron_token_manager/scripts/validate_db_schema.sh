@@ -4,7 +4,7 @@
 # Validates that the database schema matches expected structure.
 #
 # Rules:
-# 1. Database must have exactly 38 tables (17 application + 21 migration guards)
+# 1. Database must have exactly 39 tables (17 application + 22 migration guards)
 # 2. Database must have exactly 51 indexes (idx_* pattern)
 # 3. All migration guard tables must exist
 # 4. Foreign keys must be enabled
@@ -76,7 +76,7 @@ echo ""
 # Rule 1: Check table count
 # ============================================================================
 
-log_info "Rule 1: Checking table count (expect 38 total)..."
+log_info "Rule 1: Checking table count (expect 39 total)..."
 
 # Count application tables (excluding migration guards and sqlite_ tables)
 APP_TABLE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_migration_%';")
@@ -86,10 +86,10 @@ GUARD_TABLE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE
 
 TOTAL_TABLE_COUNT=$((APP_TABLE_COUNT + GUARD_TABLE_COUNT))
 
-if [ "$TOTAL_TABLE_COUNT" -eq 38 ]; then
+if [ "$TOTAL_TABLE_COUNT" -eq 39 ]; then
   log_success "Table count correct: $TOTAL_TABLE_COUNT (${APP_TABLE_COUNT} application + ${GUARD_TABLE_COUNT} guards)"
 else
-  log_error "Table count mismatch: expected 38, found $TOTAL_TABLE_COUNT (${APP_TABLE_COUNT} application + ${GUARD_TABLE_COUNT} guards)"
+  log_error "Table count mismatch: expected 39, found $TOTAL_TABLE_COUNT (${APP_TABLE_COUNT} application + ${GUARD_TABLE_COUNT} guards)"
   ((VIOLATIONS++))
 fi
 
@@ -116,8 +116,8 @@ log_info "Rule 3: Checking migration guard tables..."
 
 GUARD_VIOLATIONS=0
 
-# Expected migration guards (migrations 002-006, 008-023, all 21 guards - migration 007 is reserved/skipped)
-EXPECTED_GUARDS=("_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_008_completed" "_migration_009_completed" "_migration_010_completed" "_migration_011_completed" "_migration_012_completed" "_migration_013_completed" "_migration_014_completed" "_migration_015_completed" "_migration_016_completed" "_migration_017_completed" "_migration_018_completed" "_migration_019_completed" "_migration_020_completed" "_migration_021_completed" "_migration_022_completed" "_migration_023_completed")
+# Expected migration guards (migrations 002-006, 008-024, all 22 guards - migration 007 is reserved/skipped)
+EXPECTED_GUARDS=("_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_008_completed" "_migration_009_completed" "_migration_010_completed" "_migration_011_completed" "_migration_012_completed" "_migration_013_completed" "_migration_014_completed" "_migration_015_completed" "_migration_016_completed" "_migration_017_completed" "_migration_018_completed" "_migration_019_completed" "_migration_020_completed" "_migration_021_completed" "_migration_022_completed" "_migration_023_completed" "_migration_024_completed")
 
 for guard in "${EXPECTED_GUARDS[@]}"; do
   COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='$guard';")
