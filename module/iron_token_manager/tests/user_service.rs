@@ -137,10 +137,10 @@ async fn test_create_user_success() {
   let service = UserService::new(db.pool().clone());
 
   let params = CreateUserParams {
-    username: "john_doe".to_string(),
-    password: "SecurePass123!".to_string(),
-    email: "john@example.com".to_string(),
-    role: "user".to_string(),
+    username: "john_doe".to_owned(),
+    password: "SecurePass123!".to_owned(),
+    email: "john@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
@@ -156,10 +156,10 @@ async fn test_create_user_success() {
   assert_eq!(user.username, "john_doe", "Username should match input");
   assert_eq!(
     user.email,
-    Some("john@example.com".to_string()),
+    Some("john@example.com".to_owned()),
     "Email should match input"
   );
-  assert_eq!(user.role, "user", "Role should match input");
+  assert_eq!(user.role, "manager", "Role should match input");
   assert!(user.is_active, "New user should be active by default");
   assert!(
     user.password_hash.starts_with("$2b$"),
@@ -181,9 +181,9 @@ async fn test_create_user_empty_username() {
 
   let params = CreateUserParams {
     username: String::new(),
-    password: "SecurePass123!".to_string(),
-    email: "john@example.com".to_string(),
-    role: "user".to_string(),
+    password: "SecurePass123!".to_owned(),
+    email: "john@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
@@ -210,10 +210,10 @@ async fn test_create_user_empty_password() {
   let service = UserService::new(db.pool().clone());
 
   let params = CreateUserParams {
-    username: "john_doe".to_string(),
+    username: "john_doe".to_owned(),
     password: String::new(),
-    email: "john@example.com".to_string(),
-    role: "user".to_string(),
+    email: "john@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
@@ -240,10 +240,10 @@ async fn test_create_user_empty_email() {
   let service = UserService::new(db.pool().clone());
 
   let params = CreateUserParams {
-    username: "john_doe".to_string(),
-    password: "SecurePass123!".to_string(),
+    username: "john_doe".to_owned(),
+    password: "SecurePass123!".to_owned(),
     email: String::new(),
-    role: "user".to_string(),
+    role: "manager".to_owned(),
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
@@ -270,10 +270,10 @@ async fn test_create_user_invalid_role() {
   let service = UserService::new(db.pool().clone());
 
   let params = CreateUserParams {
-    username: "john_doe".to_string(),
-    password: "SecurePass123!".to_string(),
-    email: "john@example.com".to_string(),
-    role: "hacker".to_string(), // Invalid role
+    username: "john_doe".to_owned(),
+    password: "SecurePass123!".to_owned(),
+    email: "john@example.com".to_owned(),
+    role: "hacker".to_owned(), // Invalid role
   };
 
   // Use user_001 as admin (pre-seeded by common::create_test_db)
@@ -332,10 +332,10 @@ async fn test_password_bcrypt_cost_12() {
   let service = UserService::new(db.pool().clone());
 
   let params = CreateUserParams {
-    username: "john_doe".to_string(),
-    password: "SecurePass123!".to_string(),
-    email: "john@example.com".to_string(),
-    role: "user".to_string(),
+    username: "john_doe".to_owned(),
+    password: "SecurePass123!".to_owned(),
+    email: "john@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   let user = service
@@ -371,10 +371,10 @@ async fn test_sql_injection_username() {
   let service = UserService::new(db.pool().clone());
 
   let params = CreateUserParams {
-    username: "'; DROP TABLE users;--".to_string(),
-    password: "SecurePass123!".to_string(),
-    email: "attacker@example.com".to_string(),
-    role: "user".to_string(),
+    username: "'; DROP TABLE users;--".to_owned(),
+    password: "SecurePass123!".to_owned(),
+    email: "attacker@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   // Should either reject SQL injection OR escape it safely
@@ -411,10 +411,10 @@ async fn test_deleted_user_not_in_list() {
 
   // Create user
   let params = CreateUserParams {
-    username: "john_doe".to_string(),
-    password: "SecurePass123!".to_string(),
-    email: "john@example.com".to_string(),
-    role: "user".to_string(),
+    username: "john_doe".to_owned(),
+    password: "SecurePass123!".to_owned(),
+    email: "john@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   let user = service
@@ -502,10 +502,10 @@ async fn test_sql_injection_search() {
 
   // Create a normal user for reference
   let params = CreateUserParams {
-    username: "normal_user".to_string(),
-    password: "SecurePass123!".to_string(),
-    email: "normal@example.com".to_string(),
-    role: "user".to_string(),
+    username: "normal_user".to_owned(),
+    password: "SecurePass123!".to_owned(),
+    email: "normal@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   service
@@ -515,7 +515,7 @@ async fn test_sql_injection_search() {
 
   // Attempt SQL injection via search parameter
   let filters = ListUsersFilters {
-    search: Some("'; DROP TABLE users;--".to_string()),
+    search: Some("'; DROP TABLE users;--".to_owned()),
     role: None,
     is_active: None,
     limit: None,

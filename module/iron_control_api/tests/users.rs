@@ -29,22 +29,24 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use axum::extract::FromRef;
+use std::sync::Arc;
+
 use axum::{
   body::Body,
+  extract::FromRef,
   http::{header, Request, StatusCode},
   routing::post,
   Router,
 };
-use common::{create_test_access_token, extract_json_response, test_db};
-use iron_control_api::jwt_auth::JwtSecret;
-use iron_control_api::rbac::PermissionChecker;
-use iron_control_api::routes::auth::AuthState;
-use iron_control_api::routes::users::{
-  self, CreateUserRequest, ListUsersResponse, UserManagementState, UserResponse,
-};
-use std::sync::Arc;
 use tower::ServiceExt;
+
+use common::{create_test_access_token, extract_json_response, test_db};
+use iron_control_api::{
+  jwt_auth::JwtSecret,
+  rbac::PermissionChecker,
+  routes::auth::AuthState,
+  routes::users::{self, CreateUserRequest, ListUsersResponse, UserManagementState, UserResponse},
+};
 
 #[derive(Clone)]
 struct TestAppState {
@@ -67,7 +69,7 @@ impl FromRef<TestAppState> for UserManagementState {
 async fn create_test_app() -> (Router, TestAppState) {
   let db = test_db::create_test_db().await;
   let db_pool = db.pool();
-  let jwt_secret = Arc::new(JwtSecret::new("test_secret".to_string()));
+  let jwt_secret = Arc::new(JwtSecret::new("test_secret".to_owned()));
 
   let auth_state = AuthState {
     db_pool: db_pool.clone(),
@@ -104,10 +106,10 @@ async fn test_create_and_list_users() {
 
   // 1. Create a new user
   let create_request = CreateUserRequest {
-    username: "newuser".to_string(),
-    password: "password123".to_string(),
-    email: "newuser@example.com".to_string(),
-    role: "user".to_string(),
+    username: "newuser".to_owned(),
+    password: "password123".to_owned(),
+    email: "newuser@example.com".to_owned(),
+    role: "manager".to_owned(),
   };
 
   let response = router

@@ -1,10 +1,12 @@
 //! Shared types and state for authentication endpoints
 
-use crate::error::ValidationError;
-use crate::jwt_auth::JwtSecret;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, SqlitePool};
-use std::sync::Arc;
+
+use crate::error::ValidationError;
+use crate::jwt_auth::JwtSecret;
 
 /// Shared authentication state
 #[derive(Clone)]
@@ -95,6 +97,18 @@ impl AuthState {
     if migration_020_completed == 0 {
       let migration_020 = include_str!("../../../migrations/020_add_account_lockout_fields.sql");
       sqlx::raw_sql(migration_020).execute(&db_pool).await?;
+    }
+
+    // Migration 025: Rename RBAC roles (user->manager, viewer->developer)
+    let migration_025_completed: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_migration_025_completed'",
+    )
+    .fetch_one(&db_pool)
+    .await?;
+
+    if migration_025_completed == 0 {
+      let migration_025 = include_str!("../../../migrations/025_rename_roles.sql");
+      sqlx::raw_sql(migration_025).execute(&db_pool).await?;
     }
 
     Ok(Self {

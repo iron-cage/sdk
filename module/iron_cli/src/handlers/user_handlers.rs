@@ -4,9 +4,11 @@
 //! role change, and password reset operations.
 //! No I/O - all external operations handled by adapter layer.
 
+use core::str::FromStr;
+use std::collections::HashMap;
+
 use super::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
-use std::collections::HashMap;
 
 /// Handle .users.create command
 ///
@@ -18,7 +20,7 @@ use std::collections::HashMap;
 /// - username: String (non-empty, max 255 chars)
 /// - password: String (min 8 chars, max 1000 chars)
 /// - email: String (non-empty, contains @, max 255 chars)
-/// - role: String (viewer|user|admin)
+/// - role: String (developer|manager|admin)
 ///
 /// # Errors
 ///
@@ -97,7 +99,7 @@ pub fn create_user_handler<S: ::core::hash::BuildHasher>(
 /// ## Parameters
 ///
 /// All optional:
-/// - role: String (viewer|user|admin)
+/// - role: String (developer|manager|admin)
 /// - `is_active`: String (true|false)
 /// - search: String (username or email search)
 /// - page: String (integer, default 1)
@@ -260,7 +262,7 @@ pub fn delete_user_handler<S: ::core::hash::BuildHasher>(
 ///
 /// Required:
 /// - `user_id`: String (integer)
-/// - role: String (viewer|user|admin)
+/// - role: String (developer|manager|admin)
 ///
 /// # Errors
 ///
@@ -343,15 +345,13 @@ pub fn reset_password_handler<S: ::core::hash::BuildHasher>(
 
 // Helper validation functions
 
-/// Validates that role is one of: viewer, user, admin
+/// Validates role using `iron_types::Role` as single source of truth
 fn validate_user_role(role: &str) -> Result<(), CliError> {
-  match role {
-    "viewer" | "user" | "admin" => Ok(()),
-    _ => Err(CliError::InvalidParameter {
-      param: "role",
-      reason: "must be one of: viewer, user, admin",
-    }),
-  }
+  iron_types::Role::from_str(role).map_err(|_| CliError::InvalidParameter {
+    param: "role",
+    reason: "must be one of: developer, manager, admin",
+  })?;
+  Ok(())
 }
 
 /// Validates that a string is a boolean (true|false)

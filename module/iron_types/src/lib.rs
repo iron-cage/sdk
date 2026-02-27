@@ -235,7 +235,13 @@ pub use types::*;
 pub mod ids;
 
 #[cfg(feature = "enabled")]
+pub mod role;
+
+#[cfg(feature = "enabled")]
 pub use ids::{
   AgentId, ApiTokenId, BudgetRequestId, IcTokenId, IdError, LeaseId, ProjectId, ProviderId,
   RequestId,
 };
+
+#[cfg(feature = "enabled")]
+pub use role::Role;

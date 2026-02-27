@@ -5,9 +5,13 @@
 //!
 //! Note: Named `control_user_handlers` to distinguish from token CLI's `user_handlers`.
 
-use crate::handlers::validation::{validate_non_empty, validate_non_negative_integer};
-use crate::handlers::CliError;
+use core::str::FromStr;
 use std::collections::HashMap;
+
+use crate::handlers::{
+  validation::{validate_non_empty, validate_non_negative_integer},
+  CliError,
+};
 
 /// Validates email format
 fn validate_email(email: &str, param_name: &'static str) -> Result<(), CliError> {
@@ -65,7 +69,7 @@ pub fn list_users_handler<S: ::core::hash::BuildHasher>(
 /// Required:
 /// - username: String (3-50 chars, pattern: ^[a-zA-Z0-9_-]+$)
 /// - email: String (valid email format)
-/// - role: String (user|admin)
+/// - role: String (developer|manager|admin)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
@@ -113,15 +117,12 @@ pub fn create_user_handler<S: ::core::hash::BuildHasher>(
   validate_non_empty(email, "email")?;
   validate_email(email, "email")?;
 
-  // Validate role
-  match role.as_str() {
-    "user" | "admin" => {}
-    _ => {
-      return Err(CliError::InvalidParameter {
-        param: "role",
-        reason: "must be either 'user' or 'admin'",
-      })
-    }
+  // Validate role via iron_types::Role (single source of truth)
+  if iron_types::Role::from_str(role).is_err() {
+    return Err(CliError::InvalidParameter {
+      param: "role",
+      reason: "must be one of: developer, manager, admin",
+    });
   }
 
   // Validate optional dry run
@@ -265,13 +266,13 @@ pub fn delete_user_handler<S: ::core::hash::BuildHasher>(
 
 /// Handle `.user.set_role` command
 ///
-/// Sets user role (admin/user).
+/// Sets user role (admin/manager/developer).
 ///
 /// ## Parameters
 ///
 /// Required:
 /// - id: String (non-empty)
-/// - role: String (user|admin)
+/// - role: String (developer|manager|admin)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
@@ -292,15 +293,12 @@ pub fn set_user_role_handler<S: ::core::hash::BuildHasher>(
 
   validate_non_empty(id, "id")?;
 
-  // Validate role
-  match role.as_str() {
-    "user" | "admin" => {}
-    _ => {
-      return Err(CliError::InvalidParameter {
-        param: "role",
-        reason: "must be either 'user' or 'admin'",
-      })
-    }
+  // Validate role via iron_types::Role (single source of truth)
+  if iron_types::Role::from_str(role).is_err() {
+    return Err(CliError::InvalidParameter {
+      param: "role",
+      reason: "must be one of: developer, manager, admin",
+    });
   }
 
   // Validate optional dry run

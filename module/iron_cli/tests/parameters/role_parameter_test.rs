@@ -3,7 +3,7 @@
 //! ## Purpose
 //!
 //! Validates the `role` parameter across user management commands.
-//! Tests role enum validation (admin, user, viewer, etc.).
+//! Tests role enum validation (admin, manager, developer).
 //!
 //! ## Coverage
 //!
@@ -13,7 +13,7 @@
 //!
 //! ## Test Categories
 //!
-//! 1. **Valid Values**: Known roles (admin, user, viewer)
+//! 1. **Valid Values**: Known roles (admin, manager, developer)
 //! 2. **Invalid Values**: Unknown roles, empty, typos
 //! 3. **Edge Cases**: Case sensitivity, whitespace
 //!
@@ -57,9 +57,9 @@ mod tests {
     server.shutdown().await;
   }
 
-  /// Test valid role (user)
+  /// Test valid role (manager)
   #[tokio::test]
-  async fn test_role_user() {
+  async fn test_role_manager() {
     let server = TestServer::start().await;
     let data = TestData::new().await;
     let user_id = data.create_user("admin@example.com").await;
@@ -72,14 +72,18 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".user.create", "email::newuser@example.com", "role::user"],
+        &[
+          ".user.create",
+          "email::newuser@example.com",
+          "role::manager",
+        ],
       )
       .await;
 
     if !result.success() {
       assert!(
         !result.stderr.contains("role") || !result.stderr.contains("invalid"),
-        "Should accept 'user' role. Stderr: {}",
+        "Should accept 'manager' role. Stderr: {}",
         result.stderr
       );
     }

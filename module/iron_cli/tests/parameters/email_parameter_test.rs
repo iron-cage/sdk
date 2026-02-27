@@ -43,7 +43,11 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".user.create", "email::newuser@example.com", "role::user"],
+        &[
+          ".user.create",
+          "email::newuser@example.com",
+          "role::manager",
+        ],
       )
       .await;
 
@@ -73,7 +77,7 @@ mod tests {
       .api_key(&api_key);
 
     let result = harness
-      .run("iron", &[".user.create", "email::", "role::user"])
+      .run("iron", &[".user.create", "email::", "role::manager"])
       .await;
 
     assert!(!result.success(), "Empty email should fail");
@@ -103,7 +107,7 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".user.create", "email::userexample.com", "role::user"],
+        &[".user.create", "email::userexample.com", "role::manager"],
       )
       .await;
 
@@ -132,7 +136,11 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".user.create", "email::user@mail.example.com", "role::user"],
+        &[
+          ".user.create",
+          "email::user@mail.example.com",
+          "role::manager",
+        ],
       )
       .await;
 
@@ -162,7 +170,11 @@ mod tests {
     let result = harness
       .run(
         "iron",
-        &[".user.create", "email::user+tag@example.com", "role::user"],
+        &[
+          ".user.create",
+          "email::user+tag@example.com",
+          "role::manager",
+        ],
       )
       .await;
 
@@ -196,7 +208,7 @@ mod tests {
         &[
           ".user.create",
           &format!("email::{long_local}@example.com"),
-          "role::user",
+          "role::manager",
         ],
       )
       .await;
@@ -225,7 +237,7 @@ mod tests {
       .api_key(&api_key);
 
     let result = harness
-      .run("iron", &[".user.create", "email::user@", "role::user"])
+      .run("iron", &[".user.create", "email::user@", "role::manager"])
       .await;
 
     assert!(!result.success(), "Email without domain should fail");

@@ -39,7 +39,6 @@
 //! - ✅ Second-order SQL injection
 //! - ✅ Error message leakage prevention
 
-use super::common;
 use axum::{
   body::Body,
   http::{Request, StatusCode},
@@ -47,6 +46,8 @@ use axum::{
 use serde_json::json;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
+
+use super::common;
 
 /// Comprehensive SQL injection attack vectors (20+ payloads)
 ///
@@ -329,7 +330,7 @@ async fn test_user_creation_sql_injection() {
           "username": payload,
           "email": format!( "{}@example.com", payload ),
           "password": "secure_password_123",
-          "role": "user"
+          "role": "manager"
         })
         .to_string(),
       ))

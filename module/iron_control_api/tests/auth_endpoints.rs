@@ -17,8 +17,7 @@
 //! | `test_token_refresh_flow_concept` | Refresh token flow | Valid refresh token → new access token | New access token generated and verifiable | ✅ |
 //! | `test_logout_flow_concept` | Logout flow with token blacklist | Access token → blacklist → verify blacklisted | Token added to blacklist successfully | ✅ |
 
-use iron_control_api::jwt_auth::JwtSecret;
-use iron_control_api::rbac::Role;
+use iron_control_api::{jwt_auth::JwtSecret, rbac::Role};
 
 #[test]
 fn test_jwt_secret_creation() {
@@ -74,7 +73,7 @@ fn test_login_flow_concept() {
 
   // User logs in with credentials (username/password validation would happen here)
   let user_id = "user_123";
-  let _ = Role::User;
+  let _ = Role::Developer;
 
   // Server generates access + refresh tokens
   let access_token = secret

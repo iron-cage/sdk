@@ -3,7 +3,7 @@
 
 .PHONY: help dev api dashboard test test_one test_in test_not clean setup status ports
 .PHONY: fmt-check fmt-fix lint check typecheck build validate lint-docs lint-python
-.PHONY: db-reset db-reset-seed db-seed db-admin db-inspect debug-setup
+.PHONY: db-reset db-reset-seed db-seed db-validate db-admin db-inspect debug-setup
 .PHONY: py-build py-dev py-test py-test-e2e py-test-manual py-sync py-clean
 .PHONY: docker-build docker-up docker-down docker-down-volumes docker-logs docker-logs-backend docker-logs-frontend docker-ps
 .PHONY: secrets-check
@@ -114,7 +114,7 @@ typecheck: ## Type-check dashboard
 	fi
 	@cd $(DASHBOARD_DIR) && npm run type-check
 
-validate: check test typecheck build ## Full production validation
+validate: check db-validate test typecheck build ## Full production validation
 	@echo "[+] Validation complete"
 
 #===============================================================================
@@ -172,6 +172,12 @@ db-seed: ## Populate seed data (assumes database exists)
 	@echo "[*] Populating seed data..."
 	@module/iron_token_manager/scripts/seed_dev_data.sh iron.db
 	@echo "[+] Seed data populated: iron.db"
+
+db-validate: ## Validate database paths, schema and seed data
+	@module/iron_token_manager/scripts/validate_db_paths.sh
+	@module/iron_token_manager/scripts/validate_db_schema.sh $(CURDIR)/iron.db
+	@module/iron_token_manager/scripts/validate_seed_data.sh $(CURDIR)/iron.db
+	@echo "[+] Database validation complete"
 
 db-admin: ## Create admin user
 	@sqlite3 iron.db "INSERT OR REPLACE INTO users (id, email, username, password_hash, role, is_active, created_at) VALUES ('user_admin', 'admin@admin.com', 'admin', '\$$2b\$$12\$$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2', 'admin', 1, strftime('%s', 'now') * 1000);"

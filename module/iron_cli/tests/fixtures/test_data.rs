@@ -55,9 +55,10 @@
 //! }
 //! ```
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use iron_test_db::{StorageMode, TestDatabaseBuilder};
 use sqlx::{Row, SqlitePool};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct TestData {
   pool: SqlitePool,
@@ -101,7 +102,7 @@ impl TestData {
         username TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
-        role TEXT NOT NULL DEFAULT 'user',
+        role TEXT NOT NULL DEFAULT 'developer',
         is_active INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL
       )",
@@ -183,7 +184,7 @@ impl TestData {
     .bind(email) // Use email as username for simplicity
     .bind("test-hash")
     .bind(email)
-    .bind("user")
+    .bind("developer")
     .bind(1)
     .bind(now)
     .execute(&self.pool)

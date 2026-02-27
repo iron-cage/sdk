@@ -41,7 +41,7 @@ use crate::error::{Result, TokenError};
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-024, skipping 007).
+/// Migrations are applied in order (001-025, skipping 007).
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -151,6 +151,9 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
 
   // Migration 024: Add per-IP-key spending cap columns
   apply_migration_024(pool).await?;
+
+  // Migration 025: Rename RBAC roles (user->manager, viewer->developer)
+  apply_migration_025(pool).await?;
 
   Ok(())
 }
@@ -724,6 +727,32 @@ async fn apply_migration_024(pool: &SqlitePool) -> Result<()> {
 
     sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
       eprintln!("Migration 024 failed: {e:?}");
+      TokenError::Generic
+    })?;
+  }
+
+  Ok(())
+}
+
+/// Migration 025: Rename RBAC roles
+///
+/// Renames legacy role values in users table:
+/// - `user` -> `manager`
+/// - `viewer` -> `developer`
+async fn apply_migration_025(pool: &SqlitePool) -> Result<()> {
+  let completed: i64 = query_scalar(
+    "SELECT COUNT(*) FROM sqlite_master
+     WHERE type='table' AND name='_migration_025_completed'",
+  )
+  .fetch_one(pool)
+  .await
+  .map_err(|_| TokenError::Generic)?;
+
+  if completed == 0 {
+    let migration = include_str!("../migrations/025_rename_roles.sql");
+
+    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
+      eprintln!("Migration 025 failed: {e:?}");
       TokenError::Generic
     })?;
   }

@@ -34,6 +34,7 @@ test-adapter = []
 [dependencies]
 # Core dependencies
 iron_config_loader = { workspace = true }
+iron_types = { workspace = true, features = ["enabled"] }
 tokio = { workspace = true, optional = true, features = ["full"] }
 reqwest = { workspace = true, optional = true, features = ["json", "query"] }
 serde = { workspace = true, optional = true }
@@ -46,7 +47,6 @@ keyring = { workspace = true, optional = true }
 regex = { workspace = true }
 base64 = { workspace = true }
 tree_fmt = { workspace = true, features = ["table_plain", "expanded_postgres", "format_json", "format_yaml"] }
-sqlx = { workspace = true, optional = true }
 
 [build-dependencies]
 serde_yaml = { workspace = true }
