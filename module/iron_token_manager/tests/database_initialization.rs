@@ -82,8 +82,8 @@ async fn test_migrations_are_idempotent() {
   .expect("LOUD FAILURE: Failed to count tables");
 
   assert_eq!(
-    table_count, 17,
-    "Should have exactly 17 application tables after multiple runs"
+    table_count, 18,
+    "Should have exactly 18 application tables after multiple runs"
   );
 }
 
@@ -149,6 +149,7 @@ async fn test_production_schema_matches_test_schema() {
     "api_call_traces",
     "api_tokens",
     "audit_log",
+    "blacklist",
     "budget_change_requests",
     "budget_leases",
     "budget_modification_history",
@@ -174,8 +175,8 @@ async fn test_production_schema_matches_test_schema() {
       .expect("LOUD FAILURE: Failed to count indexes");
 
   assert_eq!(
-    index_count, 51,
-    "Should have 51 indexes across all migrations"
+    index_count, 53,
+    "Should have 53 indexes across all migrations"
   );
 }
 
@@ -218,35 +219,15 @@ async fn test_all_migrations_have_guards() {
   let pool = db.pool().clone();
   core::mem::forget(db);
 
-  // Verify guard tables exist for migrations that need them (001 and 007 have no guards)
-  let guard_tables = vec![
-    "_migration_002_completed",
-    "_migration_003_completed",
-    "_migration_004_completed",
-    "_migration_005_completed",
-    "_migration_006_completed",
-    "_migration_008_completed",
-    "_migration_009_completed",
-    "_migration_010_completed",
-    "_migration_011_completed",
-    "_migration_012_completed",
-    "_migration_013_completed",
-    "_migration_014_completed",
-    "_migration_015_completed",
-    "_migration_016_completed",
-    "_migration_017_completed",
-    "_migration_018_completed",
-    "_migration_019_completed",
-    "_migration_020_completed",
-    "_migration_021_completed",
-    "_migration_022_completed",
-    "_migration_023_completed",
-  ];
+  // Verify guard tables exist for all migrations (001-025)
+  let guard_tables: Vec<String> = (1..=25)
+    .map(|n| format!("_migration_{n:03}_completed"))
+    .collect();
 
   for guard_table in guard_tables {
     let exists: i64 =
       query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = $1")
-        .bind(guard_table)
+        .bind(&guard_table)
         .fetch_one(&pool)
         .await
         .expect("LOUD FAILURE: Failed to check guard table");

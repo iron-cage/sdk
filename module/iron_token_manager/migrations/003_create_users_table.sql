@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users
   email TEXT NOT NULL UNIQUE CHECK (LENGTH(email) > 0 AND LENGTH(email) <= 255),
 
   -- Authorization
-  role TEXT NOT NULL DEFAULT 'user' CHECK (LENGTH(role) > 0 AND LENGTH(role) <= 50),
+  role TEXT NOT NULL DEFAULT 'developer' CHECK (LENGTH(role) > 0 AND LENGTH(role) <= 50),
 
   -- User profile
   name TEXT CHECK (LENGTH(name) <= 255),
