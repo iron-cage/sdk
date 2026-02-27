@@ -453,16 +453,11 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
     }
   }
 
-  // Decode hex string to bytes
-  let ip_token_key = hex::decode(&ip_token_key_hex)
+  // Decode hex string to bytes and construct IpTokenKey
+  let ip_token_key_bytes = hex::decode(&ip_token_key_hex)
     .expect("LOUD FAILURE: IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)");
-
-  assert_eq!(
-    ip_token_key.len(),
-    32,
-    "IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters), got {} bytes",
-    ip_token_key.len()
-  );
+  let ip_token_key = iron_secrets::ip_token::IpTokenKey::try_from(ip_token_key_bytes.as_slice())
+    .expect("LOUD FAILURE: IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters)");
 
   tracing::info!("Initializing API server...");
   tracing::info!("Database: {}", database_url);

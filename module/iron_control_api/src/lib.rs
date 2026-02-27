@@ -205,10 +205,10 @@ pub mod token_auth;
 pub mod ic_token;
 
 #[cfg(feature = "enabled")]
-pub mod ip_token;
+pub mod rate_limiter;
 
 #[cfg(feature = "enabled")]
-pub mod rate_limiter;
+pub use iron_secrets::ip_token;
 
 #[cfg(feature = "enabled")]
 mod implementation {

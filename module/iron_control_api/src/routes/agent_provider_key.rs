@@ -50,8 +50,8 @@ impl GetProviderKeyRequest {
 /// Provider key response
 #[derive(Debug, Serialize)]
 pub struct GetProviderKeyResponse {
-  /// Decrypted provider API key
-  pub provider_key: String,
+  /// IP Token — AES-256-GCM encrypted provider API key
+  pub ip_token: String,
   /// Provider type ("openai" or "anthropic")
   pub provider: String,
   /// Optional custom base URL
@@ -75,11 +75,15 @@ pub struct GetProviderKeyResponse {
 /// 8. Log audit entry
 /// 9. Return decrypted key
 ///
+/// # Panics
+///
+/// Panics if the system clock is set before the Unix epoch.
+///
 /// # Returns
 ///
 /// - 200 OK with provider key
 /// - 400 Bad Request if validation fails (`INVALID_TOKEN`)
-/// - 401 Unauthorized if IC Token invalid (UNAUTHORIZED)
+/// - 401 Unauthorized if IC Token invalid (`UNAUTHORIZED`)
 /// - 403 Forbidden if no provider assigned (`NO_PROVIDER_ASSIGNED`)
 /// - 404 Not Found if provider key not found (`PROVIDER_NOT_FOUND`)
 /// - 503 Service Unavailable if crypto not configured (`CRYPTO_UNAVAILABLE`)
@@ -103,7 +107,7 @@ pub async fn get_provider_key(
       .into_response();
   }
 
-  // 2-3. Verify IC Token (JWT signature + hash-check against database)
+  // 2. Verify IC Token (JWT signature + hash-check against database)
   let (agent_id, claims) = match ic_token::validate_ic_token_for_endpoint(
     &state.ic_token_manager,
     &request.ic_token,
@@ -116,7 +120,7 @@ pub async fn get_provider_key(
     Err(response) => return response,
   };
 
-  // 4. Query agent's provider_key_id
+  // 3. Query agent's provider_key_id
   let provider_key_id: Option<i64> =
     match sqlx::query_scalar("SELECT provider_key_id FROM agents WHERE id = ?")
       .bind(agent_id)
@@ -147,7 +151,7 @@ pub async fn get_provider_key(
       }
     };
 
-  // 5. Check if agent has provider assigned
+  // 4. Check if agent has provider assigned
   let Some(provider_key_id) = provider_key_id else {
     return (
       StatusCode::FORBIDDEN,
@@ -159,7 +163,7 @@ pub async fn get_provider_key(
       .into_response();
   };
 
-  // 6. Get provider key record (includes encrypted data)
+  // 5. Get provider key record (includes encrypted data)
   let key_record = match state.provider_key_storage.get_key(provider_key_id).await {
     Ok(record) => record,
     Err(err) => {
@@ -179,7 +183,7 @@ pub async fn get_provider_key(
     }
   };
 
-  // 7. Check if key is enabled
+  // 6. Check if key is enabled
   if !key_record.metadata.is_enabled {
     return (
       StatusCode::FORBIDDEN,
@@ -191,7 +195,7 @@ pub async fn get_provider_key(
       .into_response();
   }
 
-  // 8. Get crypto service
+  // 7. Get crypto service
   let Some(crypto) = &state.crypto_service else {
     tracing::error!("CryptoService not configured");
     return (
@@ -204,7 +208,7 @@ pub async fn get_provider_key(
       .into_response();
   };
 
-  // 9. Reconstruct encrypted secret from base64
+  // 8. Reconstruct encrypted secret from base64
   let encrypted =
     match EncryptedSecret::from_base64(&key_record.encrypted_api_key, &key_record.encryption_nonce)
     {
@@ -222,7 +226,7 @@ pub async fn get_provider_key(
       }
     };
 
-  // 10. Decrypt the API key
+  // 9. Decrypt the API key
   let decrypted = match crypto.decrypt(&encrypted) {
     Ok(d) => d,
     Err(err) => {
@@ -238,7 +242,23 @@ pub async fn get_provider_key(
     }
   };
 
-  // 11. Log audit entry (fire and forget)
+  // 11. Encrypt provider key as IP Token for transit security
+  let ip_token = match state.ip_token_crypto.encrypt(&decrypted) {
+    Ok(token) => token,
+    Err(err) => {
+      tracing::error!("Failed to encrypt IP Token: {}", err);
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Internal server error",
+          "code": "INTERNAL_ERROR"
+        })),
+      )
+        .into_response();
+    }
+  };
+
+  // 12. Log audit entry (fire and forget)
   let now_ms = i64::try_from(
     std::time::SystemTime::now()
       .duration_since(std::time::UNIX_EPOCH)
@@ -268,7 +288,7 @@ pub async fn get_provider_key(
     tracing::warn!("Audit log insert failed: {}", e);
   }
 
-  // 12. Update last_used_at
+  // 13. Update last_used_at
   if let Err(e) = state
     .provider_key_storage
     .update_last_used(provider_key_id)
@@ -277,11 +297,11 @@ pub async fn get_provider_key(
     tracing::warn!("Failed to update last_used_at: {}", e);
   }
 
-  // 13. Return response
+  // 14. Return response with IP Token (encrypted provider key)
   (
     StatusCode::OK,
     Json(GetProviderKeyResponse {
-      provider_key: decrypted.to_string(),
+      ip_token,
       provider: key_record.metadata.provider.to_string(),
       base_url: key_record.metadata.base_url,
     }),

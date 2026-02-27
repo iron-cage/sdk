@@ -5,17 +5,20 @@
 //! IP Tokens are AES-256-GCM encrypted provider API keys that are:
 //! - Never written to disk (memory-only storage)
 //! - Encrypted with runtime session key
-//! - Format: `AES256:{IV_base64}:{ciphertext_base64}:{auth_tag_base64}`
+//! - Format: AES256:{IV_base64}:{ciphertext_base64}:{auth_tag_base64}
 //!
 //! The runtime acts as a secure proxy, decrypting IP Tokens on-demand to make
 //! LLM API calls without exposing provider credentials to the developer.
 
+use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
+
 use aes_gcm::{
-  aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
+  aead::rand_core::RngCore,
+  aead::{Aead, KeyInit, OsRng},
   Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use zeroize::Zeroizing;
+use secrecy::{ExposeSecret, SecretBox};
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)
 const NONCE_SIZE: usize = 12;
@@ -26,6 +29,113 @@ const TAG_SIZE: usize = 16;
 /// Key size for AES-256 (256 bits = 32 bytes)
 const KEY_SIZE: usize = 32;
 
+/// 32-byte AES-256-GCM key for IP Token encryption/decryption.
+///
+/// Wraps key material in `SecretBox` — prevents Debug/Display leaks, zeroes on drop.
+pub struct IpTokenKey {
+  inner: SecretBox<[u8; 32]>,
+}
+
+impl IpTokenKey {
+  /// Access the raw key bytes (only for crypto operations).
+  #[must_use]
+  pub fn expose_secret(&self) -> &[u8; 32] {
+    self.inner.expose_secret()
+  }
+}
+
+impl Clone for IpTokenKey {
+  fn clone(&self) -> Self {
+    let bytes = *self.inner.expose_secret();
+    Self {
+      inner: SecretBox::new(Box::new(bytes)),
+    }
+  }
+}
+
+impl Debug for IpTokenKey {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    f.debug_struct("IpTokenKey")
+      .field("inner", &"<redacted>")
+      .finish()
+  }
+}
+
+impl TryFrom<[u8; 32]> for IpTokenKey {
+  type Error = IpTokenError;
+
+  fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
+    Ok(Self {
+      inner: SecretBox::new(Box::new(bytes)),
+    })
+  }
+}
+
+impl TryFrom<&[u8]> for IpTokenKey {
+  type Error = IpTokenError;
+
+  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+    if bytes.len() != KEY_SIZE {
+      return Err(IpTokenError::InvalidKeyLength);
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(bytes);
+    Ok(Self {
+      inner: SecretBox::new(Box::new(key)),
+    })
+  }
+}
+
+/// Provider API key returned after IP Token decryption.
+///
+/// Canonical definition shared by `iron_runtime` (`KeyFetcher`) and `iron_cost` (`BudgetClient`).
+/// Defined here because IP Token decryption is the only source of `ProviderKey` values.
+///
+/// `api_key` is wrapped in `SecretBox` to prevent accidental leaks via Debug/Display
+/// and to ensure key material is zeroed on drop.
+pub struct ProviderKey {
+  /// Provider type: "openai" or "anthropic"
+  pub provider: String,
+  /// The actual API key (protected from Debug/Display leaks, zeroed on drop)
+  pub api_key: SecretBox<String>,
+  /// Optional custom base URL for the provider
+  pub base_url: Option<String>,
+}
+
+impl Clone for ProviderKey {
+  fn clone(&self) -> Self {
+    Self {
+      provider: self.provider.clone(),
+      api_key: SecretBox::new(Box::new(self.api_key.expose_secret().clone())),
+      base_url: self.base_url.clone(),
+    }
+  }
+}
+
+impl Debug for ProviderKey {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    f.debug_struct("ProviderKey")
+      .field("provider", &self.provider)
+      .field("api_key", &"<redacted>")
+      .field("base_url", &self.base_url)
+      .finish()
+  }
+}
+
+impl ProviderKey {
+  /// Detect provider type from API key format.
+  ///
+  /// `sk-ant-*` keys identify Anthropic; all other formats default to `OpenAI`.
+  #[must_use]
+  pub fn detect_provider_from_key(api_key: &str) -> &'static str {
+    if api_key.starts_with("sk-ant-") {
+      "anthropic"
+    } else {
+      "openai"
+    }
+  }
+}
+
 /// IP Token crypto manager
 ///
 /// Encrypts and decrypts provider API keys using AES-256-GCM.
@@ -34,8 +144,8 @@ pub struct IpTokenCrypto {
   cipher: Aes256Gcm,
 }
 
-impl core::fmt::Debug for IpTokenCrypto {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for IpTokenCrypto {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     f.debug_struct("IpTokenCrypto")
       .field("cipher", &"<redacted>")
       .finish()
@@ -43,7 +153,21 @@ impl core::fmt::Debug for IpTokenCrypto {
 }
 
 impl IpTokenCrypto {
-  /// Create new IP Token crypto manager
+  /// Create new IP Token crypto manager from an `IpTokenKey`.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if the key is invalid for AES-256-GCM.
+  pub fn new(key: &IpTokenKey) -> Result<Self, IpTokenError> {
+    let raw = key.expose_secret();
+    let cipher = Aes256Gcm::new_from_slice(raw).map_err(|_| IpTokenError::InvalidKey)?;
+    Ok(Self { cipher })
+  }
+
+  /// Create new IP Token crypto manager from a raw byte slice.
+  ///
+  /// Prefer `new(&IpTokenKey)` when possible. This method exists for
+  /// server-side code that constructs crypto from raw bytes directly.
   ///
   /// # Arguments
   ///
@@ -52,13 +176,11 @@ impl IpTokenCrypto {
   /// # Errors
   ///
   /// Returns error if key length is invalid
-  pub fn new(key: &[u8]) -> Result<Self, IpTokenError> {
+  pub fn from_slice(key: &[u8]) -> Result<Self, IpTokenError> {
     if key.len() != KEY_SIZE {
       return Err(IpTokenError::InvalidKeyLength);
     }
-
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| IpTokenError::InvalidKey)?;
-
     Ok(Self { cipher })
   }
 
@@ -114,7 +236,7 @@ impl IpTokenCrypto {
   ///
   /// # Returns
   ///
-  /// Decrypted provider API key (zeroized on drop)
+  /// Decrypted provider API key (protected from Debug/Display leaks, zeroed on drop)
   ///
   /// # Errors
   ///
@@ -123,7 +245,7 @@ impl IpTokenCrypto {
   /// - Base64 decoding fails
   /// - Decryption fails (wrong key or tampered data)
   /// - Plaintext is not valid UTF-8
-  pub fn decrypt(&self, ip_token: &str) -> Result<Zeroizing<String>, IpTokenError> {
+  pub fn decrypt(&self, ip_token: &str) -> Result<SecretBox<String>, IpTokenError> {
     // Parse format: AES256:{IV}:{ciphertext}:{tag}
     let parts: Vec<&str> = ip_token.split(':').collect();
     if parts.len() != 4 || parts[0] != "AES256" {
@@ -165,7 +287,7 @@ impl IpTokenCrypto {
 
     let plaintext = String::from_utf8(plaintext_bytes).map_err(|_| IpTokenError::InvalidUtf8)?;
 
-    Ok(Zeroizing::new(plaintext))
+    Ok(SecretBox::new(Box::new(plaintext)))
   }
 }
 
@@ -200,8 +322,8 @@ pub enum IpTokenError {
   InvalidUtf8,
 }
 
-impl core::fmt::Display for IpTokenError {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for IpTokenError {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     match self {
       Self::InvalidKeyLength => write!(f, "Invalid key length: must be {KEY_SIZE} bytes"),
       Self::InvalidKey => write!(f, "Invalid encryption key"),

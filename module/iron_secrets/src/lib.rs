@@ -67,3 +67,9 @@
 /// This is the only implemented module - other features (secrets manager,
 /// audit, access control, storage) are planned for future development.
 pub mod crypto;
+
+/// IP Token encryption/decryption for provider API keys in transit
+///
+/// Shared between server (encrypt) and client (decrypt) crates.
+/// Uses AES-256-GCM with format: `AES256:{IV}:{ciphertext}:{tag}`
+pub mod ip_token;

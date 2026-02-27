@@ -11,6 +11,7 @@ use crate::{
 };
 use axum::extract::FromRef;
 use iron_secrets::crypto::CryptoService;
+use iron_secrets::ip_token::IpTokenKey;
 use iron_token_manager::{
   agent_budget::AgentBudgetManager, lease_manager::LeaseManager,
   provider_key_storage::ProviderKeyStorage,
@@ -74,7 +75,7 @@ impl BudgetState {
   /// Returns error if database connection or crypto initialization fails
   pub async fn new(
     ic_token_manager: Arc<IcTokenManager>,
-    ip_token_key: &[u8],
+    ip_token_key: &IpTokenKey,
     provider_key_master: &[u8],
     jwt_secret: Arc<JwtSecret>,
     database_url: &str,

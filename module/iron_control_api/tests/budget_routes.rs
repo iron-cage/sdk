@@ -22,12 +22,12 @@
 //! | `test_usage_report_response_serialization` | UsageReportResponse JSON serialization | Serialize UsageReportResponse to JSON | Valid JSON with required fields | ✅ |
 //! | `test_budget_refresh_response_serialization` | BudgetRefreshResponse JSON serialization | Serialize BudgetRefreshResponse to JSON | Valid JSON with required fields | ✅ |
 
-use iron_control_api::ic_token::IcTokenRateLimiter;
 use iron_control_api::{
-  ic_token::{IcTokenClaims, IcTokenManager},
-  ip_token::IpTokenCrypto,
+  ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
+  ip_token::{ IpTokenCrypto, IpTokenKey },
   routes::budget::*,
 };
+use secrecy::ExposeSecret;
 
 /// Test handshake request validation
 #[test]
@@ -277,7 +277,7 @@ fn test_ip_token_encryption() {
   // Create 32-byte encryption key
   let key: [u8; 32] = [0u8; 32]; // In production, use random key
 
-  let crypto = IpTokenCrypto::new(&key).expect("LOUD FAILURE: Should create IP Token crypto");
+  let crypto = IpTokenCrypto::from_slice(&key).expect("LOUD FAILURE: Should create IP Token crypto");
 
   // Test provider API key
   let provider_key = "sk-proj_test_key_abc123";
@@ -292,14 +292,14 @@ fn test_ip_token_encryption() {
   let decrypted = crypto
     .decrypt(&ip_token)
     .expect("LOUD FAILURE: Should decrypt");
-  assert_eq!(&*decrypted, provider_key);
+  assert_eq!(decrypted.expose_secret(), provider_key);
 }
 
 /// Test IP Token format validation
 #[test]
 fn test_ip_token_format_validation() {
   let key: [u8; 32] = [0u8; 32];
-  let crypto = IpTokenCrypto::new(&key).expect("LOUD FAILURE: Should create crypto");
+  let crypto = IpTokenCrypto::from_slice(&key).expect("LOUD FAILURE: Should create crypto");
 
   // Invalid format - missing parts
   let invalid_token1 = "AES256:abc:def";
@@ -372,6 +372,7 @@ fn test_ic_token_agent_id_format() {
 async fn test_budget_state_creation() {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
+  let ip_token_key_typed = IpTokenKey::try_from(ip_token_key).unwrap();
   let provider_key_master: [u8; 32] = [42u8; 32];
   let jwt_secret = std::sync::Arc::new(iron_control_api::jwt_auth::JwtSecret::new(
     "test_jwt_secret".to_string(),
@@ -380,7 +381,7 @@ async fn test_budget_state_creation() {
 
   let state = BudgetState::new(
     std::sync::Arc::new(IcTokenManager::new(ic_token_secret)),
-    &ip_token_key,
+    &ip_token_key_typed,
     &provider_key_master,
     jwt_secret,
     database_url,

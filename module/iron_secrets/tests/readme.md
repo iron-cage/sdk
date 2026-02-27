@@ -7,6 +7,7 @@ Tests for iron_secrets encryption and key management.
 | File | Responsibility | Input→Output | Out of Scope |
 |------|----------------|--------------|--------------|
 | `crypto_test.rs` | Test cryptographic operations and key derivation | Crypto scenarios → Security validation | NOT integration (smoke_test.rs) |
+| `ip_token_test.rs` | Test IP Token AES-256-GCM encrypt/decrypt, format validation, and error paths | Crypto scenarios → Security validation | NOT key derivation (crypto_test.rs), NOT integration (smoke_test.rs) |
 | `smoke_test.rs` | Test basic functionality and integration smoke tests | End-to-end flows → Integration validation | NOT crypto details (crypto_test.rs) |
 
 ## Test Categories

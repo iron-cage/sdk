@@ -198,7 +198,8 @@ impl LlmRouter {
 
   /// Get total spent in USD (0.0 if no budget set)
   pub fn total_spent(&self) -> f64 {
-    self.cost_controller
+    self
+      .cost_controller
       .as_ref()
       .map(|c| c.total_spent() as f64 / 1_000_000.0)
       .unwrap_or(0.0)
@@ -217,7 +218,8 @@ impl LlmRouter {
 
   /// Get current budget limit in USD (None if no budget set)
   pub fn get_budget(&self) -> Option<f64> {
-    self.cost_controller
+    self
+      .cost_controller
       .as_ref()
       .map(|c| c.budget_limit() as f64 / 1_000_000.0)
   }
@@ -260,11 +262,15 @@ impl LlmRouter {
       .build()
       .map_err(|e| format!("Failed to create runtime: {}", e))?;
 
+    // Parse IP_TOKEN_KEY from environment for provider key decryption
+    let ip_token_key = parse_ip_token_key_from_env();
+
     // Create key fetcher - static if provider_key given, otherwise fetch from server
     let key_fetcher = Arc::new(if let Some(ref pk) = provider_key {
       KeyFetcher::new_static(pk.clone(), None)
     } else {
-      KeyFetcher::new(server_url.clone(), api_key.clone(), cache_ttl_seconds)
+      KeyFetcher::new(server_url.clone(), api_key.clone(), cache_ttl_seconds, ip_token_key.clone())
+        .map_err(|e| format!("Failed to create KeyFetcher: {}", e))?
     });
 
     let provider = runtime.block_on(async {
@@ -317,6 +323,7 @@ impl LlmRouter {
       cache_ttl_seconds,
       cost_controller: cost_controller.clone(),
       provider_key: provider_key.clone(),
+      ip_token_key,
       #[cfg(feature = "analytics")]
       event_store: event_store.clone(),
       #[cfg(feature = "analytics")]
@@ -442,6 +449,33 @@ impl Drop for LlmRouter {
 fn find_free_port() -> std::io::Result<u16> {
   let listener = TcpListener::bind("127.0.0.1:0")?;
   Ok(listener.local_addr()?.port())
+}
+
+/// Parse `IP_TOKEN_KEY` from environment variable (64-char hex string -> `IpTokenKey`)
+///
+/// Returns None if the env var is not set. Logs a warning on invalid format.
+fn parse_ip_token_key_from_env() -> Option<iron_secrets::ip_token::IpTokenKey> {
+  let hex_str = match std::env::var("IP_TOKEN_KEY") {
+    Ok(v) if !v.is_empty() => v,
+    _ => return None,
+  };
+
+  match hex::decode(&hex_str) {
+    Ok(bytes) => match iron_secrets::ip_token::IpTokenKey::try_from(bytes.as_slice()) {
+      Ok(key) => Some(key),
+      Err(_) => {
+        tracing::warn!(
+          "IP_TOKEN_KEY must be 32 bytes (64 hex chars), got {} bytes — IP Token decryption disabled",
+          bytes.len()
+        );
+        None
+      }
+    },
+    Err(e) => {
+      tracing::warn!("IP_TOKEN_KEY contains invalid hex — IP Token decryption disabled: {}", e);
+      None
+    }
+  }
 }
 
 /// Result from server handshake containing budget and lease info

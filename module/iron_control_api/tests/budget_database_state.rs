@@ -31,20 +31,28 @@
 
 mod common;
 
+use std::sync::Arc;
+
 use axum::{
   body::Body,
   http::{Request, StatusCode},
   Router,
 };
-use iron_control_api::{
-  ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
-  routes::budget::{handshake, refresh_budget, report_usage, BudgetState},
-};
-use iron_token_manager::lease_manager::LeaseManager;
 use serde_json::json;
 use sqlx::SqlitePool;
-use std::sync::Arc;
 use tower::ServiceExt;
+
+use iron_control_api::{
+  ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
+  ip_token::IpTokenCrypto,
+  jwt_auth::JwtSecret,
+  routes::budget::{handshake, refresh_budget, report_usage, BudgetState},
+};
+use iron_secrets::{crypto::CryptoService, ip_token::IpTokenKey};
+use iron_token_manager::{
+  agent_budget::AgentBudgetManager, lease_manager::LeaseManager,
+  provider_key_storage::ProviderKeyStorage,
+};
 
 /// Helper: Create test database with all migrations
 async fn setup_test_db() -> SqlitePool {
@@ -60,23 +68,17 @@ async fn setup_test_db() -> SqlitePool {
 async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
   let ip_token_key: [u8; 32] = [0u8; 32];
+  let ip_token_key_typed = IpTokenKey::try_from(ip_token_key).unwrap();
   let provider_key_master: [u8; 32] = [42u8; 32];
 
   let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
-  let ip_token_crypto =
-    Arc::new(iron_control_api::ip_token::IpTokenCrypto::new(&ip_token_key).unwrap());
-  let provider_key_crypto =
-    Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
-  let crypto_service =
-    Arc::new(iron_secrets::crypto::CryptoService::new(&provider_key_master).unwrap());
+  let ip_token_crypto = Arc::new(IpTokenCrypto::new(&ip_token_key_typed).unwrap());
+  let provider_key_crypto = Arc::new(CryptoService::new(&provider_key_master).unwrap());
+  let crypto_service = Arc::new(CryptoService::new(&provider_key_master).unwrap());
   let lease_manager = Arc::new(LeaseManager::from_pool(pool.clone()));
-  let agent_budget_manager =
-    Arc::new(iron_token_manager::agent_budget::AgentBudgetManager::from_pool(pool.clone()));
-  let provider_key_storage =
-    Arc::new(iron_token_manager::provider_key_storage::ProviderKeyStorage::new(pool.clone()));
-  let jwt_secret = Arc::new(iron_control_api::jwt_auth::JwtSecret::new(
-    "test_jwt_secret".to_string(),
-  ));
+  let agent_budget_manager = Arc::new(AgentBudgetManager::from_pool(pool.clone()));
+  let provider_key_storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
+  let jwt_secret = Arc::new(JwtSecret::new("test_jwt_secret".to_string()));
 
   BudgetState {
     ic_token_manager,
