@@ -44,7 +44,7 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn show_usage_adapter<S: ::core::hash::BuildHasher + Default>(
+pub async fn show_usage_adapter<S: ::core::hash::BuildHasher>(
   params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
@@ -62,7 +62,7 @@ pub async fn show_usage_adapter<S: ::core::hash::BuildHasher + Default>(
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::default();
+  let mut query_params = HashMap::new();
 
   if let Some(start_date) = params.get("start_date") {
     query_params.insert("start_date".to_string(), start_date.clone());
@@ -115,7 +115,7 @@ pub async fn show_usage_adapter<S: ::core::hash::BuildHasher + Default>(
 ///
 /// Panics if validated `export_format` or `output_file` parameters are missing
 /// after handler validation.
-pub async fn export_usage_adapter<S: ::core::hash::BuildHasher + Default>(
+pub async fn export_usage_adapter<S: ::core::hash::BuildHasher>(
   params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
@@ -133,7 +133,7 @@ pub async fn export_usage_adapter<S: ::core::hash::BuildHasher + Default>(
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::default();
+  let mut query_params = HashMap::new();
 
   query_params.insert(
     "format".to_string(),

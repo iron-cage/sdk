@@ -27,7 +27,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 ///
 /// Reservations prevent concurrent overspend by atomically reserving
 /// the maximum possible cost before an LLM request starts.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Reservation {
   /// Reserved amount in microdollars
   amount_micros: u64,

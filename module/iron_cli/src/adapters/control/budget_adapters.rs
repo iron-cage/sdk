@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn budget_status_adapter<S: ::core::hash::BuildHasher + Default>(
+pub async fn budget_status_adapter<S: ::core::hash::BuildHasher>(
   params: &HashMap<String, String, S>,
 ) -> Result<String, String> {
   budget_handlers::budget_status_handler(params).map_err(|e| e.to_string())?;
@@ -20,7 +20,7 @@ pub async fn budget_status_adapter<S: ::core::hash::BuildHasher + Default>(
   let client = ControlApiClient::new(config);
 
   // Build query parameters
-  let mut query_params = HashMap::default();
+  let mut query_params = HashMap::new();
 
   if let Some(agent_id) = params.get("agent_id") {
     query_params.insert("agent_id".to_string(), agent_id.clone());

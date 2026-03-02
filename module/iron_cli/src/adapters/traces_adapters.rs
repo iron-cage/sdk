@@ -46,7 +46,7 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn list_traces_adapter<S: ::core::hash::BuildHasher + Default>(
+pub async fn list_traces_adapter<S: ::core::hash::BuildHasher>(
   params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
@@ -64,7 +64,7 @@ pub async fn list_traces_adapter<S: ::core::hash::BuildHasher + Default>(
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::default();
+  let mut query_params = HashMap::new();
 
   if let Some(page) = params.get("page") {
     query_params.insert("page".to_string(), page.clone());
@@ -180,7 +180,7 @@ pub async fn get_trace_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// the HTTP request fails, or file write fails.
-pub async fn export_traces_adapter<S: ::core::hash::BuildHasher + Default>(
+pub async fn export_traces_adapter<S: ::core::hash::BuildHasher>(
   params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
@@ -198,7 +198,7 @@ pub async fn export_traces_adapter<S: ::core::hash::BuildHasher + Default>(
   let client = TokenApiClient::new(config);
 
   // 4. Fetch all traces (up to 1000)
-  let mut query_params = HashMap::default();
+  let mut query_params = HashMap::new();
   query_params.insert("limit".to_string(), "1000".to_string());
 
   let response = client

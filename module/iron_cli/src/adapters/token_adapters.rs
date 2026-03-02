@@ -134,7 +134,7 @@ pub async fn generate_token_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn list_tokens_adapter<S: ::core::hash::BuildHasher + Default>(
+pub async fn list_tokens_adapter<S: ::core::hash::BuildHasher>(
   params: &HashMap<String, String, S>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
@@ -152,7 +152,7 @@ pub async fn list_tokens_adapter<S: ::core::hash::BuildHasher + Default>(
   let client = TokenApiClient::new(config);
 
   // 4. Build query parameters
-  let mut query_params = HashMap::default();
+  let mut query_params = HashMap::new();
 
   if let Some(page) = params.get("page") {
     query_params.insert("page".to_string(), page.clone());
