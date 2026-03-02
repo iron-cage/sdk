@@ -1,0 +1,22 @@
+[Unit]
+Description=Iron Cage Control API Server
+After=network.target sqlite.service
+
+[Service]
+Type=simple
+User=ironcage
+Group=ironcage
+WorkingDirectory=/var/lib/iron_cage
+ExecStart=/usr/local/bin/iron_control_api_server
+Restart=always
+RestartSec=5
+EnvironmentFile=/etc/iron_cage/iron_control_api.env
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

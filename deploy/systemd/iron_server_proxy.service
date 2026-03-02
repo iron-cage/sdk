@@ -1,0 +1,22 @@
+[Unit]
+Description=Iron Cage Server-Side LLM Proxy
+After=network.target sqlite.service iron_control_api.service
+
+[Service]
+Type=simple
+User=ironcage
+Group=ironcage
+WorkingDirectory=/var/lib/iron_cage
+ExecStart=/usr/local/bin/iron_server_proxy
+Restart=always
+RestartSec=5
+EnvironmentFile=/etc/iron_cage/iron_server_proxy.env
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
