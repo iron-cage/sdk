@@ -32,6 +32,7 @@ members = [
 
   # Application layer
   "module/iron_cli",
+  "module/iron_server_proxy",
 
   # NOTE: Non-Rust modules (not in Cargo workspace):
   # Python: iron_cli_py, iron_testing

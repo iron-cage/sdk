@@ -3,10 +3,13 @@
 //! Uses AES-256-GCM (AEAD) for authenticated encryption.
 //! Master key loaded from environment variable `IRON_SECRETS_MASTER_KEY`.
 
+use core::fmt::{Debug, Formatter, Result as FmtResult};
+
 use aes_gcm::{
   aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
   Aes256Gcm, Nonce,
 };
+use base64::{engine::general_purpose::STANDARD, Engine};
 use zeroize::Zeroizing;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)
@@ -31,14 +34,12 @@ impl EncryptedSecret {
   /// Encode ciphertext as base64 string
   #[must_use]
   pub fn ciphertext_base64(&self) -> String {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
     STANDARD.encode(&self.ciphertext)
   }
 
   /// Encode nonce as base64 string
   #[must_use]
   pub fn nonce_base64(&self) -> String {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
     STANDARD.encode(self.nonce)
   }
 
@@ -48,8 +49,6 @@ impl EncryptedSecret {
   ///
   /// Returns error if base64 decoding fails or nonce length invalid
   pub fn from_base64(ciphertext_b64: &str, nonce_b64: &str) -> Result<Self, CryptoError> {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-
     let ciphertext = STANDARD
       .decode(ciphertext_b64)
       .map_err(|_| CryptoError::InvalidBase64)?;
@@ -74,8 +73,8 @@ pub struct CryptoService {
   cipher: Aes256Gcm,
 }
 
-impl core::fmt::Debug for CryptoService {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for CryptoService {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     f.debug_struct("CryptoService")
       .field("cipher", &"<redacted>")
       .finish()
@@ -108,8 +107,6 @@ impl CryptoService {
   ///
   /// Returns error if environment variable not set or invalid
   pub fn from_env() -> Result<Self, CryptoError> {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-
     let master_key_b64 =
       std::env::var(MASTER_KEY_ENV_VAR).map_err(|_| CryptoError::MasterKeyNotSet)?;
 

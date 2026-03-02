@@ -166,12 +166,14 @@ fn create_openai_error_response(
   error_type: &str,
   code: &str,
 ) -> Response<Body> {
-  let error_json = iron_llm_core::create_openai_error_json(message, error_type, code);
+  let error_body = iron_llm_core::create_openai_error(message, error_type, code);
+  let json =
+    serde_json::to_string(&error_body).expect("OpenAiErrorResponse serialization never fails");
 
   Response::builder()
     .status(status)
     .header(header::CONTENT_TYPE, "application/json")
-    .body(Body::from(error_json.to_string()))
+    .body(Body::from(json))
     .unwrap_or_else(|_| {
       // Fallback response if primary error response construction fails
       Response::builder()

@@ -5,8 +5,6 @@
 //! authentication, budget enforcement, or analytics concerns — those
 //! are the responsibility of the caller (`iron_runtime` or `iron_server_proxy`).
 
-use iron_cost::pricing::PricingManager;
-use iron_secrets::ip_token::ProviderKey;
 use reqwest::Client;
 use secrecy::ExposeSecret;
 
@@ -15,6 +13,8 @@ use crate::{
   error::LlmCoreError,
   provider, translator,
 };
+use iron_cost::pricing::PricingManager;
+use iron_secrets::ip_token::ProviderKey;
 
 /// Request to be forwarded to an LLM provider
 #[derive(Debug)]
