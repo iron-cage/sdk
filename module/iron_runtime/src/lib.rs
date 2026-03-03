@@ -253,13 +253,15 @@ mod stub {
       &self.config
     }
 
-    pub fn start_agent(&self, _script_path: &Path) -> Result<AgentHandle, anyhow::Error> {
+    #[allow(clippy::unused_async)]
+    pub async fn start_agent(&self, _script_path: &Path) -> Result<AgentHandle, anyhow::Error> {
       Ok(AgentHandle {
         agent_id: iron_types::AgentId::generate(),
       })
     }
 
-    pub fn stop_agent(&self, _agent_id: &str) -> Result<(), anyhow::Error> {
+    #[allow(clippy::unused_async)]
+    pub async fn stop_agent(&self, _agent_id: &str) -> Result<(), anyhow::Error> {
       Ok(())
     }
 

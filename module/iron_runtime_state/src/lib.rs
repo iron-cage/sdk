@@ -600,7 +600,7 @@ mod stub {
 
     pub fn save_agent_state(&self, _state: AgentState) {}
 
-    pub fn save_audit_log(&self, _event: AuditEvent) {}
+    pub fn save_audit_log(&self, _event: &AuditEvent) {}
 
     pub fn list_agents(&self) -> Vec<String> {
       vec![]
