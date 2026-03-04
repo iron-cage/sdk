@@ -1,12 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ================== INIT ======================================================================
 
 # set -x # for debug
-set -o errexit
-set -o nounset
-set -o pipefail
-
+set -euo pipefail
 
 # Color codes
 RED="\e[31m"
@@ -38,103 +35,105 @@ function __msg_success() {
 }
 
 # ==============================================================================================
+# NOTE: KUBECONFIG is NOT set here intentionally.
+# In production, cloud-init configures KUBECONFIG globally (/etc/rancher/k3s/k3s.yaml)
+# via /etc/environment, so kubectl works without explicit export.
+# Adding `export KUBECONFIG=...` here breaks the test suite (bats),
+# which provides its own KUBECONFIG pointing to a test cluster.
+# ==============================================================================================
 # ================== Set up main file ==========================================================
-# Load environment variables exported in /deploy/.secret into this shell.
+
+cd "$(dirname "$0")"
+
 set -a
-. /deploy/.secret
+. ./secrets/env
 set +a
 
+# SA_JSON key reading
+if [ -t 0 ]; then
+  __msg_error "Service Account JSON must be provided via stdin"
+  echo "Usage:"
+  echo "  deploy.sh < sa.json"
+  exit 1
+fi
 
-# Required env vars (fail fast if missing):
-# - TAG: base name used to pull the image.
-for var in \
-  TAG \
-  JWT_SECRET \
-  IRON_SECRETS_MASTER_KEY \
-  DATABASE_URL \
-  IP_TOKEN_KEY \
-  IC_TOKEN_SECRET \
-  ALLOWED_ORIGINS \
-  SERVER_PORT \
-  IRON_DEPLOYMENT_MODE \
-  ENABLE_DEMO_SEED
-do
-  # Expansion with : "${!var:?...}" exits with an error message if the variable is unset.
-  : "${!var:?$var is not set in the environment}"
-done
-# ----------------------------------------------------------------------------------------------
+SA_JSON="$(cat || true)"
 
-# Stop and remove previous container if it exists
-__msg_info "Removing old docker compose"
-docker compose down -v || echo "Nothing to remove"
+if [[ -z "${SA_JSON}" ]]; then
+  __msg_error "Empty Service Account JSON"
+  exit 1
+fi
 
+if ! grep -q '"type":' <<< "$SA_JSON"; then
+  __msg_error "Invalid GCP service account JSON"
+  exit 1
+fi
 
-__msg_info "Remove Docker image on the host: ${TAG}"
-docker rmi "${TAG}_front"  || true
-docker rmi "${TAG}_back"   || true
+# Cert-manager check
+__msg_info "Check cert-manager"
+if ! kubectl get crd certificates.cert-manager.io >/dev/null 2>&1; then
+  __msg_info "cert-manager not found → installing"
 
-__msg_info "Pulling Docker image: ${TAG}"
-docker pull "${TAG}_front" || { echo "ERROR: Failed to pull front image"; exit 1; }
-docker pull "${TAG}_back"  || { echo "ERROR: Failed to pull backend image"; exit 1; }
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
 
-# ----------------------------------------------------------------------------------------------
-cat <<EOF > compose.yml
-services:
-  backend:
-    image: ${TAG}_back
-    container_name: iron_cp_backend
-    environment:
-      DATABASE_URL: sqlite:///app/data/iron.db?mode=rwc
-      JWT_SECRET: ${JWT_SECRET}
-      IRON_SECRETS_MASTER_KEY: ${IRON_SECRETS_MASTER_KEY}
-      IP_TOKEN_KEY: ${IP_TOKEN_KEY}
-      IC_TOKEN_SECRET: ${IC_TOKEN_SECRET}
-      SERVER_PORT: ${SERVER_PORT}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
-      IRON_DEPLOYMENT_MODE: ${IRON_DEPLOYMENT_MODE}
-      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED}
-      RUST_LOG: info
-    ports:
-    - "${SERVER_PORT}:${SERVER_PORT}"
-    volumes:
-      - sqlite_data:/app/data
-    networks:
-      - iron_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
+  __msg_info "Waiting cert-manager to be ready..."
 
-  frontend:
-    image: ${TAG}_front
-    container_name: iron_cp_frontend
-    ports:
-      - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - iron_network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+  kubectl wait --for=condition=available deployment/cert-manager -n cert-manager --timeout=180s
+  kubectl wait --for=condition=available deployment/cert-manager-webhook -n cert-manager --timeout=180s
+  kubectl wait --for=condition=available deployment/cert-manager-cainjector -n cert-manager --timeout=180s
 
-networks:
-  iron_network:
-    driver: bridge
+  __msg_success "cert-manager installed"
+else
+  __msg_info "cert-manager already installed, skip"
+fi
 
-volumes:
-  sqlite_data:
-    driver: local
-EOF
+# Clusterissue apply
+__msg_info "Apply ClusterIssuer"
+kubectl apply -f ./k8s/cluster-issuer.yaml
 
-docker compose up -d
-ufw allow ${SERVER_PORT}/tcp
+# Namespace create
+__msg_info "Create namespace"
+kubectl create namespace ${ARTIFACT_REPO_NAME} --dry-run=client -o yaml | kubectl apply -f -
 
-__msg_success "Deployment successful! App is available at: http://localhost:80"
+__msg_info "Apply app env secret"
+kubectl create secret generic app-env \
+  --from-env-file=./secrets/env \
+  --namespace ${ARTIFACT_REPO_NAME} \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+__msg_info "Apply GAR docker-registry secret"
+printf "%s" "$SA_JSON" | kubectl create secret docker-registry gar-auth \
+  --docker-server=${GOOGLE_APPLICATION_REGION}-docker.pkg.dev \
+  --docker-username=_json_key \
+  --docker-password="$(cat -)" \
+  --namespace ${ARTIFACT_REPO_NAME} \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+__msg_info "Apply k8s"
+kubectl apply -k ./k8s -n ${ARTIFACT_REPO_NAME}
+
+__msg_info "Wait for deployment"
+
+__msg_info "Wait for backend deployment"
+if ! kubectl rollout status deployment/backend -n ${ARTIFACT_REPO_NAME} --timeout=120s; then
+  __msg_error "Backend rollout failed -> rolling back both deployments"
+
+  kubectl rollout undo deployment/backend -n ${ARTIFACT_REPO_NAME} || true
+  kubectl rollout undo deployment/frontend -n ${ARTIFACT_REPO_NAME} || true
+
+  exit 1
+fi
+__msg_success "Backend deployment ready"
+
+__msg_info "Wait for frontend deployment"
+if ! kubectl rollout status deployment/frontend -n ${ARTIFACT_REPO_NAME} --timeout=120s; then
+  __msg_error "Frontend rollout failed -> rolling back both deployments"
+
+  kubectl rollout undo deployment/frontend -n ${ARTIFACT_REPO_NAME} || true
+  kubectl rollout undo deployment/backend -n ${ARTIFACT_REPO_NAME} || true
+
+  exit 1
+fi
+__msg_success "Frontend deployment ready"
+
+__msg_success "Deployment complete"

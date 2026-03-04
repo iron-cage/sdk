@@ -4,9 +4,13 @@ on:
   pull_request:
     branches: [ "master" ]
 
+env:
+  TERRAFORM_VERSION: "1.14.4"
+
 jobs:
   deploy-tests:
-    runs-on: iron_cage_sdk
+    name: Run deploy/tests/redeploy.sh
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
 
     steps:
     - name: Checkout code
@@ -14,20 +18,31 @@ jobs:
 
     - name: Set up Bats testing framework
       run: |
-        sudo apt-get update
-        sudo apt-get install -y bats
+        if ! command -v bats >/dev/null 2>&1; then
+          sudo apt-get update
+          sudo apt-get install -y bats
+        fi
+
+    - name: Install k3s (cluster for tests)
+      run: |
+        if ! command -v kubectl >/dev/null 2>&1; then
+          curl -sfL https://get.k3s.io | sudo sh -
+        fi
+        sudo chmod 644 /etc/rancher/k3s/k3s.yaml || true
+        echo "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> $GITHUB_ENV
+        kubectl get nodes
 
     - name: Run Bats tests
       run: |
         bats deploy/tests/redeploy.bats
 
-  terraform-validate-gar:
-    runs-on: iron_cage_sdk
-
-    defaults:
-      run:
-        working-directory: ./deploy/gar
-
+  terraform-validate:
+    name: Validate deploy/${{ matrix.module }}
+    runs-on: ${{ vars.GH_RUNNER_DEPLOY_CHECK }}
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [gar, hetzner_server_create, service_deploy]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -37,36 +52,13 @@ jobs:
         docker run --rm \
           --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/gar \
-          hashicorp/terraform:1.7.4 \
+          -w /workspace/deploy/${{ matrix.module }} \
+          hashicorp/terraform:${{ env.TERRAFORM_VERSION }} \
           init -backend=false -input=false
 
         docker run --rm \
           --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}:/workspace \
-          -w /workspace/deploy/gar \
-          hashicorp/terraform:1.7.4 \
+          -w /workspace/deploy/${{ matrix.module }} \
+          hashicorp/terraform:${{ env.TERRAFORM_VERSION }} \
           validate
-
-  terraform-validate-hetzner:
-    name: Validate deploy/hetzner
-    runs-on: iron_cage_sdk
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Terraform validate in Docker
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/hetzner \
-            hashicorp/terraform:1.7.4 \
-            init -backend=false -input=false
-
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace/deploy/hetzner \
-            hashicorp/terraform:1.7.4 \
-            validate

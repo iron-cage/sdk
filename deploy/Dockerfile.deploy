@@ -1,0 +1,45 @@
+FROM google/cloud-sdk:548.0.0-slim
+
+# https://releases.hashicorp.com/terraform/
+ENV TF_VERSION=1.14.4
+WORKDIR /
+
+# Install system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    unzip \
+    python3 \
+    python3-pip \
+    make \
+    jq \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install hcloud CLI
+RUN curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+    | tar -xz \
+    && mv hcloud /usr/local/bin/hcloud \
+    && chmod +x /usr/local/bin/hcloud
+
+
+# Install docker CLI (not daemon)
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && \
+    apt-get install -y docker-ce-cli
+
+# Install Terraform
+RUN mkdir -p /usr/lib/terraform/${TF_VERSION} \
+    && cd /usr/lib/terraform/${TF_VERSION} \
+    && wget https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip \
+    && unzip terraform_${TF_VERSION}_linux_amd64.zip \
+    && chmod 755 terraform \
+    && ln -s /usr/lib/terraform/${TF_VERSION}/terraform /usr/bin/terraform
+
+WORKDIR /app
+
+VOLUME /var/run/docker.sock
+
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD ["make -f ./deploy/Makefile.deploy ${ACTION}"]

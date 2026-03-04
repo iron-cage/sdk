@@ -1,156 +1,161 @@
 #!/usr/bin/env bats
-
-env_without() {
-  local var="$1"
-  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
-  sed -i "/^$var=/d" "$TEST_DIR/etc-environment"
-}
+bats_require_minimum_version 1.5.0
 
 setup() {
-  TEST_DIR="$(mktemp -d)"
-  SCRIPT_ORIG="$(dirname "$BATS_TEST_FILENAME")/../redeploy.sh"
-  SCRIPT_UNDER_TEST="$TEST_DIR/redeploy.sh"
-  cp "$SCRIPT_ORIG" "$SCRIPT_UNDER_TEST"
-  tr -d '\r' < "$SCRIPT_UNDER_TEST" > "$SCRIPT_UNDER_TEST.tmp"
-  mv "$SCRIPT_UNDER_TEST.tmp" "$SCRIPT_UNDER_TEST"
-  chmod +x "$SCRIPT_UNDER_TEST"
+  export ARTIFACT_REPO_NAME="bats-test-ns"
+  export PROJECT_NAME="bats-test"
+  export DEPLOYMENT_MODE="dev"
+  export PROJECT_DOMAIN="testingdomain"
+  export GOOGLE_APPLICATION_REGION="europe-central2"
 
-  FULL_ENV="$TEST_DIR/full-env"
-  cat > "$FULL_ENV" <<'EOF'
-JWT_SECRET=dummy-jwt
-IRON_SECRETS_MASTER_KEY=secret_jwt_master_key
-DATABASE_URL=postgres://u:p@db/test_db
-TAG=example.com/app
-IRON_DEPLOYMENT_MODE=test
-IP_TOKEN_KEY=ip_token_key
-IC_TOKEN_SECRET=ic_token_key
-ALLOWED_ORIGINS=http://localhost:3001,http://localhost:5173
-SERVER_PORT=3001
-ENABLE_DEMO_SEED=true
+  BASE="$BATS_TEST_TMPDIR/app"
+
+  mkdir -p "$BASE/secrets"
+  mkdir -p "$BASE/k8s"
+
+  # copy real script into sandbox
+  cp "$BATS_TEST_DIRNAME/../redeploy.sh" "$BASE/redeploy.sh"
+  chmod +x "$BASE/redeploy.sh"
+
+  # fake env
+  cat > "$BASE/secrets/env" <<EOF
+DUMMY=1
 EOF
 
-  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
-
-  sed -i "s#/deploy/.secret#$TEST_DIR/etc-environment#g" "$SCRIPT_UNDER_TEST"
-
-  # stub docker setup
-  DOCKER_CALLS="$TEST_DIR/docker-calls.log"
-  mkdir -p "$TEST_DIR/bin"
-  cat > "$TEST_DIR/bin/docker" <<EOF
-#!/bin/bash
-echo "docker \$*" >> "$DOCKER_CALLS"
-case "\$1" in
-  rm|rmi|pull) exit 0 ;;
-  compose)
-    shift
-    if [[ "\$1" == "down" ]] || [[ "\$1" == "up" ]]; then exit 0; fi
-    ;;
-esac
-exit 0
+  # ---------- cluster issuer stub ----------
+  cat > "$BASE/k8s/cluster-issuer.yaml" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dummy-issuer
 EOF
 
-  tr -d '\r' < "$TEST_DIR/bin/docker" > "$TEST_DIR/bin/docker.tmp"
-  mv "$TEST_DIR/bin/docker.tmp" "$TEST_DIR/bin/docker"
-  chmod +x "$TEST_DIR/bin/docker"
-
-  # stub ufw (requires root on real systems)
-  cat > "$TEST_DIR/bin/ufw" <<'EOF'
-#!/bin/bash
-exit 0
+  # ---------- backend deployment ----------
+  cat > "$BASE/k8s/backend.yaml" <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: nginx
+          ports:
+            - containerPort: 8080
 EOF
-  chmod +x "$TEST_DIR/bin/ufw"
 
-  PATH="$TEST_DIR/bin:$PATH"
+  # ---------- frontend deployment ----------
+  cat > "$BASE/k8s/frontend.yaml" <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: nginx
+          ports:
+            - containerPort: 80
+EOF
+
+  # ---------- kustomization ----------
+  cat > "$BASE/k8s/kustomization.yaml" <<EOF
+resources:
+  - backend.yaml
+  - frontend.yaml
+  - cluster-issuer.yaml
+EOF
+
+  export FAKE_SA_JSON='{"type":"service_account"}'
 }
 
 teardown() {
-  rm -rf "$TEST_DIR"
+  kubectl delete ns "$ARTIFACT_REPO_NAME" --ignore-not-found=true
 }
 
-@test "succeeds with valid inputs" {
-  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"  
-  echo "$output"
-  echo "Status: $status"
-
-  [ "$status" -eq 0 ]
+run_deploy() {
+  bash -c "printf '%s' '$FAKE_SA_JSON' | bash '$BASE/redeploy.sh'"
 }
 
-@test "fails when TAG is not set" {
-  env_without "TAG"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && '$SCRIPT_UNDER_TEST'"
+# -------------------------------------------------
+@test "creates namespace" {
+  run -0 run_deploy
+  run -0 kubectl get ns "$ARTIFACT_REPO_NAME"
+}
+
+# -------------------------------------------------
+@test "creates docker registry secret" {
+  run -0 run_deploy
+  run -0 kubectl get secret gar-auth -n "$ARTIFACT_REPO_NAME"
+}
+
+# -------------------------------------------------
+@test "applies backend and frontend deployments" {
+  run -0 run_deploy
+  run -0 kubectl get deployment backend -n "$ARTIFACT_REPO_NAME"
+  run -0 kubectl get deployment frontend -n "$ARTIFACT_REPO_NAME"
+}
+
+# -------------------------------------------------
+@test "backend and frontend rollouts complete" {
+  run -0 run_deploy
+  run -0 kubectl rollout status deployment/backend -n "$ARTIFACT_REPO_NAME" --timeout=30s
+  run -0 kubectl rollout status deployment/frontend -n "$ARTIFACT_REPO_NAME" --timeout=30s
+}
+
+# -------------------------------------------------
+@test "rollback happens on bad backend image" {
+  run -0 run_deploy
+
+  run kubectl get deployment backend -n "$ARTIFACT_REPO_NAME" \
+    -o jsonpath='{.spec.template.spec.containers[0].image}'
+  previous_image="$output"
+
+  # break backend image
+  cat > "$BASE/k8s/backend.yaml" <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: definitely-not-existing-image:fail
+EOF
+
+  run run_deploy
   [ "$status" -ne 0 ]
-  [[ "$output" == *"TAG is not set in the environment"* ]]
-}
 
-@test "cleanup commands are called" {
-  cp "$FULL_ENV" "$TEST_DIR/etc-environment"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -eq 0 ]
+  run -0 kubectl rollout status deployment/backend -n "$ARTIFACT_REPO_NAME"
 
-  calls="$(cat "$DOCKER_CALLS")"
-  [[ "$calls" == *"docker compose down"* ]]
-}
-
-@test "missing JWT_SECRET" {
-  env_without "JWT_SECRET"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"JWT_SECRET is not set in the environment"* ]]
-}
-
-@test "missing IRON_SECRETS_MASTER_KEY" {
-  env_without "IRON_SECRETS_MASTER_KEY"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"IRON_SECRETS_MASTER_KEY is not set in the environment"* ]]
-}
-
-@test "missing DATABASE_URL" {
-  env_without "DATABASE_URL"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"DATABASE_URL is not set in the environment"* ]]
-}
-
-@test "missing IP_TOKEN_KEY" {
-  env_without "IP_TOKEN_KEY"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"IP_TOKEN_KEY is not set in the environment"* ]]
-}
-
-@test "missing IC_TOKEN_SECRET" {
-  env_without "IC_TOKEN_SECRET"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"IC_TOKEN_SECRET is not set in the environment"* ]]
-}
-
-@test "missing ALLOWED_ORIGINS" {
-  env_without "ALLOWED_ORIGINS"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"ALLOWED_ORIGINS is not set in the environment"* ]]
-}
-
-@test "missing SERVER_PORT" {
-  env_without "SERVER_PORT"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"SERVER_PORT is not set in the environment"* ]]
-}
-
-@test "missing IRON_DEPLOYMENT_MODE" {
-  env_without "IRON_DEPLOYMENT_MODE"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"IRON_DEPLOYMENT_MODE is not set in the environment"* ]]
-}
-
-@test "missing ENABLE_DEMO_SEED" {
-  env_without "ENABLE_DEMO_SEED"
-  run bash -c "set -a && source '$TEST_DIR/etc-environment' && cd '$TEST_DIR' && '$SCRIPT_UNDER_TEST'"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"ENABLE_DEMO_SEED is not set in the environment"* ]]
+  run kubectl get deployment backend -n "$ARTIFACT_REPO_NAME" \
+    -o jsonpath='{.spec.template.spec.containers[0].image}'
+  [ "$output" = "$previous_image" ]
 }

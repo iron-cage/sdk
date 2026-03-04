@@ -1,0 +1,309 @@
+.PHONY: \
+	deploy \
+	server_deploy \
+	build_image
+
+## --------------------------------------------------------------------------------------
+## READ variables from .secret/-secret.sh
+
+## Local secrets file for development (NOT committed; .secret/ is ignored).
+LOCAL_SECRETS_FILE ?= .secret/-secret.sh
+
+ifneq ("$(wildcard $(LOCAL_SECRETS_FILE))","")
+include $(LOCAL_SECRETS_FILE)
+endif
+
+strip_quotes = $(subst ",,$(1))
+
+## --------------------------------------------------------------------------------------
+## Required Parameters
+
+REQUIRED_SECRET_VARIABLES:= \
+	GOOGLE_APPLICATION_CREDENTIALS \
+	GOOGLE_APPLICATION_PROJECT_ID \
+	SSH_PRIVATE_KEY_PATH \
+	SSH_PUBLIC_KEY_PATH \
+	HOST_SERVER_NAME \
+	PROJECT_NAME \
+	PROJECT_DOMAIN \
+	PROJECT_CERT_EMAIL \
+	DEPLOYMENT_MODE \
+	GOOGLE_ENCRYPTION_KEY
+
+
+$(foreach v,$(REQUIRED_SECRET_VARIABLES),\
+  $(eval $(v) := $(call strip_quotes,$($(v))))\
+)
+
+$(foreach v,$(REQUIRED_SECRET_VARIABLES),\
+  $(if $($v),,$(error Required secret variable '$(v)' is missing or empty after including $(LOCAL_SECRETS_FILE))))
+
+ALLOWED_DEPLOYMENT_MODES := dev staging production
+
+ifeq ($(filter $(DEPLOYMENT_MODE),$(ALLOWED_DEPLOYMENT_MODES)),)
+$(error Invalid DEPLOYMENT_MODE '$(DEPLOYMENT_MODE)'. Must be one of $(ALLOWED_DEPLOYMENT_MODES))
+endif
+
+## --------------------------------------------------------------------------------------
+## Check that secret files exist
+
+SSH_PRIVATE_KEY_PATH 	:= $(abspath $(SSH_PRIVATE_KEY_PATH))
+SSH_PUBLIC_KEY_PATH  	:= $(abspath $(SSH_PUBLIC_KEY_PATH))
+GOOGLE_APPLICATION_CREDENTIALS 	:= $(abspath $(GOOGLE_APPLICATION_CREDENTIALS))
+export GOOGLE_APPLICATION_CREDENTIALS
+export GOOGLE_ENCRYPTION_KEY
+
+REQUIRED_SECRET_FILES := \
+	$(GOOGLE_APPLICATION_CREDENTIALS) \
+	$(SSH_PRIVATE_KEY_PATH) \
+	$(SSH_PUBLIC_KEY_PATH)
+
+define check_file_exists
+  $(if $(wildcard $(call strip_quotes,$1)),, \
+    $(error Required secret file '$(call strip_quotes,$1)' does not exist. Please check path.))
+endef
+
+$(foreach v,$(REQUIRED_SECRET_FILES),\
+  $(eval $(v) := $(call strip_quotes,$($(v))))\
+)
+
+$(foreach file,$(REQUIRED_SECRET_FILES),$(eval $(call check_file_exists,$(file))))
+
+## --------------------------------------------------------------------------------------
+## Optional Parameters
+OPTIONAL_SECRET_VARIABLES:= \
+	GOOGLE_APPLICATION_REGION \
+	HOST_SERVER_IP \
+	HOST_SERVER_LOCATION \
+	HOST_SERVER_IMAGE \
+	HOST_SERVER_TYPE \
+	HETZNER_CLOUD_TOKEN \
+	ALLOWED_SSH_IPS
+
+## Location for deployed resources | Can be set in secret/-secret.sh
+GOOGLE_APPLICATION_REGION := $(or $(call strip_quotes,$(GOOGLE_APPLICATION_REGION)),"europe-central2")
+HOST_SERVER_IP := $(or $(call strip_quotes,$(HOST_SERVER_IP)),"None")
+HOST_SERVER_LOCATION := $(or $(call strip_quotes,$(HOST_SERVER_LOCATION)),"hel1")
+HOST_SERVER_IMAGE := $(or $(call strip_quotes,$(HOST_SERVER_IMAGE)),"ubuntu-24.04")
+HOST_SERVER_TYPE := $(or $(call strip_quotes,$(HOST_SERVER_TYPE)),"cx23")
+
+ALLOWED_SSH_IPS := $(strip $(subst ",,$(ALLOWED_SSH_IPS)))
+
+# ----------------------------------------------------------------------------------------------------------------------------
+## DEFAULT VARIABLES
+DEPLOYMENT_DIR := deploy
+## Artifact Repository name for pushing the Docker images | Should not have "_"
+REPO_NAME := $(subst _,-,$(PROJECT_NAME))
+## Cloud Storage bucket name
+BUCKET_NAME := bucket-$(REPO_NAME)
+## Helper var for tagging local image
+ARTIFACT_REPO_NAME := $(REPO_NAME)-$(DEPLOYMENT_MODE)
+# VERSION := $(shell git rev-parse --short HEAD) # git hash
+VERSION ?= $(shell printf "%s" "$$(date +%Y%m%d-%H%M%S)")# date
+export VERSION 
+TAG := $(GOOGLE_APPLICATION_REGION)-docker.pkg.dev/$(GOOGLE_APPLICATION_PROJECT_ID)/$(ARTIFACT_REPO_NAME)/$(PROJECT_NAME)
+
+# ------------------------------------------------------------
+# Automatically export TF_VAR_* from existing Make variables
+# ------------------------------------------------------------
+
+# !!!!!! NEW PROJECT VARS ADD HERE
+PROJECT_ENV_VARS := \
+	ARTIFACT_REPO_NAME \
+	GOOGLE_APPLICATION_REGION \
+	DEPLOYMENT_MODE \
+	PROJECT_NAME \
+	PROJECT_DOMAIN \
+	TAG \
+	VERSION \
+	RUST_LOG \
+	DATABASE_URL \
+	JWT_SECRET \
+	IRON_SECRETS_MASTER_KEY \
+	IP_TOKEN_KEY \
+	IC_TOKEN_SECRET \
+	ALLOWED_ORIGINS \
+	SERVER_PORT \
+	IRON_DEPLOYMENT_MODE \
+	ENABLE_DEMO_SEED
+
+# !!!!!! NEW PROJECT VARS ADD HERE
+
+TFVARS_FILENAME := $(abspath .secret/env.$(DEPLOYMENT_MODE).tfvars)
+
+$(foreach v,$(PROJECT_ENV_VARS),\
+  $(if $($v),,$(error Required project env variable '$(v)' is missing or empty)))
+
+TF_EXPORT_VARS := \
+	$(REQUIRED_SECRET_VARIABLES) \
+	$(OPTIONAL_SECRET_VARIABLES) \
+	ARTIFACT_REPO_NAME \
+	BUCKET_NAME \
+	GOOGLE_APPLICATION_CREDENTIALS \
+	SERVER_PORT \
+	VERSION \
+	TAG
+
+$(foreach v,$(TF_EXPORT_VARS),\
+  $(eval export TF_VAR_$(v) := $(call strip_quotes,$($(v))))\
+)
+
+# # ============================================================================================================================
+## Deploys using tools from the container
+deploy:
+	@echo "[START] Start Dockerfile.deploy container building"
+	@docker build . \
+		-t deploy-$(PROJECT_NAME) \
+		-f $(DEPLOYMENT_DIR)/Dockerfile.deploy
+	@echo "[INFO] Run Dockerfile.deploy container. Command <server_deploy>"
+	@docker run --rm \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v $(CURDIR):/app \
+		-e HOME=/tmp \
+		--user $(shell id -u):$(shell stat -c '%g' /var/run/docker.sock) \
+		-e ACTION=deployment_orchestration \
+		deploy-$(PROJECT_NAME)
+
+# Main deployment orchestration
+deployment_orchestration:
+	@echo "[INFO] Deployment orchestration starting..."
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy build_image
+	@echo "[INFO] Set up GCP auth, GCS"
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy gc_setup
+	@echo "[INFO] Set up GAR"
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy artifact_repo_create
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy push_image || { echo "Image pushed failed"; exit 1; }
+	
+	@echo "[START] Start deployment"
+
+	@echo "[INFO] Start $(DEPLOYMENT_MODE) option"
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy deploy_$(DEPLOYMENT_MODE)
+	@echo "[SUCCESS] Deployment successful"
+
+# ============================================================================================================================
+# Images build push
+
+build_image: ## Builds uarust_conf_site image
+	@echo "[INFO]: Start to build images"
+
+	docker build .\
+		-f ./Dockerfile.frontend \
+		--build-arg VITE_API_URL="/api" \
+		--build-arg SERVER_PORT=$(SERVER_PORT) \
+		--build-arg CSP="/api" \
+		-t $(TAG)_front:$(VERSION)
+
+	docker build .\
+		-f ./Dockerfile.backend \
+		--build-arg SERVER_PORT=$(SERVER_PORT) \
+		-t $(TAG)_back:$(VERSION)
+
+	@echo "[INFO]: Images built successfuly" 
+
+
+push_image: ## Builds and pushes local docker image to the private repository via gar
+	@echo "[INFO]: Start to push images to $(TAG)"
+	@docker push $(TAG)_front:$(VERSION)
+	@docker push $(TAG)_back:$(VERSION)
+
+# ============================================================================================================================
+# Google_APPLICATION setup
+
+gc_setup:
+	@echo "[START] Setup gcp services"
+	@echo "[INFO] GCP auth"
+	@gcloud auth activate-service-account --key-file=$(GOOGLE_APPLICATION_CREDENTIALS)
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy state_storage_init
+	@gcloud auth configure-docker $(GOOGLE_APPLICATION_REGION)-docker.pkg.dev --quiet
+	@echo "[SUCCESS] GCP auth successful"
+
+## Creates GCS Bucket for terraform states
+state_storage_init:
+	@echo "[INFO] State storage init"
+	@if gsutil ls -b "gs://$(BUCKET_NAME)" > /dev/null 2>&1; then \
+		echo "GCS bucket $(BUCKET_NAME) already exists. Skipping creation."; \
+	else \
+		echo "Creating GCS bucket $(BUCKET_NAME)..."; \
+		gcloud storage buckets create gs://$(BUCKET_NAME) \
+			--project=$(GOOGLE_APPLICATION_PROJECT_ID) \
+			--location=$(GOOGLE_APPLICATION_REGION) \
+			--uniform-bucket-level-access; \
+	fi
+
+## Creates Artifact Registry repository on GCP in specified location
+artifact_repo_create:	
+	@echo "[INFO] Artifact repo create"
+	@$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy tf_init_gar
+	@terraform -chdir=$(DEPLOYMENT_DIR)/gar apply -auto-approve -input=false
+
+show_state_info:
+	@echo "Terraform states are now stored in:"
+	@for dir in gar hetzner; do \
+		echo "gs://$(BUCKET_NAME)/$$dir/default.tfstate"; \
+	done
+
+# ============================================================================================================================
+# Deployment mode
+
+init_tfvars:
+	@echo "🧹 Resetting $(TFVARS_FILENAME)"
+	@mkdir -p $(dir $(TFVARS_FILENAME))
+	@echo "" > $(TFVARS_FILENAME)
+
+generate_allowed_ssh_ips_tfvars:
+	@echo "📝 Generating allowed_ssh_ips in $(TFVARS_FILENAME)"
+	@echo 'allowed_ssh_ips = [' >> $(TFVARS_FILENAME)
+	@$(foreach ip,$(subst ;, ,$(ALLOWED_SSH_IPS)), \
+		echo '  "$(ip)",' >> $(TFVARS_FILENAME);)
+	@echo ']' >> $(TFVARS_FILENAME)
+	@echo '' >> $(TFVARS_FILENAME)
+
+generate_tfvars:
+	@echo "📝 Generating $(TFVARS_FILENAME)"
+	@echo 'PROJECT_MAP_VARIABLES = {' >> $(TFVARS_FILENAME)
+	@$(foreach v,$(PROJECT_ENV_VARS), \
+		echo '  $(v) = "$(call strip_quotes,$($(v)))"' >> $(TFVARS_FILENAME); \
+	)
+	@echo '}' >> $(TFVARS_FILENAME)
+
+
+deploy_dev: init_tfvars generate_allowed_ssh_ips_tfvars generate_tfvars
+	@echo "🟢 DEV deploy"; \
+	HOST_SERVER_IP="$(HOST_SERVER_IP)"; \
+	if [ "$$HOST_SERVER_IP" = "None" ]; then \
+		echo "🟢 Creating HOST server..."; \
+		$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy tf_init_hetzner_server_create || exit 1; \
+		terraform -chdir=$(DEPLOYMENT_DIR)/hetzner_server_create apply -auto-approve -input=false -var-file=$(TFVARS_FILENAME) || exit 1; \
+		HOST_SERVER_IP=$$(terraform -chdir=$(DEPLOYMENT_DIR)/hetzner_server_create output -raw ipv4); \
+		grep -v '^HOST_SERVER_IP=' .secret/-secret.sh > .secret/-secret.sh.tmp && \
+		echo 'HOST_SERVER_IP="'"$$HOST_SERVER_IP"'"' >> .secret/-secret.sh.tmp && \
+		mv .secret/-secret.sh.tmp .secret/-secret.sh; \
+	fi; \
+	echo "🟢 Run deployment with IP=$$HOST_SERVER_IP"; \
+	$(MAKE) --no-print-directory -f $(DEPLOYMENT_DIR)/Makefile.deploy tf_init_service_deploy || exit 1; \
+	terraform -chdir=$(DEPLOYMENT_DIR)/service_deploy apply \
+		-auto-approve \
+		-input=false \
+		-var-file=$(TFVARS_FILENAME) \
+		-var="HOST_SERVER_IP=$$HOST_SERVER_IP" \
+		|| exit 1;
+
+	@echo "🟢 DEV deploy"
+
+# deploy_staging: init_tfvars generate_tfvars
+# 	@echo "🟡 STAGING deploy"
+
+
+# deploy_production: init_tfvars generate_tfvars
+# 	@echo "🔴 PRODUCTION deploy"
+
+# ============================================================================================================================
+# Terrafrom init
+
+tf_init_%: ## Initializes terraform project. Calls terraform init.
+	@echo "🔧 Terraform init for module: $*"
+	terraform -chdir=$(DEPLOYMENT_DIR)/$* init \
+		-reconfigure \
+		-backend-config="bucket=$(BUCKET_NAME)" \
+		-backend-config="encryption_key=$(GOOGLE_ENCRYPTION_KEY)" \
+		-backend-config="prefix=$(DEPLOYMENT_MODE)/$*"
