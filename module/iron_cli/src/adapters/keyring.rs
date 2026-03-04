@@ -160,7 +160,7 @@ pub fn clear_tokens() -> Result<(), KeyringError> {
     .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
   // Ignore NotFound errors (already cleared)
-  match access_entry.delete_password() {
+  match access_entry.delete_credential() {
     Ok(()) => {}
     Err(e) => {
       let error_msg = e.to_string();
@@ -174,7 +174,7 @@ pub fn clear_tokens() -> Result<(), KeyringError> {
   let refresh_entry = Entry::new(SERVICE_NAME, REFRESH_TOKEN_KEY)
     .map_err(|e| KeyringError::StorageError(e.to_string()))?;
 
-  match refresh_entry.delete_password() {
+  match refresh_entry.delete_credential() {
     Ok(()) => {}
     Err(e) => {
       let error_msg = e.to_string();

@@ -22,9 +22,12 @@
 //!
 //! Alert if any benchmark shows >50% regression from baseline.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use iron_cli::formatting::{OutputFormat, TreeFmtFormatter};
+use core::hint::black_box;
 use std::collections::HashMap;
+
+use criterion::{criterion_group, criterion_main, Criterion};
+
+use iron_cli::formatting::{OutputFormat, TreeFmtFormatter};
 
 /// Benchmark `format_single` with small dataset (2 keys)
 fn benchmark_format_single_small(c: &mut Criterion) {

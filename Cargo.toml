@@ -264,6 +264,18 @@ version = "0.22"
 [workspace.dependencies.headers]
 version = "0.4"
 
+[workspace.dependencies.tree_fmt]
+version = "0.9"
+
+[workspace.dependencies.keyring]
+version = "3.6"
+
+[workspace.dependencies.dirs]
+version = "6.0"
+
+[workspace.dependencies.unilang]
+version = "0.48"
+
 ## Modularity
 
 [workspace.dependencies.mod_interface]
