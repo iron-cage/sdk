@@ -138,6 +138,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 
 **Deployment:**
 -> See [`deployment/readme.md`](deployment/readme.md) for packages, distribution, scaling patterns
+-> See [`deployment.md`](deployment.md) for server-proxy operational runbook (setup, rotation, troubleshooting)
 
 **Technology Decisions:**
 -> See [`technology/readme.md`](technology/readme.md) for why Rust, PyO3, infrastructure choices
