@@ -27,6 +27,18 @@ enabled = [
   "dep:keyring",
 ]
 full = ["enabled"]
+# init-admin: Enables the iron-init-admin binary (direct DB access)
+init-admin = [
+  "dep:iron_token_manager",
+  "dep:sqlx",
+  "dep:bcrypt",
+  "dep:clap",
+  "dep:rand",
+  "dep:uuid",
+  "dep:chrono",
+  "dep:anyhow",
+  "dep:tokio",
+]
 # test-adapter: Enables InMemoryAdapter for integration tests
 # (compile_error! prevents production use)
 test-adapter = []
@@ -47,6 +59,16 @@ keyring = { workspace = true, optional = true }
 regex = { workspace = true }
 base64 = { workspace = true }
 tree_fmt = { workspace = true, features = ["table_plain", "expanded_postgres", "format_json", "format_yaml"] }
+
+# init-admin binary dependencies
+iron_token_manager = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
+bcrypt = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+clap = { workspace = true, optional = true, features = ["env"] }
+rand = { workspace = true, optional = true }
+sqlx = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
 
 [build-dependencies]
 serde_yaml = { workspace = true }
@@ -73,3 +95,8 @@ path = "src/bin/iron_control_unilang.rs"
 [[bench]]
 name = "formatting_benchmarks"
 harness = false
+
+[[bin]]
+name = "iron-init-admin"
+path = "src/bin/init_admin.rs"
+required-features = ["init-admin"]
