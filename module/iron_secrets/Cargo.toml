@@ -58,7 +58,3 @@ tracing = { workspace = true, optional = true }
 
 # Modularity
 mod_interface = { workspace = true, optional = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-criterion = { workspace = true }

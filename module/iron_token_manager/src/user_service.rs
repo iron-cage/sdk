@@ -9,6 +9,7 @@ use sqlx::{Row, SqlitePool};
 use tracing::error;
 
 use crate::error::{Result, TokenError};
+use iron_types::Role;
 
 /// User data returned from database
 #[derive(Debug, Clone)]
@@ -162,7 +163,7 @@ impl UserService {
     }
 
     // Validate role via iron_types::Role (single source of truth)
-    if iron_types::Role::from_str(&params.role).is_err() {
+    if Role::from_str(&params.role).is_err() {
       return Err(TokenError::Validation {
         field: "role".to_string(),
         reason: format!(

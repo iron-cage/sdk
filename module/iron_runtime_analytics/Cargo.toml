@@ -14,7 +14,7 @@ categories = ["development-tools::profiling"]
 workspace = true
 
 [features]
-default = [ "enabled" ]
+default = ["enabled"]
 enabled = [
   "dep:serde",
   "dep:uuid",
@@ -28,18 +28,18 @@ sync = [
   "dep:tokio",
   "dep:tracing",
 ]
-full = [ "enabled", "sync" ]
+full = ["enabled", "sync"]
 
 [dependencies]
-serde = { workspace = true, optional = true, features = [ "derive", "rc" ] }
-uuid = { workspace = true, optional = true, features = [ "v4", "serde" ] }
+serde = { workspace = true, optional = true, features = ["derive", "rc"] }
+uuid = { workspace = true, optional = true, features = ["v4", "serde"] }
 iron_cost = { workspace = true, optional = true }
 crossbeam = { workspace = true, optional = true }
 dashmap = { workspace = true, optional = true }
 
 # Sync dependencies
-reqwest = { workspace = true, optional = true, features = [ "json" ] }
-tokio = { workspace = true, optional = true, features = [ "time", "sync", "rt" ] }
+reqwest = { workspace = true, optional = true, features = ["json"] }
+tokio = { workspace = true, optional = true, features = ["time", "sync", "rt"] }
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
