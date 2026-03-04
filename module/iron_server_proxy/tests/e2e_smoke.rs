@@ -18,7 +18,7 @@ use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
 use iron_cost::pricing::PricingManager;
 use iron_secrets::crypto::CryptoService;
-use iron_server_proxy::{proxy, AppState};
+use iron_server_proxy::{proxy, AppState, AuthRateLimiter};
 use iron_token_manager::ProviderKeyStorage;
 
 /// Test master key (32 bytes) for AES-256-GCM.
@@ -128,6 +128,7 @@ fn build_test_state(pool: SqlitePool, crypto: Arc<CryptoService>) -> AppState {
       .build()
       .expect("Failed to build HTTP client"),
     pricing_manager: Arc::new(PricingManager::new().expect("Failed to init pricing manager")),
+    auth_rate_limiter: AuthRateLimiter::new(),
   }
 }
 
@@ -428,4 +429,53 @@ async fn test_e2e_x_api_key_header_auth() {
     .expect("Request failed");
 
   assert_eq!(resp.status(), 200, "x-api-key auth should work");
+}
+
+/// Repeated auth failures from the same IP trigger 429 rate limiting.
+#[tokio::test]
+async fn test_e2e_rate_limit_after_repeated_auth_failures() {
+  let pool = setup_test_db().await;
+  let crypto = Arc::new(CryptoService::new(&TEST_MASTER_KEY).expect("crypto init"));
+  let state = build_test_state(pool, crypto);
+  let proxy_url = start_test_proxy(state).await;
+
+  let client = Client::new();
+
+  // Send 20 requests with invalid tokens (the rate limit threshold)
+  for i in 0..20 {
+    let resp = client
+      .post(format!("{proxy_url}/v1/chat/completions"))
+      .header("Authorization", format!("Bearer bad_token_{i}"))
+      .json(&chat_request_body())
+      .send()
+      .await
+      .expect("Request failed");
+    assert_eq!(resp.status(), 401, "Request {i} should return 401");
+  }
+
+  // The 21st request should be rate-limited (429)
+  let resp = client
+    .post(format!("{proxy_url}/v1/chat/completions"))
+    .header("Authorization", "Bearer one_more_bad_token")
+    .json(&chat_request_body())
+    .send()
+    .await
+    .expect("Request failed");
+
+  assert_eq!(resp.status(), 429, "Should return 429 after 20 failures");
+
+  let retry_after = resp
+    .headers()
+    .get("retry-after")
+    .expect("Missing Retry-After header");
+  let retry_secs: u64 = retry_after
+    .to_str()
+    .expect("valid string")
+    .parse()
+    .expect("valid number");
+  assert!(retry_secs > 0, "Retry-After must be positive");
+  assert!(retry_secs <= 61, "Retry-After must be within window");
+
+  let body = resp.json::<Value>().await.expect("parse error response");
+  assert_eq!(body["error"]["code"], "rate_limited");
 }

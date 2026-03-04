@@ -52,6 +52,8 @@ pub enum ProxyError {
   Forbidden(&'static str),
   /// 402 - spending cap exceeded for provider key.
   SpendingCapExceeded,
+  /// 429 - too many failed auth attempts from this IP.
+  RateLimited(u64),
   /// 400 - request body too large or malformed.
   BadRequest(&'static str),
   /// 502 - LLM provider unreachable or returned error.
@@ -72,6 +74,11 @@ impl IntoResponse for ProxyError {
         "Spending cap exceeded for this provider key",
         "spending_cap_exceeded",
       ),
+      Self::RateLimited(_) => (
+        StatusCode::TOO_MANY_REQUESTS,
+        "Too many failed authentication attempts",
+        "rate_limited",
+      ),
       Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, *msg, "bad_request"),
       Self::BadGateway(msg) => (StatusCode::BAD_GATEWAY, msg.as_str(), "upstream_error"),
       Self::Database(_) | Self::Internal(_) => (
@@ -89,6 +96,16 @@ impl IntoResponse for ProxyError {
     }
 
     let body = iron_llm_core::create_openai_error(message, "error", code);
-    (status, Json(body)).into_response()
+    let mut response = (status, Json(body)).into_response();
+
+    // Add Retry-After header for rate-limited responses
+    if let Self::RateLimited(retry_after) = &self {
+      response.headers_mut().insert(
+        "retry-after",
+        retry_after.to_string().parse().expect("valid header value"),
+      );
+    }
+
+    response
   }
 }

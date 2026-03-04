@@ -43,8 +43,27 @@ struct AgentRecord {
   provider_key_id: Option<i64>,
 }
 
+/// Extract client IP from reverse proxy headers, with safe fallback.
+fn extract_client_ip(request: &Request) -> String {
+  request
+    .headers()
+    .get("x-real-ip")
+    .or_else(|| request.headers().get("x-forwarded-for"))
+    .and_then(|v| v.to_str().ok())
+    .map_or_else(
+      || "unknown".to_string(),
+      |s| s.split(',').next().unwrap_or(s).trim().to_string(),
+    )
+}
+
 /// Inner proxy handler with `?` error propagation.
 async fn handle_proxy_inner(state: &AppState, request: Request) -> Result<Response, ProxyError> {
+  // Step 0: Rate limit check (before any DB work)
+  let client_ip = extract_client_ip(&request);
+  if let Err(retry_after) = state.auth_rate_limiter.check(&client_ip) {
+    return Err(ProxyError::RateLimited(retry_after));
+  }
+
   // Step 1: Extract IC Token from Authorization header or x-api-key
   let auth_header = request
     .headers()
@@ -57,9 +76,10 @@ async fn handle_proxy_inner(state: &AppState, request: Request) -> Result<Respon
     .get("x-api-key")
     .and_then(|v| v.to_str().ok());
 
-  let ic_token = auth_header
-    .or(x_api_key)
-    .ok_or(ProxyError::Unauthorized("Missing IC Token"))?;
+  let ic_token = auth_header.or(x_api_key).ok_or_else(|| {
+    state.auth_rate_limiter.record_failure(&client_ip);
+    ProxyError::Unauthorized("Missing IC Token")
+  })?;
 
   // Step 2: SHA-256 hash lookup in agents table
   let token_hash = format!("{:x}", Sha256::digest(ic_token.as_bytes()));
@@ -71,7 +91,10 @@ async fn handle_proxy_inner(state: &AppState, request: Request) -> Result<Respon
   .fetch_optional(&state.db_pool)
   .await
   .map_err(ProxyError::Database)?
-  .ok_or(ProxyError::Unauthorized("Invalid or revoked IC Token"))?;
+  .ok_or_else(|| {
+    state.auth_rate_limiter.record_failure(&client_ip);
+    ProxyError::Unauthorized("Invalid or revoked IC Token")
+  })?;
 
   // Step 3: Check that agent has a provider key assigned
   let provider_key_id = agent.provider_key_id.ok_or(ProxyError::Forbidden(

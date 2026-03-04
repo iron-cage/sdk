@@ -6,9 +6,9 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use reqwest::Client;
 use sqlx::SqlitePool;
 
-use crate::{config::Config, error::ServerError};
+use crate::{config::Config, error::ServerError, rate_limiter::AuthRateLimiter};
 use iron_cost::pricing::PricingManager;
-use iron_secrets::crypto::CryptoService;
+use iron_secrets::crypto::{CryptoService, KEY_SIZE};
 use iron_token_manager::ProviderKeyStorage;
 
 /// Shared application state passed to every axum handler via `State<AppState>`.
@@ -27,6 +27,8 @@ pub struct AppState {
   pub http_client: Client,
   /// Model pricing data for cost calculation.
   pub pricing_manager: Arc<PricingManager>,
+  /// Per-IP rate limiter for failed auth attempts.
+  pub auth_rate_limiter: AuthRateLimiter,
 }
 
 impl AppState {
@@ -56,6 +58,12 @@ impl AppState {
     let key_bytes = STANDARD
       .decode(&config.secrets_master_key)
       .map_err(|e| ServerError::Crypto(format!("Invalid base64 master key: {e}")))?;
+    if key_bytes.len() != KEY_SIZE {
+      return Err(ServerError::Crypto(format!(
+        "IRON_SECRETS_MASTER_KEY must be exactly {KEY_SIZE} bytes (AES-256), got {} bytes",
+        key_bytes.len()
+      )));
+    }
     let crypto_service = Arc::new(
       CryptoService::new(&key_bytes)
         .map_err(|e| ServerError::Crypto(format!("CryptoService init failed: {e}")))?,
@@ -77,6 +85,7 @@ impl AppState {
       crypto_service,
       http_client,
       pricing_manager,
+      auth_rate_limiter: AuthRateLimiter::new(),
     })
   }
 }

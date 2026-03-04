@@ -9,9 +9,11 @@
 pub mod config;
 pub mod error;
 pub mod proxy;
+pub mod rate_limiter;
 pub mod server;
 pub mod state;
 
 pub use config::Config;
 pub use error::{ProxyError, ServerError};
+pub use rate_limiter::AuthRateLimiter;
 pub use state::AppState;
