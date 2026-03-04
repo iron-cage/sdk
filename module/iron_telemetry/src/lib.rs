@@ -287,6 +287,7 @@ mod stub {
   /// Stub log level for disabled feature
   #[derive(Debug, Clone, Copy)]
   pub enum LogLevel {
+    Trace,
     Debug,
     Info,
     Warn,
@@ -294,7 +295,7 @@ mod stub {
   }
 
   /// Stub init function
-  pub fn init_logging(_level: LogLevel) -> Result<(), Box<dyn std::error::Error>> {
+  pub fn init_logging(_level: LogLevel) -> Result<(), Box<dyn core::error::Error>> {
     Ok(())
   }
 

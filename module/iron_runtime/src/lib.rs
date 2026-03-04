@@ -235,11 +235,13 @@ mod stub {
   }
 
   /// Stub agent handle
+  #[derive(Debug)]
   pub struct AgentHandle {
     pub agent_id: iron_types::AgentId,
   }
 
   /// Stub runtime
+  #[derive(Debug)]
   pub struct AgentRuntime {
     config: RuntimeConfig,
   }

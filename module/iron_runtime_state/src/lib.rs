@@ -587,6 +587,7 @@ mod stub {
   }
 
   /// Stub state manager
+  #[derive(Debug)]
   pub struct StateManager;
 
   impl StateManager {
