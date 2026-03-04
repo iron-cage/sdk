@@ -1,9 +1,9 @@
 [package]
 name = "iron_types"
 version = "0.3.0"
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Shared types and data structures for Iron Cage AI agent management"
 repository = "https://github.com/.../iron_cage"
 readme = "readme.md"

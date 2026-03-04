@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Performance benchmarks for formatting
 //!
 //! Measures `TreeFmtFormatter` performance across different data sizes
@@ -8,8 +9,6 @@
 //! ```bash
 //! cargo bench --bench formatting_benchmarks
 //! ```
-
-#![allow(missing_docs)]
 //!
 //! # Expected Results
 //!

@@ -96,8 +96,8 @@ pub async fn create_agent_adapter<S: ::core::hash::BuildHasher>(
   let body = json!({
     "name": name,
     "providers": providers,
-    "provider_key_id": provider_key_id.parse::< i64 >().expect( "provider_key_id validated by handler" ),
-    "initial_budget_microdollars": budget.parse::< i64 >().expect( "Budget parameter validated by handler" ),
+    "provider_key_id": provider_key_id.parse::<i64>().expect("provider_key_id validated by handler"),
+    "initial_budget_microdollars": budget.parse::<i64>().expect("Budget parameter validated by handler"),
   });
 
   // Make HTTP POST request

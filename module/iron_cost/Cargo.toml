@@ -1,9 +1,9 @@
 [package]
 name = "iron_cost"
 version = "0.3.0"
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Budget tracking and cost enforcement for Iron Cage AI agents"
 repository = "https://github.com/.../iron_cage"
 readme = "readme.md"

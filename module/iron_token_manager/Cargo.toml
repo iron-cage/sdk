@@ -1,10 +1,10 @@
 [package]
 name = "iron_token_manager"
-version= "0.5.0"
-edition.workspace = true
-rust-version.workspace = true
-authors.workspace = true
-license.workspace = true
+version = "0.5.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
 description = "API token lifecycle management and usage tracking"
 repository = "https://github.com/.../iron_runtime"
 readme = "readme.md"
