@@ -33,9 +33,6 @@ enabled = [
 full = ["enabled"]
 
 [dependencies]
-# Workspace crates (always available)
-iron_types = { workspace = true }
-
 # Workspace crates (feature-gated)
 iron_runtime_state = { workspace = true, optional = true }
 

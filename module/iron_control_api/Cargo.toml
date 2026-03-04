@@ -72,7 +72,6 @@ serde_json = { workspace = true, optional = true }
 
 # Error handling
 anyhow = { workspace = true, optional = true }
-thiserror = { workspace = true, optional = true }
 
 # Tracing
 tracing = { workspace = true, optional = true }
@@ -122,12 +121,9 @@ axum = { workspace = true, features = ["ws"] }
 iron_token_manager = { path = "../iron_token_manager" }
 iron_test_db = { path = "../iron_test_db", features = ["enabled"] }
 tokio = { workspace = true, features = ["full"] }
-hyper = { workspace = true }
 http-body-util = { workspace = true }
 sha2 = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
-serial_test = { workspace = true }
-tempfile = { workspace = true }
 reqwest = { workspace = true }
 walkdir = { workspace = true }
 

@@ -35,4 +35,5 @@ serde_json = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full"] }
+serde_json = { workspace = true }
+iron_cost = { workspace = true, features = ["enabled"] }
