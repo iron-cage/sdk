@@ -124,7 +124,12 @@ async fn handle_proxy_inner(
     return Err(ProxyError::Forbidden("Provider key is disabled"));
   }
 
-  // Step 5: Check spending cap before making the request
+  // Step 5: Soft spending cap pre-check (fast rejection for clearly over-budget keys).
+  // NOTE: This check is racy under concurrent load (TOCTOU). The authoritative guard
+  // is the atomic `increment_spending` in Step 9, which uses
+  // `WHERE spending_used + $1 <= cap` to prevent overshoot at the DB level.
+  // This pre-check exists only to avoid unnecessary LLM calls when the cap
+  // is already exceeded.
   let cap_ok = state
     .provider_key_storage
     .check_spending_cap(provider_key_id)
@@ -182,7 +187,11 @@ async fn handle_proxy_inner(
   .await
   .map_err(|e| ProxyError::BadGateway(format!("Forward failed: {e}")))?;
 
-  // Step 9: Increment spending counter (best-effort, don't fail the response)
+  // Step 9: Atomic spending increment (authoritative cap enforcement).
+  // The UPDATE uses `WHERE spending_used + $1 <= cap` atomically, so concurrent
+  // requests cannot overshoot the cap at the DB level. If the cap is exceeded,
+  // the response is still returned (the LLM call already happened and was billed),
+  // but the next request will be rejected by the pre-check in Step 5.
   if let Some(ref cost_info) = forward_resp.cost_info {
     let amount = i64::try_from(cost_info.cost_micros).unwrap_or(i64::MAX);
     if let Err(e) = state
@@ -190,10 +199,10 @@ async fn handle_proxy_inner(
       .increment_spending(provider_key_id, amount)
       .await
     {
-      tracing::warn!(
+      tracing::error!(
         key_id = provider_key_id,
         cost_micros = cost_info.cost_micros,
-        "Failed to increment spending: {e}"
+        "Spending cap exceeded during atomic increment (request already forwarded): {e}"
       );
     }
   }

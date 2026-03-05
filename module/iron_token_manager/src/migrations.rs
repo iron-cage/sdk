@@ -28,21 +28,63 @@
 //! - Guard tables prevent data loss
 //! - Foreign keys always enabled
 //! - All migrations applied in order
+//! - SQL is embedded at compile time via `include_str!()` (no filesystem access at runtime)
 //!
 //! # Known Pitfalls
 //!
 //! - Guard tables must not be deleted manually
 //! - Foreign key pragma must run before migrations
 
-use std::{fs, path::Path};
-
 use sqlx::SqlitePool;
 
 use crate::error::{Result, TokenError};
 
+/// Embeds a migration SQL file at compile time and pairs it with its filename.
+/// The filename is parsed at runtime to extract the migration number (first 3 chars).
+macro_rules! migration {
+  ($name:literal) => {
+    (
+      $name,
+      include_str!(concat!("../migrations/", $name, ".sql")),
+    )
+  };
+}
+
+/// All migrations embedded at compile time.
+/// Each entry is `(name, sql)` - sorted by number prefix for deterministic ordering.
+/// Using `include_str!()` ensures deployed binaries carry their own migrations
+/// without depending on the build machine's filesystem paths.
+static MIGRATIONS: &[(&str, &str)] = &[
+  migration!("001_initial_schema"),
+  migration!("002_add_length_constraints"),
+  migration!("003_create_users_table"),
+  migration!("004_create_ai_provider_keys"),
+  migration!("005_enhance_users_table"),
+  migration!("006_create_user_audit_log"),
+  migration!("007_create_blacklist_table"),
+  migration!("008_create_agents_table"),
+  migration!("009_create_budget_leases"),
+  migration!("010_create_agent_budgets"),
+  migration!("011_create_budget_requests"),
+  migration!("012_create_analytics_events"),
+  migration!("013_create_budget_history"),
+  migration!("014_add_api_tokens_fk"),
+  migration!("015_add_agents_owner_id"),
+  migration!("016_add_revoked_at"),
+  migration!("017_add_lease_return_columns"),
+  migration!("018_create_system_config"),
+  migration!("019_convert_budgets_to_microdollars"),
+  migration!("020_add_agent_provider_key_id"),
+  migration!("021_add_account_lockout_fields"),
+  migration!("022_add_ic_token_to_agents"),
+  migration!("023_seed_agent1_ic_token"),
+  migration!("024_add_ip_key_spending_cap"),
+  migration!("025_rename_roles"),
+];
+
 /// Applies all migrations to the database pool.
 ///
-/// All `.sql` files in the `migrations/` directory are applied in sorted order.
+/// All migrations are embedded at compile time and applied in sorted order.
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -67,25 +109,8 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
       TokenError::Generic
     })?;
 
-  // Discover and apply all .sql migrations in sorted order
-  let migrations_dir = format!("{}/migrations", env!("CARGO_MANIFEST_DIR"));
-  let mut filenames = fs::read_dir(&migrations_dir)
-    .map_err(|e| {
-      eprintln!("Failed to read migrations directory: {e}");
-      TokenError::Generic
-    })?
-    .filter_map(|entry| {
-      let name = entry.ok()?.file_name().into_string().ok()?;
-      Path::new(&name)
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("sql"))
-        .then_some(name)
-    })
-    .collect::<Vec<_>>();
-  filenames.sort();
-
-  for filename in &filenames {
-    apply_guarded_migration(pool, filename).await?;
+  for (name, sql) in MIGRATIONS {
+    apply_guarded_migration(pool, name, sql).await?;
   }
 
   Ok(())
@@ -95,17 +120,8 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
 ///
 /// Checks the guard table `_migration_{number}_completed` before running.
 /// If the guard table exists, the migration is skipped (idempotent).
-///
-/// The migration number is extracted from the first 3 characters of `filename`
-/// (e.g. `"003_create_users_table.sql"` → `"003"`).
-async fn apply_guarded_migration(pool: &SqlitePool, filename: &str) -> Result<()> {
-  let number = &filename[..3];
-  let path = format!("{}/migrations/{filename}", env!("CARGO_MANIFEST_DIR"));
-  let sql = fs::read_to_string(&path).map_err(|e| {
-    eprintln!("Failed to read migration {filename}: {e}");
-    TokenError::Generic
-  })?;
-
+async fn apply_guarded_migration(pool: &SqlitePool, name: &str, sql: &str) -> Result<()> {
+  let number = &name[..3];
   let guard_table = format!("_migration_{number}_completed");
   let check_sql =
     format!("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{guard_table}'");
@@ -116,8 +132,8 @@ async fn apply_guarded_migration(pool: &SqlitePool, filename: &str) -> Result<()
     .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
-    sqlx::raw_sql(&sql).execute(pool).await.map_err(|e| {
-      eprintln!("Migration {number} failed: {e:?}");
+    sqlx::raw_sql(sql).execute(pool).await.map_err(|e| {
+      eprintln!("Migration {name} failed: {e:?}");
       TokenError::Generic
     })?;
   }
