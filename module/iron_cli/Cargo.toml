@@ -25,6 +25,9 @@ enabled = [
   "dep:async-trait",
   "dep:dirs",
   "dep:keyring",
+  "dep:regex",
+  "dep:base64",
+  "dep:tree_fmt",
 ]
 full = ["enabled"]
 # init-admin: Enables the iron-init-admin binary (direct DB access)
@@ -56,9 +59,9 @@ unilang = { workspace = true, optional = true, features = ["default"] }
 async-trait = { workspace = true, optional = true }
 dirs = { workspace = true, optional = true }
 keyring = { workspace = true, optional = true }
-regex = { workspace = true }
-base64 = { workspace = true }
-tree_fmt = { workspace = true, features = ["table_plain", "expanded_postgres", "format_json", "format_yaml"] }
+regex = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+tree_fmt = { workspace = true, optional = true, features = ["table_plain", "expanded_postgres", "format_json", "format_yaml"] }
 
 # init-admin binary dependencies
 iron_token_manager = { workspace = true, optional = true }
