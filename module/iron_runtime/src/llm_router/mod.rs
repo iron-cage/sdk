@@ -18,9 +18,3 @@ pub use router::LlmRouter;
 
 // Re-export proxy config and server entry point
 pub use proxy::{run_proxy, ProxyConfig};
-
-// Re-export from iron_llm_core for backwards compatibility
-pub use iron_llm_core::{
-  detect_provider_from_model, strip_provider_prefix, translate_anthropic_to_openai,
-  translate_openai_to_anthropic,
-};

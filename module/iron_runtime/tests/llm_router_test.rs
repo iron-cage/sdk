@@ -1,7 +1,6 @@
 //! Unit tests for LLM Router module
 
-use iron_runtime::llm_router::detect_provider_from_model;
-use iron_runtime::llm_router::strip_provider_prefix;
+use iron_llm_core::{detect_provider_from_model, strip_provider_prefix};
 use iron_secrets::ip_token::ProviderKey;
 
 // =============================================================================

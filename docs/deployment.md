@@ -15,7 +15,7 @@ token control platform.
                                v          v
                    +-----------+--+  +----+-------------+
                    | control_api  |  | server_proxy     |
-                   | (port 3000)  |  | (port 8081)      |
+                   | (port 8080)  |  | (port 8081)      |
                    |              |  |                  |
                    | - User/RBAC  |  | - IC Token auth  |
                    | - Key CRUD   |  | - Key decryption |
@@ -41,7 +41,7 @@ Both services share the same SQLite database and `IRON_SECRETS_MASTER_KEY`.
 | `JWT_SECRET` | yes | control_api | Secret for JWT token signing (must not be the default) |
 | `IC_TOKEN_SECRET` | yes | control_api | Secret for IC Token HMAC generation |
 | `IP_TOKEN_KEY` | yes | control_api | Hex-encoded 32-byte AES-256-GCM key for IP Token encryption |
-| `SERVER_PORT` | no | control_api | Control API listen port (default: 3000) |
+| `SERVER_PORT` | no | control_api | Control API listen port (default: 8080) |
 | `PROXY_PORT` | no | server_proxy | Proxy listen port (default: 8081) |
 | `BIND_ADDR` | no | server_proxy | Proxy bind address (default: `0.0.0.0`) |
 | `IRON_DEPLOYMENT_MODE` | recommended | control_api | `production` / `development` / `pilot` |
