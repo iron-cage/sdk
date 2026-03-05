@@ -50,6 +50,7 @@ default-members = [
   "module/iron_test_db",
   "module/iron_config_loader",
   "module/iron_llm_core",
+  "module/iron_server_proxy",
   "module/iron_safety",
   "module/iron_reliability",
   "module/iron_secrets",

@@ -7,9 +7,9 @@
 //! | `test_role_ordering` | Role hierarchy | Admin > Manager > Developer |
 //! | `test_admin_has_all_permissions` | Admin permissions | All permissions granted |
 //! | `test_manager_permissions` | Manager permissions | Keys/tokens/agents, no users/roles |
-//! | `test_developer_has_read_only_permissions` | Developer permissions | Read-only + own token |
+//! | `test_developer_has_read_only_permissions` | Developer permissions | Read-only access |
 //! | `test_role_from_string` | Parse canonical names | Correct Role enum variants |
-//! | `test_role_from_string_legacy` | Parse legacy names | "user"→Manager, "viewer"→Developer |
+//! | `test_role_from_string_legacy` | Parse legacy names | User->Manager, Viewer->Developer |
 //! | `test_role_to_string` | Convert to string | Canonical names |
 //! | `test_permission_from_string` | Parse permission names | Correct Permission variants |
 //! | `test_user_context_creation` | Create user context | UserContext with correct fields |
@@ -41,7 +41,6 @@ fn test_admin_has_all_permissions() {
   assert!(checker.has_permission(Role::Admin, Permission::WriteAgents));
   assert!(checker.has_permission(Role::Admin, Permission::ManageProviderKeys));
   assert!(checker.has_permission(Role::Admin, Permission::ManageIcTokens));
-  assert!(checker.has_permission(Role::Admin, Permission::ReadOwnToken));
   assert!(checker.has_permission(Role::Admin, Permission::ManageUsers));
   assert!(checker.has_permission(Role::Admin, Permission::AssignRoles));
   assert!(checker.has_permission(Role::Admin, Permission::ReadMetrics));
@@ -56,7 +55,6 @@ fn test_manager_permissions() {
   assert!(checker.has_permission(Role::Manager, Permission::WriteAgents));
   assert!(checker.has_permission(Role::Manager, Permission::ManageProviderKeys));
   assert!(checker.has_permission(Role::Manager, Permission::ManageIcTokens));
-  assert!(checker.has_permission(Role::Manager, Permission::ReadOwnToken));
   assert!(checker.has_permission(Role::Manager, Permission::ReadMetrics));
 
   // Manager CANNOT do:
@@ -76,7 +74,6 @@ fn test_developer_has_read_only_permissions() {
 
   // Developer CAN do:
   assert!(checker.has_permission(Role::Developer, Permission::ReadAgents));
-  assert!(checker.has_permission(Role::Developer, Permission::ReadOwnToken));
   assert!(checker.has_permission(Role::Developer, Permission::ReadMetrics));
 
   // Developer CANNOT do:
@@ -127,10 +124,6 @@ fn test_permission_from_string() {
   assert_eq!(
     Permission::from_str("manage_ic_tokens"),
     Ok(Permission::ManageIcTokens)
-  );
-  assert_eq!(
-    Permission::from_str("read_own_token"),
-    Ok(Permission::ReadOwnToken)
   );
   assert_eq!(
     Permission::from_str("manage_users"),
@@ -184,7 +177,6 @@ fn test_middleware_permission_checking() {
     role: Role::Developer,
   };
   assert!(checker.has_permission(dev_context.role, Permission::ReadAgents));
-  assert!(checker.has_permission(dev_context.role, Permission::ReadOwnToken));
   assert!(!checker.has_permission(dev_context.role, Permission::WriteAgents));
   assert!(!checker.has_permission(dev_context.role, Permission::ManageProviderKeys));
 }

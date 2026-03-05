@@ -5,7 +5,7 @@
 //!
 //! Uses wiremock to mock the LLM provider and in-memory `SQLite` for the database.
 
-use core::time::Duration;
+use core::{net::SocketAddr, time::Duration};
 use std::sync::Arc;
 
 use axum::{routing, Router};
@@ -141,9 +141,12 @@ async fn start_test_proxy(state: AppState) -> String {
   let addr = listener.local_addr().expect("Failed to get local addr");
 
   tokio::spawn(async move {
-    axum::serve(listener, router)
-      .await
-      .expect("Test proxy server crashed");
+    axum::serve(
+      listener,
+      router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("Test proxy server crashed");
   });
 
   format!("http://{addr}")

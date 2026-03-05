@@ -39,8 +39,6 @@ pub enum Permission {
   ManageProviderKeys,
   /// Manage IC tokens (create, revoke, assign)
   ManageIcTokens,
-  /// Inspect own IC token details
-  ReadOwnToken,
   /// Manage user accounts (CRUD, suspend, activate)
   ManageUsers,
   /// Assign or change user roles (Admin-only privilege escalation guard)
@@ -63,7 +61,6 @@ impl FromStr for Permission {
       "write_agents" => Ok(Self::WriteAgents),
       "manage_provider_keys" => Ok(Self::ManageProviderKeys),
       "manage_ic_tokens" => Ok(Self::ManageIcTokens),
-      "read_own_token" => Ok(Self::ReadOwnToken),
       "manage_users" => Ok(Self::ManageUsers),
       "assign_roles" => Ok(Self::AssignRoles),
       "read_metrics" => Ok(Self::ReadMetrics),
@@ -97,7 +94,6 @@ impl PermissionChecker {
   /// | WriteAgents        | ✓     | ✓       | ✗         |
   /// | ManageProviderKeys | ✓     | ✓       | ✗         |
   /// | ManageIcTokens     | ✓     | ✓       | ✗         |
-  /// | ReadOwnToken       | ✓     | ✓       | ✓         |
   /// | ManageUsers        | ✓     | ✗       | ✗         |
   /// | AssignRoles        | ✓     | ✗       | ✗         |
   /// | ReadMetrics        | ✓     | ✓       | ✓         |
@@ -113,16 +109,12 @@ impl PermissionChecker {
             | Permission::WriteAgents
             | Permission::ManageProviderKeys
             | Permission::ManageIcTokens
-            | Permission::ReadOwnToken
             | Permission::ReadMetrics
         )
       }
 
       Role::Developer => {
-        matches!(
-          permission,
-          Permission::ReadAgents | Permission::ReadOwnToken | Permission::ReadMetrics
-        )
+        matches!(permission, Permission::ReadAgents | Permission::ReadMetrics)
       }
     }
   }
