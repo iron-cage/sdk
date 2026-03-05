@@ -1,6 +1,8 @@
 [Unit]
 Description=Iron Cage Server-Side LLM Proxy
-After=network.target sqlite.service iron_control_api.service
+After=network.target iron_control_api.service
+StartLimitBurst=3
+StartLimitIntervalSec=60
 
 [Service]
 Type=simple
@@ -8,14 +10,16 @@ User=ironcage
 Group=ironcage
 WorkingDirectory=/var/lib/iron_cage
 ExecStart=/usr/local/bin/iron_server_proxy
-Restart=always
+Restart=on-failure
 RestartSec=5
+TimeoutStopSec=300
 EnvironmentFile=/etc/iron_cage/iron_server_proxy.env
 
 # Security hardening
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectSystem=full
+ProtectSystem=strict
+ReadWritePaths=/var/lib/iron_cage
 ProtectHome=yes
 
 [Install]

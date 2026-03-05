@@ -111,7 +111,7 @@ Store this file securely - the password is shown only once.
 
 ```nginx
 upstream control_api {
-    server 127.0.0.1:3000;
+    server 127.0.0.1:8080;
 }
 
 upstream server_proxy {

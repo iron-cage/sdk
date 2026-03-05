@@ -37,13 +37,34 @@ fn test_role_ordering() {
 fn test_admin_has_all_permissions() {
   let checker = PermissionChecker::new();
 
-  assert!(checker.has_permission(Role::Admin, Permission::ReadAgents));
-  assert!(checker.has_permission(Role::Admin, Permission::WriteAgents));
-  assert!(checker.has_permission(Role::Admin, Permission::ManageProviderKeys));
-  assert!(checker.has_permission(Role::Admin, Permission::ManageIcTokens));
-  assert!(checker.has_permission(Role::Admin, Permission::ManageUsers));
-  assert!(checker.has_permission(Role::Admin, Permission::AssignRoles));
-  assert!(checker.has_permission(Role::Admin, Permission::ReadMetrics));
+  assert!(
+    checker.has_permission(Role::Admin, Permission::ReadAgents),
+    "Admin should have ReadAgents"
+  );
+  assert!(
+    checker.has_permission(Role::Admin, Permission::WriteAgents),
+    "Admin should have WriteAgents"
+  );
+  assert!(
+    checker.has_permission(Role::Admin, Permission::ManageProviderKeys),
+    "Admin should have ManageProviderKeys"
+  );
+  assert!(
+    checker.has_permission(Role::Admin, Permission::ManageIcTokens),
+    "Admin should have ManageIcTokens"
+  );
+  assert!(
+    checker.has_permission(Role::Admin, Permission::ManageUsers),
+    "Admin should have ManageUsers"
+  );
+  assert!(
+    checker.has_permission(Role::Admin, Permission::AssignRoles),
+    "Admin should have AssignRoles"
+  );
+  assert!(
+    checker.has_permission(Role::Admin, Permission::ReadMetrics),
+    "Admin should have ReadMetrics"
+  );
 }
 
 #[test]
@@ -51,11 +72,26 @@ fn test_manager_permissions() {
   let checker = PermissionChecker::new();
 
   // Manager CAN do:
-  assert!(checker.has_permission(Role::Manager, Permission::ReadAgents));
-  assert!(checker.has_permission(Role::Manager, Permission::WriteAgents));
-  assert!(checker.has_permission(Role::Manager, Permission::ManageProviderKeys));
-  assert!(checker.has_permission(Role::Manager, Permission::ManageIcTokens));
-  assert!(checker.has_permission(Role::Manager, Permission::ReadMetrics));
+  assert!(
+    checker.has_permission(Role::Manager, Permission::ReadAgents),
+    "Manager should have ReadAgents"
+  );
+  assert!(
+    checker.has_permission(Role::Manager, Permission::WriteAgents),
+    "Manager should have WriteAgents"
+  );
+  assert!(
+    checker.has_permission(Role::Manager, Permission::ManageProviderKeys),
+    "Manager should have ManageProviderKeys"
+  );
+  assert!(
+    checker.has_permission(Role::Manager, Permission::ManageIcTokens),
+    "Manager should have ManageIcTokens"
+  );
+  assert!(
+    checker.has_permission(Role::Manager, Permission::ReadMetrics),
+    "Manager should have ReadMetrics"
+  );
 
   // Manager CANNOT do:
   assert!(
@@ -73,15 +109,36 @@ fn test_developer_has_read_only_permissions() {
   let checker = PermissionChecker::new();
 
   // Developer CAN do:
-  assert!(checker.has_permission(Role::Developer, Permission::ReadAgents));
-  assert!(checker.has_permission(Role::Developer, Permission::ReadMetrics));
+  assert!(
+    checker.has_permission(Role::Developer, Permission::ReadAgents),
+    "Developer should have ReadAgents"
+  );
+  assert!(
+    checker.has_permission(Role::Developer, Permission::ReadMetrics),
+    "Developer should have ReadMetrics"
+  );
 
   // Developer CANNOT do:
-  assert!(!checker.has_permission(Role::Developer, Permission::WriteAgents));
-  assert!(!checker.has_permission(Role::Developer, Permission::ManageProviderKeys));
-  assert!(!checker.has_permission(Role::Developer, Permission::ManageIcTokens));
-  assert!(!checker.has_permission(Role::Developer, Permission::ManageUsers));
-  assert!(!checker.has_permission(Role::Developer, Permission::AssignRoles));
+  assert!(
+    !checker.has_permission(Role::Developer, Permission::WriteAgents),
+    "Developer should NOT have WriteAgents"
+  );
+  assert!(
+    !checker.has_permission(Role::Developer, Permission::ManageProviderKeys),
+    "Developer should NOT have ManageProviderKeys"
+  );
+  assert!(
+    !checker.has_permission(Role::Developer, Permission::ManageIcTokens),
+    "Developer should NOT have ManageIcTokens"
+  );
+  assert!(
+    !checker.has_permission(Role::Developer, Permission::ManageUsers),
+    "Developer should NOT have ManageUsers"
+  );
+  assert!(
+    !checker.has_permission(Role::Developer, Permission::AssignRoles),
+    "Developer should NOT have AssignRoles"
+  );
 }
 
 #[test]
@@ -160,23 +217,44 @@ fn test_middleware_permission_checking() {
     user_id: "admin_1".to_string(),
     role: Role::Admin,
   };
-  assert!(checker.has_permission(admin_context.role, Permission::ManageUsers));
-  assert!(checker.has_permission(admin_context.role, Permission::AssignRoles));
+  assert!(
+    checker.has_permission(admin_context.role, Permission::ManageUsers),
+    "Admin should have ManageUsers"
+  );
+  assert!(
+    checker.has_permission(admin_context.role, Permission::AssignRoles),
+    "Admin should have AssignRoles"
+  );
 
   // Manager can manage keys but not assign roles
   let manager_context = UserContext {
     user_id: "su_1".to_string(),
     role: Role::Manager,
   };
-  assert!(checker.has_permission(manager_context.role, Permission::ManageProviderKeys));
-  assert!(!checker.has_permission(manager_context.role, Permission::AssignRoles));
+  assert!(
+    checker.has_permission(manager_context.role, Permission::ManageProviderKeys),
+    "Manager should have ManageProviderKeys"
+  );
+  assert!(
+    !checker.has_permission(manager_context.role, Permission::AssignRoles),
+    "Manager should NOT have AssignRoles"
+  );
 
   // Developer can only read
   let dev_context = UserContext {
     user_id: "dev_1".to_string(),
     role: Role::Developer,
   };
-  assert!(checker.has_permission(dev_context.role, Permission::ReadAgents));
-  assert!(!checker.has_permission(dev_context.role, Permission::WriteAgents));
-  assert!(!checker.has_permission(dev_context.role, Permission::ManageProviderKeys));
+  assert!(
+    checker.has_permission(dev_context.role, Permission::ReadAgents),
+    "Developer should have ReadAgents"
+  );
+  assert!(
+    !checker.has_permission(dev_context.role, Permission::WriteAgents),
+    "Developer should NOT have WriteAgents"
+  );
+  assert!(
+    !checker.has_permission(dev_context.role, Permission::ManageProviderKeys),
+    "Developer should NOT have ManageProviderKeys"
+  );
 }

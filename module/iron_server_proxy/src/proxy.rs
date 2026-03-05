@@ -208,11 +208,9 @@ async fn handle_proxy_inner(
   }
 
   // Step 10: Return provider response to agent (no API key leaks)
-  Ok(
-    Response::builder()
-      .status(forward_resp.status.as_u16())
-      .header("content-type", "application/json")
-      .body(Body::from(forward_resp.body))
-      .expect("Failed to build response"),
-  )
+  Response::builder()
+    .status(forward_resp.status.as_u16())
+    .header("content-type", "application/json")
+    .body(Body::from(forward_resp.body))
+    .map_err(|e| ProxyError::Internal(format!("Response build failed: {e}")))
 }
