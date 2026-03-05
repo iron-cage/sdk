@@ -3,15 +3,18 @@
 //! Implements the core request pipeline:
 //! IC Token auth -> provider key lookup -> decrypt -> forward -> cost tracking.
 
+use core::net::SocketAddr;
+
 use axum::{
   body::{self, Body},
-  extract::{Request, State},
+  extract::{ConnectInfo, Request, State},
   http::header,
   response::{IntoResponse, Response},
   Json,
 };
 use secrecy::SecretBox;
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 
 use crate::{error::ProxyError, state::AppState};
 use iron_llm_core::{self, ForwardRequest};
@@ -27,8 +30,12 @@ pub async fn handle_health() -> Json<serde_json::Value> {
 
 /// Main LLM proxy endpoint - authenticates agent via IC Token,
 /// decrypts provider key from DB, forwards request to LLM provider.
-pub async fn handle_proxy(State(state): State<AppState>, request: Request) -> Response {
-  handle_proxy_inner(&state, request)
+pub async fn handle_proxy(
+  State(state): State<AppState>,
+  ConnectInfo(addr): ConnectInfo<SocketAddr>,
+  request: Request,
+) -> Response {
+  handle_proxy_inner(&state, addr, request)
     .await
     .unwrap_or_else(IntoResponse::into_response)
 }
@@ -41,25 +48,18 @@ struct AgentRecord {
   #[allow(dead_code)]
   name: String,
   provider_key_id: Option<i64>,
-}
-
-/// Extract client IP from reverse proxy headers, with safe fallback.
-fn extract_client_ip(request: &Request) -> String {
-  request
-    .headers()
-    .get("x-real-ip")
-    .or_else(|| request.headers().get("x-forwarded-for"))
-    .and_then(|v| v.to_str().ok())
-    .map_or_else(
-      || "unknown".to_string(),
-      |s| s.split(',').next().unwrap_or(s).trim().to_string(),
-    )
+  /// SHA-256 hash of the IC token (used for constant-time comparison).
+  ic_token_hash: String,
 }
 
 /// Inner proxy handler with `?` error propagation.
-async fn handle_proxy_inner(state: &AppState, request: Request) -> Result<Response, ProxyError> {
-  // Step 0: Rate limit check (before any DB work)
-  let client_ip = extract_client_ip(&request);
+async fn handle_proxy_inner(
+  state: &AppState,
+  addr: SocketAddr,
+  request: Request,
+) -> Result<Response, ProxyError> {
+  // Step 0: Rate limit check using TCP peer IP (not spoofable via headers)
+  let client_ip = addr.ip().to_string();
   if let Err(retry_after) = state.auth_rate_limiter.check(&client_ip) {
     return Err(ProxyError::RateLimited(retry_after));
   }
@@ -81,20 +81,32 @@ async fn handle_proxy_inner(state: &AppState, request: Request) -> Result<Respon
     ProxyError::Unauthorized("Missing IC Token")
   })?;
 
-  // Step 2: SHA-256 hash lookup in agents table
+  // Step 2: SHA-256 hash lookup with constant-time comparison.
+  // Fetch candidate by hash prefix (non-secret, narrows DB scan),
+  // then verify full hash via subtle::ct_eq to prevent timing attacks.
   let token_hash = format!("{:x}", Sha256::digest(ic_token.as_bytes()));
+  let hash_prefix = &token_hash[..8];
 
-  let agent = sqlx::query_as::<_, AgentRecord>(
-    "SELECT id, name, provider_key_id FROM agents WHERE ic_token_hash = ?",
+  let candidates = sqlx::query_as::<_, AgentRecord>(
+    "SELECT id, name, provider_key_id, ic_token_hash FROM agents WHERE ic_token_hash LIKE ?",
   )
-  .bind(&token_hash)
-  .fetch_optional(&state.db_pool)
+  .bind(format!("{hash_prefix}%"))
+  .fetch_all(&state.db_pool)
   .await
-  .map_err(ProxyError::Database)?
-  .ok_or_else(|| {
-    state.auth_rate_limiter.record_failure(&client_ip);
-    ProxyError::Unauthorized("Invalid or revoked IC Token")
-  })?;
+  .map_err(ProxyError::Database)?;
+
+  let agent = candidates
+    .into_iter()
+    .find(|a| {
+      a.ic_token_hash
+        .as_bytes()
+        .ct_eq(token_hash.as_bytes())
+        .into()
+    })
+    .ok_or_else(|| {
+      state.auth_rate_limiter.record_failure(&client_ip);
+      ProxyError::Unauthorized("Invalid or revoked IC Token")
+    })?;
 
   // Step 3: Check that agent has a provider key assigned
   let provider_key_id = agent.provider_key_id.ok_or(ProxyError::Forbidden(

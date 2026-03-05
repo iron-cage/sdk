@@ -5,7 +5,7 @@
 //! authentication, budget enforcement, or analytics concerns — those
 //! are the responsibility of the caller (`iron_runtime` or `iron_server_proxy`).
 
-use reqwest::Client;
+use reqwest::{header, Client, StatusCode};
 use secrecy::ExposeSecret;
 
 use crate::{
@@ -33,7 +33,7 @@ pub struct ForwardRequest {
 #[derive(Debug)]
 pub struct ForwardResponse {
   /// HTTP status code from the provider
-  pub status: reqwest::StatusCode,
+  pub status: StatusCode,
   /// Response body bytes (translated to `OpenAI` format if applicable)
   pub body: Vec<u8>,
   /// Cost information (present only for successful requests with known pricing)
@@ -100,7 +100,7 @@ pub async fn forward_request(
   // 5. Build forwarded request with provider-specific auth headers
   let mut req_builder = client
     .request(request.method, &target_url)
-    .header(reqwest::header::CONTENT_TYPE, "application/json");
+    .header(header::CONTENT_TYPE, "application/json");
 
   if target_provider == "anthropic" {
     req_builder = req_builder
@@ -108,7 +108,7 @@ pub async fn forward_request(
       .header("anthropic-version", "2023-06-01");
   } else {
     req_builder = req_builder.header(
-      reqwest::header::AUTHORIZATION,
+      header::AUTHORIZATION,
       format!("Bearer {}", provider_key.api_key.expose_secret().as_str()),
     );
   }
@@ -127,8 +127,18 @@ pub async fn forward_request(
     .await
     .map_err(|e| LlmCoreError::Forward(format!("Response read error: {e}")))?;
 
-  // 8. Translate response back to OpenAI format if needed
-  let final_body = if needs_translation && status.is_success() {
+  // 8. Translate response back to OpenAI format if needed.
+  // For 401/403 responses, replace body with a generic error to prevent
+  // provider error messages from leaking partial API key material.
+
+  let final_body = if [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN].contains(&status) {
+    tracing::warn!(
+      target_provider,
+      status = %status,
+      "Provider auth error (original body suppressed to prevent key leakage)"
+    );
+    br#"{"error":{"message":"Provider authentication failed","type":"auth_error"}}"#.to_vec()
+  } else if needs_translation && status.is_success() {
     translator::translate_anthropic_to_openai(&resp_body)
       .map_err(|e| LlmCoreError::Translation(format!("Response: {e}")))?
   } else {

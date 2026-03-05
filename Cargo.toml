@@ -241,6 +241,7 @@ version = "0.4"
 
 [workspace.dependencies.aes-gcm]
 version = "0.10"
+features = ["zeroize"]
 
 [workspace.dependencies.argon2]
 version = "0.5"

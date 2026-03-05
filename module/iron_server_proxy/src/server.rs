@@ -1,5 +1,7 @@
 //! HTTP server setup with axum router and graceful shutdown.
 
+use core::net::SocketAddr;
+
 use axum::{routing, Router};
 
 use crate::{config::Config, error::ServerError, proxy, state::AppState};
@@ -30,10 +32,15 @@ pub async fn start_server(config: &Config, state: AppState) -> Result<(), Server
     .map_err(|e| ServerError::Server(format!("Failed to bind {addr}: {e}")))?;
   tracing::info!("iron_server_proxy listening on {addr}");
 
-  axum::serve(listener, router)
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .map_err(|e| ServerError::Server(format!("Server runtime error: {e}")))?;
+  // into_make_service_with_connect_info enables ConnectInfo<SocketAddr>
+  // for extracting the real TCP peer IP (not spoofable via headers).
+  axum::serve(
+    listener,
+    router.into_make_service_with_connect_info::<SocketAddr>(),
+  )
+  .with_graceful_shutdown(shutdown_signal())
+  .await
+  .map_err(|e| ServerError::Server(format!("Server runtime error: {e}")))?;
   tracing::info!("Server shut down gracefully");
 
   Ok(())

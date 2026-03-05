@@ -38,6 +38,22 @@ if [ ! -f "/etc/iron_cage/iron_server_proxy.env" ]; then
     sudo cp deploy/env/iron_server_proxy.env.example /etc/iron_cage/iron_server_proxy.env
 fi
 
+# Validate that placeholder keys are not left in production env files
+for env_file in /etc/iron_cage/iron_control_api.env /etc/iron_cage/iron_server_proxy.env; do
+    if [ -f "$env_file" ]; then
+        if grep -q "^IP_TOKEN_KEY=0\{64\}" "$env_file"; then
+            echo "[ERROR] Placeholder IP_TOKEN_KEY detected in $env_file"
+            echo "        Replace with a real key: openssl rand -hex 32"
+            exit 1
+        fi
+        if grep -q "^IRON_SECRETS_MASTER_KEY=CHANGE_ME" "$env_file"; then
+            echo "[ERROR] Placeholder IRON_SECRETS_MASTER_KEY detected in $env_file"
+            echo "        Replace with a real key: openssl rand -base64 32"
+            exit 1
+        fi
+    fi
+done
+
 # Set permissions
 echo "[*] Setting permissions..."
 sudo chown -R ironcage:ironcage /var/lib/iron_cage

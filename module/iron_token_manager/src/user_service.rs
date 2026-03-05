@@ -7,9 +7,14 @@ use core::str::FromStr;
 
 use sqlx::{Row, SqlitePool};
 use tracing::error;
+use uuid::Uuid;
 
 use crate::error::{Result, TokenError};
 use iron_types::Role;
+
+/// `BCrypt` cost factor for password hashing.
+/// Must be 12 (not `DEFAULT_COST=10`) per Fix(issue-001) security requirements.
+const BCRYPT_COST: u32 = 12;
 
 /// User data returned from database
 #[derive(Debug, Clone)]
@@ -173,17 +178,8 @@ impl UserService {
       });
     }
 
-    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10)
-    //
-    // Root cause: Used bcrypt::DEFAULT_COST which is 10 for backward compatibility,
-    // but our security requirements mandate cost=12 for adequate protection against
-    // brute-force attacks. DEFAULT_COST=10 is 4x weaker than cost=12.
-    //
-    // Pitfall: Library defaults prioritize backward compatibility over security.
-    // When implementing security-critical features (password hashing, encryption,
-    // key derivation), ALWAYS specify security parameters explicitly. Never rely
-    // on library defaults - they may be weak for current security standards.
-    const BCRYPT_COST: u32 = 12;
+    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10).
+    // See module-level BCRYPT_COST constant for details.
     let password_hash = bcrypt::hash(&params.password, BCRYPT_COST).map_err(|e| {
       error!("Error hashing password: {}", e);
       TokenError::Generic
@@ -192,7 +188,7 @@ impl UserService {
     let now_ms = current_time_ms();
 
     let mut user_prefix = "user_".to_string();
-    let user_id = uuid::Uuid::new_v4().to_string();
+    let user_id = Uuid::new_v4().to_string();
     user_prefix.push_str(&user_id);
 
     // Insert user
@@ -667,7 +663,7 @@ impl UserService {
   ) -> Result<User> {
     // Hash new password
     let password_hash =
-      bcrypt::hash(&new_password, bcrypt::DEFAULT_COST).map_err(|_| TokenError::Generic)?;
+      bcrypt::hash(&new_password, BCRYPT_COST).map_err(|_| TokenError::Generic)?;
 
     let force_change_val = i32::from(force_change);
 
@@ -719,7 +715,7 @@ impl UserService {
     reason: Option<String>,
   ) -> Result<()> {
     let now_ms = current_time_ms();
-    let audit_id = format!("audit_{}", uuid::Uuid::new_v4());
+    let audit_id = format!("audit_{}", Uuid::new_v4());
 
     sqlx::query(
       "INSERT INTO user_audit_log \

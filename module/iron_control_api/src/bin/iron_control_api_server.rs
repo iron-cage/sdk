@@ -50,15 +50,34 @@
 //! **Prevention:** Use environment variable `DATABASE_URL` with proper format, or
 //! ensure default value includes the parameter (as implemented here).
 
+use core::{error::Error, net::SocketAddr, time::Duration};
+use std::{env, fs, path::Path, sync::Arc};
+
 use axum::{
-  http::{header, Method},
-  routing::{delete, get, post, put},
+  extract::FromRef,
+  http::{header, HeaderValue, Method},
+  routing::{delete, get, patch, post, put},
   Router,
 };
-use core::net::SocketAddr;
-use std::env;
+use base64::{engine::general_purpose::STANDARD, Engine};
+use sqlx::SqlitePool;
+use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 use workspace_tools::workspace;
+use zeroize::Zeroizing;
+
+use iron_control_api::{
+  ic_token::{IcTokenManager, IcTokenRateLimiter},
+  rbac::PermissionChecker,
+  routes::{
+    self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, ic_token::IcTokenState,
+    keys::KeysState, limits::LimitsState, providers::ProvidersState, tokens::TokenState,
+    usage::UsageState, users::UserManagementState,
+  },
+  token_auth::ApiTokenState,
+};
+use iron_secrets::{crypto::CryptoService, ip_token::IpTokenKey};
+use iron_token_manager::{rate_limiter::RateLimiter, seed};
 
 /// Deployment mode classification for production safety warnings
 ///
@@ -127,7 +146,7 @@ fn detect_deployment_mode() -> DeploymentMode {
 /// All paths are workspace-relative and work regardless of execution directory.
 ///
 /// Returns `SQLite` URL with ?mode=rwc parameter for database creation.
-fn get_database_url() -> Result<String, Box<dyn core::error::Error>> {
+fn get_database_url() -> Result<String, Box<dyn Error>> {
   // Check for explicit DATABASE_URL override (highest priority)
   if let Ok(url) = env::var("DATABASE_URL") {
     return Ok(url);
@@ -148,14 +167,14 @@ fn get_database_url() -> Result<String, Box<dyn core::error::Error>> {
     DeploymentMode::Development => {
       // Development: {workspace}/data/dev_control.db
       let data_dir = ws.data_dir();
-      std::fs::create_dir_all(&data_dir)?;
+      fs::create_dir_all(&data_dir)?;
       data_dir.join("dev_control.db")
     }
     DeploymentMode::Production | DeploymentMode::ProductionUnconfirmed => {
       // Production: {workspace}/data/iron_production.db
       // Note: Production should use PostgreSQL in real deployment
       let data_dir = ws.data_dir();
-      std::fs::create_dir_all(&data_dir)?;
+      fs::create_dir_all(&data_dir)?;
       data_dir.join("iron_production.db")
     }
   };
@@ -190,17 +209,17 @@ fn get_database_url() -> Result<String, Box<dyn core::error::Error>> {
 /// ```
 #[derive(Clone)]
 struct AppState {
-  auth: iron_control_api::routes::auth::AuthState,
-  tokens: iron_control_api::routes::tokens::TokenState,
-  usage: iron_control_api::routes::usage::UsageState,
-  limits: iron_control_api::routes::limits::LimitsState,
-  providers: iron_control_api::routes::providers::ProvidersState,
-  keys: iron_control_api::routes::keys::KeysState,
-  users: iron_control_api::routes::users::UserManagementState,
-  agents: sqlx::SqlitePool,
-  budget: iron_control_api::routes::budget::BudgetState,
-  analytics: iron_control_api::routes::analytics::AnalyticsState,
-  ic_token: iron_control_api::routes::ic_token::IcTokenState,
+  auth: AuthState,
+  tokens: TokenState,
+  usage: UsageState,
+  limits: LimitsState,
+  providers: ProvidersState,
+  keys: KeysState,
+  users: UserManagementState,
+  agents: SqlitePool,
+  budget: BudgetState,
+  analytics: AnalyticsState,
+  ic_token: IcTokenState,
 }
 
 /// Enable auth routes and extractors to access `AuthState` from combined `AppState`
@@ -208,7 +227,7 @@ struct AppState {
 /// This implementation allows:
 /// - Routes with `State<AuthState>` parameter to extract auth substate
 /// - `AuthenticatedUser` extractor to access JWT secret for token verification
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::auth::AuthState {
+impl FromRef<AppState> for AuthState {
   fn from_ref(state: &AppState) -> Self {
     state.auth.clone()
   }
@@ -218,86 +237,86 @@ impl axum::extract::FromRef<AppState> for iron_control_api::routes::auth::AuthSt
 ///
 /// This implementation allows routes with `State<TokenState>` parameter to
 /// extract the token management substate (database connection, token generator).
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::tokens::TokenState {
+impl FromRef<AppState> for TokenState {
   fn from_ref(state: &AppState) -> Self {
     state.tokens.clone()
   }
 }
 
 /// Enable usage routes to access `UsageState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::usage::UsageState {
+impl FromRef<AppState> for UsageState {
   fn from_ref(state: &AppState) -> Self {
     state.usage.clone()
   }
 }
 
 /// Enable limits routes to access `LimitsState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::limits::LimitsState {
+impl FromRef<AppState> for LimitsState {
   fn from_ref(state: &AppState) -> Self {
     state.limits.clone()
   }
 }
 
 /// Enable providers routes to access `ProvidersState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::providers::ProvidersState {
+impl FromRef<AppState> for ProvidersState {
   fn from_ref(state: &AppState) -> Self {
     state.providers.clone()
   }
 }
 
 /// Enable keys routes to access `KeysState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::keys::KeysState {
+impl FromRef<AppState> for KeysState {
   fn from_ref(state: &AppState) -> Self {
     state.keys.clone()
   }
 }
 
 /// Enable user management routes to access `UserManagementState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::users::UserManagementState {
+impl FromRef<AppState> for UserManagementState {
   fn from_ref(state: &AppState) -> Self {
     state.users.clone()
   }
 }
 
 /// Enable agent routes to access `SqlitePool` from combined `AppState`
-impl axum::extract::FromRef<AppState> for sqlx::SqlitePool {
+impl FromRef<AppState> for SqlitePool {
   fn from_ref(state: &AppState) -> Self {
     state.agents.clone()
   }
 }
 
 /// Enable budget routes to access `BudgetState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::budget::BudgetState {
+impl FromRef<AppState> for BudgetState {
   fn from_ref(state: &AppState) -> Self {
     state.budget.clone()
   }
 }
 
 /// Enable API token authentication extractor to access `ApiTokenState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::token_auth::ApiTokenState {
+impl FromRef<AppState> for ApiTokenState {
   fn from_ref(state: &AppState) -> Self {
-    iron_control_api::token_auth::ApiTokenState {
+    ApiTokenState {
       token_storage: state.keys.token_storage.clone(),
     }
   }
 }
 
 /// Enable analytics routes to access `AnalyticsState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::analytics::AnalyticsState {
+impl FromRef<AppState> for AnalyticsState {
   fn from_ref(state: &AppState) -> Self {
     state.analytics.clone()
   }
 }
 
 /// Enable IC token routes to access `IcTokenState` from combined `AppState`
-impl axum::extract::FromRef<AppState> for iron_control_api::routes::ic_token::IcTokenState {
+impl FromRef<AppState> for IcTokenState {
   fn from_ref(state: &AppState) -> Self {
     state.ic_token.clone()
   }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn core::error::Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
   // Load .env file if present (ignore if not found)
   let dotenv_result = dotenvy::dotenv();
 
@@ -338,7 +357,7 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
       tracing::warn!("⚠️  See docs/production_deployment.md for security checklist");
       tracing::warn!("");
       tracing::warn!("Sleeping 10 seconds to ensure this warning is visible...");
-      tokio::time::sleep(core::time::Duration::from_secs(10)).await;
+      tokio::time::sleep(Duration::from_secs(10)).await;
     }
     DeploymentMode::Production => {
       tracing::info!("✓ Production mode confirmed (IRON_DEPLOYMENT_MODE=production)");
@@ -348,8 +367,8 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
 
       // Extract database path from DATABASE_URL and delete it for clean state
       if let Some(db_path) = extract_sqlite_path(&database_url) {
-        if std::path::Path::new(&db_path).exists() {
-          if let Err(e) = std::fs::remove_file(&db_path) {
+        if Path::new(&db_path).exists() {
+          if let Err(e) = fs::remove_file(&db_path) {
             tracing::warn!("⚠️  Failed to delete {}: {}", db_path, e);
           } else {
             tracing::info!("✓ Cleared {}", db_path);
@@ -456,7 +475,7 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   // Decode hex string to bytes and construct IpTokenKey
   let ip_token_key_bytes = hex::decode(&ip_token_key_hex)
     .expect("LOUD FAILURE: IP_TOKEN_KEY must be a valid 64-character hex string (32 bytes)");
-  let ip_token_key = iron_secrets::ip_token::IpTokenKey::try_from(ip_token_key_bytes.as_slice())
+  let ip_token_key = IpTokenKey::try_from(ip_token_key_bytes.as_slice())
     .expect("LOUD FAILURE: IP_TOKEN_KEY must be exactly 32 bytes (64 hex characters)");
 
   tracing::info!("Initializing API server...");
@@ -475,27 +494,23 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   }
 
   // Initialize route states
-  let auth_state = iron_control_api::routes::auth::AuthState::new(
-    jwt_secret,
-    &database_url,
-    rate_limiting_enabled,
-  )
-  .await
-  .expect("LOUD FAILURE: Failed to initialize auth state");
+  let auth_state = AuthState::new(jwt_secret, &database_url, rate_limiting_enabled)
+    .await
+    .expect("LOUD FAILURE: Failed to initialize auth state");
 
-  let token_state = iron_control_api::routes::tokens::TokenState::new(&database_url)
+  let token_state = TokenState::new(&database_url)
     .await
     .expect("LOUD FAILURE: Failed to initialize token state");
 
-  let usage_state = iron_control_api::routes::usage::UsageState::new(&database_url)
+  let usage_state = UsageState::new(&database_url)
     .await
     .expect("LOUD FAILURE: Failed to initialize usage state");
 
-  let limits_state = iron_control_api::routes::limits::LimitsState::new(&database_url)
+  let limits_state = LimitsState::new(&database_url)
     .await
     .expect("LOUD FAILURE: Failed to initialize limits state");
 
-  let providers_state = iron_control_api::routes::providers::ProvidersState::new(&database_url)
+  let providers_state = ProvidersState::new(&database_url)
     .await
     .expect("LOUD FAILURE: Failed to initialize providers storage");
 
@@ -504,25 +519,23 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   let provider_key_master_b64 = env::var("IRON_SECRETS_MASTER_KEY")
     .expect("LOUD FAILURE: IRON_SECRETS_MASTER_KEY required for provider key encryption");
 
-  let provider_key_master_bytes = base64::Engine::decode(
-    &base64::engine::general_purpose::STANDARD,
-    &provider_key_master_b64,
-  )
-  .expect("LOUD FAILURE: IRON_SECRETS_MASTER_KEY must be valid base64");
+  let provider_key_master_bytes = Zeroizing::new(
+    Engine::decode(&STANDARD, &provider_key_master_b64)
+      .expect("LOUD FAILURE: IRON_SECRETS_MASTER_KEY must be valid base64"),
+  );
 
-  let crypto_service = std::sync::Arc::new(
-    iron_secrets::crypto::CryptoService::new(&provider_key_master_bytes)
+  let crypto_service = Arc::new(
+    CryptoService::new(&provider_key_master_bytes)
       .expect("LOUD FAILURE: Failed to create crypto service"),
   );
 
   // Rate limiter for /api/keys endpoint: 10 requests per minute per user/project
-  let key_rate_limiter =
-    iron_token_manager::rate_limiter::RateLimiter::new(10, core::time::Duration::from_secs(60));
+  let key_rate_limiter = RateLimiter::new(10, Duration::from_secs(60));
 
   // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
   let crypto_service_for_budget = crypto_service.clone();
 
-  let keys_state = iron_control_api::routes::keys::KeysState {
+  let keys_state = KeysState {
     token_storage: token_state.storage.clone(),
     provider_storage: providers_state.storage.clone(),
     crypto: crypto_service,
@@ -530,26 +543,22 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   };
 
   // Initialize user management state
-  let permission_checker = std::sync::Arc::new(iron_control_api::rbac::PermissionChecker::new());
-  let user_management_state = iron_control_api::routes::users::UserManagementState::new(
-    auth_state.db_pool.clone(),
-    permission_checker,
-  );
+  let permission_checker = Arc::new(PermissionChecker::new());
+  let user_management_state =
+    UserManagementState::new(auth_state.db_pool.clone(), permission_checker);
 
   // Shared IC Token manager — one instance for budget, analytics, and ic_token routes.
   // All three use the same secret, so sharing via Arc avoids redundant allocations.
-  let ic_token_manager = std::sync::Arc::new(iron_control_api::ic_token::IcTokenManager::new(
-    ic_token_secret,
-  ));
+  let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
 
   // Shared IC Token rate limiter — one instance across all endpoint groups.
   // Cloning shares the inner `Arc<Mutex<...>>`, so budget and analytics endpoints
   // draw from the same failure counter and cannot be bypassed by mixing endpoints.
-  let ic_token_rate_limiter = iron_control_api::ic_token::IcTokenRateLimiter::new();
+  let ic_token_rate_limiter = IcTokenRateLimiter::new();
 
   // Initialize analytics state (Protocol 012)
   // Uses same IC_TOKEN_SECRET as budget module for consistent agent authentication
-  let analytics_state = iron_control_api::routes::analytics::AnalyticsState::new(
+  let analytics_state = AnalyticsState::new(
     &database_url,
     ic_token_manager.clone(),
     ic_token_rate_limiter.clone(),
@@ -561,7 +570,7 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   let agents_pool = token_state.storage.pool().clone();
 
   // Initialize IC token state for agent IC token management
-  let ic_token_state = iron_control_api::routes::ic_token::IcTokenState {
+  let ic_token_state = IcTokenState {
     pool: agents_pool.clone(),
     ic_token_manager: ic_token_manager.clone(),
   };
@@ -572,9 +581,9 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
     .await
     .unwrap_or(0);
 
-  if user_count == 0 && iron_token_manager::seed::is_demo_seed_enabled() {
+  if user_count == 0 && seed::is_demo_seed_enabled() {
     tracing::info!("Seeding database with demo data (ENABLE_DEMO_SEED=true)...");
-    iron_token_manager::seed::seed_all(&agents_pool)
+    seed::seed_all(&agents_pool)
       .await
       .expect("LOUD FAILURE: Failed to seed database");
     tracing::info!("✓ Database seeded (admin@ironcage.ai / IronDemo2025!)");
@@ -586,7 +595,7 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
 
   // Initialize budget state (Protocol 005: Budget Control Protocol)
   // crypto_service_for_budget enables Feature 014: Agent Provider Key retrieval
-  let budget_state = iron_control_api::routes::budget::BudgetState::new(
+  let budget_state = BudgetState::new(
     ic_token_manager,
     &ip_token_key,
     &provider_key_master_bytes,
@@ -616,15 +625,15 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   // Fix(iron-cage-migration): Replace hardcoded CORS with ALLOWED_ORIGINS env var
   // Root cause: Hardcoded origins prevented multi-domain production deployment
   // Pitfall: Never hardcode deployment-specific config (origins, ports, URLs)
-  let allowed_origins_str = std::env::var("ALLOWED_ORIGINS")
+  let allowed_origins_str = env::var("ALLOWED_ORIGINS")
     .expect("ALLOWED_ORIGINS environment variable required (comma-separated URLs)");
 
-  let allowed_origins: Vec<axum::http::HeaderValue> = allowed_origins_str
+  let allowed_origins: Vec<HeaderValue> = allowed_origins_str
     .split(',')
     .map(|origin| {
       origin
         .trim()
-        .parse::<axum::http::HeaderValue>()
+        .parse::<HeaderValue>()
         .unwrap_or_else(|_| panic!("Invalid origin in ALLOWED_ORIGINS: {origin}"))
     })
     .collect();
@@ -637,288 +646,207 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   // Build router with all endpoints
   let app = Router::new()
     // Health check (FR-2: Health endpoint at /api/health)
-    .route(
-      "/api/health",
-      get(iron_control_api::routes::health::health_check),
-    )
+    .route("/api/health", get(routes::health::health_check))
     // Version endpoint (API version discovery)
-    .route(
-      "/api/v1/version",
-      get(iron_control_api::routes::version::get_version),
-    )
+    .route("/api/v1/version", get(routes::version::get_version))
     // Authentication endpoints
-    .route(
-      "/api/v1/auth/login",
-      post(iron_control_api::routes::auth::login),
-    )
-    .route(
-      "/api/v1/auth/refresh",
-      post(iron_control_api::routes::auth::refresh),
-    )
-    .route(
-      "/api/v1/auth/logout",
-      post(iron_control_api::routes::auth::logout),
-    )
-    .route(
-      "/api/v1/auth/validate",
-      post(iron_control_api::routes::auth::validate),
-    )
+    .route("/api/v1/auth/login", post(routes::auth::login))
+    .route("/api/v1/auth/refresh", post(routes::auth::refresh))
+    .route("/api/v1/auth/logout", post(routes::auth::logout))
+    .route("/api/v1/auth/validate", post(routes::auth::validate))
     // User management endpoints
-    .route(
-      "/api/v1/users",
-      post(iron_control_api::routes::users::create_user),
-    )
-    .route(
-      "/api/v1/users",
-      get(iron_control_api::routes::users::list_users),
-    )
-    .route(
-      "/api/v1/users/{id}",
-      get(iron_control_api::routes::users::get_user),
-    )
-    .route(
-      "/api/v1/users/{id}",
-      delete(iron_control_api::routes::users::delete_user),
-    )
+    .route("/api/v1/users", post(routes::users::create_user))
+    .route("/api/v1/users", get(routes::users::list_users))
+    .route("/api/v1/users/{id}", get(routes::users::get_user))
+    .route("/api/v1/users/{id}", delete(routes::users::delete_user))
     .route(
       "/api/v1/users/{id}/suspend",
-      axum::routing::put(iron_control_api::routes::users::suspend_user),
+      put(routes::users::suspend_user),
     )
     .route(
       "/api/v1/users/{id}/activate",
-      axum::routing::put(iron_control_api::routes::users::activate_user),
+      put(routes::users::activate_user),
     )
     .route(
       "/api/v1/users/{id}/role",
-      axum::routing::put(iron_control_api::routes::users::change_user_role),
+      put(routes::users::change_user_role),
     )
     .route(
       "/api/v1/users/{id}/reset-password",
-      post(iron_control_api::routes::users::reset_password),
+      post(routes::users::reset_password),
     )
     // Token management endpoints
-    .route(
-      "/api/v1/api-tokens",
-      post(iron_control_api::routes::tokens::create_token),
-    )
+    .route("/api/v1/api-tokens", post(routes::tokens::create_token))
     .route(
       "/api/v1/api-tokens/validate",
-      post(iron_control_api::routes::tokens::validate_token),
+      post(routes::tokens::validate_token),
     )
-    .route(
-      "/api/v1/api-tokens",
-      get(iron_control_api::routes::tokens::list_tokens),
-    )
-    .route(
-      "/api/v1/api-tokens/{id}",
-      get(iron_control_api::routes::tokens::get_token),
-    )
+    .route("/api/v1/api-tokens", get(routes::tokens::list_tokens))
+    .route("/api/v1/api-tokens/{id}", get(routes::tokens::get_token))
     .route(
       "/api/v1/api-tokens/{id}/rotate",
-      post(iron_control_api::routes::tokens::rotate_token),
+      post(routes::tokens::rotate_token),
     )
     .route(
       "/api/v1/api-tokens/{id}",
-      delete(iron_control_api::routes::tokens::revoke_token),
+      delete(routes::tokens::revoke_token),
     )
-    .route(
-      "/api/v1/api-tokens/{id}",
-      put(iron_control_api::routes::tokens::update_token),
-    )
+    .route("/api/v1/api-tokens/{id}", put(routes::tokens::update_token))
     // Usage analytics endpoints
     .route(
       "/api/v1/usage/aggregate",
-      get(iron_control_api::routes::usage::get_aggregate_usage),
+      get(routes::usage::get_aggregate_usage),
     )
     .route(
       "/api/v1/usage/by-project/{project_id}",
-      get(iron_control_api::routes::usage::get_usage_by_project),
+      get(routes::usage::get_usage_by_project),
     )
     .route(
       "/api/v1/usage/by-provider/{provider}",
-      get(iron_control_api::routes::usage::get_usage_by_provider),
+      get(routes::usage::get_usage_by_provider),
     )
     // Limits management endpoints
-    .route(
-      "/api/v1/limits",
-      get(iron_control_api::routes::limits::list_limits),
-    )
-    .route(
-      "/api/v1/limits",
-      post(iron_control_api::routes::limits::create_limit),
-    )
-    .route(
-      "/api/v1/limits/{id}",
-      get(iron_control_api::routes::limits::get_limit),
-    )
-    .route(
-      "/api/v1/limits/{id}",
-      axum::routing::put(iron_control_api::routes::limits::update_limit),
-    )
-    .route(
-      "/api/v1/limits/{id}",
-      axum::routing::delete(iron_control_api::routes::limits::delete_limit),
-    )
+    .route("/api/v1/limits", get(routes::limits::list_limits))
+    .route("/api/v1/limits", post(routes::limits::create_limit))
+    .route("/api/v1/limits/{id}", get(routes::limits::get_limit))
+    .route("/api/v1/limits/{id}", put(routes::limits::update_limit))
+    .route("/api/v1/limits/{id}", delete(routes::limits::delete_limit))
     // Provider key management endpoints
     .route(
       "/api/v1/providers",
-      post(iron_control_api::routes::providers::create_provider_key),
+      post(routes::providers::create_provider_key),
     )
     .route(
       "/api/v1/providers",
-      get(iron_control_api::routes::providers::list_provider_keys),
+      get(routes::providers::list_provider_keys),
     )
     .route(
       "/api/v1/providers/{id}",
-      get(iron_control_api::routes::providers::get_provider_key),
+      get(routes::providers::get_provider_key),
     )
     .route(
       "/api/v1/providers/{id}",
-      axum::routing::put(iron_control_api::routes::providers::update_provider_key),
+      put(routes::providers::update_provider_key),
     )
     .route(
       "/api/v1/providers/{id}",
-      delete(iron_control_api::routes::providers::delete_provider_key),
+      delete(routes::providers::delete_provider_key),
     )
     .route(
       "/api/v1/projects/{project_id}/provider",
-      post(iron_control_api::routes::providers::assign_provider_to_project),
+      post(routes::providers::assign_provider_to_project),
     )
     .route(
       "/api/v1/projects/{project_id}/provider",
-      delete(iron_control_api::routes::providers::unassign_provider_from_project),
+      delete(routes::providers::unassign_provider_from_project),
     )
     // Key fetch endpoint (API token authentication)
-    .route("/api/v1/keys", get(iron_control_api::routes::keys::get_key))
+    .route("/api/v1/keys", get(routes::keys::get_key))
     // Agent management endpoints
-    .route(
-      "/api/v1/agents",
-      get(iron_control_api::routes::agents::list_agents),
-    )
-    .route(
-      "/api/v1/agents",
-      post(iron_control_api::routes::agents::create_agent),
-    )
+    .route("/api/v1/agents", get(routes::agents::list_agents))
+    .route("/api/v1/agents", post(routes::agents::create_agent))
     // Agent Provider Key endpoint (Feature 014) - must be before :id routes
     .route(
       "/api/v1/agents/provider-key",
-      post(iron_control_api::routes::agent_provider_key::get_provider_key),
+      post(routes::agent_provider_key::get_provider_key),
     )
-    .route(
-      "/api/v1/agents/{id}",
-      get(iron_control_api::routes::agents::get_agent),
-    )
-    .route(
-      "/api/v1/agents/{id}",
-      axum::routing::put(iron_control_api::routes::agents::update_agent),
-    )
-    .route(
-      "/api/v1/agents/{id}",
-      delete(iron_control_api::routes::agents::delete_agent),
-    )
+    .route("/api/v1/agents/{id}", get(routes::agents::get_agent))
+    .route("/api/v1/agents/{id}", put(routes::agents::update_agent))
+    .route("/api/v1/agents/{id}", delete(routes::agents::delete_agent))
     .route(
       "/api/v1/agents/{id}/budget",
-      axum::routing::put(iron_control_api::routes::agents::update_agent_budget),
+      put(routes::agents::update_agent_budget),
     )
     .route(
       "/api/v1/agents/{id}/tokens",
-      get(iron_control_api::routes::agents::get_agent_tokens),
+      get(routes::agents::get_agent_tokens),
     )
     // IC Token management endpoints (agent authentication with budget runtime)
     .route(
       "/api/v1/agents/{id}/ic-token",
-      post(iron_control_api::routes::ic_token::generate_ic_token),
+      post(routes::ic_token::generate_ic_token),
     )
     .route(
       "/api/v1/agents/{id}/ic-token",
-      get(iron_control_api::routes::ic_token::get_ic_token_status),
+      get(routes::ic_token::get_ic_token_status),
     )
     .route(
       "/api/v1/agents/{id}/ic-token/regenerate",
-      post(iron_control_api::routes::ic_token::regenerate_ic_token),
+      post(routes::ic_token::regenerate_ic_token),
     )
     .route(
       "/api/v1/agents/{id}/ic-token",
-      delete(iron_control_api::routes::ic_token::revoke_ic_token),
+      delete(routes::ic_token::revoke_ic_token),
     )
     // Budget Control Protocol endpoints (Protocol 005)
-    .route(
-      "/api/v1/budget/handshake",
-      post(iron_control_api::routes::budget::handshake),
-    )
-    .route(
-      "/api/v1/budget/report",
-      post(iron_control_api::routes::budget::report_usage),
-    )
+    .route("/api/v1/budget/handshake", post(routes::budget::handshake))
+    .route("/api/v1/budget/report", post(routes::budget::report_usage))
     .route(
       "/api/v1/budget/refresh",
-      post(iron_control_api::routes::budget::refresh_budget),
+      post(routes::budget::refresh_budget),
     )
-    .route(
-      "/api/v1/budget/return",
-      post(iron_control_api::routes::budget::return_budget),
-    )
+    .route("/api/v1/budget/return", post(routes::budget::return_budget))
     // Budget Request Workflow endpoints (Protocol 012)
     .route(
       "/api/v1/budget/requests",
-      post(iron_control_api::routes::budget::create_budget_request),
+      post(routes::budget::create_budget_request),
     )
     .route(
       "/api/v1/budget/requests/{id}",
-      get(iron_control_api::routes::budget::get_budget_request),
+      get(routes::budget::get_budget_request),
     )
     .route(
       "/api/v1/budget/requests",
-      get(iron_control_api::routes::budget::list_budget_requests),
+      get(routes::budget::list_budget_requests),
     )
     .route(
       "/api/v1/budget/requests/{id}/approve",
-      axum::routing::patch(iron_control_api::routes::budget::approve_budget_request),
+      patch(routes::budget::approve_budget_request),
     )
     .route(
       "/api/v1/budget/requests/{id}/reject",
-      axum::routing::patch(iron_control_api::routes::budget::reject_budget_request),
+      patch(routes::budget::reject_budget_request),
     )
     // Analytics endpoints (Protocol 012)
     .route(
       "/api/v1/analytics/events",
-      post(iron_control_api::routes::analytics::post_event),
+      post(routes::analytics::post_event),
     )
     .route(
       "/api/v1/analytics/events/list",
-      get(iron_control_api::routes::analytics::list_events),
+      get(routes::analytics::list_events),
     )
     .route(
       "/api/v1/analytics/spending/total",
-      get(iron_control_api::routes::analytics::get_spending_total),
+      get(routes::analytics::get_spending_total),
     )
     .route(
       "/api/v1/analytics/spending/by-agent",
-      get(iron_control_api::routes::analytics::get_spending_by_agent),
+      get(routes::analytics::get_spending_by_agent),
     )
     .route(
       "/api/v1/analytics/spending/by-provider",
-      get(iron_control_api::routes::analytics::get_spending_by_provider),
+      get(routes::analytics::get_spending_by_provider),
     )
     .route(
       "/api/v1/analytics/spending/avg-per-request",
-      get(iron_control_api::routes::analytics::get_spending_avg),
+      get(routes::analytics::get_spending_avg),
     )
     .route(
       "/api/v1/analytics/budget/status",
-      get(iron_control_api::routes::analytics::get_budget_status),
+      get(routes::analytics::get_budget_status),
     )
     .route(
       "/api/v1/analytics/usage/requests",
-      get(iron_control_api::routes::analytics::get_usage_requests),
+      get(routes::analytics::get_usage_requests),
     )
     .route(
       "/api/v1/analytics/usage/tokens/by-agent",
-      get(iron_control_api::routes::analytics::get_usage_tokens),
+      get(routes::analytics::get_usage_tokens),
     )
     .route(
       "/api/v1/analytics/usage/models",
-      get(iron_control_api::routes::analytics::get_usage_models),
+      get(routes::analytics::get_usage_models),
     )
     // Apply combined state to all routes
     .with_state(app_state)
@@ -941,7 +869,7 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   // Fix(iron-cage-migration): Replace hardcoded port with SERVER_PORT env var
   // Root cause: Hardcoded port prevented multienvironment deployment
   // Pitfall: Never hardcode deployment-specific config (ports, hosts, URLs)
-  let server_port_str = std::env::var("SERVER_PORT")
+  let server_port_str = env::var("SERVER_PORT")
     .expect("SERVER_PORT environment variable required (port number 1-65535)");
 
   let server_port: u16 = server_port_str
@@ -1009,7 +937,7 @@ async fn main() -> Result<(), Box<dyn core::error::Error>> {
   //          "Missing request extension: ConnectInfo<SocketAddr>".
   //
   // Start server with ConnectInfo support
-  let listener = tokio::net::TcpListener::bind(addr).await?;
+  let listener = TcpListener::bind(addr).await?;
   axum::serve(
     listener,
     app.into_make_service_with_connect_info::<SocketAddr>(),

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use reqwest::Client;
 use sqlx::SqlitePool;
+use zeroize::Zeroizing;
 
 use crate::{config::Config, error::ServerError, rate_limiter::AuthRateLimiter};
 use iron_cost::pricing::PricingManager;
@@ -54,10 +55,13 @@ impl AppState {
     // Initialize provider key storage
     let provider_key_storage = ProviderKeyStorage::new(db_pool.clone());
 
-    // Decode base64 master key and create crypto service
-    let key_bytes = STANDARD
-      .decode(&config.secrets_master_key)
-      .map_err(|e| ServerError::Crypto(format!("Invalid base64 master key: {e}")))?;
+    // Decode base64 master key and create crypto service.
+    // Wrap in Zeroizing so decoded key material is zeroed on drop.
+    let key_bytes = Zeroizing::new(
+      STANDARD
+        .decode(&config.secrets_master_key)
+        .map_err(|e| ServerError::Crypto(format!("Invalid base64 master key: {e}")))?,
+    );
     if key_bytes.len() != KEY_SIZE {
       return Err(ServerError::Crypto(format!(
         "IRON_SECRETS_MASTER_KEY must be exactly {KEY_SIZE} bytes (AES-256), got {} bytes",
