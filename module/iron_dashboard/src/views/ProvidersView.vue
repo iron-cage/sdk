@@ -23,6 +23,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -177,103 +178,51 @@ function getProviderBadgeClass(providerType: ProviderType): string {
       </Button>
     </template>
 
-    <!-- Loading state -->
-    <div v-if="isLoading" class="border border-border rounded-lg p-4">
-      <p class="text-muted-foreground">Loading provider keys...</p>
-    </div>
+    <DataTable
+      :columns="[
+        { label: 'Provider' },
+        { label: 'Description' },
+        { label: 'API Key' },
+        { label: 'Status' },
+        { label: 'Created' },
+        { label: 'Actions', align: 'right' },
+      ]"
+      :is-loading="isLoading"
+      :error="error as Error | null"
+      :is-empty="!providerKeys || providerKeys.length === 0"
+      loading-text="Loading provider keys..."
+      :on-retry="() => refetch()"
+    >
+      <template #empty>
+        <p class="text-muted-foreground mb-2">No AI provider keys configured</p>
+        <p class="text-base text-muted-foreground mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
+        <Button @click="showCreateModal = true">Add First Provider Key</Button>
+      </template>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading provider keys: {{ (error as Error).message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
-        Retry
-      </Button>
-    </div>
-
-    <!-- Provider keys table -->
-    <div v-else-if="providerKeys && providerKeys.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-      <table class="min-w-[700px] w-full divide-y divide-border">
-        <thead>
-          <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Provider
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Description
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              API Key
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Status
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Created
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-for="key in providerKeys" :key="key.id">
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-              <Badge :class="getProviderBadgeClass(key.provider)">
-                {{ getProviderLabel(key.provider) }}
-              </Badge>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-              {{ key.description || '-' }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-mono text-muted-foreground">
-              {{ key.masked_key }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-              <Button
-                @click="handleToggleEnabled(key)"
-                :disabled="toggleMutation.isPending.value"
-                :variant="key.is_enabled ? 'default' : 'outline'"
-                size="sm"
-                :class="key.is_enabled ? '' : 'text-muted-foreground'"
-              >
-                {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
-              </Button>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-              {{ formatDate(key.created_at) }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
-              <Button
-                @click="openEditModal(key)"
-                :disabled="updateMutation.isPending.value"
-                variant="ghost"
-                size="sm"
-              >
-                Edit
-              </Button>
-              <Button
-                @click="handleDeleteKey(key)"
-                :disabled="deleteMutation.isPending.value"
-                variant="ghost"
-                size="sm"
-                class="text-destructive hover:text-destructive"
-              >
-                Delete
-              </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else class="border border-border rounded-lg p-4 text-center">
-      <p class="text-muted-foreground mb-4">No AI provider keys configured</p>
-      <p class="text-base text-muted-foreground mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
-      <Button @click="showCreateModal = true">
-        Add First Provider Key
-      </Button>
-    </div>
+      <tr v-for="key in providerKeys" :key="key.id">
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+          <Badge :class="getProviderBadgeClass(key.provider)">{{ getProviderLabel(key.provider) }}</Badge>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+          <Button
+            @click="handleToggleEnabled(key)"
+            :disabled="toggleMutation.isPending.value"
+            :variant="key.is_enabled ? 'default' : 'outline'"
+            size="sm"
+            :class="key.is_enabled ? '' : 'text-muted-foreground'"
+          >
+            {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
+          </Button>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(key.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
+          <Button @click="openEditModal(key)" :disabled="updateMutation.isPending.value" variant="ghost" size="sm">Edit</Button>
+          <Button @click="handleDeleteKey(key)" :disabled="deleteMutation.isPending.value" variant="ghost" size="sm" class="text-destructive hover:text-destructive">Delete</Button>
+        </td>
+      </tr>
+    </DataTable>
 
     <!-- Create provider key modal -->
     <Dialog v-model:open="showCreateModal">

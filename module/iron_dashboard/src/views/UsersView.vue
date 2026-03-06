@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
 
 
 const api = useApi()
@@ -233,20 +234,12 @@ watch(search, () => {
 <template>
   <PageLayout title="User Management">
     <template #actions>
-      <Button @click="showCreateModal = true">
-        Create New User
-      </Button>
-    </template>
 
-    <!-- Filters -->
-    <div class="border border-border rounded-lg p-4 mb-6 flex flex-wrap gap-4 items-end">
       <div class="w-full md:w-64">
-        <Label for="search">Search</Label>
         <Input id="search" v-model="search" placeholder="Search by username or email..." />
       </div>
       
       <div class="w-full md:w-40">
-        <Label for="role-filter">Role</Label>
         <Select v-model="roleFilter">
           <SelectTrigger id="role-filter">
             <SelectValue placeholder="All Roles" />
@@ -259,146 +252,76 @@ watch(search, () => {
           </SelectContent>
         </Select>
       </div>
-    </div>
 
-    <!-- Loading state -->
-    <div v-if="isLoading" class="border border-border rounded-lg p-4">
-      <p class="text-muted-foreground">Loading users...</p>
-    </div>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading users: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
-        Retry
-      </Button>
-    </div>
-
-    <!-- Users table -->
-    <div v-else-if="usersData && usersData.users.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-      <table class="min-w-[700px] w-full divide-y divide-border">
-        <thead>
-          <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              User
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Role
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Status
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Created
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-for="user in usersData.users" :key="user.id">
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-              <div class="flex flex-col">
-                <span class="text-base font-medium text-foreground">{{ user.username }}</span>
-                <span class="text-base text-muted-foreground">{{ user.email }}</span>
-              </div>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-              <Badge variant="outline">{{ user.role }}</Badge>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-              <Badge :variant="user.is_active ? 'default' : 'destructive'">
-                {{ user.is_active ? 'Active' : 'Suspended' }}
-              </Badge>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-              {{ new Date(user.created_at).toLocaleDateString() }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-              <div class="flex justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  @click="handleChangeRole(user)"
-                  :disabled="user.username === 'admin'"
-                >
-                  Role
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  @click="handleResetPassword(user)"
-                >
-                  Reset Pass
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  :class="user.is_active ? 'text-muted-foreground hover:text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                  @click="handleToggleStatus(user)"
-                  :disabled="user.username === 'admin'"
-                >
-                  {{ user.is_active ? 'Suspend' : 'Activate' }}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="text-destructive hover:text-destructive"
-                  @click="handleDeleteUser(user)"
-                  :disabled="user.username === 'admin'"
-                >
-                  Delete
-                </Button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      
-      <!-- Pagination -->
-      <div class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
-        <div class="flex-1 flex justify-between sm:hidden">
-          <Button :disabled="page === 1" @click="page--">Previous</Button>
-          <Button :disabled="page * pageSize >= usersData.total" @click="page++">Next</Button>
-        </div>
-        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-          <div>
-            <p class="text-base text-foreground">
-              Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span> to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span> of <span class="font-medium">{{ usersData.total }}</span> results
-            </p>
-          </div>
-          <div>
-            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-              <Button 
-                variant="outline" 
-                :disabled="page === 1" 
-                @click="page--"
-                class="rounded-l-md"
-              >
-                Previous
-              </Button>
-              <Button 
-                variant="outline" 
-                :disabled="page * pageSize >= usersData.total" 
-                @click="page++"
-                class="rounded-r-md"
-              >
-                Next
-              </Button>
-            </nav>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else class="border border-border rounded-lg p-4 text-center">
-      <p class="text-muted-foreground mb-4">No users found</p>
       <Button @click="showCreateModal = true">
-        Create First User
+        Create New User
       </Button>
-    </div>
+    </template>
+
+    <DataTable
+      :columns="[
+        { label: 'User' },
+        { label: 'Role' },
+        { label: 'Status' },
+        { label: 'Created' },
+        { label: 'Actions', align: 'right' },
+      ]"
+      :is-loading="isLoading"
+      :error="error"
+      :is-empty="!usersData || usersData.users.length === 0"
+      loading-text="Loading users..."
+      :on-retry="() => refetch()"
+    >
+      <template #empty>
+        <p class="text-muted-foreground mb-4">No users found</p>
+        <Button @click="showCreateModal = true">Create First User</Button>
+      </template>
+
+      <tr v-for="user in usersData?.users" :key="user.id">
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+          <div class="flex flex-col">
+            <span class="text-base font-medium text-foreground">{{ user.username }}</span>
+            <span class="text-base text-muted-foreground">{{ user.email }}</span>
+          </div>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          <Badge variant="outline">{{ user.role }}</Badge>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+          <Badge :variant="user.is_active ? 'default' : 'destructive'">
+            {{ user.is_active ? 'Active' : 'Suspended' }}
+          </Badge>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+          {{ new Date(user.created_at).toLocaleDateString() }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+          <div class="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" @click="handleChangeRole(user)" :disabled="user.username === 'admin'">Role</Button>
+            <Button variant="ghost" size="sm" @click="handleResetPassword(user)">Reset Pass</Button>
+            <Button variant="ghost" size="sm" @click="handleToggleStatus(user)" :disabled="user.username === 'admin'">
+              {{ user.is_active ? 'Suspend' : 'Activate' }}
+            </Button>
+            <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="handleDeleteUser(user)" :disabled="user.username === 'admin'">Delete</Button>
+          </div>
+        </td>
+      </tr>
+
+      <template #footer>
+        <div v-if="usersData" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
+          <p class="text-base text-foreground">
+            Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
+            to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
+            of <span class="font-medium">{{ usersData.total }}</span> results
+          </p>
+          <div class="flex gap-2">
+            <Button variant="outline" :disabled="page === 1" @click="page--">Previous</Button>
+            <Button variant="outline" :disabled="page * pageSize >= usersData.total" @click="page++">Next</Button>
+          </div>
+        </div>
+      </template>
+    </DataTable>
 
     <!-- Create user modal -->
     <Dialog v-model:open="showCreateModal">

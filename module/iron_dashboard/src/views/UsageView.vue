@@ -167,7 +167,7 @@ function loadMoreLogs() {
 </script>
 
 <template>
-  <PageLayout title="Analytics">
+  <PageLayout title="Analytics" content-class="p-4 lg:p-6">
     <template #actions>
       <select
         v-model="selectedAgentId"

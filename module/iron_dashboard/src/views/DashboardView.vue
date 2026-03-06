@@ -32,7 +32,7 @@ function formatCurrency(usd: number): string {
 </script>
 
 <template>
-  <PageLayout title="Dashboard">
+  <PageLayout title="Dashboard" content-class="p-4 lg:p-6">
 
     <!-- Loading state -->
     <div v-if="isLoading" class="p-4">

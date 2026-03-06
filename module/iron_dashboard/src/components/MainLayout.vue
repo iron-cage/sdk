@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -11,6 +11,15 @@ const sidebarOpen = ref(false)
 const workspaceOpen = ref(true)
 const adminOpen = ref(true)
 const userMenuOpen = ref(false)
+const userMenuRef = ref<HTMLElement | null>(null)
+
+function onClickOutside(e: MouseEvent) {
+  if (userMenuOpen.value && userMenuRef.value && !userMenuRef.value.contains(e.target as Node)) {
+    userMenuOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onClickOutside, true))
+onUnmounted(() => document.removeEventListener('click', onClickOutside, true))
 
 const AVATAR_COLORS = ['#5E6AD2', '#26B5CE', '#4CB782', '#F2994A']
 
@@ -178,8 +187,16 @@ async function handleLogout() {
       </nav>
 
       <!-- Sidebar footer -->
-      <div class="p-2 relative">
+      <div ref="userMenuRef" class="p-2 relative">
         <!-- Dropdown menu -->
+        <Transition
+          enter-active-class="transition duration-150 ease-out"
+          enter-from-class="opacity-0 translate-y-1"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition duration-150 ease-in"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 translate-y-1"
+        >
         <div
           v-if="userMenuOpen"
           class="absolute bottom-full left-2 right-2 mb-1 bg-background border border-border rounded-[8px] shadow-md overflow-hidden"
@@ -194,6 +211,7 @@ async function handleLogout() {
             Sign out
           </button>
         </div>
+        </Transition>
 
         <!-- Trigger button -->
         <button

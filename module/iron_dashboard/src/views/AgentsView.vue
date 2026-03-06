@@ -26,6 +26,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuthStore } from '../stores/auth'
 import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -347,154 +348,107 @@ async function copyTokenToClipboard() {
       <AlertDescription>{{ icTokenError }}</AlertDescription>
     </Alert>
 
-    <!-- Loading state -->
-    <div v-if="isLoading" class="border border-border rounded-lg p-4">
-      <p class="text-muted-foreground">Loading agents...</p>
-    </div>
+    <DataTable
+      :columns="[
+        { label: 'Name' },
+        { label: 'Owner' },
+        { label: 'Providers' },
+        { label: 'Provider Key' },
+        { label: 'IC Token' },
+        { label: 'Created' },
+        { label: 'Actions', align: 'right' },
+      ]"
+      :is-loading="isLoading"
+      :error="error"
+      :is-empty="!agents || agents.length === 0"
+      loading-text="Loading agents..."
+      :on-retry="() => refetch()"
+    >
+      <template #empty>
+        <p class="text-muted-foreground mb-4">No agents found</p>
+        <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
+          Create First Agent
+        </Button>
+      </template>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading agents: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
-        Retry
-      </Button>
-    </div>
-
-    <!-- Agents table -->
-    <div v-else-if="agents && agents.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-      <table class="min-w-[700px] w-full divide-y divide-border">
-        <thead>
-          <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Name
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Owner
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Providers
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Provider Key
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              IC Token
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Created
-            </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-for="agent in agents" :key="agent.id">
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
-              {{ agent.name }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-              {{ agent.owner_id || 'Unknown' }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-              <div class="flex gap-1 flex-wrap">
-                <span
-                  v-for="provider in agent.providers"
-                  :key="provider"
-                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground"
+      <tr v-for="agent in agents" :key="agent.id">
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
+          {{ agent.name }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+          {{ agent.owner_id || 'Unknown' }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+          <div class="flex gap-1 flex-wrap">
+            <span
+              v-for="provider in agent.providers"
+              :key="provider"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground"
+            >
+              {{ provider }}
+            </span>
+          </div>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          {{ agent.provider_key_id ?? 'None' }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
+            Loading...
+          </div>
+          <div v-else>
+            <Badge v-if="getIcTokenStatus(agent.id)?.has_ic_token" variant="default">Active</Badge>
+            <Badge v-else variant="outline" class="text-foreground">None</Badge>
+            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground mt-1">
+              Created {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
+            </div>
+          </div>
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+          {{ formatDate(agent.created_at) }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm">
+                <span class="sr-only">Open menu</span>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
+                @click="handleGenerateIcToken(agent)"
+                :disabled="tokenActionLoadingId === agent.id"
+              >
+                {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
+              </DropdownMenuItem>
+              <template v-else>
+                <DropdownMenuItem
+                  @click="handleRegenerateIcToken(agent)"
+                  :disabled="tokenActionLoadingId === agent.id"
                 >
-                  {{ provider }}
-                </span>
-              </div>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-              {{ agent.provider_key_id ?? 'None' }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-              <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
-                Loading...
-              </div>
-              <div v-else>
-                <Badge
-                  v-if="getIcTokenStatus(agent.id)?.has_ic_token"
-                  variant="default"
+                  {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  @click="handleRevokeIcToken(agent)"
+                  :disabled="tokenActionLoadingId === agent.id"
+                  class="text-destructive"
                 >
-                  Active
-                </Badge>
-                <Badge
-                  v-else
-                  variant="outline"
-                  class="text-foreground"
-                >
-                  None
-                </Badge>
-                <div
-                  v-if="getIcTokenStatus(agent.id)?.created_at"
-                  class="text-xs text-muted-foreground mt-1"
-                >
-                  Created {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
-                </div>
-              </div>
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-              {{ formatDate(agent.created_at) }}
-            </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="sm">
-                    <span class="sr-only">Open menu</span>
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem
-                    v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
-                    @click="handleGenerateIcToken(agent)"
-                    :disabled="tokenActionLoadingId === agent.id"
-                  >
-                    {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
-                  </DropdownMenuItem>
-                  <template v-else>
-                    <DropdownMenuItem
-                      @click="handleRegenerateIcToken(agent)"
-                      :disabled="tokenActionLoadingId === agent.id"
-                    >
-                      {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      @click="handleRevokeIcToken(agent)"
-                      :disabled="tokenActionLoadingId === agent.id"
-                      class="text-destructive"
-                    >
-                      Revoke IC Token
-                    </DropdownMenuItem>
-                  </template>
-                  <template v-if="authStore.isAdmin">
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem @click="openUpdateModal(agent)">
-                      Edit Agent
-                    </DropdownMenuItem>
-                    <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">
-                      Delete Agent
-                    </DropdownMenuItem>
-                  </template>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else class="border border-border rounded-lg p-4 text-center">
-      <p class="text-muted-foreground mb-4">No agents found</p>
-      <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
-        Create First Agent
-      </Button>
-    </div>
+                  Revoke IC Token
+                </DropdownMenuItem>
+              </template>
+              <template v-if="authStore.isAdmin">
+                <DropdownMenuSeparator />
+                <DropdownMenuItem @click="openUpdateModal(agent)">Edit Agent</DropdownMenuItem>
+                <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">Delete Agent</DropdownMenuItem>
+              </template>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </td>
+      </tr>
+    </DataTable>
 
     <!-- Create agent modal -->
     <Dialog v-model:open="showCreateModal">
