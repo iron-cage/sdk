@@ -848,16 +848,6 @@ createApp(App).mount('#app')
 
 ---
 
-### Utility Components
-
-#### 9. HelloWorld.vue
-
-**Status:** Legacy Vue template component (not used in production)
-**Purpose:** Original Vite + Vue template demo component
-**Action:** Should be removed in future cleanup
-
----
-
 ## Composables (Composition Functions)
 
 Location: `src/composables/`
