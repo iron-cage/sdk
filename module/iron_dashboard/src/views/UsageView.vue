@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod, type AnalyticsEvent } from '../composables/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import PageLayout from '@/components/PageLayout.vue'
 
 const api = useApi()
 
@@ -166,33 +167,26 @@ function loadMoreLogs() {
 </script>
 
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-sm font-semibold text-foreground">Analytics</h1>
-
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
-        <!-- Agent selector -->
-        <select
-          v-model="selectedAgentId"
-          class="px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option :value="null">All Agents</option>
-          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-            {{ agent.name }}
-          </option>
-        </select>
-
-        <!-- Period selector -->
-        <select
-          v-model="selectedPeriod"
-          class="px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option v-for="option in periodOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-      </div>
-    </div>
+  <PageLayout title="Analytics">
+    <template #actions>
+      <select
+        v-model="selectedAgentId"
+        class="px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option :value="null">All Agents</option>
+        <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+          {{ agent.name }}
+        </option>
+      </select>
+      <select
+        v-model="selectedPeriod"
+        class="px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option v-for="option in periodOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+    </template>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="border border-border rounded-lg p-4">
@@ -408,5 +402,5 @@ function loadMoreLogs() {
         </CardContent>
       </Card>
     </div>
-  </div>
+  </PageLayout>
 </template>

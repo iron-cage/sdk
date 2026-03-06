@@ -68,7 +68,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-muted text-foreground;
+    @apply bg-muted  text-foreground h-screen overflow-hidden;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: 'cv01', 'ss03';
   }

@@ -18,7 +18,7 @@ function navLinkClass(path: string): string {
   if (isActive(path)) {
     return `${base} bg-border text-foreground font-medium`
   }
-  return `${base} text-muted-foreground hover:text-foreground hover:bg-border/50`
+  return `${base} text-foreground hover:bg-border/50`
 }
 
 function handleNavClick() {
@@ -32,7 +32,7 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background">
+  <div class="min-h-screen bg-muted">
     <!-- Mobile sidebar backdrop -->
     <div
       v-if="sidebarOpen"
@@ -42,14 +42,14 @@ async function handleLogout() {
 
     <!-- Sidebar -->
     <div
-      class="fixed inset-y-0 left-0 z-50 w-56 bg-muted border-r border-border flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0"
+      class="fixed inset-y-0 left-0 z-50 w-56 bg-muted  flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <!-- Logo row -->
-      <div class="h-12 flex items-center justify-between px-3 border-b border-border">
+      <div class="h-12 flex items-center justify-between px-3">
         <span class="text-sm font-semibold text-foreground">Iron Cage</span>
         <button
-          class="lg:hidden text-muted-foreground hover:text-foreground"
+          class="lg:hidden text-foreground"
           @click="sidebarOpen = false"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,9 +195,9 @@ async function handleLogout() {
       </nav>
 
       <!-- Sidebar footer -->
-      <div class="border-t border-border p-3">
+      <div class="p-3">
         <div class="flex items-center gap-2 mb-2">
-          <span class="text-xs text-muted-foreground truncate">{{ authStore.username }}</span>
+          <span class="text-xs text-foreground truncate">{{ authStore.username }}</span>
         </div>
         <button @click="handleLogout" class="text-xs text-muted-foreground hover:text-foreground w-full text-left">
           Sign out
@@ -206,9 +206,9 @@ async function handleLogout() {
     </div>
 
     <!-- Main content -->
-    <div class="lg:ml-56">
+    <div class="lg:ml-56 lg:my-[8px] lg:mr-[8px] rounded-[8px] h-[calc(100vh-16px)] border border-border overflow-hidden bg-background flex flex-col">
       <!-- Mobile header -->
-      <div class="lg:hidden h-12 flex items-center px-3 border-b border-border bg-muted">
+      <div class="lg:hidden h-12 flex items-center px-3 border-b border-border shrink-0">
         <button
           class="p-1 rounded text-muted-foreground hover:text-foreground"
           @click="sidebarOpen = true"
@@ -220,7 +220,7 @@ async function handleLogout() {
       </div>
 
       <!-- Page content -->
-      <main class="p-4 sm:p-6">
+      <main class="flex-1 overflow-hidden">
         <router-view />
       </main>
     </div>

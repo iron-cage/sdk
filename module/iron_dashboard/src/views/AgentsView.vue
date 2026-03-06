@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuthStore } from '../stores/auth'
+import PageLayout from '@/components/PageLayout.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -335,13 +336,12 @@ async function copyTokenToClipboard() {
 </script>
 
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-sm font-semibold text-foreground">Agents</h1>
-      <Button v-if="authStore.isAdmin" @click="showCreateModal = true" class="w-full sm:w-auto">
+  <PageLayout title="Agents">
+    <template #actions>
+      <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
         Create Agent
       </Button>
-    </div>
+    </template>
 
     <Alert v-if="icTokenError" variant="destructive" class="mb-4">
       <AlertDescription>{{ icTokenError }}</AlertDescription>
@@ -742,5 +742,5 @@ async function copyTokenToClipboard() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </PageLayout>
 </template>

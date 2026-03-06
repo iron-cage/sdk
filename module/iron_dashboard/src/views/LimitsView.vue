@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import PageLayout from '@/components/PageLayout.vue'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -235,10 +236,7 @@ function handleUpdateBudget() {
 </script>
 
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-sm font-semibold text-foreground">Agent Budgets</h1>
-    </div>
+  <PageLayout title="Agent Budgets">
 
     <!-- Global Limits hidden - not integrated with iron_cage runtime
     <div class="flex justify-between items-center mb-6">
@@ -616,5 +614,5 @@ function handleUpdateBudget() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </PageLayout>
 </template>

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type TokenMetadata, type CreateTokenResponse } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
+import PageLayout from '@/components/PageLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -116,13 +117,12 @@ function copyToken(token: string) {
 </script>
 
 <template>
-  <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-sm font-semibold text-foreground">Token Management</h1>
+  <PageLayout title="Token Management">
+    <template #actions>
       <Button @click="showCreateModal = true">
         Generate New Token
       </Button>
-    </div>
+    </template>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="border border-border rounded-lg p-4">
@@ -348,5 +348,5 @@ function copyToken(token: string) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </PageLayout>
 </template>

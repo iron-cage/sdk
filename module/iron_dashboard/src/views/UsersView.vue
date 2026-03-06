@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import PageLayout from '@/components/PageLayout.vue'
 
 
 const api = useApi()
@@ -230,13 +231,12 @@ watch(search, () => {
 </script>
 
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-sm font-semibold text-foreground">User Management</h1>
-      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
+  <PageLayout title="User Management">
+    <template #actions>
+      <Button @click="showCreateModal = true">
         Create New User
       </Button>
-    </div>
+    </template>
 
     <!-- Filters -->
     <div class="border border-border rounded-lg p-4 mb-6 flex flex-wrap gap-4 items-end">
@@ -658,5 +658,5 @@ watch(search, () => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </PageLayout>
 </template>

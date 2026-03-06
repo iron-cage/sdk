@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import PageLayout from '@/components/PageLayout.vue'
 
 const api = useApi()
 
@@ -31,8 +32,7 @@ function formatCurrency(usd: number): string {
 </script>
 
 <template>
-  <div>
-    <h1 class="text-sm font-semibold text-foreground mb-4">Dashboard</h1>
+  <PageLayout title="Dashboard">
 
     <!-- Loading state -->
     <div v-if="isLoading" class="p-4">
@@ -95,5 +95,5 @@ function formatCurrency(usd: number): string {
         </Card>
       </div>
     </div>
-  </div>
+  </PageLayout>
 </template>

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import PageLayout from '@/components/PageLayout.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -169,13 +170,12 @@ function getProviderBadgeClass(providerType: ProviderType): string {
 </script>
 
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-sm font-semibold text-foreground">AI Provider Keys</h1>
-      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
+  <PageLayout title="AI Provider Keys">
+    <template #actions>
+      <Button @click="showCreateModal = true">
         Add Provider Key
       </Button>
-    </div>
+    </template>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="border border-border rounded-lg p-4">
@@ -428,5 +428,5 @@ function getProviderBadgeClass(providerType: ProviderType): string {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </PageLayout>
 </template>

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import PageLayout from '@/components/PageLayout.vue'
 import {
   Tabs,
   TabsContent,
@@ -209,13 +210,12 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 </script>
 
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-sm font-semibold text-foreground">Budget Requests</h1>
-      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
+  <PageLayout title="Budget Requests">
+    <template #actions>
+      <Button @click="showCreateModal = true">
         Create Budget Request
       </Button>
-    </div>
+    </template>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="border border-border rounded-lg p-4">
@@ -614,5 +614,5 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </PageLayout>
 </template>
