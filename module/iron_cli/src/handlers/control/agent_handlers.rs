@@ -22,9 +22,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if pagination or verbosity parameters are invalid.
-pub fn list_agents_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn list_agents_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate optional pagination
   if let Some(page_str) = params.get("page") {
     validate_non_negative_integer(page_str, "page")?;
@@ -69,9 +67,7 @@ pub fn list_agents_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn create_agent_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn create_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let name = params
     .get("name")
@@ -164,9 +160,7 @@ pub fn create_agent_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn get_agent_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -197,9 +191,7 @@ pub fn get_agent_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn update_agent_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn update_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -266,9 +258,7 @@ pub fn update_agent_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn delete_agent_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn delete_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -309,9 +299,7 @@ pub fn delete_agent_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn assign_providers_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn assign_providers_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -363,9 +351,7 @@ pub fn assign_providers_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn list_agent_providers_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn list_agent_providers_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -395,9 +381,7 @@ pub fn list_agent_providers_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn remove_provider_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn remove_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -441,9 +425,7 @@ pub fn remove_provider_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn generate_ic_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn generate_ic_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -471,9 +453,7 @@ pub fn generate_ic_token_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn get_ic_token_status_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_ic_token_status_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -501,9 +481,7 @@ pub fn get_ic_token_status_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn regenerate_ic_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn regenerate_ic_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
@@ -531,9 +509,7 @@ pub fn regenerate_ic_token_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn revoke_ic_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn revoke_ic_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 

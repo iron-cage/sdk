@@ -19,9 +19,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn get_budget_limit_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_budget_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
@@ -45,9 +43,7 @@ pub fn get_budget_limit_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn set_budget_limit_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn set_budget_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let limit_str = params
     .get("limit")

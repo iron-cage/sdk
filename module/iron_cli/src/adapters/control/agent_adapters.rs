@@ -15,9 +15,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn list_agents_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn list_agents_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::list_agents_handler(params).map_err(|e| e.to_string())?;
 
@@ -60,9 +58,7 @@ pub async fn list_agents_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Panics if validated parameters (`name`, `providers`, `provider_key_id`, `budget`)
 /// are missing from the map after handler validation, or if their values cannot be parsed.
-pub async fn create_agent_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn create_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::create_agent_handler(params).map_err(|e| e.to_string())?;
 
@@ -123,9 +119,7 @@ pub async fn create_agent_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn get_agent_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn get_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::get_agent_handler(params).map_err(|e| e.to_string())?;
 
@@ -160,9 +154,7 @@ pub async fn get_agent_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing, or if `budget` cannot be parsed as `i64`.
-pub async fn update_agent_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn update_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::update_agent_handler(params).map_err(|e| e.to_string())?;
 
@@ -221,9 +213,7 @@ pub async fn update_agent_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn delete_agent_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn delete_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::delete_agent_handler(params).map_err(|e| e.to_string())?;
 
@@ -269,9 +259,7 @@ pub async fn delete_agent_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `id` or `provider_ids` parameters are missing after handler validation.
-pub async fn assign_providers_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn assign_providers_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::assign_providers_handler(params).map_err(|e| e.to_string())?;
 
@@ -329,8 +317,8 @@ pub async fn assign_providers_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn list_agent_providers_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn list_agent_providers_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::list_agent_providers_handler(params).map_err(|e| e.to_string())?;
@@ -366,9 +354,7 @@ pub async fn list_agent_providers_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `id` or `provider_id` parameters are missing after handler validation.
-pub async fn remove_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn remove_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::remove_provider_handler(params).map_err(|e| e.to_string())?;
 
@@ -415,9 +401,7 @@ pub async fn remove_provider_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn generate_ic_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn generate_ic_token_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::generate_ic_token_handler(params).map_err(|e| e.to_string())?;
 
@@ -452,8 +436,8 @@ pub async fn generate_ic_token_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn get_ic_token_status_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn get_ic_token_status_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::get_ic_token_status_handler(params).map_err(|e| e.to_string())?;
@@ -489,8 +473,8 @@ pub async fn get_ic_token_status_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn regenerate_ic_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn regenerate_ic_token_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::regenerate_ic_token_handler(params).map_err(|e| e.to_string())?;
@@ -526,9 +510,7 @@ pub async fn regenerate_ic_token_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn revoke_ic_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn revoke_ic_token_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   // Validate parameters using handler
   agent_handlers::revoke_ic_token_handler(params).map_err(|e| e.to_string())?;
 

@@ -50,8 +50,8 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 /// # Panics
 ///
 /// Panics if validated `name` or `scope` parameters are missing after handler validation.
-pub async fn generate_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn generate_token_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::generate_token_handler(params)?;
@@ -134,9 +134,7 @@ pub async fn generate_token_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn list_tokens_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn list_tokens_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::list_tokens_handler(params)?;
 
@@ -201,9 +199,7 @@ pub async fn list_tokens_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing after handler validation.
-pub async fn get_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn get_token_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::get_token_handler(params)?;
 
@@ -262,8 +258,8 @@ pub async fn get_token_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing after handler validation.
-pub async fn rotate_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn rotate_token_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::rotate_token_handler(params)?;
@@ -342,8 +338,8 @@ pub async fn rotate_token_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing after handler validation.
-pub async fn revoke_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn revoke_token_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   token_handlers::revoke_token_handler(params)?;

@@ -46,9 +46,7 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn list_traces_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn list_traces_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   traces_handlers::list_traces_handler(params)?;
 
@@ -121,9 +119,7 @@ pub async fn list_traces_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing after handler validation.
-pub async fn get_trace_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn get_trace_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   traces_handlers::get_trace_handler(params)?;
 
@@ -180,8 +176,8 @@ pub async fn get_trace_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// the HTTP request fails, or file write fails.
-pub async fn export_traces_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn export_traces_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   traces_handlers::export_traces_handler(params)?;

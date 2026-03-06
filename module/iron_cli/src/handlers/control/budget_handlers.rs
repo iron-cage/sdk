@@ -24,9 +24,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn budget_status_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn budget_status_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate optional agent_id
   if let Some(agent_id_str) = params.get("agent_id") {
     let agent_id = validate_non_negative_integer(agent_id_str, "agent_id")?;

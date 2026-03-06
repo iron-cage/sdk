@@ -23,9 +23,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn create_user_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn create_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let username = params
     .get("username")
@@ -106,9 +104,7 @@ pub fn create_user_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn list_users_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn list_users_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate optional role filter
   if let Some(role) = params.get("role") {
     validate_user_role(role)?;
@@ -157,9 +153,7 @@ pub fn list_users_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn get_user_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -186,9 +180,7 @@ pub fn get_user_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn suspend_user_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn suspend_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -212,9 +204,7 @@ pub fn suspend_user_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn activate_user_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn activate_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -238,9 +228,7 @@ pub fn activate_user_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn delete_user_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn delete_user_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -265,9 +253,7 @@ pub fn delete_user_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn change_user_role_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn change_user_role_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")
@@ -302,9 +288,7 @@ pub fn change_user_role_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn reset_password_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn reset_password_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required user_id
   let user_id_str = params
     .get("user_id")

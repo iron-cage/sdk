@@ -38,8 +38,8 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 /// # Errors
 ///
 /// Returns `Err(AdapterError)` if handler validation fails or the HTTP request fails.
-pub async fn health_check_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn health_check_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   health_handlers::health_handler(params)?;
@@ -81,9 +81,7 @@ pub async fn health_check_adapter<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(AdapterError)` if handler validation fails or formatting fails.
-pub async fn version_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn version_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   health_handlers::version_handler(params)?;
 
