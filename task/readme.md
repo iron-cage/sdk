@@ -1,9 +1,9 @@
 <!-- task_system_metadata
 type: root
 version: 1.0
-highest_id: 10
+highest_id: 11
 last_allocation:
-  id: 10
+  id: 11
   crate: workspace
   timestamp: 2026-03-06T00:00:00Z
 -->
@@ -12,7 +12,7 @@ last_allocation:
 
 **Last Updated**: 2026-03-06
 **Purpose**: Comprehensive task tracking for this workspace task folder
-**Total Tasks**: 10 tasks
+**Total Tasks**: 11 tasks
 
 ---
 
@@ -34,8 +34,8 @@ highest_id: 8
 -->
 
 **Current State:**
-- **Highest Allocated ID**: 10
-- **Active Tasks**: 10
+- **Highest Allocated ID**: 11
+- **Active Tasks**: 11
 - **Completed Tasks**: 0
 - **Backlog Tasks**: 0
 - **Task Systems**: 1 (root workspace task system)
@@ -43,7 +43,7 @@ highest_id: 8
 **ID Allocation Policy:**
 - All task IDs are allocated from this registry
 - IDs must be globally unique within this workspace task system
-- Next available ID: 11
+- Next available ID: 12
 
 ---
 
@@ -53,16 +53,17 @@ highest_id: 8
 
 | Order | ID | Advisability | Value | Easiness | Safety | Priority | Status | Task | Description |
 |-------|----|--------------:|------:|---------:|-------:|---------:|--------|------|-------------|
-| 1 | [008](008-deploy-iron-cage-internal.md) | 1800 | 10 | 4 | 9 | 5 | 🔄 (Planned) | Deploy Iron Cage as internal centralized token control platform | Centralized IP key sharing, IC token distribution, RBAC, and secure internal deployment by 2026-02-28 |
-| 2 | [001](001-fix-ic-token-regeneration-invalidation.md) | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | Fix IC token invalidation after regeneration | Ensure old IC tokens are rejected after regenerate/revoke |
-| 3 | [007](007-migrate-to-api-llm-bindings.md) | 235 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
-| 4 | [003](003-provider-key-spending-and-limits.md) | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
-| 5 | [002](002-support-multiple-provider-keys-per-provider.md) | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | Support multiple keys per provider | Remove single-key behavior and enforce owner-scoped key selection |
-| 6 | [004](004-per-ic-key-limits.md) | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
-| 7 | [005](005-add-gemini-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
-| 8 | [006](006-add-xai-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
-| 9 | [009](009-linear-style-ui.md) | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Linear-style UI | Restyle dashboard to match Linear's light mode aesthetic |
-| 10 | [010](010-analytics-ui-refactor.md) | 180 | 7 | 6 | 10 | 2 | 🔄 (Planned) | Analytics UI Refactor | Surface unused backend data, add spending by agent and cost efficiency views |
+| 1 | [008](backend/008-deploy-iron-cage-internal.md) | 1800 | 10 | 4 | 9 | 5 | 🔄 (Planned) | Deploy Iron Cage as internal centralized token control platform | Centralized IP key sharing, IC token distribution, RBAC, and secure internal deployment by 2026-02-28 |
+| 2 | [001](backend/001-fix-ic-token-regeneration-invalidation.md) | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | Fix IC token invalidation after regeneration | Ensure old IC tokens are rejected after regenerate/revoke |
+| 3 | [007](backend/007-migrate-to-api-llm-bindings.md) | 235 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
+| 4 | [003](backend/003-provider-key-spending-and-limits.md) | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
+| 5 | [002](backend/002-support-multiple-provider-keys-per-provider.md) | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | Support multiple keys per provider | Remove single-key behavior and enforce owner-scoped key selection |
+| 6 | [004](backend/004-per-ic-key-limits.md) | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
+| 7 | [005](backend/005-add-gemini-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
+| 8 | [006](backend/006-add-xai-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
+| 9 | [010](backend/010-analytics-trend-comparison.md) | 180 | 7 | 6 | 10 | 2 | 🔄 (Planned) | Analytics trend comparison | Backend analytics improvements and trend data |
+| 10 | [009](frontend/009-linear-style-ui.md) | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Linear-style UI | Restyle dashboard to match Linear's light mode aesthetic |
+| 11 | [011](frontend/011-analytics-ui-refactor.md) | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Analytics UI refactor | Surface unused backend data, add spending by agent and cost efficiency views |
 
 ---
 
@@ -72,16 +73,17 @@ highest_id: 8
 
 | Order | ID | Crate | Advisability | Value | Easiness | Safety | Priority | Status | Task | Description |
 |-------|----|-------|-------------:|------:|---------:|-------:|---------:|--------|------|-------------|
-| 1 | [008](008-deploy-iron-cage-internal.md) | workspace | 1800 | 10 | 4 | 9 | 5 | 🔄 (Planned) | Internal deployment | IP key sharing, IC distribution, RBAC, TLS — by 2026-02-28 |
-| 2 | [001](001-fix-ic-token-regeneration-invalidation.md) | workspace | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | Fix IC token invalidation | Reject stale tokens after rotate/revoke |
-| 3 | [007](007-migrate-to-api-llm-bindings.md) | workspace | 235 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
-| 4 | [003](003-provider-key-spending-and-limits.md) | workspace | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Provider-key spending/limits | Enforce and expose key-level budgeting |
-| 5 | [002](002-support-multiple-provider-keys-per-provider.md) | workspace | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | Multi-key provider support | Create and manage multiple keys per provider safely |
-| 6 | [004](004-per-ic-key-limits.md) | workspace | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Per-IC-key limits | Independent IC policy limits per agent |
-| 7 | [005](005-add-gemini-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Gemini provider integration | Add Gemini across API, runtime, analytics |
-| 8 | [006](006-add-xai-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | xAI provider integration | Add xAI across API, runtime, analytics |
-| 9 | [010](010-analytics-ui-refactor.md) | workspace | 180 | 7 | 6 | 10 | 2 | 🔄 (Planned) | Analytics UI refactor | Surface unused backend data, spending by agent, cost efficiency |
-| 10 | [009](009-linear-style-ui.md) | workspace | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Linear-style UI | Restyle dashboard to match Linear's light mode aesthetic |
+| 1 | [008](backend/008-deploy-iron-cage-internal.md) | backend | 1800 | 10 | 4 | 9 | 5 | 🔄 (Planned) | Internal deployment | IP key sharing, IC distribution, RBAC, TLS — by 2026-02-28 |
+| 2 | [001](backend/001-fix-ic-token-regeneration-invalidation.md) | backend | 240 | 8 | 6 | 10 | 1 | 🔄 (Planned) | Fix IC token invalidation | Reject stale tokens after rotate/revoke |
+| 3 | [007](backend/007-migrate-to-api-llm-bindings.md) | backend | 235 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
+| 4 | [003](backend/003-provider-key-spending-and-limits.md) | backend | 230 | 9 | 5 | 9 | 1 | 🔄 (Planned) | Provider-key spending/limits | Enforce and expose key-level budgeting |
+| 5 | [002](backend/002-support-multiple-provider-keys-per-provider.md) | backend | 220 | 8 | 7 | 9 | 1 | 🔄 (Planned) | Multi-key provider support | Create and manage multiple keys per provider safely |
+| 6 | [004](backend/004-per-ic-key-limits.md) | backend | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Per-IC-key limits | Independent IC policy limits per agent |
+| 7 | [005](backend/005-add-gemini-provider.md) | backend | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Gemini provider integration | Add Gemini across API, runtime, analytics |
+| 8 | [006](backend/006-add-xai-provider.md) | backend | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | xAI provider integration | Add xAI across API, runtime, analytics |
+| 9 | [010](backend/010-analytics-trend-comparison.md) | backend | 180 | 7 | 6 | 10 | 2 | 🔄 (Planned) | Analytics trend comparison | Backend analytics improvements and trend data |
+| 10 | [009](frontend/009-linear-style-ui.md) | frontend | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Linear-style UI | Restyle dashboard to match Linear's light mode aesthetic |
+| 11 | [011](frontend/011-analytics-ui-refactor.md) | frontend | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Analytics UI refactor | Surface unused backend data, spending by agent, cost efficiency |
 
 ---
 
@@ -106,23 +108,23 @@ highest_id: 8
 
 | Status | Count | Percentage | Location |
 |--------|-------|------------|----------|
-| 🔄 Planned | 10 | 100.0% | `task/` |
+| 🔄 Planned | 11 | 100.0% | `task/` |
 | ✅ Completed | 0 | 0.0% | `task/completed/` |
 | 📥 Backlog | 0 | 0.0% | `task/backlog/` |
-| **TOTAL** | **10** | **100%** | |
+| **TOTAL** | **11** | **100%** | |
 
 ### Tasks by Domain
 
 | Domain | Total | Planned | Completed | Backlog |
 |--------|-------|---------|-----------|---------|
-| Deployment & Operations | 1 | 1 | 0 | 0 |
 | Security & Auth | 1 | 1 | 0 | 0 |
 | Provider Key Management | 1 | 1 | 0 | 0 |
 | Budget & Limits | 2 | 2 | 0 | 0 |
 | Provider Integrations | 2 | 2 | 0 | 0 |
 | LLM Binding & Migration | 1 | 1 | 0 | 0 |
+| Analytics | 1 | 1 | 0 | 0 |
 | Frontend & UI | 2 | 2 | 0 | 0 |
-| **TOTAL** | **10** | **10** | **0** | **0** |
+| **TOTAL** | **11** | **11** | **0** | **0** |
 
 ---
 
@@ -131,7 +133,8 @@ highest_id: 8
 ### Task File Locations
 
 Tasks are organized in this workspace as:
-- **Active**: `task/*.md`
+- **Backend**: `task/backend/*.md`
+- **Frontend**: `task/frontend/*.md`
 - **Completed**: `task/completed/*.md`
 - **Backlog**: `task/backlog/*.md`
 - **Obsolete**: `task/obsolete/*.md`
@@ -151,7 +154,7 @@ Tasks are organized in this workspace as:
 
 ### By Concern
 
-**Deployment & Operations** ⚡ (deadline 2026-02-28)
+**Deployment & Operations**
 - Task 008 (internal deployment — IP key sharing, IC distribution, RBAC, TLS)
 
 **Security & Token Lifecycle**
@@ -172,6 +175,13 @@ Tasks are organized in this workspace as:
 **LLM Binding Standardization and Migration**
 - Task 007 (migrate to `api_llm` bindings)
 
+**Analytics**
+- Task 010 (analytics trend comparison — backend)
+
+**Frontend & UI**
+- Task 009 (Linear-style UI)
+- Task 011 (analytics UI refactor)
+
 ---
 
 ## Documentation
@@ -184,10 +194,11 @@ Tasks are organized in this workspace as:
 ## Recent Changes
 
 **2026-03-06**:
-- ✅ Registered task 009 (Linear-style UI) — Value=6, Easiness=7, Safety=10, Priority=3, Advisability=150
-- ✅ Registered task 010 (Analytics UI refactor) — Value=7, Easiness=6, Safety=10, Priority=2, Advisability=180
-- ✅ Updated global registry to highest ID `010` and next available ID `011`
-- ✅ Added Frontend & UI domain to summary
+- ✅ Registered task 009 (Linear-style UI) — frontend
+- ✅ Registered task 010 (Analytics trend comparison) — backend
+- ✅ Registered task 011 (Analytics UI refactor) — frontend
+- ✅ Restructured task folder into backend/, frontend/, devops/ subfolders
+- ✅ Updated global registry to highest ID `011` and next available ID `012`
 
 **2026-02-22**:
 - ✅ Registered task 008 (internal deployment) — Value=10, Easiness=4, Safety=9, Priority=5, Advisability=1800
