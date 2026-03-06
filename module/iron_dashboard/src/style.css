@@ -6,25 +6,26 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;           /* #ffffff */
-    --foreground: 225 9% 17%;          /* #282a30 */
-    --card: 0 0% 100%;                 /* #ffffff */
-    --card-foreground: 225 9% 17%;     /* #282a30 */
-    --popover: 0 0% 100%;              /* #ffffff */
-    --popover-foreground: 225 9% 17%;  /* #282a30 */
-    --primary: 225 9% 17%;             /* #282a30 */
+    /* Linear light — from linear.app CSS variables */
+    --background: 0 0% 99%;            /* #fcfcfc — base page */
+    --foreground: 222 9% 15%;          /* #23252a — primary text */
+    --card: 0 0% 99%;                  /* #fcfcfc */
+    --card-foreground: 222 9% 15%;     /* #23252a */
+    --popover: 0 0% 99%;               /* #fcfcfc */
+    --popover-foreground: 222 9% 15%;  /* #23252a */
+    --primary: 222 9% 15%;             /* #23252a */
     --primary-foreground: 0 0% 100%;   /* #ffffff */
-    --secondary: 300 4% 93%;           /* #eeedef — hover surface */
-    --secondary-foreground: 220 9% 24%; /* #3c4149 */
-    --muted: 0, 0%, 96.1%;               /* #f4f2f4 — sidebar, muted surfaces */
-    --muted-foreground: 247 4% 45%;    /* #6f6e77 */
-    --accent: 241 100% 72%;            /* #7170ff */
-    --accent-foreground: 0 0% 100%;    /* #ffffff */
-    --destructive: 358 74% 59%;        /* #e5484d */
+    --secondary: 0 0% 92%;             /* hover surface */
+    --secondary-foreground: 222 9% 15%;
+    --muted: 0 0% 96%;                 /* #f5f5f5 — sidebar */
+    --muted-foreground: 221 11% 72%;   /* #b0b5c0 — secondary text */
+    --accent: 241 100% 72%;            /* Linear violet */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 358 74% 59%;
     --destructive-foreground: 0 0% 100%;
-    --border: 270 1% 91%;              /* #e9e8ea */
-    --input: 270 1% 91%;               /* #e9e8ea */
-    --ring: 241 100% 72%;              /* #7170ff — focus ring = accent */
+    --border: 0 0% 88%;                /* #e0e0e0 */
+    --input: 0 0% 88%;                 /* #e0e0e0 */
+    --ring: 241 100% 72%;
     --radius: 0.25rem;
     --chart-1: 241 100% 72%;
     --chart-2: 173 58% 39%;
@@ -34,24 +35,25 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 241 100% 72%;
+    /* Linear dark — from linear.app CSS variables */
+    --background: 240 6% 7%;           /* #101012 — base page */
+    --foreground: 0 0% 100%;           /* #ffffff */
+    --card: 240 6% 7%;                 /* #101012 */
+    --card-foreground: 0 0% 100%;      /* #ffffff */
+    --popover: 240 6% 7%;              /* #101012 */
+    --popover-foreground: 0 0% 100%;   /* #ffffff */
+    --primary: 0 0% 100%;              /* #ffffff */
+    --primary-foreground: 240 6% 7%;   /* #101012 */
+    --secondary: 240 4% 11%;           /* hover surface */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 4%;                  /* #090909 — sidebar */
+    --muted-foreground: 218 5% 44%;    /* #6b6f76 — secondary text */
+    --accent: 241 100% 72%;            /* Linear violet */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --destructive: 358 74% 59%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 9% 15%;              /* #23252a */
+    --input: 222 9% 15%;               /* #23252a */
     --ring: 241 100% 72%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -66,7 +68,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-muted text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: 'cv01', 'ss03';
   }
