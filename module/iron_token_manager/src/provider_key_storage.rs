@@ -516,30 +516,59 @@ impl ProviderKeyStorage {
     Ok(())
   }
 
-  /// Check if spending is within cap
+  /// Atomically reserve estimated cost before forwarding to LLM provider.
   ///
-  /// # Returns
-  ///
-  /// `true` if spending is within cap (or no cap set), `false` if cap exceeded
+  /// Increments `spending_used_microdollars` by `estimated_amount` if within cap.
+  /// Returns `Ok(())` if reservation succeeded, `Err` if cap would be exceeded.
+  /// After receiving the actual cost, call [`adjust_spending`] to correct the delta.
   ///
   /// # Errors
   ///
-  /// Returns error if key not found or database query fails
-  pub async fn check_spending_cap(&self, key_id: i64) -> Result<bool> {
-    let row: Option<(Option<i64>, i64)> = sqlx::query_as(
-      "SELECT spending_cap_microdollars, spending_used_microdollars \
-       FROM ai_provider_keys WHERE id = $1",
+  /// Returns error if spending cap would be exceeded or database update fails
+  pub async fn reserve_spending(&self, key_id: i64, estimated_amount: i64) -> Result<()> {
+    let result = sqlx::query(
+      "UPDATE ai_provider_keys \
+       SET spending_used_microdollars = spending_used_microdollars + $1 \
+       WHERE id = $2 \
+       AND (spending_cap_microdollars IS NULL \
+            OR spending_used_microdollars + $1 <= spending_cap_microdollars)",
     )
+    .bind(estimated_amount)
     .bind(key_id)
-    .fetch_optional(&self.pool)
+    .execute(&self.pool)
     .await
     .map_err(|_| TokenError::Generic)?;
 
-    match row {
-      Some((None, _)) => Ok(true),
-      Some((Some(cap), used)) => Ok(used < cap),
-      None => Err(TokenError::Database(sqlx::Error::RowNotFound)),
+    if result.rows_affected() == 0 {
+      return Err(TokenError::Generic);
     }
+    Ok(())
+  }
+
+  /// Adjust spending after actual cost is known.
+  ///
+  /// Corrects the difference between reserved and actual cost.
+  /// If actual < reserved, releases the excess. If actual > reserved, adds the difference.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  pub async fn adjust_spending(&self, key_id: i64, reserved: i64, actual: i64) -> Result<()> {
+    let delta = actual - reserved;
+    if delta == 0 {
+      return Ok(());
+    }
+    sqlx::query(
+      "UPDATE ai_provider_keys \
+       SET spending_used_microdollars = spending_used_microdollars + $1 \
+       WHERE id = $2",
+    )
+    .bind(delta)
+    .bind(key_id)
+    .execute(&self.pool)
+    .await
+    .map_err(|_| TokenError::Generic)?;
+    Ok(())
   }
 
   /// Get spending summary for a provider key

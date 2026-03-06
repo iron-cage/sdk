@@ -79,20 +79,7 @@ async fn main() -> Result<()> {
     .map_err(|e| anyhow::anyhow!("{e:?}"))
     .context("Failed to apply migrations")?;
 
-  // Check if admin already exists
-  let existing_admin: Option<(String,)> =
-    sqlx::query_as("SELECT username FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 1")
-      .fetch_optional(&pool)
-      .await
-      .context("Failed to query users")?;
-
-  if let Some((username,)) = existing_admin {
-    println!("\nAdmin account already exists: {username}");
-    println!("No action taken. To create another admin, use the Control API.");
-    return Ok(());
-  }
-
-  // Generate secure password
+  // Generate secure password (before transaction to avoid holding lock during hashing)
   let password = generate_password();
 
   // Hash password with BCrypt (cost=12)
@@ -101,6 +88,27 @@ async fn main() -> Result<()> {
   // Generate user ID
   let user_id = format!("user_{}", uuid::Uuid::new_v4());
   let now_ms = chrono::Utc::now().timestamp_millis();
+
+  // Atomic check-then-insert: BEGIN EXCLUSIVE prevents concurrent duplicate admins.
+  // SQLite exclusive lock ensures no other connection can read or write between
+  // the existence check and the INSERT.
+  sqlx::query("BEGIN EXCLUSIVE")
+    .execute(&pool)
+    .await
+    .context("Failed to begin exclusive transaction")?;
+
+  let existing_admin: Option<(String,)> =
+    sqlx::query_as("SELECT username FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 1")
+      .fetch_optional(&pool)
+      .await
+      .context("Failed to query users")?;
+
+  if let Some((username,)) = existing_admin {
+    sqlx::query("ROLLBACK").execute(&pool).await.ok();
+    println!("\nAdmin account already exists: {username}");
+    println!("No action taken. To create another admin, use the Control API.");
+    return Ok(());
+  }
 
   // Insert admin user
   sqlx::query(
@@ -116,12 +124,18 @@ async fn main() -> Result<()> {
   .await
   .context("Failed to create admin user")?;
 
+  sqlx::query("COMMIT")
+    .execute(&pool)
+    .await
+    .context("Failed to commit transaction")?;
+
   // Write credentials file
   write_credentials_file(&args.output_dir, &args.username, &password, &args.email)?;
 
   println!();
   println!("Admin account created successfully!");
   println!("  Username: {}", args.username);
+  println!("  Password: {password}");
   println!("  Email:    {}", args.email);
   println!();
   println!(
@@ -129,8 +143,7 @@ async fn main() -> Result<()> {
     args.output_dir.display()
   );
   println!();
-  println!("IMPORTANT: Store this file securely and restrict access.");
-  println!("           The password is shown only once at generation time.");
+  println!("IMPORTANT: Store the password above securely. It is shown only at generation time.");
 
   Ok(())
 }

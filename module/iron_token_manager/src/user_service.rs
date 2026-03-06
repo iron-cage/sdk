@@ -603,6 +603,14 @@ impl UserService {
     admin_id: &str,
     new_role: String,
   ) -> Result<User> {
+    // Validate role string via iron_types::Role (single source of truth)
+    if Role::from_str(&new_role).is_err() {
+      return Err(TokenError::Validation {
+        field: "role".to_string(),
+        reason: format!("invalid role '{new_role}'. Must be admin, manager, or developer"),
+      });
+    }
+
     // Prevent changing own role
     if user_id == admin_id {
       return Err(TokenError::Generic);

@@ -170,7 +170,7 @@ let params = CreateUserParams {
   username: "john_doe".to_string(),
   password: "SecurePass123!".to_string(),
   email: "john.doe@example.com".to_string(),
-  role: "user".to_string(),
+  role: "developer".to_string(),
 };
 let user = user_service.create_user(params, admin_id).await?;
 

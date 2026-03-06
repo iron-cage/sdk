@@ -1043,7 +1043,7 @@ async fn test_jwt_expiration_enforcement() {
 
   let expired_claims = AccessTokenClaims {
     sub: user_id,
-    role: "user".to_string(),
+    role: "developer".to_string(),
     email: "user@example.com".to_string(),
     iat: past_timestamp - 3600, // Issued 2 hours ago
     exp: past_timestamp,        // Expired 1 hour ago

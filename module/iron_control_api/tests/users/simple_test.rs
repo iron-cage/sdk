@@ -30,7 +30,7 @@ async fn test_direct_handler_call() {
     username: "testuser".to_string(),
     password: "testpass123".to_string(),
     email: "test@test.com".to_string(),
-    role: "user".to_string(),
+    role: "developer".to_string(),
   };
 
   let user = user_service

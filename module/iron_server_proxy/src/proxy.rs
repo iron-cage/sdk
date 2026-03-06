@@ -124,19 +124,34 @@ async fn handle_proxy_inner(
     return Err(ProxyError::Forbidden("Provider key is disabled"));
   }
 
-  // Step 5: Soft spending cap pre-check (fast rejection for clearly over-budget keys).
-  // NOTE: This check is racy under concurrent load (TOCTOU). The authoritative guard
-  // is the atomic `increment_spending` in Step 9, which uses
-  // `WHERE spending_used + $1 <= cap` to prevent overshoot at the DB level.
-  // This pre-check exists only to avoid unnecessary LLM calls when the cap
-  // is already exceeded.
-  let cap_ok = state
-    .provider_key_storage
-    .check_spending_cap(provider_key_id)
-    .await
-    .map_err(|e| ProxyError::Internal(format!("Failed to check spending cap: {e}")))?;
+  // Step 5: Extract request metadata and read body early (needed for cost estimation)
+  let method = request.method().clone();
+  let path = request.uri().path().to_string();
+  let query = request
+    .uri()
+    .query()
+    .map(|q| format!("?{q}"))
+    .unwrap_or_default();
 
-  if !cap_ok {
+  let body = body::to_bytes(request.into_body(), MAX_REQUEST_BODY_BYTES)
+    .await
+    .map_err(|_| ProxyError::BadRequest("Request body too large or malformed"))?
+    .to_vec();
+
+  // Step 5b: Atomic budget reservation (pre-flight spending cap enforcement).
+  // Estimate max cost from request body (model + max_tokens), then atomically
+  // increment spending_used. If cap exceeded, reject BEFORE forwarding to LLM.
+  // This eliminates the TOCTOU race of the previous check-then-forward-then-increment pattern.
+  let estimated_cost = state
+    .pricing_manager
+    .estimate_max_cost(&body)
+    .map_or(1_000_000, |c| i64::try_from(c).unwrap_or(i64::MAX));
+
+  if let Err(_e) = state
+    .provider_key_storage
+    .reserve_spending(provider_key_id, estimated_cost)
+    .await
+  {
     return Err(ProxyError::SpendingCapExceeded);
   }
 
@@ -156,20 +171,7 @@ async fn handle_proxy_inner(
     base_url: key_record.metadata.base_url.clone(),
   };
 
-  // Step 7: Prepare forward request from incoming HTTP request
-  let method = request.method().clone();
-  let path = request.uri().path().to_string();
-  let query = request
-    .uri()
-    .query()
-    .map(|q| format!("?{q}"))
-    .unwrap_or_default();
-
-  let body = body::to_bytes(request.into_body(), MAX_REQUEST_BODY_BYTES)
-    .await
-    .map_err(|_| ProxyError::BadRequest("Request body too large or malformed"))?
-    .to_vec();
-
+  // Step 7: Prepare forward request (body and metadata extracted in Step 5)
   let forward_req = ForwardRequest {
     method,
     path,
@@ -187,24 +189,25 @@ async fn handle_proxy_inner(
   .await
   .map_err(|e| ProxyError::BadGateway(format!("Forward failed: {e}")))?;
 
-  // Step 9: Atomic spending increment (authoritative cap enforcement).
-  // The UPDATE uses `WHERE spending_used + $1 <= cap` atomically, so concurrent
-  // requests cannot overshoot the cap at the DB level. If the cap is exceeded,
-  // the response is still returned (the LLM call already happened and was billed),
-  // but the next request will be rejected by the pre-check in Step 5.
-  if let Some(ref cost_info) = forward_resp.cost_info {
-    let amount = i64::try_from(cost_info.cost_micros).unwrap_or(i64::MAX);
-    if let Err(e) = state
-      .provider_key_storage
-      .increment_spending(provider_key_id, amount)
-      .await
-    {
-      tracing::error!(
-        key_id = provider_key_id,
-        cost_micros = cost_info.cost_micros,
-        "Spending cap exceeded during atomic increment (request already forwarded): {e}"
-      );
-    }
+  // Step 9: Adjust spending to actual cost.
+  // The pre-flight reservation (Step 5b) already incremented by estimated_cost.
+  // Now correct the delta: release excess if actual < estimated, or add if actual > estimated.
+  let actual_cost = forward_resp
+    .cost_info
+    .as_ref()
+    .map_or(0, |c| i64::try_from(c.cost_micros).unwrap_or(i64::MAX));
+
+  if let Err(e) = state
+    .provider_key_storage
+    .adjust_spending(provider_key_id, estimated_cost, actual_cost)
+    .await
+  {
+    tracing::error!(
+      key_id = provider_key_id,
+      estimated = estimated_cost,
+      actual = actual_cost,
+      "Failed to adjust spending after forward: {e}"
+    );
   }
 
   // Step 10: Return provider response to agent (no API key leaks)

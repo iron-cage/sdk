@@ -44,7 +44,7 @@ async fn debug_direct_suspend() {
     username: "directuser".to_string(),
     password: "testpass123".to_string(),
     email: "direct@test.com".to_string(),
-    role: "user".to_string(),
+    role: "developer".to_string(),
   };
 
   let create_result = user_service.create_user(params, 999).await;

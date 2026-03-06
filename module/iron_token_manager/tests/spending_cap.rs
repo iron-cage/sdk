@@ -7,20 +7,19 @@ mod common;
 use iron_token_manager::ProviderType;
 
 #[tokio::test]
-async fn no_cap_check_returns_true() {
+async fn no_cap_reserve_succeeds() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
     .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
     .await
     .unwrap();
 
-  // No cap set -> always within limit
-  let within = storage.check_spending_cap(key_id).await.unwrap();
-  assert!(within, "No cap set should return true");
+  // No cap set -> reserve should always succeed
+  storage.reserve_spending(key_id, 999_999).await.unwrap();
 }
 
 #[tokio::test]
-async fn set_cap_and_check_within_limit() {
+async fn set_cap_and_reserve_within_limit() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
     .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
@@ -32,12 +31,11 @@ async fn set_cap_and_check_within_limit() {
     .await
     .unwrap();
 
-  let within = storage.check_spending_cap(key_id).await.unwrap();
-  assert!(within, "Fresh key with cap should be within limit");
+  storage.reserve_spending(key_id, 5_000_000).await.unwrap();
 }
 
 #[tokio::test]
-async fn increment_then_check_still_within() {
+async fn increment_then_reserve_still_within() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
     .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
@@ -51,12 +49,12 @@ async fn increment_then_check_still_within() {
 
   storage.increment_spending(key_id, 5_000_000).await.unwrap();
 
-  let within = storage.check_spending_cap(key_id).await.unwrap();
-  assert!(within, "Used 5M of 10M cap should be within limit");
+  // Still 5M of room left
+  storage.reserve_spending(key_id, 4_000_000).await.unwrap();
 }
 
 #[tokio::test]
-async fn increment_to_exact_cap_still_within() {
+async fn reserve_to_exact_cap_succeeds() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
     .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
@@ -65,14 +63,13 @@ async fn increment_to_exact_cap_still_within() {
 
   storage.set_spending_cap(key_id, Some(1_000)).await.unwrap();
 
-  // Increment exactly to the cap
-  storage.increment_spending(key_id, 1_000).await.unwrap();
+  // Reserve exactly to the cap should succeed (used + amount <= cap)
+  storage.reserve_spending(key_id, 1_000).await.unwrap();
 
-  // used == cap -> check_spending_cap returns false (used < cap is the check)
-  let within = storage.check_spending_cap(key_id).await.unwrap();
+  // Any further reservation should fail
   assert!(
-    !within,
-    "used == cap should return false (strict less-than)"
+    storage.reserve_spending(key_id, 1).await.is_err(),
+    "Over cap should fail"
   );
 }
 
@@ -104,9 +101,6 @@ async fn increment_without_cap_succeeds() {
     .increment_spending(key_id, 999_999_999)
     .await
     .unwrap();
-
-  let within = storage.check_spending_cap(key_id).await.unwrap();
-  assert!(within, "No cap -> always within limit");
 }
 
 #[tokio::test]
@@ -189,9 +183,6 @@ async fn remove_cap_allows_unlimited() {
 
   // Now spending should succeed
   storage.increment_spending(key_id, 1).await.unwrap();
-
-  let within = storage.check_spending_cap(key_id).await.unwrap();
-  assert!(within, "No cap -> within limit");
 }
 
 #[tokio::test]
@@ -202,8 +193,51 @@ async fn spending_summary_nonexistent_key_fails() {
 }
 
 #[tokio::test]
-async fn check_spending_cap_nonexistent_key_fails() {
+async fn reserve_nonexistent_key_fails() {
   let (storage, _db) = common::create_test_provider_storage().await;
-  let result = storage.check_spending_cap(99999).await;
+  let result = storage.reserve_spending(99999, 100).await;
   assert!(result.is_err(), "Nonexistent key should error");
+}
+
+#[tokio::test]
+async fn adjust_spending_releases_excess() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  storage
+    .set_spending_cap(key_id, Some(10_000))
+    .await
+    .unwrap();
+
+  // Reserve 5000
+  storage.reserve_spending(key_id, 5_000).await.unwrap();
+
+  // Actual cost was only 2000 - adjust should release 3000
+  storage.adjust_spending(key_id, 5_000, 2_000).await.unwrap();
+
+  let summary = storage.get_spending_summary(key_id).await.unwrap();
+  assert_eq!(
+    summary.used_microdollars, 2_000,
+    "Should reflect actual cost after adjust"
+  );
+}
+
+#[tokio::test]
+async fn adjust_spending_no_change() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  storage.reserve_spending(key_id, 5_000).await.unwrap();
+
+  // Actual == reserved -> no-op
+  storage.adjust_spending(key_id, 5_000, 5_000).await.unwrap();
+
+  let summary = storage.get_spending_summary(key_id).await.unwrap();
+  assert_eq!(summary.used_microdollars, 5_000);
 }

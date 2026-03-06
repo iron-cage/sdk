@@ -175,6 +175,7 @@ db-seed: ## Populate seed data (assumes database exists)
 
 db-validate: ## Validate database paths, schema and seed data
 	@module/iron_token_manager/scripts/validate_db_paths.sh
+	@if [ ! -f "$(CURDIR)/iron.db" ]; then echo "[skip] db-validate: iron.db not present"; exit 0; fi
 	@module/iron_token_manager/scripts/validate_db_schema.sh $(CURDIR)/iron.db
 	@module/iron_token_manager/scripts/validate_seed_data.sh $(CURDIR)/iron.db
 	@echo "[+] Database validation complete"

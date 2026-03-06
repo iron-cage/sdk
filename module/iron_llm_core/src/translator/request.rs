@@ -28,13 +28,18 @@ pub fn translate_openai_to_anthropic(openai_body: &[u8]) -> Result<Vec<u8>, Stri
     let role = msg["role"].as_str().unwrap_or("");
     if role == "system" {
       // Concatenate multiple system messages if present
-      let content = msg["content"].as_str().unwrap_or("");
+      let content = extract_text_content(&msg["content"]);
       system_prompt = Some(match system_prompt {
         Some(existing) => format!("{existing}\n{content}"),
-        None => content.to_string(),
+        None => content,
       });
     } else {
-      user_messages.push(msg.clone());
+      // Translate message content (handles both string and multimodal array formats)
+      let mut translated_msg = msg.clone();
+      if let Some(content_array) = msg["content"].as_array() {
+        translated_msg["content"] = translate_content_blocks(content_array);
+      }
+      user_messages.push(translated_msg);
     }
   }
 
@@ -71,4 +76,77 @@ pub fn translate_openai_to_anthropic(openai_body: &[u8]) -> Result<Vec<u8>, Stri
   }
 
   serde_json::to_vec(&anthropic).map_err(|e| format!("Serialization error: {e}"))
+}
+
+/// Extract text from content field (handles both string and array formats)
+fn extract_text_content(content: &Value) -> String {
+  if let Some(s) = content.as_str() {
+    return s.to_string();
+  }
+  if let Some(blocks) = content.as_array() {
+    let texts: Vec<&str> = blocks
+      .iter()
+      .filter(|b| b["type"].as_str() == Some("text"))
+      .filter_map(|b| b["text"].as_str())
+      .collect();
+    return texts.join("");
+  }
+  String::new()
+}
+
+/// Translate `OpenAI` multimodal content blocks to Anthropic format
+///
+/// Maps:
+/// - `{"type":"text","text":"..."}` -> `{"type":"text","text":"..."}`
+/// - `{"type":"image_url","image_url":{"url":"data:image/png;base64,..."}}` -> Anthropic image block
+fn translate_content_blocks(blocks: &[Value]) -> Value {
+  let mut anthropic_blocks = Vec::new();
+
+  for block in blocks {
+    match block["type"].as_str() {
+      Some("text") => {
+        anthropic_blocks.push(json!({
+          "type": "text",
+          "text": block["text"]
+        }));
+      }
+      Some("image_url") => {
+        if let Some(url) = block["image_url"]["url"].as_str() {
+          if let Some((media_type, data)) = parse_data_url(url) {
+            anthropic_blocks.push(json!({
+              "type": "image",
+              "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": data,
+              }
+            }));
+          } else {
+            // External URL - Anthropic supports url source type
+            anthropic_blocks.push(json!({
+              "type": "image",
+              "source": {
+                "type": "url",
+                "url": url,
+              }
+            }));
+          }
+        }
+      }
+      _ => {
+        // Pass through unknown block types
+        anthropic_blocks.push(block.clone());
+      }
+    }
+  }
+
+  json!(anthropic_blocks)
+}
+
+/// Parse a data URL into (`media_type`, `base64_data`)
+fn parse_data_url(url: &str) -> Option<(&str, &str)> {
+  let rest = url.strip_prefix("data:")?;
+  let (meta, data) = rest.split_once(',')?;
+  let media_type = meta.strip_suffix(";base64")?;
+  Some((media_type, data))
 }

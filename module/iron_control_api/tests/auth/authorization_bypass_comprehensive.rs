@@ -83,8 +83,8 @@ use tower::ServiceExt;
 async fn test_vertical_privilege_escalation_user_to_admin() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  // Create regular user (role: "user")
-  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
+  // Create regular user (role: "developer")
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "developer", true).await;
 
   // Create admin user for comparison (role: "admin")
   common::auth::seed_test_user(&pool, "admin@example.com", "admin_password", "admin", true).await;
