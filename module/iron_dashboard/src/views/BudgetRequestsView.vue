@@ -211,22 +211,20 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 <template>
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">
-        Budget Requests
-      </h1>
+      <h1 class="text-sm font-semibold text-foreground">Budget Requests</h1>
       <Button @click="showCreateModal = true" class="w-full sm:w-auto">
         Create Budget Request
       </Button>
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-gray-600">Loading budget requests...</p>
+    <div v-if="isLoading" class="border border-border rounded-lg p-4">
+      <p class="text-muted-foreground">Loading budget requests...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading budget requests: {{ error.message }}</p>
+    <div v-else-if="error" class="border border-border rounded-lg p-4">
+      <p class="text-destructive">Error loading budget requests: {{ error.message }}</p>
       <Button @click="() => refetch()" variant="secondary" class="mt-4">
         Retry
       </Button>
@@ -248,39 +246,39 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 
         <!-- My Requests Tab -->
         <TabsContent value="my-requests">
-          <div v-if="myRequests.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
-            <table class="min-w-[700px] w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+          <div v-if="myRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
+            <table class="min-w-[700px] w-full divide-y divide-border">
+              <thead>
                 <tr>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     ID
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Agent
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Amount
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Created
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Justification
                   </th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
+              <tbody class="divide-y divide-border">
                 <tr v-for="request in myRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
                   <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -288,10 +286,10 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
                       {{ request.status }}
                     </Badge>
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 text-sm text-muted-foreground">
                     <div class="max-w-xs truncate">
                       {{ request.justification }}
                     </div>
@@ -300,8 +298,8 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               </tbody>
             </table>
           </div>
-          <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-            <p class="text-gray-600 mb-4">You have no budget requests yet</p>
+          <div v-else class="border border-border rounded-lg p-4 text-center">
+            <p class="text-muted-foreground mb-4">You have no budget requests yet</p>
             <Button @click="showCreateModal = true">
               Create First Request
             </Button>
@@ -310,59 +308,59 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 
         <!-- Pending Approvals Tab (Admin Only) -->
         <TabsContent v-if="authStore.isAdmin" value="pending-approvals">
-          <div v-if="pendingRequests.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
-            <table class="min-w-[900px] w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+          <div v-if="pendingRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
+            <table class="min-w-[900px] w-full divide-y divide-border">
+              <thead>
                 <tr>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     ID
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Requester
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Agent
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Current Budget
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Requested
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Justification
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Created
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
+              <tbody class="divide-y divide-border">
                 <tr v-for="request in pendingRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.requester_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     ${{ request.current_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 text-sm text-muted-foreground">
                     <div class="max-w-xs">
                       {{ request.justification }}
                     </div>
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
                   <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
@@ -371,7 +369,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
                       :disabled="approveMutation.isPending.value"
                       variant="ghost"
                       size="sm"
-                      class="text-green-600 hover:text-green-700"
+                      class="text-foreground hover:text-muted-foreground"
                     >
                       Approve
                     </Button>
@@ -389,8 +387,8 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               </tbody>
             </table>
           </div>
-          <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-            <p class="text-gray-600">No pending budget requests</p>
+          <div v-else class="border border-border rounded-lg p-4 text-center">
+            <p class="text-muted-foreground">No pending budget requests</p>
           </div>
         </TabsContent>
 
@@ -412,45 +410,45 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             </Select>
           </div>
 
-          <div v-if="filteredRequests.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
-            <table class="min-w-[800px] w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+          <div v-if="filteredRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
+            <table class="min-w-[800px] w-full divide-y divide-border">
+              <thead>
                 <tr>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     ID
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Requester
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Agent
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Amount
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Created
                   </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Justification
                   </th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
+              <tbody class="divide-y divide-border">
                 <tr v-for="request in filteredRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.requester_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
                   <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -458,10 +456,10 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
                       {{ request.status }}
                     </Badge>
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 text-sm text-gray-500">
+                  <td class="px-3 sm:px-6 py-4 text-sm text-muted-foreground">
                     <div class="max-w-xs truncate">
                       {{ request.justification }}
                     </div>
@@ -470,8 +468,8 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               </tbody>
             </table>
           </div>
-          <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-            <p class="text-gray-600">No budget requests found</p>
+          <div v-else class="border border-border rounded-lg p-4 text-center">
+            <p class="text-muted-foreground">No budget requests found</p>
           </div>
         </TabsContent>
       </Tabs>
@@ -522,7 +520,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               placeholder="1000.00"
               :disabled="createMutation.isPending.value"
             />
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-muted-foreground">
               Maximum: $10,000
             </p>
           </div>
@@ -536,7 +534,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               rows="4"
               :disabled="createMutation.isPending.value"
             />
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-muted-foreground">
               {{ createForm.justification.length }}/500 characters (min: 20)
             </p>
           </div>

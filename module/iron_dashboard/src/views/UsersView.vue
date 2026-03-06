@@ -232,14 +232,14 @@ watch(search, () => {
 <template>
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">User Management</h1>
+      <h1 class="text-sm font-semibold text-foreground">User Management</h1>
       <Button @click="showCreateModal = true" class="w-full sm:w-auto">
         Create New User
       </Button>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6 flex flex-wrap gap-4 items-end">
+    <div class="border border-border rounded-lg p-4 mb-6 flex flex-wrap gap-4 items-end">
       <div class="w-full md:w-64">
         <Label for="search">Search</Label>
         <Input id="search" v-model="search" placeholder="Search by username or email..." />
@@ -262,49 +262,49 @@ watch(search, () => {
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-gray-600">Loading users...</p>
+    <div v-if="isLoading" class="border border-border rounded-lg p-4">
+      <p class="text-muted-foreground">Loading users...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading users: {{ error.message }}</p>
+    <div v-else-if="error" class="border border-border rounded-lg p-4">
+      <p class="text-destructive">Error loading users: {{ error.message }}</p>
       <Button @click="() => refetch()" variant="secondary" class="mt-4">
         Retry
       </Button>
     </div>
 
     <!-- Users table -->
-    <div v-else-if="usersData && usersData.users.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
-      <table class="min-w-[700px] w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+    <div v-else-if="usersData && usersData.users.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
+      <table class="min-w-[700px] w-full divide-y divide-border">
+        <thead>
           <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               User
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Role
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Status
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Created
             </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-border">
           <tr v-for="user in usersData.users" :key="user.id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <div class="flex flex-col">
-                <span class="text-sm font-medium text-gray-900">{{ user.username }}</span>
-                <span class="text-sm text-gray-500">{{ user.email }}</span>
+                <span class="text-sm font-medium text-foreground">{{ user.username }}</span>
+                <span class="text-sm text-muted-foreground">{{ user.email }}</span>
               </div>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
               <Badge variant="outline">{{ user.role }}</Badge>
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -312,7 +312,7 @@ watch(search, () => {
                 {{ user.is_active ? 'Active' : 'Suspended' }}
               </Badge>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
               {{ new Date(user.created_at).toLocaleDateString() }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -335,7 +335,7 @@ watch(search, () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  :class="user.is_active ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'"
+                  :class="user.is_active ? 'text-muted-foreground hover:text-foreground' : 'text-muted-foreground hover:text-foreground'"
                   @click="handleToggleStatus(user)"
                   :disabled="user.username === 'admin'"
                 >
@@ -344,7 +344,7 @@ watch(search, () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="text-red-600 hover:text-red-900"
+                  class="text-destructive hover:text-destructive"
                   @click="handleDeleteUser(user)"
                   :disabled="user.username === 'admin'"
                 >
@@ -357,14 +357,14 @@ watch(search, () => {
       </table>
       
       <!-- Pagination -->
-      <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+      <div class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
         <div class="flex-1 flex justify-between sm:hidden">
           <Button :disabled="page === 1" @click="page--">Previous</Button>
           <Button :disabled="page * pageSize >= usersData.total" @click="page++">Next</Button>
         </div>
         <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
           <div>
-            <p class="text-sm text-gray-700">
+            <p class="text-sm text-foreground">
               Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span> to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span> of <span class="font-medium">{{ usersData.total }}</span> results
             </p>
           </div>
@@ -393,8 +393,8 @@ watch(search, () => {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-gray-600 mb-4">No users found</p>
+    <div v-else class="border border-border rounded-lg p-4 text-center">
+      <p class="text-muted-foreground mb-4">No users found</p>
       <Button @click="showCreateModal = true">
         Create First User
       </Button>
@@ -633,7 +633,7 @@ watch(search, () => {
             <input 
               id="force-change" 
               type="checkbox" 
-              class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              class="h-4 w-4 rounded border-border text-accent focus:ring-ring"
               :checked="forcePasswordChange" 
               @change="forcePasswordChange = ($event.target as HTMLInputElement).checked" 
             />

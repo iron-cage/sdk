@@ -14,11 +14,11 @@ function isActive(path: string): boolean {
 }
 
 function navLinkClass(path: string): string {
-  const base = 'flex items-center px-4 py-2 text-sm font-medium rounded-md'
+  const base = 'flex items-center px-3 py-1.5 text-sm rounded-md'
   if (isActive(path)) {
-    return `${base} bg-gray-800 text-white`
+    return `${base} bg-border text-foreground font-medium`
   }
-  return `${base} text-gray-300 hover:bg-gray-800 hover:text-white`
+  return `${base} text-muted-foreground hover:text-foreground hover:bg-border/50`
 }
 
 function handleNavClick() {
@@ -32,39 +32,40 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="min-h-screen bg-background">
     <!-- Mobile sidebar backdrop -->
     <div
       v-if="sidebarOpen"
-      class="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+      class="fixed inset-0 z-40 bg-black/50 lg:hidden"
       @click="sidebarOpen = false"
     />
 
     <!-- Sidebar -->
     <div
-      class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform transition-transform duration-200 ease-in-out lg:translate-x-0"
+      class="fixed inset-y-0 left-0 z-50 w-56 bg-muted border-r border-border flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div class="flex items-center justify-between h-16 px-4 bg-gray-800">
-        <span class="text-xl font-semibold text-white">Iron Token</span>
+      <!-- Logo row -->
+      <div class="h-12 flex items-center justify-between px-3 border-b border-border">
+        <span class="text-sm font-semibold text-foreground">Iron Cage</span>
         <button
-          class="lg:hidden text-gray-400 hover:text-white"
+          class="lg:hidden text-muted-foreground hover:text-foreground"
           @click="sidebarOpen = false"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <nav class="px-4 py-6 space-y-2">
+      <nav class="px-2 py-3 space-y-0.5 flex-1">
         <router-link
           to="/dashboard"
           :class="navLinkClass('/dashboard')"
           @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3 flex-shrink-0"
+            class="w-4 h-4 mr-2 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -85,7 +86,7 @@ async function handleLogout() {
           @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3 flex-shrink-0"
+            class="w-4 h-4 mr-2 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -112,7 +113,7 @@ async function handleLogout() {
           @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3 flex-shrink-0"
+            class="w-4 h-4 mr-2 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -133,7 +134,7 @@ async function handleLogout() {
           @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3 flex-shrink-0"
+            class="w-4 h-4 mr-2 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -155,7 +156,7 @@ async function handleLogout() {
           @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3 flex-shrink-0"
+            class="w-4 h-4 mr-2 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -177,7 +178,7 @@ async function handleLogout() {
           @click="handleNavClick"
         >
           <svg
-            class="w-5 h-5 mr-3 flex-shrink-0"
+            class="w-4 h-4 mr-2 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -192,34 +193,31 @@ async function handleLogout() {
           Users
         </router-link>
       </nav>
+
+      <!-- Sidebar footer -->
+      <div class="border-t border-border p-3">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-muted-foreground truncate">{{ authStore.username }}</span>
+        </div>
+        <button @click="handleLogout" class="text-xs text-muted-foreground hover:text-foreground w-full text-left">
+          Sign out
+        </button>
+      </div>
     </div>
 
     <!-- Main content -->
-    <div class="lg:ml-64">
-      <!-- Header -->
-      <header class="bg-white shadow-sm sticky top-0 z-30">
-        <div class="flex items-center justify-between h-16 px-4">
-          <!-- Mobile menu button -->
-          <button
-            class="lg:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            @click="sidebarOpen = true"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-
-          <div class="flex items-center space-x-2 sm:space-x-4 ml-auto">
-            <span class="text-sm text-gray-700 hidden sm:inline">{{ authStore.username }}</span>
-            <button
-              @click="handleLogout"
-              class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+    <div class="lg:ml-56">
+      <!-- Mobile header -->
+      <div class="lg:hidden h-12 flex items-center px-3 border-b border-border bg-muted">
+        <button
+          class="p-1 rounded text-muted-foreground hover:text-foreground"
+          @click="sidebarOpen = true"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
 
       <!-- Page content -->
       <main class="p-4 sm:p-6">

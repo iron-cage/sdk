@@ -118,62 +118,62 @@ function copyToken(token: string) {
 <template>
   <div>
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Token Management</h1>
+      <h1 class="text-sm font-semibold text-foreground">Token Management</h1>
       <Button @click="showCreateModal = true">
         Generate New Token
       </Button>
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-gray-600">Loading tokens...</p>
+    <div v-if="isLoading" class="border border-border rounded-lg p-4">
+      <p class="text-muted-foreground">Loading tokens...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading tokens: {{ error.message }}</p>
+    <div v-else-if="error" class="border border-border rounded-lg p-4">
+      <p class="text-destructive">Error loading tokens: {{ error.message }}</p>
       <Button @click="() => refetch()" variant="secondary" class="mt-4">
         Retry
       </Button>
     </div>
 
     <!-- Tokens table -->
-    <div v-else-if="tokens && tokens.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+    <div v-else-if="tokens && tokens.length > 0" class="border border-border rounded-lg overflow-hidden">
+      <table class="min-w-full divide-y divide-border">
+        <thead>
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               ID
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Provider
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Description
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Created
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Status
             </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-border">
           <tr v-for="token in tokens" :key="token.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
               {{ token.id }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
               <Badge variant="outline">{{ token.provider || '-' }}</Badge>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
               {{ token.name || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
               {{ formatDate(token.created_at) }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
@@ -208,8 +208,8 @@ function copyToken(token: string) {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-gray-600 mb-4">No tokens found</p>
+    <div v-else class="border border-border rounded-lg p-4 text-center">
+      <p class="text-muted-foreground mb-4">No tokens found</p>
       <Button @click="showCreateModal = true">
         Generate First Token
       </Button>

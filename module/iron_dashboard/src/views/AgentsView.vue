@@ -337,7 +337,7 @@ async function copyTokenToClipboard() {
 <template>
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Agents</h1>
+      <h1 class="text-sm font-semibold text-foreground">Agents</h1>
       <Button v-if="authStore.isAdmin" @click="showCreateModal = true" class="w-full sm:w-auto">
         Create Agent
       </Button>
@@ -348,70 +348,70 @@ async function copyTokenToClipboard() {
     </Alert>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-gray-600">Loading agents...</p>
+    <div v-if="isLoading" class="border border-border rounded-lg p-4">
+      <p class="text-muted-foreground">Loading agents...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading agents: {{ error.message }}</p>
+    <div v-else-if="error" class="border border-border rounded-lg p-4">
+      <p class="text-destructive">Error loading agents: {{ error.message }}</p>
       <Button @click="() => refetch()" variant="secondary" class="mt-4">
         Retry
       </Button>
     </div>
 
     <!-- Agents table -->
-    <div v-else-if="agents && agents.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
-      <table class="min-w-[700px] w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+    <div v-else-if="agents && agents.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
+      <table class="min-w-[700px] w-full divide-y divide-border">
+        <thead>
           <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Name
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Owner
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Providers
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Provider Key
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               IC Token
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Created
             </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-border">
           <tr v-for="agent in agents" :key="agent.id">
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
               {{ agent.name }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
               {{ agent.owner_id || 'Unknown' }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
               <div class="flex gap-1 flex-wrap">
                 <span
                   v-for="provider in agent.providers"
                   :key="provider"
-                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground"
                 >
                   {{ provider }}
                 </span>
               </div>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
               {{ agent.provider_key_id ?? 'None' }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+              <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
                 Loading...
               </div>
               <div v-else>
@@ -424,19 +424,19 @@ async function copyTokenToClipboard() {
                 <Badge
                   v-else
                   variant="outline"
-                  class="text-gray-700"
+                  class="text-foreground"
                 >
                   None
                 </Badge>
                 <div
                   v-if="getIcTokenStatus(agent.id)?.created_at"
-                  class="text-xs text-gray-500 mt-1"
+                  class="text-xs text-muted-foreground mt-1"
                 >
                   Created {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
                 </div>
               </div>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
               {{ formatDate(agent.created_at) }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -466,7 +466,7 @@ async function copyTokenToClipboard() {
                     <DropdownMenuItem
                       @click="handleRevokeIcToken(agent)"
                       :disabled="tokenActionLoadingId === agent.id"
-                      class="text-red-600"
+                      class="text-destructive"
                     >
                       Revoke IC Token
                     </DropdownMenuItem>
@@ -476,7 +476,7 @@ async function copyTokenToClipboard() {
                     <DropdownMenuItem @click="openUpdateModal(agent)">
                       Edit Agent
                     </DropdownMenuItem>
-                    <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-red-600">
+                    <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">
                       Delete Agent
                     </DropdownMenuItem>
                   </template>
@@ -489,8 +489,8 @@ async function copyTokenToClipboard() {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-gray-600 mb-4">No agents found</p>
+    <div v-else class="border border-border rounded-lg p-4 text-center">
+      <p class="text-muted-foreground mb-4">No agents found</p>
       <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
         Create First Agent
       </Button>
@@ -551,7 +551,7 @@ async function copyTokenToClipboard() {
               placeholder="10.00"
               :disabled="createMutation.isPending.value"
             />
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-muted-foreground">
               Required. Used to create the agent's budget (microdollars on backend).
             </p>
           </div>
@@ -573,7 +573,7 @@ async function copyTokenToClipboard() {
                 {{ user.username }} ({{ user.email || 'no email' }})
               </option>
             </select>
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-muted-foreground">
               Leave empty to assign to yourself.
             </p>
           </div>
@@ -718,16 +718,16 @@ async function copyTokenToClipboard() {
         </DialogHeader>
 
         <div class="space-y-3">
-          <div class="bg-gray-100 border rounded-md p-3 font-mono text-sm break-all">
+          <div class="bg-muted border border-border rounded-md p-3 font-mono text-sm break-all">
             {{ tokenDialogValue }}
           </div>
-          <p class="text-sm text-yellow-700">
+          <p class="text-sm text-muted-foreground">
             {{ tokenDialogWarning }}
           </p>
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-muted-foreground">
             After closing this dialog you will not be able to view the token again. Regenerate if you need a new value.
           </p>
-          <p v-if="copyMessage" class="text-sm text-gray-600">
+          <p v-if="copyMessage" class="text-sm text-muted-foreground">
             {{ copyMessage }}
           </p>
         </div>

@@ -168,13 +168,13 @@ function loadMoreLogs() {
 <template>
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Analytics</h1>
+      <h1 class="text-sm font-semibold text-foreground">Analytics</h1>
 
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
         <!-- Agent selector -->
         <select
           v-model="selectedAgentId"
-          class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         >
           <option :value="null">All Agents</option>
           <option v-for="agent in agents" :key="agent.id" :value="agent.id">
@@ -185,7 +185,7 @@ function loadMoreLogs() {
         <!-- Period selector -->
         <select
           v-model="selectedPeriod"
-          class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         >
           <option v-for="option in periodOptions" :key="option.value" :value="option.value">
             {{ option.label }}
@@ -195,13 +195,13 @@ function loadMoreLogs() {
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-gray-600">Loading usage analytics...</p>
+    <div v-if="isLoading" class="border border-border rounded-lg p-4">
+      <p class="text-muted-foreground">Loading usage analytics...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading usage analytics: {{ (error as Error).message }}</p>
+    <div v-else-if="error" class="border border-border rounded-lg p-4">
+      <p class="text-destructive">Error loading usage analytics: {{ (error as Error).message }}</p>
     </div>
 
     <!-- Analytics content -->
@@ -211,10 +211,10 @@ function loadMoreLogs() {
         <!-- Total requests -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Total Requests</CardTitle>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Total Requests</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-gray-900">
+            <div class="text-3xl font-bold text-foreground">
               {{ formatNumber(totalRequests) }}
             </div>
           </CardContent>
@@ -223,10 +223,10 @@ function loadMoreLogs() {
         <!-- Success rate -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Success Rate</CardTitle>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Success Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold" :class="successRate >= 95 ? 'text-green-600' : 'text-yellow-600'">
+            <div class="text-3xl font-bold" :class="successRate >= 95 ? 'text-foreground' : 'text-foreground'">
               {{ successRate.toFixed(1) }}%
             </div>
           </CardContent>
@@ -235,10 +235,10 @@ function loadMoreLogs() {
         <!-- Total input tokens -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Input Tokens</CardTitle>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Input Tokens</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-blue-600">
+            <div class="text-3xl font-bold text-foreground">
               {{ formatNumber(totalInputTokens) }}
             </div>
           </CardContent>
@@ -247,10 +247,10 @@ function loadMoreLogs() {
         <!-- Total output tokens -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Output Tokens</CardTitle>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Output Tokens</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-green-600">
+            <div class="text-3xl font-bold text-foreground">
               {{ formatNumber(totalOutputTokens) }}
             </div>
           </CardContent>
@@ -259,10 +259,10 @@ function loadMoreLogs() {
         <!-- Total cost -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium text-gray-600">Total Cost</CardTitle>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Total Cost</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold text-purple-600">
+            <div class="text-3xl font-bold text-foreground">
               {{ formatCost(totalSpend) }}
             </div>
           </CardContent>
@@ -277,25 +277,25 @@ function loadMoreLogs() {
             <CardTitle>Usage by Provider</CardTitle>
           </CardHeader>
           <CardContent>
-            <div v-if="providerBreakdown.length === 0" class="text-center text-gray-600">
+            <div v-if="providerBreakdown.length === 0" class="text-center text-muted-foreground">
               No provider data available
             </div>
             <div v-else class="space-y-4">
               <div v-for="provider in providerBreakdown" :key="provider.provider">
                 <div class="flex justify-between items-center mb-2">
-                  <span class="text-sm font-medium text-gray-900">{{ provider.provider }}</span>
+                  <span class="text-sm font-medium text-foreground">{{ provider.provider }}</span>
                   <div class="text-right">
-                    <span class="text-sm font-semibold text-gray-900">
+                    <span class="text-sm font-semibold text-foreground">
                       {{ formatCost(provider.spending) }}
                     </span>
-                    <span class="text-xs text-gray-500 ml-2">
+                    <span class="text-xs text-muted-foreground ml-2">
                       {{ formatNumber(provider.request_count) }} requests
                     </span>
                   </div>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="w-full bg-muted rounded-full h-2">
                   <div
-                    class="bg-blue-600 h-2 rounded-full transition-all"
+                    class="bg-foreground h-2 rounded-full transition-all"
                     :style="{ width: `${provider.percentage}%` }"
                   />
                 </div>
@@ -310,25 +310,25 @@ function loadMoreLogs() {
             <CardTitle>Usage by Model</CardTitle>
           </CardHeader>
           <CardContent>
-            <div v-if="modelBreakdown.length === 0" class="text-center text-gray-600">
+            <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground">
               No model data available
             </div>
             <div v-else class="space-y-4">
               <div v-for="model in modelBreakdown" :key="model.model">
                 <div class="flex justify-between items-center mb-2">
-                  <span class="text-sm font-medium text-gray-900">{{ model.model }}</span>
+                  <span class="text-sm font-medium text-foreground">{{ model.model }}</span>
                   <div class="text-right">
-                    <span class="text-sm font-semibold text-gray-900">
+                    <span class="text-sm font-semibold text-foreground">
                       {{ formatNumber(model.request_count) }} requests
                     </span>
-                    <span class="text-xs text-gray-500 ml-2">
+                    <span class="text-xs text-muted-foreground ml-2">
                       {{ formatCost(model.spending) }}
                     </span>
                   </div>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="w-full bg-muted rounded-full h-2">
                   <div
-                    class="bg-green-600 h-2 rounded-full transition-all"
+                    class="bg-foreground h-2 rounded-full transition-all"
                     :style="{ width: `${model.percentage}%` }"
                   />
                 </div>
@@ -342,55 +342,55 @@ function loadMoreLogs() {
       <Card>
         <CardHeader class="flex flex-row items-center justify-between">
           <CardTitle>Recent Logs</CardTitle>
-          <span v-if="totalEvents > 0" class="text-sm text-gray-500">
+          <span v-if="totalEvents > 0" class="text-sm text-muted-foreground">
             Showing {{ accumulatedLogs.length }} of {{ totalEvents }} events
           </span>
         </CardHeader>
         <CardContent>
-          <div v-if="eventsLoading && accumulatedLogs.length === 0" class="text-center text-gray-600 py-4">
+          <div v-if="eventsLoading && accumulatedLogs.length === 0" class="text-center text-muted-foreground py-4">
             Loading logs...
           </div>
-          <div v-else-if="accumulatedLogs.length === 0" class="text-center text-gray-600 py-4">
+          <div v-else-if="accumulatedLogs.length === 0" class="text-center text-muted-foreground py-4">
             No logs available
           </div>
           <div v-else>
             <div class="overflow-x-auto touch-pan-x">
-              <table class="min-w-[600px] w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+              <table class="min-w-[600px] w-full divide-y divide-border">
+                <thead>
                   <tr>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tokens</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Time</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Agent</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Model</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Tokens</th>
+                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Cost</th>
                   </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-border">
                   <tr v-for="event in accumulatedLogs" :key="event.event_id">
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {{ formatTimestamp(event.timestamp_ms) }}
                     </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-foreground">
                       {{ event.agent_name }}
                     </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {{ event.model }}
                     </td>
                     <td class="px-3 sm:px-4 py-3 whitespace-nowrap">
                       <span
                         class="px-2 py-1 text-xs font-medium rounded-full"
                         :class="event.event_type === 'llm_request_completed'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'"
+                          ? 'bg-muted text-foreground'
+                          : 'bg-destructive/10 text-destructive'"
                       >
                         {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
                       </span>
                     </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {{ formatNumber(event.input_tokens + event.output_tokens) }}
                     </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {{ formatMicrodollars(event.cost_micros) }}
                     </td>
                   </tr>
