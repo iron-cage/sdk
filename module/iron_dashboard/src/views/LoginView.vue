@@ -37,7 +37,7 @@ async function handleLogin() {
   <div class="min-h-screen flex items-center justify-center bg-background">
     <div class="w-full max-w-sm px-4">
       <h1 class="text-lg font-semibold text-foreground mb-1">Iron Cage</h1>
-      <p class="text-sm text-muted-foreground mb-6">Sign in to continue</p>
+      <p class="text-base text-muted-foreground mb-6">Sign in to continue</p>
       <form class="space-y-4" @submit.prevent="handleLogin">
         <Alert v-if="error" variant="destructive">
           <AlertDescription>{{ error }}</AlertDescription>

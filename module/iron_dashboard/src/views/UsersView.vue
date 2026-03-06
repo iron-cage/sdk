@@ -300,11 +300,11 @@ watch(search, () => {
           <tr v-for="user in usersData.users" :key="user.id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <div class="flex flex-col">
-                <span class="text-sm font-medium text-foreground">{{ user.username }}</span>
-                <span class="text-sm text-muted-foreground">{{ user.email }}</span>
+                <span class="text-base font-medium text-foreground">{{ user.username }}</span>
+                <span class="text-base text-muted-foreground">{{ user.email }}</span>
               </div>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
               <Badge variant="outline">{{ user.role }}</Badge>
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -312,10 +312,10 @@ watch(search, () => {
                 {{ user.is_active ? 'Active' : 'Suspended' }}
               </Badge>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               {{ new Date(user.created_at).toLocaleDateString() }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
               <div class="flex justify-end gap-2">
                 <Button
                   variant="ghost"
@@ -364,7 +364,7 @@ watch(search, () => {
         </div>
         <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
           <div>
-            <p class="text-sm text-foreground">
+            <p class="text-base text-foreground">
               Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span> to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span> of <span class="font-medium">{{ usersData.total }}</span> results
             </p>
           </div>

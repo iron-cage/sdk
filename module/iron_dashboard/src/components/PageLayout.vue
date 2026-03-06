@@ -13,7 +13,7 @@ const slots = useSlots()
   <div class="flex flex-col h-full">
     <!-- Title bar -->
     <div class="flex items-center px-4 h-10 shrink-0">
-      <h1 class="text-sm font-semibold text-foreground">{{ title }}</h1>
+      <h1 class="text-base font-semibold text-foreground">{{ title }}</h1>
     </div>
 
     <div class="border-t border-border shrink-0" />

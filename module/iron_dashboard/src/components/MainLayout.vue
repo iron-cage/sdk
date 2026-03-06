@@ -14,7 +14,7 @@ function isActive(path: string): boolean {
 }
 
 function navLinkClass(path: string): string {
-  const base = 'flex items-center px-3 py-1.5 text-sm rounded-md'
+  const base = 'flex items-center px-3 py-1.5 text-base rounded-md'
   if (isActive(path)) {
     return `${base} bg-border text-foreground font-medium`
   }
@@ -47,7 +47,7 @@ async function handleLogout() {
     >
       <!-- Logo row -->
       <div class="h-12 flex items-center justify-between px-3">
-        <span class="text-sm font-semibold text-foreground">Iron Cage</span>
+        <span class="text-base font-semibold text-foreground">Iron Cage</span>
         <button
           class="lg:hidden text-foreground"
           @click="sidebarOpen = false"

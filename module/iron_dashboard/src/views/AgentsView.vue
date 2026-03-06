@@ -390,13 +390,13 @@ async function copyTokenToClipboard() {
         </thead>
         <tbody class="divide-y divide-border">
           <tr v-for="agent in agents" :key="agent.id">
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
               {{ agent.name }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               {{ agent.owner_id || 'Unknown' }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               <div class="flex gap-1 flex-wrap">
                 <span
                   v-for="provider in agent.providers"
@@ -407,10 +407,10 @@ async function copyTokenToClipboard() {
                 </span>
               </div>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ agent.provider_key_id ?? 'None' }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
               <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
                 Loading...
               </div>
@@ -436,10 +436,10 @@ async function copyTokenToClipboard() {
                 </div>
               </div>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               {{ formatDate(agent.created_at) }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <Button variant="ghost" size="sm">
@@ -527,7 +527,7 @@ async function copyTokenToClipboard() {
               id="create-provider-key"
               v-model="selectedProviderKeyId"
               :disabled="createMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-sm"
+              class="w-full border rounded-md px-3 py-2 text-base"
             >
               <option :value="null">None</option>
               <option
@@ -562,7 +562,7 @@ async function copyTokenToClipboard() {
               id="create-owner"
               v-model="selectedOwnerId"
               :disabled="createMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-sm"
+              class="w-full border rounded-md px-3 py-2 text-base"
             >
               <option :value="null">Current User ({{ authStore.username }})</option>
               <option
@@ -628,7 +628,7 @@ async function copyTokenToClipboard() {
               id="update-provider-key"
               v-model="selectedProviderKeyId"
               :disabled="updateMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-sm"
+              class="w-full border rounded-md px-3 py-2 text-base"
             >
               <option :value="null">None</option>
               <option
@@ -647,7 +647,7 @@ async function copyTokenToClipboard() {
               id="update-owner"
               v-model="selectedOwnerId"
               :disabled="updateMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-sm"
+              class="w-full border rounded-md px-3 py-2 text-base"
             >
               <option
                 v-for="user in users?.users"
@@ -718,16 +718,16 @@ async function copyTokenToClipboard() {
         </DialogHeader>
 
         <div class="space-y-3">
-          <div class="bg-muted border border-border rounded-md p-3 font-mono text-sm break-all">
+          <div class="bg-muted border border-border rounded-md p-3 font-mono text-base break-all">
             {{ tokenDialogValue }}
           </div>
-          <p class="text-sm text-muted-foreground">
+          <p class="text-base text-muted-foreground">
             {{ tokenDialogWarning }}
           </p>
           <p class="text-xs text-muted-foreground">
             After closing this dialog you will not be able to view the token again. Regenerate if you need a new value.
           </p>
-          <p v-if="copyMessage" class="text-sm text-muted-foreground">
+          <p v-if="copyMessage" class="text-base text-muted-foreground">
             {{ copyMessage }}
           </p>
         </div>

@@ -164,16 +164,16 @@ function copyToken(token: string) {
         </thead>
         <tbody class="divide-y divide-border">
           <tr v-for="token in tokens" :key="token.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ token.id }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               <Badge variant="outline">{{ token.provider || '-' }}</Badge>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ token.name || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               {{ formatDate(token.created_at) }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
@@ -181,7 +181,7 @@ function copyToken(token: string) {
                 {{ token.is_active ? 'Active' : 'Revoked' }}
               </Badge>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
               <Button
                 v-if="token.is_active"
                 @click="handleRotateToken(token)"
@@ -310,7 +310,7 @@ function copyToken(token: string) {
               <Input
                 v-model="newTokenData.token"
                 readonly
-                class="font-mono text-sm bg-muted"
+                class="font-mono text-base bg-muted"
               />
               <Button
                 @click="copyToken(newTokenData.token)"
@@ -321,7 +321,7 @@ function copyToken(token: string) {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="grid grid-cols-2 gap-4 text-base">
             <div>
               <span class="text-muted-foreground">ID:</span>
               <span class="ml-2 font-medium">{{ newTokenData.id }}</span>

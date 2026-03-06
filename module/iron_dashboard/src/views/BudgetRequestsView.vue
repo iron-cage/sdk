@@ -272,13 +272,13 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               </thead>
               <tbody class="divide-y divide-border">
                 <tr v-for="request in myRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
                   <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -286,10 +286,10 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
                       {{ request.status }}
                     </Badge>
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 text-sm text-muted-foreground">
+                  <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
                     <div class="max-w-xs truncate">
                       {{ request.justification }}
                     </div>
@@ -340,30 +340,30 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               </thead>
               <tbody class="divide-y divide-border">
                 <tr v-for="request in pendingRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.requester_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     ${{ request.current_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 text-sm text-muted-foreground">
+                  <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
                     <div class="max-w-xs">
                       {{ request.justification }}
                     </div>
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
                     <Button
                       @click="handleApproveRequest(request)"
                       :disabled="approveMutation.isPending.value"
@@ -439,16 +439,16 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
               </thead>
               <tbody class="divide-y divide-border">
                 <tr v-for="request in filteredRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.id.substring(0, 8) }}...
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.requester_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     {{ request.agent_id }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                     ${{ request.requested_budget_usd.toFixed(2) }}
                   </td>
                   <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -456,10 +456,10 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
                       {{ request.status }}
                     </Badge>
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 text-sm text-muted-foreground">
+                  <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
                     <div class="max-w-xs truncate">
                       {{ request.justification }}
                     </div>
@@ -573,7 +573,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
         </Alert>
 
         <div v-if="rejectingRequest" class="space-y-4 py-4">
-          <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="grid grid-cols-2 gap-4 text-base">
             <div>
               <span class="text-muted-foreground">Requester:</span>
               <span class="ml-2 font-medium">{{ rejectingRequest.requester_id }}</span>

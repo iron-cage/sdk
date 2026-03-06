@@ -115,7 +115,7 @@ import { Button } from '@/components/ui/button'
 - `Card` - Root container (rounded border, shadow, bg-card)
 - `CardHeader` - Header section (flex column, space-y-1.5, p-6)
 - `CardTitle` - Title heading (text-2xl font-semibold)
-- `CardDescription` - Subtitle text (text-sm text-muted-foreground)
+- `CardDescription` - Subtitle text (text-base text-muted-foreground)
 - `CardContent` - Main content area (p-6 pt-0)
 - `CardFooter` - Footer section (flex items-center, p-6 pt-0)
 
@@ -163,7 +163,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 - `DialogScrollContent` - Scrollable variant of DialogContent
 - `DialogHeader` - Header section (flex column, space-y-1.5, text-center)
 - `DialogTitle` - Dialog title (text-lg font-semibold)
-- `DialogDescription` - Dialog description (text-sm text-muted-foreground)
+- `DialogDescription` - Dialog description (text-base text-muted-foreground)
 - `DialogFooter` - Footer section (flex justify-end, space-x-2)
 - `DialogClose` - Close button component
 
@@ -400,7 +400,7 @@ import { Input } from '@/components/ui/input'
 **Subcomponents:**
 - `Alert` - Root container with variant styling
 - `AlertTitle` - Title heading (mb-1 font-medium leading-none)
-- `AlertDescription` - Description text (text-sm opacity-90)
+- `AlertDescription` - Description text (text-base opacity-90)
 
 **Props:**
 ```typescript

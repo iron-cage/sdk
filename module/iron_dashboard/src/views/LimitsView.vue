@@ -288,25 +288,25 @@ function handleUpdateBudget() {
         </thead>
         <tbody class="divide-y divide-border">
           <tr v-for="limit in limits" :key="limit.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ limit.id }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ limit.project_id || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ limit.max_tokens_per_day?.toLocaleString() || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ limit.max_requests_per_minute?.toLocaleString() || '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
               {{ limit.max_cost_per_month_microdollars ? formatCost( microdollarsToCents( limit.max_cost_per_month_microdollars ) || 0 ) : '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               {{ formatDate( limit.created_at ) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
               <Button
                 @click="openEditModal( limit )"
                 :disabled="updateMutation.isPending.value"
@@ -342,7 +342,7 @@ function handleUpdateBudget() {
     <div class="border border-border rounded-lg overflow-x-auto touch-pan-x">
       <div class="flex items-center justify-between px-4 py-3 border-b border-border">
         <div>
-          <p class="text-sm text-muted-foreground">Allocated, spent, and remaining budget per agent.</p>
+          <p class="text-base text-muted-foreground">Allocated, spent, and remaining budget per agent.</p>
         </div>
         <div class="space-x-2">
           <Button variant="outline" size="sm" @click="refetchBudget">
@@ -383,22 +383,22 @@ function handleUpdateBudget() {
           </thead>
           <tbody class="divide-y divide-border">
             <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
                 {{ row.agent_name }}
               </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                 ${{ (row.budget / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                 ${{ (row.spent / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                 ${{ (row.remaining / 1_000_000).toFixed(2) }}
               </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
                 {{ row.percent_used.toFixed(1) }}%
               </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
                 <Button
                   v-if="authStore.isAdmin"
                   size="sm"
@@ -476,7 +476,7 @@ function handleUpdateBudget() {
               placeholder="e.g., 10000 for $100.00"
               :disabled="createMutation.isPending.value"
             />
-            <p v-if="maxCostPerMonthCents" class="text-sm text-muted-foreground">
+            <p v-if="maxCostPerMonthCents" class="text-base text-muted-foreground">
               = {{ formatCost( maxCostPerMonthCents ) }}/month
             </p>
           </div>
@@ -549,7 +549,7 @@ function handleUpdateBudget() {
               placeholder="e.g., 10000 for $100.00"
               :disabled="updateMutation.isPending.value"
             />
-            <p v-if="maxCostPerMonthCents" class="text-sm text-muted-foreground">
+            <p v-if="maxCostPerMonthCents" class="text-base text-muted-foreground">
               = {{ formatCost( maxCostPerMonthCents ) }}/month
             </p>
           </div>

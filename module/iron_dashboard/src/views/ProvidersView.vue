@@ -222,10 +222,10 @@ function getProviderBadgeClass(providerType: ProviderType): string {
                 {{ getProviderLabel(key.provider) }}
               </Badge>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
               {{ key.description || '-' }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-mono text-muted-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-mono text-muted-foreground">
               {{ key.masked_key }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -239,10 +239,10 @@ function getProviderBadgeClass(providerType: ProviderType): string {
                 {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
               </Button>
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
               {{ formatDate(key.created_at) }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
               <Button
                 @click="openEditModal(key)"
                 :disabled="updateMutation.isPending.value"
@@ -269,7 +269,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
     <!-- Empty state -->
     <div v-else class="border border-border rounded-lg p-4 text-center">
       <p class="text-muted-foreground mb-4">No AI provider keys configured</p>
-      <p class="text-sm text-muted-foreground mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
+      <p class="text-base text-muted-foreground mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
       <Button @click="showCreateModal = true">
         Add First Provider Key
       </Button>
@@ -376,7 +376,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
         <div v-if="editingKey" class="space-y-4 py-4">
           <div class="space-y-2">
             <Label>Provider</Label>
-            <p class="text-sm text-foreground">{{ getProviderLabel(editingKey.provider) }}</p>
+            <p class="text-base text-foreground">{{ getProviderLabel(editingKey.provider) }}</p>
           </div>
 
           <div class="space-y-2">

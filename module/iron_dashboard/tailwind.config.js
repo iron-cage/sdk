@@ -17,6 +17,9 @@ export default {
   		sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
   	},
   	extend: {
+		fontSize: {
+			base: ['0.8125rem', { lineHeight: '1.25rem' }],
+		},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
