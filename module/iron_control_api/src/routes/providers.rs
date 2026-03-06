@@ -275,34 +275,18 @@ fn usd_to_microdollars(usd: f64) -> i64 {
 }
 
 /// Check if user has `ManageProviderKeys` permission
-fn check_manage_provider_keys(role_str: &str) -> Result<(), impl IntoResponse> {
+fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiError> {
   let role = iron_types::Role::from_str(role_str).map_err(|_| {
-    (
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({ "error": format!("Invalid role: {role_str}") })),
-    )
+    crate::error::ApiError::Forbidden(format!("Invalid role: {role_str}"))
   })?;
   let checker = PermissionChecker::new();
   if checker.has_permission(role, Permission::ManageProviderKeys) {
     Ok(())
   } else {
-    Err((
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({
-        "error": "Insufficient permissions: ManageProviderKeys required"
-      })),
+    Err(crate::error::ApiError::Forbidden(
+      "Insufficient permissions: ManageProviderKeys required".into(),
     ))
   }
-}
-
-/// Error response for disabled feature
-fn feature_disabled_response() -> impl IntoResponse {
-  (
-    StatusCode::SERVICE_UNAVAILABLE,
-    Json(serde_json::json!({
-      "error": "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY environment variable to enable."
-    })),
-  )
 }
 
 /// POST /api/providers
@@ -312,137 +296,66 @@ pub async fn create_provider_key(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(request): JsonBody<CreateProviderKeyRequest>,
-) -> impl IntoResponse {
-  // RBAC: require ManageProviderKeys permission
-  if let Err(resp) = check_manage_provider_keys(&claims.role) {
-    return resp.into_response();
-  }
+) -> crate::error::ApiResult<impl IntoResponse> {
+  use crate::error::ApiError;
 
-  // Check if crypto is enabled
-  let Some(crypto) = &state.crypto else {
-    return feature_disabled_response().into_response();
-  };
+  check_manage_provider_keys(&claims.role)?;
 
-  // Validate request
-  if let Err(validation_error) = request.validate() {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json(serde_json::json!({
-        "error": validation_error.to_string()
-      })),
+  let crypto = state.crypto.as_ref().ok_or_else(|| {
+    ApiError::ServiceUnavailable(
+      "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
     )
-      .into_response();
-  }
+  })?;
 
-  // Parse provider type
+  request.validate().map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
-    _ => {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json(serde_json::json!({
-          "error": "Invalid provider type"
-        })),
-      )
-        .into_response();
-    }
+    _ => return Err(ApiError::BadRequest("Invalid provider type".into())),
   };
 
-  // Encrypt API key
-  let Ok(encrypted) = crypto.encrypt(&request.api_key) else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to encrypt API key"
-      })),
-    )
-      .into_response();
-  };
-
-  // Create masked key for response
   let masked_key = mask_api_key(&request.api_key);
 
-  let Ok(keys) = state.storage.get_keys_by_provider(provider).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to get provider keys"
-      })),
-    )
-      .into_response();
-  };
-  let key_id = if keys.is_empty() {
-    match state
-      .storage
-      .create_key(
-        provider,
-        &encrypted.ciphertext_base64(),
-        &encrypted.nonce_base64(),
-        request.base_url.as_deref(),
-        request.description.as_deref(),
-        &claims.sub,
-      )
-      .await
-    {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({
-            "error": "Failed to create provider key"
-          })),
-        )
-          .into_response();
-      }
-    }
-  } else {
-    match state
-      .storage
-      .update_key(
-        keys[0],
-        provider,
-        &encrypted.ciphertext_base64(),
-        &encrypted.nonce_base64(),
-        request.base_url.as_deref(),
-        request.description.as_deref(),
-        &claims.sub,
-      )
-      .await
-    {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({
-            "error": "Failed to update provider key"
-          })),
-        )
-          .into_response();
-      }
-    }
-  };
+  let encrypted = crypto
+    .encrypt(&request.api_key)
+    .map_err(|_| ApiError::Internal("Failed to encrypt API key".into()))?;
 
-  // Get metadata for response
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to retrieve provider key metadata"
-      })),
-    )
-      .into_response();
-  };
+  let count = state
+    .storage
+    .count_keys_by_owner_and_provider(&claims.sub, provider)
+    .await
+    .map_err(|_| ApiError::Internal("Failed to check key quota".into()))?;
 
-  (
+  if count >= 20 {
+    return Err(ApiError::TooManyRequests(
+      "Key quota exceeded: maximum 20 keys per provider".into(),
+    ));
+  }
+
+  let key_id = state
+    .storage
+    .create_key(
+      provider,
+      &encrypted.ciphertext_base64(),
+      &encrypted.nonce_base64(),
+      request.base_url.as_deref(),
+      request.description.as_deref(),
+      &claims.sub,
+    )
+    .await
+    .map_err(|_| ApiError::Internal("Failed to create provider key".into()))?;
+
+  let metadata = state
+    .storage
+    .get_key_metadata(key_id)
+    .await
+    .map_err(|_| ApiError::Internal("Failed to retrieve provider key metadata".into()))?;
+
+  Ok((
     StatusCode::CREATED,
-    Json(ProviderKeyResponse::from_metadata(
-      metadata,
-      masked_key,
-      vec![],
-    )),
-  )
-    .into_response()
+    Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![])),
+  ))
 }
 
 /// GET /api/providers
@@ -565,69 +478,26 @@ pub async fn update_provider_key(
       .into_response();
   }
 
-  // Update fields if provided
-  if let Some(ref description) = request.description {
-    if state
-      .storage
-      .update_description(key_id, Some(description))
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update description"
-        })),
-      )
-        .into_response();
-    }
-  }
+  // Apply all field updates atomically in a single transaction
+  let description = request.description.as_deref().map(Some);
+  let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
+  let spending_cap = request
+    .spending_cap_usd
+    .map(|cap| cap.map(usd_to_microdollars));
 
-  if let Some(ref base_url) = request.base_url {
-    let url = if base_url.is_empty() {
-      None
-    } else {
-      Some(base_url.as_str())
-    };
-    if state.storage.update_base_url(key_id, url).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update base_url"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  if let Some(is_enabled) = request.is_enabled {
-    if state.storage.set_enabled(key_id, is_enabled).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update is_enabled"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  if let Some(spending_cap) = request.spending_cap_usd {
-    let cap_microdollars = spending_cap.map(usd_to_microdollars);
-    if state
-      .storage
-      .set_spending_cap(key_id, cap_microdollars)
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update spending_cap"
-        })),
-      )
-        .into_response();
-    }
+  if state
+    .storage
+    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
+    .await
+    .is_err()
+  {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to update provider key"
+      })),
+    )
+      .into_response();
   }
 
   // Get updated metadata
@@ -767,9 +637,14 @@ pub async fn assign_provider_to_project(
 /// Unassign provider key from project
 pub async fn unassign_provider_from_project(
   State(state): State<ProvidersState>,
-  AuthenticatedUser(_claims): AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
   Path(project_id): Path<String>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Get the current assignment to verify it exists
   let provider_key_id = match state.storage.get_project_key(&project_id).await {
     Ok(Some(id)) => id,
@@ -792,6 +667,27 @@ pub async fn unassign_provider_from_project(
         .into_response();
     }
   };
+
+  // Verify ownership — only the key owner may remove the assignment
+  let Ok(metadata) = state.storage.get_key_metadata(provider_key_id).await else {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to verify key ownership"
+      })),
+    )
+      .into_response();
+  };
+
+  if metadata.user_id != claims.sub {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": "You do not own the key assigned to this project"
+      })),
+    )
+      .into_response();
+  }
 
   // Unassign from project
   match state

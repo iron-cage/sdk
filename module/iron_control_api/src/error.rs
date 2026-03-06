@@ -84,8 +84,12 @@ pub enum ApiError {
   Conflict(String),
   /// 500 Internal Server Error — database query failed
   Database(sqlx::Error),
+  /// 429 Too Many Requests — rate limit or quota exceeded
+  TooManyRequests(String),
   /// 500 Internal Server Error — generic internal failure
   Internal(String),
+  /// 503 Service Unavailable — feature not configured
+  ServiceUnavailable(String),
 }
 
 impl IntoResponse for ApiError {
@@ -101,6 +105,7 @@ impl IntoResponse for ApiError {
         ErrorResponse::with_code(msg, "NOT_FOUND"),
       ),
       ApiError::Conflict(msg) => (StatusCode::CONFLICT, ErrorResponse::new(msg)),
+      ApiError::TooManyRequests(msg) => (StatusCode::TOO_MANY_REQUESTS, ErrorResponse::new(msg)),
       ApiError::Database(err) => {
         tracing::error!("Database error: {:?}", err);
         (
@@ -109,6 +114,9 @@ impl IntoResponse for ApiError {
         )
       }
       ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse::new(msg)),
+      ApiError::ServiceUnavailable(msg) => {
+        (StatusCode::SERVICE_UNAVAILABLE, ErrorResponse::new(msg))
+      }
     };
     (status, Json(body)).into_response()
   }
