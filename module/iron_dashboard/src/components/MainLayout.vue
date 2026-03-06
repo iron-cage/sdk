@@ -10,16 +10,25 @@ const authStore = useAuthStore()
 const sidebarOpen = ref(false)
 const workspaceOpen = ref(true)
 const adminOpen = ref(true)
+const userMenuOpen = ref(false)
+
+const AVATAR_COLORS = ['#5E6AD2', '#26B5CE', '#4CB782', '#F2994A']
+
+function avatarColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i)
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]!
+}
 
 function isActive(path: string): boolean {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
 function navLinkClass(path: string): string {
-  let base = 'flex items-center px-3 py-1.5 text-base rounded-md'
+  let base = 'flex items-center px-3 py-1.5 text-base rounded-[8px]'
   
   if (isActive(path)) {
-    return `${base} bg-border text-trettiary font-medium`
+    return `${base} bg-border/80 text-trettiary font-medium`
   }
   return `${base} text-trettiary hover:bg-border/50`
 }
@@ -169,12 +178,45 @@ async function handleLogout() {
       </nav>
 
       <!-- Sidebar footer -->
-      <div class="p-3">
-        <div class="flex items-center gap-2 mb-2">
-          <span class="text-xs text-foreground truncate">{{ authStore.username }}</span>
+      <div class="p-2 relative">
+        <!-- Dropdown menu -->
+        <div
+          v-if="userMenuOpen"
+          class="absolute bottom-full left-2 right-2 mb-1 bg-background border border-border rounded-[8px] shadow-md overflow-hidden"
+        >
+          <button
+            @click="handleLogout"
+            class="flex items-center gap-2 w-full px-3 py-2 text-base text-trettiary hover:bg-border/50 text-left"
+          >
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Sign out
+          </button>
         </div>
-        <button @click="handleLogout" class="text-xs text-muted-foreground hover:text-foreground w-full text-left">
-          Sign out
+
+        <!-- Trigger button -->
+        <button
+          @click="userMenuOpen = !userMenuOpen"
+          class="flex items-center gap-2 w-full px-2 py-1.5 rounded-[8px] hover:bg-border/50 text-left"
+        >
+          <!-- Avatar -->
+          <span
+            class="w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
+            :style="{ backgroundColor: avatarColor(authStore.username || 'u') }"
+          >
+            {{ (authStore?.username ?? 'U')[0]!.toUpperCase() }}
+          </span>
+          <!-- Name -->
+          <span class="text-base text-trettiary truncate flex-1">{{ authStore.username }}</span>
+          <!-- Chevron -->
+          <svg
+            class="w-3 h-3 text-muted-foreground transition-transform duration-150 flex-shrink-0"
+            :class="userMenuOpen ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
       </div>
     </div>

@@ -12,15 +12,15 @@ const slots = useSlots()
 <template>
   <div class="flex flex-col h-full">
     <!-- Title bar -->
-    <div class="flex items-center px-4 h-10 shrink-0">
-      <h1 class="text-base font-semibold text-foreground">{{ title }}</h1>
+    <div class="flex items-center px-4 lg:px-6 h-10 shrink-0">
+      <h1 class="text-base text-foreground">{{ title }}</h1>
     </div>
 
     <div class="border-t border-border shrink-0" />
 
     <!-- Actions bar -->
     <template v-if="slots.actions">
-      <div class="flex items-center justify-end gap-2 px-4 py-2 shrink-0 min-h-[40px]">
+      <div class="flex items-center justify-end gap-2 px-4 lg:px-6 py-2 shrink-0 min-h-[40px]">
         <slot name="actions" />
       </div>
       <div class="border-t border-border shrink-0" />
@@ -28,7 +28,7 @@ const slots = useSlots()
 
     <!-- Scrollable content -->
     <ScrollArea class="flex-1">
-      <div class="p-4">
+      <div class="px-4 lg:px-6">
         <slot />
       </div>
     </ScrollArea>

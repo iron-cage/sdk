@@ -18,7 +18,7 @@ export default {
   	},
   	extend: {
 		fontSize: {
-			base: ['0.8125rem', { lineHeight: '1.25rem' }],
+			base: ['0.875rem', { lineHeight: '1.25rem' }],
 		},
   		colors: {
   			border: 'hsl(var(--border))',
