@@ -17,6 +17,7 @@
     --primary-foreground: 0 0% 100%;   /* #ffffff */
     --secondary: 0 0% 92%;             /* hover surface */
     --secondary-foreground: 222 9% 15%;
+    --trettiary: 283 1% 19%;
     --muted: 0 0% 96%;                 /* #f5f5f5 — sidebar */
     --muted-foreground: 221 11% 72%;   /* #b0b5c0 — secondary text */
     --accent: 241 100% 72%;            /* Linear violet */
