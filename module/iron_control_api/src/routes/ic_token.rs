@@ -16,6 +16,7 @@
 //! - Only the SHA-256 hash is stored in the database
 //! - Only agent owner or admin can manage IC tokens
 
+use core::str::FromStr;
 use std::sync::Arc;
 
 use axum::{
@@ -80,14 +81,17 @@ pub struct IcTokenStatusResponse {
   pub created_at: Option<i64>,
 }
 
-/// Check if user has access to agent (owner or admin)
+/// Check if user has access to agent (`ManageIcTokens` permission or ownership)
 async fn check_agent_access(
   pool: &SqlitePool,
   agent_id: i64,
   user_id: &str,
   user_role: &str,
 ) -> ApiResult<()> {
-  if user_role == "admin" {
+  let role = iron_types::Role::from_str(user_role)
+    .map_err(|_| ApiError::Forbidden(format!("Invalid role: {user_role}")))?;
+  let checker = crate::rbac::PermissionChecker::new();
+  if checker.has_permission(role, crate::rbac::Permission::ManageIcTokens) {
     return Ok(());
   }
 

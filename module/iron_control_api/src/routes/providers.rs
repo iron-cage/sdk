@@ -12,6 +12,7 @@
 use core::{
   error::Error,
   fmt::{Debug, Formatter, Result as FmtResult},
+  str::FromStr,
 };
 use std::sync::Arc;
 
@@ -26,6 +27,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use crate::{
   error::{JsonBody, ValidationError},
   jwt_auth::AuthenticatedUser,
+  rbac::{Permission, PermissionChecker},
 };
 use iron_secrets::crypto::{mask_api_key, CryptoService};
 use iron_token_manager::provider_key_storage::{
@@ -272,6 +274,27 @@ fn usd_to_microdollars(usd: f64) -> i64 {
   (usd * 1_000_000.0).round() as i64
 }
 
+/// Check if user has `ManageProviderKeys` permission
+fn check_manage_provider_keys(role_str: &str) -> Result<(), impl IntoResponse> {
+  let role = iron_types::Role::from_str(role_str).map_err(|_| {
+    (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": format!("Invalid role: {role_str}") })),
+    )
+  })?;
+  let checker = PermissionChecker::new();
+  if checker.has_permission(role, Permission::ManageProviderKeys) {
+    Ok(())
+  } else {
+    Err((
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": "Insufficient permissions: ManageProviderKeys required"
+      })),
+    ))
+  }
+}
+
 /// Error response for disabled feature
 fn feature_disabled_response() -> impl IntoResponse {
   (
@@ -290,6 +313,11 @@ pub async fn create_provider_key(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(request): JsonBody<CreateProviderKeyRequest>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Check if crypto is enabled
   let Some(crypto) = &state.crypto else {
     return feature_disabled_response().into_response();
@@ -511,6 +539,11 @@ pub async fn update_provider_key(
   Path(key_id): Path<i64>,
   JsonBody(request): JsonBody<UpdateProviderKeyRequest>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Verify ownership
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
@@ -634,6 +667,11 @@ pub async fn delete_provider_key(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(key_id): Path<i64>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Verify ownership
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
@@ -677,6 +715,11 @@ pub async fn assign_provider_to_project(
   Path(project_id): Path<String>,
   JsonBody(request): JsonBody<AssignProviderRequest>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Verify key ownership
   let Ok(metadata) = state
     .storage

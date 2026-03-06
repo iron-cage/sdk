@@ -123,13 +123,13 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
 async fn apply_guarded_migration(pool: &SqlitePool, name: &str, sql: &str) -> Result<()> {
   let number = &name[..3];
   let guard_table = format!("_migration_{number}_completed");
-  let check_sql =
-    format!("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{guard_table}'");
 
-  let completed: i64 = sqlx::query_scalar(&check_sql)
-    .fetch_one(pool)
-    .await
-    .map_err(|_| TokenError::Generic)?;
+  let completed: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?")
+      .bind(&guard_table)
+      .fetch_one(pool)
+      .await
+      .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
     sqlx::raw_sql(sql).execute(pool).await.map_err(|e| {

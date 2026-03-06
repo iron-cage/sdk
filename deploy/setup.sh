@@ -58,6 +58,7 @@ done
 echo "[*] Setting permissions..."
 sudo chown -R ironcage:ironcage /var/lib/iron_cage
 sudo chown -R ironcage:ironcage /etc/iron_cage
+sudo chmod 640 /etc/iron_cage/iron_control_api.env /etc/iron_cage/iron_server_proxy.env
 
 # Reload and enable services
 echo "[*] Activating services..."
