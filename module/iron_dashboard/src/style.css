@@ -1,23 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Linear light palette — extracted from linear.app */
     --background: 0 0% 100%;           /* #ffffff */
     --foreground: 225 9% 17%;          /* #282a30 */
     --card: 0 0% 100%;                 /* #ffffff */
     --card-foreground: 225 9% 17%;     /* #282a30 */
     --popover: 0 0% 100%;              /* #ffffff */
     --popover-foreground: 225 9% 17%;  /* #282a30 */
-    --primary: 225 9% 17%;             /* #282a30 — near-black buttons */
+    --primary: 225 9% 17%;             /* #282a30 */
     --primary-foreground: 0 0% 100%;   /* #ffffff */
     --secondary: 300 4% 93%;           /* #eeedef — hover surface */
     --secondary-foreground: 220 9% 24%; /* #3c4149 */
-    --muted: 300 3% 95%;               /* #f4f2f4 — sidebar, muted surfaces */
+    --muted: 0, 0%, 96.1%;               /* #f4f2f4 — sidebar, muted surfaces */
     --muted-foreground: 247 4% 45%;    /* #6f6e77 */
-    --accent: 241 100% 72%;            /* #7170ff — Linear violet */
+    --accent: 241 100% 72%;            /* #7170ff */
     --accent-foreground: 0 0% 100%;    /* #ffffff */
     --destructive: 358 74% 59%;        /* #e5484d */
     --destructive-foreground: 0 0% 100%;
