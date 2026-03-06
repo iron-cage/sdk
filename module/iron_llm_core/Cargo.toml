@@ -13,7 +13,7 @@ categories = ["web-programming::http-client"]
 workspace = true
 
 [features]
-default = ["full"]
+default = ["enabled"]
 enabled = [
   "dep:iron_cost",
   "dep:iron_secrets",
