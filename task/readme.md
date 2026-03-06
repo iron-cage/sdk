@@ -1,18 +1,18 @@
 <!-- task_system_metadata
 type: root
 version: 1.0
-highest_id: 8
+highest_id: 10
 last_allocation:
-  id: 8
+  id: 10
   crate: workspace
-  timestamp: 2026-02-22T00:00:00Z
+  timestamp: 2026-03-06T00:00:00Z
 -->
 
 # Master Task Index - Workspace
 
-**Last Updated**: 2026-02-22
+**Last Updated**: 2026-03-06
 **Purpose**: Comprehensive task tracking for this workspace task folder
-**Total Tasks**: 8 tasks
+**Total Tasks**: 10 tasks
 
 ---
 
@@ -34,8 +34,8 @@ highest_id: 8
 -->
 
 **Current State:**
-- **Highest Allocated ID**: 8
-- **Active Tasks**: 8
+- **Highest Allocated ID**: 10
+- **Active Tasks**: 10
 - **Completed Tasks**: 0
 - **Backlog Tasks**: 0
 - **Task Systems**: 1 (root workspace task system)
@@ -43,7 +43,7 @@ highest_id: 8
 **ID Allocation Policy:**
 - All task IDs are allocated from this registry
 - IDs must be globally unique within this workspace task system
-- Next available ID: 9
+- Next available ID: 11
 
 ---
 
@@ -61,6 +61,8 @@ highest_id: 8
 | 6 | [004](004-per-ic-key-limits.md) | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
 | 7 | [005](005-add-gemini-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
 | 8 | [006](006-add-xai-provider.md) | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
+| 9 | [009](009-linear-style-ui.md) | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Linear-style UI | Restyle dashboard to match Linear's light mode aesthetic |
+| 10 | [010](010-analytics-ui-refactor.md) | 180 | 7 | 6 | 10 | 2 | 🔄 (Planned) | Analytics UI Refactor | Surface unused backend data, add spending by agent and cost efficiency views |
 
 ---
 
@@ -78,6 +80,8 @@ highest_id: 8
 | 6 | [004](004-per-ic-key-limits.md) | workspace | 210 | 8 | 6 | 9 | 1 | 🔄 (Planned) | Per-IC-key limits | Independent IC policy limits per agent |
 | 7 | [005](005-add-gemini-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | Gemini provider integration | Add Gemini across API, runtime, analytics |
 | 8 | [006](006-add-xai-provider.md) | workspace | 200 | 7 | 6 | 8 | 2 | 🔄 (Planned) | xAI provider integration | Add xAI across API, runtime, analytics |
+| 9 | [010](010-analytics-ui-refactor.md) | workspace | 180 | 7 | 6 | 10 | 2 | 🔄 (Planned) | Analytics UI refactor | Surface unused backend data, spending by agent, cost efficiency |
+| 10 | [009](009-linear-style-ui.md) | workspace | 150 | 6 | 7 | 10 | 3 | 🔄 (Planned) | Linear-style UI | Restyle dashboard to match Linear's light mode aesthetic |
 
 ---
 
@@ -102,10 +106,10 @@ highest_id: 8
 
 | Status | Count | Percentage | Location |
 |--------|-------|------------|----------|
-| 🔄 Planned | 8 | 100.0% | `task/` |
+| 🔄 Planned | 10 | 100.0% | `task/` |
 | ✅ Completed | 0 | 0.0% | `task/completed/` |
 | 📥 Backlog | 0 | 0.0% | `task/backlog/` |
-| **TOTAL** | **8** | **100%** | |
+| **TOTAL** | **10** | **100%** | |
 
 ### Tasks by Domain
 
@@ -117,7 +121,8 @@ highest_id: 8
 | Budget & Limits | 2 | 2 | 0 | 0 |
 | Provider Integrations | 2 | 2 | 0 | 0 |
 | LLM Binding & Migration | 1 | 1 | 0 | 0 |
-| **TOTAL** | **8** | **8** | **0** | **0** |
+| Frontend & UI | 2 | 2 | 0 | 0 |
+| **TOTAL** | **10** | **10** | **0** | **0** |
 
 ---
 
@@ -177,6 +182,12 @@ Tasks are organized in this workspace as:
 ---
 
 ## Recent Changes
+
+**2026-03-06**:
+- ✅ Registered task 009 (Linear-style UI) — Value=6, Easiness=7, Safety=10, Priority=3, Advisability=150
+- ✅ Registered task 010 (Analytics UI refactor) — Value=7, Easiness=6, Safety=10, Priority=2, Advisability=180
+- ✅ Updated global registry to highest ID `010` and next available ID `011`
+- ✅ Added Frontend & UI domain to summary
 
 **2026-02-22**:
 - ✅ Registered task 008 (internal deployment) — Value=10, Easiness=4, Safety=9, Priority=5, Advisability=1800
