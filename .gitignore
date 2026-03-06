@@ -60,6 +60,9 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Claude Code workspace files
+.claude/
+
 # IDEs
 .vscode/
 .idea/
