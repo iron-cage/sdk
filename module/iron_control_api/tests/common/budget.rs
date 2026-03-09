@@ -203,6 +203,8 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
 
   // Insert provider key first (agent references it via FK)
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
+  // Create real encrypted provider key for testing
+  // Must be inserted BEFORE the agent row so the provider_key_id foreign key is valid
   let test_provider_key = format!("sk-test_key_for_agent_{agent_id}");
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
   let crypto_service =

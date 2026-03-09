@@ -29,8 +29,9 @@ use iron_control_api::{
     providers::{create_provider_key, ProvidersState},
   },
 };
-use iron_secrets::crypto::CryptoService;
+use iron_secrets::{crypto::CryptoService, ip_token::IpTokenCrypto};
 use iron_token_manager::provider_key_storage::ProviderKeyStorage;
+use secrecy::ExposeSecret;
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -390,6 +391,25 @@ async fn test_handshake_uses_agent_assigned_key() {
     .unwrap();
 
   assert_eq!(resp.status(), StatusCode::OK, "Handshake with agent-assigned key should succeed");
+
+  // Parse the response body and verify the ip_token decrypts to the seeded provider key
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let json_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+  let ip_token = json_resp["ip_token"]
+    .as_str()
+    .expect("Response must contain ip_token field");
+
+  // Decrypt using the same ip_token_crypto key as create_test_budget_state ([0u8; 32])
+  let ip_token_key: [u8; 32] = [0u8; 32];
+  let client_crypto =
+    IpTokenCrypto::from_slice(&ip_token_key).expect("Should create IpTokenCrypto for decryption");
+  let decrypted = client_crypto.decrypt(ip_token).expect("ip_token should decrypt successfully");
+
+  assert_eq!(
+    decrypted.expose_secret().as_str(),
+    "sk-agent-assigned-key",
+    "Decrypted ip_token must equal the seeded provider API key"
+  );
 }
 
 /// Explicit provider_key_id owned by another user must return 403 UNAUTHORIZED_KEY_ACCESS
@@ -614,7 +634,8 @@ async fn test_handshake_no_assigned_key_returns_403() {
 ///
 /// `std::env::set_var` / `remove_var` are not thread-safe. Tests that manipulate
 /// this env var must hold this guard for the duration of the handshake call.
-static DEV_KEY_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+//qqq: [Medium] lock is module-local — future test modules that also set IRON_ALLOW_DEV_KEYS won't know to acquire this lock; move to common/ and pub use
+static DEV_KEY_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Seed user and update agent_1's owner_id.
 ///
@@ -666,7 +687,7 @@ async fn handshake_dev_key_creation_requires_flag() {
   // Hold the env-var lock for the duration of the handshake call to prevent the
   // concurrent `works_with_flag` test from setting the var mid-flight.
   let resp = {
-    let _guard = DEV_KEY_ENV_LOCK.lock().unwrap();
+    let _guard = DEV_KEY_ENV_LOCK.lock().await;
     std::env::remove_var("IRON_ALLOW_DEV_KEYS");
     app
       .oneshot(
@@ -715,7 +736,7 @@ async fn handshake_dev_key_creation_works_with_flag() {
   let body = json!({ "ic_token": ic_token, "provider": "openai" });
 
   let resp = {
-    let _guard = DEV_KEY_ENV_LOCK.lock().unwrap();
+    let _guard = DEV_KEY_ENV_LOCK.lock().await;
     std::env::set_var("IRON_ALLOW_DEV_KEYS", "1");
     let r = app
       .oneshot(
@@ -846,6 +867,8 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
+  // Save a reference to the pool before state is consumed by the router builder
+  let db_pool = state.db_pool.clone();
   let app = build_handshake_router(state);
   // No explicit provider_key_id — the handler will use the agent's assigned key,
   // then the TOCTOU re-check will find that key.user_id (user_a) ≠ owner_for_key (user_b)
@@ -874,5 +897,112 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
     json["error"].as_str().unwrap(),
     "UNAUTHORIZED_KEY_ACCESS",
     "TOCTOU re-check error code must be UNAUTHORIZED_KEY_ACCESS"
+  );
+
+  // Verify budget was NOT consumed (reservation should not have been made, or was refunded)
+  let initial_budget: i64 = 1_000_000_000;
+  let budget: Option<(i64,)> = sqlx::query_as(
+    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?",
+  )
+  .bind(agent_id)
+  .fetch_optional(&db_pool)
+  .await
+  .unwrap();
+  assert_eq!(
+    budget.map(|b| b.0),
+    Some(initial_budget),
+    "Budget should be unchanged after rejected handshake"
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Key deletion cascade tests
+// ─────────────────────────────────────────────────────────────────
+
+/// Handshake must fail gracefully after the agent's assigned provider key is deleted.
+///
+/// Simulates the sequence:
+///   1. Agent is assigned a provider key
+///   2. The key is hard-deleted from `ai_provider_keys` (ON DELETE SET NULL fires)
+///   3. Agent's `provider_key_id` is set to NULL (simulating the cascade)
+///   4. Handshake is called — must return 403 NO_PROVIDER_ASSIGNED (or 404)
+///   5. Budget must remain unchanged
+#[tokio::test]
+async fn handshake_fails_gracefully_after_assigned_key_deleted() {
+  let pool = setup_test_db().await;
+  let state = create_test_budget_state(pool.clone()).await;
+
+  let agent_id: i64 = 905;
+
+  // Seed user + agent with a provider key and budget via the common helper
+  common::budget::seed_agent_with_budget(&pool, agent_id, 1_000_000_000).await;
+
+  // Capture the provider_key_id that was seeded (agent_id * 1000 per seed_agent_with_budget)
+  let provider_key_id = agent_id * 1000;
+
+  // Delete the provider key — simulates what delete_provider_key endpoint does.
+  // First NULL out agents.provider_key_id (ON DELETE SET NULL behaviour), then delete the key.
+  sqlx::query("UPDATE agents SET provider_key_id = NULL WHERE id = ?")
+    .bind(agent_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+  sqlx::query("DELETE FROM ai_provider_keys WHERE id = ?")
+    .bind(provider_key_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+  // Create IC token for the agent
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+
+  // Save pool reference before state is consumed by router builder
+  let db_pool = state.db_pool.clone();
+
+  let app = build_handshake_router(state);
+  let body = json!({ "ic_token": ic_token, "provider": "openai" }); // no provider_key_id
+
+  let resp = app
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/budget/handshake")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  // Must return 403 NO_PROVIDER_ASSIGNED or 404 (key not found); must NOT be 200
+  let status = resp.status();
+  assert!(
+    status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND,
+    "Handshake after key deletion must return 403 or 404, got {status}"
+  );
+
+  if status == StatusCode::FORBIDDEN {
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(
+      json_resp["error"].as_str().unwrap(),
+      "NO_PROVIDER_ASSIGNED",
+      "Error code must be NO_PROVIDER_ASSIGNED when key is deleted"
+    );
+  }
+
+  // Budget must not have been consumed
+  let initial_budget: i64 = 1_000_000_000;
+  let budget: Option<(i64,)> =
+    sqlx::query_as("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_optional(&db_pool)
+      .await
+      .unwrap();
+  assert_eq!(
+    budget.map(|b| b.0),
+    Some(initial_budget),
+    "Budget must be unchanged after handshake with deleted key"
   );
 }

@@ -197,6 +197,7 @@ pub async fn handshake(
   }
 
   // Get agent's owner_id to look up usage_limits
+  //qqq: [High] bypasses storage abstraction — direct SQL against agents table
   let owner_id: Option<String> =
     match sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
       .bind(agent_id)
@@ -320,86 +321,95 @@ pub async fn handshake(
   //   None:     use the key assigned to this agent in the agents table;
   //             if none is assigned, reject with NO_PROVIDER_ASSIGNED
   //             (agent_id == 1 + IRON_ALLOW_DEV_KEYS env var permits auto-creation for dev)
-  let key_id_pre = if let Some(id) = request.provider_key_id {
-    // Ownership check: key must belong to agent's owner
-    match state.provider_key_storage.get_key_metadata(id).await {
-      Ok(meta) if meta.user_id == owner_for_key => id,
-      Ok(_) => {
-        return (
-          StatusCode::FORBIDDEN,
-          Json(serde_json::json!({ "error": "UNAUTHORIZED_KEY_ACCESS" })),
-        )
-          .into_response();
-      }
-      Err(iron_token_manager::error::TokenError::NotFound) => {
-        return (
-          StatusCode::NOT_FOUND,
-          Json(serde_json::json!({ "error": "Provider key not found" })),
-        )
-          .into_response();
-      }
-      Err(err) => {
-        tracing::error!("Database error fetching provider key metadata: {}", err);
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({ "error": "Key storage unavailable" })),
-        )
-          .into_response();
+  let key_id_pre = match request.provider_key_id {
+    Some(id) => {
+      //qqq: [Medium] pre-check verifies ownership only; is_enabled and provider match not checked here — budget reserved before those are validated below
+      // Ownership check: key must belong to agent's owner
+      match state.provider_key_storage.get_key_metadata(id).await {
+        Ok(meta) if meta.user_id == owner_for_key => id,
+        Ok(_) => {
+          return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "UNAUTHORIZED_KEY_ACCESS" })),
+          )
+            .into_response();
+        }
+        Err(iron_token_manager::error::TokenError::NotFound) => {
+          return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Provider key not found" })),
+          )
+            .into_response();
+        }
+        Err(err) => {
+          tracing::error!("Database error fetching provider key metadata: {}", err);
+          return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": "Key storage unavailable" })),
+          )
+            .into_response();
+        }
       }
     }
-  } else {
-    // Use the provider key assigned to this agent
-    let assigned_key_id: Option<i64> = match sqlx::query_scalar(
-      "SELECT provider_key_id FROM agents WHERE id = ?",
-    )
-    .bind(agent_id)
-    .fetch_one(&state.db_pool)
-    .await
-    {
-      Ok(id) => id,
-      Err(err) => {
-        tracing::error!("Database error fetching agent provider_key_id: {}", err);
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({ "error": "Database error" })),
-        )
-          .into_response();
-      }
-    };
-
-    match assigned_key_id {
-      Some(id) => id,
-      None => {
-        // No key assigned; allow auto-creation only for agent_1 when dev mode is explicitly enabled
-        if agent_id == 1 && std::env::var("IRON_ALLOW_DEV_KEYS").is_ok() {
-          tracing::warn!(
-            "IRON_ALLOW_DEV_KEYS: auto-creating dev provider key for agent_1 (provider={})",
-            provider_type
-          );
-          match create_dev_provider_key_for_agent1(&state, provider_type, &owner_for_key).await {
-            Ok(new_id) => {
-              let _ = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
-                .bind(new_id)
-                .bind(agent_id)
-                .execute(&state.db_pool)
-                .await;
-              new_id
-            }
-            Err(e) => {
-              tracing::error!("Failed to auto-create provider key: {}", e);
-              return (
-                StatusCode::FORBIDDEN,
-                Json(serde_json::json!({ "error": "NO_PROVIDER_ASSIGNED" })),
-              )
-                .into_response();
-            }
-          }
-        } else {
+    None => {
+      //qqq: [High] bypasses storage abstraction — raw SQL against agents table; schema changes here won't be caught at compile time
+      // Use the provider key assigned to this agent
+      let assigned_key_id: Option<i64> = match sqlx::query_scalar(
+        "SELECT provider_key_id FROM agents WHERE id = ?",
+      )
+      .bind(agent_id)
+      .fetch_one(&state.db_pool)
+      .await
+      {
+        Ok(id) => id,
+        Err(err) => {
+          tracing::error!("Database error fetching agent provider_key_id: {}", err);
           return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!({ "error": "NO_PROVIDER_ASSIGNED" })),
           )
             .into_response();
+        }
+      };
+
+      match assigned_key_id {
+        Some(id) => id,
+        None => {
+          // No key assigned; allow auto-creation only for agent_1 when dev mode is explicitly enabled
+          if agent_id == 1 && std::env::var("IRON_ALLOW_DEV_KEYS").is_ok() {
+            tracing::warn!(
+              "IRON_ALLOW_DEV_KEYS: auto-creating dev provider key for agent_1 (provider={})",
+              provider_type
+            );
+            match create_dev_provider_key_for_agent1(&state, provider_type, &owner_for_key).await {
+              Ok(new_id) => {
+                //qqq: [Medium] if UPDATE fails the new key is created but unlinked — next handshake creates another orphan key; consider making this a hard error
+                if let Err(e) = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+                  .bind(new_id)
+                  .bind(agent_id)
+                  .execute(&state.db_pool)
+                  .await
+                {
+                  tracing::warn!("IRON_ALLOW_DEV_KEYS: failed to link dev key {} to agent {}: {}", new_id, agent_id, e);
+                }
+                new_id
+              }
+              Err(e) => {
+                tracing::error!("Failed to auto-create provider key: {}", e);
+                return (
+                  StatusCode::FORBIDDEN,
+                  Json(serde_json::json!({ "error": "NO_PROVIDER_ASSIGNED" })),
+                )
+                  .into_response();
+              }
+            }
+          } else {
+            return (
+              StatusCode::FORBIDDEN,
+              Json(serde_json::json!({ "error": "NO_PROVIDER_ASSIGNED" })),
+            )
+              .into_response();
+          }
         }
       }
     }
@@ -420,6 +430,7 @@ pub async fn handshake(
     .requested_budget
     .unwrap_or(HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET);
 
+  //qqq: [Medium] spending_cap_microdollars on the provider key is NOT checked here — cap is only enforced at the proxy layer; a lease can be issued for a key already at its cap
   let reservation = match state
     .agent_budget_manager
     .reserve_budget_with_limits(agent_id, Some(key_id_pre), budget_requested)
@@ -470,6 +481,10 @@ pub async fn handshake(
   let key_record = match state.provider_key_storage.get_key(key_id).await {
     Ok(record) => record,
     Err(TokenError::NotFound) => {
+      //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+        tracing::error!("Failed to refund reserved budget after key-not-found for agent {}: {}", agent_id, e);
+      }
       return (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({ "error": "Provider key not found" })),
@@ -478,6 +493,10 @@ pub async fn handshake(
     }
     Err(err) => {
       tracing::error!("Database error fetching provider key: {}", err);
+      //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+        tracing::error!("Failed to refund reserved budget after key fetch DB error: {}", e);
+      }
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(serde_json::json!({ "error": "Key storage unavailable" })),
@@ -489,6 +508,10 @@ pub async fn handshake(
   // TOCTOU re-validation: re-check ownership on the freshly-fetched record to close
   // any race between the initial ownership check and the actual key use.
   if key_record.metadata.user_id != owner_for_key {
+    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after ownership mismatch for agent {}: {}", agent_id, e);
+    }
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "UNAUTHORIZED_KEY_ACCESS" })),
@@ -498,6 +521,10 @@ pub async fn handshake(
 
   // Validate provider key matches requested provider
   if key_record.metadata.provider != provider_type {
+    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after provider mismatch for agent {}: {}", agent_id, e);
+    }
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "Provider key does not match requested provider" })),
@@ -507,6 +534,10 @@ pub async fn handshake(
 
   // Validate provider key is enabled
   if !key_record.metadata.is_enabled {
+    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after disabled-key check for agent {}: {}", agent_id, e);
+    }
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "Provider key is disabled" })),
@@ -520,6 +551,10 @@ pub async fn handshake(
     &key_record.encryption_nonce,
   ) else {
     tracing::error!("Failed to decode provider key base64");
+    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after key base64 decode failure: {}", e);
+    }
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Key storage error" })),
@@ -531,6 +566,10 @@ pub async fn handshake(
     Ok(key) => key,
     Err(err) => {
       tracing::error!("Failed to decrypt provider API key: {:?}", err);
+      //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+        tracing::error!("Failed to refund reserved budget after provider key decryption failure: {}", e);
+      }
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(serde_json::json!({ "error": "Failed to decrypt provider key" })),
@@ -541,12 +580,41 @@ pub async fn handshake(
 
   // Encrypt provider API key into IP Token
   let Ok(ip_token) = state.ip_token_crypto.encrypt(&provider_key) else {
+    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after IP token encryption failure: {}", e);
+    }
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Failed to encrypt IP Token" })),
     )
       .into_response();
   };
+
+  // Budget spending already recorded by check_and_reserve_budget() - no separate call needed
+
+  // Deduct lease amount from usage_limits (the "bank") BEFORE creating the lease so that
+  // a failure here leaves no orphaned lease that the caller can never reclaim.
+  // Both are now in microdollars - no conversion needed
+  //qqq: [High] bypasses storage abstraction — direct SQL against usage_limits table
+  if let Err( err ) = sqlx::query(
+    "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + ? WHERE user_id = ?"
+  )
+  .bind( budget_to_grant )
+  .bind( &owner_id )
+  .execute( &state.db_pool )
+  .await
+  {
+    tracing::error!( "Database error updating usage_limits: {}", err );
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after usage_limits update failure: {}", e);
+    }
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json( serde_json::json!({ "error": "Failed to update usage limits" }) ),
+    )
+      .into_response();
+  }
 
   // Create budget lease
   // Note: Budget already atomically reserved by check_and_reserve_budget() above
@@ -558,29 +626,28 @@ pub async fn handshake(
     .await
   {
     tracing::error!("Database error creating lease: {}", err);
+    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after lease creation failure: {}", e);
+    }
+    // usage_limits was already debited above; attempt a compensating reversal
+    if let Err(e) = sqlx::query(
+      "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month - ? WHERE user_id = ?"
+    )
+    .bind(budget_to_grant)
+    .bind(&owner_id)
+    .execute(&state.db_pool)
+    .await
+    {
+      tracing::warn!(
+        "Failed to reverse usage_limits debit after lease creation failure (owner={}, amount={}): {}. \
+         usage_limits may be inconsistent — manual reconciliation may be required.",
+        owner_id, budget_to_grant, e
+      );
+    }
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Failed to create budget lease" })),
-    )
-      .into_response();
-  }
-
-  // Budget spending already recorded by check_and_reserve_budget() - no separate call needed
-
-  // Deduct lease amount from usage_limits (the "bank")
-  // Both are now in microdollars - no conversion needed
-  if let Err( err ) = sqlx::query(
-    "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + ? WHERE user_id = ?"
-  )
-  .bind( budget_to_grant )
-  .bind( &owner_id )
-  .execute( &state.db_pool )
-  .await
-  {
-    tracing::error!( "Database error updating usage_limits: {}", err );
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json( serde_json::json!({ "error": "Failed to update usage limits" }) ),
     )
       .into_response();
   }

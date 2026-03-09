@@ -1,4 +1,4 @@
--- Migration 026: Per-IC-key and Per-IP-key spending limits
+-- Migration 028: Per-IC-key and Per-IP-key spending limits
 --
 -- Adds spending cap/used columns to agent_budgets (IC-key limits)
 -- and provider_key_id attribution to leases and analytics.
@@ -16,4 +16,4 @@ ALTER TABLE analytics_events ADD COLUMN provider_key_id INTEGER;
 CREATE INDEX idx_analytics_events_provider_key ON analytics_events(provider_key_id);
 
 -- Guard table
-CREATE TABLE _migration_026_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE _migration_028_completed (id INTEGER PRIMARY KEY);

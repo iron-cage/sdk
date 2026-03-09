@@ -93,19 +93,19 @@ async fn enable_disable_key() {
   );
 
   // Disable
-  storage.set_enabled(key_id, false).await.unwrap();
+  storage.update_key_fields(key_id, None, None, Some(false), None).await.unwrap();
   let meta = storage.get_key_metadata(key_id).await.unwrap();
   assert!(
     !meta.is_enabled,
-    "Key should be disabled after set_enabled(false)"
+    "Key should be disabled after update_key_fields with Some(false)"
   );
 
   // Enable again
-  storage.set_enabled(key_id, true).await.unwrap();
+  storage.update_key_fields(key_id, None, None, Some(true), None).await.unwrap();
   let meta = storage.get_key_metadata(key_id).await.unwrap();
   assert!(
     meta.is_enabled,
-    "Key should be enabled after set_enabled(true)"
+    "Key should be enabled after update_key_fields with Some(true)"
   );
 }
 
@@ -371,6 +371,7 @@ async fn get_project_key_deterministic_multiple_assignments() {
 
   storage.assign_to_project(key_a, "proj_det").await.unwrap();
   // Small sleep ensures key_b gets a later assigned_at timestamp
+  //qqq: [Medium] timing-dependent — 2ms sleep may collide on slow CI; inject explicit assigned_at timestamps instead of relying on wall-clock ordering
   tokio::time::sleep(core::time::Duration::from_millis(2)).await;
   storage.assign_to_project(key_b, "proj_det").await.unwrap();
 

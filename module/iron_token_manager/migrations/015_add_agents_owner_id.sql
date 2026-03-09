@@ -15,6 +15,7 @@ ALTER TABLE agents ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE CASCA
 -- Step 2: Update existing agents to have an owner (use first user if exists, or fail if no users)
 -- In production, this should be handled by application logic or data migration
 -- For now, set to NULL and application will validate on first use
+-- //qqq: [Medium] agents with NULL owner_id fall back to "user_admin" string in handshake — add NOT NULL constraint once all rows are backfilled
 UPDATE agents SET owner_id = (SELECT id FROM users LIMIT 1) WHERE owner_id IS NULL;
 
 -- Step 3: Create index on owner_id for fast lookups
