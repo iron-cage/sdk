@@ -50,6 +50,9 @@ pub async fn get_spending_total(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut q = sqlx::query_scalar::<_, i64>(&query)
     .bind(start_ms)
@@ -65,6 +68,9 @@ pub async fn get_spending_total(
   }
   if let Some(ref provider_id) = params.provider_id {
     q = q.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   match q.fetch_one(&state.pool).await {
@@ -82,6 +88,7 @@ pub async fn get_spending_total(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
           calculated_at: Utc::now().to_rfc3339(),
         }),
@@ -301,6 +308,9 @@ pub async fn get_spending_by_provider(
   if params.agent_id.is_some() {
     query.push_str(" AND agent_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   query.push_str(" GROUP BY provider ORDER BY spending_micros DESC");
 
@@ -315,6 +325,9 @@ pub async fn get_spending_by_provider(
 
   if let Some(agent_id) = params.agent_id {
     q = q.bind(agent_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   let rows = q.fetch_all(&state.pool).await;
@@ -413,6 +426,9 @@ pub async fn get_spending_avg(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut q = sqlx::query_as::<_, (i64, i64, i64, i64)>(&query)
     .bind(start_ms)
@@ -428,6 +444,9 @@ pub async fn get_spending_avg(
   }
   if let Some(ref provider_id) = params.provider_id {
     q = q.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   match q.fetch_one(&state.pool).await {
@@ -455,6 +474,7 @@ pub async fn get_spending_avg(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
           calculated_at: Utc::now().to_rfc3339(),
         }),

@@ -201,36 +201,8 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
   .await
   .unwrap();
 
-  // Insert agent with owner_id
-  sqlx::query(
-    "INSERT OR IGNORE INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
-  )
-  .bind( agent_id )
-  .bind( format!( "test_agent_{agent_id}" ) )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert agent budget (using microdollars)
-  sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
-     VALUES (?, ?, 0, ?, ?, ?)"
-  )
-  .bind( agent_id )
-  .bind( budget_microdollars )
-  .bind( budget_microdollars )
-  .bind( now_ms )
-  .bind( now_ms )
-  .execute( pool )
-  .await
-  .unwrap();
-
-  // Insert provider key
+  // Insert provider key first (agent references it via FK)
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
-  // Create real encrypted provider key for testing
   let test_provider_key = format!("sk-test_key_for_agent_{agent_id}");
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
   let crypto_service =
@@ -250,6 +222,34 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
   .bind( 1 )
   .bind( now_ms )
   .bind( "test_user" )
+  .execute( pool )
+  .await
+  .unwrap();
+
+  // Insert agent with owner_id and provider_key_id
+  sqlx::query(
+    "INSERT OR IGNORE INTO agents (id, name, providers, created_at, owner_id, provider_key_id) VALUES (?, ?, ?, ?, ?, ?)"
+  )
+  .bind( agent_id )
+  .bind( format!( "test_agent_{agent_id}" ) )
+  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
+  .bind( now_ms )
+  .bind( "test_user" )
+  .bind( agent_id * 1000 )
+  .execute( pool )
+  .await
+  .unwrap();
+
+  // Insert agent budget (using microdollars)
+  sqlx::query(
+    "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+     VALUES (?, ?, 0, ?, ?, ?)"
+  )
+  .bind( agent_id )
+  .bind( budget_microdollars )
+  .bind( budget_microdollars )
+  .bind( now_ms )
+  .bind( now_ms )
   .execute( pool )
   .await
   .unwrap();

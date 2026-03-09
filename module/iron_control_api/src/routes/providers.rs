@@ -21,7 +21,7 @@ use axum::{
   http::StatusCode,
   response::{IntoResponse, Json},
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::Deserializer, Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 
 use crate::{
@@ -191,6 +191,7 @@ impl CreateProviderKeyRequest {
 
 /// Update provider key request
 #[derive(Debug, Deserialize)]
+#[allow(clippy::option_option)] // Three-state semantics for spending_cap_usd
 pub struct UpdateProviderKeyRequest {
   /// Updated base URL override
   pub base_url: Option<String>,
@@ -199,7 +200,29 @@ pub struct UpdateProviderKeyRequest {
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
   /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
+  ///
+  /// JSON mapping:
+  /// - field absent → `None` (don't change)
+  /// - `"spending_cap_usd": null` → `Some(None)` (remove cap / unlimited)
+  /// - `"spending_cap_usd": 10.0` → `Some(Some(10.0))` (set cap)
+  #[serde(default, deserialize_with = "deserialize_nullable_f64")]
   pub spending_cap_usd: Option<Option<f64>>,
+}
+
+/// Deserialize a JSON field into `Option<Option<f64>>` with three-state semantics.
+///
+/// - Field absent (handled by `#[serde(default)]`) → `None`
+/// - Field present as `null` → `Some(None)`
+/// - Field present as number → `Some(Some(value))`
+#[allow(clippy::option_option)] // Three-state semantics: absent vs null vs value
+fn deserialize_nullable_f64<'de, D>(deserializer: D) -> Result<Option<Option<f64>>, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  // If this function is called, the field was present in JSON.
+  // Deserialize its value: null becomes None, number becomes Some(x).
+  let value: Option<f64> = Option::deserialize(deserializer)?;
+  Ok(Some(value))
 }
 
 /// Provider key response (never contains plaintext API key)
@@ -292,6 +315,10 @@ fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiErr
 /// POST /api/providers
 ///
 /// Create new AI provider key
+///
+/// # Errors
+///
+/// Returns `ApiError` if encryption fails, database insert fails, or request validation fails.
 pub async fn create_provider_key(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,

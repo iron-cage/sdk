@@ -758,6 +758,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
       put(routes::agents::update_agent_budget),
     )
     .route(
+      "/api/v1/agents/{id}/spending-cap",
+      put(routes::agents::set_agent_spending_cap),
+    )
+    .route(
       "/api/v1/agents/{id}/tokens",
       get(routes::agents::get_agent_tokens),
     )

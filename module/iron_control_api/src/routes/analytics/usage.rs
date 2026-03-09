@@ -89,6 +89,7 @@ pub async fn get_usage_requests(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
           calculated_at: Utc::now().to_rfc3339(),
         }),

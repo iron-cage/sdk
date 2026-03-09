@@ -141,6 +141,8 @@ pub struct AnalyticsQuery {
   pub agent_id: Option<i64>,
   /// Optional provider ID filter
   pub provider_id: Option<String>,
+  /// Optional provider key ID filter
+  pub provider_key_id: Option<i64>,
 }
 
 /// Pagination parameters
@@ -225,6 +227,9 @@ pub struct AnalyticsEventRequest {
   /// Error message if event represents an error
   #[serde(default)]
   pub error_message: Option<String>,
+  /// Optional provider key ID
+  #[serde(default)]
+  pub provider_key_id: Option<i64>,
 }
 
 /// POST /api/v1/analytics/events - Response
@@ -243,6 +248,8 @@ pub struct Filters {
   pub agent_id: Option<i64>,
   /// Provider ID filter applied
   pub provider_id: Option<String>,
+  /// Provider key ID filter applied
+  pub provider_key_id: Option<i64>,
 }
 
 /// Pagination info in response
@@ -610,6 +617,9 @@ pub struct AnalyticsEventWithAgent {
   pub error_code: Option<String>,
   /// Error message if event represents an error
   pub error_message: Option<String>,
+  /// Optional provider key ID
+  #[serde(default)]
+  pub provider_key_id: Option<i64>,
 }
 
 // ============================================================================
