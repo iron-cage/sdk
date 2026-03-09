@@ -50,12 +50,17 @@ pub async fn post_event(
   }
 
   // Validate provider
-  if event.provider != "openai" && event.provider != "anthropic" && event.provider != "unknown" {
+  if event.provider != "openai"
+    && event.provider != "anthropic"
+    && event.provider != "gemini"
+    && event.provider != "xai"
+    && event.provider != "unknown"
+  {
     return (
       StatusCode::BAD_REQUEST,
       Json(serde_json::json!({
         "error": "VALIDATION_ERROR",
-        "message": "provider must be 'openai', 'anthropic', or 'unknown'"
+        "message": "provider must be 'openai', 'anthropic', 'gemini', 'xai', or 'unknown'"
       })),
     )
       .into_response();

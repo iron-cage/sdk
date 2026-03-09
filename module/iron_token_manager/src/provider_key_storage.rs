@@ -1,6 +1,6 @@
 //! AI Provider Key storage layer
 //!
-//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`).
+//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`, `Gemini`, `XAI`).
 
 use core::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -15,6 +15,10 @@ pub enum ProviderType {
   OpenAI,
   /// `Anthropic` provider
   Anthropic,
+  /// Google Gemini provider
+  Gemini,
+  /// xAI provider
+  XAI,
 }
 
 impl ProviderType {
@@ -24,6 +28,8 @@ impl ProviderType {
     match self {
       Self::OpenAI => "openai",
       Self::Anthropic => "anthropic",
+      Self::Gemini => "gemini",
+      Self::XAI => "xai",
     }
   }
 
@@ -35,6 +41,8 @@ impl ProviderType {
     match s {
       "openai" => Some(Self::OpenAI),
       "anthropic" => Some(Self::Anthropic),
+      "gemini" => Some(Self::Gemini),
+      "xai" => Some(Self::XAI),
       _ => None,
     }
   }

@@ -25,6 +25,11 @@ pub enum Provider {
   OpenAI,
   /// Anthropic provider (e.g. Claude models).
   Anthropic,
+  /// Google Gemini provider.
+  Gemini,
+  /// xAI provider (e.g. Grok models).
+  #[serde(rename = "xai")]
+  XAI,
 
   /// Fallback for unknown/unsupported providers during deserialization.
   #[serde(other)]
@@ -39,6 +44,8 @@ impl Provider {
     match self {
       Self::OpenAI => "openai",
       Self::Anthropic => "anthropic",
+      Self::Gemini => "gemini",
+      Self::XAI => "xai",
       Self::Unknown => "unknown",
     }
   }
@@ -63,6 +70,8 @@ impl FromStr for Provider {
     match s {
       s if s.eq_ignore_ascii_case("openai") => Ok(Self::OpenAI),
       s if s.eq_ignore_ascii_case("anthropic") => Ok(Self::Anthropic),
+      s if s.eq_ignore_ascii_case("gemini") => Ok(Self::Gemini),
+      s if s.eq_ignore_ascii_case("xai") => Ok(Self::XAI),
       _ => Ok(Self::Unknown),
     }
   }
@@ -97,6 +106,16 @@ pub fn infer_provider(model: &str) -> Provider {
   // Check Anthropic (claude-*)
   if has_prefix_ignore_case(model, "claude-") {
     return Provider::Anthropic;
+  }
+
+  // Check Gemini (gemini-*)
+  if has_prefix_ignore_case(model, "gemini-") {
+    return Provider::Gemini;
+  }
+
+  // Check xAI (grok-*)
+  if has_prefix_ignore_case(model, "grok-") {
+    return Provider::XAI;
   }
 
   Provider::Unknown

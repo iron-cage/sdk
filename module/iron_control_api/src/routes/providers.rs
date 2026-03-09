@@ -125,10 +125,14 @@ impl CreateProviderKeyRequest {
   /// or too long, or optional fields exceed length limits.
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate provider type
-    if self.provider != "openai" && self.provider != "anthropic" {
+    if self.provider != "openai"
+      && self.provider != "anthropic"
+      && self.provider != "gemini"
+      && self.provider != "xai"
+    {
       return Err(ValidationError::InvalidFormat {
         field: "provider".to_owned(),
-        expected: "'openai' or 'anthropic'".to_owned(),
+        expected: "'openai', 'anthropic', 'gemini', or 'xai'".to_owned(),
       });
     }
 
@@ -339,6 +343,8 @@ pub async fn create_provider_key(
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
+    "gemini" => ProviderType::Gemini,
+    "xai" => ProviderType::XAI,
     _ => return Err(ApiError::BadRequest("Invalid provider type".into())),
   };
 
