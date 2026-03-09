@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import IconLogIn from '@/components/icons/IconLogIn.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -66,7 +67,7 @@ async function handleLogin() {
         </div>
 
         <Button type="submit" :disabled="loading" class="w-full">
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
+          <IconLogIn />
           {{ loading ? 'Signing in...' : 'Sign in' }}
         </Button>
       </form>

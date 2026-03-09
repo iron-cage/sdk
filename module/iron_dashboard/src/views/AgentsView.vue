@@ -5,7 +5,6 @@ import { useApi, type Agent, type IcTokenStatus, type ProviderType } from '../co
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 
 import {
   Dialog,
@@ -31,6 +30,20 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
+import { formatDate, formatTimestamp } from '@/lib/formatters'
+import { useConfirm } from '@/composables/useConfirm'
+import ProviderBadge from '@/components/ProviderBadge.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import IconX from '@/components/icons/IconX.vue'
+import IconCheck from '@/components/icons/IconCheck.vue'
+import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
+import IconTrash from '@/components/icons/IconTrash.vue'
+import IconEdit from '@/components/icons/IconEdit.vue'
+import IconRefresh from '@/components/icons/IconRefresh.vue'
+import IconKey from '@/components/icons/IconKey.vue'
+import IconBan from '@/components/icons/IconBan.vue'
+import IconCopy from '@/components/icons/IconCopy.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -42,19 +55,7 @@ const authStore = useAuthStore()
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
-const showConfirmModal = ref(false)
-const confirmTitle = ref('')
-const confirmDescription = ref('')
-const confirmLabel = ref('')
-const confirmCallback = ref<(() => void) | null>(null)
-
-function openConfirm(title: string, description: string, label: string, action: () => void) {
-  confirmTitle.value = title
-  confirmDescription.value = description
-  confirmLabel.value = label
-  confirmCallback.value = action
-  showConfirmModal.value = true
-}
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const name = ref('')
 const selectedProviderKeyId = ref<string>('')
 const initialBudgetUsd = ref<number | undefined>(undefined)
@@ -242,17 +243,6 @@ function confirmDelete() {
   }
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString()
-}
-
-function formatTimestamp(timestamp?: number | null): string {
-  if (!timestamp) return '-'
-  // IC token timestamps are seconds; agent created_at is milliseconds. Normalize to ms for display.
-  const millis = timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000
-  return new Date(millis).toLocaleString()
-}
-
 function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
   return icTokenStatuses.value[agentId]
 }
@@ -341,20 +331,13 @@ async function copyTokenToClipboard() {
   }
 }
 
-function getProviderLabel(providerType: ProviderType): string {
-  return providerType === 'openai' ? 'OpenAI' : 'Anthropic'
-}
-
-function getProviderBadgeClass(providerType: ProviderType): string {
-  return providerType === 'openai' ? 'bg-success/80' : 'bg-accent/80'
-}
 </script>
 
 <template>
   <PageLayout title="Agents">
     <template #actions>
       <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+        <IconPlus />
         Create Agent
       </Button>
     </template>
@@ -379,7 +362,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
       <template #empty>
         <p class="text-muted-foreground mb-4">No agents found</p>
         <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          <IconPlus />
           Create First Agent
         </Button>
       </template>
@@ -388,12 +371,12 @@ function getProviderBadgeClass(providerType: ProviderType): string {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
           {{ agent.name }}
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground max-w-[200px] truncate">
           {{ agent.owner_id || 'Unknown' }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 flex-wrap">
-            <Badge v-for="provider in agent.providers" :key="provider" :class="getProviderBadgeClass(provider as ProviderType)">{{ getProviderLabel(provider as ProviderType) }}</Badge>
+            <ProviderBadge v-for="provider in agent.providers" :key="provider" :provider="provider as ProviderType" />
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
@@ -404,14 +387,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             Loading...
           </div>
           <div v-else class="flex gap-1 items-center">
-            <Badge v-if="getIcTokenStatus(agent.id)?.has_ic_token" variant="outline" class="text-success border-none">
-              <svg width="7" height="7" viewBox="0 0 12 12" fill="none"> <circle cx="6" cy="6" r="6" fill="currentColor" /> </svg> 
-              <span class="text-foreground">Active</span>
-            </Badge>
-            <Badge v-else variant="outline" class="text-muted-foreground border-none">
-              <svg width="7" height="7" viewBox="0 0 12 12" fill="none"> <circle cx="6" cy="6" r="6" fill="currentColor" /> </svg> 
-              <span class="text-foreground">None</span>
-            </Badge>
+            <StatusBadge :active="!!getIcTokenStatus(agent.id)?.has_ic_token" active-label="Active" inactive-label="None" />
             <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground">
               {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
             </div>
@@ -425,7 +401,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
                 <span class="sr-only">Open menu</span>
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -434,7 +410,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
                 @click="handleGenerateIcToken(agent)"
                 :disabled="tokenActionLoadingId === agent.id"
               >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                <IconKey />
                 {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
               </DropdownMenuItem>
               <template v-else>
@@ -442,7 +418,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
                   @click="handleRegenerateIcToken(agent)"
                   :disabled="tokenActionLoadingId === agent.id"
                 >
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  <IconRefresh />
                   {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -450,18 +426,18 @@ function getProviderBadgeClass(providerType: ProviderType): string {
                   :disabled="tokenActionLoadingId === agent.id"
                   class="text-destructive"
                 >
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                  <IconBan />
                   Revoke IC Token
                 </DropdownMenuItem>
               </template>
               <template v-if="authStore.isAdmin">
                 <DropdownMenuSeparator />
                 <DropdownMenuItem @click="openUpdateModal(agent)">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  <IconEdit />
                   Edit Agent
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  <IconTrash />
                   Delete Agent
                 </DropdownMenuItem>
               </template>
@@ -555,14 +531,14 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
             @click="handleCreateAgent"
             :disabled="createMutation.isPending.value"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            <IconPlus />
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Agent' }}
           </Button>
         </DialogFooter>
@@ -634,14 +610,14 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="updateMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
             @click="handleUpdateAgent"
             :disabled="updateMutation.isPending.value"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
           </Button>
         </DialogFooter>
@@ -664,7 +640,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="deleteMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
@@ -672,7 +648,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            <IconTrash />
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
           </Button>
         </DialogFooter>
@@ -703,11 +679,11 @@ function getProviderBadgeClass(providerType: ProviderType): string {
 
         <DialogFooter>
           <Button variant="outline" @click="showTokenDialog = false">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Close
           </Button>
           <Button @click="copyTokenToClipboard">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            <IconCopy />
             Copy Token
           </Button>
         </DialogFooter>

@@ -10,10 +10,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatCostUsd, formatMicrodollars, formatNumber, formatTimestamp } from '@/lib/formatters'
 import PageLayout from '@/components/PageLayout.vue'
 import StatCard from '@/components/cards/StatCard.vue'
 import PercentBar from '@/components/PercentBar.vue'
 import DataTable from '@/components/DataTable.vue'
+import IconChevronUp from '@/components/icons/IconChevronUp.vue'
+import IconChevronDown from '@/components/icons/IconChevronDown.vue'
+import IconDownload from '@/components/icons/IconDownload.vue'
+import IconBarChart from '@/components/icons/IconBarChart.vue'
+import IconCheckCircle from '@/components/icons/IconCheckCircle.vue'
+import IconArrowDownToLine from '@/components/icons/IconArrowDownToLine.vue'
+import IconArrowUpFromLine from '@/components/icons/IconArrowUpFromLine.vue'
+import IconCoin from '@/components/icons/IconCoin.vue'
+import IconServer from '@/components/icons/IconServer.vue'
+import IconGrid from '@/components/icons/IconGrid.vue'
+import IconClipboard from '@/components/icons/IconClipboard.vue'
 
 const api = useApi()
 
@@ -125,19 +137,7 @@ const visibleModels = computed(() =>
 )
 
 function formatCost(cost: number): string {
-  return `$${cost.toFixed(4)}`
-}
-
-function formatNumber(num: number): string {
-  return num.toLocaleString()
-}
-
-function formatTimestamp(ms: number): string {
-  return new Date(ms).toLocaleString()
-}
-
-function formatMicrodollars(micros: number): string {
-  return `$${(micros / 1_000_000).toFixed(4)}`
+  return formatCostUsd(cost, 4)
 }
 
 function loadMoreLogs() {
@@ -191,45 +191,35 @@ function loadMoreLogs() {
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6">
         <StatCard title="Total Requests">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+            <IconBarChart class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalRequests) }}</div>
         </StatCard>
 
         <StatCard title="Success Rate">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
         </StatCard>
 
         <StatCard title="Input Tokens">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <IconArrowDownToLine class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalInputTokens) }}</div>
         </StatCard>
 
         <StatCard title="Output Tokens">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
+            <IconArrowUpFromLine class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalOutputTokens) }}</div>
         </StatCard>
 
           <StatCard title="Total Cost">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <IconCoin class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatCost(totalSpend) }}</div>
         </StatCard>
@@ -239,9 +229,7 @@ function loadMoreLogs() {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <StatCard title="Usage by Provider" :showSeparator="true">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-            </svg>
+            <IconServer class="h-4 w-4 text-muted-foreground" />
           </template>
           <div v-if="providerBreakdown.length === 0" class="text-center text-muted-foreground mt-6">
             No provider data available
@@ -264,7 +252,8 @@ function loadMoreLogs() {
               class="w-full"
               @click="showAllProviders = !showAllProviders"
             >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="showAllProviders ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'" /></svg>
+              <IconChevronUp v-if="showAllProviders" />
+              <IconChevronDown v-else />
               {{ showAllProviders ? 'Show less' : `Show all ${providerBreakdown.length}` }}
             </Button>
           </div>
@@ -272,9 +261,7 @@ function loadMoreLogs() {
 
         <StatCard title="Usage by Model" :showSeparator="true">
           <template #icon>
-            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
-            </svg>
+            <IconGrid class="h-4 w-4 text-muted-foreground" />
           </template>
           <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground mt-6">
             No model data available
@@ -297,7 +284,8 @@ function loadMoreLogs() {
               class="w-full"
               @click="showAllModels = !showAllModels"
             >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="showAllModels ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'" /></svg>
+              <IconChevronUp v-if="showAllModels" />
+              <IconChevronDown v-else />
               {{ showAllModels ? 'Show less' : `Show all ${modelBreakdown.length}` }}
             </Button>
           </div>
@@ -307,9 +295,7 @@ function loadMoreLogs() {
       <!-- Recent Logs -->
       <StatCard title="Recent Logs" :showSeparator="true">
         <template #icon>
-          <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
+          <IconClipboard class="h-4 w-4 text-muted-foreground" />
         </template>
         <template #action>
           <span v-if="totalEvents > 0" class="text-base text-muted-foreground">
@@ -351,7 +337,7 @@ function loadMoreLogs() {
           <template #footer>
             <div v-if="logsPage < totalPages" class="p-4 text-center">
               <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                <IconDownload />
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>
             </div>

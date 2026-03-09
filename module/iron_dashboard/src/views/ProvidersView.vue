@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'vue-sonner'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +28,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { formatDate } from '@/lib/formatters'
+import { getProviderLabel } from '@/lib/providers'
+import { useConfirm } from '@/composables/useConfirm'
+import ProviderBadge from '@/components/ProviderBadge.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import IconX from '@/components/icons/IconX.vue'
+import IconCheck from '@/components/icons/IconCheck.vue'
+import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
+import IconTrash from '@/components/icons/IconTrash.vue'
+import IconEdit from '@/components/icons/IconEdit.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -38,19 +47,7 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
-const showConfirmModal = ref(false)
-const confirmTitle = ref('')
-const confirmDescription = ref('')
-const confirmLabel = ref('')
-const confirmCallback = ref<(() => void) | null>(null)
-
-function openConfirm(title: string, description: string, label: string, action: () => void) {
-  confirmTitle.value = title
-  confirmDescription.value = description
-  confirmLabel.value = label
-  confirmCallback.value = action
-  showConfirmModal.value = true
-}
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
 
 // Form fields
@@ -171,24 +168,13 @@ function handleToggleEnabled(key: ProviderKey) {
 
 
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString()
-}
-
-function getProviderLabel(providerType: ProviderType): string {
-  return providerType === 'openai' ? 'OpenAI' : 'Anthropic'
-}
-
-function getProviderBadgeClass(providerType: ProviderType): string {
-  return providerType === 'openai' ? 'bg-success/80' : 'bg-accent/80'
-}
 </script>
 
 <template>
   <PageLayout title="AI Provider Keys">
     <template #actions>
       <Button @click="showCreateModal = true">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+        <IconPlus />
         Add Provider Key
       </Button>
     </template>
@@ -211,12 +197,12 @@ function getProviderBadgeClass(providerType: ProviderType): string {
       <template #empty>
         <p class="text-muted-foreground mb-2">No AI provider keys configured</p>
         <p class="text-base text-muted-foreground mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
-        <Button @click="showCreateModal = true"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>Add First Provider Key</Button>
+        <Button @click="showCreateModal = true"><IconPlus />Add First Provider Key</Button>
       </template>
 
       <tr v-for="key in providerKeys" :key="key.id">
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
-          <Badge :class="getProviderBadgeClass(key.provider)">{{ getProviderLabel(key.provider) }}</Badge>
+          <ProviderBadge :provider="key.provider" />
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
@@ -228,7 +214,8 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             size="sm"
             :class="key.is_enabled ? '' : 'text-muted-foreground'"
           >
-            <svg class="h-4 w-4" :class="key.is_enabled ? 'text-success' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="key.is_enabled ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12'" /></svg>
+            <IconCheck v-if="key.is_enabled" class="text-success" />
+            <IconX v-else />
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
@@ -238,17 +225,17 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
                 <span class="sr-only">Open menu</span>
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem @click="openEditModal(key)" :disabled="updateMutation.isPending.value">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                <IconEdit />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem @click="handleDeleteKey(key)" :disabled="deleteMutation.isPending.value" class="text-destructive">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                <IconTrash />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -325,14 +312,14 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
             @click="handleCreateKey"
             :disabled="createMutation.isPending.value"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            <IconPlus />
             {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
           </Button>
         </DialogFooter>
@@ -393,14 +380,14 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             :disabled="updateMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
             @click="handleUpdateKey"
             :disabled="updateMutation.isPending.value"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Key' }}
           </Button>
         </DialogFooter>

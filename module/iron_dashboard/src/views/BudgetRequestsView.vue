@@ -31,6 +31,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { formatDate } from '@/lib/formatters'
+import { useConfirm } from '@/composables/useConfirm'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import IconX from '@/components/icons/IconX.vue'
+import IconCheck from '@/components/icons/IconCheck.vue'
+import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
+import IconRefresh from '@/components/icons/IconRefresh.vue'
+import DataTable from '@/components/DataTable.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import {
@@ -46,21 +54,7 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showRejectModal = ref(false)
-const showConfirmModal = ref(false)
-const confirmTitle = ref('')
-const confirmDescription = ref('')
-const confirmLabel = ref('')
-const confirmVariant = ref<'default' | 'destructive'>('default')
-const confirmCallback = ref<(() => void) | null>(null)
-
-function openConfirm(title: string, description: string, label: string, action: () => void, variant: 'default' | 'destructive' = 'default') {
-  confirmTitle.value = title
-  confirmDescription.value = description
-  confirmLabel.value = label
-  confirmVariant.value = variant
-  confirmCallback.value = action
-  showConfirmModal.value = true
-}
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const rejectingRequest = ref<BudgetRequest | null>(null)
 const rejectionReason = ref('')
 
@@ -209,10 +203,6 @@ function handleRejectRequest() {
   })
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString()
-}
-
 function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'approved':
@@ -247,255 +237,196 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
         </Select>
       </div>
       <Button @click="showCreateModal = true">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+        <IconPlus />
         Create Budget Request
       </Button>
     </template>
 
-    <!-- Loading state -->
-    <div v-if="isLoading" class="border border-border rounded-lg p-4">
-      <p class="text-muted-foreground">Loading budget requests...</p>
-    </div>
+    <Tabs default-value="my-requests" class="w-full">
+      <TabsList class="mb-4">
+        <TabsTrigger value="my-requests">My Requests</TabsTrigger>
+        <TabsTrigger v-if="authStore.isAdmin" value="pending-approvals">
+          Pending Approvals
+          <Badge v-if="pendingRequests.length > 0" variant="secondary" class="ml-2">
+            {{ pendingRequests.length }}
+          </Badge>
+        </TabsTrigger>
+        <TabsTrigger v-if="authStore.isAdmin" value="all-requests">All Requests</TabsTrigger>
+      </TabsList>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading budget requests: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="outline" class="mt-4">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-        Retry
-      </Button>
-    </div>
-
-    <!-- Main content -->
-    <div v-else>
-      <Tabs default-value="my-requests" class="w-full">
-        <TabsList class="mb-4">
-          <TabsTrigger value="my-requests">My Requests</TabsTrigger>
-          <TabsTrigger v-if="authStore.isAdmin" value="pending-approvals">
-            Pending Approvals
-            <Badge v-if="pendingRequests.length > 0" variant="secondary" class="ml-2">
-              {{ pendingRequests.length }}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger v-if="authStore.isAdmin" value="all-requests">All Requests</TabsTrigger>
-        </TabsList>
-
-        <!-- My Requests Tab -->
-        <TabsContent value="my-requests">
-          <div v-if="myRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-            <table class="min-w-[700px] w-full divide-y divide-border">
-              <thead>
-                <tr>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Agent
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Justification
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="request in myRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.id.substring(0, 8) }}...
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.agent_id }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    ${{ request.requested_budget_usd.toFixed(2) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <Badge :variant="getStatusBadgeVariant(request.status)">
-                      {{ request.status }}
-                    </Badge>
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-                    {{ formatDate(request.created_at) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
-                    <div class="max-w-xs truncate">
-                      {{ request.justification }}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="border border-border rounded-lg p-4 text-center">
+      <!-- My Requests Tab -->
+      <TabsContent value="my-requests">
+        <DataTable
+          :columns="[
+            { label: 'ID' },
+            { label: 'Agent' },
+            { label: 'Amount' },
+            { label: 'Status' },
+            { label: 'Created' },
+            { label: 'Justification' },
+          ]"
+          :is-loading="isLoading"
+          :error="error"
+          :is-empty="myRequests.length === 0"
+          loading-text="Loading budget requests..."
+          :on-retry="() => refetch()"
+        >
+          <template #empty>
             <p class="text-muted-foreground mb-4">You have no budget requests yet</p>
             <Button @click="showCreateModal = true">
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+              <IconPlus />
               Create First Request
             </Button>
-          </div>
-        </TabsContent>
+          </template>
+          <tr v-for="request in myRequests" :key="request.id">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.id.substring(0, 8) }}...
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.agent_id }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              ${{ request.requested_budget_usd.toFixed(2) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+              <Badge :variant="getStatusBadgeVariant(request.status)">
+                {{ request.status }}
+              </Badge>
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+              {{ formatDate(request.created_at) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
+              <div class="max-w-xs truncate">
+                {{ request.justification }}
+              </div>
+            </td>
+          </tr>
+        </DataTable>
+      </TabsContent>
 
-        <!-- Pending Approvals Tab (Admin Only) -->
-        <TabsContent v-if="authStore.isAdmin" value="pending-approvals">
-          <div v-if="pendingRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-            <table class="min-w-[900px] w-full divide-y divide-border">
-              <thead>
-                <tr>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Requester
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Agent
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Current Budget
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Requested
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Justification
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="request in pendingRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.id.substring(0, 8) }}...
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.requester_id }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.agent_id }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    ${{ request.current_budget_usd.toFixed(2) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    ${{ request.requested_budget_usd.toFixed(2) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
-                    <div class="max-w-xs">
-                      {{ request.justification }}
-                    </div>
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-                    {{ formatDate(request.created_at) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger as-child>
-                        <Button variant="ghost" size="sm">
-                          <span class="sr-only">Open menu</span>
-                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem @click="handleApproveRequest(request)" :disabled="approveMutation.isPending.value">
-                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                          Approve
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem @click="openRejectModal(request)" :disabled="rejectMutation.isPending.value" class="text-destructive">
-                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                          Reject
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="border border-border rounded-lg p-4 text-center">
+      <!-- Pending Approvals Tab (Admin Only) -->
+      <TabsContent v-if="authStore.isAdmin" value="pending-approvals">
+        <DataTable
+          :columns="[
+            { label: 'ID' },
+            { label: 'Requester' },
+            { label: 'Agent' },
+            { label: 'Current Budget' },
+            { label: 'Requested' },
+            { label: 'Justification' },
+            { label: 'Created' },
+            { label: 'Actions', align: 'right' },
+          ]"
+          :is-loading="isLoading"
+          :error="error"
+          :is-empty="pendingRequests.length === 0"
+          loading-text="Loading budget requests..."
+          :on-retry="() => refetch()"
+        >
+          <template #empty>
             <p class="text-muted-foreground">No pending budget requests</p>
-          </div>
-        </TabsContent>
+          </template>
+          <tr v-for="request in pendingRequests" :key="request.id">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.id.substring(0, 8) }}...
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.requester_id }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.agent_id }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              ${{ request.current_budget_usd.toFixed(2) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              ${{ request.requested_budget_usd.toFixed(2) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
+              <div class="max-w-xs">
+                {{ request.justification }}
+              </div>
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+              {{ formatDate(request.created_at) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="sm">
+                    <span class="sr-only">Open menu</span>
+                    <IconDotsHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="handleApproveRequest(request)" :disabled="approveMutation.isPending.value">
+                    <IconCheck />
+                    Approve
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem @click="openRejectModal(request)" :disabled="rejectMutation.isPending.value" class="text-destructive">
+                    <IconX />
+                    Reject
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </td>
+          </tr>
+        </DataTable>
+      </TabsContent>
 
-        <!-- All Requests Tab (Admin Only) -->
-        <TabsContent v-if="authStore.isAdmin" value="all-requests">
-          <div v-if="filteredRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-            <table class="min-w-[800px] w-full divide-y divide-border">
-              <thead>
-                <tr>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Requester
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Agent
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Justification
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="request in filteredRequests" :key="request.id">
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.id.substring(0, 8) }}...
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.requester_id }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    {{ request.agent_id }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                    ${{ request.requested_budget_usd.toFixed(2) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <Badge :variant="getStatusBadgeVariant(request.status)">
-                      {{ request.status }}
-                    </Badge>
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-                    {{ formatDate(request.created_at) }}
-                  </td>
-                  <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
-                    <div class="max-w-xs truncate">
-                      {{ request.justification }}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="border border-border rounded-lg p-4 text-center">
+      <!-- All Requests Tab (Admin Only) -->
+      <TabsContent v-if="authStore.isAdmin" value="all-requests">
+        <DataTable
+          :columns="[
+            { label: 'ID' },
+            { label: 'Requester' },
+            { label: 'Agent' },
+            { label: 'Amount' },
+            { label: 'Status' },
+            { label: 'Created' },
+            { label: 'Justification' },
+          ]"
+          :is-loading="isLoading"
+          :error="error"
+          :is-empty="filteredRequests.length === 0"
+          loading-text="Loading budget requests..."
+          :on-retry="() => refetch()"
+        >
+          <template #empty>
             <p class="text-muted-foreground">No budget requests found</p>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+          </template>
+          <tr v-for="request in filteredRequests" :key="request.id">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.id.substring(0, 8) }}...
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.requester_id }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              {{ request.agent_id }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              ${{ request.requested_budget_usd.toFixed(2) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+              <Badge :variant="getStatusBadgeVariant(request.status)">
+                {{ request.status }}
+              </Badge>
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+              {{ formatDate(request.created_at) }}
+            </td>
+            <td class="px-3 sm:px-6 py-4 text-base text-muted-foreground">
+              <div class="max-w-xs truncate">
+                {{ request.justification }}
+              </div>
+            </td>
+          </tr>
+        </DataTable>
+      </TabsContent>
+    </Tabs>
 
     <!-- Create budget request modal -->
     <Dialog v-model:open="showCreateModal">
@@ -565,14 +496,14 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
             @click="handleCreateRequest"
             :disabled="createMutation.isPending.value"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            <IconCheck />
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Request' }}
           </Button>
         </DialogFooter>
@@ -620,7 +551,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             :disabled="rejectMutation.isPending.value"
             variant="outline"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             Cancel
           </Button>
           <Button
@@ -628,7 +559,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             :disabled="rejectMutation.isPending.value"
             variant="destructive"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <IconX />
             {{ rejectMutation.isPending.value ? 'Rejecting...' : 'Reject Request' }}
           </Button>
         </DialogFooter>

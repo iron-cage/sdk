@@ -87,7 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
         const error = await response.json();
         msg = error.error.message
       } catch (error) {
-        msg = 'Log in failed'
+        msg = 'Login failed'
       }
       throw new Error(msg)
     }
