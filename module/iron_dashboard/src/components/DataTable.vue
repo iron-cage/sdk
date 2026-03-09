@@ -43,7 +43,7 @@ defineProps<{
                 v-for="col in columns"
                 :key="col.label"
                 :class="[
-                  'px-3 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider',
+                  'px-3 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider text-nowrap',
                   col.align === 'right' ? 'text-right' : 'text-left',
                 ]"
               >

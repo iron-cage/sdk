@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   percentage: number
+  class?: string
 }>()
 
 const colorClass = computed(() => {
@@ -13,7 +15,7 @@ const colorClass = computed(() => {
 </script>
 
 <template>
-  <div class="w-full bg-muted rounded-full h-2">
+  <div :class="cn('w-full bg-muted rounded-full h-2', props.class)">
     <div
       class="h-1.5 rounded-full transition-all"
       :class="colorClass"

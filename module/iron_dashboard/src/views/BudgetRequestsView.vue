@@ -23,16 +23,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import {
   Tabs,
   TabsContent,
@@ -46,10 +46,23 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showRejectModal = ref(false)
+const showConfirmModal = ref(false)
+const confirmTitle = ref('')
+const confirmDescription = ref('')
+const confirmLabel = ref('')
+const confirmVariant = ref<'default' | 'destructive'>('default')
+let confirmCallback: (() => void) | null = null
+
+function openConfirm(title: string, description: string, label: string, action: () => void, variant: 'default' | 'destructive' = 'default') {
+  confirmTitle.value = title
+  confirmDescription.value = description
+  confirmLabel.value = label
+  confirmVariant.value = variant
+  confirmCallback = action
+  showConfirmModal.value = true
+}
 const rejectingRequest = ref<BudgetRequest | null>(null)
 const rejectionReason = ref('')
-const createError = ref('')
-const rejectError = ref('')
 
 // Create request form
 const createForm = ref({
@@ -84,11 +97,10 @@ const createMutation = useMutation({
       requested_budget_usd: 0,
       justification: '',
     }
-    createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['budget-requests'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create budget request'
+    toast.error(err instanceof Error ? err.message : 'Failed to create budget request')
   },
 })
 
@@ -108,11 +120,10 @@ const rejectMutation = useMutation({
     showRejectModal.value = false
     rejectingRequest.value = null
     rejectionReason.value = ''
-    rejectError.value = ''
     queryClient.invalidateQueries({ queryKey: ['budget-requests'] })
   },
   onError: (err) => {
-    rejectError.value = err instanceof Error ? err.message : 'Failed to reject budget request'
+    toast.error(err instanceof Error ? err.message : 'Failed to reject budget request')
   },
 })
 
@@ -137,31 +148,30 @@ const pendingRequests = computed(() => {
 
 function handleCreateRequest() {
   if (createForm.value.agent_id === 0) {
-    createError.value = 'Agent is required'
+    toast.error('Agent is required')
     return
   }
 
   if (createForm.value.requested_budget_usd <= 0) {
-    createError.value = 'Budget amount must be positive'
+    toast.error('Budget amount must be positive')
     return
   }
 
   if (createForm.value.requested_budget_usd > 10000) {
-    createError.value = 'Maximum budget increase is $10,000'
+    toast.error('Maximum budget increase is $10,000')
     return
   }
 
   if (createForm.value.justification.trim().length < 20) {
-    createError.value = 'Justification must be at least 20 characters'
+    toast.error('Justification must be at least 20 characters')
     return
   }
 
   if (createForm.value.justification.trim().length > 500) {
-    createError.value = 'Justification cannot exceed 500 characters'
+    toast.error('Justification cannot exceed 500 characters')
     return
   }
 
-  createError.value = ''
   createMutation.mutate({
     agent_id: createForm.value.agent_id,
     requester_id: authStore.username || 'default',
@@ -171,15 +181,17 @@ function handleCreateRequest() {
 }
 
 function handleApproveRequest(request: BudgetRequest) {
-  if (confirm(`Approve budget request ${request.id} for $${request.requested_budget_usd.toFixed(2)}?`)) {
-    approveMutation.mutate(request.id)
-  }
+  openConfirm(
+    'Approve Budget Request',
+    `Approve request #${request.id} for $${request.requested_budget_usd.toFixed(2)}?`,
+    'Approve',
+    () => approveMutation.mutate(request.id),
+  )
 }
 
 function openRejectModal(request: BudgetRequest) {
   rejectingRequest.value = request
   rejectionReason.value = ''
-  rejectError.value = ''
   showRejectModal.value = true
 }
 
@@ -187,7 +199,7 @@ function handleRejectRequest() {
   if (!rejectingRequest.value) return
 
   if (rejectionReason.value.trim().length === 0) {
-    rejectError.value = 'Rejection reason is required'
+    toast.error('Rejection reason is required')
     return
   }
 
@@ -495,12 +507,9 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="agent">Agent</Label>
             <Select v-model="createForm.agent_id" :disabled="createMutation.isPending.value">
               <SelectTrigger>
@@ -518,7 +527,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             </Select>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="amount">Budget Amount (USD)</Label>
             <Input
               id="amount"
@@ -535,7 +544,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             </p>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="justification">Justification</Label>
             <Textarea
               id="justification"
@@ -580,11 +589,8 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="rejectError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ rejectError }}</AlertDescription>
-        </Alert>
 
-        <div v-if="rejectingRequest" class="space-y-4 py-4">
+        <div v-if="rejectingRequest" class="space-y-4">
           <div class="grid grid-cols-2 gap-4 text-base">
             <div>
               <span class="text-muted-foreground">Requester:</span>
@@ -596,7 +602,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             </div>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="rejection-reason">Rejection Reason (required)</Label>
             <Textarea
               id="rejection-reason"
@@ -628,5 +634,14 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      :variant="confirmVariant"
+      @confirm="confirmCallback?.()"
+    />
   </PageLayout>
 </template>

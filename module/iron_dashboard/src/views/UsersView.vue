@@ -21,12 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -59,18 +58,12 @@ const userToResetPassword = ref<User | null>(null)
 const username = ref('')
 const password = ref('')
 const email = ref('')
-const role = ref('user')
+const role = ref('manager')
 const suspendReason = ref('')
 const newRole = ref('')
 const newPassword = ref('')
 const forcePasswordChange = ref(true)
 
-// Errors
-const createError = ref('')
-const updateError = ref('')
-const deleteError = ref('')
-const roleError = ref('')
-const passwordError = ref('')
 
 // Fetch users
 const { data: usersData, isLoading, error, refetch } = useQuery({
@@ -93,16 +86,14 @@ const createMutation = useMutation({
     password.value = ''
     email.value = ''
     role.value = 'user'
-    createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create user'
+    toast.error(err instanceof Error ? err.message : 'Failed to create user')
   },
 })
 
 function handleCreateUser() {
-  createError.value = ''
   createMutation.mutate({
     username: username.value,
     password: password.value,
@@ -121,7 +112,7 @@ const suspendMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
-    updateError.value = err instanceof Error ? err.message : 'Failed to suspend user'
+    toast.error(err instanceof Error ? err.message : 'Failed to suspend user')
   },
 })
 
@@ -131,8 +122,7 @@ const activateMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
-    // Show toast or alert
-    console.error(err)
+    toast.error(err instanceof Error ? err.message : 'Failed to activate user')
   },
 })
 
@@ -160,7 +150,7 @@ const deleteMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
-    deleteError.value = err instanceof Error ? err.message : 'Failed to delete user'
+    toast.error(err instanceof Error ? err.message : 'Failed to delete user')
   },
 })
 
@@ -184,7 +174,7 @@ const changeRoleMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
-    roleError.value = err instanceof Error ? err.message : 'Failed to change role'
+    toast.error(err instanceof Error ? err.message : 'Failed to change role')
   },
 })
 
@@ -209,10 +199,10 @@ const resetPasswordMutation = useMutation({
     userToResetPassword.value = null
     newPassword.value = ''
     forcePasswordChange.value = true
-    // Show success toast
+    toast.success('Password reset successfully')
   },
   onError: (err) => {
-    passwordError.value = err instanceof Error ? err.message : 'Failed to reset password'
+    toast.error(err instanceof Error ? err.message : 'Failed to reset password')
   },
 })
 
@@ -237,6 +227,16 @@ function confirmResetPassword() {
 watch(search, () => {
   page.value = 1
 })
+
+
+const AVATAR_COLORS = ['#5E6AD2', '#26B5CE', '#4CB782', '#F2994A']
+
+function avatarColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i)
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]!
+}
+
 </script>
 
 <template>
@@ -264,7 +264,7 @@ watch(search, () => {
 
       <Button @click="showCreateModal = true">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-        Create User
+        <span class="max-sm:sr-only">Create User</span>
       </Button>
     </template>
 
@@ -288,24 +288,33 @@ watch(search, () => {
       </template>
 
       <tr v-for="user in usersData?.users" :key="user.id">
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
+          <div class="flex gap-2 items-center">
+            <span
+            class="w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
+            :style="{ backgroundColor: avatarColor(user.username || 'u') }"
+          >
+            {{ (user.username ?? 'U')[0]!.toUpperCase() }}
+          </span>
           <div class="flex flex-col">
             <span class="text-base font-medium text-foreground">{{ user.username }}</span>
-            <span class="text-base text-muted-foreground">{{ user.email }}</span>
+            <span class="text-muted-foreground text-xs">{{ user.email }}</span>
+          </div>
           </div>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-          <Badge variant="outline">{{ user.role }}</Badge>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
+          <Badge variant="outline">{{ user.role.charAt(0).toUpperCase() + user.role.slice(1) }}</Badge>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
-          <Badge :variant="user.is_active ? 'default' : 'destructive'">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
+          <Badge variant='outline' class="text-foreground border-none">
+            <svg width="7" height="7" viewBox="0 0 12 12" fill="none" :class ="user.is_active ? 'text-success' : 'text-destructive'"> <circle cx="6" cy="6" r="6" fill="currentColor" /> </svg> 
             {{ user.is_active ? 'Active' : 'Suspended' }}
           </Badge>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           {{ new Date(user.created_at).toLocaleDateString() }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
@@ -338,7 +347,7 @@ watch(search, () => {
 
       <template #footer>
         <div v-if="usersData" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
-          <p class="text-base text-foreground">
+          <p class="text-xs text-muted-foreground">
             Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
             to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
             of <span class="font-medium">{{ usersData.total }}</span> results
@@ -361,12 +370,9 @@ watch(search, () => {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="username">Username</Label>
             <Input
               id="username"
@@ -376,7 +382,7 @@ watch(search, () => {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="email">Email</Label>
             <Input
               id="email"
@@ -387,7 +393,7 @@ watch(search, () => {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="password">Password</Label>
             <Input
               id="password"
@@ -398,7 +404,7 @@ watch(search, () => {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="role">Role</Label>
             <Select v-model="role">
               <SelectTrigger id="role">
@@ -443,11 +449,8 @@ watch(search, () => {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="updateError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ updateError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-2 py-2">
+        <div class="space-y-2">
           <Label for="reason">Reason (Optional)</Label>
           <Input
             id="reason"
@@ -489,9 +492,6 @@ watch(search, () => {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="deleteError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ deleteError }}</AlertDescription>
-        </Alert>
 
         <DialogFooter>
           <Button
@@ -524,11 +524,8 @@ watch(search, () => {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="roleError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ roleError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-2 py-4">
+        <div class="space-y-2">
           <Label for="new-role">Role</Label>
           <Select v-model="newRole">
             <SelectTrigger id="new-role">
@@ -572,12 +569,9 @@ watch(search, () => {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="passwordError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ passwordError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="new-password">New Password</Label>
             <Input
               id="new-password"

@@ -49,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = tokens.user_token
     refreshToken.value = tokens.refresh_token
     username.value = user
+    
     role.value = tokens.user.role
 
     localStorage.setItem('access_token', tokens.user_token)

@@ -14,20 +14,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
+import PercentBar from '@/components/PercentBar.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const api = useApi()
 const authStore = useAuthStore()
 const queryClient = useQueryClient()
+
+const showConfirmModal = ref(false)
+const confirmTitle = ref('')
+const confirmDescription = ref('')
+const confirmLabel = ref('')
+let confirmCallback: (() => void) | null = null
+
+function openConfirm(title: string, description: string, label: string, action: () => void) {
+  confirmTitle.value = title
+  confirmDescription.value = description
+  confirmLabel.value = label
+  confirmCallback = action
+  showConfirmModal.value = true
+}
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -37,13 +52,10 @@ const overrideUserId = ref<string | null>(null)
 const maxTokensPerDay = ref<number | undefined>(undefined)
 const maxRequestsPerMinute = ref<number | undefined>(undefined)
 const maxCostPerMonthCents = ref<number | undefined>(undefined)
-const createError = ref('')
-const editError = ref('')
 const showBudgetModal = ref(false)
 const budgetAgentId = ref<number | null>(null)
 const budgetAgentName = ref('')
 const budgetUsd = ref<number | undefined>(undefined)
-const budgetError = ref('')
 
 // Fetch limits (hidden - global limits not integrated)
 const { data: _limits, isLoading: _isLoading, error: _error, refetch: _refetch } = useQuery({
@@ -74,7 +86,7 @@ const createMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['limits'] })
   },
   onError: ( err ) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create limit'
+    toast.error(err instanceof Error ? err.message : 'Failed to create limit')
   },
 })
 
@@ -88,7 +100,7 @@ const updateMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['limits'] })
   },
   onError: ( err ) => {
-    editError.value = err instanceof Error ? err.message : 'Failed to update limit'
+    toast.error(err instanceof Error ? err.message : 'Failed to update limit')
   },
 })
 
@@ -106,8 +118,6 @@ function resetForm() {
   maxTokensPerDay.value = undefined
   maxRequestsPerMinute.value = undefined
   maxCostPerMonthCents.value = undefined
-  createError.value = ''
-  editError.value = ''
 }
 
 // Convert cents to microdollars (1 cent = 10,000 microdollars)
@@ -121,13 +131,11 @@ function microdollarsToCents( microdollars: number | undefined ): number | undef
 }
 
 function handleCreateLimit() {
-  createError.value = ''
-
   const userId = overrideUserId.value || authStore.username || 'default'
 
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
-    createError.value = 'At least one limit must be specified'
+    toast.error('At least one limit must be specified')
     return
   }
 
@@ -148,18 +156,16 @@ function _openEditModal( limit: LimitRecord ) {
   maxRequestsPerMinute.value = limit.max_requests_per_minute
   // Convert microdollars (backend) to cents (UI)
   maxCostPerMonthCents.value = microdollarsToCents( limit.max_cost_per_month_microdollars )
-  editError.value = ''
   showEditModal.value = true
 }
 void _openEditModal
 
 function handleUpdateLimit() {
   if( !editingLimit.value ) return
-  editError.value = ''
 
   // Validate at least one limit is set
   if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
-    editError.value = 'At least one limit must be specified'
+    toast.error('At least one limit must be specified')
     return
   }
 
@@ -174,9 +180,12 @@ function handleUpdateLimit() {
 }
 
 function _handleDeleteLimit( limit: LimitRecord ) {
-  if( confirm( `Delete limit ${limit.id}? This action cannot be undone.` ) ) {
-    deleteMutation.mutate( limit.id )
-  }
+  openConfirm(
+    'Delete Limit',
+    `Delete limit ${limit.id}? This action cannot be undone.`,
+    'Delete',
+    () => deleteMutation.mutate( limit.id ),
+  )
 }
 void _handleDeleteLimit
 
@@ -203,7 +212,6 @@ function _openCreateLimitForAgent(agentId: number) {
   maxTokensPerDay.value = undefined
   maxRequestsPerMinute.value = undefined
   maxCostPerMonthCents.value = undefined
-  createError.value = ''
   showCreateModal.value = true
 }
 void _openCreateLimitForAgent
@@ -212,7 +220,6 @@ function openBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
   budgetAgentName.value = row.agent_name
   budgetUsd.value = Number((row.budget / 1_000_000).toFixed(2))
-  budgetError.value = ''
   showBudgetModal.value = true
 }
 
@@ -224,14 +231,14 @@ const updateBudgetMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['budget-status'] })
   },
   onError: (err) => {
-    budgetError.value = err instanceof Error ? err.message : 'Failed to update budget'
+    toast.error(err instanceof Error ? err.message : 'Failed to update budget')
   },
 })
 
 function handleUpdateBudget() {
   if (!budgetAgentId.value) return
   if (!budgetUsd.value || budgetUsd.value <= 0) {
-    budgetError.value = 'Budget must be greater than zero'
+    toast.error('Budget must be greater than zero')
     return
   }
 
@@ -252,106 +259,6 @@ function handleUpdateBudget() {
         Refresh
       </Button>
     </template>
-    
-    <!-- Global Limits hidden - not integrated with iron_cage runtime
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-foreground">Usage Limits</h1>
-      <Button @click="showCreateModal = true">
-        Create New Limit
-      </Button>
-    </div>
-
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-muted-foreground">Loading limits...</p>
-    </div>
-
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-destructive">Error loading limits: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="outline" class="mt-4">
-        Retry
-      </Button>
-    </div>
-    -->
-
-    <!-- Global Limits table - hidden
-    <div v-else-if="limits && limits.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-border">
-        <thead>
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              ID
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Project
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Tokens/Day
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Requests/Min
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Cost/Month
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Created
-            </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-for="limit in limits" :key="limit.id">
-            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
-              {{ limit.id }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
-              {{ limit.project_id || '-' }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
-              {{ limit.max_tokens_per_day?.toLocaleString() || '-' }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
-              {{ limit.max_requests_per_minute?.toLocaleString() || '-' }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
-              {{ limit.max_cost_per_month_microdollars ? formatCost( microdollarsToCents( limit.max_cost_per_month_microdollars ) || 0 ) : '-' }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
-              {{ formatDate( limit.created_at ) }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
-              <Button
-                @click="openEditModal( limit )"
-                :disabled="updateMutation.isPending.value"
-                variant="ghost"
-                size="sm"
-              >
-                Edit
-              </Button>
-              <Button
-                @click="handleDeleteLimit( limit )"
-                :disabled="deleteMutation.isPending.value"
-                variant="ghost"
-                size="sm"
-                class="text-destructive hover:text-destructive"
-              >
-                Delete
-              </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-muted-foreground mb-4">No limits configured</p>
-      <Button @click="showCreateModal = true">
-        Create First Limit
-      </Button>
-    </div>
-    -->
 
     <!-- Agent Budgets -->
     <DataTable
@@ -372,22 +279,25 @@ function handleUpdateBudget() {
         <p class="text-muted-foreground">No agent budget data available.</p>
       </template>
       <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
           {{ row.agent_name }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           ${{ (row.budget / 1_000_000).toFixed(2) }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           ${{ (row.spent / 1_000_000).toFixed(2) }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           ${{ (row.remaining / 1_000_000).toFixed(2) }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-          {{ row.percent_used.toFixed(1) }}%
+        <td class="px-3 sm:px-6 py-2 text-base text-foreground">
+          <div class="flex items-center gap-2 min-w-[100px]">
+            <PercentBar :percentage="row.percent_used" class="max-w-[100px]" />
+            <span class="shrink-0 text-muted-foreground text-xs">{{ row.percent_used.toFixed(1) }}%</span>
+          </div>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu v-if="authStore.isAdmin">
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
@@ -416,12 +326,9 @@ function handleUpdateBudget() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="project">Project ID (optional)</Label>
             <Input
               id="project"
@@ -431,7 +338,7 @@ function handleUpdateBudget() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="maxTokensPerDay">Max Tokens per Day (optional)</Label>
             <Input
               id="maxTokensPerDay"
@@ -443,7 +350,7 @@ function handleUpdateBudget() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="maxRequestsPerMinute">Max Requests per Minute (optional)</Label>
             <Input
               id="maxRequestsPerMinute"
@@ -455,7 +362,7 @@ function handleUpdateBudget() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="maxCostPerMonth">Max Cost per Month in cents (optional)</Label>
             <Input
               id="maxCostPerMonth"
@@ -501,12 +408,9 @@ function handleUpdateBudget() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="editError" variant="destructive">
-          <AlertDescription>{{ editError }}</AlertDescription>
-        </Alert>
 
-        <div v-if="editingLimit" class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div v-if="editingLimit" class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="editMaxTokensPerDay">Max Tokens per Day (optional)</Label>
             <Input
               id="editMaxTokensPerDay"
@@ -518,7 +422,7 @@ function handleUpdateBudget() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="editMaxRequestsPerMinute">Max Requests per Minute (optional)</Label>
             <Input
               id="editMaxRequestsPerMinute"
@@ -530,7 +434,7 @@ function handleUpdateBudget() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="editMaxCostPerMonth">Max Cost per Month in cents (optional)</Label>
             <Input
               id="editMaxCostPerMonth"
@@ -576,12 +480,9 @@ function handleUpdateBudget() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="budgetError" variant="destructive">
-          <AlertDescription>{{ budgetError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="budget-amount">Total Budget (USD)</Label>
             <Input
               id="budget-amount"
@@ -609,5 +510,13 @@ function handleUpdateBudget() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      @confirm="confirmCallback?.()"
+    />
   </PageLayout>
 </template>

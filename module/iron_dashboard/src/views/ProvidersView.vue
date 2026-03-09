@@ -20,24 +20,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
+const showConfirmModal = ref(false)
+const confirmTitle = ref('')
+const confirmDescription = ref('')
+const confirmLabel = ref('')
+let confirmCallback: (() => void) | null = null
+
+function openConfirm(title: string, description: string, label: string, action: () => void) {
+  confirmTitle.value = title
+  confirmDescription.value = description
+  confirmLabel.value = label
+  confirmCallback = action
+  showConfirmModal.value = true
+}
 const editingKey = ref<ProviderKey | null>(null)
 
 // Form fields
@@ -47,9 +60,6 @@ const baseUrl = ref('')
 const description = ref('')
 const isEnabled = ref(true)
 
-// Error states
-const createError = ref('')
-const editError = ref('')
 
 // Fetch provider keys
 const { data: providerKeys, isLoading, error, refetch } = useQuery({
@@ -69,7 +79,7 @@ const createMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create provider key'
+    toast.error(err instanceof Error ? err.message : 'Failed to create provider key')
   },
 })
 
@@ -83,7 +93,7 @@ const updateMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
   onError: (err) => {
-    editError.value = err instanceof Error ? err.message : 'Failed to update provider key'
+    toast.error(err instanceof Error ? err.message : 'Failed to update provider key')
   },
 })
 
@@ -112,15 +122,11 @@ function resetForm() {
   baseUrl.value = ''
   description.value = ''
   isEnabled.value = true
-  createError.value = ''
-  editError.value = ''
 }
 
 function handleCreateKey() {
-  createError.value = ''
-
   if (!apiKey.value.trim()) {
-    createError.value = 'API key is required'
+    toast.error('API key is required')
     return
   }
 
@@ -137,14 +143,11 @@ function openEditModal(key: ProviderKey) {
   baseUrl.value = key.base_url || ''
   description.value = key.description || ''
   isEnabled.value = key.is_enabled
-  editError.value = ''
   showEditModal.value = true
 }
 
 function handleUpdateKey() {
   if (!editingKey.value) return
-  editError.value = ''
-
   updateMutation.mutate({
     id: editingKey.value.id,
     base_url: baseUrl.value || undefined,
@@ -154,9 +157,12 @@ function handleUpdateKey() {
 }
 
 function handleDeleteKey(key: ProviderKey) {
-  if (confirm(`Delete ${key.provider} key? This action cannot be undone.`)) {
-    deleteMutation.mutate(key.id)
-  }
+  openConfirm(
+    'Delete Provider Key',
+    `Delete the ${getProviderLabel(key.provider)} key? This action cannot be undone.`,
+    'Delete',
+    () => deleteMutation.mutate(key.id),
+  )
 }
 
 function handleToggleEnabled(key: ProviderKey) {
@@ -174,7 +180,7 @@ function getProviderLabel(providerType: ProviderType): string {
 }
 
 function getProviderBadgeClass(providerType: ProviderType): string {
-  return providerType === 'openai' ? 'bg-muted text-foreground' : 'bg-muted text-foreground'
+  return providerType === 'openai' ? 'bg-success/80' : 'bg-accent/80'
 }
 </script>
 
@@ -209,12 +215,12 @@ function getProviderBadgeClass(providerType: ProviderType): string {
       </template>
 
       <tr v-for="key in providerKeys" :key="key.id">
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <Badge :class="getProviderBadgeClass(key.provider)">{{ getProviderLabel(key.provider) }}</Badge>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <Button
             @click="handleToggleEnabled(key)"
             :disabled="toggleMutation.isPending.value"
@@ -222,12 +228,12 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             size="sm"
             :class="key.is_enabled ? '' : 'text-muted-foreground'"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="key.is_enabled ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12'" /></svg>
+            <svg class="h-4 w-4" :class="key.is_enabled ? 'text-success' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="key.is_enabled ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12'" /></svg>
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(key.created_at) }}</td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(key.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
@@ -261,12 +267,8 @@ function getProviderBadgeClass(providerType: ProviderType): string {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
-
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="provider">Provider</Label>
             <Select v-model="provider" :disabled="createMutation.isPending.value">
               <SelectTrigger>
@@ -279,7 +281,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             </Select>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="apiKey">API Key</Label>
             <Input
               id="apiKey"
@@ -293,7 +295,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             </p>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="baseUrl">Base URL (optional)</Label>
             <Input
               id="baseUrl"
@@ -306,7 +308,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             </p>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="description">Description (optional)</Label>
             <Input
               id="description"
@@ -347,17 +349,13 @@ function getProviderBadgeClass(providerType: ProviderType): string {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="editError" variant="destructive">
-          <AlertDescription>{{ editError }}</AlertDescription>
-        </Alert>
-
-        <div v-if="editingKey" class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div v-if="editingKey" class="space-y-4">
+          <div class="space-y-1.5">
             <Label>Provider</Label>
             <p class="text-base text-foreground">{{ getProviderLabel(editingKey.provider) }}</p>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="editBaseUrl">Base URL (optional)</Label>
             <Input
               id="editBaseUrl"
@@ -367,7 +365,7 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="editDescription">Description (optional)</Label>
             <Input
               id="editDescription"
@@ -408,5 +406,13 @@ function getProviderBadgeClass(providerType: ProviderType): string {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      @confirm="confirmCallback?.()"
+    />
   </PageLayout>
 </template>

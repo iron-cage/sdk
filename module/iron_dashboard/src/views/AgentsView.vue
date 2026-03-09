@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
+import { useApi, type Agent, type IcTokenStatus, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,11 +19,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 import {
   Select,
   SelectContent,
@@ -34,6 +33,7 @@ import {
 import { useAuthStore } from '../stores/auth'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -42,16 +42,27 @@ const authStore = useAuthStore()
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
+const showConfirmModal = ref(false)
+const confirmTitle = ref('')
+const confirmDescription = ref('')
+const confirmLabel = ref('')
+let confirmCallback: (() => void) | null = null
+
+function openConfirm(title: string, description: string, label: string, action: () => void) {
+  confirmTitle.value = title
+  confirmDescription.value = description
+  confirmLabel.value = label
+  confirmCallback = action
+  showConfirmModal.value = true
+}
 const name = ref('')
 const selectedProviderKeyId = ref<string>('')
 const initialBudgetUsd = ref<number | undefined>(undefined)
 const selectedOwnerId = ref<string>('')
-const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
 const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
 const icTokenStatusLoading = ref(false)
-const icTokenError = ref('')
 const tokenActionLoadingId = ref<number | null>(null)
 const showTokenDialog = ref(false)
 const tokenDialogValue = ref('')
@@ -75,7 +86,6 @@ watch(
     }
 
     icTokenStatusLoading.value = true
-    icTokenError.value = ''
     const statusMap: Record<number, IcTokenStatus> = {}
 
     await Promise.all(
@@ -84,9 +94,7 @@ watch(
           const status = await api.getIcTokenStatus(agent.id)
           statusMap[agent.id] = status
         } catch (err) {
-          if (!icTokenError.value) {
-            icTokenError.value = err instanceof Error ? err.message : 'Failed to load IC token status'
-          }
+          console.error('Failed to load IC token status for agent', agent.id, err)
         }
       })
     )
@@ -120,11 +128,10 @@ const createMutation = useMutation({
     selectedProviderKeyId.value = ''
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = ''
-    createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create agent'
+    toast.error(err instanceof Error ? err.message : 'Failed to create agent')
   },
 })
 
@@ -138,11 +145,10 @@ const updateMutation = useMutation({
     name.value = ''
     selectedProviderKeyId.value = ''
     selectedOwnerId.value = ''
-    createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to update agent'
+    toast.error(err instanceof Error ? err.message : 'Failed to update agent')
   },
 })
 
@@ -156,30 +162,29 @@ const deleteMutation = useMutation({
 
 function handleCreateAgent() {
   if (!name.value) {
-    createError.value = 'Name is required'
+    toast.error('Name is required')
     return
   }
 
   if (!selectedProviderKeyId.value) {
-    createError.value = 'Provider key is required'
+    toast.error('Provider key is required')
     return
   }
 
   if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
-    createError.value = 'Initial budget (USD) is required and must be positive'
+    toast.error('Initial budget (USD) is required and must be positive')
     return
   }
 
   const providerKeyId = Number(selectedProviderKeyId.value)
   const providerRecord = providers.value?.find(p => p.id === providerKeyId)
   if (!providerRecord) {
-    createError.value = 'Selected provider key not found'
+    toast.error('Selected provider key not found')
     return
   }
 
   const budgetMicros = Math.round(initialBudgetUsd.value * 1_000_000)
 
-  createError.value = ''
   createMutation.mutate({
     name: name.value,
     providers: [providerRecord.provider],
@@ -199,23 +204,22 @@ function openUpdateModal(agent: Agent) {
 
 function handleUpdateAgent() {
   if (!selectedAgent.value || !name.value) {
-    createError.value = 'Name is required'
+    toast.error('Name is required')
     return
   }
 
   if (!selectedProviderKeyId.value) {
-    createError.value = 'Provider key is required'
+    toast.error('Provider key is required')
     return
   }
 
   const providerKeyId = Number(selectedProviderKeyId.value)
   const providerRecord = providers.value?.find(p => p.id === providerKeyId)
   if (!providerRecord) {
-    createError.value = 'Selected provider key not found'
+    toast.error('Selected provider key not found')
     return
   }
 
-  createError.value = ''
   updateMutation.mutate({
     id: selectedAgent.value.id,
     name: name.value,
@@ -255,7 +259,6 @@ function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
 
 async function handleGenerateIcToken(agent: Agent) {
   tokenActionLoadingId.value = agent.id
-  icTokenError.value = ''
   try {
     const response = await api.generateIcToken(agent.id)
     icTokenStatuses.value = {
@@ -272,63 +275,59 @@ async function handleGenerateIcToken(agent: Agent) {
     copyMessage.value = ''
     showTokenDialog.value = true
   } catch (err) {
-    icTokenError.value = err instanceof Error ? err.message : 'Failed to generate IC token'
+    toast.error(err instanceof Error ? err.message : 'Failed to generate IC token')
   } finally {
     tokenActionLoadingId.value = null
   }
 }
 
 async function handleRegenerateIcToken(agent: Agent) {
-  if (!confirm(`Regenerate IC token for ${agent.name}? This will invalidate the current token.`)) {
-    return
-  }
-
-  tokenActionLoadingId.value = agent.id
-  icTokenError.value = ''
-  try {
-    const response = await api.regenerateIcToken(agent.id)
-    icTokenStatuses.value = {
-      ...icTokenStatuses.value,
-      [agent.id]: {
-        agent_id: agent.id,
-        has_ic_token: true,
-        created_at: response.created_at,
-      },
-    }
-    tokenDialogAgentName.value = agent.name
-    tokenDialogValue.value = response.ic_token
-    tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
-    copyMessage.value = ''
-    showTokenDialog.value = true
-  } catch (err) {
-    icTokenError.value = err instanceof Error ? err.message : 'Failed to regenerate IC token'
-  } finally {
-    tokenActionLoadingId.value = null
-  }
+  openConfirm(
+    'Regenerate IC Token',
+    `Regenerate IC token for ${agent.name}? The current token will be invalidated immediately.`,
+    'Regenerate',
+    async () => {
+      tokenActionLoadingId.value = agent.id
+      try {
+        const response = await api.regenerateIcToken(agent.id)
+        icTokenStatuses.value = {
+          ...icTokenStatuses.value,
+          [agent.id]: { agent_id: agent.id, has_ic_token: true, created_at: response.created_at },
+        }
+        tokenDialogAgentName.value = agent.name
+        tokenDialogValue.value = response.ic_token
+        tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
+        copyMessage.value = ''
+        showTokenDialog.value = true
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to regenerate IC token')
+      } finally {
+        tokenActionLoadingId.value = null
+      }
+    },
+  )
 }
 
 async function handleRevokeIcToken(agent: Agent) {
-  if (!confirm(`Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`)) {
-    return
-  }
-
-  tokenActionLoadingId.value = agent.id
-  icTokenError.value = ''
-  try {
-    await api.revokeIcToken(agent.id)
-    icTokenStatuses.value = {
-      ...icTokenStatuses.value,
-      [agent.id]: {
-        agent_id: agent.id,
-        has_ic_token: false,
-        created_at: null,
-      },
-    }
-  } catch (err) {
-    icTokenError.value = err instanceof Error ? err.message : 'Failed to revoke IC token'
-  } finally {
-    tokenActionLoadingId.value = null
-  }
+  openConfirm(
+    'Revoke IC Token',
+    `Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`,
+    'Revoke',
+    async () => {
+      tokenActionLoadingId.value = agent.id
+      try {
+        await api.revokeIcToken(agent.id)
+        icTokenStatuses.value = {
+          ...icTokenStatuses.value,
+          [agent.id]: { agent_id: agent.id, has_ic_token: false, created_at: null },
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to revoke IC token')
+      } finally {
+        tokenActionLoadingId.value = null
+      }
+    },
+  )
 }
 
 async function copyTokenToClipboard() {
@@ -341,6 +340,14 @@ async function copyTokenToClipboard() {
     copyMessage.value = err instanceof Error ? err.message : 'Copy failed'
   }
 }
+
+function getProviderLabel(providerType: ProviderType): string {
+  return providerType === 'openai' ? 'OpenAI' : 'Anthropic'
+}
+
+function getProviderBadgeClass(providerType: ProviderType): string {
+  return providerType === 'openai' ? 'bg-success/80' : 'bg-accent/80'
+}
 </script>
 
 <template>
@@ -352,9 +359,6 @@ async function copyTokenToClipboard() {
       </Button>
     </template>
 
-    <Alert v-if="icTokenError" variant="destructive" class="mb-4">
-      <AlertDescription>{{ icTokenError }}</AlertDescription>
-    </Alert>
 
     <DataTable
       :columns="[
@@ -381,42 +385,42 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
           {{ agent.name }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           {{ agent.owner_id || 'Unknown' }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 flex-wrap">
-            <span
-              v-for="provider in agent.providers"
-              :key="provider"
-              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground"
-            >
-              {{ provider }}
-            </span>
+            <Badge v-for="provider in agent.providers" :key="provider" :class="getProviderBadgeClass(provider as ProviderType)">{{ getProviderLabel(provider as ProviderType) }}</Badge>
           </div>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           {{ agent.provider_key_id ?? 'None' }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
             Loading...
           </div>
-          <div v-else>
-            <Badge v-if="getIcTokenStatus(agent.id)?.has_ic_token" variant="default">Active</Badge>
-            <Badge v-else variant="outline" class="text-foreground">None</Badge>
-            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground mt-1">
-              Created {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
+          <div v-else class="flex gap-1 items-center">
+            <Badge v-if="getIcTokenStatus(agent.id)?.has_ic_token" variant="outline" class="text-success border-none">
+              <svg width="7" height="7" viewBox="0 0 12 12" fill="none"> <circle cx="6" cy="6" r="6" fill="currentColor" /> </svg> 
+              <span class="text-foreground">Active</span>
+            </Badge>
+            <Badge v-else variant="outline" class="text-muted-foreground border-none">
+              <svg width="7" height="7" viewBox="0 0 12 12" fill="none"> <circle cx="6" cy="6" r="6" fill="currentColor" /> </svg> 
+              <span class="text-foreground">None</span>
+            </Badge>
+            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground">
+              {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
             </div>
           </div>
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           {{ formatDate(agent.created_at) }}
         </td>
-        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
@@ -477,12 +481,9 @@ async function copyTokenToClipboard() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="name">Name</Label>
             <Input
               id="name"
@@ -492,7 +493,7 @@ async function copyTokenToClipboard() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="create-provider-key">Assigned Provider Key (required)</Label>
             <Select v-model="selectedProviderKeyId" :disabled="createMutation.isPending.value">
               <SelectTrigger id="create-provider-key">
@@ -510,7 +511,7 @@ async function copyTokenToClipboard() {
             </Select>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="create-budget">Initial Budget (USD)</Label>
             <Input
               id="create-budget"
@@ -578,12 +579,9 @@ async function copyTokenToClipboard() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
 
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="update-name">Name</Label>
             <Input
               id="update-name"
@@ -593,7 +591,7 @@ async function copyTokenToClipboard() {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="update-provider-key">Assigned Provider Key</Label>
             <Select v-model="selectedProviderKeyId" :disabled="updateMutation.isPending.value">
               <SelectTrigger id="update-provider-key">
@@ -692,15 +690,12 @@ async function copyTokenToClipboard() {
         </DialogHeader>
 
         <div class="space-y-3">
-          <div class="bg-muted border border-border rounded-md p-3 font-mono text-base break-all">
+          <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
+            <strong>Important:</strong> {{ tokenDialogWarning || 'Copy this token now — it won\'t be shown again.' }}
+          </div>
+          <div class="bg-muted border border-border rounded-md p-3 font-mono text-sm break-all select-all">
             {{ tokenDialogValue }}
           </div>
-          <p class="text-base text-muted-foreground">
-            {{ tokenDialogWarning }}
-          </p>
-          <p class="text-xs text-muted-foreground">
-            After closing this dialog you will not be able to view the token again. Regenerate if you need a new value.
-          </p>
           <p v-if="copyMessage" class="text-base text-muted-foreground">
             {{ copyMessage }}
           </p>
@@ -718,5 +713,13 @@ async function copyTokenToClipboard() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      @confirm="confirmCallback?.()"
+    />
   </PageLayout>
 </template>

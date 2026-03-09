@@ -5,6 +5,7 @@ import { useApi, type TokenMetadata, type CreateTokenResponse } from '../composa
 import { useAuthStore } from '../stores/auth'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -24,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,10 +41,24 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showTokenModal = ref(false)
+const showConfirmModal = ref(false)
+const confirmTitle = ref('')
+const confirmDescription = ref('')
+const confirmLabel = ref('')
+const confirmVariant = ref<'default' | 'destructive'>('destructive')
+let confirmCallback: (() => void) | null = null
+
+function openConfirm(title: string, description: string, label: string, action: () => void, variant: 'default' | 'destructive' = 'destructive') {
+  confirmTitle.value = title
+  confirmDescription.value = description
+  confirmLabel.value = label
+  confirmVariant.value = variant
+  confirmCallback = action
+  showConfirmModal.value = true
+}
 const newTokenData = ref<CreateTokenResponse | null>(null)
 const projectId = ref('')
 const description = ref('')
-const createError = ref('')
 const selectedUserId = ref('')
 
 // Fetch users for dropdown
@@ -69,11 +84,10 @@ const createMutation = useMutation({
     projectId.value = ''
     description.value = ''
     selectedUserId.value = authStore.username || ''
-    createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create token'
+    toast.error(err instanceof Error ? err.message : 'Failed to create token')
   },
 })
 
@@ -96,7 +110,6 @@ const revokeMutation = useMutation({
 })
 
 function handleCreateToken() {
-  createError.value = ''
   createMutation.mutate({
     user_id: selectedUserId.value || authStore.username || 'default',
     project_id: projectId.value || undefined,
@@ -105,15 +118,21 @@ function handleCreateToken() {
 }
 
 function handleRotateToken(token: TokenMetadata) {
-  if (confirm(`Rotate token ${token.id}? The old token will be revoked.`)) {
-    rotateMutation.mutate(token.id)
-  }
+  openConfirm(
+    'Rotate Token',
+    `Rotate token ${token.id}? The current token will be revoked and a new one issued.`,
+    'Rotate',
+    () => rotateMutation.mutate(token.id),
+  )
 }
 
 function handleRevokeToken(token: TokenMetadata) {
-  if (confirm(`Revoke token ${token.id}? This action cannot be undone.`)) {
-    revokeMutation.mutate(token.id)
-  }
+  openConfirm(
+    'Revoke Token',
+    `Revoke token ${token.id}? This action cannot be undone.`,
+    'Revoke',
+    () => revokeMutation.mutate(token.id),
+  )
 }
 
 function formatDate(timestamp: number): string {
@@ -201,12 +220,8 @@ function copyToken(token: string) {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
-
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="user">User</Label>
             <Select v-model="selectedUserId">
               <SelectTrigger id="user">
@@ -224,7 +239,7 @@ function copyToken(token: string) {
             </Select>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="project">Project ID (optional)</Label>
             <Input
               id="project"
@@ -234,7 +249,7 @@ function copyToken(token: string) {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="description">Description (optional)</Label>
             <Input
               id="description"
@@ -275,14 +290,12 @@ function copyToken(token: string) {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert variant="default" class="bg-yellow-50 border-yellow-400">
-          <AlertDescription class="text-yellow-800">
-            <strong>Important:</strong> Save this token now. You won't be able to see it again!
-          </AlertDescription>
-        </Alert>
+        <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
+          <strong>Important:</strong> Copy this token now — it won't be shown again.
+        </div>
 
-        <div v-if="newTokenData" class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div v-if="newTokenData" class="space-y-4">
+          <div class="space-y-1.5">
             <Label>Token</Label>
             <div class="flex space-x-2">
               <Input
@@ -328,5 +341,14 @@ function copyToken(token: string) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      :variant="confirmVariant"
+      @confirm="confirmCallback?.()"
+    />
   </PageLayout>
 </template>
