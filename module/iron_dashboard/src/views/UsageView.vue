@@ -2,25 +2,23 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod, type AnalyticsEvent } from '../composables/useApi'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import PageLayout from '@/components/PageLayout.vue'
+import StatCard from '@/components/cards/StatCard.vue'
+import PercentBar from '@/components/PercentBar.vue'
+import DataTable from '@/components/DataTable.vue'
 
 const api = useApi()
 
-// Agent selector
 const selectedAgentId = ref<number | null>(null)
 
-// Fetch agents for dropdown
 const { data: agents } = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
 
-// Period selector
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
 
-// Logs pagination - accumulate logs across pages
 const logsPage = ref(1)
 const logsPerPage = 10
 const accumulatedLogs = ref<AnalyticsEvent[]>([])
@@ -28,78 +26,52 @@ const totalEvents = ref(0)
 const totalPages = ref(1)
 
 const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'last7-days', label: 'Last 7 Days' },
-  { value: 'last30-days', label: 'Last 30 Days' },
-  { value: 'this-month', label: 'This Month' },
-  { value: 'all-time', label: 'All Time' },
+  { value: 'today',       label: 'Today'       },
+  { value: 'yesterday',   label: 'Yesterday'   },
+  { value: 'last7-days',  label: 'Last 7 Days' },
+  { value: 'last30-days', label: 'Last 30 Days'},
+  { value: 'this-month',  label: 'This Month'  },
+  { value: 'all-time',    label: 'All Time'    },
 ]
 
-// Fetch from Protocol 012 endpoints with agent filter
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
   queryKey: ['analytics-requests', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageRequests({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
   queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingByProvider({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
   queryKey: ['analytics-models', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageModels({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingTotal({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () => api.getAnalyticsSpendingTotal({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
 })
 
-// Fetch recent events/logs
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
   queryFn: () => api.getAnalyticsEventsList(
-    {
-      period: selectedPeriod.value,
-      agent_id: selectedAgentId.value ?? undefined,
-    },
-    {
-      page: logsPage.value,
-      per_page: logsPerPage,
-    }
+    { period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined },
+    { page: logsPage.value, per_page: logsPerPage },
   ),
 })
 
-// Accumulate logs when new data arrives
 watch(eventsList, (newData) => {
   if (newData) {
-    if (logsPage.value === 1) {
-      // First page - replace all
-      accumulatedLogs.value = newData.data
-    } else {
-      // Append new logs
-      accumulatedLogs.value = [...accumulatedLogs.value, ...newData.data]
-    }
+    accumulatedLogs.value = logsPage.value === 1
+      ? newData.data
+      : [...accumulatedLogs.value, ...newData.data]
     totalEvents.value = newData.pagination.total
     totalPages.value = newData.pagination.total_pages
   }
 }, { immediate: true })
 
-// Reset when filters change
 watch([selectedPeriod, selectedAgentId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
@@ -112,38 +84,38 @@ const error = computed(() =>
   requestsError.value || providerError.value || modelError.value
 )
 
-// Computed values from Protocol 012 responses
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
 const successRate = computed(() => requestStats.value?.success_rate || 0)
 const totalSpend = computed(() => spendingTotal.value?.total_spend || 0)
-const totalInputTokens = computed(() =>
-  modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0
-)
-const totalOutputTokens = computed(() =>
-  modelUsage.value?.data.reduce((sum, m) => sum + m.output_tokens, 0) || 0
-)
+const totalInputTokens = computed(() => modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0)
+const totalOutputTokens = computed(() => modelUsage.value?.data.reduce((sum, m) => sum + m.output_tokens, 0) || 0)
 
-// Provider breakdown with visual bars
 const providerBreakdown = computed(() => {
-  if (!spendingByProvider.value?.data) return []
-  const data = spendingByProvider.value.data
+  const data = spendingByProvider.value?.data ?? []
+  if (!data.length) return []
   const maxCost = Math.max(...data.map(p => p.spending), 0.001)
-  return data.map(p => ({
-    ...p,
-    percentage: maxCost > 0 ? (p.spending / maxCost) * 100 : 0,
-  }))
+  return data.map(p => ({ ...p, percentage: (p.spending / maxCost) * 100 }))
+            .sort((a, b) => b.percentage - a.percentage)
 })
 
-// Model breakdown with visual bars
 const modelBreakdown = computed(() => {
-  if (!modelUsage.value?.data) return []
-  const data = modelUsage.value.data
+  const data = modelUsage.value?.data ?? []
+  if (!data.length) return []
   const maxRequests = Math.max(...data.map(m => m.request_count), 1)
-  return data.map(m => ({
-    ...m,
-    percentage: maxRequests > 0 ? (m.request_count / maxRequests) * 100 : 0,
-  }))
+  return data.map(m => ({ ...m, percentage: (m.request_count / maxRequests) * 100 }))
+            .sort((a, b) => b.percentage - a.percentage)
 })
+
+const BREAKDOWN_LIMIT = 10
+const showAllProviders = ref(false)
+const showAllModels = ref(false)
+
+const visibleProviders = computed(() =>
+  showAllProviders.value ? providerBreakdown.value : providerBreakdown.value.slice(0, BREAKDOWN_LIMIT)
+)
+const visibleModels = computed(() =>
+  showAllModels.value ? modelBreakdown.value : modelBreakdown.value.slice(0, BREAKDOWN_LIMIT)
+)
 
 function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`
@@ -202,205 +174,172 @@ function loadMoreLogs() {
     <div v-else>
       <!-- Summary statistics -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6">
-        <!-- Total requests -->
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-base font-medium text-muted-foreground">Total Requests</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="text-3xl font-bold text-foreground">
-              {{ formatNumber(totalRequests) }}
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard title="Total Requests">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalRequests) }}</div>
+        </StatCard>
 
-        <!-- Success rate -->
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-base font-medium text-muted-foreground">Success Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="text-3xl font-bold" :class="successRate >= 95 ? 'text-foreground' : 'text-foreground'">
-              {{ successRate.toFixed(1) }}%
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard title="Success Rate">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
+        </StatCard>
 
-        <!-- Total input tokens -->
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-base font-medium text-muted-foreground">Input Tokens</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="text-3xl font-bold text-foreground">
-              {{ formatNumber(totalInputTokens) }}
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard title="Input Tokens">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalInputTokens) }}</div>
+        </StatCard>
 
-        <!-- Total output tokens -->
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-base font-medium text-muted-foreground">Output Tokens</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="text-3xl font-bold text-foreground">
-              {{ formatNumber(totalOutputTokens) }}
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard title="Output Tokens">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalOutputTokens) }}</div>
+        </StatCard>
 
-        <!-- Total cost -->
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-base font-medium text-muted-foreground">Total Cost</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="text-3xl font-bold text-foreground">
-              {{ formatCost(totalSpend) }}
-            </div>
-          </CardContent>
-        </Card>
+          <StatCard title="Total Cost">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ formatCost(totalSpend) }}</div>
+        </StatCard>
       </div>
 
       <!-- Provider and Model breakdown -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Provider breakdown -->
-        <Card>
-          <CardHeader>
-            <CardTitle>Usage by Provider</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div v-if="providerBreakdown.length === 0" class="text-center text-muted-foreground">
-              No provider data available
-            </div>
-            <div v-else class="space-y-4">
-              <div v-for="provider in providerBreakdown" :key="provider.provider">
-                <div class="flex justify-between items-center mb-2">
-                  <span class="text-base font-medium text-foreground">{{ provider.provider }}</span>
-                  <div class="text-right">
-                    <span class="text-base font-semibold text-foreground">
-                      {{ formatCost(provider.spending) }}
-                    </span>
-                    <span class="text-xs text-muted-foreground ml-2">
-                      {{ formatNumber(provider.request_count) }} requests
-                    </span>
-                  </div>
-                </div>
-                <div class="w-full bg-muted rounded-full h-2">
-                  <div
-                    class="bg-foreground h-2 rounded-full transition-all"
-                    :style="{ width: `${provider.percentage}%` }"
-                  />
+        <StatCard title="Usage by Provider" :showSeparator="true">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+            </svg>
+          </template>
+          <div v-if="providerBreakdown.length === 0" class="text-center text-muted-foreground">
+            No provider data available
+          </div>
+          <div v-else class="space-y-4">
+            <div v-for="provider in visibleProviders" :key="provider.provider">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-base font-medium text-foreground">{{ provider.provider }}</span>
+                <div class="text-right">
+                  <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
+                  <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
                 </div>
               </div>
+              <PercentBar :percentage="provider.percentage" />
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              v-if="providerBreakdown.length > BREAKDOWN_LIMIT"
+              variant="ghost"
+              size="sm"
+              class="w-full"
+              @click="showAllProviders = !showAllProviders"
+            >
+              {{ showAllProviders ? 'Show less' : `Show all ${providerBreakdown.length}` }}
+            </Button>
+          </div>
+        </StatCard>
 
-        <!-- Model breakdown -->
-        <Card>
-          <CardHeader>
-            <CardTitle>Usage by Model</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground">
-              No model data available
-            </div>
-            <div v-else class="space-y-4">
-              <div v-for="model in modelBreakdown" :key="model.model">
-                <div class="flex justify-between items-center mb-2">
-                  <span class="text-base font-medium text-foreground">{{ model.model }}</span>
-                  <div class="text-right">
-                    <span class="text-base font-semibold text-foreground">
-                      {{ formatNumber(model.request_count) }} requests
-                    </span>
-                    <span class="text-xs text-muted-foreground ml-2">
-                      {{ formatCost(model.spending) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="w-full bg-muted rounded-full h-2">
-                  <div
-                    class="bg-foreground h-2 rounded-full transition-all"
-                    :style="{ width: `${model.percentage}%` }"
-                  />
+        <StatCard title="Usage by Model" :showSeparator="true">
+          <template #icon>
+            <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+            </svg>
+          </template>
+          <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground">
+            No model data available
+          </div>
+          <div v-else class="space-y-4">
+            <div v-for="model in visibleModels" :key="model.model">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-base font-medium text-foreground">{{ model.model }}</span>
+                <div class="text-right">
+                  <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
+                  <span class="text-xs text-muted-foreground ml-2">{{ formatCost(model.spending) }}</span>
                 </div>
               </div>
+              <PercentBar :percentage="model.percentage" />
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              v-if="modelBreakdown.length > BREAKDOWN_LIMIT"
+              variant="ghost"
+              size="sm"
+              class="w-full"
+              @click="showAllModels = !showAllModels"
+            >
+              {{ showAllModels ? 'Show less' : `Show all ${modelBreakdown.length}` }}
+            </Button>
+          </div>
+        </StatCard>
       </div>
 
       <!-- Recent Logs -->
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between">
-          <CardTitle>Recent Logs</CardTitle>
+      <StatCard title="Recent Logs" :showSeparator="true">
+        <template #icon>
+          <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+        </template>
+        <template #action>
           <span v-if="totalEvents > 0" class="text-base text-muted-foreground">
             Showing {{ accumulatedLogs.length }} of {{ totalEvents }} events
           </span>
-        </CardHeader>
-        <CardContent>
-          <div v-if="eventsLoading && accumulatedLogs.length === 0" class="text-center text-muted-foreground py-4">
-            Loading logs...
-          </div>
-          <div v-else-if="accumulatedLogs.length === 0" class="text-center text-muted-foreground py-4">
-            No logs available
-          </div>
-          <div v-else>
-            <div class="overflow-x-auto touch-pan-x">
-              <table class="min-w-[600px] w-full divide-y divide-border">
-                <thead>
-                  <tr>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Time</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Agent</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Model</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Tokens</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Cost</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                  <tr v-for="event in accumulatedLogs" :key="event.event_id">
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-base text-muted-foreground">
-                      {{ formatTimestamp(event.timestamp_ms) }}
-                    </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-base text-foreground">
-                      {{ event.agent_name }}
-                    </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-base text-muted-foreground">
-                      {{ event.model }}
-                    </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap">
-                      <span
-                        class="px-2 py-1 text-xs font-medium rounded-full"
-                        :class="event.event_type === 'llm_request_completed'
-                          ? 'bg-muted text-foreground'
-                          : 'bg-destructive/10 text-destructive'"
-                      >
-                        {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
-                      </span>
-                    </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-base text-muted-foreground">
-                      {{ formatNumber(event.input_tokens + event.output_tokens) }}
-                    </td>
-                    <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-base text-muted-foreground">
-                      {{ formatMicrodollars(event.cost_micros) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+        </template>
 
-            <!-- Load More Button -->
-            <div v-if="logsPage < totalPages" class="mt-4 text-center">
+        <DataTable
+          :columns="[
+            { label: 'Time' },
+            { label: 'Agent' },
+            { label: 'Model' },
+            { label: 'Status' },
+            { label: 'Tokens' },
+            { label: 'Cost' },
+          ]"
+          :isLoading="eventsLoading && accumulatedLogs.length === 0"
+          :isEmpty="accumulatedLogs.length === 0"
+          loadingText="Loading logs..."
+        >
+          <template #empty>
+            <p class="text-muted-foreground">No logs available</p>
+          </template>
+          <tr v-for="event in accumulatedLogs" :key="event.event_id">
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.model }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+              <span
+                class="px-2 py-1 text-xs font-medium rounded-full"
+                :class="event.event_type === 'llm_request_completed' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'"
+              >
+                {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
+              </span>
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(event.input_tokens + event.output_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ formatMicrodollars(event.cost_micros) }}</td>
+          </tr>
+          <template #footer>
+            <div v-if="logsPage < totalPages" class="p-4 text-center">
               <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </template>
+        </DataTable>
+      </StatCard>
     </div>
   </PageLayout>
 </template>
