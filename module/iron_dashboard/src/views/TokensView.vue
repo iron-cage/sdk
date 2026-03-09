@@ -46,14 +46,14 @@ const confirmTitle = ref('')
 const confirmDescription = ref('')
 const confirmLabel = ref('')
 const confirmVariant = ref<'default' | 'destructive'>('destructive')
-let confirmCallback: (() => void) | null = null
+const confirmCallback = ref<(() => void) | null>(null)
 
 function openConfirm(title: string, description: string, label: string, action: () => void, variant: 'default' | 'destructive' = 'destructive') {
   confirmTitle.value = title
   confirmDescription.value = description
   confirmLabel.value = label
   confirmVariant.value = variant
-  confirmCallback = action
+  confirmCallback.value = action
   showConfirmModal.value = true
 }
 const newTokenData = ref<CreateTokenResponse | null>(null)

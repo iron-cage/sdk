@@ -34,13 +34,13 @@ const showConfirmModal = ref(false)
 const confirmTitle = ref('')
 const confirmDescription = ref('')
 const confirmLabel = ref('')
-let confirmCallback: (() => void) | null = null
+const confirmCallback = ref<(() => void) | null>(null)
 
 function openConfirm(title: string, description: string, label: string, action: () => void) {
   confirmTitle.value = title
   confirmDescription.value = description
   confirmLabel.value = label
-  confirmCallback = action
+  confirmCallback.value = action
   showConfirmModal.value = true
 }
 

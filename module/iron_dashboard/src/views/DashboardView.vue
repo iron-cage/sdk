@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
 import PageLayout from '@/components/PageLayout.vue'
 import DashboardCards from '@/components/DashboardCards.vue'
+import { computed } from 'vue'
 
 const api = useApi()
 
@@ -21,7 +22,7 @@ const { data: agents, isLoading: agentsLoading } = useQuery({
   queryFn: () => api.getAgents(),
 })
 
-const isLoading = spendingLoading || requestsLoading || agentsLoading
+const isLoading = computed(() => spendingLoading.value || requestsLoading.value || agentsLoading.value)
 </script>
 
 <template>

@@ -51,14 +51,14 @@ const confirmTitle = ref('')
 const confirmDescription = ref('')
 const confirmLabel = ref('')
 const confirmVariant = ref<'default' | 'destructive'>('default')
-let confirmCallback: (() => void) | null = null
+const confirmCallback = ref<(() => void) | null>(null)
 
 function openConfirm(title: string, description: string, label: string, action: () => void, variant: 'default' | 'destructive' = 'default') {
   confirmTitle.value = title
   confirmDescription.value = description
   confirmLabel.value = label
   confirmVariant.value = variant
-  confirmCallback = action
+  confirmCallback.value = action
   showConfirmModal.value = true
 }
 const rejectingRequest = ref<BudgetRequest | null>(null)
