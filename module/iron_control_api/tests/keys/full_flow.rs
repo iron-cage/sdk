@@ -213,7 +213,7 @@ impl TestState {
   async fn disable_key(&self, key_id: i64) {
     self
       .provider_storage
-      .set_enabled(key_id, false)
+      .update_key_fields(key_id, None, None, Some(false), None)
       .await
       .expect("LOUD FAILURE: Failed to disable key");
   }

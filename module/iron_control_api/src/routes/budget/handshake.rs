@@ -380,11 +380,14 @@ pub async fn handshake(
             );
             match create_dev_provider_key_for_agent1(&state, provider_type, &owner_for_key).await {
               Ok(new_id) => {
-                let _ = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
+                if let Err(e) = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
                   .bind(new_id)
                   .bind(agent_id)
                   .execute(&state.db_pool)
-                  .await;
+                  .await
+                {
+                  tracing::warn!("IRON_ALLOW_DEV_KEYS: failed to link dev key {} to agent {}: {}", new_id, agent_id, e);
+                }
                 new_id
               }
               Err(e) => {
@@ -467,6 +470,9 @@ pub async fn handshake(
   let key_record = match state.provider_key_storage.get_key(key_id).await {
     Ok(record) => record,
     Err(TokenError::NotFound) => {
+      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+        tracing::error!("Failed to refund reserved budget after key-not-found for agent {}: {}", agent_id, e);
+      }
       return (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({ "error": "Provider key not found" })),
@@ -486,6 +492,9 @@ pub async fn handshake(
   // TOCTOU re-validation: re-check ownership on the freshly-fetched record to close
   // any race between the initial ownership check and the actual key use.
   if key_record.metadata.user_id != owner_for_key {
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after ownership mismatch for agent {}: {}", agent_id, e);
+    }
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "UNAUTHORIZED_KEY_ACCESS" })),
@@ -495,6 +504,9 @@ pub async fn handshake(
 
   // Validate provider key matches requested provider
   if key_record.metadata.provider != provider_type {
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after provider mismatch for agent {}: {}", agent_id, e);
+    }
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "Provider key does not match requested provider" })),
@@ -504,6 +516,9 @@ pub async fn handshake(
 
   // Validate provider key is enabled
   if !key_record.metadata.is_enabled {
+    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
+      tracing::error!("Failed to refund reserved budget after disabled-key check for agent {}: {}", agent_id, e);
+    }
     return (
       StatusCode::FORBIDDEN,
       Json(serde_json::json!({ "error": "Provider key is disabled" })),

@@ -289,6 +289,9 @@ fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiErr
   }
 }
 
+/// Maximum number of provider keys a single user may create per provider
+const MAX_KEYS_PER_USER_PER_PROVIDER: i64 = 20;
+
 /// POST /api/providers
 ///
 /// Create new AI provider key
@@ -327,9 +330,10 @@ pub async fn create_provider_key(
     .await
     .map_err(|_| ApiError::Internal("Failed to check key quota".into()))?;
 
-  if count >= 20 {
+  if count >= MAX_KEYS_PER_USER_PER_PROVIDER {
     return Err(ApiError::TooManyRequests(
-      "Key quota exceeded: maximum 20 keys per provider".into(),
+      format!("Key quota exceeded: maximum {} keys per provider", MAX_KEYS_PER_USER_PER_PROVIDER)
+        .into(),
     ));
   }
 
@@ -375,22 +379,12 @@ pub async fn list_provider_keys(
       .into_response();
   };
 
-  // For each key, fetch assigned projects and build response
+  let key_ids: Vec<i64> = keys.iter().map(|m| m.id).collect();
+  let mut all_projects = state.storage.get_all_key_projects(&key_ids).await.unwrap_or_default();
   let mut responses: Vec<ProviderKeyResponse> = Vec::with_capacity(keys.len());
-
   for meta in keys {
-    // Fetch projects assigned to this key
-    let assigned_projects = state
-      .storage
-      .get_key_projects(meta.id)
-      .await
-      .unwrap_or_default();
-
-    responses.push(ProviderKeyResponse::from_metadata(
-      meta,
-      "***",
-      assigned_projects,
-    ));
+    let assigned_projects = all_projects.remove(&meta.id).unwrap_or_default();
+    responses.push(ProviderKeyResponse::from_metadata(meta, "***", assigned_projects));
   }
 
   (StatusCode::OK, Json(responses)).into_response()

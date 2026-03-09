@@ -614,7 +614,7 @@ async fn test_handshake_no_assigned_key_returns_403() {
 ///
 /// `std::env::set_var` / `remove_var` are not thread-safe. Tests that manipulate
 /// this env var must hold this guard for the duration of the handshake call.
-static DEV_KEY_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static DEV_KEY_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Seed user and update agent_1's owner_id.
 ///
@@ -666,7 +666,7 @@ async fn handshake_dev_key_creation_requires_flag() {
   // Hold the env-var lock for the duration of the handshake call to prevent the
   // concurrent `works_with_flag` test from setting the var mid-flight.
   let resp = {
-    let _guard = DEV_KEY_ENV_LOCK.lock().unwrap();
+    let _guard = DEV_KEY_ENV_LOCK.lock().await;
     std::env::remove_var("IRON_ALLOW_DEV_KEYS");
     app
       .oneshot(
@@ -715,7 +715,7 @@ async fn handshake_dev_key_creation_works_with_flag() {
   let body = json!({ "ic_token": ic_token, "provider": "openai" });
 
   let resp = {
-    let _guard = DEV_KEY_ENV_LOCK.lock().unwrap();
+    let _guard = DEV_KEY_ENV_LOCK.lock().await;
     std::env::set_var("IRON_ALLOW_DEV_KEYS", "1");
     let r = app
       .oneshot(
@@ -846,6 +846,8 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
+  // Save a reference to the pool before state is consumed by the router builder
+  let db_pool = state.db_pool.clone();
   let app = build_handshake_router(state);
   // No explicit provider_key_id — the handler will use the agent's assigned key,
   // then the TOCTOU re-check will find that key.user_id (user_a) ≠ owner_for_key (user_b)
@@ -874,5 +876,20 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
     json["error"].as_str().unwrap(),
     "UNAUTHORIZED_KEY_ACCESS",
     "TOCTOU re-check error code must be UNAUTHORIZED_KEY_ACCESS"
+  );
+
+  // Verify budget was NOT consumed (reservation should not have been made, or was refunded)
+  let initial_budget: i64 = 1_000_000_000;
+  let budget: Option<(i64,)> = sqlx::query_as(
+    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?",
+  )
+  .bind(agent_id)
+  .fetch_optional(&db_pool)
+  .await
+  .unwrap();
+  assert_eq!(
+    budget.map(|b| b.0),
+    Some(initial_budget),
+    "Budget should be unchanged after rejected handshake"
   );
 }

@@ -3,6 +3,7 @@
 //! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`).
 
 use core::fmt::{Display, Formatter, Result as FmtResult};
+use std::collections::HashMap;
 
 use sqlx::{sqlite::SqliteRow, Row, SqlitePool};
 
@@ -244,51 +245,6 @@ impl ProviderKeyStorage {
     Ok(rows.iter().map(row_to_metadata).collect())
   }
 
-  /// Set key enabled/disabled status
-  ///
-  /// # Errors
-  ///
-  /// Returns error if database update fails
-  pub async fn set_enabled(&self, key_id: i64, enabled: bool) -> Result<()> {
-    sqlx::query("UPDATE ai_provider_keys SET is_enabled = $1 WHERE id = $2")
-      .bind(enabled)
-      .bind(key_id)
-      .execute(&self.pool)
-      .await
-      .map_err(TokenError::Database)?;
-    Ok(())
-  }
-
-  /// Update description
-  ///
-  /// # Errors
-  ///
-  /// Returns error if database update fails
-  pub async fn update_description(&self, key_id: i64, description: Option<&str>) -> Result<()> {
-    sqlx::query("UPDATE ai_provider_keys SET description = $1 WHERE id = $2")
-      .bind(description)
-      .bind(key_id)
-      .execute(&self.pool)
-      .await
-      .map_err(TokenError::Database)?;
-    Ok(())
-  }
-
-  /// Update base URL
-  ///
-  /// # Errors
-  ///
-  /// Returns error if database update fails
-  pub async fn update_base_url(&self, key_id: i64, base_url: Option<&str>) -> Result<()> {
-    sqlx::query("UPDATE ai_provider_keys SET base_url = $1 WHERE id = $2")
-      .bind(base_url)
-      .bind(key_id)
-      .execute(&self.pool)
-      .await
-      .map_err(TokenError::Database)?;
-    Ok(())
-  }
-
   /// Update balance
   ///
   /// # Errors
@@ -417,6 +373,41 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     Ok(rows.into_iter().map(|r| r.0).collect())
+  }
+
+  /// Get all project assignments for multiple keys in a single query
+  ///
+  /// Returns a map from key ID to list of project IDs.
+  /// Keys with no assignments are absent from the map.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn get_all_key_projects(&self, key_ids: &[i64]) -> Result<HashMap<i64, Vec<String>>> {
+    if key_ids.is_empty() {
+      return Ok(HashMap::new());
+    }
+    // Build parameterized IN clause
+    let placeholders = key_ids
+      .iter()
+      .enumerate()
+      .map(|(i, _)| format!("${}", i + 1))
+      .collect::<Vec<_>>()
+      .join(", ");
+    let sql = format!(
+      "SELECT provider_key_id, project_id FROM project_provider_key_assignments WHERE provider_key_id IN ({})",
+      placeholders
+    );
+    let mut query = sqlx::query_as::<_, (i64, String)>(&sql);
+    for id in key_ids {
+      query = query.bind(id);
+    }
+    let rows = query.fetch_all(&self.pool).await.map_err(TokenError::Database)?;
+    let mut map: HashMap<i64, Vec<String>> = HashMap::new();
+    for (key_id, project_id) in rows {
+      map.entry(key_id).or_default().push(project_id);
+    }
+    Ok(map)
   }
 
   /// Get all keys of provider (unscoped — admin/internal use only)
@@ -589,7 +580,7 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
-      return Err(TokenError::Generic);
+      return Err(TokenError::NotFound);
     }
     Ok(())
   }
@@ -618,7 +609,7 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
-      return Err(TokenError::Generic);
+      return Err(TokenError::NotFound);
     }
     Ok(())
   }

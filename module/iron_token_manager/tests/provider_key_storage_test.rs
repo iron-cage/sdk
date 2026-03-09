@@ -93,19 +93,19 @@ async fn enable_disable_key() {
   );
 
   // Disable
-  storage.set_enabled(key_id, false).await.unwrap();
+  storage.update_key_fields(key_id, None, None, Some(false), None).await.unwrap();
   let meta = storage.get_key_metadata(key_id).await.unwrap();
   assert!(
     !meta.is_enabled,
-    "Key should be disabled after set_enabled(false)"
+    "Key should be disabled after update_key_fields with Some(false)"
   );
 
   // Enable again
-  storage.set_enabled(key_id, true).await.unwrap();
+  storage.update_key_fields(key_id, None, None, Some(true), None).await.unwrap();
   let meta = storage.get_key_metadata(key_id).await.unwrap();
   assert!(
     meta.is_enabled,
-    "Key should be enabled after set_enabled(true)"
+    "Key should be enabled after update_key_fields with Some(true)"
   );
 }
 
