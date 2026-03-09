@@ -21,7 +21,7 @@ defineProps<{
     <!-- Error -->
     <div v-else-if="error" class="p-4">
       <p class="text-destructive">{{ error.message }}</p>
-      <Button v-if="onRetry" @click="onRetry" variant="secondary" class="mt-4">
+      <Button v-if="onRetry" @click="onRetry" variant="outline" class="mt-4">
         Retry
       </Button>
     </div>

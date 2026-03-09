@@ -15,6 +15,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 
@@ -240,18 +247,10 @@ function handleUpdateBudget() {
   <PageLayout title="Agent Budgets">
 
     <template #actions>
-
-      <div class="flex items-center justify-between w-full">
-        <div>
-          <p class="text-base text-muted-foreground">Allocated, spent, and remaining budget per agent.</p>
-        </div>
-        <div class="space-x-2">
-          <Button variant="outline" size="sm" @click="refetchBudget">
-            Refresh
-          </Button>
-        </div>
-      </div>
-
+      <Button variant="outline" @click="refetchBudget">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        Refresh
+      </Button>
     </template>
     
     <!-- Global Limits hidden - not integrated with iron_cage runtime
@@ -268,7 +267,7 @@ function handleUpdateBudget() {
 
     <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
       <p class="text-destructive">Error loading limits: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
+      <Button @click="() => refetch()" variant="outline" class="mt-4">
         Retry
       </Button>
     </div>
@@ -389,14 +388,20 @@ function handleUpdateBudget() {
           {{ row.percent_used.toFixed(1) }}%
         </td>
         <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-          <Button
-            v-if="authStore.isAdmin"
-            size="sm"
-            variant="secondary"
-            @click="openBudgetModal(row)"
-          >
-            Update Budget
-          </Button>
+          <DropdownMenu v-if="authStore.isAdmin">
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm">
+                <span class="sr-only">Open menu</span>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @click="openBudgetModal(row)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Update Budget
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </td>
       </tr>
     </DataTable>
@@ -472,12 +477,14 @@ function handleUpdateBudget() {
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleCreateLimit"
             :disabled="createMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Limit' }}
           </Button>
         </DialogFooter>
@@ -545,12 +552,14 @@ function handleUpdateBudget() {
             :disabled="updateMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleUpdateLimit"
             :disabled="updateMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Limit' }}
           </Button>
         </DialogFooter>
@@ -590,9 +599,11 @@ function handleUpdateBudget() {
 
         <DialogFooter>
           <Button variant="outline" @click="showBudgetModal = false">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button @click="handleUpdateBudget">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             Update Budget
           </Button>
         </DialogFooter>

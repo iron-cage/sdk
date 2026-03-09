@@ -22,6 +22,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 
@@ -247,15 +255,16 @@ watch(search, () => {
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="user">User</SelectItem>
-            <SelectItem value="viewer">Viewer</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
+            <SelectItem value="developer">Developer</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
 
       <Button @click="showCreateModal = true">
-        Create New User
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+        Create User
       </Button>
     </template>
 
@@ -275,7 +284,7 @@ watch(search, () => {
     >
       <template #empty>
         <p class="text-muted-foreground mb-4">No users found</p>
-        <Button @click="showCreateModal = true">Create First User</Button>
+        <Button @click="showCreateModal = true"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>Create First User</Button>
       </template>
 
       <tr v-for="user in usersData?.users" :key="user.id">
@@ -297,14 +306,33 @@ watch(search, () => {
           {{ new Date(user.created_at).toLocaleDateString() }}
         </td>
         <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-          <div class="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" @click="handleChangeRole(user)" :disabled="user.username === 'admin'">Role</Button>
-            <Button variant="ghost" size="sm" @click="handleResetPassword(user)">Reset Pass</Button>
-            <Button variant="ghost" size="sm" @click="handleToggleStatus(user)" :disabled="user.username === 'admin'">
-              {{ user.is_active ? 'Suspend' : 'Activate' }}
-            </Button>
-            <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="handleDeleteUser(user)" :disabled="user.username === 'admin'">Delete</Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm">
+                <span class="sr-only">Open menu</span>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @click="handleChangeRole(user)" :disabled="user.username === 'admin'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                Change Role
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="handleResetPassword(user)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                Reset Password
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="handleToggleStatus(user)" :disabled="user.username === 'admin'">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="user.is_active ? 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' : 'M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z'" /></svg>
+                {{ user.is_active ? 'Suspend' : 'Activate' }}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="handleDeleteUser(user)" :disabled="user.username === 'admin'" class="text-destructive">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </td>
       </tr>
 
@@ -316,8 +344,8 @@ watch(search, () => {
             of <span class="font-medium">{{ usersData.total }}</span> results
           </p>
           <div class="flex gap-2">
-            <Button variant="outline" :disabled="page === 1" @click="page--">Previous</Button>
-            <Button variant="outline" :disabled="page * pageSize >= usersData.total" @click="page++">Next</Button>
+            <Button variant="outline" :disabled="page === 1" @click="page--"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>Previous</Button>
+            <Button variant="outline" :disabled="page * pageSize >= usersData.total" @click="page++">Next<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></Button>
           </div>
         </div>
       </template>
@@ -378,8 +406,8 @@ watch(search, () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="user">User</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="developer">Developer</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -391,12 +419,14 @@ watch(search, () => {
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleCreateUser"
             :disabled="createMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             {{ createMutation.isPending.value ? 'Creating...' : 'Create User' }}
           </Button>
         </DialogFooter>
@@ -433,6 +463,7 @@ watch(search, () => {
             :disabled="suspendMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
@@ -440,6 +471,7 @@ watch(search, () => {
             :disabled="suspendMutation.isPending.value"
             variant="destructive"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             {{ suspendMutation.isPending.value ? 'Suspending...' : 'Suspend User' }}
           </Button>
         </DialogFooter>
@@ -467,6 +499,7 @@ watch(search, () => {
             :disabled="deleteMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
@@ -474,6 +507,7 @@ watch(search, () => {
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete User' }}
           </Button>
         </DialogFooter>
@@ -502,8 +536,8 @@ watch(search, () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="user">User</SelectItem>
-              <SelectItem value="viewer">Viewer</SelectItem>
+              <SelectItem value="manager">Manager</SelectItem>
+              <SelectItem value="developer">Developer</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -514,12 +548,14 @@ watch(search, () => {
             :disabled="changeRoleMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="confirmChangeRole"
             :disabled="changeRoleMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             {{ changeRoleMutation.isPending.value ? 'Saving...' : 'Save Changes' }}
           </Button>
         </DialogFooter>
@@ -570,12 +606,14 @@ watch(search, () => {
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="confirmResetPassword"
             :disabled="resetPasswordMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             {{ resetPasswordMutation.isPending.value ? 'Resetting...' : 'Reset Password' }}
           </Button>
         </DialogFooter>

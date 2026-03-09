@@ -24,6 +24,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -36,9 +43,9 @@ const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const name = ref('')
-const selectedProviderKeyId = ref<number | null>(null)
+const selectedProviderKeyId = ref<string>('')
 const initialBudgetUsd = ref<number | undefined>(undefined)
-const selectedOwnerId = ref<string | null>(null)  // For owner assignment
+const selectedOwnerId = ref<string>('')
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -110,9 +117,9 @@ const createMutation = useMutation({
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
-    selectedProviderKeyId.value = null
+    selectedProviderKeyId.value = ''
     initialBudgetUsd.value = undefined
-    selectedOwnerId.value = null
+    selectedOwnerId.value = ''
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -129,8 +136,8 @@ const updateMutation = useMutation({
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
-    selectedProviderKeyId.value = null
-    selectedOwnerId.value = null
+    selectedProviderKeyId.value = ''
+    selectedOwnerId.value = ''
     createError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
@@ -153,7 +160,7 @@ function handleCreateAgent() {
     return
   }
 
-  if (selectedProviderKeyId.value === null) {
+  if (!selectedProviderKeyId.value) {
     createError.value = 'Provider key is required'
     return
   }
@@ -185,8 +192,8 @@ function handleCreateAgent() {
 function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
-  selectedProviderKeyId.value = agent.provider_key_id ?? null
-  selectedOwnerId.value = agent.owner_id ?? null
+  selectedProviderKeyId.value = agent.provider_key_id ? String(agent.provider_key_id) : ''
+  selectedOwnerId.value = agent.owner_id ?? ''
   showUpdateModal.value = true
 }
 
@@ -196,7 +203,7 @@ function handleUpdateAgent() {
     return
   }
 
-  if (selectedProviderKeyId.value === null) {
+  if (!selectedProviderKeyId.value) {
     createError.value = 'Provider key is required'
     return
   }
@@ -340,6 +347,7 @@ async function copyTokenToClipboard() {
   <PageLayout title="Agents">
     <template #actions>
       <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
         Create Agent
       </Button>
     </template>
@@ -367,6 +375,7 @@ async function copyTokenToClipboard() {
       <template #empty>
         <p class="text-muted-foreground mb-4">No agents found</p>
         <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
           Create First Agent
         </Button>
       </template>
@@ -416,12 +425,12 @@ async function copyTokenToClipboard() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
                 v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
                 @click="handleGenerateIcToken(agent)"
                 :disabled="tokenActionLoadingId === agent.id"
               >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                 {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
               </DropdownMenuItem>
               <template v-else>
@@ -429,6 +438,7 @@ async function copyTokenToClipboard() {
                   @click="handleRegenerateIcToken(agent)"
                   :disabled="tokenActionLoadingId === agent.id"
                 >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -436,13 +446,20 @@ async function copyTokenToClipboard() {
                   :disabled="tokenActionLoadingId === agent.id"
                   class="text-destructive"
                 >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                   Revoke IC Token
                 </DropdownMenuItem>
               </template>
               <template v-if="authStore.isAdmin">
                 <DropdownMenuSeparator />
-                <DropdownMenuItem @click="openUpdateModal(agent)">Edit Agent</DropdownMenuItem>
-                <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">Delete Agent</DropdownMenuItem>
+                <DropdownMenuItem @click="openUpdateModal(agent)">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  Edit Agent
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Delete Agent
+                </DropdownMenuItem>
               </template>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -477,21 +494,20 @@ async function copyTokenToClipboard() {
 
           <div class="space-y-2">
             <Label for="create-provider-key">Assigned Provider Key (required)</Label>
-            <select
-              id="create-provider-key"
-              v-model="selectedProviderKeyId"
-              :disabled="createMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-base"
-            >
-              <option :value="null">None</option>
-              <option
-                v-for="providerKey in providers"
-                :key="providerKey.id"
-                :value="providerKey.id"
-              >
-                {{ providerKey.id }} - {{ providerKey.provider }}
-              </option>
-            </select>
+            <Select v-model="selectedProviderKeyId" :disabled="createMutation.isPending.value">
+              <SelectTrigger id="create-provider-key">
+                <SelectValue placeholder="Select a provider key" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="providerKey in providers"
+                  :key="providerKey.id"
+                  :value="String(providerKey.id)"
+                >
+                  {{ providerKey.id }} - {{ providerKey.provider }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div class="space-y-2">
@@ -512,21 +528,20 @@ async function copyTokenToClipboard() {
 
           <div v-if="authStore.isAdmin" class="space-y-2">
             <Label for="create-owner">Assign to User (optional)</Label>
-            <select
-              id="create-owner"
-              v-model="selectedOwnerId"
-              :disabled="createMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-base"
-            >
-              <option :value="null">Current User ({{ authStore.username }})</option>
-              <option
-                v-for="user in users?.users"
-                :key="user.id"
-                :value="user.id"
-              >
-                {{ user.username }} ({{ user.email || 'no email' }})
-              </option>
-            </select>
+            <Select v-model="selectedOwnerId" :disabled="createMutation.isPending.value">
+              <SelectTrigger id="create-owner">
+                <SelectValue :placeholder="`Current User (${authStore.username})`" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="user in users?.users"
+                  :key="user.id"
+                  :value="user.id"
+                >
+                  {{ user.username }} ({{ user.email || 'no email' }})
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <p class="text-xs text-muted-foreground">
               Leave empty to assign to yourself.
             </p>
@@ -539,12 +554,14 @@ async function copyTokenToClipboard() {
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleCreateAgent"
             :disabled="createMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Agent' }}
           </Button>
         </DialogFooter>
@@ -578,39 +595,38 @@ async function copyTokenToClipboard() {
 
           <div class="space-y-2">
             <Label for="update-provider-key">Assigned Provider Key</Label>
-            <select
-              id="update-provider-key"
-              v-model="selectedProviderKeyId"
-              :disabled="updateMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-base"
-            >
-              <option :value="null">None</option>
-              <option
-                v-for="providerKey in providers"
-                :key="providerKey.id"
-                :value="providerKey.id"
-              >
-                {{ providerKey.id }} - {{ providerKey.provider }}
-              </option>
-            </select>
+            <Select v-model="selectedProviderKeyId" :disabled="updateMutation.isPending.value">
+              <SelectTrigger id="update-provider-key">
+                <SelectValue placeholder="Select a provider key" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="providerKey in providers"
+                  :key="providerKey.id"
+                  :value="String(providerKey.id)"
+                >
+                  {{ providerKey.id }} - {{ providerKey.provider }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div v-if="authStore.isAdmin" class="space-y-2">
             <Label for="update-owner">Owner</Label>
-            <select
-              id="update-owner"
-              v-model="selectedOwnerId"
-              :disabled="updateMutation.isPending.value"
-              class="w-full border rounded-md px-3 py-2 text-base"
-            >
-              <option
-                v-for="user in users?.users"
-                :key="user.id"
-                :value="user.id"
-              >
-                {{ user.username }} ({{ user.email || 'no email' }})
-              </option>
-            </select>
+            <Select v-model="selectedOwnerId" :disabled="updateMutation.isPending.value">
+              <SelectTrigger id="update-owner">
+                <SelectValue placeholder="Select an owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="user in users?.users"
+                  :key="user.id"
+                  :value="user.id"
+                >
+                  {{ user.username }} ({{ user.email || 'no email' }})
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -620,12 +636,14 @@ async function copyTokenToClipboard() {
             :disabled="updateMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleUpdateAgent"
             :disabled="updateMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
           </Button>
         </DialogFooter>
@@ -648,6 +666,7 @@ async function copyTokenToClipboard() {
             :disabled="deleteMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
@@ -655,6 +674,7 @@ async function copyTokenToClipboard() {
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
           </Button>
         </DialogFooter>
@@ -688,9 +708,11 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button variant="outline" @click="showTokenDialog = false">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Close
           </Button>
           <Button @click="copyTokenToClipboard">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             Copy Token
           </Button>
         </DialogFooter>

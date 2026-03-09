@@ -25,6 +25,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -121,6 +129,7 @@ function copyToken(token: string) {
   <PageLayout title="Token Management">
     <template #actions>
       <Button @click="showCreateModal = true">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
         Generate New Token
       </Button>
     </template>
@@ -142,7 +151,7 @@ function copyToken(token: string) {
     >
       <template #empty>
         <p class="text-muted-foreground mb-4">No tokens found</p>
-        <Button @click="showCreateModal = true">Generate First Token</Button>
+        <Button @click="showCreateModal = true"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>Generate First Token</Button>
       </template>
 
       <tr v-for="token in tokens" :key="token.id">
@@ -157,9 +166,27 @@ function copyToken(token: string) {
             {{ token.is_active ? 'Active' : 'Revoked' }}
           </Badge>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
-          <Button v-if="token.is_active" @click="handleRotateToken(token)" :disabled="rotateMutation.isPending.value" variant="ghost" size="sm">Rotate</Button>
-          <Button v-if="token.is_active" @click="handleRevokeToken(token)" :disabled="revokeMutation.isPending.value" variant="ghost" size="sm" class="text-destructive hover:text-destructive">Revoke</Button>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+          <DropdownMenu v-if="token.is_active">
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm">
+                <span class="sr-only">Open menu</span>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem @click="handleRotateToken(token)" :disabled="rotateMutation.isPending.value">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Rotate
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="handleRevokeToken(token)" :disabled="revokeMutation.isPending.value" class="text-destructive">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                Revoke
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </td>
       </tr>
     </DataTable>
@@ -224,12 +251,14 @@ function copyToken(token: string) {
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleCreateToken"
             :disabled="createMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             {{ createMutation.isPending.value ? 'Generating...' : 'Generate Token' }}
           </Button>
         </DialogFooter>
@@ -263,8 +292,9 @@ function copyToken(token: string) {
               />
               <Button
                 @click="copyToken(newTokenData.token)"
-                variant="secondary"
+                variant="outline"
               >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                 Copy
               </Button>
             </div>
@@ -292,6 +322,7 @@ function copyToken(token: string) {
 
         <DialogFooter>
           <Button @click="showTokenModal = false">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Close
           </Button>
         </DialogFooter>

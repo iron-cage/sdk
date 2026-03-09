@@ -24,6 +24,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
 import {
   Tabs,
@@ -212,7 +220,22 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 <template>
   <PageLayout title="Budget Requests">
     <template #actions>
+      <div v-if="authStore.isAdmin" class="w-full md:w-40">
+        <Select v-model="statusFilter">
+          <SelectTrigger>
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <Button @click="showCreateModal = true">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
         Create Budget Request
       </Button>
     </template>
@@ -225,7 +248,8 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
     <!-- Error state -->
     <div v-else-if="error" class="border border-border rounded-lg p-4">
       <p class="text-destructive">Error loading budget requests: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
+      <Button @click="() => refetch()" variant="outline" class="mt-4">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         Retry
       </Button>
     </div>
@@ -301,6 +325,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
           <div v-else class="border border-border rounded-lg p-4 text-center">
             <p class="text-muted-foreground mb-4">You have no budget requests yet</p>
             <Button @click="showCreateModal = true">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
               Create First Request
             </Button>
           </div>
@@ -363,25 +388,26 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
                   <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">
                     {{ formatDate(request.created_at) }}
                   </td>
-                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium space-x-2">
-                    <Button
-                      @click="handleApproveRequest(request)"
-                      :disabled="approveMutation.isPending.value"
-                      variant="ghost"
-                      size="sm"
-                      class="text-foreground hover:text-muted-foreground"
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      @click="openRejectModal(request)"
-                      :disabled="rejectMutation.isPending.value"
-                      variant="ghost"
-                      size="sm"
-                      class="text-destructive hover:text-destructive"
-                    >
-                      Reject
-                    </Button>
+                  <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger as-child>
+                        <Button variant="ghost" size="sm">
+                          <span class="sr-only">Open menu</span>
+                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem @click="handleApproveRequest(request)" :disabled="approveMutation.isPending.value">
+                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                          Approve
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem @click="openRejectModal(request)" :disabled="rejectMutation.isPending.value" class="text-destructive">
+                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                          Reject
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               </tbody>
@@ -394,22 +420,6 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
 
         <!-- All Requests Tab (Admin Only) -->
         <TabsContent v-if="authStore.isAdmin" value="all-requests">
-          <div class="mb-4">
-            <Label for="status-filter">Filter by Status</Label>
-            <Select v-model="statusFilter">
-              <SelectTrigger class="w-48">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div v-if="filteredRequests.length > 0" class="border border-border rounded-lg overflow-x-auto touch-pan-x">
             <table class="min-w-[800px] w-full divide-y divide-border">
               <thead>
@@ -546,12 +556,14 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
             @click="handleCreateRequest"
             :disabled="createMutation.isPending.value"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Request' }}
           </Button>
         </DialogFooter>
@@ -602,6 +614,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             :disabled="rejectMutation.isPending.value"
             variant="outline"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             Cancel
           </Button>
           <Button
@@ -609,6 +622,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
             :disabled="rejectMutation.isPending.value"
             variant="destructive"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             {{ rejectMutation.isPending.value ? 'Rejecting...' : 'Reject Request' }}
           </Button>
         </DialogFooter>

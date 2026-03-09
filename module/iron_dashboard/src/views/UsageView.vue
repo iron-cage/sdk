@@ -3,6 +3,13 @@ import { ref, computed, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod, type AnalyticsEvent } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import PageLayout from '@/components/PageLayout.vue'
 import StatCard from '@/components/cards/StatCard.vue'
 import PercentBar from '@/components/PercentBar.vue'
@@ -10,7 +17,7 @@ import DataTable from '@/components/DataTable.vue'
 
 const api = useApi()
 
-const selectedAgentId = ref<number | null>(null)
+const selectedAgentId = ref<string>('all')
 
 const { data: agents } = useQuery({
   queryKey: ['agents'],
@@ -36,28 +43,28 @@ const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
   queryKey: ['analytics-requests', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
+  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
   queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
+  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
   queryKey: ['analytics-models', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
+  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingTotal({ period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined }),
+  queryFn: () => api.getAnalyticsSpendingTotal({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
 })
 
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
   queryFn: () => api.getAnalyticsEventsList(
-    { period: selectedPeriod.value, agent_id: selectedAgentId.value ?? undefined },
+    { period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined },
     { page: logsPage.value, per_page: logsPerPage },
   ),
 })
@@ -141,23 +148,31 @@ function loadMoreLogs() {
 <template>
   <PageLayout title="Analytics" content-class="p-4 lg:p-6">
     <template #actions>
-      <select
-        v-model="selectedAgentId"
-        class="px-3 py-1.5 text-base border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-      >
-        <option :value="null">All Agents</option>
-        <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-          {{ agent.name }}
-        </option>
-      </select>
-      <select
-        v-model="selectedPeriod"
-        class="px-3 py-1.5 text-base border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-      >
-        <option v-for="option in periodOptions" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
-      </select>
+      <div class="w-full md:w-40">
+        <Select v-model="selectedAgentId">
+          <SelectTrigger>
+            <SelectValue placeholder="All Agents" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Agents</SelectItem>
+            <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">
+              {{ agent.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div class="w-full md:w-40">
+        <Select v-model="selectedPeriod">
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </template>
 
     <!-- Loading state -->
@@ -228,7 +243,7 @@ function loadMoreLogs() {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
             </svg>
           </template>
-          <div v-if="providerBreakdown.length === 0" class="text-center text-muted-foreground">
+          <div v-if="providerBreakdown.length === 0" class="text-center text-muted-foreground mt-6">
             No provider data available
           </div>
           <div v-else class="space-y-4">
@@ -249,6 +264,7 @@ function loadMoreLogs() {
               class="w-full"
               @click="showAllProviders = !showAllProviders"
             >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="showAllProviders ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'" /></svg>
               {{ showAllProviders ? 'Show less' : `Show all ${providerBreakdown.length}` }}
             </Button>
           </div>
@@ -260,7 +276,7 @@ function loadMoreLogs() {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
             </svg>
           </template>
-          <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground">
+          <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground mt-6">
             No model data available
           </div>
           <div v-else class="space-y-4">
@@ -281,6 +297,7 @@ function loadMoreLogs() {
               class="w-full"
               @click="showAllModels = !showAllModels"
             >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="showAllModels ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'" /></svg>
               {{ showAllModels ? 'Show less' : `Show all ${modelBreakdown.length}` }}
             </Button>
           </div>
@@ -314,7 +331,7 @@ function loadMoreLogs() {
           loadingText="Loading logs..."
         >
           <template #empty>
-            <p class="text-muted-foreground">No logs available</p>
+            <p class="text-muted-foreground mt-4">No logs available</p>
           </template>
           <tr v-for="event in accumulatedLogs" :key="event.event_id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
@@ -334,6 +351,7 @@ function loadMoreLogs() {
           <template #footer>
             <div v-if="logsPage < totalPages" class="p-4 text-center">
               <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>
             </div>
