@@ -12,7 +12,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="border border-border rounded-lg overflow-hidden">
+  <div class="overflow-hidden">
     <!-- Loading -->
     <div v-if="isLoading" class="p-4">
       <p class="text-muted-foreground">{{ loadingText ?? 'Loading...' }}</p>

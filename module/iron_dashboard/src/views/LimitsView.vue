@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -238,6 +239,21 @@ function handleUpdateBudget() {
 <template>
   <PageLayout title="Agent Budgets">
 
+    <template #actions>
+
+      <div class="flex items-center justify-between w-full">
+        <div>
+          <p class="text-base text-muted-foreground">Allocated, spent, and remaining budget per agent.</p>
+        </div>
+        <div class="space-x-2">
+          <Button variant="outline" size="sm" @click="refetchBudget">
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+    </template>
+    
     <!-- Global Limits hidden - not integrated with iron_cage runtime
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-foreground">Usage Limits</h1>
@@ -339,83 +355,51 @@ function handleUpdateBudget() {
     -->
 
     <!-- Agent Budgets -->
-    <div class="border border-border rounded-lg overflow-x-auto touch-pan-x">
-      <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div>
-          <p class="text-base text-muted-foreground">Allocated, spent, and remaining budget per agent.</p>
-        </div>
-        <div class="space-x-2">
-          <Button variant="outline" size="sm" @click="refetchBudget">
-            Refresh
+    <DataTable
+      :columns="[
+        { label: 'Agent' },
+        { label: 'Allocated' },
+        { label: 'Spent' },
+        { label: 'Remaining' },
+        { label: 'Used' },
+        { label: 'Actions', align: 'right' },
+      ]"
+      :isLoading="isBudgetLoading"
+      :error="budgetQueryError"
+      :isEmpty="!budgetStatus?.data?.length"
+      loadingText="Loading agent budgets..."
+    >
+      <template #empty>
+        <p class="text-muted-foreground">No agent budget data available.</p>
+      </template>
+      <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
+          {{ row.agent_name }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          ${{ (row.budget / 1_000_000).toFixed(2) }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          ${{ (row.spent / 1_000_000).toFixed(2) }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          ${{ (row.remaining / 1_000_000).toFixed(2) }}
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+          {{ row.percent_used.toFixed(1) }}%
+        </td>
+        <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+          <Button
+            v-if="authStore.isAdmin"
+            size="sm"
+            variant="secondary"
+            @click="openBudgetModal(row)"
+          >
+            Update Budget
           </Button>
-        </div>
-      </div>
-
-      <div v-if="isBudgetLoading" class="p-6 text-muted-foreground">
-        Loading agent budgets...
-      </div>
-      <div v-else-if="budgetQueryError" class="p-6 text-destructive">
-        Error loading budgets: {{ budgetQueryError.message }}
-      </div>
-      <div v-else-if="budgetStatus?.data?.length">
-        <table class="min-w-[600px] w-full divide-y divide-border">
-          <thead>
-            <tr>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Agent
-              </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Allocated
-              </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Spent
-              </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Remaining
-              </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Used
-              </th>
-              <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border">
-            <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base font-medium text-foreground">
-                {{ row.agent_name }}
-              </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                ${{ (row.budget / 1_000_000).toFixed(2) }}
-              </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                ${{ (row.spent / 1_000_000).toFixed(2) }}
-              </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                ${{ (row.remaining / 1_000_000).toFixed(2) }}
-              </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
-                {{ row.percent_used.toFixed(1) }}%
-              </td>
-              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-                <Button
-                  v-if="authStore.isAdmin"
-                  size="sm"
-                  variant="secondary"
-                  @click="openBudgetModal(row)"
-                >
-                  Update Budget
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-else class="p-6 text-muted-foreground">
-        No agent budget data available.
-      </div>
-    </div>
+        </td>
+      </tr>
+    </DataTable>
 
     <!-- Create limit modal -->
     <Dialog v-model:open="showCreateModal">
