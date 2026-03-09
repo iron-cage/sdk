@@ -323,6 +323,12 @@ async fn test_null_cap_means_unlimited() {
       "LOUD FAILURE: Reservation {i} should succeed with unlimited caps"
     );
   }
+
+  let summary = mgr.get_spending_summary(agent_id).await.unwrap();
+  assert_eq!(
+    summary.used_microdollars, 500_000_000,
+    "LOUD FAILURE: All 5 × $100 reservations should be recorded in spending_used"
+  );
 }
 
 // ─── Test 7: Lease stores provider_key_id ─────────────────────────────────────
@@ -443,7 +449,7 @@ async fn test_agent_cap_isolated_between_agents() {
 
 // ─── Test 10: Concurrent handshakes respect cap ───────────────────────────────
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_concurrent_handshakes_respect_cap() {
   let pool = setup_test_db().await;
   let agent_id = 211i64;
@@ -487,6 +493,13 @@ async fn test_concurrent_handshakes_respect_cap() {
     "LOUD FAILURE: Exactly 5 reservations should succeed ($50 cap / $10 each). Got {succeeded} succeeded, {blocked} blocked"
   );
   assert_eq!(blocked, 5);
+
+  // Verify total spending equals exactly cap (5 × $10 = $50)
+  let summary = mgr.get_spending_summary(agent_id).await.unwrap();
+  assert_eq!(
+    summary.used_microdollars, 50_000_000,
+    "LOUD FAILURE: Total spending should equal exactly the cap"
+  );
 }
 
 // ─── Test 11: Insufficient budget blocks before caps checked ──────────────────
@@ -528,4 +541,124 @@ async fn test_insufficient_budget_blocks() {
     Some(BlockedBy::InsufficientBudget),
     "LOUD FAILURE: Should be blocked by insufficient budget"
   );
+}
+
+// ─── Test 12: Refresh denied when cap exhausted ───────────────────────────────
+
+#[tokio::test]
+async fn test_refresh_denied_when_cap_exhausted() {
+  let pool = setup_test_db().await;
+  let agent_id = 213i64;
+  let key_id = 213_000i64;
+
+  seed_agent_budget(&pool, agent_id, 100_000_000).await; // $100 budget (plenty)
+  seed_provider_key(&pool, key_id, None).await;
+
+  let mgr = AgentBudgetManager::from_pool(pool.clone());
+
+  // Set IC-key cap to $10
+  mgr
+    .set_spending_cap(agent_id, SpendingCap::Limited(10_000_000))
+    .await
+    .expect("LOUD FAILURE: Should set spending cap");
+
+  // Exhaust the cap — reserve $10 (fills it exactly)
+  let initial = mgr
+    .reserve_budget_with_limits(agent_id, Some(key_id), 10_000_000)
+    .await
+    .expect("LOUD FAILURE: Should return result, not DB error");
+  assert!(
+    initial.blocked_by.is_none(),
+    "LOUD FAILURE: Initial reservation should succeed"
+  );
+  assert_eq!(initial.granted, 10_000_000);
+
+  // Simulate a refresh: attempt another reservation — cap is now exhausted
+  let refresh_attempt = mgr
+    .reserve_budget_with_limits(agent_id, Some(key_id), 10_000_000)
+    .await
+    .expect("LOUD FAILURE: Should return result, not DB error");
+
+  assert_eq!(
+    refresh_attempt.blocked_by,
+    Some(BlockedBy::AgentSpendingCap),
+    "LOUD FAILURE: Refresh should be blocked by exhausted agent spending cap"
+  );
+  assert_eq!(
+    refresh_attempt.granted, 0,
+    "LOUD FAILURE: No budget should be granted when cap is exhausted"
+  );
+
+  // Verify spending summary reflects the cap is fully used
+  let summary = mgr.get_spending_summary(agent_id).await.unwrap();
+  assert_eq!(
+    summary.used_microdollars, 10_000_000,
+    "LOUD FAILURE: Spending used should equal the cap after exhaustion"
+  );
+}
+
+// ─── Test 13: Both caps exceeded — IP-key cap checked first ──────────────────
+
+#[tokio::test]
+async fn test_both_caps_exceeded_provider_key_wins() {
+  let pool = setup_test_db().await;
+  let agent_id = 214i64;
+  let key_id = 214_000i64;
+
+  seed_agent_budget(&pool, agent_id, 100_000_000).await; // $100 budget (plenty)
+  seed_provider_key(&pool, key_id, Some(3_000_000)).await; // $3 IP-key cap
+
+  let mgr = AgentBudgetManager::from_pool(pool.clone());
+
+  // Set IC-key cap to $5 (also exceeded by $10 request)
+  mgr
+    .set_spending_cap(agent_id, SpendingCap::Limited(5_000_000))
+    .await
+    .expect("LOUD FAILURE: Should set spending cap");
+
+  // Try to reserve $10 — both caps would be exceeded
+  let result = mgr
+    .reserve_budget_with_limits(agent_id, Some(key_id), 10_000_000)
+    .await
+    .expect("LOUD FAILURE: Should return result, not DB error");
+
+  // IP-key cap is checked first via explicit early-return before the combined UPDATE,
+  // so ProviderKeyCap wins even when both are exceeded.
+  assert_eq!(
+    result.blocked_by,
+    Some(BlockedBy::ProviderKeyCap),
+    "LOUD FAILURE: IP-key cap is checked first and should be reported as the block reason"
+  );
+  assert_eq!(result.granted, 0);
+}
+
+// ─── Test 14: No provider key still enforces agent cap ────────────────────────
+
+#[tokio::test]
+async fn test_no_provider_key_still_enforces_agent_cap() {
+  let pool = setup_test_db().await;
+  let agent_id = 215i64;
+
+  seed_agent_budget(&pool, agent_id, 100_000_000).await; // $100 budget (plenty)
+
+  let mgr = AgentBudgetManager::from_pool(pool.clone());
+
+  // Set IC-key cap to $5
+  mgr
+    .set_spending_cap(agent_id, SpendingCap::Limited(5_000_000))
+    .await
+    .expect("LOUD FAILURE: Should set spending cap");
+
+  // Reserve $10 with no provider key — should be blocked by agent cap
+  let result = mgr
+    .reserve_budget_with_limits(agent_id, None, 10_000_000)
+    .await
+    .expect("LOUD FAILURE: Should return result, not DB error");
+
+  assert_eq!(
+    result.blocked_by,
+    Some(BlockedBy::AgentSpendingCap),
+    "LOUD FAILURE: Agent cap should be enforced even when no provider key is provided"
+  );
+  assert_eq!(result.granted, 0);
 }

@@ -358,15 +358,22 @@ pub async fn handshake(
         "SELECT provider_key_id FROM agents WHERE id = ?",
       )
       .bind(agent_id)
-      .fetch_one(&state.db_pool)
+      .fetch_optional(&state.db_pool)
       .await
       {
-        Ok(id) => id,
-        Err(err) => {
-          tracing::error!("Database error fetching agent provider_key_id: {}", err);
+        Ok(Some(id)) => id,
+        Ok(None) => {
           return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!({ "error": "NO_PROVIDER_ASSIGNED" })),
+          )
+            .into_response();
+        }
+        Err(err) => {
+          tracing::error!("Database error fetching agent provider_key_id: {}", err);
+          return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": "Database error" })),
           )
             .into_response();
         }

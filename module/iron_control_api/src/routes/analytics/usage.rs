@@ -51,6 +51,9 @@ pub async fn get_usage_requests(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut q = sqlx::query_as::<_, (i64, i64, i64)>(&query)
     .bind(start_ms)
@@ -66,6 +69,9 @@ pub async fn get_usage_requests(
   }
   if let Some(ref provider_id) = params.provider_id {
     q = q.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   match q.fetch_one(&state.pool).await {
@@ -124,8 +130,8 @@ pub async fn get_usage_tokens(
   let offset = (page.page - 1) * page.per_page;
   let is_admin = user.0.role == "admin";
 
-  // Build query with optional owner filter
-  let base_query = if is_admin {
+  // Build query with optional owner and provider_key_id filters
+  let mut base_query = String::from(
     r"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -136,111 +142,97 @@ pub async fn get_usage_tokens(
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
        AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL
-       GROUP BY e.agent_id
-       ORDER BY (input_tokens + output_tokens) DESC
-       LIMIT ? OFFSET ?"
-  } else {
+       AND e.agent_id IS NOT NULL",
+  );
+
+  if !is_admin {
+    base_query.push_str(" AND a.owner_id = ?");
+  }
+
+  if params.provider_key_id.is_some() {
+    base_query.push_str(" AND e.provider_key_id = ?");
+  }
+
+  base_query
+    .push_str(" GROUP BY e.agent_id ORDER BY (input_tokens + output_tokens) DESC LIMIT ? OFFSET ?");
+
+  let rows: Result<Vec<TokensByAgentRow>, _> = {
+    let mut q = sqlx::query_as::<_, TokensByAgentRow>(&base_query)
+      .bind(start_ms)
+      .bind(end_ms);
+    if !is_admin {
+      q = q.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      q = q.bind(provider_key_id);
+    }
+    q.bind(i64::from(page.per_page))
+      .bind(i64::from(offset))
+      .fetch_all(&state.pool)
+      .await
+  };
+
+  // Query totals (filtered by owner and provider_key_id)
+  let mut totals_query = String::from(
     r"SELECT
-         e.agent_id,
-         a.name as agent_name,
-         COALESCE(SUM(e.input_tokens), 0) as input_tokens,
-         COALESCE(SUM(e.output_tokens), 0) as output_tokens,
-         COUNT(*) as request_count
+         COALESCE(SUM(e.input_tokens), 0),
+         COALESCE(SUM(e.output_tokens), 0)
+       FROM analytics_events e
+       LEFT JOIN agents a ON e.agent_id = a.id
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+       AND e.event_type = 'llm_request_completed'",
+  );
+
+  if !is_admin {
+    totals_query.push_str(" AND a.owner_id = ?");
+  }
+
+  if params.provider_key_id.is_some() {
+    totals_query.push_str(" AND e.provider_key_id = ?");
+  }
+
+  let totals: (i64, i64) = {
+    let mut tq = sqlx::query_as::<_, (i64, i64)>(&totals_query)
+      .bind(start_ms)
+      .bind(end_ms);
+    if !is_admin {
+      tq = tq.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      tq = tq.bind(provider_key_id);
+    }
+    tq.fetch_one(&state.pool).await.unwrap_or((0, 0))
+  };
+
+  // Query total count (filtered by owner and provider_key_id)
+  let mut count_query = String::from(
+    r"SELECT COUNT(DISTINCT e.agent_id)
        FROM analytics_events e
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
        AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL
-       AND a.owner_id = ?
-       GROUP BY e.agent_id
-       ORDER BY (input_tokens + output_tokens) DESC
-       LIMIT ? OFFSET ?"
-  };
+       AND e.agent_id IS NOT NULL",
+  );
 
-  let rows: Result<Vec<TokensByAgentRow>, _> = if is_admin {
-    sqlx::query_as(base_query)
+  if !is_admin {
+    count_query.push_str(" AND a.owner_id = ?");
+  }
+
+  if params.provider_key_id.is_some() {
+    count_query.push_str(" AND e.provider_key_id = ?");
+  }
+
+  let total_count: i64 = {
+    let mut cq = sqlx::query_scalar::<_, i64>(&count_query)
       .bind(start_ms)
-      .bind(end_ms)
-      .bind(i64::from(page.per_page))
-      .bind(i64::from(offset))
-      .fetch_all(&state.pool)
-      .await
-  } else {
-    sqlx::query_as(base_query)
-      .bind(start_ms)
-      .bind(end_ms)
-      .bind(&user.0.sub)
-      .bind(i64::from(page.per_page))
-      .bind(i64::from(offset))
-      .fetch_all(&state.pool)
-      .await
-  };
-
-  // Query totals (filtered by owner for non-admins)
-  let totals: (i64, i64) = if is_admin {
-    sqlx::query_as(
-      r"SELECT
-           COALESCE(SUM(input_tokens), 0),
-           COALESCE(SUM(output_tokens), 0)
-         FROM analytics_events
-         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-         AND event_type = 'llm_request_completed'",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or((0, 0))
-  } else {
-    sqlx::query_as(
-      r"SELECT
-           COALESCE(SUM(e.input_tokens), 0),
-           COALESCE(SUM(e.output_tokens), 0)
-         FROM analytics_events e
-         INNER JOIN agents a ON e.agent_id = a.id
-         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-         AND e.event_type = 'llm_request_completed'
-         AND a.owner_id = ?",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .bind(&user.0.sub)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or((0, 0))
-  };
-
-  // Query total count (filtered by owner for non-admins)
-  let total_count: i64 = if is_admin {
-    sqlx::query_scalar(
-      r"SELECT COUNT(DISTINCT agent_id)
-         FROM analytics_events
-         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-         AND event_type = 'llm_request_completed'
-         AND agent_id IS NOT NULL",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0)
-  } else {
-    sqlx::query_scalar(
-      r"SELECT COUNT(DISTINCT e.agent_id)
-         FROM analytics_events e
-         INNER JOIN agents a ON e.agent_id = a.id
-         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-         AND e.event_type = 'llm_request_completed'
-         AND e.agent_id IS NOT NULL
-         AND a.owner_id = ?",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .bind(&user.0.sub)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0)
+      .bind(end_ms);
+    if !is_admin {
+      cq = cq.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      cq = cq.bind(provider_key_id);
+    }
+    cq.fetch_one(&state.pool).await.unwrap_or(0)
   };
 
   match rows {
@@ -334,6 +326,9 @@ pub async fn get_usage_models(
   if params.agent_id.is_some() {
     query.push_str(" AND agent_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   query.push_str(" GROUP BY model, provider ORDER BY request_count DESC LIMIT ? OFFSET ?");
 
@@ -348,6 +343,9 @@ pub async fn get_usage_models(
 
   if let Some(agent_id) = params.agent_id {
     q = q.bind(agent_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   let rows = q
@@ -375,6 +373,9 @@ pub async fn get_usage_models(
   if params.agent_id.is_some() {
     totals_query.push_str(" AND agent_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    totals_query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut tq = sqlx::query_as::<_, (i64, i64, i64)>(&totals_query)
     .bind(start_ms)
@@ -387,6 +388,9 @@ pub async fn get_usage_models(
 
   if let Some(agent_id) = params.agent_id {
     tq = tq.bind(agent_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    tq = tq.bind(provider_key_id);
   }
 
   let totals = tq.fetch_one(&state.pool).await.unwrap_or((0, 0, 0));

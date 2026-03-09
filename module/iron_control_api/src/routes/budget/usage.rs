@@ -527,6 +527,8 @@ pub async fn return_budget(
       .await
     {
       tracing::error!("Database error restoring agent budget: {}", err);
+      // Continue — lease is already closed; budget restoration failure is non-fatal.
+      // Returning an error here would break return_budget idempotency (client cannot retry).
     } else {
       tracing::info!(
         lease_id = %request.lease_id,

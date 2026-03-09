@@ -838,7 +838,17 @@ pub async fn get_agent_tokens(
 /// Request body for setting agent spending cap
 #[derive(Debug, Deserialize)]
 pub struct SetSpendingCapRequest {
-  /// Spending cap in USD (null or absent = unlimited)
+  /// Spending cap in USD.
+  ///
+  /// - `null` or field absent → `None` → [`SpendingCap::Unlimited`] (no cap enforced)
+  /// - `0.0` → [`SpendingCap::Limited(0)`] — sets a zero-microdollar cap, which immediately
+  ///   blocks all budget reservations for this agent ("freeze" mode).
+  /// - Any positive finite value → cap in USD, converted to microdollars (rounded).
+  ///
+  /// Note: `spending_cap_usd: 0.0` sets a zero-microdollar cap, which immediately
+  /// blocks all budget reservations for this agent ("freeze" mode).
+  /// To remove the cap entirely, omit the field or set it to `null` (if supported),
+  /// or call with `spending_cap_usd: null` which maps to `SpendingCap::Unlimited`.
   pub spending_cap_usd: Option<f64>,
 }
 
@@ -891,6 +901,12 @@ pub async fn set_agent_spending_cap(
 
   // Validate cap if provided
   if let Some(cap) = req.spending_cap_usd {
+    if !cap.is_finite() {
+      return Err((
+        StatusCode::BAD_REQUEST,
+        "spending_cap_usd must be a finite number".to_string(),
+      ));
+    }
     if cap < 0.0 {
       return Err((
         StatusCode::BAD_REQUEST,
@@ -941,5 +957,5 @@ fn microdollars_to_usd(microdollars: i64) -> f64 {
 
 #[allow(clippy::cast_possible_truncation)]
 fn usd_to_microdollars(usd: f64) -> i64 {
-  (usd * 1_000_000.0) as i64
+  (usd * 1_000_000.0).round() as i64
 }

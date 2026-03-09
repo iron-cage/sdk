@@ -75,6 +75,25 @@ pub async fn post_event(
       .into_response();
   }
 
+  // Validate provider_key_id exists if supplied
+  if let Some(key_id) = event.provider_key_id {
+    let exists: bool = sqlx::query_scalar(
+      "SELECT EXISTS(SELECT 1 FROM ai_provider_keys WHERE id = ?)",
+    )
+    .bind(key_id)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(false);
+
+    if !exists {
+      return (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({ "error": "provider_key_id not found" })),
+      )
+        .into_response();
+    }
+  }
+
   let now_ms = Utc::now().timestamp_millis();
 
   // INSERT OR IGNORE for deduplication (agent_id from verified token)

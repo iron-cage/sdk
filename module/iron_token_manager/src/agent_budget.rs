@@ -279,6 +279,10 @@ impl AgentBudgetManager {
   ///
   /// Supports **partial grants**: If agent has $5 (`5_000_000` microdollars) and requests $10 (`10_000_000`), grants $5.
   ///
+  /// ⚠️ DOES NOT enforce spending caps (`spending_used_microdollars`).
+  /// Use [`AgentBudgetManager::reserve_budget_with_limits`] for cap-aware reservation.
+  /// This method only checks the agent's base budget pool.
+  ///
   /// # Arguments
   ///
   /// * `agent_id` - Agent database ID
@@ -657,11 +661,12 @@ impl AgentBudgetManager {
       }
     }
 
-    Ok(ReservationResult {
-      granted: 0,
-      agent_budget_remaining: 0,
-      blocked_by: Some(BlockedBy::InsufficientBudget),
-    })
+    // All retries exhausted due to persistent lock contention (not a budget problem).
+    // Return a database error rather than the misleading BlockedBy::InsufficientBudget.
+    Err(sqlx::Error::Protocol(
+      "reserve_budget_with_limits: all retries exhausted due to persistent database lock contention"
+        .to_string(),
+    ))
   }
 
   /// Single attempt to reserve budget with limits (internal helper)
@@ -679,9 +684,12 @@ impl AgentBudgetManager {
 
     let mut tx = self.pool.begin().await?;
 
-    // 1. Check agent spending cap
+    // 1. Read agent row to get budget_remaining for block-reason reporting and
+    //    total_spent for grant-amount calculation. The IC-key spending cap check
+    //    is NOT performed here in Rust — it is enforced atomically by the
+    //    conditional UPDATE in step 3 (Fix C1: eliminate TOCTOU race).
     let agent_row = sqlx::query(
-      "SELECT spending_cap_microdollars, spending_used_microdollars, total_spent, budget_remaining \
+      "SELECT total_spent, budget_remaining \
        FROM agent_budgets WHERE agent_id = ?",
     )
     .bind(agent_id)
@@ -697,21 +705,14 @@ impl AgentBudgetManager {
       });
     };
 
-    let agent_cap = SpendingCap::from_db(agent_row.get("spending_cap_microdollars"));
-    let agent_used: i64 = agent_row.get("spending_used_microdollars");
     let budget_remaining: i64 = agent_row.get("budget_remaining");
 
-    // Check IC-key (agent) spending cap
-    if agent_cap.would_exceed(agent_used, requested_amount) {
-      tx.rollback().await?;
-      return Ok(ReservationResult {
-        granted: 0,
-        agent_budget_remaining: budget_remaining,
-        blocked_by: Some(BlockedBy::AgentSpendingCap),
-      });
-    }
-
-    // 2. Check IP-key (provider key) spending cap
+    // 2. Check IP-key (provider key) spending cap.
+    //    Provider-key cap check is still a read-then-check pattern; it is
+    //    protected from the critical TOCTOU race by SQLite's serialized write
+    //    semantics within this IMMEDIATE transaction. For full atomicity on the
+    //    provider key cap the check should be merged into the UPDATE in step 4
+    //    below (future improvement).
     if let Some(pkey_id) = provider_key_id {
       let pkey_row = sqlx::query(
         "SELECT spending_cap_microdollars, spending_used_microdollars \
@@ -736,54 +737,93 @@ impl AgentBudgetManager {
       }
     }
 
-    // 3. Reserve from agent budget (partial grants supported)
+    // 3. Atomically reserve from agent budget pool AND enforce IC-key spending cap
+    //    in a single conditional UPDATE.
+    //
+    //    Fix(C1): The WHERE clause enforces the spending cap atomically — no
+    //    separate SELECT + Rust would_exceed check precedes this write. Two
+    //    concurrent transactions cannot both pass: SQLite's row-level write lock
+    //    ensures only one UPDATE commits when the cap would be exceeded by the
+    //    second writer.
+    //
+    //    The CASE expression implements partial grants:
+    //      granted = min(budget_remaining, requested_amount)
+    //
+    //    spending_used_microdollars is also incremented in the same statement so
+    //    that the cap enforcement and its counter update are one atomic operation.
     let spent_before: i64 = agent_row.get("total_spent");
 
     let result = sqlx::query(
       "UPDATE agent_budgets
       SET total_spent = total_spent +
-        CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
+            CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
           budget_remaining = budget_remaining -
-        CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
+            CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
+          spending_used_microdollars = spending_used_microdollars +
+            CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
           updated_at = ?
-      WHERE agent_id = ? AND budget_remaining > 0",
+      WHERE agent_id = ?
+        AND budget_remaining > 0
+        AND (spending_cap_microdollars IS NULL
+             OR spending_used_microdollars + ? <= spending_cap_microdollars)",
     )
+    .bind(requested_amount) // total_spent CASE
     .bind(requested_amount)
+    .bind(requested_amount) // budget_remaining CASE
     .bind(requested_amount)
-    .bind(requested_amount)
+    .bind(requested_amount) // spending_used CASE
     .bind(requested_amount)
     .bind(now)
     .bind(agent_id)
+    .bind(requested_amount) // spending cap WHERE check
     .execute(&mut *tx)
     .await?;
 
     let granted = if result.rows_affected() == 1 {
-      let row = sqlx::query("SELECT total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?")
-        .bind(agent_id)
-        .fetch_one(&mut *tx)
-        .await?;
+      // Determine how much was actually granted (may be less than requested_amount
+      // due to partial grant when budget_remaining < requested_amount).
+      let row =
+        sqlx::query("SELECT total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?")
+          .bind(agent_id)
+          .fetch_one(&mut *tx)
+          .await?;
 
       let spent_after: i64 = row.get("total_spent");
       spent_after - spent_before
     } else {
+      // UPDATE touched 0 rows — either spending cap exceeded or budget pool empty.
+      // Distinguish the two by reading current state. The read is safe here: we are
+      // the only writer in this transaction and the UPDATE already failed.
+      let check_row = sqlx::query(
+        "SELECT budget_remaining, spending_cap_microdollars, spending_used_microdollars \
+         FROM agent_budgets WHERE agent_id = ?",
+      )
+      .bind(agent_id)
+      .fetch_optional(&mut *tx)
+      .await?;
+
       tx.rollback().await?;
+
+      let block_reason = if let Some(r) = check_row {
+        let cap = SpendingCap::from_db(r.get("spending_cap_microdollars"));
+        let used: i64 = r.get("spending_used_microdollars");
+        if cap.would_exceed(used, requested_amount) {
+          BlockedBy::AgentSpendingCap
+        } else {
+          BlockedBy::InsufficientBudget
+        }
+      } else {
+        BlockedBy::InsufficientBudget
+      };
+
       return Ok(ReservationResult {
         granted: 0,
         agent_budget_remaining: budget_remaining,
-        blocked_by: Some(BlockedBy::InsufficientBudget),
+        blocked_by: Some(block_reason),
       });
     };
 
-    // 4. Increment agent spending_used
-    sqlx::query(
-      "UPDATE agent_budgets SET spending_used_microdollars = spending_used_microdollars + ? WHERE agent_id = ?",
-    )
-    .bind(granted)
-    .bind(agent_id)
-    .execute(&mut *tx)
-    .await?;
-
-    // 5. Increment provider key spending_used
+    // 4. Increment provider key spending_used
     if let Some(pkey_id) = provider_key_id {
       sqlx::query(
         "UPDATE ai_provider_keys SET spending_used_microdollars = spending_used_microdollars + ? WHERE id = ?",
@@ -837,12 +877,14 @@ impl AgentBudgetManager {
 
     let mut tx = self.pool.begin().await?;
 
-    // Restore agent budget + decrement spending_used
+    // Restore agent budget + decrement spending_used.
+    // MAX(0, ...) guards against spending_used_microdollars going negative if
+    // returned_amount ever exceeds the recorded used amount (Fix W6).
     sqlx::query(
       "UPDATE agent_budgets
       SET total_spent = total_spent - ?,
           budget_remaining = budget_remaining + ?,
-          spending_used_microdollars = spending_used_microdollars - ?,
+          spending_used_microdollars = MAX(0, spending_used_microdollars - ?),
           updated_at = ?
       WHERE agent_id = ?",
     )
@@ -857,7 +899,7 @@ impl AgentBudgetManager {
     // Restore provider key spending_used
     if let Some(pkey_id) = provider_key_id {
       sqlx::query(
-        "UPDATE ai_provider_keys SET spending_used_microdollars = spending_used_microdollars - ? WHERE id = ?",
+        "UPDATE ai_provider_keys SET spending_used_microdollars = MAX(0, spending_used_microdollars - ?) WHERE id = ?",
       )
       .bind(returned_amount)
       .bind(pkey_id)

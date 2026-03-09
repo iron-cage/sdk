@@ -123,8 +123,8 @@ pub async fn get_spending_by_agent(
   let offset = (page.page - 1) * page.per_page;
   let is_admin = user.0.role == "admin";
 
-  // Build query with optional owner filter
-  let base_query = if is_admin {
+  // Build query with optional owner and provider_key_id filters
+  let mut base_query = String::from(
     r"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -136,79 +136,66 @@ pub async fn get_spending_by_agent(
        LEFT JOIN agent_budgets ab ON e.agent_id = ab.agent_id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
        AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL
-       GROUP BY e.agent_id
-       ORDER BY spending_micros DESC
-       LIMIT ? OFFSET ?"
-  } else {
-    r"SELECT
-         e.agent_id,
-         a.name as agent_name,
-         COALESCE(SUM(e.cost_micros), 0) as spending_micros,
-         COUNT(*) as request_count,
-         ab.total_allocated as budget
-       FROM analytics_events e
-       LEFT JOIN agents a ON e.agent_id = a.id
-       LEFT JOIN agent_budgets ab ON e.agent_id = ab.agent_id
-       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-       AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL
-       AND a.owner_id = ?
-       GROUP BY e.agent_id
-       ORDER BY spending_micros DESC
-       LIMIT ? OFFSET ?"
-  };
+       AND e.agent_id IS NOT NULL",
+  );
+
+  if !is_admin {
+    base_query.push_str(" AND a.owner_id = ?");
+  }
+
+  if params.provider_key_id.is_some() {
+    base_query.push_str(" AND e.provider_key_id = ?");
+  }
+
+  base_query.push_str(" GROUP BY e.agent_id ORDER BY spending_micros DESC LIMIT ? OFFSET ?");
 
   // Query spending by agent with budget info
-  let rows: Result<Vec<SpendingByAgentRow>, _> = if is_admin {
-    sqlx::query_as(base_query)
+  let rows: Result<Vec<SpendingByAgentRow>, _> = {
+    let mut q = sqlx::query_as::<_, SpendingByAgentRow>(&base_query)
       .bind(start_ms)
-      .bind(end_ms)
-      .bind(i64::from(page.per_page))
-      .bind(i64::from(offset))
-      .fetch_all(&state.pool)
-      .await
-  } else {
-    sqlx::query_as(base_query)
-      .bind(start_ms)
-      .bind(end_ms)
-      .bind(&user.0.sub)
-      .bind(i64::from(page.per_page))
+      .bind(end_ms);
+    if !is_admin {
+      q = q.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      q = q.bind(provider_key_id);
+    }
+    q.bind(i64::from(page.per_page))
       .bind(i64::from(offset))
       .fetch_all(&state.pool)
       .await
   };
 
+  // Build count query with same filters
+  let mut count_query = String::from(
+    r"SELECT COUNT(DISTINCT e.agent_id)
+       FROM analytics_events e
+       INNER JOIN agents a ON e.agent_id = a.id
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+       AND e.event_type = 'llm_request_completed'
+       AND e.agent_id IS NOT NULL",
+  );
+
+  if !is_admin {
+    count_query.push_str(" AND a.owner_id = ?");
+  }
+
+  if params.provider_key_id.is_some() {
+    count_query.push_str(" AND e.provider_key_id = ?");
+  }
+
   // Query total count (filtered by owner for non-admins)
-  let total_count: i64 = if is_admin {
-    sqlx::query_scalar(
-      r"SELECT COUNT(DISTINCT agent_id)
-         FROM analytics_events
-         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-         AND event_type = 'llm_request_completed'
-         AND agent_id IS NOT NULL",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0)
-  } else {
-    sqlx::query_scalar(
-      r"SELECT COUNT(DISTINCT e.agent_id)
-         FROM analytics_events e
-         INNER JOIN agents a ON e.agent_id = a.id
-         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-         AND e.event_type = 'llm_request_completed'
-         AND e.agent_id IS NOT NULL
-         AND a.owner_id = ?",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .bind(&user.0.sub)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0)
+  let total_count: i64 = {
+    let mut cq = sqlx::query_scalar::<_, i64>(&count_query)
+      .bind(start_ms)
+      .bind(end_ms);
+    if !is_admin {
+      cq = cq.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      cq = cq.bind(provider_key_id);
+    }
+    cq.fetch_one(&state.pool).await.unwrap_or(0)
   };
 
   match rows {

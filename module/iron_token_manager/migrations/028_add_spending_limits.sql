@@ -16,4 +16,5 @@ ALTER TABLE analytics_events ADD COLUMN provider_key_id INTEGER;
 CREATE INDEX idx_analytics_events_provider_key ON analytics_events(provider_key_id);
 
 -- Guard table
-CREATE TABLE _migration_028_completed (id INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS _migration_028_completed (applied_at INTEGER NOT NULL);
+INSERT OR IGNORE INTO _migration_028_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);

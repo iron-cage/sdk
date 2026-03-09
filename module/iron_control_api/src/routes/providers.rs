@@ -527,6 +527,12 @@ pub async fn update_provider_key(
 
   // Validate spending_cap_usd is non-negative if provided
   if let Some(Some(cap)) = request.spending_cap_usd {
+    if !cap.is_finite() {
+      return crate::error::ApiError::BadRequest(
+        "spending_cap_usd must be a finite number".into(),
+      )
+      .into_response();
+    }
     if cap < 0.0 {
       return crate::error::ApiError::BadRequest(
         "spending_cap_usd must be greater than or equal to 0".into(),
