@@ -51,7 +51,7 @@ log_warning() {
 }
 
 # Expected counts (update when adding migrations)
-EXPECTED_TABLE_COUNT=43   # 18 application + 25 migration guards
+EXPECTED_TABLE_COUNT=44   # 18 application + 26 migration guards
 EXPECTED_INDEX_COUNT=53
 
 # Validation state
