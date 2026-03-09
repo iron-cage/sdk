@@ -371,6 +371,7 @@ async fn get_project_key_deterministic_multiple_assignments() {
 
   storage.assign_to_project(key_a, "proj_det").await.unwrap();
   // Small sleep ensures key_b gets a later assigned_at timestamp
+  //qqq: [Medium] timing-dependent — 2ms sleep may collide on slow CI; inject explicit assigned_at timestamps instead of relying on wall-clock ordering
   tokio::time::sleep(core::time::Duration::from_millis(2)).await;
   storage.assign_to_project(key_b, "proj_det").await.unwrap();
 

@@ -438,7 +438,7 @@ async fn test_all_indexes_created() {
   // Migration 022: 1 index (idx_agents_ic_token_hash)
   // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
   assert_eq!(
-    index_count, 53,
-    "Expected 53 indexes to be created across all migrations"
+    index_count, 54,
+    "Expected 54 indexes to be created across all migrations"
   );
 }

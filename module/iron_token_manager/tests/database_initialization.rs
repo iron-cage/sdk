@@ -175,8 +175,8 @@ async fn test_production_schema_matches_test_schema() {
       .expect("LOUD FAILURE: Failed to count indexes");
 
   assert_eq!(
-    index_count, 53,
-    "Should have 53 indexes across all migrations"
+    index_count, 54,
+    "Should have 54 indexes across all migrations"
   );
 }
 

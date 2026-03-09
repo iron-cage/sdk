@@ -167,6 +167,12 @@ impl CreateProviderKeyRequest {
           character: "NULL".to_owned(),
         });
       }
+      if !base_url.is_empty() && !base_url.starts_with("https://") {
+        return Err(ValidationError::InvalidFormat {
+          field: "base_url".to_owned(),
+          expected: "URL must use the https scheme".to_owned(),
+        });
+      }
     }
 
     // Validate description if provided
@@ -304,6 +310,7 @@ pub async fn create_provider_key(
 
   check_manage_provider_keys(&claims.role)?;
 
+  //qqq: [Low] 503 implies transient failure — 501 Not Implemented is more accurate for a missing configuration
   let crypto = state.crypto.as_ref().ok_or_else(|| {
     ApiError::ServiceUnavailable(
       "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
@@ -324,12 +331,14 @@ pub async fn create_provider_key(
     .encrypt(&request.api_key)
     .map_err(|_| ApiError::Internal("Failed to encrypt API key".into()))?;
 
+  //qqq: [Medium] TOCTOU race — count and insert are separate transactions; two concurrent requests at count=19 can both pass and create 21 keys
   let count = state
     .storage
     .count_keys_by_owner_and_provider(&claims.sub, provider)
     .await
     .map_err(|_| ApiError::Internal("Failed to check key quota".into()))?;
 
+  //qqq: [Low] no machine-readable error code in response body and no Retry-After header
   if count >= MAX_KEYS_PER_USER_PER_PROVIDER {
     return Err(ApiError::TooManyRequests(
       format!("Key quota exceeded: maximum {} keys per provider", MAX_KEYS_PER_USER_PER_PROVIDER)
@@ -369,6 +378,11 @@ pub async fn list_provider_keys(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   let Ok(keys) = state.storage.list_keys(&claims.sub).await else {
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
@@ -398,6 +412,11 @@ pub async fn get_provider_key(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(key_id): Path<i64>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
       StatusCode::NOT_FOUND,
@@ -472,8 +491,27 @@ pub async fn update_provider_key(
       .into_response();
   }
 
+  // Validate base_url scheme if provided
+  if let Some(ref url) = request.base_url {
+    if !url.is_empty() && !url.starts_with("https://") {
+      return crate::error::ApiError::BadRequest("base_url must use HTTPS".into()).into_response();
+    }
+  }
+
+  // Validate spending_cap_usd is non-negative if provided
+  if let Some(Some(cap)) = request.spending_cap_usd {
+    if cap < 0.0 {
+      return crate::error::ApiError::BadRequest(
+        "spending_cap_usd must be greater than or equal to 0".into(),
+      )
+      .into_response();
+    }
+  }
+
   // Apply all field updates atomically in a single transaction
+  //qqq: [Medium] None means "skip update" — there is no way to clear description once set; use Option<Option<String>> to distinguish "absent" from "clear"
   let description = request.description.as_deref().map(Some);
+  //qqq: [Low] empty string is a sentinel to clear base_url — undocumented and inconsistent with description field semantics
   let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
   let spending_cap = request
     .spending_cap_usd
@@ -584,6 +622,7 @@ pub async fn assign_provider_to_project(
     return resp.into_response();
   }
 
+  //qqq: [High] BOLA — project ownership is never verified; any user can assign their key to another user's project_id
   // Verify key ownership
   let Ok(metadata) = state
     .storage
@@ -609,6 +648,7 @@ pub async fn assign_provider_to_project(
       .into_response();
   }
 
+  //qqq: [Medium] no UNIQUE(project_id) constraint — a project can accumulate multiple key assignments; active key is resolved by most-recent assigned_at
   // Assign to project
   match state
     .storage
@@ -673,6 +713,7 @@ pub async fn unassign_provider_from_project(
       .into_response();
   };
 
+  //qqq: [Low] returns 403 on wrong owner; assign returns 404 — inconsistent; 404 is preferable to not leak key existence
   if metadata.user_id != claims.sub {
     return (
       StatusCode::FORBIDDEN,

@@ -442,6 +442,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tracing::warn!("⚠️  Production deployments SHOULD use PostgreSQL for reliability");
       }
 
+      // Block startup if IRON_ALLOW_DEV_KEYS is set in production.
+      // This variable enables auto-creation of placeholder provider keys for
+      // agent_1 during handshake — a development convenience that must never
+      // be active in production as it bypasses the key-assignment requirement
+      // and could expose unguarded API key paths.
+      if env::var("IRON_ALLOW_DEV_KEYS").is_ok() {
+        tracing::error!(
+          "❌ CRITICAL: IRON_ALLOW_DEV_KEYS is set in a production environment"
+        );
+        tracing::error!("❌ This variable is a development-only bypass that must NEVER be");
+        tracing::error!("❌ enabled in production. Remove it from your environment and");
+        tracing::error!("❌ ensure every agent has an explicit provider_key_id assigned.");
+        tracing::error!("❌ REFUSING TO START SERVER");
+        panic!("Production deployment blocked: IRON_ALLOW_DEV_KEYS must not be set in production");
+      }
+
       // Block startup if any insecure defaults detected
       if !insecure_secrets.is_empty() {
         tracing::error!(

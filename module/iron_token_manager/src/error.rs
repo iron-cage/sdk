@@ -29,6 +29,9 @@ pub enum TokenError {
     /// Reason for validation failure
     reason: String,
   },
+  //qqq: [Info] callers in handshake.rs currently hit a wildcard Err arm — consider explicit match arm returning 402 Payment Required
+  /// Operation would exceed the spending cap
+  SpendingCapExceeded,
 }
 
 impl core::fmt::Display for TokenError {
@@ -38,6 +41,7 @@ impl core::fmt::Display for TokenError {
       Self::NotFound => write!(f, "Resource not found"),
       Self::Database(e) => write!(f, "Database error: {e}"),
       Self::Validation { field, reason } => write!(f, "Validation error: {field} - {reason}"),
+      Self::SpendingCapExceeded => write!(f, "Spending cap exceeded"),
     }
   }
 }

@@ -144,6 +144,7 @@ impl ProviderKeyStorage {
   ) -> Result<i64> {
     let now_ms = current_time_ms();
 
+    //qqq: [Low] no UNIQUE(user_id, provider, encrypted_api_key) constraint — same plaintext key can be registered multiple times for the same provider
     let result = sqlx::query(
       "INSERT INTO ai_provider_keys \
        ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at ) \
@@ -202,7 +203,7 @@ impl ProviderKeyStorage {
   pub async fn get_key_metadata(&self, key_id: i64) -> Result<ProviderKeyMetadata> {
     let row = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
-       last_used_at, balance_cents, encrypted_api_key, balance_updated_at, user_id, \
+       last_used_at, balance_cents, balance_updated_at, user_id, \
        spending_cap_microdollars, spending_used_microdollars \
        FROM ai_provider_keys WHERE id = ?",
     )
@@ -232,6 +233,7 @@ impl ProviderKeyStorage {
   /// Returns error if database query fails
   pub async fn list_keys(&self, user_id: &str) -> Result<Vec<ProviderKeyMetadata>> {
     let rows = sqlx::query(
+      //qqq: [Low] no covering index for sort — (user_id, created_at) composite index would eliminate sort step; negligible at current 20-key quota
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, balance_updated_at, user_id, \
        spending_cap_microdollars, spending_used_microdollars \
@@ -387,6 +389,25 @@ impl ProviderKeyStorage {
     if key_ids.is_empty() {
       return Ok(HashMap::new());
     }
+    // SQLite limits bind parameters to 999 per statement; chunk to stay within that.
+    if key_ids.len() > 999 {
+      let mut result: HashMap<i64, Vec<String>> = HashMap::new();
+      for chunk in key_ids.chunks(999) {
+        let partial = self.get_all_key_projects_batch(chunk).await?;
+        for (k, v) in partial {
+          result.entry(k).or_default().extend(v);
+        }
+      }
+      return Ok(result);
+    }
+    self.get_all_key_projects_batch(key_ids).await
+  }
+
+  /// Inner helper: run a single batched query for up to 999 key IDs at a time.
+  async fn get_all_key_projects_batch(
+    &self,
+    key_ids: &[i64],
+  ) -> Result<HashMap<i64, Vec<String>>> {
     // Build parameterized IN clause
     let placeholders = key_ids
       .iter()
@@ -395,8 +416,7 @@ impl ProviderKeyStorage {
       .collect::<Vec<_>>()
       .join(", ");
     let sql = format!(
-      "SELECT provider_key_id, project_id FROM project_provider_key_assignments WHERE provider_key_id IN ({})",
-      placeholders
+      "SELECT provider_key_id, project_id FROM project_provider_key_assignments WHERE provider_key_id IN ({placeholders})"
     );
     let mut query = sqlx::query_as::<_, (i64, String)>(&sql);
     for id in key_ids {
@@ -404,6 +424,7 @@ impl ProviderKeyStorage {
     }
     let rows = query.fetch_all(&self.pool).await.map_err(TokenError::Database)?;
     let mut map: HashMap<i64, Vec<String>> = HashMap::new();
+    //qqq: [Low] result order within each key's project list is non-deterministic — add ORDER BY project_id if stable ordering matters
     for (key_id, project_id) in rows {
       map.entry(key_id).or_default().push(project_id);
     }
@@ -430,6 +451,7 @@ impl ProviderKeyStorage {
   /// # Errors
   ///
   /// Returns error if database query fails
+  //qqq: [Low] idx_ai_provider_keys_user_id is now redundant — composite index (026) subsumes it; drop old index in a follow-up migration to reduce write amplification
   pub async fn get_keys_by_owner_and_provider(
     &self,
     user_id: &str,
@@ -543,12 +565,17 @@ impl ProviderKeyStorage {
   ///
   /// Returns error if database update fails
   pub async fn set_spending_cap(&self, key_id: i64, cap_microdollars: Option<i64>) -> Result<()> {
-    sqlx::query("UPDATE ai_provider_keys SET spending_cap_microdollars = $1 WHERE id = $2")
-      .bind(cap_microdollars)
-      .bind(key_id)
-      .execute(&self.pool)
-      .await
-      .map_err(TokenError::Database)?;
+    let result =
+      sqlx::query("UPDATE ai_provider_keys SET spending_cap_microdollars = $1 WHERE id = $2")
+        .bind(cap_microdollars)
+        .bind(key_id)
+        .execute(&self.pool)
+        .await
+        .map_err(TokenError::Database)?;
+
+    if result.rows_affected() == 0 {
+      return Err(TokenError::NotFound);
+    }
     Ok(())
   }
 
@@ -580,6 +607,16 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
+      // Distinguish: row missing vs. cap condition blocked the update
+      let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_provider_keys WHERE id = $1)")
+          .bind(key_id)
+          .fetch_one(&self.pool)
+          .await
+          .map_err(TokenError::Database)?;
+      if exists {
+        return Err(TokenError::SpendingCapExceeded);
+      }
       return Err(TokenError::NotFound);
     }
     Ok(())
@@ -609,6 +646,16 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
+      // Distinguish: row missing vs. cap condition blocked the update
+      let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_provider_keys WHERE id = $1)")
+          .bind(key_id)
+          .fetch_one(&self.pool)
+          .await
+          .map_err(TokenError::Database)?;
+      if exists {
+        return Err(TokenError::SpendingCapExceeded);
+      }
       return Err(TokenError::NotFound);
     }
     Ok(())
@@ -627,7 +674,8 @@ impl ProviderKeyStorage {
     if delta == 0 {
       return Ok(());
     }
-    sqlx::query(
+    //qqq: [Medium] no spending cap guard — when actual > estimated, this can push spending_used_microdollars past spending_cap_microdollars silently
+    let result = sqlx::query(
       "UPDATE ai_provider_keys \
        SET spending_used_microdollars = spending_used_microdollars + $1 \
        WHERE id = $2",
@@ -637,6 +685,10 @@ impl ProviderKeyStorage {
     .execute(&self.pool)
     .await
     .map_err(TokenError::Database)?;
+
+    if result.rows_affected() == 0 {
+      return Err(TokenError::NotFound);
+    }
     Ok(())
   }
 
@@ -678,6 +730,7 @@ fn row_to_metadata(row: &SqliteRow) -> ProviderKeyMetadata {
   let provider_str: String = row.get("provider");
   ProviderKeyMetadata {
     id: row.get("id"),
+    //qqq: [Medium] unknown provider string silently defaults to OpenAI — DB corruption or new provider before enum extension would be misreported; consider returning TokenError
     provider: ProviderType::parse_str(&provider_str).unwrap_or(ProviderType::OpenAI),
     base_url: row.get("base_url"),
     description: row.get("description"),
