@@ -371,7 +371,7 @@ async fn get_project_key_deterministic_multiple_assignments() {
 
   storage.assign_to_project(key_a, "proj_det").await.unwrap();
   // Small sleep ensures key_b gets a later assigned_at timestamp
-  tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+  tokio::time::sleep(core::time::Duration::from_millis(2)).await;
   storage.assign_to_project(key_b, "proj_det").await.unwrap();
 
   let assigned = storage.get_project_key("proj_det").await.unwrap();
