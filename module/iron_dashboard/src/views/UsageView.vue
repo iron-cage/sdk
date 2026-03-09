@@ -26,6 +26,12 @@ import IconCoin from '@/components/icons/IconCoin.vue'
 import IconServer from '@/components/icons/IconServer.vue'
 import IconGrid from '@/components/icons/IconGrid.vue'
 import IconClipboard from '@/components/icons/IconClipboard.vue'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const api = useApi()
 
@@ -143,6 +149,12 @@ function formatCost(cost: number): string {
 function loadMoreLogs() {
   logsPage.value++
 }
+
+function openLogModal(key: AnalyticsEvent) {
+  
+}
+
+
 </script>
 
 <template>
@@ -311,6 +323,7 @@ function loadMoreLogs() {
             { label: 'Status' },
             { label: 'Tokens' },
             { label: 'Cost' },
+            { label: 'Actions', align: 'right' },
           ]"
           :isLoading="eventsLoading && accumulatedLogs.length === 0"
           :isEmpty="accumulatedLogs.length === 0"
@@ -333,6 +346,22 @@ function loadMoreLogs() {
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(event.input_tokens + event.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ formatMicrodollars(event.cost_micros) }}</td>
+            <td class="px-3 sm:px-6 py-4 text-right whitespace-nowrap">
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="sm">
+                    <span class="sr-only">Open menu</span>
+                    <IconDotsHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="openLogModal(event)">
+                    <IconEdit />
+                    Edit
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </td>
           </tr>
           <template #footer>
             <div v-if="logsPage < totalPages" class="p-4 text-center">
