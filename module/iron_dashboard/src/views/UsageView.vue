@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {cn} from "@/lib/utils"
+import TrendBadge from '@/components/TrendBadge.vue'
 
 const api = useApi()
 
@@ -82,7 +83,7 @@ const activeFilters = computed(() => ({
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
   queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsUsageRequests(activeFilters.value),
+  queryFn: () => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
@@ -97,7 +98,7 @@ const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuer
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsSpendingTotal(activeFilters.value),
+  queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
 })
 
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
@@ -268,23 +269,16 @@ function openLogModal(event: AnalyticsEvent) {
     <!-- Analytics content -->
     <div v-else>
       <!-- Summary statistics -->
-      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <StatCard title="Total Requests">
           <template #icon>
             <IconBarChart class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalRequests) }}</div>
+          <TrendBadge :changePercent="requestStats?.previous_period?.change_percent" class="mt-1" />
         </StatCard>
 
-        <StatCard title="Success Rate">
-          <template #icon>
-            <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
-          </template>
-          <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
-          <div v-if="requestStats?.failed_requests" class="text-xs text-destructive mt-1">
-            {{ formatNumber(requestStats.failed_requests) }} failed
-          </div>
-        </StatCard>
+
 
         <StatCard title="Input Tokens">
           <template #icon>
@@ -300,11 +294,34 @@ function openLogModal(event: AnalyticsEvent) {
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalOutputTokens) }}</div>
         </StatCard>
 
+        <StatCard title="Success Rate">
+          <template #icon>
+            <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
+
+          <div class="flex gap-2 items-center">
+            <TrendBadge
+            v-if="requestStats?.previous_period"
+            :changePercent="((requestStats.success_rate - requestStats.previous_period.success_rate) * 100)"
+            class="mt-1"
+          />
+
+          <span v-if="requestStats?.failed_requests && requestStats.previous_period" class="size-1 inline-block bg-muted-foreground rounded-full"></span>
+
+          <div v-if="requestStats?.failed_requests" class="text-xs text-destructive mt-1">
+            {{ formatNumber(requestStats.failed_requests) }} failed
+          </div>
+
+          </div>
+        </StatCard>
+
         <StatCard title="Total Cost">
           <template #icon>
             <IconCoin class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatCost(totalSpend) }}</div>
+          <TrendBadge :changePercent="spendingTotal?.previous_period?.change_percent" class="mt-1" />
         </StatCard>
 
         <StatCard title="Avg Cost / Request">

@@ -503,6 +503,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`)
   }
@@ -525,6 +526,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`)
   }
@@ -826,6 +828,7 @@ export interface AnalyticsFilters {
   period?: AnalyticsPeriod
   agent_id?: number
   provider_id?: string
+  compare?: boolean
 }
 
 export interface PaginationParams {
@@ -833,11 +836,17 @@ export interface PaginationParams {
   per_page?: number
 }
 
+export interface SpendingTotalComparison {
+  total_spend: number
+  change_percent: number | null
+}
+
 export interface SpendingTotalResponse {
   total_spend: number
   currency: string
   period: string
   filters: { agent_id?: number; provider_id?: string }
+  previous_period?: SpendingTotalComparison
   calculated_at: string
 }
 
@@ -891,6 +900,14 @@ export interface BudgetStatus {
   risk_level: string
 }
 
+export interface RequestUsageComparison {
+  total_requests: number
+  successful_requests: number
+  failed_requests: number
+  success_rate: number
+  change_percent: number | null
+}
+
 export interface RequestUsageResponse {
   total_requests: number
   successful_requests: number
@@ -898,6 +915,7 @@ export interface RequestUsageResponse {
   success_rate: number
   period: string
   filters: { agent_id?: number; provider_id?: string }
+  previous_period?: RequestUsageComparison
   calculated_at: string
 }
 
