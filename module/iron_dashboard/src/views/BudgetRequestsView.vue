@@ -69,8 +69,10 @@ const statusFilter = ref<string>('all')
 
 // Fetch budget requests
 const { data: requests, isLoading, error, refetch } = useQuery({
-  queryKey: ['budget-requests'],
-  queryFn: () => api.listBudgetRequests(),
+  queryKey: ['budget-requests', statusFilter],
+  queryFn: () => api.listBudgetRequests(
+    statusFilter.value !== 'all' ? { status: statusFilter.value } : undefined
+  ),
 })
 
 // Fetch agents for dropdown
@@ -120,18 +122,14 @@ const rejectMutation = useMutation({
   },
 })
 
-// Filtered requests
-const filteredRequests = computed(() => {
-  if (!requests.value?.requests) return []
-  if (statusFilter.value === 'all') return requests.value.requests
-  return requests.value.requests.filter(r => r.status === statusFilter.value)
-})
-
-// My requests (user view)
+// My requests (user view) — client-side since status filter is an admin-only feature
 const myRequests = computed(() => {
   if (!requests.value?.requests) return []
   return requests.value.requests.filter(r => r.requester_id === authStore.username)
 })
+
+// All requests filtered by backend status param
+const filteredRequests = computed(() => requests.value?.requests ?? [])
 
 // Pending approval requests (admin view)
 const pendingRequests = computed(() => {

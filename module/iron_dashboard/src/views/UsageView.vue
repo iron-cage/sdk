@@ -384,7 +384,7 @@ function openLogModal(event: AnalyticsEvent) {
         <template v-if="spendingByAgent?.summary" #action>
           <span class="text-xs text-muted-foreground">
             Total {{ formatCost(spendingByAgent.summary.total_spend) }}
-            · avg {{ spendingByAgent.summary.average_percent_used.toFixed(1) }}% budget used
+            · avg {{ (spendingByAgent.summary.average_percent_used ?? 0).toFixed(1) }}% budget used
           </span>
         </template>
         <DataTable
