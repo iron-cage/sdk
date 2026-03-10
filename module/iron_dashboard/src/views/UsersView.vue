@@ -116,7 +116,7 @@ function handleCreateUser() {
 
 // Suspend/Activate mutation
 const suspendMutation = useMutation({
-  mutationFn: ({ id, reason }: { id: number; reason?: string }) => api.suspendUser(id, reason),
+  mutationFn: ({ id, reason }: { id: string; reason?: string }) => api.suspendUser(id, reason),
   onSuccess: () => {
     showDisableConfirm.value = false
     userToDisable.value = null
@@ -129,7 +129,7 @@ const suspendMutation = useMutation({
 })
 
 const activateMutation = useMutation({
-  mutationFn: (id: number) => api.activateUser(id),
+  mutationFn: (id: string) => api.activateUser(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },

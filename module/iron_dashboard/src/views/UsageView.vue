@@ -234,10 +234,10 @@ function openLogModal(event: AnalyticsEvent) {
             <SelectItem value="all">All Providers</SelectItem>
             <SelectItem
               v-for="p in providerList?.data"
-              :key="p.provider_id"
-              :value="p.provider_id"
+              :key="p.provider"
+              :value="p.provider"
             >
-              {{ p.provider_name }}
+              {{ p.provider }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -347,9 +347,9 @@ function openLogModal(event: AnalyticsEvent) {
             No provider data available
           </div>
           <div v-else class="space-y-4">
-            <div v-for="provider in visibleProviders" :key="provider.provider_id">
+            <div v-for="provider in visibleProviders" :key="provider.provider">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ provider.provider_name }}</span>
+                <span class="text-base font-medium text-foreground">{{ provider.provider }}</span>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
@@ -396,13 +396,13 @@ function openLogModal(event: AnalyticsEvent) {
               <div class="flex justify-between items-center mb-2">
                 <div>
                   <span class="text-base font-medium text-foreground">{{ model.model }}</span>
-                  <span class="text-xs text-muted-foreground block">{{ model.provider_name }}</span>
+                  <span class="text-xs text-muted-foreground block">{{ model.provider }}</span>
                 </div>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatCost(model.spending) }}</span>
                   <span class="text-xs text-muted-foreground block">
-                    {{ formatCost((model.spending / (model.total_tokens || 1)) * 1000) }}/1k tokens
+                    {{ formatCost((model.spending / ((model.input_tokens + model.output_tokens) || 1)) * 1000) }}/1k tokens
                   </span>
                 </div>
               </div>

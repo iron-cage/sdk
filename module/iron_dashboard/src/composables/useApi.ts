@@ -145,7 +145,7 @@ interface ListBudgetRequestsResponse {
 interface ApproveBudgetRequestResponse {
   request_id: string
   status: string
-  approved_at: number
+  updated_at: number
 }
 
 interface RejectBudgetRequestRequest {
@@ -155,7 +155,7 @@ interface RejectBudgetRequestRequest {
 interface RejectBudgetRequestResponse {
   request_id: string
   status: string
-  rejected_at: number
+  updated_at: number
 }
 
 export function useApi() {
@@ -349,7 +349,7 @@ export function useApi() {
     })
   }
 
-  async function updateUserStatus(id: number, isActive: boolean): Promise<User> {
+  async function updateUserStatus(id: string, isActive: boolean): Promise<User> {
     if (isActive) {
       return activateUser(id)
     } else {
@@ -357,34 +357,34 @@ export function useApi() {
     }
   }
 
-  async function suspendUser(id: number, reason?: string): Promise<User> {
+  async function suspendUser(id: string, reason?: string): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/suspend`, {
       method: 'PUT',
       body: JSON.stringify({ reason }),
     })
   }
 
-  async function activateUser(id: number): Promise<User> {
+  async function activateUser(id: string): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/activate`, {
       method: 'PUT',
     })
   }
 
-  async function changeUserRole(id: number, role: string): Promise<User> {
+  async function changeUserRole(id: string, role: string): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/role`, {
       method: 'PUT',
       body: JSON.stringify({ role }),
     })
   }
 
-  async function resetUserPassword(id: number, newPassword: string, forceChange: boolean): Promise<User> {
+  async function resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
       method: 'POST',
       body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
     })
   }
 
-  async function deleteUser(id: number): Promise<{ success: boolean }> {
+  async function deleteUser(id: string): Promise<{ success: boolean }> {
     return fetchApi<{ success: boolean }>(`/api/v1/users/${id}`, {
       method: 'DELETE',
     })
@@ -738,7 +738,7 @@ export function useApi() {
 }
 
 export interface User {
-  id: number
+  id: string
   username: string
   email?: string
   role: string
@@ -763,15 +763,13 @@ export interface Agent {
   created_at: number
   owner_id?: string
   provider_key_id?: number | null
-  has_ic_token?: boolean
-  ic_token_created_at?: number
 }
 
 export interface AgentBudgetResponse {
   agent_id: number
-  total_allocated: number
-  total_spent: number
-  budget_remaining: number
+  total_allocated: number    // microdollars
+  total_spent: number        // microdollars
+  budget_remaining: number   // microdollars
 }
 // IC Token types
 export interface IcTokenResponse {
@@ -851,8 +849,7 @@ export interface SpendingTotalResponse {
 }
 
 export interface ProviderSpending {
-  provider_id: string
-  provider_name: string
+  provider: string
   spending: number
   request_count: number
   avg_cost_per_request: number
@@ -921,14 +918,11 @@ export interface RequestUsageResponse {
 
 export interface ModelUsage {
   model: string
-  provider_id: string
-  provider_name: string
+  provider: string
   request_count: number
   spending: number
   input_tokens: number
   output_tokens: number
-  total_tokens: number
-  avg_cost_per_request: number
 }
 
 export interface ModelUsageResponse {
@@ -962,7 +956,7 @@ export interface EventsListResponse {
 }
 
 export interface AgentSpending {
-  agent_id: string
+  agent_id: number
   agent_name: string
   spending: number
   budget: number
