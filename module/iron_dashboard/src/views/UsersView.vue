@@ -155,7 +155,7 @@ function confirmDisable() {
 
 // Delete user mutation
 const deleteMutation = useMutation({
-  mutationFn: (id: number) => api.deleteUser(id),
+  mutationFn: (id: string) => api.deleteUser(id),
   onSuccess: () => {
     showDeleteConfirm.value = false
     userToDelete.value = null
@@ -179,7 +179,7 @@ function confirmDelete() {
 
 // Change role mutation
 const changeRoleMutation = useMutation({
-  mutationFn: ({ id, role }: { id: number; role: string }) => api.changeUserRole(id, role),
+  mutationFn: ({ id, role }: { id: string; role: string }) => api.changeUserRole(id, role),
   onSuccess: () => {
     showChangeRoleModal.value = false
     userToChangeRole.value = null
@@ -204,7 +204,7 @@ function confirmChangeRole() {
 
 // Reset password mutation
 const resetPasswordMutation = useMutation({
-  mutationFn: ({ id, password, force }: { id: number; password: string; force: boolean }) => 
+  mutationFn: ({ id, password, force }: { id: string; password: string; force: boolean }) =>
     api.resetUserPassword(id, password, force),
   onSuccess: () => {
     showResetPasswordModal.value = false
@@ -227,10 +227,10 @@ function handleResetPassword(user: User) {
 
 function confirmResetPassword() {
   if (userToResetPassword.value) {
-    resetPasswordMutation.mutate({ 
-      id: userToResetPassword.value.id, 
-      password: newPassword.value, 
-      force: forcePasswordChange.value 
+    resetPasswordMutation.mutate({
+      id: userToResetPassword.value.id,
+      password: newPassword.value,
+      force: forcePasswordChange.value,
     })
   }
 }
