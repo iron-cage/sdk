@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
+import { useAuthStore } from '../stores/auth'
 import { formatCostUsd, formatNumber } from '@/lib/formatters'
 import StatCard from '@/components/cards/StatCard.vue'
 import IconCoin from '@/components/icons/IconCoin.vue'
@@ -14,6 +15,7 @@ import IconUsers from '@/components/icons/IconUsers.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const api = useApi()
 
 const { data: spending } = useQuery({
@@ -120,6 +122,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
         </template>
         <div class="space-y-2 h-full flex flex-col justify-center">
           <button
+            v-if="authStore.isAdmin"
             class="w-full flex items-center justify-between p-3 border border-border rounded-md hover:bg-muted/50 hover:border-primary/30 transition-all group"
             @click="router.push({ name: 'providers' })"
           >
