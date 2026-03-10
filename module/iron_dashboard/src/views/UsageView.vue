@@ -36,12 +36,7 @@ import {
 const api = useApi()
 
 const selectedAgentId = ref<string>('all')
-
-const { data: agents } = useQuery({
-  queryKey: ['agents'],
-  queryFn: () => api.getAgents(),
-})
-
+const selectedProviderId = ref<string>('all')
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
 
 const logsPage = ref(1)
@@ -60,32 +55,50 @@ const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
   { value: 'all-time',    label: 'All Time'     },
 ]
 
+const { data: agents } = useQuery({
+  queryKey: ['agents'],
+  queryFn: () => api.getAgents(),
+})
+
+// Unfiltered provider list — used only to populate the provider dropdown.
+// Never includes provider_id so it always returns all available providers.
+const { data: providerList } = useQuery({
+  queryKey: ['analytics-provider-list', selectedPeriod, selectedAgentId],
+  queryFn: () => api.getAnalyticsSpendingByProvider({
+    period: selectedPeriod.value,
+    agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
+  }),
+})
+
+const activeFilters = computed(() => ({
+  period: selectedPeriod.value,
+  agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
+  provider_id: selectedProviderId.value !== 'all' ? selectedProviderId.value : undefined,
+}))
+
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
-  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsUsageRequests(activeFilters.value),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
-  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingByProvider(activeFilters.value),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
-  queryKey: ['analytics-models', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsUsageModels(activeFilters.value),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
-  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingTotal({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingTotal(activeFilters.value),
 })
 
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
-  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
-  queryFn: () => api.getAnalyticsEventsList(
-    { period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined },
-    { page: logsPage.value, per_page: logsPerPage },
-  ),
+  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderId, logsPage],
+  queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
 })
 
 watch(eventsList, (newData) => {
@@ -98,7 +111,7 @@ watch(eventsList, (newData) => {
   }
 }, { immediate: true })
 
-watch([selectedPeriod, selectedAgentId], () => {
+watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
 })
@@ -152,10 +165,8 @@ function loadMoreLogs() {
 }
 
 function openLogModal(key: AnalyticsEvent) {
-  
+
 }
-
-
 </script>
 
 <template>
@@ -170,6 +181,23 @@ function openLogModal(key: AnalyticsEvent) {
             <SelectItem value="all">All Agents</SelectItem>
             <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">
               {{ agent.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div class="w-full md:w-40">
+        <Select v-model="selectedProviderId">
+          <SelectTrigger>
+            <SelectValue placeholder="All Providers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Providers</SelectItem>
+            <SelectItem
+              v-for="p in providerList?.data"
+              :key="p.provider_id"
+              :value="p.provider_id"
+            >
+              {{ p.provider_name }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -230,7 +258,7 @@ function openLogModal(key: AnalyticsEvent) {
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalOutputTokens) }}</div>
         </StatCard>
 
-          <StatCard title="Total Cost">
+        <StatCard title="Total Cost">
           <template #icon>
             <IconCoin class="h-4 w-4 text-muted-foreground" />
           </template>
@@ -248,9 +276,9 @@ function openLogModal(key: AnalyticsEvent) {
             No provider data available
           </div>
           <div v-else class="space-y-4">
-            <div v-for="provider in visibleProviders" :key="provider.provider">
+            <div v-for="provider in visibleProviders" :key="provider.provider_id">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ provider.provider }}</span>
+                <span class="text-base font-medium text-foreground">{{ provider.provider_name }}</span>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
