@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi, type AnalyticsPeriod, type AnalyticsEvent } from '../composables/useApi'
+import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -26,12 +26,15 @@ import IconCoin from '@/components/icons/IconCoin.vue'
 import IconServer from '@/components/icons/IconServer.vue'
 import IconGrid from '@/components/icons/IconGrid.vue'
 import IconClipboard from '@/components/icons/IconClipboard.vue'
+import IconUsers from '@/components/icons/IconUsers.vue'
+import IconExternalLink from '@/components/icons/IconExternalLink.vue'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {cn} from "@/lib/utils"
 
 const api = useApi()
 
@@ -101,6 +104,16 @@ const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching }
   queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
 })
 
+const { data: spendingByAgent, isLoading: agentSpendingLoading } = useQuery({
+  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value),
+})
+
+const { data: avgCostData } = useQuery({
+  queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value),
+})
+
 watch(eventsList, (newData) => {
   if (newData) {
     accumulatedLogs.value = logsPage.value === 1
@@ -114,6 +127,11 @@ watch(eventsList, (newData) => {
 watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
+})
+
+const agentBreakdown = computed<AgentSpending[]>(() => {
+  const data = spendingByAgent.value?.data ?? []
+  return [...data].sort((a, b) => b.spending - a.spending)
 })
 
 const isLoading = computed(() =>
@@ -164,8 +182,12 @@ function loadMoreLogs() {
   logsPage.value++
 }
 
-function openLogModal(key: AnalyticsEvent) {
+const selectedLog = ref<AnalyticsEvent | null>(null)
+const showLogModal = ref(false)
 
+function openLogModal(event: AnalyticsEvent) {
+  selectedLog.value = event
+  showLogModal.value = true
 }
 </script>
 
@@ -229,7 +251,7 @@ function openLogModal(key: AnalyticsEvent) {
     <!-- Analytics content -->
     <div v-else>
       <!-- Summary statistics -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6">
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <StatCard title="Total Requests">
           <template #icon>
             <IconBarChart class="h-4 w-4 text-muted-foreground" />
@@ -242,6 +264,9 @@ function openLogModal(key: AnalyticsEvent) {
             <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
+          <div v-if="requestStats?.failed_requests" class="text-xs text-destructive mt-1">
+            {{ formatNumber(requestStats.failed_requests) }} failed
+          </div>
         </StatCard>
 
         <StatCard title="Input Tokens">
@@ -263,6 +288,18 @@ function openLogModal(key: AnalyticsEvent) {
             <IconCoin class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatCost(totalSpend) }}</div>
+        </StatCard>
+
+        <StatCard title="Avg Cost / Request">
+          <template #icon>
+            <IconCoin class="h-4 w-4 text-muted-foreground" />
+          </template>
+          <div :class="cn('text-2xl font-bold', avgCostData ? 'text-foreground' : 'text-muted-foreground')">
+            {{ avgCostData ? formatCost(avgCostData.average_cost_per_request) : "No data" }}
+          </div>
+          <div v-if="avgCostData?.median_cost_per_request != null" class="text-xs text-muted-foreground mt-1">
+            median {{ formatCost(avgCostData.median_cost_per_request) }}
+          </div>
         </StatCard>
       </div>
 
@@ -310,10 +347,16 @@ function openLogModal(key: AnalyticsEvent) {
           <div v-else class="space-y-4">
             <div v-for="model in visibleModels" :key="model.model">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ model.model }}</span>
+                <div>
+                  <span class="text-base font-medium text-foreground">{{ model.model }}</span>
+                  <span class="text-xs text-muted-foreground block">{{ model.provider_name }}</span>
+                </div>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatCost(model.spending) }}</span>
+                  <span class="text-xs text-muted-foreground block">
+                    {{ formatCost((model.spending / (model.total_tokens || 1)) * 1000) }}/1k tokens
+                  </span>
                 </div>
               </div>
               <PercentBar :percentage="model.percentage" />
@@ -332,6 +375,47 @@ function openLogModal(key: AnalyticsEvent) {
           </div>
         </StatCard>
       </div>
+
+      <!-- Spending by Agent -->
+      <StatCard title="Spending by Agent" :showSeparator="true" class="mb-6">
+        <template #icon>
+          <IconUsers class="h-4 w-4 text-muted-foreground" />
+        </template>
+        <template v-if="spendingByAgent?.summary" #action>
+          <span class="text-xs text-muted-foreground">
+            Total {{ formatCost(spendingByAgent.summary.total_spend) }}
+            · avg {{ spendingByAgent.summary.average_percent_used.toFixed(1) }}% budget used
+          </span>
+        </template>
+        <DataTable
+          :columns="[
+            { label: 'Agent' },
+            { label: 'Spending' },
+            { label: 'Budget' },
+            { label: 'Used' },
+            { label: 'Requests' },
+          ]"
+          :isLoading="agentSpendingLoading"
+          :isEmpty="agentBreakdown.length === 0"
+          loadingText="Loading agent spending..."
+        >
+          <template #empty>
+            <p class="text-muted-foreground">No agent spending data available</p>
+          </template>
+          <tr v-for="agent in agentBreakdown" :key="agent.agent_id">
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ agent.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatCost(agent.spending) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget) }}</td>
+            <td class="px-3 sm:px-6 py-2 text-base text-foreground">
+              <div class="flex items-center gap-2 min-w-[100px]">
+                <PercentBar :percentage="agent.percent_used" class="max-w-[100px]" />
+                <span class="shrink-0 text-muted-foreground text-xs">{{ agent.percent_used.toFixed(1) }}%</span>
+              </div>
+            </td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>
+          </tr>
+        </DataTable>
+      </StatCard>
 
       <!-- Recent Logs -->
       <StatCard title="Recent Logs" :showSeparator="true">
@@ -365,31 +449,26 @@ function openLogModal(key: AnalyticsEvent) {
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.agent_name }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.model }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+            <td class="px-3 sm:px-6 py-4">
               <span
                 class="px-2 py-1 text-xs font-medium rounded-full"
                 :class="event.event_type === 'llm_request_completed' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'"
               >
                 {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
               </span>
+              <span v-if="event.error_code" class="text-xs text-muted-foreground block mt-1">
+                {{ event.error_code }}
+              </span>
+              <span v-if="event.error_message" class="text-xs text-destructive/70 block max-w-[180px] truncate" :title="event.error_message">
+                {{ event.error_message }}
+              </span>
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(event.input_tokens + event.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ formatMicrodollars(event.cost_micros) }}</td>
             <td class="px-3 sm:px-6 py-4 text-right whitespace-nowrap">
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="sm">
-                    <span class="sr-only">Open menu</span>
-                    <IconDotsHorizontal />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="openLogModal(event)">
-                    <IconEdit />
-                    Edit
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button variant="ghost" size="sm" @click="openLogModal(event)">
+                <IconExternalLink class="h-4 w-4" />
+              </Button>
             </td>
           </tr>
           <template #footer>
@@ -403,5 +482,66 @@ function openLogModal(key: AnalyticsEvent) {
         </DataTable>
       </StatCard>
     </div>
+
+    <!-- Log detail modal -->
+    <Dialog v-model:open="showLogModal">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <span
+              class="px-2 py-0.5 text-xs font-medium rounded-full"
+              :class="selectedLog?.event_type === 'llm_request_completed' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'"
+            >
+              {{ selectedLog?.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
+            </span>
+            Event Details
+          </DialogTitle>
+        </DialogHeader>
+
+        <div v-if="selectedLog" class="space-y-4 text-sm">
+          <!-- Error block (only for failed) -->
+          <div v-if="selectedLog.event_type !== 'llm_request_completed'" class="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+            <p class="font-medium text-destructive">{{ selectedLog.error_code ?? 'Unknown error' }}</p>
+            <p v-if="selectedLog.error_message" class="text-destructive/80">{{ selectedLog.error_message }}</p>
+          </div>
+
+          <!-- Fields grid -->
+          <div class="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Event ID</p>
+              <p class="font-mono text-xs text-foreground truncate">{{ selectedLog.event_id }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Time</p>
+              <p class="text-foreground">{{ formatTimestamp(selectedLog.timestamp_ms) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Agent</p>
+              <p class="text-foreground">{{ selectedLog.agent_name }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Provider</p>
+              <p class="text-foreground capitalize">{{ selectedLog.provider }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Model</p>
+              <p class="text-foreground">{{ selectedLog.model }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Cost</p>
+              <p class="text-foreground">{{ formatMicrodollars(selectedLog.cost_micros) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Input Tokens</p>
+              <p class="text-foreground">{{ formatNumber(selectedLog.input_tokens) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Output Tokens</p>
+              <p class="text-foreground">{{ formatNumber(selectedLog.output_tokens) }}</p>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   </PageLayout>
 </template>

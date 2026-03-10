@@ -12,7 +12,8 @@ export function formatMicrodollars(micros: number): string {
   return `$${(micros / 1_000_000).toFixed(4)}`
 }
 
-export function formatCostUsd(usd: number, decimals = 2): string {
+export function formatCostUsd(usd: number | null | undefined, decimals = 2): string {
+  if (usd == null || isNaN(usd)) return '—'
   return `$${usd.toFixed(decimals)}`
 }
 
