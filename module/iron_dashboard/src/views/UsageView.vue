@@ -18,6 +18,8 @@ import PercentBar from '@/components/PercentBar.vue'
 import DataTable from '@/components/DataTable.vue'
 import IconChevronUp from '@/components/icons/IconChevronUp.vue'
 import IconChevronDown from '@/components/icons/IconChevronDown.vue'
+import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
+import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 import IconDownload from '@/components/icons/IconDownload.vue'
 import IconBarChart from '@/components/icons/IconBarChart.vue'
 import IconCheckCircle from '@/components/icons/IconCheckCircle.vue'
@@ -37,6 +39,7 @@ import {
 } from '@/components/ui/dialog'
 import {cn} from "@/lib/utils"
 import TrendBadge from '@/components/TrendBadge.vue'
+import { getProviderLabel } from '@/lib/providers'
 
 const api = useApi()
 
@@ -49,6 +52,11 @@ const logsPerPage = 10
 const accumulatedLogs = ref<AnalyticsEvent[]>([])
 const totalEvents = ref(0)
 const totalPages = ref(1)
+
+const ANALYTICS_PER_PAGE = 10
+const agentSpendingPage = ref(1)
+const modelsPage = ref(1)
+const tokensPage = ref(1)
 
 const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
   { value: 'today',       label: 'Today'        },
@@ -65,14 +73,11 @@ const { data: agents } = useQuery({
   queryFn: () => api.getAgents(),
 })
 
-// Unfiltered provider list — used only to populate the provider dropdown.
-// Never includes provider_id so it always returns all available providers.
+// Provider list for the dropdown — uses the providers endpoint so all
+// configured providers appear regardless of whether they have usage in the current period.
 const { data: providerList } = useQuery({
-  queryKey: ['analytics-provider-list', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingByProvider({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
-  }),
+  queryKey: ['providers'],
+  queryFn: () => api.getProviderKeys(),
 })
 
 const activeFilters = computed(() => ({
@@ -92,8 +97,8 @@ const { data: spendingByProvider, isLoading: providerLoading, error: providerErr
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
-  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsUsageModels(activeFilters.value),
+  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderId, modelsPage],
+  queryFn: () => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
@@ -107,8 +112,8 @@ const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching }
 })
 
 const { data: spendingByAgent, isLoading: agentSpendingLoading } = useQuery({
-  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value),
+  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderId, agentSpendingPage],
+  queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 const { data: avgCostData } = useQuery({
@@ -117,8 +122,8 @@ const { data: avgCostData } = useQuery({
 })
 
 const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
-  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value),
+  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderId, tokensPage],
+  queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 watch(eventsList, (newData) => {
@@ -134,6 +139,9 @@ watch(eventsList, (newData) => {
 watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
+  agentSpendingPage.value = 1
+  modelsPage.value = 1
+  tokensPage.value = 1
 })
 
 const agentBreakdown = computed<AgentSpending[]>(() => {
@@ -163,33 +171,18 @@ const providerBreakdown = computed(() => {
 })
 
 const modelBreakdown = computed(() => {
-  const allData = modelUsage.value?.data ?? []
-  const data = allData.filter(m => selectedModel.value === 'all' || m.model === selectedModel.value)
+  const data = modelUsage.value?.data ?? []
   if (!data.length) return []
-  const maxRequests = Math.max(...allData.map(m => m.request_count), 1)
+  const maxRequests = Math.max(...data.map(m => m.request_count), 1)
   return data.map(m => ({ ...m, percentage: (m.request_count / maxRequests) * 100 }))
             .sort((a, b) => b.percentage - a.percentage)
 })
 
-const selectedModel = ref<string>('all')
-
-const availableModels = computed(() =>
-  (modelUsage.value?.data ?? []).map(m => ({ value: m.model, label: m.model }))
-)
-
-watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
-  selectedModel.value = 'all'
-})
-
 const BREAKDOWN_LIMIT = 10
 const showAllProviders = ref(false)
-const showAllModels = ref(false)
 
 const visibleProviders = computed(() =>
   showAllProviders.value ? providerBreakdown.value : providerBreakdown.value.slice(0, BREAKDOWN_LIMIT)
-)
-const visibleModels = computed(() =>
-  showAllModels.value ? modelBreakdown.value : modelBreakdown.value.slice(0, BREAKDOWN_LIMIT)
 )
 
 function formatCost(cost: number): string {
@@ -233,11 +226,11 @@ function openLogModal(event: AnalyticsEvent) {
           <SelectContent>
             <SelectItem value="all">All Providers</SelectItem>
             <SelectItem
-              v-for="p in providerList?.data"
+              v-for="p in providerList"
               :key="p.provider"
               :value="p.provider"
             >
-              {{ p.provider }}
+              {{ getProviderLabel(p.provider) }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -349,7 +342,7 @@ function openLogModal(event: AnalyticsEvent) {
           <div v-else class="space-y-4">
             <div v-for="provider in visibleProviders" :key="provider.provider">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ provider.provider }}</span>
+                <span class="text-base font-medium text-foreground">{{ getProviderLabel(provider.provider) }}</span>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
@@ -375,28 +368,15 @@ function openLogModal(event: AnalyticsEvent) {
           <template #icon>
             <IconGrid class="h-4 w-4 text-muted-foreground" />
           </template>
-          <template v-if="availableModels.length > 1" #action>
-            <Select v-model="selectedModel">
-              <SelectTrigger class="h-7 text-xs w-44">
-                <SelectValue placeholder="All Models" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Models</SelectItem>
-                <SelectItem v-for="m in availableModels" :key="m.value" :value="m.value">
-                  {{ m.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </template>
           <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground mt-6">
             No model data available
           </div>
           <div v-else class="space-y-4">
-            <div v-for="model in visibleModels" :key="model.model">
+            <div v-for="model in modelBreakdown" :key="model.model">
               <div class="flex justify-between items-center mb-2">
                 <div>
                   <span class="text-base font-medium text-foreground">{{ model.model }}</span>
-                  <span class="text-xs text-muted-foreground block">{{ model.provider }}</span>
+                  <span class="text-xs text-muted-foreground block">{{ getProviderLabel(model.provider) }}</span>
                 </div>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
@@ -408,17 +388,20 @@ function openLogModal(event: AnalyticsEvent) {
               </div>
               <PercentBar :percentage="model.percentage" />
             </div>
-            <Button
-              v-if="modelBreakdown.length > BREAKDOWN_LIMIT"
-              variant="ghost"
-              size="sm"
-              class="w-full"
-              @click="showAllModels = !showAllModels"
-            >
-              <IconChevronUp v-if="showAllModels" />
-              <IconChevronDown v-else />
-              {{ showAllModels ? 'Show less' : `Show all ${modelBreakdown.length}` }}
-            </Button>
+            <div v-if="modelUsage?.pagination && modelUsage.pagination.total_pages > 1" class="flex items-center justify-between pt-2 border-t border-border">
+              <p class="text-xs text-muted-foreground">
+                Page <span class="font-medium">{{ modelsPage }}</span> of <span class="font-medium">{{ modelUsage.pagination.total_pages }}</span>
+                · <span class="font-medium">{{ modelUsage.pagination.total }}</span> models
+              </p>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" :disabled="modelsPage === 1" @click="modelsPage--">
+                  <IconChevronLeft />Previous
+                </Button>
+                <Button variant="outline" size="sm" :disabled="modelsPage >= modelUsage.pagination.total_pages" @click="modelsPage++">
+                  Next<IconChevronRight />
+                </Button>
+              </div>
+            </div>
           </div>
         </StatCard>
       </div>
@@ -461,6 +444,23 @@ function openLogModal(event: AnalyticsEvent) {
             </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>
           </tr>
+          <template #footer>
+            <div v-if="spendingByAgent?.pagination && spendingByAgent.pagination.total_pages > 1" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
+              <p class="text-xs text-muted-foreground">
+                Showing <span class="font-medium">{{ (agentSpendingPage - 1) * ANALYTICS_PER_PAGE + 1 }}</span>
+                – <span class="font-medium">{{ Math.min(agentSpendingPage * ANALYTICS_PER_PAGE, spendingByAgent.pagination.total) }}</span>
+                of <span class="font-medium">{{ spendingByAgent.pagination.total }}</span>
+              </p>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" :disabled="agentSpendingPage === 1" @click="agentSpendingPage--">
+                  <IconChevronLeft />Previous
+                </Button>
+                <Button variant="outline" size="sm" :disabled="agentSpendingPage >= spendingByAgent.pagination.total_pages" @click="agentSpendingPage++">
+                  Next<IconChevronRight />
+                </Button>
+              </div>
+            </div>
+          </template>
         </DataTable>
       </StatCard>
 
@@ -500,6 +500,23 @@ function openLogModal(event: AnalyticsEvent) {
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(row.request_count) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(Math.round(row.avg_tokens_per_request)) }}</td>
           </tr>
+          <template #footer>
+            <div v-if="tokensByAgent?.pagination && tokensByAgent.pagination.total_pages > 1" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
+              <p class="text-xs text-muted-foreground">
+                Showing <span class="font-medium">{{ (tokensPage - 1) * ANALYTICS_PER_PAGE + 1 }}</span>
+                – <span class="font-medium">{{ Math.min(tokensPage * ANALYTICS_PER_PAGE, tokensByAgent.pagination.total) }}</span>
+                of <span class="font-medium">{{ tokensByAgent.pagination.total }}</span>
+              </p>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" :disabled="tokensPage === 1" @click="tokensPage--">
+                  <IconChevronLeft />Previous
+                </Button>
+                <Button variant="outline" size="sm" :disabled="tokensPage >= tokensByAgent.pagination.total_pages" @click="tokensPage++">
+                  Next<IconChevronRight />
+                </Button>
+              </div>
+            </div>
+          </template>
         </DataTable>
       </StatCard>
 
@@ -607,7 +624,7 @@ function openLogModal(event: AnalyticsEvent) {
             </div>
             <div>
               <p class="text-xs text-muted-foreground mb-0.5">Provider</p>
-              <p class="text-foreground capitalize">{{ selectedLog.provider }}</p>
+              <p class="text-foreground">{{ getProviderLabel(selectedLog.provider) }}</p>
             </div>
             <div>
               <p class="text-xs text-muted-foreground mb-0.5">Model</p>

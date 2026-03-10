@@ -169,6 +169,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           </RouterLink>
         </template>
         <div class="space-y-3">
+          <p class="text-sm text-muted-foreground text-center py-2" v-if="topSpenders.length === 0">No data yet</p>
           <div
             v-for="(agent, i) in topSpenders"
             :key="agent.agent_name"

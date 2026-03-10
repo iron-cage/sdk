@@ -29,7 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/formatters'
-import { getProviderLabel } from '@/lib/providers'
+import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -41,6 +41,7 @@ import IconEdit from '@/components/icons/IconEdit.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -262,8 +263,8 @@ function handleToggleEnabled(key: ProviderKey) {
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="openai">{{ getProviderLabel('openai') }}</SelectItem>
+                <SelectItem value="anthropic">{{getProviderLabel('anthropic')}}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -274,7 +275,7 @@ function handleToggleEnabled(key: ProviderKey) {
               id="apiKey"
               v-model="apiKey"
               type="password"
-              :placeholder="provider === 'openai' ? 'sk-proj-...' : 'sk-ant-...'"
+              :placeholder="getProviderKeyPlaceholder(provider)"
               :disabled="createMutation.isPending.value"
             />
             <p class="text-xs text-muted-foreground">

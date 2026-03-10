@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { refDebounced } from '@vueuse/core'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type CreateUserRequest, type User } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -54,6 +55,7 @@ const authStore = useAuthStore()
 const page = ref(1)
 const pageSize = ref(20)
 const search = ref('')
+const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
 const isActiveFilter = ref<boolean | undefined>(undefined)
 
@@ -81,11 +83,11 @@ const forcePasswordChange = ref(true)
 
 // Fetch users
 const { data: usersData, isLoading, error, refetch } = useQuery({
-  queryKey: ['users', page, pageSize, search, roleFilter, isActiveFilter],
+  queryKey: ['users', page, pageSize, searchDebounced, roleFilter, isActiveFilter],
   queryFn: () => api.getUsers({
     page: page.value,
     page_size: pageSize.value,
-    search: search.value || undefined,
+    search: searchDebounced.value || undefined,
     role: roleFilter.value === 'all' ? undefined : roleFilter.value,
     is_active: isActiveFilter.value
   }),
@@ -238,7 +240,7 @@ function confirmResetPassword() {
 }
 
 // Watch for search changes to reset page
-watch(search, () => {
+watch(searchDebounced, () => {
   page.value = 1
 })
 
@@ -291,7 +293,7 @@ watch(search, () => {
     >
       <template #empty>
         <p class="text-muted-foreground mb-4">No users found</p>
-        <Button @click="showCreateModal = true"><IconPlus />Create First User</Button>
+        <Button @click="showCreateModal = true"><IconPlus />Create User</Button>
       </template>
 
       <tr v-for="user in usersData?.users" :key="user.id">
