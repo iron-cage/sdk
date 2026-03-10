@@ -6,8 +6,11 @@ use serde_json::{json, Value};
 ///
 /// Key transformations:
 /// - Extract system prompt from messages array to separate `system` field
+/// - Translate `role: "tool"` messages to Anthropic `tool_result` content blocks (wrapped in a `user` turn)
+/// - Translate `role: "assistant"` messages with `tool_calls` to Anthropic `tool_use` content blocks
 /// - Map `stop` to `stop_sequences`
 /// - Ensure `max_tokens` is present (required by Anthropic)
+/// - Forward the `stream` flag to the Anthropic request body
 ///
 /// # Errors
 ///
@@ -33,6 +36,53 @@ pub fn translate_openai_to_anthropic(openai_body: &[u8]) -> Result<Vec<u8>, Stri
         Some(existing) => format!("{existing}\n{content}"),
         None => content,
       });
+    } else if role == "tool" {
+      // OpenAI tool result → Anthropic user message with tool_result content block
+      // OpenAI: {"role":"tool","tool_call_id":"call_xyz","content":"result text"}
+      // Anthropic: {"role":"user","content":[{"type":"tool_result","tool_use_id":"call_xyz","content":"result text"}]}
+      user_messages.push(json!({
+        "role": "user",
+        "content": [{
+          "type": "tool_result",
+          "tool_use_id": msg["tool_call_id"],
+          "content": msg["content"],
+        }]
+      }));
+    } else if role == "assistant" {
+      if let Some(tool_calls) = msg["tool_calls"].as_array() {
+        // OpenAI assistant tool call → Anthropic assistant message with tool_use content blocks
+        // OpenAI: {"role":"assistant","tool_calls":[{"id":"call_xyz","type":"function","function":{"name":"fn","arguments":"{\"k\":\"v\"}"}}]}
+        // Anthropic: {"role":"assistant","content":[{"type":"tool_use","id":"call_xyz","name":"fn","input":{...}}]}
+        let mut content_blocks = Vec::new();
+
+        // Carry over any text content alongside the tool calls
+        let text = extract_text_content(&msg["content"]);
+        if !text.is_empty() {
+          content_blocks.push(json!({"type": "text", "text": text}));
+        }
+
+        for call in tool_calls {
+          let input: Value = call["function"]["arguments"]
+            .as_str()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or(Value::Object(serde_json::Map::default()));
+          content_blocks.push(json!({
+            "type": "tool_use",
+            "id": call["id"],
+            "name": call["function"]["name"],
+            "input": input,
+          }));
+        }
+
+        user_messages.push(json!({"role": "assistant", "content": content_blocks}));
+      } else {
+        // Plain assistant message — translate content blocks as usual
+        let mut translated_msg = msg.clone();
+        if let Some(content_array) = msg["content"].as_array() {
+          translated_msg["content"] = translate_content_blocks(content_array);
+        }
+        user_messages.push(translated_msg);
+      }
     } else {
       // Translate message content (handles both string and multimodal array formats)
       let mut translated_msg = msg.clone();
@@ -73,6 +123,11 @@ pub fn translate_openai_to_anthropic(openai_body: &[u8]) -> Result<Vec<u8>, Stri
     } else if stop.is_string() {
       anthropic["stop_sequences"] = json!([stop]);
     }
+  }
+
+  // Forward stream flag — Anthropic controls streaming via the request body, not query params
+  if let Some(stream) = openai.get("stream") {
+    anthropic["stream"] = stream.clone();
   }
 
   serde_json::to_vec(&anthropic).map_err(|e| format!("Serialization error: {e}"))

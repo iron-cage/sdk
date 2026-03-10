@@ -765,11 +765,17 @@ pub async fn assign_provider_to_project(
 /// DELETE `/api/projects/{project_id}/provider`
 ///
 /// Unassign provider key from project
+///
+/// Requires the `ManageProviderKeys` permission.
 pub async fn unassign_provider_from_project(
   State(state): State<ProvidersState>,
-  AuthenticatedUser(_claims): AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
   Path(project_id): Path<String>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
   // Get the current assignment to verify it exists
   let provider_key_id = match state.storage.get_project_key(&project_id).await {
     Ok(Some(id)) => id,

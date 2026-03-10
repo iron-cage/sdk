@@ -9,7 +9,7 @@ use secrecy::SecretBox;
 use tokio::sync::RwLock;
 
 use crate::llm_router::error::LlmRouterError;
-use iron_secrets::ip_token::{IpTokenCrypto, IpTokenKey, ProviderKey};
+use iron_secrets::ip_token::{IpTokenCrypto, IpTokenKey, ProviderApiKey, ProviderKey};
 
 /// Cached key entry
 #[derive(Debug)]
@@ -83,7 +83,7 @@ impl KeyFetcher {
     let provider = ProviderKey::detect_provider_from_key(&api_key).to_string();
     let static_key = ProviderKey {
       provider,
-      api_key: SecretBox::new(Box::new(api_key)),
+      api_key: SecretBox::new(Box::new(ProviderApiKey::new(api_key))),
       base_url,
     };
 
@@ -204,7 +204,7 @@ impl KeyFetcher {
 
     Ok(ProviderKey {
       provider: data.provider,
-      api_key,
+      api_key: SecretBox::new(Box::new(api_key)),
       base_url: data.base_url,
     })
   }

@@ -1,6 +1,34 @@
 //! Server proxy configuration from CLI args and environment variables.
 
 use clap::Parser;
+use zeroize::Zeroizing;
+
+/// AES-256 master key read from the environment, stored as a `Zeroizing<String>` so the
+/// base64-encoded key material is zeroed when `Config` is dropped.
+///
+/// Implements `FromStr` for clap parsing and `Debug` as `<redacted>` to prevent accidental leaks.
+#[derive(Clone)]
+pub struct MasterKey(pub(crate) Zeroizing<String>);
+
+impl core::str::FromStr for MasterKey {
+  type Err = core::convert::Infallible;
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Ok(Self(Zeroizing::new(s.to_owned())))
+  }
+}
+
+impl core::fmt::Debug for MasterKey {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.write_str("<redacted>")
+  }
+}
+
+impl core::ops::Deref for MasterKey {
+  type Target = str;
+  fn deref(&self) -> &str {
+    self.0.as_str()
+  }
+}
 
 /// Server-side LLM proxy configuration.
 ///
@@ -27,5 +55,5 @@ pub struct Config {
   /// Master encryption key for provider API keys (base64-encoded, 32 bytes for AES-256-GCM).
   /// Must match the `IRON_SECRETS_MASTER_KEY` used by `iron_control_api`.
   #[arg(long, env = "IRON_SECRETS_MASTER_KEY")]
-  pub secrets_master_key: String,
+  pub secrets_master_key: MasterKey,
 }

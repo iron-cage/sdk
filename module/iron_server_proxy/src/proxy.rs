@@ -167,7 +167,7 @@ async fn handle_proxy_inner(
 
   let provider_key = ProviderKey {
     provider: key_record.metadata.provider.as_str().to_string(),
-    api_key: SecretBox::new(Box::new(decrypted.to_string())),
+    api_key: SecretBox::new(Box::new(iron_secrets::ip_token::ProviderApiKey::from(decrypted))),
     base_url: key_record.metadata.base_url.clone(),
   };
 
@@ -211,9 +211,28 @@ async fn handle_proxy_inner(
   }
 
   // Step 10: Return provider response to agent (no API key leaks)
+  let content_type = forward_resp
+    .headers
+    .get(axum::http::header::CONTENT_TYPE)
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("application/json")
+    .to_owned();
+
+  let response_body = match forward_resp.body {
+    iron_llm_core::ForwardBody::Buffered(bytes) => Body::from(bytes),
+    iron_llm_core::ForwardBody::Streaming(provider_resp) => {
+      Body::from_stream(futures_util::stream::unfold(provider_resp, |mut resp| async move {
+        match resp.chunk().await {
+          Ok(Some(chunk)) => Some((Ok::<_, String>(chunk), resp)),
+          _ => None,
+        }
+      }))
+    }
+  };
+
   Response::builder()
     .status(forward_resp.status.as_u16())
-    .header("content-type", "application/json")
-    .body(Body::from(forward_resp.body))
+    .header("content-type", content_type)
+    .body(response_body)
     .map_err(|e| ProxyError::Internal(format!("Response build failed: {e}")))
 }

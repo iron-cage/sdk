@@ -29,14 +29,40 @@ pub struct ForwardRequest {
   pub body: Vec<u8>,
 }
 
+/// Body of a forwarded provider response.
+///
+/// Non-streaming requests are fully buffered (and translated when needed).
+/// Streaming requests hand the raw provider `Response` to the caller so it can be
+/// piped directly to the client via `.bytes_stream()`.
+pub enum ForwardBody {
+  /// Fully buffered, optionally translated response body.
+  Buffered(Vec<u8>),
+  /// Raw provider response for streaming — consume via `.bytes_stream()`.
+  ///
+  /// Note: when `needs_translation` was true the body is in Anthropic SSE format;
+  /// OpenAI-compatible SSE translation is not yet implemented.
+  Streaming(reqwest::Response),
+}
+
+impl core::fmt::Debug for ForwardBody {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    match self {
+      Self::Buffered(b) => write!(f, "Buffered({} bytes)", b.len()),
+      Self::Streaming(_) => write!(f, "Streaming(...)"),
+    }
+  }
+}
+
 /// Response from an LLM provider after forwarding
 #[derive(Debug)]
 pub struct ForwardResponse {
   /// HTTP status code from the provider
   pub status: StatusCode,
-  /// Response body bytes (translated to `OpenAI` format if applicable)
-  pub body: Vec<u8>,
-  /// Cost information (present only for successful requests with known pricing)
+  /// Response headers from the provider (includes `Content-Type` for stream detection).
+  pub headers: reqwest::header::HeaderMap,
+  /// Response body — buffered for normal requests, streaming for `stream: true` requests.
+  pub body: ForwardBody,
+  /// Cost information (present only for successful buffered requests with known pricing).
   pub cost_info: Option<CostInfo>,
 }
 
@@ -47,9 +73,11 @@ pub struct ForwardResponse {
 /// 1. Provider detection from path prefix or model name in body
 /// 2. Request format translation (`OpenAI` -> Anthropic) when needed
 /// 3. Building the correct provider URL and auth headers
-/// 4. Sending the request and reading the response
-/// 5. Response format translation (Anthropic -> `OpenAI`) when needed
-/// 6. Cost calculation for successful requests
+/// 4. Sending the request; for streaming (`stream: true`) the raw provider response is
+///    returned immediately as [`ForwardBody::Streaming`] — buffering, translation, and
+///    cost calculation are skipped
+/// 5. Response format translation (Anthropic -> `OpenAI`) when needed (buffered path only)
+/// 6. Cost calculation for successful requests (buffered path only)
 ///
 /// # Arguments
 ///
@@ -113,24 +141,48 @@ pub async fn forward_request(
     );
   }
 
-  // 6. Send request to provider
+  // 6. Detect streaming from original request body
+  let is_streaming = serde_json::from_slice::<serde_json::Value>(&request.body)
+    .ok()
+    .and_then(|v| v["stream"].as_bool())
+    .unwrap_or(false);
+
+  // 7. Send request to provider
   let provider_response = req_builder
     .body(request_body)
     .send()
     .await
     .map_err(|e| LlmCoreError::Forward(format!("Forward error: {e}")))?;
 
-  // 7. Read response
   let status = provider_response.status();
+  let headers = provider_response.headers().clone();
+
+  // 8. For streaming requests, hand the raw response to the caller immediately.
+  // Response translation and cost calculation are skipped — the stream is piped through.
+  if is_streaming {
+    tracing::debug!(
+      target_provider,
+      needs_translation,
+      status = %status,
+      "LLM streaming request forwarded"
+    );
+    return Ok(ForwardResponse {
+      status,
+      headers,
+      body: ForwardBody::Streaming(provider_response),
+      cost_info: None,
+    });
+  }
+
+  // 9. Buffer non-streaming response
   let resp_body = provider_response
     .bytes()
     .await
     .map_err(|e| LlmCoreError::Forward(format!("Response read error: {e}")))?;
 
-  // 8. Translate response back to OpenAI format if needed.
+  // 10. Translate response back to OpenAI format if needed.
   // For 401/403 responses, replace body with a generic error to prevent
   // provider error messages from leaking partial API key material.
-
   let final_body = if [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN].contains(&status) {
     tracing::warn!(
       target_provider,
@@ -145,7 +197,7 @@ pub async fn forward_request(
     resp_body.to_vec()
   };
 
-  // 9. Calculate cost for successful requests
+  // 11. Calculate cost for successful requests
   let cost_info = if status.is_success() {
     cost::calculate_request_cost(pricing_manager, &request.body, &final_body)
   } else {
@@ -161,7 +213,8 @@ pub async fn forward_request(
 
   Ok(ForwardResponse {
     status,
-    body: final_body,
+    headers,
+    body: ForwardBody::Buffered(final_body),
     cost_info,
   })
 }

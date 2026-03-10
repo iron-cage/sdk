@@ -229,3 +229,75 @@ fn anthropic_invalid_json_returns_error() {
   let result = translate_anthropic_to_openai(b"bad json");
   assert!(result.is_err());
 }
+
+#[test]
+fn tool_role_message_translated_to_tool_result() {
+  let openai = serde_json::json!({
+    "model": "claude-3-5-sonnet-20241022",
+    "messages": [
+      {"role": "user", "content": "What's the weather?"},
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [{
+          "id": "call_abc",
+          "type": "function",
+          "function": {"name": "get_weather", "arguments": "{\"location\":\"SF\"}"}
+        }]
+      },
+      {"role": "tool", "tool_call_id": "call_abc", "content": "72°F and sunny"}
+    ]
+  });
+
+  let result = translate_openai_to_anthropic(&serde_json::to_vec(&openai).unwrap()).unwrap();
+  let anthropic = serde_json::from_slice::<Value>(&result).unwrap();
+  let messages = anthropic["messages"].as_array().unwrap();
+
+  // user message passes through as-is
+  assert_eq!(messages[0]["role"], "user");
+
+  // assistant message with tool_use block
+  assert_eq!(messages[1]["role"], "assistant");
+  let tool_use = &messages[1]["content"][0];
+  assert_eq!(tool_use["type"], "tool_use");
+  assert_eq!(tool_use["id"], "call_abc");
+  assert_eq!(tool_use["name"], "get_weather");
+  assert_eq!(tool_use["input"]["location"], "SF");
+
+  // tool result translated to user message with tool_result block
+  assert_eq!(messages[2]["role"], "user");
+  let tool_result = &messages[2]["content"][0];
+  assert_eq!(tool_result["type"], "tool_result");
+  assert_eq!(tool_result["tool_use_id"], "call_abc");
+  assert_eq!(tool_result["content"], "72°F and sunny");
+}
+
+#[test]
+fn assistant_tool_calls_translated_to_tool_use_blocks() {
+  let openai = serde_json::json!({
+    "model": "claude-3-5-sonnet-20241022",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "Let me check that.",
+        "tool_calls": [{
+          "id": "call_xyz",
+          "type": "function",
+          "function": {"name": "lookup", "arguments": "{\"q\":\"rust\"}"}
+        }]
+      }
+    ]
+  });
+
+  let result = translate_openai_to_anthropic(&serde_json::to_vec(&openai).unwrap()).unwrap();
+  let anthropic = serde_json::from_slice::<Value>(&result).unwrap();
+  let content = anthropic["messages"][0]["content"].as_array().unwrap();
+
+  // text block preserved before tool_use
+  assert_eq!(content[0]["type"], "text");
+  assert_eq!(content[0]["text"], "Let me check that.");
+  assert_eq!(content[1]["type"], "tool_use");
+  assert_eq!(content[1]["id"], "call_xyz");
+  assert_eq!(content[1]["name"], "lookup");
+  assert_eq!(content[1]["input"]["q"], "rust");
+}
