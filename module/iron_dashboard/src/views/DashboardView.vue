@@ -13,6 +13,7 @@ import IconCog from '@/components/icons/IconCog.vue'
 import IconServer from '@/components/icons/IconServer.vue'
 import IconUsers from '@/components/icons/IconUsers.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
+import PageLayout from '@/components/PageLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -44,13 +45,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
 </script>
 
 <template>
-  <div class="p-4 lg:p-6 space-y-6">
-    <!-- Page header -->
-    <div>
-      <h1 class="text-base font-semibold text-foreground">Dashboard</h1>
-      <p class="text-xs text-muted-foreground mt-0.5">Overview of your Iron Token workspace</p>
-    </div>
-
+  <PageLayout title="Dashboard" contentClass="p-4 lg:p-6 space-y-6">
     <!-- System health bar -->
     <div class="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-lg">
       <div class="flex items-center gap-3">
@@ -70,11 +65,11 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
     </div>
 
     <!-- Stat cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
       <!-- Total Spending -->
       <div class="bg-card border border-border rounded-lg p-5">
         <div class="flex items-start justify-between mb-3">
-          <span class="text-xs text-muted-foreground">Total Spending</span>
+          <span class="text-xs text-foreground">Total Spending</span>
           <IconCoin class="h-4 w-4 text-muted-foreground" />
         </div>
         <p class="text-2xl font-semibold text-foreground tracking-tight">{{ formatCostUsd(totalSpend, 3) }}</p>
@@ -84,7 +79,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
       <!-- Total Requests -->
       <div class="bg-card border border-border rounded-lg p-5">
         <div class="flex items-start justify-between mb-3">
-          <span class="text-xs text-muted-foreground">Total Requests</span>
+          <span class="text-xs text-foreground">Total Requests</span>
           <IconBarChart class="h-4 w-4 text-muted-foreground" />
         </div>
         <p class="text-2xl font-semibold text-foreground tracking-tight">{{ formatNumber(totalRequests) }}</p>
@@ -94,7 +89,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
       <!-- Success Rate -->
       <div class="bg-card border border-border rounded-lg p-5">
         <div class="flex items-start justify-between mb-3">
-          <span class="text-xs text-muted-foreground">Success Rate</span>
+          <span class="text-xs text-foreground">Success Rate</span>
           <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
         </div>
         <p class="text-2xl font-semibold text-foreground tracking-tight">{{ successRate.toFixed(1) }}%</p>
@@ -104,7 +99,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
       <!-- Active Agents -->
       <div class="bg-card border border-border rounded-lg p-5">
         <div class="flex items-start justify-between mb-3">
-          <span class="text-xs text-muted-foreground">Active Agents</span>
+          <span class="text-xs text-foreground">Active Agents</span>
           <IconCog class="h-4 w-4 text-muted-foreground" />
         </div>
         <p class="text-2xl font-semibold text-foreground tracking-tight">{{ agentCount }}</p>
@@ -193,5 +188,5 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
         </div>
       </StatCard>
     </div>
-  </div>
+  </PageLayout>
 </template>

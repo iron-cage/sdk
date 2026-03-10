@@ -125,7 +125,7 @@ const rejectMutation = useMutation({
 // My requests (user view) — client-side since status filter is an admin-only feature
 const myRequests = computed(() => {
   if (!requests.value?.requests) return []
-  return requests.value.requests.filter(r => r.requester_id === authStore.username)
+  return requests.value.requests.filter(r => r.requester_id === authStore.userId)
 })
 
 // All requests filtered by backend status param
@@ -165,7 +165,7 @@ function handleCreateRequest() {
 
   createMutation.mutate({
     agent_id: createForm.value.agent_id,
-    requester_id: authStore.username || 'default',
+    requester_id: authStore.userId || 'default',
     requested_budget_usd: createForm.value.requested_budget_usd,
     justification: createForm.value.justification,
   })

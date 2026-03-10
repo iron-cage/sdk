@@ -102,7 +102,7 @@ function riskBadgeVariant(risk: string) {
     </template>
 
     <!-- Budget summary bar -->
-    <div v-if="budgetStatus?.summary" class="flex flex-wrap items-center gap-2 mb-4 px-4 py-3 border-b border-border bg-muted/30">
+    <div v-if="budgetStatus?.summary" class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
       <span class="text-sm font-medium text-foreground mr-1">
         {{ budgetStatus.summary.total_agents }} agents
       </span>

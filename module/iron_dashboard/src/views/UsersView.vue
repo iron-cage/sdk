@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
+import { useAuthStore } from '../stores/auth'
 import DataTable from '@/components/DataTable.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -47,6 +48,7 @@ import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
+const authStore = useAuthStore()
 
 // State
 const page = ref(1)
@@ -255,9 +257,9 @@ watch(search, () => {
       <div class="w-full md:w-40">
         <Select v-model="roleFilter">
           <SelectTrigger id="role-filter">
-            <SelectValue placeholder="All Roles" />
+            <SelectValue placeholder="All Roles" class="text-foreground"/>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent >
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="manager">Manager</SelectItem>
@@ -320,7 +322,7 @@ watch(search, () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="handleChangeRole(user)" :disabled="user.username === 'admin'">
+              <DropdownMenuItem @click="handleChangeRole(user)" :disabled="user.id === authStore.userId">
                 <IconEdit />
                 Change Role
               </DropdownMenuItem>
@@ -328,13 +330,13 @@ watch(search, () => {
                 <IconKey />
                 Reset Password
               </DropdownMenuItem>
-              <DropdownMenuItem @click="handleToggleStatus(user)" :disabled="user.username === 'admin'">
+              <DropdownMenuItem @click="handleToggleStatus(user)" :disabled="user.id === authStore.userId">
                 <IconBan v-if="user.is_active" />
                 <IconCheck v-else />
                 {{ user.is_active ? 'Suspend' : 'Activate' }}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="handleDeleteUser(user)" :disabled="user.username === 'admin'" class="text-destructive">
+              <DropdownMenuItem @click="handleDeleteUser(user)" :disabled="user.id === authStore.userId" class="text-destructive">
                 <IconTrash />
                 Delete
               </DropdownMenuItem>

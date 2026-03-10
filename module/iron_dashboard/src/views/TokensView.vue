@@ -78,7 +78,7 @@ const createMutation = useMutation({
     showTokenModal.value = true
     projectId.value = ''
     description.value = ''
-    selectedUserId.value = authStore.username || ''
+    selectedUserId.value = authStore.userId || ''
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
   onError: (err) => {
@@ -106,7 +106,7 @@ const revokeMutation = useMutation({
 
 function handleCreateToken() {
   createMutation.mutate({
-    user_id: selectedUserId.value || authStore.username || 'default',
+    user_id: selectedUserId.value || authStore.userId || 'default',
     project_id: projectId.value || undefined,
     description: description.value || undefined,
   })

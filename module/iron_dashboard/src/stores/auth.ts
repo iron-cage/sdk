@@ -24,7 +24,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const refreshToken = ref<string | null>(null)
-  const username = ref<string | null>(null)
+  const username = ref<string | null>(null)  // display name
+  const userId = ref<string | null>(null)    // FK / ID
   const role = ref<string | null>(null)
   const isAuthenticated = computed(() => !!accessToken.value)
   const isAdmin = computed(() => role.value === 'admin')
@@ -34,27 +35,30 @@ export const useAuthStore = defineStore('auth', () => {
     const storedAccessToken = localStorage.getItem('access_token')
     const storedRefreshToken = localStorage.getItem('refresh_token')
     const storedUsername = localStorage.getItem('username')
+    const storedUserId = localStorage.getItem('user_id')
     const storedRole = localStorage.getItem('role')
 
     if (storedAccessToken && storedRefreshToken) {
       accessToken.value = storedAccessToken
       refreshToken.value = storedRefreshToken
       username.value = storedUsername
+      userId.value = storedUserId
       role.value = storedRole
     }
   }
 
   // Save tokens to localStorage
-  function saveTokens(tokens: AuthTokens, user: string) {
+  function saveTokens(tokens: AuthTokens) {
     accessToken.value = tokens.user_token
     refreshToken.value = tokens.refresh_token
-    username.value = user
-    
+    username.value = tokens.user.name || tokens.user.email
+    userId.value = tokens.user.id
     role.value = tokens.user.role
 
     localStorage.setItem('access_token', tokens.user_token)
     localStorage.setItem('refresh_token', tokens.refresh_token)
-    localStorage.setItem('username', user)
+    localStorage.setItem('username', username.value)
+    localStorage.setItem('user_id', tokens.user.id)
     localStorage.setItem('role', tokens.user.role)
   }
 
@@ -63,11 +67,13 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = null
     refreshToken.value = null
     username.value = null
+    userId.value = null
     role.value = null
 
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('username')
+    localStorage.removeItem('user_id')
     localStorage.removeItem('role')
   }
 
@@ -93,7 +99,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, tokens.user.id)  // Use user.id for FK relations, not email
+    saveTokens(tokens)
   }
 
   // Refresh access token
@@ -116,7 +122,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, tokens.user.id)  // Use user.id from response
+    saveTokens(tokens)
   }
 
   // Logout
@@ -150,6 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     refreshToken,
     username,
+    userId,
     role,
     isAuthenticated,
     isAdmin,
