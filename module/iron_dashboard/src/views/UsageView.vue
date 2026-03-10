@@ -51,12 +51,13 @@ const totalEvents = ref(0)
 const totalPages = ref(1)
 
 const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
-  { value: 'today',       label: 'Today'       },
-  { value: 'yesterday',   label: 'Yesterday'   },
-  { value: 'last7-days',  label: 'Last 7 Days' },
-  { value: 'last30-days', label: 'Last 30 Days'},
-  { value: 'this-month',  label: 'This Month'  },
-  { value: 'all-time',    label: 'All Time'    },
+  { value: 'today',       label: 'Today'        },
+  { value: 'yesterday',   label: 'Yesterday'    },
+  { value: 'last7-days',  label: 'Last 7 Days'  },
+  { value: 'last30-days', label: 'Last 30 Days' },
+  { value: 'this-month',  label: 'This Month'   },
+  { value: 'last-month',  label: 'Last Month'   },
+  { value: 'all-time',    label: 'All Time'     },
 ]
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({

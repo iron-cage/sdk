@@ -513,6 +513,7 @@ export function useApi() {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`)
   }
@@ -535,6 +536,7 @@ export function useApi() {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
@@ -548,19 +550,26 @@ export function useApi() {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`)
   }
 
-  async function getBudgetStatus(
-    page?: number,
+  async function getBudgetStatus(filters?: {
+    status?: string
+    threshold?: number
+    agent_id?: number
+    page?: number
     per_page?: number
-  ): Promise<BudgetStatusResponse> {
+  }): Promise<BudgetStatusResponse> {
     const params = new URLSearchParams()
-    if (page) params.append('page', String(page))
-    if (per_page) params.append('per_page', String(per_page))
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.threshold != null) params.append('threshold', String(filters.threshold))
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.page) params.append('page', String(filters.page))
+    if (filters?.per_page) params.append('per_page', String(filters.per_page))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
   }
@@ -791,7 +800,8 @@ export interface SpendingTotalResponse {
 }
 
 export interface ProviderSpending {
-  provider: string
+  provider_id: string
+  provider_name: string
   spending: number
   request_count: number
   avg_cost_per_request: number
@@ -851,11 +861,14 @@ export interface RequestUsageResponse {
 
 export interface ModelUsage {
   model: string
-  provider: string
+  provider_id: string
+  provider_name: string
   request_count: number
   spending: number
   input_tokens: number
   output_tokens: number
+  total_tokens: number
+  avg_cost_per_request: number
 }
 
 export interface ModelUsageResponse {
