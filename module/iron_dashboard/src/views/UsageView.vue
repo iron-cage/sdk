@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '../composables/useApi'
+import IconChip from '@/components/icons/IconChip.vue'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -114,6 +115,11 @@ const { data: avgCostData } = useQuery({
   queryFn: () => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value),
 })
 
+const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
+  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value),
+})
+
 watch(eventsList, (newData) => {
   if (newData) {
     accumulatedLogs.value = logsPage.value === 1
@@ -156,11 +162,22 @@ const providerBreakdown = computed(() => {
 })
 
 const modelBreakdown = computed(() => {
-  const data = modelUsage.value?.data ?? []
+  const allData = modelUsage.value?.data ?? []
+  const data = allData.filter(m => selectedModel.value === 'all' || m.model === selectedModel.value)
   if (!data.length) return []
-  const maxRequests = Math.max(...data.map(m => m.request_count), 1)
+  const maxRequests = Math.max(...allData.map(m => m.request_count), 1)
   return data.map(m => ({ ...m, percentage: (m.request_count / maxRequests) * 100 }))
             .sort((a, b) => b.percentage - a.percentage)
+})
+
+const selectedModel = ref<string>('all')
+
+const availableModels = computed(() =>
+  (modelUsage.value?.data ?? []).map(m => ({ value: m.model, label: m.model }))
+)
+
+watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
+  selectedModel.value = 'all'
 })
 
 const BREAKDOWN_LIMIT = 10
@@ -341,6 +358,19 @@ function openLogModal(event: AnalyticsEvent) {
           <template #icon>
             <IconGrid class="h-4 w-4 text-muted-foreground" />
           </template>
+          <template v-if="availableModels.length > 1" #action>
+            <Select v-model="selectedModel">
+              <SelectTrigger class="h-7 text-xs w-44">
+                <SelectValue placeholder="All Models" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Models</SelectItem>
+                <SelectItem v-for="m in availableModels" :key="m.value" :value="m.value">
+                  {{ m.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </template>
           <div v-if="modelBreakdown.length === 0" class="text-center text-muted-foreground mt-6">
             No model data available
           </div>
@@ -413,6 +443,45 @@ function openLogModal(event: AnalyticsEvent) {
               </div>
             </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>
+          </tr>
+        </DataTable>
+      </StatCard>
+
+      <!-- Token Usage by Agent -->
+      <StatCard title="Token Usage by Agent" :showSeparator="true" class="mb-6">
+        <template #icon>
+          <IconChip class="h-4 w-4 text-muted-foreground" />
+        </template>
+        <template v-if="tokensByAgent?.summary" #action>
+          <span class="text-xs text-muted-foreground">
+            {{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens
+            · {{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in
+            · {{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out
+          </span>
+        </template>
+        <DataTable
+          :columns="[
+            { label: 'Agent' },
+            { label: 'Input Tokens' },
+            { label: 'Output Tokens' },
+            { label: 'Total Tokens' },
+            { label: 'Requests' },
+            { label: 'Avg / Request' },
+          ]"
+          :isLoading="tokensByAgentLoading"
+          :isEmpty="!tokensByAgent?.data?.length"
+          loadingText="Loading token usage..."
+        >
+          <template #empty>
+            <p class="text-muted-foreground">No token usage data available</p>
+          </template>
+          <tr v-for="row in tokensByAgent?.data" :key="row.agent_id">
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ row.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.input_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.output_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ formatNumber(row.total_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(row.request_count) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(Math.round(row.avg_tokens_per_request)) }}</td>
           </tr>
         </DataTable>
       </StatCard>

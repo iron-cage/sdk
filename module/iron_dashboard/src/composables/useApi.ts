@@ -599,6 +599,20 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`)
   }
 
+  async function getAnalyticsUsageTokensByAgent(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams
+  ): Promise<TokenUsageByAgentResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/tokens/by-agent${query ? `?${query}` : ''}`)
+  }
+
   // ============================================================================
   // Budget Request Workflow API
   // ============================================================================
@@ -707,6 +721,7 @@ export function useApi() {
     getAnalyticsSpendingByProvider,
     getAnalyticsSpendingByAgent,
     getAnalyticsSpendingAvgPerRequest,
+    getAnalyticsUsageTokensByAgent,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
     getAnalyticsEventsList,
@@ -943,6 +958,28 @@ export interface SpendingByAgentResponse {
     total_spend: number
     total_budget: number
     average_percent_used: number
+  }
+  pagination: Pagination
+  period: string
+  calculated_at: string
+}
+
+export interface AgentTokenUsage {
+  agent_id: number
+  agent_name: string
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  request_count: number
+  avg_tokens_per_request: number
+}
+
+export interface TokenUsageByAgentResponse {
+  data: AgentTokenUsage[]
+  summary: {
+    total_input_tokens: number
+    total_output_tokens: number
+    total_tokens: number
   }
   pagination: Pagination
   period: string
