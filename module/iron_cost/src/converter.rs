@@ -20,6 +20,8 @@ pub const TOKENS_PER_MILLION: u64 = 1_000_000;
 /// assert_eq!(usd_to_micros(0.000001), 1);
 /// ```
 #[must_use]
+// Safe: f64→u64 cast — `try_from` is unavailable for floats; `.round()` eliminates
+// truncation error > 0.5 and `.max(0.0)` prevents sign loss before the cast.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn usd_to_micros(usd: f64) -> u64 {
   (usd * MICROS_PER_USD as f64).round().max(0.0) as u64
@@ -42,6 +44,8 @@ pub fn micros_to_usd(micros: u64) -> f64 {
 ///
 /// Example: $0.00000125/token = $1.25/M tokens = 1,250,000 micros/M tokens
 #[must_use]
+// Safe: f64→u64 cast — `try_from` is unavailable for floats; `.round()` eliminates
+// truncation error > 0.5 and `.max(0.0)` prevents sign loss before the cast.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn usd_per_token_to_micros_per_mtok(usd_per_token: f64) -> u64 {
   let micros = usd_per_token * (TOKENS_PER_MILLION as f64) * (MICROS_PER_USD as f64);
