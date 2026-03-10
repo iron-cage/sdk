@@ -574,6 +574,31 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
   }
 
+  async function getAnalyticsSpendingByAgent(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams
+  ): Promise<SpendingByAgentResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/by-agent${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsSpendingAvgPerRequest(
+    filters?: AnalyticsFilters
+  ): Promise<AvgCostResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`)
+  }
+
   // ============================================================================
   // Budget Request Workflow API
   // ============================================================================
@@ -680,6 +705,8 @@ export function useApi() {
     // Analytics (Protocol 012)
     getAnalyticsSpendingTotal,
     getAnalyticsSpendingByProvider,
+    getAnalyticsSpendingByAgent,
+    getAnalyticsSpendingAvgPerRequest,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
     getAnalyticsEventsList,
@@ -898,5 +925,38 @@ export interface EventsListResponse {
   data: AnalyticsEvent[]
   pagination: { page: number; per_page: number; total: number; total_pages: number }
   period: string
+  calculated_at: string
+}
+
+export interface AgentSpending {
+  agent_id: string
+  agent_name: string
+  spending: number
+  budget: number
+  percent_used: number
+  request_count: number
+}
+
+export interface SpendingByAgentResponse {
+  data: AgentSpending[]
+  summary: {
+    total_spend: number
+    total_budget: number
+    average_percent_used: number
+  }
+  pagination: Pagination
+  period: string
+  calculated_at: string
+}
+
+export interface AvgCostResponse {
+  average_cost_per_request: number
+  total_requests: number
+  total_spend: number
+  median_cost_per_request: number
+  min_cost_per_request: number
+  max_cost_per_request: number
+  period: string
+  filters: { agent_id: string | null; provider_id: string | null }
   calculated_at: string
 }
