@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -585,12 +586,10 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
           </div>
           
           <div class="flex items-center space-x-2">
-            <input 
-              id="force-change" 
-              type="checkbox" 
-              class="h-4 w-4 rounded border-border text-accent focus:ring-ring"
-              :checked="forcePasswordChange" 
-              @change="forcePasswordChange = ($event.target as HTMLInputElement).checked" 
+            <Switch
+              id="force-change"
+              v-model="forcePasswordChange"
+              :disabled="resetPasswordMutation.isPending.value"
             />
             <Label for="force-change">Force password change on next login</Label>
           </div>

@@ -41,7 +41,7 @@ import IconEdit from '@/components/icons/IconEdit.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-
+import Switch from '@/components/ui/switch/Switch.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -124,11 +124,23 @@ const deleteMutation = useMutation({
   },
 })
 
-// Toggle enabled state
+// Toggle enabled state — optimistic update so the switch flips immediately
 const toggleMutation = useMutation({
   mutationFn: (data: { id: number; is_enabled: boolean }) =>
     api.updateProviderKey(data.id, { is_enabled: data.is_enabled }),
-  onSuccess: () => {
+  onMutate: async (data) => {
+    await queryClient.cancelQueries({ queryKey: ['providerKeys'] })
+    const previous = queryClient.getQueryData<ProviderKey[]>(['providerKeys'])
+    queryClient.setQueryData<ProviderKey[]>(['providerKeys'], old =>
+      old?.map(k => k.id === data.id ? { ...k, is_enabled: data.is_enabled } : k)
+    )
+    return { previous }
+  },
+  onError: (_err, _vars, context) => {
+    if (context?.previous) queryClient.setQueryData(['providerKeys'], context.previous)
+    toast.error('Failed to update provider key')
+  },
+  onSettled: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
@@ -241,14 +253,13 @@ function handleToggleEnabled(key: ProviderKey) {
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <Button
-            @click="handleToggleEnabled(key)"
-            :disabled="toggleMutation.isPending.value"
-            :variant="key.is_enabled ? 'default' : 'outline'"
+            variant="outline"
             size="sm"
-            :class="key.is_enabled ? '' : 'text-muted-foreground'"
+            :disabled="toggleMutation.isPending.value"
+            @click="handleToggleEnabled(key)"
           >
-            <IconCheck v-if="key.is_enabled" class="text-success" />
-            <IconX v-else />
+            <IconCheck v-if="key.is_enabled" class="text-green-500" />
+            <IconX v-else class="text-muted-foreground" />
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
@@ -421,12 +432,10 @@ function handleToggleEnabled(key: ProviderKey) {
           </div>
 
           <div class="flex items-center space-x-2">
-            <input
+            <Switch
               id="editEnabled"
-              type="checkbox"
               v-model="isEnabled"
               :disabled="updateMutation.isPending.value"
-              class="h-4 w-4 rounded border-border text-primary focus:ring-ring"
             />
             <Label for="editEnabled">Enabled</Label>
           </div>
