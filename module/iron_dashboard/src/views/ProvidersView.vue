@@ -146,9 +146,6 @@ const toggleMutation = useMutation({
   onSettled: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
-  onError: (err) => {
-    toast.error(err instanceof Error ? err.message : 'Failed to update provider key')
-  },
 })
 
 
