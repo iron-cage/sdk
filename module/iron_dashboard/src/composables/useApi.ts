@@ -81,7 +81,7 @@ interface UpdateLimitRequest {
 }
 
 // AI Provider Key types
-type ProviderType = 'openai' | 'anthropic'
+type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
 
 interface ProviderKey {
   id: number

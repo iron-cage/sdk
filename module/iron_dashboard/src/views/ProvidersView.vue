@@ -264,7 +264,9 @@ function handleToggleEnabled(key: ProviderKey) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="openai">{{ getProviderLabel('openai') }}</SelectItem>
-                <SelectItem value="anthropic">{{getProviderLabel('anthropic')}}</SelectItem>
+                <SelectItem value="anthropic">{{ getProviderLabel('anthropic') }}</SelectItem>
+                <SelectItem value="gemini">{{ getProviderLabel('gemini') }}</SelectItem>
+                <SelectItem value="xai">{{ getProviderLabel('xai') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
