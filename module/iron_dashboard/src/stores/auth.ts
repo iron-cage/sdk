@@ -111,9 +111,8 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${refreshToken.value}`,
       },
-      body: JSON.stringify({ refresh_token: refreshToken.value }),
     })
 
     if (!response.ok) {
