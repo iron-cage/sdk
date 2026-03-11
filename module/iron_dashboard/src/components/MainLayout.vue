@@ -13,6 +13,7 @@ import IconChip from './icons/IconChip.vue'
 import IconUsers from './icons/IconUsers.vue'
 import IconLogOut from './icons/IconLogOut.vue'
 import IconMenu from './icons/IconMenu.vue'
+import IconClipboard from './icons/IconClipboard.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -128,6 +129,15 @@ async function handleLogout() {
             >
               <IconCoin class="w-4 h-4 mr-2 flex-shrink-0" />
               Budgets
+            </router-link>
+
+            <router-link
+              to="/budget-requests"
+              :class="navLinkClass('/budget-requests')"
+              @click="handleNavClick"
+            >
+              <IconClipboard class="w-4 h-4 mr-2 flex-shrink-0" />
+              Budget Requests
             </router-link>
           </div>
         </div>
