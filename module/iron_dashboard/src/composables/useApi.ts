@@ -1006,6 +1006,6 @@ export interface AvgCostResponse {
   min_cost_per_request: number
   max_cost_per_request: number
   period: string
-  filters: { agent_id: string | null; provider_id: string | null }
+  filters: { agent_id: number | null; provider_id: string | null }
   calculated_at: string
 }
