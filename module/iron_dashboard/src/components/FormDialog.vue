@@ -39,7 +39,6 @@ const emit = defineEmits<{
       <DialogFooter>
         <Button
           @click="emit('update:open', false)"
-          :disabled="props.confirmDisabled"
           variant="outline"
         >
           <IconX />
