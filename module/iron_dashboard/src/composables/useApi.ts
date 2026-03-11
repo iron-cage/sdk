@@ -384,8 +384,8 @@ export function useApi() {
     })
   }
 
-  async function deleteUser(id: string): Promise<{ success: boolean }> {
-    return fetchApi<{ success: boolean }>(`/api/v1/users/${id}`, {
+  async function deleteUser(id: string): Promise<User> {
+    return fetchApi<User>(`/api/v1/users/${id}`, {
       method: 'DELETE',
     })
   }
@@ -969,7 +969,7 @@ export interface SpendingByAgentResponse {
   summary: {
     total_spend: number
     total_budget: number
-    average_percent_used: number
+    total_agents: number
   }
   pagination: Pagination
   period: string

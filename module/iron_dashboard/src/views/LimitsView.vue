@@ -49,7 +49,7 @@ const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError,
 function openBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
   budgetAgentName.value = row.agent_name
-  budgetUsd.value = Number(row.budget.toFixed(2))
+  budgetUsd.value = Number((row.budget / 1_000_000).toFixed(2))
   showBudgetModal.value = true
 }
 
@@ -178,13 +178,13 @@ function riskBadgeVariant(risk: string) {
           <Badge variant="outline" class="capitalize">{{ row.status }}</Badge>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
-          ${{ row.budget.toFixed(2) }}
+          ${{ (row.budget / 1_000_000).toFixed(2) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
-          ${{ row.spent.toFixed(2) }}
+          ${{ (row.spent / 1_000_000).toFixed(2) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
-          ${{ row.remaining.toFixed(2) }}
+          ${{ (row.remaining / 1_000_000).toFixed(2) }}
         </td>
         <td class="px-3 sm:px-6 py-2 text-base text-foreground">
           <div class="flex items-center gap-2 min-w-[100px]">
