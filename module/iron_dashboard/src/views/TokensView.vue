@@ -105,8 +105,13 @@ const revokeMutation = useMutation({
 })
 
 function handleCreateToken() {
+  const userId = selectedUserId.value || authStore.userId
+  if (!userId) {
+    toast.error('Cannot create token: no authenticated user')
+    return
+  }
   createMutation.mutate({
-    user_id: selectedUserId.value || authStore.userId || 'default',
+    user_id: userId,
     project_id: projectId.value || undefined,
     description: description.value || undefined,
   })
