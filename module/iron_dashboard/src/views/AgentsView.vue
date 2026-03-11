@@ -678,7 +678,7 @@ async function copyTokenToClipboard() {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="showTokenDialog = false; tokenDialogValue.value = ''">
+          <Button variant="outline" @click="showTokenDialog = false; tokenDialogValue = ''">
             <IconX />
             Close
           </Button>

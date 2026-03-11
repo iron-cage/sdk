@@ -330,7 +330,7 @@ function copyToken(token: string) {
         </div>
 
         <DialogFooter>
-          <Button @click="showTokenModal = false; newTokenData.value = null">
+          <Button @click="showTokenModal = false; newTokenData = null">
             <IconX />
             Close
           </Button>
