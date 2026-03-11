@@ -296,7 +296,7 @@ function openLogModal(event: AnalyticsEvent) {
           <div class="flex gap-2 items-center">
             <TrendBadge
             v-if="requestStats?.previous_period"
-            :changePercent="((requestStats.success_rate - requestStats.previous_period.success_rate) * 100)"
+            :changePercent="(requestStats.success_rate - requestStats.previous_period.success_rate)"
             class="mt-1"
           />
 
