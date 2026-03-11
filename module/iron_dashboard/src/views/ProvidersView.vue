@@ -122,6 +122,9 @@ const deleteMutation = useMutation({
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to delete provider key')
+  },
 })
 
 // Toggle enabled state — optimistic update so the switch flips immediately
@@ -142,6 +145,9 @@ const toggleMutation = useMutation({
   },
   onSettled: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to update provider key')
   },
 })
 
