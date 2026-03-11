@@ -539,6 +539,34 @@ pub async fn handshake(
       .into_response();
   }
 
+  // Check and reserve provider key spending cap before issuing the IP Token
+  if let Err(e) = state.provider_key_storage.reserve_spending(key_id, budget_to_grant).await {
+    if let Err(refund_err) =
+      state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await
+    {
+      tracing::error!(
+        "Failed to refund agent budget after spending cap exceeded for agent {}: {}",
+        agent_id,
+        refund_err
+      );
+    }
+    return match e {
+      TokenError::SpendingCapExceeded => (
+        StatusCode::FORBIDDEN,
+        Json(serde_json::json!({ "error": "PROVIDER_KEY_SPENDING_CAP_EXCEEDED" })),
+      )
+        .into_response(),
+      _ => {
+        tracing::error!("Failed to reserve provider key spending: {}", e);
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(serde_json::json!({ "error": "Provider key spending reservation failed" })),
+        )
+          .into_response()
+      }
+    };
+  }
+
   // Decrypt provider API key from database
   let Ok(encrypted_secret) = iron_secrets::crypto::EncryptedSecret::from_base64(
     &key_record.encrypted_api_key,
@@ -548,6 +576,9 @@ pub async fn handshake(
     //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after key base64 decode failure: {}", e);
+    }
+    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
+      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
     }
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
@@ -564,6 +595,9 @@ pub async fn handshake(
       if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
         tracing::error!("Failed to refund reserved budget after provider key decryption failure: {}", e);
       }
+      if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
+        tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
+      }
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(serde_json::json!({ "error": "Failed to decrypt provider key" })),
@@ -577,6 +611,9 @@ pub async fn handshake(
     //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after IP token encryption failure: {}", e);
+    }
+    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
+      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
     }
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
@@ -603,6 +640,9 @@ pub async fn handshake(
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after usage_limits update failure: {}", e);
     }
+    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
+      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
+    }
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json( serde_json::json!({ "error": "Failed to update usage limits" }) ),
@@ -623,6 +663,9 @@ pub async fn handshake(
     //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after lease creation failure: {}", e);
+    }
+    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
+      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
     }
     // usage_limits was already debited above; attempt a compensating reversal
     if let Err(e) = sqlx::query(

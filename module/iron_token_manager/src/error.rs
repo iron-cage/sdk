@@ -32,6 +32,8 @@ pub enum TokenError {
   //qqq: [Info] callers in handshake.rs currently hit a wildcard Err arm — consider explicit match arm returning 402 Payment Required
   /// Operation would exceed the spending cap
   SpendingCapExceeded,
+  /// Key creation would exceed the per-user per-provider quota
+  KeyQuotaExceeded,
 }
 
 impl core::fmt::Display for TokenError {
@@ -42,6 +44,7 @@ impl core::fmt::Display for TokenError {
       Self::Database(e) => write!(f, "Database error: {e}"),
       Self::Validation { field, reason } => write!(f, "Validation error: {field} - {reason}"),
       Self::SpendingCapExceeded => write!(f, "Spending cap exceeded"),
+      Self::KeyQuotaExceeded => write!(f, "Key quota exceeded"),
     }
   }
 }

@@ -12,8 +12,6 @@
 
 mod common;
 
-use std::sync::Arc;
-
 use axum::{
   body::Body,
   http::{Method, Request, StatusCode},
@@ -21,14 +19,8 @@ use axum::{
   Router,
 };
 use common::budget::{create_ic_token, create_test_budget_state, setup_test_db};
-use iron_control_api::{
-  jwt_auth::JwtSecret,
-  routes::{
-    auth::AuthState,
-    budget::handshake,
-    providers::{create_provider_key, ProvidersState},
-  },
-};
+use common::providers::{bearer, make_providers_state, TestProvidersAppState, MASTER_KEY};
+use iron_control_api::routes::{budget::handshake, providers::create_provider_key};
 use iron_secrets::{crypto::CryptoService, ip_token::IpTokenCrypto};
 use iron_token_manager::provider_key_storage::ProviderKeyStorage;
 use secrecy::ExposeSecret;
@@ -39,64 +31,11 @@ use tower::ServiceExt;
 // Test helpers
 // ─────────────────────────────────────────────────────────────────
 
-const TEST_JWT_SECRET: &str = "test_jwt_secret_for_providers_12345";
-const MASTER_KEY: [u8; 32] = [42u8; 32];
-
-/// Combined state that satisfies both `ProvidersState` and `AuthState` extraction.
-#[derive(Clone)]
-struct TestProvidersAppState {
-  providers: ProvidersState,
-  auth: AuthState,
-}
-
-impl axum::extract::FromRef<TestProvidersAppState> for ProvidersState {
-  fn from_ref(s: &TestProvidersAppState) -> Self {
-    s.providers.clone()
-  }
-}
-
-impl axum::extract::FromRef<TestProvidersAppState> for AuthState {
-  fn from_ref(s: &TestProvidersAppState) -> Self {
-    s.auth.clone()
-  }
-}
-
 /// Build a router with just the POST /api/v1/providers endpoint
 fn build_providers_router(state: TestProvidersAppState) -> Router {
   Router::new()
     .route("/api/v1/providers", post(create_provider_key))
     .with_state(state)
-}
-
-/// Build a test providers state backed by the given pool
-async fn make_providers_state(pool: &sqlx::SqlitePool) -> TestProvidersAppState {
-  let storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
-  let crypto = Arc::new(CryptoService::new(&MASTER_KEY).unwrap());
-
-  let providers = ProvidersState {
-    storage,
-    crypto: Some(crypto),
-  };
-
-  let auth = AuthState::new(TEST_JWT_SECRET.to_string(), "sqlite::memory:", false)
-    .await
-    .expect("LOUD FAILURE: Failed to create test AuthState");
-
-  TestProvidersAppState { providers, auth }
-}
-
-/// Generate a bearer token for a user with admin role (ManageProviderKeys required)
-fn bearer(user_id: &str) -> String {
-  let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());
-  let token = jwt
-    .generate_access_token(
-      user_id,
-      &format!("{user_id}@example.com"),
-      "admin",
-      "tok_001",
-    )
-    .expect("LOUD FAILURE: Failed to generate test JWT");
-  format!("Bearer {token}")
 }
 
 /// POST /api/v1/providers with the given body and bearer token
@@ -630,12 +569,7 @@ async fn test_handshake_no_assigned_key_returns_403() {
 // Step 6 — Handshake: dev path + TOCTOU re-check
 // ─────────────────────────────────────────────────────────────────
 
-/// Mutex to serialize tests that read/write `IRON_ALLOW_DEV_KEYS`.
-///
-/// `std::env::set_var` / `remove_var` are not thread-safe. Tests that manipulate
-/// this env var must hold this guard for the duration of the handshake call.
-//qqq: [Medium] lock is module-local — future test modules that also set IRON_ALLOW_DEV_KEYS won't know to acquire this lock; move to common/ and pub use
-static DEV_KEY_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+use common::DEV_KEY_ENV_LOCK;
 
 /// Seed user and update agent_1's owner_id.
 ///

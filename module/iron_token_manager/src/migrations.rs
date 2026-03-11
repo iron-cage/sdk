@@ -82,6 +82,7 @@ static MIGRATIONS: &[(&str, &str)] = &[
   migration!("025_rename_roles"),
   migration!("026_add_provider_keys_user_provider_index"),
   migration!("027_backfill_agent_provider_key_id"),
+  migration!("028_add_spending_used_non_negative_guard"),
 ];
 
 /// Applies all migrations to the database pool.

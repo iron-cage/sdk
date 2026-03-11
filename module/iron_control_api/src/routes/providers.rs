@@ -200,8 +200,8 @@ impl CreateProviderKeyRequest {
 pub struct UpdateProviderKeyRequest {
   /// Updated base URL override
   pub base_url: Option<String>,
-  /// Updated human-readable description
-  pub description: Option<String>,
+  /// Updated human-readable description (None = skip, Some(None) = clear, Some(Some(s)) = set)
+  pub description: Option<Option<String>>,
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
   /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
@@ -331,33 +331,31 @@ pub async fn create_provider_key(
     .encrypt(&request.api_key)
     .map_err(|_| ApiError::Internal("Failed to encrypt API key".into()))?;
 
-  //qqq: [Medium] TOCTOU race — count and insert are separate transactions; two concurrent requests at count=19 can both pass and create 21 keys
-  let count = state
-    .storage
-    .count_keys_by_owner_and_provider(&claims.sub, provider)
-    .await
-    .map_err(|_| ApiError::Internal("Failed to check key quota".into()))?;
-
-  //qqq: [Low] no machine-readable error code in response body and no Retry-After header
-  if count >= MAX_KEYS_PER_USER_PER_PROVIDER {
-    return Err(ApiError::TooManyRequests(
-      format!("Key quota exceeded: maximum {} keys per provider", MAX_KEYS_PER_USER_PER_PROVIDER)
-        .into(),
-    ));
-  }
-
   let key_id = state
     .storage
-    .create_key(
+    .create_key_within_quota(
       provider,
       &encrypted.ciphertext_base64(),
       &encrypted.nonce_base64(),
       request.base_url.as_deref(),
       request.description.as_deref(),
       &claims.sub,
+      MAX_KEYS_PER_USER_PER_PROVIDER,
     )
     .await
-    .map_err(|_| ApiError::Internal("Failed to create provider key".into()))?;
+    .map_err(|e| {
+      if matches!(e, iron_token_manager::error::TokenError::KeyQuotaExceeded) {
+        ApiError::TooManyRequests(
+          format!(
+            "Key quota exceeded: maximum {} keys per provider",
+            MAX_KEYS_PER_USER_PER_PROVIDER
+          )
+          .into(),
+        )
+      } else {
+        ApiError::Internal("Failed to create provider key".into())
+      }
+    })?;
 
   let metadata = state
     .storage
@@ -509,8 +507,7 @@ pub async fn update_provider_key(
   }
 
   // Apply all field updates atomically in a single transaction
-  //qqq: [Medium] None means "skip update" — there is no way to clear description once set; use Option<Option<String>> to distinguish "absent" from "clear"
-  let description = request.description.as_deref().map(Some);
+  let description = request.description.as_ref().map(|opt| opt.as_deref());
   //qqq: [Low] empty string is a sentinel to clear base_url — undocumented and inconsistent with description field semantics
   let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
   let spending_cap = request
@@ -622,7 +619,6 @@ pub async fn assign_provider_to_project(
     return resp.into_response();
   }
 
-  //qqq: [High] BOLA — project ownership is never verified; any user can assign their key to another user's project_id
   // Verify key ownership
   let Ok(metadata) = state
     .storage
@@ -646,6 +642,30 @@ pub async fn assign_provider_to_project(
       })),
     )
       .into_response();
+  }
+
+  // Verify project ownership — query api_tokens to confirm the caller owns this project.
+  // Return 404 (not 403) to avoid leaking whether the project exists.
+  match state.storage.verify_project_owner(&project_id, &claims.sub).await {
+    Ok(true) => {}
+    Ok(false) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({
+          "error": "Project not found"
+        })),
+      )
+        .into_response();
+    }
+    Err(_) => {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to verify project ownership"
+        })),
+      )
+        .into_response();
+    }
   }
 
   //qqq: [Medium] no UNIQUE(project_id) constraint — a project can accumulate multiple key assignments; active key is resolved by most-recent assigned_at

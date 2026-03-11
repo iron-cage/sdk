@@ -82,18 +82,20 @@ impl BudgetState {
     crypto_service: Option<Arc<CryptoService>>,
     ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn core::error::Error>> {
-    let db_pool = SqlitePool::connect(database_url).await?;
-
     // Enforce referential integrity on every connection in this pool.
-    // SQLite disables foreign-key enforcement by default; the PRAGMA must be
-    // re-issued per connection.  apply_all_migrations() does this for pools
-    // that own migrations, but BudgetState shares the same database file and
-    // creates its own pool, so we set it explicitly here.
-    //qqq: [Info] PRAGMA foreign_keys is OFF by default in SQLite — this pragma must be set on every new connection; verify pool connection hooks also set it
-    sqlx::query("PRAGMA foreign_keys = ON")
-      .execute(&db_pool)
-      .await
-      .map_err(|e| format!("PRAGMA foreign_keys failed: {e}"))?;
+    // SQLite disables FK enforcement by default; PRAGMA must be re-issued per
+    // connection so every pool connection has it active.
+    let db_pool = sqlx::sqlite::SqlitePoolOptions::new()
+      .after_connect(|conn, _| {
+        Box::pin(async move {
+          sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(conn)
+            .await?;
+          Ok(())
+        })
+      })
+      .connect(database_url)
+      .await?;
 
     let ip_token_crypto = Arc::new(IpTokenCrypto::new(ip_token_key)?);
     let provider_key_crypto = Arc::new(CryptoService::new(provider_key_master)?);

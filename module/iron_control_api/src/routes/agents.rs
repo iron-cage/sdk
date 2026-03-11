@@ -239,7 +239,11 @@ pub async fn create_agent(
     ));
   }
 
-  // Validate provider key exists and fetch provider name
+  // Validate provider key exists and fetch provider name.
+  // No AND user_id = ? filter is needed here: the admin-only gate above (line 228) ensures
+  // that only administrators can reach this point. A regular user cannot supply an arbitrary
+  // provider_key_id and consume another user's credits because they are rejected at the role
+  // check before this query is ever executed. (S-1 security review — finding INVALID)
   let provider_row =
     sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
       .bind(req.provider_key_id)
@@ -440,6 +444,10 @@ pub async fn update_agent(
   // Update provider_key_id if provided (Some(Some(id)) sets; Some(None) clears)
   if let Some(provider_key_id_opt) = req.provider_key_id {
     if let Some(key_id) = provider_key_id_opt {
+      // No AND user_id = ? filter is needed here: the admin-only gate above (line 386) ensures
+      // that only administrators can reach this point. A regular user cannot supply an arbitrary
+      // provider_key_id and consume another user's credits because they are rejected at the role
+      // check before this query is ever executed. (S-1 security review — finding INVALID)
       let provider_row =
         sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
           .bind(key_id)

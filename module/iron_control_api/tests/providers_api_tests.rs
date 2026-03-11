@@ -19,6 +19,7 @@ use axum::{
   Router,
 };
 use common::budget::setup_test_db;
+use common::providers::{bearer, make_providers_state, TestProvidersAppState, TEST_JWT_SECRET};
 use iron_control_api::{
   jwt_auth::JwtSecret,
   routes::{
@@ -29,7 +30,6 @@ use iron_control_api::{
     },
   },
 };
-use iron_secrets::crypto::CryptoService;
 use iron_token_manager::provider_key_storage::{ProviderKeyStorage, ProviderType};
 use serde_json::json;
 use tower::ServiceExt;
@@ -37,37 +37,6 @@ use tower::ServiceExt;
 // ─────────────────────────────────────────────────────────────────
 // Constants & shared state builders
 // ─────────────────────────────────────────────────────────────────
-
-const TEST_JWT_SECRET: &str = "test_jwt_secret_for_providers_12345";
-const MASTER_KEY: [u8; 32] = [42u8; 32];
-
-#[derive(Clone)]
-struct TestProvidersAppState {
-  providers: ProvidersState,
-  auth: AuthState,
-}
-
-impl axum::extract::FromRef<TestProvidersAppState> for ProvidersState {
-  fn from_ref(s: &TestProvidersAppState) -> Self {
-    s.providers.clone()
-  }
-}
-
-impl axum::extract::FromRef<TestProvidersAppState> for AuthState {
-  fn from_ref(s: &TestProvidersAppState) -> Self {
-    s.auth.clone()
-  }
-}
-
-async fn make_providers_state(pool: &sqlx::SqlitePool) -> TestProvidersAppState {
-  let storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
-  let crypto = Arc::new(CryptoService::new(&MASTER_KEY).unwrap());
-  let providers = ProvidersState { storage, crypto: Some(crypto) };
-  let auth = AuthState::new(TEST_JWT_SECRET.to_string(), "sqlite::memory:", false)
-    .await
-    .expect("LOUD FAILURE: Failed to create test AuthState");
-  TestProvidersAppState { providers, auth }
-}
 
 async fn make_providers_state_no_crypto(pool: &sqlx::SqlitePool) -> TestProvidersAppState {
   let storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
@@ -89,15 +58,6 @@ fn build_full_router(state: TestProvidersAppState) -> Router {
     .route("/api/v1/projects/{id}/provider", post(assign_provider_to_project))
     .route("/api/v1/projects/{id}/provider", delete(unassign_provider_from_project))
     .with_state(state)
-}
-
-/// Admin bearer token (has ManageProviderKeys)
-fn bearer(user_id: &str) -> String {
-  let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());
-  let token = jwt
-    .generate_access_token(user_id, &format!("{user_id}@example.com"), "admin", "tok_001")
-    .expect("LOUD FAILURE: Failed to generate test JWT");
-  format!("Bearer {token}")
 }
 
 /// Developer bearer token (lacks ManageProviderKeys)
@@ -633,5 +593,60 @@ async fn unassign_returns_403_for_wrong_owner() {
     resp.status(),
     StatusCode::FORBIDDEN,
     "Non-owner trying to unassign must receive 403"
+  );
+}
+
+/// User A cannot assign their provider key to user B's project.
+///
+/// The assign endpoint verifies project ownership via api_tokens; if the caller has
+/// no token for the target project, the assignment is rejected with 404.
+#[tokio::test]
+async fn cross_tenant_project_assignment_rejected() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  // user_a creates a provider key
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .await
+    .unwrap();
+
+  // Seed user_b's project: insert an api_token row that belongs to user_b / project_b
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  sqlx::query(
+    "INSERT INTO api_tokens (user_id, project_id, token_hash, is_active, created_at) \
+     VALUES (?, ?, ?, 1, ?)",
+  )
+  .bind("user_b")
+  .bind("project_b")
+  .bind("hash_b")
+  .bind(now_ms)
+  .execute(&pool)
+  .await
+  .unwrap();
+
+  // user_a tries to assign their key to user_b's project — must be rejected
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/projects/project_b/provider")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_a"))
+        .body(Body::from(
+          serde_json::to_string(&json!({ "provider_key_id": key_id })).unwrap(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  // The project exists (user_b owns it) but user_a is not the owner → 404
+  assert_eq!(
+    resp.status(),
+    StatusCode::NOT_FOUND,
+    "User A must not be able to assign their key to user B's project"
   );
 }
