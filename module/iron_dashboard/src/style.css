@@ -18,6 +18,7 @@
     --secondary: 0 0% 92%;             /* hover surface */
     --secondary-foreground: 222 9% 15%;
     --trettiary: 283 1% 19%;
+    --trettiary-foreground: 0 0% 100%;
     --muted: 0 0% 96%;                 /* #f5f5f5 — sidebar */
     --muted-foreground: 221 11% 72%;   /* #b0b5c0 — secondary text */
     --accent: 241 100% 72%;            /* Linear violet */
@@ -49,6 +50,8 @@
     --primary-foreground: 240 6% 7%;   /* #101012 */
     --secondary: 240 4% 11%;           /* hover surface */
     --secondary-foreground: 0 0% 100%;
+    --trettiary: 283 1% 75%;
+    --trettiary-foreground: 240 6% 7%;
     --muted: 0 0% 4%;                  /* #090909 — sidebar */
     --muted-foreground: 218 5% 44%;    /* #6b6f76 — secondary text */
     --accent: 241 100% 72%;            /* Linear violet */
