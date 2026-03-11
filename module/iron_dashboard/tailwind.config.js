@@ -32,6 +32,7 @@ export default {
   			},
 			trettiary: {
 				DEFAULT: 'hsl(var(--trettiary))',
+				foreground: 'hsl(var(--trettiary-foreground))',
 			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',

@@ -15,6 +15,6 @@ function avatarColor(name: string): string {
     class="w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
     :style="{ backgroundColor: avatarColor(props.name) }"
   >
-    {{ props.name[0]!.toUpperCase() }}
+    {{ props.name[0]?.toUpperCase() ?? '?' }}
   </span>
 </template>

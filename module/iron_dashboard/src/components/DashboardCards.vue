@@ -3,16 +3,13 @@ import StatCard from '@/components/cards/StatCard.vue'
 import IconCoin from '@/components/icons/IconCoin.vue'
 import IconCheckCircle from '@/components/icons/IconCheckCircle.vue'
 import IconCog from '@/components/icons/IconCog.vue'
+import { formatCostUsd } from '@/lib/formatters'
 
 defineProps<{
   spending?: { total_spend: number } | null
   requestUsage?: { success_rate: number; successful_requests: number; total_requests: number } | null
   agentCount?: number | null
 }>()
-
-function formatCurrency(usd: number): string {
-  return `$${usd.toFixed(3)}`
-}
 </script>
 
 <template>
@@ -22,7 +19,7 @@ function formatCurrency(usd: number): string {
         <IconCoin class="h-4 w-4 text-muted-foreground" />
       </template>
       <div class="text-2xl font-semibold text-foreground">
-        {{ spending != null ? formatCurrency(spending.total_spend) : '$0.00' }}
+        {{ spending != null ? formatCostUsd(spending.total_spend, 3) : '$0.00' }}
       </div>
       <p class="text-xs text-muted-foreground mt-1">All time</p>
     </StatCard>
