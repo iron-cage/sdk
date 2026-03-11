@@ -10,6 +10,48 @@
 use sqlx::{Row, SqlitePool};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::error::TokenError;
+
+/// Explicit spending cap — no silent `None` semantics.
+///
+/// Database maps `NULL` → `Unlimited`, non-NULL → `Limited(value)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpendingCap {
+  /// No cap enforced
+  Unlimited,
+  /// Capped at this many microdollars
+  Limited(i64),
+}
+
+impl SpendingCap {
+  /// Convert from the nullable database column
+  #[must_use]
+  pub fn from_db(value: Option<i64>) -> Self {
+    match value {
+      Some(v) => Self::Limited(v),
+      None => Self::Unlimited,
+    }
+  }
+
+  /// Convert to nullable value for database storage
+  #[must_use]
+  pub fn to_db(self) -> Option<i64> {
+    match self {
+      Self::Unlimited => None,
+      Self::Limited(v) => Some(v),
+    }
+  }
+
+  /// Returns `true` if the cap would be exceeded by adding `amount` to `used`
+  #[must_use]
+  pub fn would_exceed(&self, used: i64, amount: i64) -> bool {
+    match self {
+      Self::Unlimited => false,
+      Self::Limited(cap) => used + amount > *cap,
+    }
+  }
+}
+
 /// Agent budget record
 #[derive(Debug, Clone)]
 pub struct AgentBudget {
@@ -25,6 +67,41 @@ pub struct AgentBudget {
   pub created_at: i64,
   /// Last update timestamp (milliseconds since epoch)
   pub updated_at: i64,
+  /// Per-agent spending cap
+  pub spending_cap: SpendingCap,
+  /// Cumulative spending tracked against spending cap
+  pub spending_used_microdollars: i64,
+}
+
+/// Result of a unified budget reservation attempt
+#[derive(Debug, Clone)]
+pub struct ReservationResult {
+  /// Amount granted in microdollars
+  pub granted: i64,
+  /// Agent budget remaining after reservation
+  pub agent_budget_remaining: i64,
+  /// If reservation was blocked, the reason
+  pub blocked_by: Option<BlockedBy>,
+}
+
+/// Reason a budget reservation was blocked
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockedBy {
+  /// Agent (IC-key) spending cap exceeded
+  AgentSpendingCap,
+  /// Provider key (IP-key) spending cap exceeded
+  ProviderKeyCap,
+  /// Agent budget pool exhausted
+  InsufficientBudget,
+}
+
+/// Summary of spending for an agent
+#[derive(Debug, Clone)]
+pub struct AgentSpendingSummary {
+  /// Amount spent in microdollars
+  pub used_microdollars: i64,
+  /// Spending cap
+  pub cap: SpendingCap,
 }
 
 /// Agent budget manager for budget CRUD operations
@@ -96,7 +173,8 @@ impl AgentBudgetManager {
   /// Returns error if database query fails
   pub async fn get_budget_status(&self, agent_id: i64) -> Result<Option<AgentBudget>, sqlx::Error> {
     let row = sqlx::query(
-      "SELECT agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at
+      "SELECT agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at,
+              spending_cap_microdollars, spending_used_microdollars
       FROM agent_budgets WHERE agent_id = ?",
     )
     .bind(agent_id)
@@ -110,6 +188,8 @@ impl AgentBudgetManager {
       budget_remaining: r.get("budget_remaining"),
       created_at: r.get("created_at"),
       updated_at: r.get("updated_at"),
+      spending_cap: SpendingCap::from_db(r.get("spending_cap_microdollars")),
+      spending_used_microdollars: r.get("spending_used_microdollars"),
     }))
   }
 
@@ -441,6 +521,349 @@ impl AgentBudgetManager {
     .bind(agent_id)
     .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
+
+    Ok(())
+  }
+
+  /// Set spending cap for an agent
+  ///
+  /// # Arguments
+  ///
+  /// * `agent_id` - Agent database ID
+  /// * `cap` - Spending cap in microdollars (None = unlimited)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  pub async fn set_spending_cap(
+    &self,
+    agent_id: i64,
+    cap: SpendingCap,
+  ) -> core::result::Result<(), TokenError> {
+    let result =
+      sqlx::query("UPDATE agent_budgets SET spending_cap_microdollars = ? WHERE agent_id = ?")
+        .bind(cap.to_db())
+        .bind(agent_id)
+        .execute(&self.pool)
+        .await
+        .map_err(TokenError::Database)?;
+
+    if result.rows_affected() == 0 {
+      return Err(TokenError::NotFound);
+    }
+    Ok(())
+  }
+
+  /// Get spending summary for an agent (cap and used)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if agent not found or database query fails
+  pub async fn get_spending_summary(
+    &self,
+    agent_id: i64,
+  ) -> core::result::Result<AgentSpendingSummary, TokenError> {
+    let row: Option<(Option<i64>, i64)> = sqlx::query_as(
+      "SELECT spending_cap_microdollars, spending_used_microdollars \
+       FROM agent_budgets WHERE agent_id = ?",
+    )
+    .bind(agent_id)
+    .fetch_optional(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+
+    match row {
+      Some((cap, used)) => Ok(AgentSpendingSummary {
+        used_microdollars: used,
+        cap: SpendingCap::from_db(cap),
+      }),
+      None => Err(TokenError::NotFound),
+    }
+  }
+
+  /// Reset spending counter for an agent
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  pub async fn reset_spending(
+    &self,
+    agent_id: i64,
+  ) -> core::result::Result<(), TokenError> {
+    let result = sqlx::query(
+      "UPDATE agent_budgets SET spending_used_microdollars = 0 WHERE agent_id = ?",
+    )
+    .bind(agent_id)
+    .execute(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+
+    if result.rows_affected() == 0 {
+      return Err(TokenError::NotFound);
+    }
+    Ok(())
+  }
+
+  /// Atomically reserve budget checking both IC-key (agent) and IP-key (provider) caps.
+  ///
+  /// Single transaction:
+  /// 1. Check agent spending cap
+  /// 2. Check provider key spending cap
+  /// 3. Reserve from agent budget (partial grants supported)
+  /// 4. Increment agent `spending_used`
+  /// 5. Increment provider key `spending_used`
+  ///
+  /// # Returns
+  ///
+  /// `ReservationResult` with granted amount and optional block reason.
+  ///
+  /// # Errors
+  ///
+  /// Returns error on database failure (not for cap/budget exhaustion).
+  pub async fn reserve_budget_with_limits(
+    &self,
+    agent_id: i64,
+    provider_key_id: Option<i64>,
+    requested_amount: i64,
+  ) -> Result<ReservationResult, sqlx::Error> {
+    // Retry logic for SQLite database busy/locked/deadlocked errors
+    const MAX_RETRIES: u32 = 50;
+
+    for attempt in 0..MAX_RETRIES {
+      if attempt > 0 {
+        let backoff_ms = 2_u64.pow(attempt.min(8));
+        tokio::time::sleep(tokio::time::Duration::from_millis(backoff_ms)).await;
+      }
+
+      match self
+        .try_reserve_with_limits_once(agent_id, provider_key_id, requested_amount)
+        .await
+      {
+        Ok(result) => return Ok(result),
+        Err(e) => {
+          let err_msg = e.to_string().to_lowercase();
+          let is_retryable = err_msg.contains("database is locked")
+            || err_msg.contains("database is busy")
+            || err_msg.contains("deadlock");
+
+          if is_retryable && attempt < MAX_RETRIES - 1 {
+            // Retry
+          } else {
+            return Err(e);
+          }
+        }
+      }
+    }
+
+    Ok(ReservationResult {
+      granted: 0,
+      agent_budget_remaining: 0,
+      blocked_by: Some(BlockedBy::InsufficientBudget),
+    })
+  }
+
+  /// Single attempt to reserve budget with limits (internal helper)
+  async fn try_reserve_with_limits_once(
+    &self,
+    agent_id: i64,
+    provider_key_id: Option<i64>,
+    requested_amount: i64,
+  ) -> Result<ReservationResult, sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
+    let now = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
+      .as_millis() as i64;
+
+    let mut tx = self.pool.begin().await?;
+
+    // 1. Check agent spending cap
+    let agent_row = sqlx::query(
+      "SELECT spending_cap_microdollars, spending_used_microdollars, total_spent, budget_remaining \
+       FROM agent_budgets WHERE agent_id = ?",
+    )
+    .bind(agent_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let Some(agent_row) = agent_row else {
+      tx.rollback().await?;
+      return Ok(ReservationResult {
+        granted: 0,
+        agent_budget_remaining: 0,
+        blocked_by: Some(BlockedBy::InsufficientBudget),
+      });
+    };
+
+    let agent_cap = SpendingCap::from_db(agent_row.get("spending_cap_microdollars"));
+    let agent_used: i64 = agent_row.get("spending_used_microdollars");
+    let budget_remaining: i64 = agent_row.get("budget_remaining");
+
+    // Check IC-key (agent) spending cap
+    if agent_cap.would_exceed(agent_used, requested_amount) {
+      tx.rollback().await?;
+      return Ok(ReservationResult {
+        granted: 0,
+        agent_budget_remaining: budget_remaining,
+        blocked_by: Some(BlockedBy::AgentSpendingCap),
+      });
+    }
+
+    // 2. Check IP-key (provider key) spending cap
+    if let Some(pkey_id) = provider_key_id {
+      let pkey_row = sqlx::query(
+        "SELECT spending_cap_microdollars, spending_used_microdollars \
+         FROM ai_provider_keys WHERE id = ?",
+      )
+      .bind(pkey_id)
+      .fetch_optional(&mut *tx)
+      .await?;
+
+      if let Some(pkey_row) = pkey_row {
+        let pkey_cap = SpendingCap::from_db(pkey_row.get("spending_cap_microdollars"));
+        let pkey_used: i64 = pkey_row.get("spending_used_microdollars");
+
+        if pkey_cap.would_exceed(pkey_used, requested_amount) {
+          tx.rollback().await?;
+          return Ok(ReservationResult {
+            granted: 0,
+            agent_budget_remaining: budget_remaining,
+            blocked_by: Some(BlockedBy::ProviderKeyCap),
+          });
+        }
+      }
+    }
+
+    // 3. Reserve from agent budget (partial grants supported)
+    let spent_before: i64 = agent_row.get("total_spent");
+
+    let result = sqlx::query(
+      "UPDATE agent_budgets
+      SET total_spent = total_spent +
+        CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
+          budget_remaining = budget_remaining -
+        CASE WHEN budget_remaining < ? THEN budget_remaining ELSE ? END,
+          updated_at = ?
+      WHERE agent_id = ? AND budget_remaining > 0",
+    )
+    .bind(requested_amount)
+    .bind(requested_amount)
+    .bind(requested_amount)
+    .bind(requested_amount)
+    .bind(now)
+    .bind(agent_id)
+    .execute(&mut *tx)
+    .await?;
+
+    let granted = if result.rows_affected() == 1 {
+      let row = sqlx::query("SELECT total_spent, budget_remaining FROM agent_budgets WHERE agent_id = ?")
+        .bind(agent_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+      let spent_after: i64 = row.get("total_spent");
+      spent_after - spent_before
+    } else {
+      tx.rollback().await?;
+      return Ok(ReservationResult {
+        granted: 0,
+        agent_budget_remaining: budget_remaining,
+        blocked_by: Some(BlockedBy::InsufficientBudget),
+      });
+    };
+
+    // 4. Increment agent spending_used
+    sqlx::query(
+      "UPDATE agent_budgets SET spending_used_microdollars = spending_used_microdollars + ? WHERE agent_id = ?",
+    )
+    .bind(granted)
+    .bind(agent_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // 5. Increment provider key spending_used
+    if let Some(pkey_id) = provider_key_id {
+      sqlx::query(
+        "UPDATE ai_provider_keys SET spending_used_microdollars = spending_used_microdollars + ? WHERE id = ?",
+      )
+      .bind(granted)
+      .bind(pkey_id)
+      .execute(&mut *tx)
+      .await?;
+    }
+
+    // Get final budget_remaining
+    let final_row = sqlx::query("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_one(&mut *tx)
+      .await?;
+    let final_remaining: i64 = final_row.get("budget_remaining");
+
+    tx.commit().await?;
+
+    Ok(ReservationResult {
+      granted,
+      agent_budget_remaining: final_remaining,
+      blocked_by: None,
+    })
+  }
+
+  /// Atomically restore budget to both agent and provider key.
+  ///
+  /// Single transaction reverses reservation:
+  /// 1. Restore agent budget (`total_spent`, `budget_remaining`, `spending_used`)
+  /// 2. Restore provider key `spending_used` (if `provider_key_id` present)
+  ///
+  /// # Errors
+  ///
+  /// Returns error on database failure.
+  ///
+  /// # Panics
+  ///
+  /// Panics if system time is before UNIX epoch (should never happen on modern systems)
+  pub async fn restore_budget_with_limits(
+    &self,
+    agent_id: i64,
+    provider_key_id: Option<i64>,
+    returned_amount: i64,
+  ) -> Result<(), sqlx::Error> {
+    #[allow(clippy::cast_possible_truncation)]
+    let now = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .expect("LOUD FAILURE: Time went backwards")
+      .as_millis() as i64;
+
+    let mut tx = self.pool.begin().await?;
+
+    // Restore agent budget + decrement spending_used
+    sqlx::query(
+      "UPDATE agent_budgets
+      SET total_spent = total_spent - ?,
+          budget_remaining = budget_remaining + ?,
+          spending_used_microdollars = spending_used_microdollars - ?,
+          updated_at = ?
+      WHERE agent_id = ?",
+    )
+    .bind(returned_amount)
+    .bind(returned_amount)
+    .bind(returned_amount)
+    .bind(now)
+    .bind(agent_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // Restore provider key spending_used
+    if let Some(pkey_id) = provider_key_id {
+      sqlx::query(
+        "UPDATE ai_provider_keys SET spending_used_microdollars = spending_used_microdollars - ? WHERE id = ?",
+      )
+      .bind(returned_amount)
+      .bind(pkey_id)
+      .execute(&mut *tx)
+      .await?;
+    }
 
     tx.commit().await?;
 

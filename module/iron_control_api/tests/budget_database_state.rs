@@ -566,7 +566,7 @@ async fn test_report_usage_on_expired_lease() {
 
   state
     .lease_manager
-    .create_lease(lease_id, 116, 116, 10_000_000, Some(one_hour_ago)) // $10
+    .create_lease(lease_id, 116, 116, 10_000_000, Some(one_hour_ago), None) // $10
     .await
     .unwrap();
 
@@ -725,7 +725,7 @@ async fn test_report_usage_exceeding_lease_budget() {
   let lease_id = "lease_budget_test";
   state
     .lease_manager
-    .create_lease(lease_id, 117, 117, 1_000_000, None) // $1.00
+    .create_lease(lease_id, 117, 117, 1_000_000, None, None) // $1.00
     .await
     .unwrap();
 
@@ -919,7 +919,7 @@ async fn test_refresh_with_insufficient_agent_budget() {
   let lease_id = "lease_refresh_test";
   state
     .lease_manager
-    .create_lease(lease_id, 118, 118, 10_000_000, None) // $10
+    .create_lease(lease_id, 118, 118, 10_000_000, None, None) // $10
     .await
     .unwrap();
 

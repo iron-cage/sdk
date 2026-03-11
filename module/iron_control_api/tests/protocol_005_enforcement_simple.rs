@@ -75,11 +75,21 @@ async fn test_database_constraints_enforce_agent_budget_relationship() {
      Without this, leases could reference non-existent budgets."
   );
 
-  // Conclusion: Database enforces agent-budget-lease relationship
+  // Assert: provider_key_id foreign key exists (added by migration 026)
+  let has_provider_key_fk = foreign_keys
+    .iter()
+    .any(|(from, table, _to)| from == "provider_key_id" && table == "ai_provider_keys");
+  assert!(
+    has_provider_key_fk,
+    "budget_leases MUST have foreign key on provider_key_id → ai_provider_keys(id). \
+     Without this, leases could reference non-existent provider keys."
+  );
+
+  // Conclusion: Database enforces agent-budget-lease-provider relationship
   assert_eq!(
     foreign_keys.len(),
-    2,
-    "budget_leases should have exactly 2 foreign keys (agent_id, budget_id)"
+    3,
+    "budget_leases should have exactly 3 foreign keys (agent_id, budget_id, provider_key_id)"
   );
 }
 

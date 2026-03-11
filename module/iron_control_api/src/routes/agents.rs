@@ -9,6 +9,7 @@
 //! - `POST /agents` - Create agent (admin only)
 //! - `PUT /agents/{id}` - Update agent (admin only)
 //! - `DELETE /agents/{id}` - Delete agent (admin only)
+//! - `PUT /agents/{id}/spending-cap` - Set or remove spending cap (admin only)
 //!
 //! **Access Control:**
 //! - Admins: Full access to all agents
@@ -832,4 +833,113 @@ pub async fn get_agent_tokens(
     .collect();
 
   Ok(Json(tokens))
+}
+
+/// Request body for setting agent spending cap
+#[derive(Debug, Deserialize)]
+pub struct SetSpendingCapRequest {
+  /// Spending cap in USD (null or absent = unlimited)
+  pub spending_cap_usd: Option<f64>,
+}
+
+/// Response body for agent spending information
+#[derive(Debug, Serialize)]
+pub struct AgentSpendingResponse {
+  /// Agent identifier
+  pub agent_id: i64,
+  /// Spending cap status
+  pub spending_cap: SpendingCapResponse,
+  /// Current spending in USD
+  pub spending_used_usd: f64,
+}
+
+/// Spending cap in the API response
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+pub enum SpendingCapResponse {
+  /// No limit
+  #[serde(rename = "unlimited")]
+  Unlimited,
+  /// Capped at a specific amount
+  #[serde(rename = "limited")]
+  Limited {
+    /// Cap amount in USD
+    cap_usd: f64,
+  },
+}
+
+/// PUT /api/v1/agents/{id}/spending-cap
+///
+/// Set or remove agent spending cap (admin only).
+///
+/// # Errors
+///
+/// Returns `(StatusCode, String)` if user is not admin, agent not found,
+/// or on database failure.
+pub async fn set_agent_spending_cap(
+  State(pool): State<SqlitePool>,
+  Path(id): Path<i64>,
+  user: AuthenticatedUser,
+  Json(req): Json<SetSpendingCapRequest>,
+) -> Result<Json<AgentSpendingResponse>, (StatusCode, String)> {
+  if user.0.role != "admin" {
+    return Err((
+      StatusCode::FORBIDDEN,
+      "Only administrators can set spending caps".to_string(),
+    ));
+  }
+
+  // Validate cap if provided
+  if let Some(cap) = req.spending_cap_usd {
+    if cap < 0.0 {
+      return Err((
+        StatusCode::BAD_REQUEST,
+        "spending_cap_usd cannot be negative".to_string(),
+      ));
+    }
+  }
+
+  let manager = iron_token_manager::agent_budget::AgentBudgetManager::from_pool(pool.clone());
+
+  let cap = match req.spending_cap_usd {
+    Some(usd) => iron_token_manager::SpendingCap::Limited(usd_to_microdollars(usd)),
+    None => iron_token_manager::SpendingCap::Unlimited,
+  };
+
+  manager.set_spending_cap(id, cap).await.map_err(|e| match e {
+    iron_token_manager::error::TokenError::NotFound => {
+      (StatusCode::NOT_FOUND, "Agent budget not found".to_string())
+    }
+    _ => (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      format!("Database error: {e}"),
+    ),
+  })?;
+
+  let summary = manager.get_spending_summary(id).await.map_err(|e| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      format!("Database error: {e}"),
+    )
+  })?;
+
+  Ok(Json(AgentSpendingResponse {
+    agent_id: id,
+    spending_cap: match summary.cap {
+      iron_token_manager::SpendingCap::Unlimited => SpendingCapResponse::Unlimited,
+      iron_token_manager::SpendingCap::Limited(v) => SpendingCapResponse::Limited {
+        cap_usd: microdollars_to_usd(v),
+      },
+    },
+    spending_used_usd: microdollars_to_usd(summary.used_microdollars),
+  }))
+}
+
+fn microdollars_to_usd(microdollars: i64) -> f64 {
+  microdollars as f64 / 1_000_000.0
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn usd_to_microdollars(usd: f64) -> i64 {
+  (usd * 1_000_000.0) as i64
 }

@@ -14,9 +14,10 @@ use axum::{
 use chrono::Utc;
 
 use super::shared::{
-  AgentSpending, AnalyticsQuery, AnalyticsState, AvgCostResponse, Filters, Pagination,
-  PaginationQuery, ProviderSpending, ProviderSpendingSummary, SpendingByAgentResponse,
-  SpendingByAgentRow, SpendingByProviderResponse, SpendingSummary, SpendingTotalResponse,
+  compute_change_percent, AgentSpending, AnalyticsQuery, AnalyticsState, AvgCostResponse, Filters,
+  Pagination, PaginationQuery, ProviderSpending, ProviderSpendingSummary,
+  SpendingByAgentResponse, SpendingByAgentRow, SpendingByProviderResponse, SpendingSummary,
+  SpendingTotalComparison, SpendingTotalResponse,
 };
 use crate::jwt_auth::AuthenticatedUser;
 
@@ -50,26 +51,66 @@ pub async fn get_spending_total(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
-
-  let mut q = sqlx::query_scalar::<_, i64>(&query)
-    .bind(start_ms)
-    .bind(end_ms);
-
-  // Bind owner_id for non-admins
-  if !is_admin {
-    q = q.bind(&user.0.sub);
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
   }
 
-  if let Some(agent_id) = params.agent_id {
-    q = q.bind(agent_id);
-  }
-  if let Some(ref provider_id) = params.provider_id {
-    q = q.bind(provider_id);
+  // Bind time range and all active filters to a spending scalar query.
+  // Defined once to guarantee both the current and previous-period queries
+  // use an identical bind sequence (prevents silent mismatches).
+  macro_rules! bind_spending_filters {
+    ($start:expr, $end:expr) => {{
+      let mut __q = sqlx::query_scalar::<_, i64>(&query)
+        .bind($start)
+        .bind($end);
+      if !is_admin {
+        __q = __q.bind(&user.0.sub);
+      }
+      if let Some(agent_id) = params.agent_id {
+        __q = __q.bind(agent_id);
+      }
+      if let Some(ref provider_id) = params.provider_id {
+        __q = __q.bind(provider_id);
+      }
+      if let Some(provider_key_id) = params.provider_key_id {
+        __q = __q.bind(provider_key_id);
+      }
+      __q
+    }};
   }
 
-  match q.fetch_one(&state.pool).await {
+  match bind_spending_filters!(start_ms, end_ms)
+    .fetch_one(&state.pool)
+    .await
+  {
     Ok(total_micros) => {
       let total_usd = total_micros as f64 / 1_000_000.0;
+
+      // Compute previous period comparison if requested
+      let previous_period = if params.compare {
+        if let Some((prev_start, prev_end)) = params.period.previous_period_range() {
+          match bind_spending_filters!(prev_start, prev_end)
+            .fetch_one(&state.pool)
+            .await
+          {
+            Ok(prev_micros) => {
+              let prev_usd = prev_micros as f64 / 1_000_000.0;
+              Some(SpendingTotalComparison {
+                total_spend: prev_usd,
+                change_percent: compute_change_percent(total_usd, prev_usd),
+              })
+            }
+            Err(e) => {
+              tracing::warn!("Failed to query previous period spending: {}", e);
+              None
+            }
+          }
+        } else {
+          None // AllTime has no previous period
+        }
+      } else {
+        None
+      };
 
       (
         StatusCode::OK,
@@ -82,7 +123,9 @@ pub async fn get_spending_total(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
+          previous_period,
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )
@@ -301,6 +344,9 @@ pub async fn get_spending_by_provider(
   if params.agent_id.is_some() {
     query.push_str(" AND agent_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   query.push_str(" GROUP BY provider ORDER BY spending_micros DESC");
 
@@ -315,6 +361,9 @@ pub async fn get_spending_by_provider(
 
   if let Some(agent_id) = params.agent_id {
     q = q.bind(agent_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   let rows = q.fetch_all(&state.pool).await;
@@ -413,6 +462,9 @@ pub async fn get_spending_avg(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut q = sqlx::query_as::<_, (i64, i64, i64, i64)>(&query)
     .bind(start_ms)
@@ -428,6 +480,9 @@ pub async fn get_spending_avg(
   }
   if let Some(ref provider_id) = params.provider_id {
     q = q.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   match q.fetch_one(&state.pool).await {
@@ -455,6 +510,7 @@ pub async fn get_spending_avg(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
           calculated_at: Utc::now().to_rfc3339(),
         }),

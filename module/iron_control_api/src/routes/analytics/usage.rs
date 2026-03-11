@@ -13,9 +13,10 @@ use axum::{
 use chrono::Utc;
 
 use super::shared::{
-  AgentTokenUsage, AnalyticsQuery, AnalyticsState, Filters, ModelUsage, ModelUsageResponse,
-  ModelUsageRow, ModelUsageSummary, Pagination, PaginationQuery, RequestUsageResponse,
-  TokenUsageResponse, TokenUsageSummary, TokensByAgentRow,
+  compute_change_percent, AgentTokenUsage, AnalyticsQuery, AnalyticsState, Filters, ModelUsage,
+  ModelUsageResponse, ModelUsageRow, ModelUsageSummary, Pagination, PaginationQuery,
+  RequestUsageComparison, RequestUsageResponse, TokenUsageResponse, TokenUsageSummary,
+  TokensByAgentRow,
 };
 use crate::jwt_auth::AuthenticatedUser;
 
@@ -52,28 +53,69 @@ pub async fn get_usage_requests(
     query.push_str(" AND provider_id = ?");
   }
 
-  let mut q = sqlx::query_as::<_, (i64, i64, i64)>(&query)
-    .bind(start_ms)
-    .bind(end_ms);
-
-  // Bind owner_id for non-admins
-  if !is_admin {
-    q = q.bind(&user.0.sub);
+  // Bind time range and all active filters to a usage query.
+  // Defined once to guarantee both the current and previous-period queries
+  // use an identical bind sequence (prevents silent mismatches).
+  macro_rules! bind_usage_filters {
+    ($start:expr, $end:expr) => {{
+      let mut __q = sqlx::query_as::<_, (i64, i64, i64)>(&query)
+        .bind($start)
+        .bind($end);
+      if !is_admin {
+        __q = __q.bind(&user.0.sub);
+      }
+      if let Some(agent_id) = params.agent_id {
+        __q = __q.bind(agent_id);
+      }
+      if let Some(ref provider_id) = params.provider_id {
+        __q = __q.bind(provider_id);
+      }
+      __q
+    }};
   }
 
-  if let Some(agent_id) = params.agent_id {
-    q = q.bind(agent_id);
-  }
-  if let Some(ref provider_id) = params.provider_id {
-    q = q.bind(provider_id);
-  }
-
-  match q.fetch_one(&state.pool).await {
+  match bind_usage_filters!(start_ms, end_ms)
+    .fetch_one(&state.pool)
+    .await
+  {
     Ok((total, successful, failed)) => {
       let success_rate = if total > 0 {
         (successful as f64 / total as f64) * 100.0
       } else {
         0.0
+      };
+
+      // Compute previous period comparison if requested
+      let previous_period = if params.compare {
+        if let Some((prev_start, prev_end)) = params.period.previous_period_range() {
+          match bind_usage_filters!(prev_start, prev_end)
+            .fetch_one(&state.pool)
+            .await
+          {
+            Ok((prev_total, prev_successful, prev_failed)) => {
+              let prev_success_rate = if prev_total > 0 {
+                (prev_successful as f64 / prev_total as f64) * 100.0
+              } else {
+                0.0
+              };
+              Some(RequestUsageComparison {
+                total_requests: prev_total,
+                successful_requests: prev_successful,
+                failed_requests: prev_failed,
+                success_rate: prev_success_rate,
+                change_percent: compute_change_percent(total as f64, prev_total as f64),
+              })
+            }
+            Err(e) => {
+              tracing::warn!("Failed to query previous period request usage: {}", e);
+              None
+            }
+          }
+        } else {
+          None // AllTime has no previous period
+        }
+      } else {
+        None
       };
 
       (
@@ -89,7 +131,9 @@ pub async fn get_usage_requests(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
+          previous_period,
           calculated_at: Utc::now().to_rfc3339(),
         }),
       )

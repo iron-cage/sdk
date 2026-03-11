@@ -65,6 +65,7 @@ async fn setup_analytics_db() -> SqlitePool {
       provider_id TEXT,
       error_code TEXT,
       error_message TEXT,
+      provider_key_id INTEGER,
       received_at INTEGER NOT NULL,
       UNIQUE(agent_id, event_id)
     )",

@@ -175,8 +175,8 @@ async fn test_production_schema_matches_test_schema() {
       .expect("LOUD FAILURE: Failed to count indexes");
 
   assert_eq!(
-    index_count, 53,
-    "Should have 53 indexes across all migrations"
+    index_count, 55,
+    "Should have 55 indexes across all migrations"
   );
 }
 
@@ -219,8 +219,8 @@ async fn test_all_migrations_have_guards() {
   let pool = db.pool().clone();
   core::mem::forget(db);
 
-  // Verify guard tables exist for all migrations (001-025)
-  let guard_tables: Vec<String> = (1..=25)
+  // Verify guard tables exist for all migrations (001-026)
+  let guard_tables: Vec<String> = (1..=26)
     .map(|n| format!("_migration_{n:03}_completed"))
     .collect();
 
