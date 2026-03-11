@@ -204,7 +204,7 @@ function handleToggleEnabled(key: ProviderKey) {
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
-
+const typedError = error as unknown as Error | null
 
 </script>
 
@@ -229,7 +229,7 @@ function handleToggleEnabled(key: ProviderKey) {
         { label: 'Actions', align: 'right' },
       ]"
       :is-loading="isLoading"
-      :error="error as Error | null"
+      :error="typedError"
       :is-empty="!providerKeys || providerKeys.length === 0"
       loading-text="Loading provider keys..."
       :on-retry="() => refetch()"
@@ -251,14 +251,14 @@ function handleToggleEnabled(key: ProviderKey) {
           <span v-if="keyStatsLoading" class="text-muted-foreground text-xs">…</span>
           <span v-else>{{ keySpendMap[key.id] !== undefined ? formatCostUsd(keySpendMap[key.id], 2) : '—' }}</span>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap relative -left-3">
           <Button
             variant="outline"
             size="sm"
             :disabled="toggleMutation.isPending.value"
             @click="handleToggleEnabled(key)"
           >
-            <IconCheck v-if="key.is_enabled" class="text-green-500" />
+            <IconCheck v-if="key.is_enabled" class="text-success" />
             <IconX v-else class="text-muted-foreground" />
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
@@ -273,12 +273,12 @@ function handleToggleEnabled(key: ProviderKey) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="openEditModal(key)" :disabled="updateMutation.isPending.value">
+              <DropdownMenuItem :disabled="updateMutation.isPending.value" @click="openEditModal(key)">
                 <IconEdit />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="handleDeleteKey(key)" :disabled="deleteMutation.isPending.value" class="text-destructive">
+              <DropdownMenuItem :disabled="deleteMutation.isPending.value" class="text-destructive" @click="handleDeleteKey(key)">
                 <IconTrash />
                 Delete
               </DropdownMenuItem>
@@ -367,16 +367,16 @@ function handleToggleEnabled(key: ProviderKey) {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false; resetForm()"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false; resetForm()"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateKey"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateKey"
           >
             <IconPlus />
             {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
@@ -443,16 +443,16 @@ function handleToggleEnabled(key: ProviderKey) {
 
         <DialogFooter>
           <Button
-            @click="showEditModal = false; editingKey = null"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="showEditModal = false; editingKey = null"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleUpdateKey"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateKey"
           >
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Key' }}

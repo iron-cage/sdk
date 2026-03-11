@@ -325,7 +325,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="handleChangeRole(user)" :disabled="user.id === authStore.userId">
+              <DropdownMenuItem :disabled="user.id === authStore.userId" @click="handleChangeRole(user)">
                 <IconEdit />
                 Change Role
               </DropdownMenuItem>
@@ -333,13 +333,13 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
                 <IconKey />
                 Reset Password
               </DropdownMenuItem>
-              <DropdownMenuItem @click="handleToggleStatus(user)" :disabled="user.id === authStore.userId">
+              <DropdownMenuItem :disabled="user.id === authStore.userId" @click="handleToggleStatus(user)">
                 <IconBan v-if="user.is_active" />
                 <IconCheck v-else />
                 {{ user.is_active ? 'Suspend' : 'Activate' }}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="handleDeleteUser(user)" :disabled="user.id === authStore.userId" class="text-destructive">
+              <DropdownMenuItem :disabled="user.id === authStore.userId" class="text-destructive" @click="handleDeleteUser(user)">
                 <IconTrash />
                 Delete
               </DropdownMenuItem>
@@ -389,8 +389,8 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
             <Label for="email">Email</Label>
             <Input
               id="email"
-              type="email"
               v-model="email"
+              type="email"
               placeholder="user@example.com"
               :disabled="createMutation.isPending.value"
             />
@@ -400,8 +400,8 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
             <Label for="password">Password</Label>
             <Input
               id="password"
-              type="password"
               v-model="password"
+              type="password"
               placeholder="password"
               :disabled="createMutation.isPending.value"
             />
@@ -424,16 +424,16 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateUser"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateUser"
           >
             <IconCheck />
             {{ createMutation.isPending.value ? 'Creating...' : 'Create User' }}
@@ -465,17 +465,17 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
 
         <DialogFooter>
           <Button
-            @click="showDisableConfirm = false"
             :disabled="suspendMutation.isPending.value"
             variant="outline"
+            @click="showDisableConfirm = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="confirmDisable"
             :disabled="suspendMutation.isPending.value"
             variant="destructive"
+            @click="confirmDisable"
           >
             <IconBan />
             {{ suspendMutation.isPending.value ? 'Suspending...' : 'Suspend User' }}
@@ -498,17 +498,17 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
 
         <DialogFooter>
           <Button
-            @click="showDeleteConfirm = false"
             :disabled="deleteMutation.isPending.value"
             variant="outline"
+            @click="showDeleteConfirm = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="confirmDelete"
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
+            @click="confirmDelete"
           >
             <IconTrash />
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete User' }}
@@ -544,16 +544,16 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
 
         <DialogFooter>
           <Button
-            @click="showChangeRoleModal = false"
             :disabled="changeRoleMutation.isPending.value"
             variant="outline"
+            @click="showChangeRoleModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="confirmChangeRole"
             :disabled="changeRoleMutation.isPending.value"
+            @click="confirmChangeRole"
           >
             <IconCheck />
             {{ changeRoleMutation.isPending.value ? 'Saving...' : 'Save Changes' }}
@@ -578,8 +578,8 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
             <Label for="new-password">New Password</Label>
             <Input
               id="new-password"
-              type="password"
               v-model="newPassword"
+              type="password"
               placeholder="New secure password"
               :disabled="resetPasswordMutation.isPending.value"
             />
@@ -597,16 +597,16 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
 
         <DialogFooter>
           <Button
-            @click="showResetPasswordModal = false"
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
+            @click="showResetPasswordModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="confirmResetPassword"
             :disabled="resetPasswordMutation.isPending.value"
+            @click="confirmResetPassword"
           >
             <IconKey />
             {{ resetPasswordMutation.isPending.value ? 'Resetting...' : 'Reset Password' }}

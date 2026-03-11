@@ -191,12 +191,12 @@ function copyToken(token: string) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem @click="handleRotateToken(token)" :disabled="rotateMutation.isPending.value">
+              <DropdownMenuItem :disabled="rotateMutation.isPending.value" @click="handleRotateToken(token)">
                 <IconRefresh />
                 Rotate
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="handleRevokeToken(token)" :disabled="revokeMutation.isPending.value" class="text-destructive">
+              <DropdownMenuItem :disabled="revokeMutation.isPending.value" class="text-destructive" @click="handleRevokeToken(token)">
                 <IconBan />
                 Revoke
               </DropdownMenuItem>
@@ -258,16 +258,16 @@ function copyToken(token: string) {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateToken"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateToken"
           >
             <IconKey />
             {{ createMutation.isPending.value ? 'Generating...' : 'Generate Token' }}
@@ -300,8 +300,8 @@ function copyToken(token: string) {
                 class="font-mono text-base bg-muted"
               />
               <Button
-                @click="copyToken(newTokenData.token)"
                 variant="outline"
+                @click="copyToken(newTokenData.token)"
               >
                 <IconCopy />
                 Copy

@@ -162,10 +162,10 @@ function riskBadgeVariant(risk: string) {
         { label: 'Risk' },
         { label: 'Actions', align: 'right' },
       ]"
-      :isLoading="isBudgetLoading"
+      :is-loading="isBudgetLoading"
       :error="budgetQueryError"
-      :isEmpty="!budgetStatus?.data?.length"
-      loadingText="Loading agent budgets..."
+      :is-empty="!budgetStatus?.data?.length"
+      loading-text="Loading agent budgets..."
     >
       <template #empty>
         <p class="text-muted-foreground">No agent budget data available.</p>

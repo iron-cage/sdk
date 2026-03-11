@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent, type IcTokenStatus, type ProviderType } from '../composables/useApi'
+import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,8 +31,8 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
 import { formatDate, formatTimestamp } from '@/lib/formatters'
+import { getProviderLabel } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
-import ProviderBadge from '@/components/ProviderBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -95,8 +95,8 @@ watch(
         try {
           const status = await api.getIcTokenStatus(agent.id)
           statusMap[agent.id] = status
-        } catch (err) {
-          console.error('Failed to load IC token status for agent', agent.id, err)
+        } catch {
+          toast.error('Failed to load IC token status for agent ' + agent.name)
         }
       })
     )
@@ -133,6 +133,16 @@ function providerKeyLabel(keyId: number): string {
   const key = providers.value?.find(p => p.id === keyId)
   if (!key) return `#${keyId}`
   return key.alias || key.provider
+}
+
+function providerAlias(agent: Agent, providerType: string): string | null {
+  // Prefer the assigned key if its provider matches
+  if (agent.provider_key_id) {
+    const assigned = providers.value?.find(p => p.id === agent.provider_key_id && p.provider === providerType)
+    if (assigned?.alias) return assigned.alias
+  }
+  // Fall back to any key of that provider type
+  return providers.value?.find(p => p.provider === providerType)?.alias ?? null
 }
 
 // Fetch users for owner selection (admin only)
@@ -343,9 +353,11 @@ async function copyTokenToClipboard() {
   try {
     await navigator.clipboard.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
-  } catch (err) {
-    copyMessage.value = err instanceof Error ? err.message : 'Copy failed'
-  }
+    } catch (_err: unknown) {
+      const message = _err instanceof Error ? _err.message : 'Copy failed'
+      copyMessage.value = message
+    }
+
 }
 
 </script>
@@ -392,13 +404,13 @@ async function copyTokenToClipboard() {
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 flex-wrap items-center">
-            <template v-if="agent.provider_key_id && providers?.find(p => p.id === agent.provider_key_id)?.alias">
-              <ProviderBadge :provider="providers!.find(p => p.id === agent.provider_key_id)!.provider as ProviderType" />
-              <span class="text-xs text-foreground">{{ providers!.find(p => p.id === agent.provider_key_id)!.alias }}</span>
-            </template>
-            <template v-else>
-              <ProviderBadge v-for="provider in agent.providers" :key="provider" :provider="provider as ProviderType" />
-            </template>
+            <span
+              v-for="provider in agent.providers"
+              :key="provider"
+              class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+            >
+              {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
+            </span>
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
@@ -426,24 +438,24 @@ async function copyTokenToClipboard() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
-                @click="handleGenerateIcToken(agent)"
                 :disabled="tokenActionLoadingId === agent.id"
+                @click="handleGenerateIcToken(agent)"
               >
                 <IconKey />
                 {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
               </DropdownMenuItem>
               <template v-else>
                 <DropdownMenuItem
-                  @click="handleRegenerateIcToken(agent)"
                   :disabled="tokenActionLoadingId === agent.id"
+                  @click="handleRegenerateIcToken(agent)"
                 >
                   <IconRefresh />
                   {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  @click="handleRevokeIcToken(agent)"
                   :disabled="tokenActionLoadingId === agent.id"
                   class="text-destructive"
+                  @click="handleRevokeIcToken(agent)"
                 >
                   <IconBan />
                   Revoke IC Token
@@ -455,7 +467,7 @@ async function copyTokenToClipboard() {
                   <IconEdit />
                   Edit Agent
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">
+                <DropdownMenuItem class="text-destructive" @click="handleDeleteAgent(agent)">
                   <IconTrash />
                   Delete Agent
                 </DropdownMenuItem>
@@ -506,7 +518,7 @@ async function copyTokenToClipboard() {
                 </button>
               </div>
             </div>
-            <div class="flex gap-2" v-if="availableProviderKeys.length">
+            <div v-if="availableProviderKeys.length" class="flex gap-2">
               <Select v-model="addingProviderKeyId" :disabled="createMutation.isPending.value">
                 <SelectTrigger class="flex-1">
                   <SelectValue placeholder="Add a provider key" />
@@ -521,7 +533,7 @@ async function copyTokenToClipboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" @click="addProviderKey" :disabled="!addingProviderKeyId || createMutation.isPending.value">
+              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="addProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -539,7 +551,7 @@ async function copyTokenToClipboard() {
               :disabled="createMutation.isPending.value"
             />
             <p class="text-xs text-muted-foreground">
-              Required. Used to create the agent's budget (microdollars on backend).
+              Required. Used to create the agent's budget.
             </p>
           </div>
 
@@ -567,16 +579,16 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateAgent"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateAgent"
           >
             <IconPlus />
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Agent' }}
@@ -625,7 +637,7 @@ async function copyTokenToClipboard() {
                 </button>
               </div>
             </div>
-            <div class="flex gap-2" v-if="availableProviderKeys.length">
+            <div v-if="availableProviderKeys.length" class="flex gap-2">
               <Select v-model="addingProviderKeyId" :disabled="updateMutation.isPending.value">
                 <SelectTrigger class="flex-1">
                   <SelectValue placeholder="Add a provider key" />
@@ -640,7 +652,7 @@ async function copyTokenToClipboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" @click="addProviderKey" :disabled="!addingProviderKeyId || updateMutation.isPending.value">
+              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="addProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -667,16 +679,16 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showUpdateModal = false"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="showUpdateModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleUpdateAgent"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateAgent"
           >
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
@@ -697,17 +709,17 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showDeleteModal = false"
             :disabled="deleteMutation.isPending.value"
             variant="outline"
+            @click="showDeleteModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="confirmDelete"
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
+            @click="confirmDelete"
           >
             <IconTrash />
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
