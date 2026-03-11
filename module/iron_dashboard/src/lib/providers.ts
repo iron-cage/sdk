@@ -1,10 +1,20 @@
 import type { ProviderType } from '../composables/useApi'
 
-export function getProviderLabel(provider: ProviderType): string {
-  return provider === 'openai' ? 'OpenAI' : 'Anthropic'
+const PROVIDER_LABELS: Record<ProviderType, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
 }
 
-export function getProviderBadgeClass(provider: ProviderType): string {
-  const bg = provider === 'openai' ? 'bg-success/80' : 'bg-accent/80'
+const PROVIDER_BADGE_CLASSES: Record<ProviderType, string> = {
+  openai: 'bg-success/80',
+  anthropic: 'bg-accent/80',
+}
+
+export function getProviderLabel(provider: string): string {
+  return PROVIDER_LABELS[provider as ProviderType] ?? provider
+}
+
+export function getProviderBadgeClass(provider: string): string {
+  const bg = PROVIDER_BADGE_CLASSES[provider as ProviderType] ?? 'bg-muted/80'
   return `${bg} text-white text-xs font-medium px-2 py-0.5 rounded-full`
 }
