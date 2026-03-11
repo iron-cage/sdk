@@ -235,8 +235,8 @@ function confirmResetPassword() {
   }
 }
 
-// Watch for search changes to reset page
-watch(search, () => {
+// Watch for filter changes to reset page
+watch([search, roleFilter, isActiveFilter], () => {
   page.value = 1
 })
 
