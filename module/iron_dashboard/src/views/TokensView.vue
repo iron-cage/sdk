@@ -130,8 +130,13 @@ function handleRevokeToken(token: TokenMetadata) {
   )
 }
 
-function copyToken(token: string) {
-  navigator.clipboard.writeText(token)
+async function copyToken(token: string) {
+  try {
+    await navigator.clipboard.writeText(token)
+    toast.success('Token copied to clipboard')
+  } catch {
+    toast.error('Failed to copy token')
+  }
 }
 </script>
 
