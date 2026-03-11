@@ -559,12 +559,6 @@ function openLogModal(event: AnalyticsEvent) {
               >
                 {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
               </span>
-              <span v-if="event.error_code" class="text-xs text-muted-foreground block mt-1">
-                {{ event.error_code }}
-              </span>
-              <span v-if="event.error_message" class="text-xs text-destructive/70 block max-w-[180px] truncate" :title="event.error_message">
-                {{ event.error_message }}
-              </span>
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(event.input_tokens + event.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ formatMicrodollars(event.cost_micros) }}</td>
