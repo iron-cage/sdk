@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, formatCostUsd } from '@/lib/formatters'
 import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
@@ -54,6 +54,7 @@ const editingKey = ref<ProviderKey | null>(null)
 // Form fields
 const provider = ref<ProviderType>('openai')
 const apiKey = ref('')
+const alias = ref('')
 const baseUrl = ref('')
 const description = ref('')
 const isEnabled = ref(true)
@@ -65,11 +66,31 @@ const { data: providerKeys, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
-// Note: Tokens are now user-centric and provider-based, not project-based
+// Per-key spend, fetched in parallel after keys load.
+// TODO: move to backend — include total_spend in GET /api/v1/provider-keys response.
+const keySpendMap = ref<Record<number, number>>({})
+const keyStatsLoading = ref(false)
+
+watch(providerKeys, async (keys) => {
+  if (!keys?.length) return
+  keyStatsLoading.value = true
+  const results = await Promise.allSettled(
+    keys.map(async (key) => {
+      const res = await api.getAnalyticsSpendingTotal({ period: 'all-time', provider_key_id: key.id })
+      return { id: key.id, spend: res.total_spend }
+    })
+  )
+  const map: Record<number, number> = {}
+  for (const r of results) {
+    if (r.status === 'fulfilled') map[r.value.id] = r.value.spend
+  }
+  keySpendMap.value = map
+  keyStatsLoading.value = false
+}, { immediate: true })
 
 // Create provider key mutation
 const createMutation = useMutation({
-  mutationFn: (data: { provider: ProviderType; api_key: string; base_url?: string; description?: string }) =>
+  mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string; base_url?: string; description?: string }) =>
     api.createProviderKey(data),
   onSuccess: () => {
     showCreateModal.value = false
@@ -83,8 +104,8 @@ const createMutation = useMutation({
 
 // Update provider key mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; base_url?: string; description?: string; is_enabled?: boolean }) =>
-    api.updateProviderKey(data.id, { base_url: data.base_url, description: data.description, is_enabled: data.is_enabled }),
+  mutationFn: (data: { id: number; alias?: string; base_url?: string; description?: string; is_enabled?: boolean }) =>
+    api.updateProviderKey(data.id, { alias: data.alias, base_url: data.base_url, description: data.description, is_enabled: data.is_enabled }),
   onSuccess: () => {
     showEditModal.value = false
     editingKey.value = null
@@ -117,6 +138,7 @@ const toggleMutation = useMutation({
 function resetForm() {
   provider.value = 'openai'
   apiKey.value = ''
+  alias.value = ''
   baseUrl.value = ''
   description.value = ''
   isEnabled.value = true
@@ -131,6 +153,7 @@ function handleCreateKey() {
   createMutation.mutate({
     provider: provider.value,
     api_key: apiKey.value,
+    alias: alias.value || undefined,
     base_url: baseUrl.value || undefined,
     description: description.value || undefined,
   })
@@ -138,6 +161,7 @@ function handleCreateKey() {
 
 function openEditModal(key: ProviderKey) {
   editingKey.value = key
+  alias.value = key.alias || ''
   baseUrl.value = key.base_url || ''
   description.value = key.description || ''
   isEnabled.value = key.is_enabled
@@ -148,6 +172,7 @@ function handleUpdateKey() {
   if (!editingKey.value) return
   updateMutation.mutate({
     id: editingKey.value.id,
+    alias: alias.value || undefined,
     base_url: baseUrl.value || undefined,
     description: description.value || undefined,
     is_enabled: isEnabled.value,
@@ -183,8 +208,10 @@ function handleToggleEnabled(key: ProviderKey) {
     <DataTable
       :columns="[
         { label: 'Provider' },
+        { label: 'Name' },
         { label: 'Description' },
         { label: 'API Key' },
+        { label: 'Spend (all-time)' },
         { label: 'Status' },
         { label: 'Created' },
         { label: 'Actions', align: 'right' },
@@ -205,8 +232,13 @@ function handleToggleEnabled(key: ProviderKey) {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <ProviderBadge :provider="key.provider" />
         </td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.alias || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
+          <span v-if="keyStatsLoading" class="text-muted-foreground text-xs">…</span>
+          <span v-else>{{ keySpendMap[key.id] !== undefined ? formatCostUsd(keySpendMap[key.id], 2) : '—' }}</span>
+        </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <Button
             @click="handleToggleEnabled(key)"
@@ -286,6 +318,19 @@ function handleToggleEnabled(key: ProviderKey) {
           </div>
 
           <div class="space-y-1.5">
+            <Label for="alias">Name / Alias (optional)</Label>
+            <Input
+              id="alias"
+              v-model="alias"
+              placeholder="e.g., Production, Team A key"
+              :disabled="createMutation.isPending.value"
+            />
+            <p class="text-xs text-muted-foreground">
+              A friendly name shown in the agent selector instead of the provider type.
+            </p>
+          </div>
+
+          <div class="space-y-1.5">
             <Label for="baseUrl">Base URL (optional)</Label>
             <Input
               id="baseUrl"
@@ -343,6 +388,16 @@ function handleToggleEnabled(key: ProviderKey) {
           <div class="space-y-1.5">
             <Label>Provider</Label>
             <p class="text-base text-foreground">{{ getProviderLabel(editingKey.provider) }}</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <Label for="editAlias">Name / Alias (optional)</Label>
+            <Input
+              id="editAlias"
+              v-model="alias"
+              placeholder="e.g., Production, Team A key"
+              :disabled="updateMutation.isPending.value"
+            />
           </div>
 
           <div class="space-y-1.5">

@@ -86,6 +86,7 @@ type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
 interface ProviderKey {
   id: number
   provider: ProviderType
+  alias?: string
   base_url?: string
   description?: string
   is_enabled: boolean
@@ -98,11 +99,13 @@ interface ProviderKey {
 interface CreateProviderKeyRequest {
   provider: ProviderType
   api_key: string
+  alias?: string
   base_url?: string
   description?: string
 }
 
 interface UpdateProviderKeyRequest {
+  alias?: string
   base_url?: string
   description?: string
   is_enabled?: boolean
@@ -503,6 +506,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`)
@@ -526,6 +530,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`)
@@ -826,6 +831,7 @@ export interface AnalyticsFilters {
   period?: AnalyticsPeriod
   agent_id?: number
   provider_id?: string
+  provider_key_id?: number
   compare?: boolean
 }
 
@@ -850,6 +856,8 @@ export interface SpendingTotalResponse {
 
 export interface ProviderSpending {
   provider: string
+  provider_key_id?: number
+  alias?: string
   spending: number
   request_count: number
   avg_cost_per_request: number

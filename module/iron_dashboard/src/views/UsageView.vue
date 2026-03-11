@@ -83,7 +83,7 @@ const { data: providerList } = useQuery({
 const activeFilters = computed(() => ({
   period: selectedPeriod.value,
   agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
-  provider_id: selectedProviderId.value !== 'all' ? selectedProviderId.value : undefined,
+  provider_key_id: selectedProviderId.value !== 'all' ? Number(selectedProviderId.value) : undefined,
 }))
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
@@ -170,6 +170,7 @@ const providerBreakdown = computed(() => {
             .sort((a, b) => b.percentage - a.percentage)
 })
 
+
 const modelBreakdown = computed(() => {
   const data = modelUsage.value?.data ?? []
   if (!data.length) return []
@@ -227,10 +228,10 @@ function openLogModal(event: AnalyticsEvent) {
             <SelectItem value="all">All Providers</SelectItem>
             <SelectItem
               v-for="p in providerList"
-              :key="p.provider"
-              :value="p.provider"
+              :key="p.id"
+              :value="String(p.id)"
             >
-              {{ getProviderLabel(p.provider) }}
+              {{ p.alias || getProviderLabel(p.provider) }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -342,7 +343,7 @@ function openLogModal(event: AnalyticsEvent) {
           <div v-else class="space-y-4">
             <div v-for="provider in visibleProviders" :key="provider.provider">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ getProviderLabel(provider.provider) }}</span>
+                <span class="text-base font-medium text-foreground">{{ provider.alias || getProviderLabel(provider.provider) }}</span>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
