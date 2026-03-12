@@ -65,8 +65,6 @@ const agentToDelete = ref<Agent | null>(null)
 const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
 const icTokenStatusLoading = ref(false)
 const tokenActionLoadingId = ref<number | null>(null)
-const createFormError = ref('')
-const updateFormError = ref('')
 const showTokenDialog = ref(false)
 const tokenDialogValue = ref('')
 const tokenDialogAgentName = ref('')
@@ -154,7 +152,6 @@ const createMutation = useMutation({
     addingProviderKeyId.value = ''
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = ''
-    createFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -173,7 +170,6 @@ const updateMutation = useMutation({
     selectedProviderKeyIds.value = []
     addingProviderKeyId.value = ''
     selectedOwnerId.value = ''
-    updateFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -190,19 +186,18 @@ const deleteMutation = useMutation({
 })
 
 function handleCreateAgent() {
-  createFormError.value = ''
   if (!name.value) {
-    createFormError.value = 'Name is required'
+    toast.error('Name is required')
     return
   }
 
   if (selectedProviderKeyIds.value.length === 0) {
-    createFormError.value = 'At least one provider key is required'
+    toast.error('At least one provider key is required')
     return
   }
 
   if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
-    createFormError.value = 'Initial budget (USD) is required and must be positive'
+    toast.error('Initial budget (USD) is required and must be positive')
     return
   }
 
@@ -225,19 +220,17 @@ function openUpdateModal(agent: Agent) {
   selectedProviderKeyIds.value = [...(agent.provider_key_ids ?? [])]
   addingProviderKeyId.value = ''
   selectedOwnerId.value = agent.owner_id ?? ''
-  updateFormError.value = ''
   showUpdateModal.value = true
 }
 
 function handleUpdateAgent() {
-  updateFormError.value = ''
   if (!selectedAgent.value || !name.value) {
-    updateFormError.value = 'Name is required'
+    toast.error('Name is required')
     return
   }
 
   if (selectedProviderKeyIds.value.length === 0) {
-    updateFormError.value = 'At least one provider key is required'
+    toast.error('At least one provider key is required')
     return
   }
 
@@ -573,13 +566,11 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
-        <p v-if="createFormError" class="text-sm text-destructive">{{ createFormError }}</p>
-
         <DialogFooter>
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; createFormError = ''"
+            @click="showCreateModal = false"
           >
             <IconX />
             Cancel
@@ -675,13 +666,11 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
-        <p v-if="updateFormError" class="text-sm text-destructive">{{ updateFormError }}</p>
-
         <DialogFooter>
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="showUpdateModal = false; updateFormError = ''"
+            @click="showUpdateModal = false"
           >
             <IconX />
             Cancel
