@@ -418,7 +418,7 @@ async function copyTokenToClipboard() {
                 <span
                   v-for="keyId in agent.provider_key_ids.slice(3)"
                   :key="keyId"
-                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border max-w-[120px] truncate"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border max-w-[200px] truncate"
                   :title="providerKeyLabel(keyId)"
                 >
                   {{ providerKeyLabel(keyId) }}
