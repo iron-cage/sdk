@@ -65,6 +65,8 @@ const agentToDelete = ref<Agent | null>(null)
 const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
 const icTokenStatusLoading = ref(false)
 const tokenActionLoadingId = ref<number | null>(null)
+const createFormError = ref('')
+const updateFormError = ref('')
 const showTokenDialog = ref(false)
 const tokenDialogValue = ref('')
 const tokenDialogAgentName = ref('')
@@ -129,6 +131,7 @@ const createMutation = useMutation({
     selectedProviderKeyId.value = ''
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = ''
+    createFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -146,6 +149,7 @@ const updateMutation = useMutation({
     name.value = ''
     selectedProviderKeyId.value = ''
     selectedOwnerId.value = ''
+    updateFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -162,25 +166,26 @@ const deleteMutation = useMutation({
 })
 
 function handleCreateAgent() {
+  createFormError.value = ''
   if (!name.value) {
-    toast.error('Name is required')
+    createFormError.value = 'Name is required'
     return
   }
 
   if (!selectedProviderKeyId.value) {
-    toast.error('Provider key is required')
+    createFormError.value = 'Provider key is required'
     return
   }
 
   if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
-    toast.error('Initial budget (USD) is required and must be positive')
+    createFormError.value = 'Initial budget (USD) is required and must be positive'
     return
   }
 
   const providerKeyId = Number(selectedProviderKeyId.value)
   const providerRecord = providers.value?.find(p => p.id === providerKeyId)
   if (!providerRecord) {
-    toast.error('Selected provider key not found')
+    createFormError.value = 'Selected provider key not found'
     return
   }
 
@@ -200,24 +205,26 @@ function openUpdateModal(agent: Agent) {
   name.value = agent.name
   selectedProviderKeyId.value = agent.provider_key_id ? String(agent.provider_key_id) : ''
   selectedOwnerId.value = agent.owner_id ?? ''
+  updateFormError.value = ''
   showUpdateModal.value = true
 }
 
 function handleUpdateAgent() {
+  updateFormError.value = ''
   if (!selectedAgent.value || !name.value) {
-    toast.error('Name is required')
+    updateFormError.value = 'Name is required'
     return
   }
 
   if (!selectedProviderKeyId.value) {
-    toast.error('Provider key is required')
+    updateFormError.value = 'Provider key is required'
     return
   }
 
   const providerKeyId = Number(selectedProviderKeyId.value)
   const providerRecord = providers.value?.find(p => p.id === providerKeyId)
   if (!providerRecord) {
-    toast.error('Selected provider key not found')
+    updateFormError.value = 'Selected provider key not found'
     return
   }
 
@@ -525,9 +532,11 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
+        <p v-if="createFormError" class="text-sm text-destructive">{{ createFormError }}</p>
+
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
+            @click="showCreateModal = false; createFormError = ''"
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
@@ -604,9 +613,11 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
+        <p v-if="updateFormError" class="text-sm text-destructive">{{ updateFormError }}</p>
+
         <DialogFooter>
           <Button
-            @click="showUpdateModal = false"
+            @click="showUpdateModal = false; updateFormError = ''"
             :disabled="updateMutation.isPending.value"
             variant="outline"
           >

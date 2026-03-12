@@ -38,6 +38,7 @@ const showBudgetModal = ref(false)
 const budgetAgentId = ref<number | null>(null)
 const budgetAgentName = ref('')
 const budgetUsd = ref<number | undefined>(undefined)
+const budgetError = ref('')
 
 // Fetch agent budget status
 const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError, refetch: refetchBudget } = useQuery({
@@ -49,6 +50,7 @@ function openBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
   budgetAgentName.value = row.agent_name
   budgetUsd.value = Number((row.budget / 1_000_000).toFixed(2))
+  budgetError.value = ''
   showBudgetModal.value = true
 }
 
@@ -66,8 +68,9 @@ const updateBudgetMutation = useMutation({
 
 function handleUpdateBudget() {
   if (!budgetAgentId.value) return
+  budgetError.value = ''
   if (!budgetUsd.value || budgetUsd.value <= 0) {
-    toast.error('Budget must be greater than zero')
+    budgetError.value = 'Budget must be greater than zero'
     return
   }
 
@@ -173,8 +176,10 @@ function handleUpdateBudget() {
           </div>
         </div>
 
+        <p v-if="budgetError" class="text-sm text-destructive">{{ budgetError }}</p>
+
         <DialogFooter>
-          <Button variant="outline" @click="showBudgetModal = false">
+          <Button variant="outline" @click="showBudgetModal = false; budgetError = ''">
             <IconX />
             Cancel
           </Button>
