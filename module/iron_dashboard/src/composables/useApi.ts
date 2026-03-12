@@ -195,6 +195,11 @@ export function useApi() {
     return JSON.parse(text)
   }
 
+  // Health API
+  async function getHealth(): Promise<{ status: string; timestamp: number }> {
+    return fetchApi('/api/health')
+  }
+
   // Token API methods
   async function getTokens(): Promise<TokenMetadata[]> {
     return fetchApi<TokenMetadata[]>('/api/v1/api-tokens')
@@ -687,6 +692,7 @@ export function useApi() {
   }
 
   return {
+    getHealth,
     getTokens,
     getToken,
     createToken,

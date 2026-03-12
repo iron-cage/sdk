@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
 import { formatDate, formatTimestamp } from '@/lib/formatters'
-import { getProviderLabel } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -67,6 +66,8 @@ const agentToDelete = ref<Agent | null>(null)
 const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
 const icTokenStatusLoading = ref(false)
 const tokenActionLoadingId = ref<number | null>(null)
+const createFormError = ref('')
+const updateFormError = ref('')
 const showTokenDialog = ref(false)
 const tokenDialogValue = ref('')
 const tokenDialogAgentName = ref('')
@@ -136,15 +137,6 @@ function providerKeyLabel(keyId: number): string {
   return key.alias || key.provider
 }
 
-function providerAlias(agent: Agent, providerType: string): string | null {
-  // Prefer an assigned key whose provider matches
-  const ids = agent.provider_key_ids ?? [] as number[]
-  const assigned = providers.value?.find(p => ids.includes(p.id) && p.provider === providerType)
-  if (assigned?.alias) return assigned.alias
-  // Fall back to any key of that provider type
-  return providers.value?.find(p => p.provider === providerType)?.alias ?? null
-}
-
 // Fetch users for owner selection (admin only)
 const { data: users } = useQuery({
   queryKey: ['users-for-agents'],
@@ -163,6 +155,7 @@ const createMutation = useMutation({
     addingProviderKeyId.value = ''
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = ''
+    createFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -181,6 +174,7 @@ const updateMutation = useMutation({
     selectedProviderKeyIds.value = []
     addingProviderKeyId.value = ''
     selectedOwnerId.value = ''
+    updateFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -197,18 +191,19 @@ const deleteMutation = useMutation({
 })
 
 function handleCreateAgent() {
+  createFormError.value = ''
   if (!name.value) {
-    toast.error('Name is required')
+    createFormError.value = 'Name is required'
     return
   }
 
   if (selectedProviderKeyIds.value.length === 0) {
-    toast.error('At least one provider key is required')
+    createFormError.value = 'At least one provider key is required'
     return
   }
 
   if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
-    toast.error('Initial budget (USD) is required and must be positive')
+    createFormError.value = 'Initial budget (USD) is required and must be positive'
     return
   }
 
@@ -231,17 +226,19 @@ function openUpdateModal(agent: Agent) {
   selectedProviderKeyIds.value = [...(agent.provider_key_ids ?? [])]
   addingProviderKeyId.value = ''
   selectedOwnerId.value = agent.owner_id ?? ''
+  updateFormError.value = ''
   showUpdateModal.value = true
 }
 
 function handleUpdateAgent() {
+  updateFormError.value = ''
   if (!selectedAgent.value || !name.value) {
-    toast.error('Name is required')
+    updateFormError.value = 'Name is required'
     return
   }
 
   if (selectedProviderKeyIds.value.length === 0) {
-    toast.error('At least one provider key is required')
+    updateFormError.value = 'At least one provider key is required'
     return
   }
 
@@ -405,25 +402,25 @@ async function copyTokenToClipboard() {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 items-center flex-wrap max-w-[200px]">
             <span
-              v-for="provider in agent.providers.slice(0, 3)"
-              :key="provider"
+              v-for="keyId in agent.provider_key_ids.slice(0, 3)"
+              :key="keyId"
               class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
             >
-              {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
+              {{ providerKeyLabel(keyId) }}
             </span>
-            <Popover v-if="agent.providers.length > 3">
+            <Popover v-if="agent.provider_key_ids.length > 3">
               <PopoverTrigger as-child>
                 <button class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border-border border hover:text-foreground transition-colors">
-                  +{{ agent.providers.length - 3 }}
+                  +{{ agent.provider_key_ids.length - 3 }}
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" class="flex flex-wrap gap-1 max-w-[220px]">
                 <span
-                  v-for="provider in agent.providers.slice(3)"
-                  :key="provider"
+                  v-for="keyId in agent.provider_key_ids.slice(3)"
+                  :key="keyId"
                   class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
                 >
-                  {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
+                  {{ providerKeyLabel(keyId) }}
                 </span>
               </PopoverContent>
             </Popover>
@@ -593,11 +590,13 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
+        <p v-if="createFormError" class="text-sm text-destructive">{{ createFormError }}</p>
+
         <DialogFooter>
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false"
+            @click="showCreateModal = false; createFormError = ''"
           >
             <IconX />
             Cancel
@@ -693,11 +692,13 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
+        <p v-if="updateFormError" class="text-sm text-destructive">{{ updateFormError }}</p>
+
         <DialogFooter>
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="showUpdateModal = false"
+            @click="showUpdateModal = false; updateFormError = ''"
           >
             <IconX />
             Cancel

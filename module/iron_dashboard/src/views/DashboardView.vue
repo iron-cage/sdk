@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatTimestamp } from '@/lib/formatters'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
@@ -36,6 +37,12 @@ const { data: agentSpending } = useQuery({
   queryFn: () => api.getAnalyticsSpendingByAgent({ period: 'all-time' }, { per_page: 5 }),
 })
 
+const { data: health, isLoading: healthLoading, isError: healthError } = useQuery({
+  queryKey: ['health'],
+  queryFn: () => api.getHealth(),
+  refetchInterval: 30_000,
+})
+
 const totalSpend     = computed(() => spending.value?.total_spend ?? 0)
 const totalRequests  = computed(() => requestUsage.value?.total_requests ?? 0)
 const successRate    = computed(() => requestUsage.value?.success_rate ?? 0)
@@ -50,11 +57,18 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
     <div class="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-lg">
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
-          <span class="h-2 w-2 rounded-full bg-success animate-pulse" />
-          <span class="text-sm font-medium text-foreground">All Systems Operational</span>
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="healthLoading ? 'bg-muted-foreground' : healthError ? 'bg-destructive' : 'bg-success animate-pulse'"
+          />
+          <span class="text-sm font-medium text-foreground">
+            {{ healthLoading ? 'Checking...' : healthError ? 'Service Unavailable' : 'All Systems Operational' }}
+          </span>
         </div>
-        <span class="text-muted-foreground max-sm:hidden">·</span>
-        <span class="text-xs text-muted-foreground max-sm:hidden">API gateway active</span>
+        <template v-if="!healthLoading && health">
+          <span class="text-muted-foreground max-sm:hidden">·</span>
+          <span class="text-xs text-muted-foreground max-sm:hidden">Last checked {{ formatTimestamp(health.timestamp) }}</span>
+        </template>
       </div>
       <RouterLink
         :to="{ name: 'usage' }"
