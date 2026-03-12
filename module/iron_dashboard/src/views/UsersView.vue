@@ -262,7 +262,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
           <SelectTrigger id="role-filter">
             <SelectValue placeholder="All Roles" class="text-foreground"/>
           </SelectTrigger>
-          <SelectContent >
+          <SelectContent class="max-w-[200px]">
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="manager">Manager</SelectItem>
@@ -301,9 +301,9 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <div class="flex gap-2 items-center">
             <AvatarInitial :name="user.username || 'u'" />
-          <div class="flex flex-col">
-            <span class="text-base font-medium text-foreground">{{ user.username }}</span>
-            <span class="text-muted-foreground text-xs">{{ user.email }}</span>
+          <div class="flex flex-col min-w-0">
+            <span class="text-base font-medium text-foreground max-w-[280px] truncate" :title="user.username">{{ user.username }}</span>
+            <span class="text-muted-foreground text-xs max-w-[280px] truncate" :title="user.email">{{ user.email }}</span>
           </div>
           </div>
         </td>
@@ -324,7 +324,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem :disabled="user.id === authStore.userId" @click="handleChangeRole(user)">
                 <IconEdit />
                 Change Role
@@ -534,7 +534,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
             <SelectTrigger id="new-role">
               <SelectValue placeholder="Select a role" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent class="max-w-[200px]">
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="manager">Manager</SelectItem>
               <SelectItem value="developer">Developer</SelectItem>

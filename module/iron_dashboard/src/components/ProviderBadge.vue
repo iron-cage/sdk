@@ -6,7 +6,7 @@ defineProps<{ provider: string }>()
 </script>
 
 <template>
-  <Badge variant="outline" :class="getProviderBadgeClass(provider)">
+  <Badge variant="outline" :class="getProviderBadgeClass(provider)" class="max-w-[120px] truncate" :title="getProviderLabel(provider)">
     {{ getProviderLabel(provider) }}
   </Badge>
 </template>

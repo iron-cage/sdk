@@ -129,6 +129,12 @@ function removeProviderKey(keyId: number) {
   selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter(id => id !== keyId)
 }
 
+function ownerEmail(ownerId: string | null | undefined): string {
+  if (!ownerId) return 'Unknown'
+  const user = users.value?.users.find(u => u.id === ownerId)
+  return user?.email || ownerId
+}
+
 function providerKeyLabel(keyId: number): string {
   const key = providers.value?.find(p => p.id === keyId)
   if (!key) return `#${keyId}`
@@ -386,18 +392,19 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.name">
           {{ agent.name }}
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground max-w-[200px] truncate">
-          {{ agent.owner_id || 'Unknown' }}
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
+          {{ ownerEmail(agent.owner_id) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 items-center flex-wrap max-w-[200px]">
             <span
               v-for="keyId in agent.provider_key_ids.slice(0, 3)"
               :key="keyId"
-              class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+              class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border max-w-[190px] truncate"
+              :title="providerKeyLabel(keyId)"
             >
               {{ providerKeyLabel(keyId) }}
             </span>
@@ -411,7 +418,8 @@ async function copyTokenToClipboard() {
                 <span
                   v-for="keyId in agent.provider_key_ids.slice(3)"
                   :key="keyId"
-                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border max-w-[120px] truncate"
+                  :title="providerKeyLabel(keyId)"
                 >
                   {{ providerKeyLabel(keyId) }}
                 </span>
@@ -441,7 +449,7 @@ async function copyTokenToClipboard() {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem
                 v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
                 :disabled="tokenActionLoadingId === agent.id"
@@ -458,7 +466,7 @@ async function copyTokenToClipboard() {
                   <IconRefresh />
                   {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
                 </DropdownMenuItem>
-                <DropdownMenuItem
+                <DropdownMenuItem 
                   :disabled="tokenActionLoadingId === agent.id"
                   class="text-destructive"
                   @click="handleRevokeIcToken(agent)"
@@ -512,34 +520,34 @@ async function copyTokenToClipboard() {
               <div
                 v-for="keyId in selectedProviderKeyIds"
                 :key="keyId"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted max-w-[190px]"
               >
-                <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
+                <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
-                  class="ml-0.5 text-muted-foreground hover:text-destructive"
+                  class="ml-0.5 text-muted-foreground hover:text-destructive shrink-0"
                   @click="removeProviderKey(keyId)"
                 >
                   <IconX class="h-3 w-3" />
                 </button>
               </div>
             </div>
-            <div v-if="availableProviderKeys.length" class="flex gap-2">
+            <div v-if="availableProviderKeys.length" class="flex gap-2 max-w-full items-center">
               <Select v-model="addingProviderKeyId" :disabled="createMutation.isPending.value">
-                <SelectTrigger class="flex-1">
+                <SelectTrigger class="flex-1 min-w-0">
                   <SelectValue placeholder="Add a provider key" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="max-w-[280px]">
                   <SelectItem
                     v-for="pk in availableProviderKeys"
                     :key="pk.id"
                     :value="String(pk.id)"
                   >
-                    {{ pk.alias || pk.provider }}
+                    <span :title="pk.alias || pk.provider">{{ pk.alias || pk.provider }}</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="addProviderKey">
+              <Button type="button" variant="outline" size="sm" class="shrink-0" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="addProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -567,13 +575,13 @@ async function copyTokenToClipboard() {
               <SelectTrigger id="create-owner">
                 <SelectValue :placeholder="`Current User (${authStore.username})`" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent class="max-w-[280px]">
                 <SelectItem
                   v-for="user in users?.users"
                   :key="user.id"
                   :value="user.id"
                 >
-                  {{ user.username }} ({{ user.email || 'no email' }})
+                  <span :title="`${user.username} (${user.email || 'no email'})`">{{ user.username }} ({{ user.email || 'no email' }})</span>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -631,34 +639,34 @@ async function copyTokenToClipboard() {
               <div
                 v-for="keyId in selectedProviderKeyIds"
                 :key="keyId"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted  max-w-[190px]"
               >
-                <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
+                <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
-                  class="ml-0.5 text-muted-foreground hover:text-destructive"
+                  class="ml-0.5 text-muted-foreground hover:text-destructive shrink-0"
                   @click="removeProviderKey(keyId)"
                 >
                   <IconX class="h-3 w-3" />
                 </button>
               </div>
             </div>
-            <div v-if="availableProviderKeys.length" class="flex gap-2">
+            <div v-if="availableProviderKeys.length" class="flex gap-2 max-w-full items-center">
               <Select v-model="addingProviderKeyId" :disabled="updateMutation.isPending.value">
-                <SelectTrigger class="flex-1">
+                <SelectTrigger class="flex-1 min-w-0">
                   <SelectValue placeholder="Add a provider key" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="max-w-[280px]">
                   <SelectItem
                     v-for="pk in availableProviderKeys"
                     :key="pk.id"
                     :value="String(pk.id)"
                   >
-                    {{ pk.alias || pk.provider }}
+                    <span :title="pk.alias || pk.provider">{{ pk.alias || pk.provider }}</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="addProviderKey">
+              <Button type="button" variant="outline" size="sm" class="shrink-0" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="addProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -670,13 +678,13 @@ async function copyTokenToClipboard() {
               <SelectTrigger id="update-owner">
                 <SelectValue placeholder="Select an owner" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent class="max-w-[280px]">
                 <SelectItem
                   v-for="user in users?.users"
                   :key="user.id"
                   :value="user.id"
                 >
-                  {{ user.username }} ({{ user.email || 'no email' }})
+                  <span :title="`${user.username} (${user.email || 'no email'})`">{{ user.username }} ({{ user.email || 'no email' }})</span>
                 </SelectItem>
               </SelectContent>
             </Select>

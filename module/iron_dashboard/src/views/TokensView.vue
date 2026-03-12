@@ -177,9 +177,9 @@ async function copyToken(token: string) {
       <tr v-for="token in tokens" :key="token.id">
         <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">{{ token.id }}</td>
         <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
-          <Badge variant="outline">{{ token.provider || '-' }}</Badge>
+          <Badge variant="outline" class="max-w-[120px] truncate" :title="token.provider || '-'">{{ token.provider || '-' }}</Badge>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">{{ token.name || '-' }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="token.name || '-'">{{ token.name || '-' }}</td>
         <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(token.created_at) }}</td>
         <td class="px-6 py-4 whitespace-nowrap">
           <Badge :variant="token.is_active ? 'default' : 'destructive'">
@@ -194,7 +194,7 @@ async function copyToken(token: string) {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem :disabled="rotateMutation.isPending.value" @click="handleRotateToken(token)">
                 <IconRefresh />
@@ -228,13 +228,13 @@ async function copyToken(token: string) {
               <SelectTrigger id="user">
                 <SelectValue placeholder="Select a user" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem 
-                  v-for="user in usersList?.users" 
-                  :key="user.id" 
+              <SelectContent class="max-w-[280px]">
+                <SelectItem
+                  v-for="user in usersList?.users"
+                  :key="user.id"
                   :value="user.username"
                 >
-                  {{ user.username }}
+                  <span :title="user.username">{{ user.username }}</span>
                 </SelectItem>
               </SelectContent>
             </Select>

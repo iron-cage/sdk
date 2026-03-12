@@ -227,9 +227,9 @@ const typedError = error as unknown as Error | null
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <ProviderBadge :provider="key.provider" />
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.alias || '-' }}</td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[240px] truncate" :title="key.alias || '-'">{{ key.alias || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[320px] truncate" :title="key.description || '-'">{{ key.description || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground max-w-[160px] truncate" :title="key.masked_key">{{ key.masked_key }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           {{ formatCostUsd(key.total_spend_usd, 2) }}
         </td>
@@ -254,7 +254,7 @@ const typedError = error as unknown as Error | null
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem :disabled="updateMutation.isPending.value" @click="openEditModal(key)">
                 <IconEdit />
                 Edit
@@ -287,7 +287,7 @@ const typedError = error as unknown as Error | null
               <SelectTrigger>
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent class="max-w-[200px]">
                 <SelectItem value="openai">{{ getProviderLabel('openai') }}</SelectItem>
                 <SelectItem value="anthropic">{{ getProviderLabel('anthropic') }}</SelectItem>
                 <SelectItem value="gemini">{{ getProviderLabel('gemini') }}</SelectItem>
