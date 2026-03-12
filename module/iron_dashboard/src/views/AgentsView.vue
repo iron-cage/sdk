@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
 import { formatDate, formatTimestamp } from '@/lib/formatters'
-import { getProviderLabel } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -135,15 +134,6 @@ function providerKeyLabel(keyId: number): string {
   const key = providers.value?.find(p => p.id === keyId)
   if (!key) return `#${keyId}`
   return key.alias || key.provider
-}
-
-function providerAlias(agent: Agent, providerType: string): string | null {
-  // Prefer an assigned key whose provider matches
-  const ids = agent.provider_key_ids ?? [] as number[]
-  const assigned = providers.value?.find(p => ids.includes(p.id) && p.provider === providerType)
-  if (assigned?.alias) return assigned.alias
-  // Fall back to any key of that provider type
-  return providers.value?.find(p => p.provider === providerType)?.alias ?? null
 }
 
 // Fetch users for owner selection (admin only)
@@ -411,11 +401,11 @@ async function copyTokenToClipboard() {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 flex-wrap items-center">
             <span
-              v-for="provider in agent.providers"
-              :key="provider"
+              v-for="keyId in agent.provider_key_ids"
+              :key="keyId"
               class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
             >
-              {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
+              {{ providerKeyLabel(keyId) }}
             </span>
           </div>
         </td>
