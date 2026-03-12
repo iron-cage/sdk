@@ -53,8 +53,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="h-2 w-2 rounded-full bg-success animate-pulse" />
           <span class="text-sm font-medium text-foreground">All Systems Operational</span>
         </div>
-        <span class="text-muted-foreground">·</span>
-        <span class="text-xs text-muted-foreground">API gateway active</span>
+        <span class="text-muted-foreground max-sm:hidden">·</span>
+        <span class="text-xs text-muted-foreground max-sm:hidden">API gateway active</span>
       </div>
       <RouterLink
         :to="{ name: 'usage' }"

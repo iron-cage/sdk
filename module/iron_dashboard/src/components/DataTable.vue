@@ -111,7 +111,7 @@ onUnmounted(() => {
         <!-- Scroll wrapper: overflow-x-auto with native scrollbar hidden -->
         <div
           ref="wrapperRef"
-          class="overflow-x-auto touch-pan-x [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+          class="overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
         >
           <table class="w-full min-w-max divide-y divide-border">
             <thead>

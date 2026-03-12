@@ -47,6 +47,7 @@ import IconCopy from '@/components/icons/IconCopy.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -402,14 +403,30 @@ async function copyTokenToClipboard() {
           {{ agent.owner_id || 'Unknown' }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          <div class="flex gap-1 flex-wrap items-center">
+          <div class="flex gap-1 items-center flex-wrap max-w-[200px]">
             <span
-              v-for="provider in agent.providers"
+              v-for="provider in agent.providers.slice(0, 3)"
               :key="provider"
               class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
             >
               {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
             </span>
+            <Popover v-if="agent.providers.length > 3">
+              <PopoverTrigger as-child>
+                <button class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border-border border hover:text-foreground transition-colors">
+                  +{{ agent.providers.length - 3 }}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" class="flex flex-wrap gap-1 max-w-[220px]">
+                <span
+                  v-for="provider in agent.providers.slice(3)"
+                  :key="provider"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+                >
+                  {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
+                </span>
+              </PopoverContent>
+            </Popover>
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
@@ -418,7 +435,7 @@ async function copyTokenToClipboard() {
           </div>
           <div v-else class="flex gap-1 items-center">
             <StatusBadge :active="!!getIcTokenStatus(agent.id)?.has_ic_token" active-label="Active" inactive-label="None" />
-            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground">
+            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground max-sm:hidden">
               {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
             </div>
           </div>

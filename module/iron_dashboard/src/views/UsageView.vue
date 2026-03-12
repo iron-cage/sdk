@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { formatCostUsd, formatMicrodollars, formatNumber, formatTimestamp } from '@/lib/formatters'
 import PageLayout from '@/components/PageLayout.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import StatCard from '@/components/cards/StatCard.vue'
 import PercentBar from '@/components/PercentBar.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -197,6 +198,7 @@ function loadMoreLogs() {
 const selectedLog = ref<AnalyticsEvent | null>(null)
 const showLogModal = ref(false)
 
+
 function openLogModal(event: AnalyticsEvent) {
   selectedLog.value = event
   showLogModal.value = true
@@ -206,47 +208,66 @@ function openLogModal(event: AnalyticsEvent) {
 <template>
   <PageLayout title="Analytics" content-class="p-4 lg:p-6">
     <template #actions>
-      <div class="w-full md:w-40">
-        <Select v-model="selectedAgentId">
-          <SelectTrigger>
-            <SelectValue placeholder="All Agents" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Agents</SelectItem>
-            <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">
-              {{ agent.name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div class="w-full md:w-40">
-        <Select v-model="selectedProviderId">
-          <SelectTrigger>
-            <SelectValue placeholder="All Providers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Providers</SelectItem>
-            <SelectItem
-              v-for="p in providerList"
-              :key="p.id"
-              :value="String(p.id)"
-            >
-              {{ p.alias || getProviderLabel(p.provider) }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div class="w-full md:w-40">
-        <Select v-model="selectedPeriod">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+      <!-- Mobile: filters dropdown -->
+      <Popover class="md:hidden">
+        <PopoverTrigger as-child>
+          <Button variant="outline" size="sm">
+            Filters
+            <IconChevronDown class="w-3.5 h-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="flex flex-col gap-2 w-52">
+          <Select v-model="selectedAgentId">
+            <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Agents</SelectItem>
+              <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">{{ agent.name }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="selectedProviderId">
+            <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Providers</SelectItem>
+              <SelectItem v-for="p in providerList" :key="p.id" :value="String(p.id)">{{ p.alias || getProviderLabel(p.provider) }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="selectedPeriod">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </PopoverContent>
+      </Popover>
+
+      <!-- Desktop: inline filters -->
+      <div class="hidden md:flex gap-2">
+        <div class="w-40">
+          <Select v-model="selectedAgentId">
+            <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Agents</SelectItem>
+              <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">{{ agent.name }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="w-40">
+          <Select v-model="selectedProviderId">
+            <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Providers</SelectItem>
+              <SelectItem v-for="p in providerList" :key="p.id" :value="String(p.id)">{{ p.alias || getProviderLabel(p.provider) }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="w-40">
+          <Select v-model="selectedPeriod">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </template>
 
@@ -413,9 +434,10 @@ function openLogModal(event: AnalyticsEvent) {
           <IconUsers class="h-4 w-4 text-muted-foreground" />
         </template>
         <template v-if="spendingByAgent?.summary" #action>
-          <span class="text-xs text-muted-foreground">
-            Total {{ formatCost(spendingByAgent.summary.total_spend) }}
-            · avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / (spendingByAgent.summary.total_budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}% budget used
+          <span class="text-xs text-muted-foreground flex gap-2 max-sm:flex-col">
+            <span>Total {{ formatCost(spendingByAgent.summary.total_spend) }}</span>
+            <span class="max-sm:hidden">·</span>
+            <span class="max-sm:capitalize">avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / (spendingByAgent.summary.total_budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}% budget used</span>
           </span>
         </template>
         <DataTable
@@ -439,8 +461,8 @@ function openLogModal(event: AnalyticsEvent) {
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget / 1_000_000) }}</td>
             <td class="px-3 sm:px-6 py-2 text-base text-foreground">
               <div class="flex items-center gap-2 min-w-[100px]">
-                <PercentBar :percentage="agent.budget > 0 ? (agent.spending / (agent.budget / 1_000_000)) * 100 : 0" class="max-w-[100px]" />
-                <span class="shrink-0 text-muted-foreground text-xs">{{ agent.budget > 0 ? ((agent.spending / (agent.budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}%</span>
+                <PercentBar :percentage="agent.budget > 0 ? (agent.spending / (agent.budget / 1_000_000)) * 100 : 0" class="max-w-[100px] max-sm:hidden" />
+                <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground">{{ agent.budget > 0 ? ((agent.spending / (agent.budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}%</span>
               </div>
             </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>
@@ -471,10 +493,10 @@ function openLogModal(event: AnalyticsEvent) {
           <IconChip class="h-4 w-4 text-muted-foreground" />
         </template>
         <template v-if="tokensByAgent?.summary" #action>
-          <span class="text-xs text-muted-foreground">
+          <span class="text-xs text-muted-foreground flex gap-2">
             {{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens
-            · {{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in
-            · {{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out
+            <span class="max-sm:hidden"> · </span><span class="max-sm:hidden">{{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in</span>
+            <span class="max-sm:hidden"> · </span><span class="max-sm:hidden">{{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out</span>
           </span>
         </template>
         <DataTable
