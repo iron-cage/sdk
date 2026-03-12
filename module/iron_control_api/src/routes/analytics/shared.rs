@@ -13,8 +13,8 @@ use std::sync::Arc;
 // Type Aliases (for complex query result types)
 // ============================================================================
 
-/// Row type for spending by agent: (`agent_id`, `agent_name`, `spending_micros`, `request_count`, budget)
-pub type SpendingByAgentRow = (i64, Option<String>, i64, i64, Option<f64>);
+/// Row type for spending by agent: (`agent_id`, `agent_name`, `spending_micros`, `request_count`, `budget_micros`)
+pub type SpendingByAgentRow = (i64, Option<String>, i64, i64, Option<i64>);
 
 /// Row type for token usage by agent: (`agent_id`, `agent_name`, `input_tokens`, `output_tokens`, `request_count`)
 pub type TokensByAgentRow = (i64, Option<String>, i64, i64, i64);
@@ -268,6 +268,8 @@ pub struct AnalyticsQuery {
   /// Include previous period comparison data
   #[serde(default)]
   pub compare: bool,
+  /// Optional group-by field (e.g., "key" for by-provider endpoint)
+  pub group_by: Option<String>,
 }
 
 /// Pagination parameters
@@ -487,6 +489,12 @@ pub struct ProviderSpending {
   pub avg_cost_per_request: f64,
   /// Number of agents using this provider
   pub agent_count: i64,
+  /// Provider key ID (when grouped by key)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub provider_key_id: Option<i64>,
+  /// Provider key alias (when grouped by key)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub alias: Option<String>,
 }
 
 /// GET /api/v1/analytics/spending/by-provider - Response
@@ -526,6 +534,8 @@ pub struct AvgCostResponse {
   pub min_cost_per_request: f64,
   /// Maximum cost per request in dollars
   pub max_cost_per_request: f64,
+  /// Median cost per request in dollars
+  pub median_cost_per_request: f64,
   /// Period description
   pub period: String,
   /// Filters applied to query
@@ -720,6 +730,10 @@ pub struct EventsListQuery {
   pub period: Period,
   /// Optional agent ID filter
   pub agent_id: Option<i64>,
+  /// Optional provider ID filter
+  pub provider_id: Option<String>,
+  /// Optional provider key ID filter
+  pub provider_key_id: Option<i64>,
   /// Current page number (1-indexed)
   #[serde(default = "default_page")]
   pub page: u32,

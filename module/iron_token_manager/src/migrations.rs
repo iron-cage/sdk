@@ -82,6 +82,9 @@ static MIGRATIONS: &[(&str, &str)] = &[
   migration!("025_rename_roles"),
   migration!("026_add_spending_limits"),
   migration!("027_add_gemini_xai_providers"),
+  migration!("028_add_provider_keys_user_provider_index"),
+  migration!("029_add_provider_key_alias"),
+  migration!("030_agent_provider_keys"),
 ];
 
 /// Applies all migrations to the database pool.

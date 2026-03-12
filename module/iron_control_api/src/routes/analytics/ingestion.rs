@@ -154,27 +154,36 @@ pub async fn list_events(
   let (start_ms, end_ms) = params.period.to_range();
   let offset = (params.page.saturating_sub(1)) * params.per_page;
 
-  // Build count query
-  let count_result: Result<i64, _> = if let Some(agent_id) = params.agent_id {
-    sqlx::query_scalar(
-      "SELECT COUNT(*) FROM analytics_events WHERE timestamp_ms >= ? AND timestamp_ms <= ? AND agent_id = ?"
-    )
-      .bind( start_ms )
-      .bind( end_ms )
-      .bind( agent_id )
-      .fetch_one( &state.pool )
-      .await
-  } else {
-    sqlx::query_scalar(
-      "SELECT COUNT(*) FROM analytics_events WHERE timestamp_ms >= ? AND timestamp_ms <= ?",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .fetch_one(&state.pool)
-    .await
-  };
+  // Build dynamic count query
+  let mut count_sql = String::from(
+    "SELECT COUNT(*) FROM analytics_events WHERE timestamp_ms >= ? AND timestamp_ms <= ?",
+  );
 
-  let total = match count_result {
+  if params.agent_id.is_some() {
+    count_sql.push_str(" AND agent_id = ?");
+  }
+  if params.provider_id.is_some() {
+    count_sql.push_str(" AND provider = ?");
+  }
+  if params.provider_key_id.is_some() {
+    count_sql.push_str(" AND provider_key_id = ?");
+  }
+
+  let mut cq = sqlx::query_scalar::<_, i64>(&count_sql)
+    .bind(start_ms)
+    .bind(end_ms);
+
+  if let Some(agent_id) = params.agent_id {
+    cq = cq.bind(agent_id);
+  }
+  if let Some(ref provider_id) = params.provider_id {
+    cq = cq.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    cq = cq.bind(provider_key_id);
+  }
+
+  let total = match cq.fetch_one(&state.pool).await {
     Ok(c) => u32::try_from(c).unwrap_or(u32::MAX),
     Err(e) => {
       tracing::error!("Failed to count events: {}", e);
@@ -189,8 +198,8 @@ pub async fn list_events(
     }
   };
 
-  // Build data query with agent join
-  let query = if params.agent_id.is_some() {
+  // Build dynamic data query with agent join
+  let mut data_sql = String::from(
     r"SELECT
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
@@ -198,40 +207,41 @@ pub async fn list_events(
          e.error_code, e.error_message, e.provider_key_id
        FROM analytics_events e
        LEFT JOIN agents a ON e.agent_id = a.id
-       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ? AND e.agent_id = ?
-       ORDER BY e.timestamp_ms DESC
-       LIMIT ? OFFSET ?"
-  } else {
-    r"SELECT
-         e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
-         e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
-         COALESCE(a.name, 'Unknown') as agent_name,
-         e.error_code, e.error_message, e.provider_key_id
-       FROM analytics_events e
-       LEFT JOIN agents a ON e.agent_id = a.id
-       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-       ORDER BY e.timestamp_ms DESC
-       LIMIT ? OFFSET ?"
-  };
+       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?",
+  );
 
-  let data: Vec<AnalyticsEventWithAgent> = match if let Some(agent_id) = params.agent_id {
-    sqlx::query_as(query)
-      .bind(start_ms)
-      .bind(end_ms)
-      .bind(agent_id)
-      .bind(i64::from(params.per_page))
-      .bind(i64::from(offset))
-      .fetch_all(&state.pool)
-      .await
-  } else {
-    sqlx::query_as(query)
-      .bind(start_ms)
-      .bind(end_ms)
-      .bind(i64::from(params.per_page))
-      .bind(i64::from(offset))
-      .fetch_all(&state.pool)
-      .await
-  } {
+  if params.agent_id.is_some() {
+    data_sql.push_str(" AND e.agent_id = ?");
+  }
+  if params.provider_id.is_some() {
+    data_sql.push_str(" AND e.provider = ?");
+  }
+  if params.provider_key_id.is_some() {
+    data_sql.push_str(" AND e.provider_key_id = ?");
+  }
+
+  data_sql.push_str(" ORDER BY e.timestamp_ms DESC LIMIT ? OFFSET ?");
+
+  let mut dq = sqlx::query_as::<_, AnalyticsEventWithAgent>(&data_sql)
+    .bind(start_ms)
+    .bind(end_ms);
+
+  if let Some(agent_id) = params.agent_id {
+    dq = dq.bind(agent_id);
+  }
+  if let Some(ref provider_id) = params.provider_id {
+    dq = dq.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    dq = dq.bind(provider_key_id);
+  }
+
+  let data: Vec<AnalyticsEventWithAgent> = match dq
+    .bind(i64::from(params.per_page))
+    .bind(i64::from(offset))
+    .fetch_all(&state.pool)
+    .await
+  {
     Ok(rows) => rows,
     Err(e) => {
       tracing::error!("Failed to fetch events: {}", e);

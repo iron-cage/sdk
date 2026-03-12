@@ -82,8 +82,8 @@ async fn test_migrations_are_idempotent() {
   .expect("LOUD FAILURE: Failed to count tables");
 
   assert_eq!(
-    table_count, 18,
-    "Should have exactly 18 application tables after multiple runs"
+    table_count, 19,
+    "Should have exactly 19 application tables after multiple runs"
   );
 }
 
@@ -143,6 +143,7 @@ async fn test_production_schema_matches_test_schema() {
   // Expected application tables from all migrations (excluding guard tables)
   let expected_tables = vec![
     "agent_budgets",
+    "agent_provider_keys",
     "agents",
     "ai_provider_keys",
     "analytics_events",
@@ -175,8 +176,8 @@ async fn test_production_schema_matches_test_schema() {
       .expect("LOUD FAILURE: Failed to count indexes");
 
   assert_eq!(
-    index_count, 55,
-    "Should have 55 indexes across all migrations"
+    index_count, 56,
+    "Should have 56 indexes across all migrations"
   );
 }
 

@@ -120,7 +120,7 @@ async fn update_provider_key_requires_manage_permission() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 
@@ -151,7 +151,7 @@ async fn delete_provider_key_requires_manage_permission() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 
@@ -181,7 +181,7 @@ async fn assign_requires_manage_permission() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 
@@ -390,7 +390,7 @@ async fn update_provider_key_success() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Before"), "owner_upd")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Before"), "owner_upd", None)
     .await
     .unwrap();
 
@@ -422,7 +422,7 @@ async fn delete_provider_key_success() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "owner_del")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "owner_del", None)
     .await
     .unwrap();
 
@@ -467,7 +467,7 @@ async fn assign_and_unassign_project_provider() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "owner_assign")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "owner_assign", None)
     .await
     .unwrap();
 
@@ -513,7 +513,7 @@ async fn get_provider_key_returns_404_for_wrong_owner() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 
@@ -543,7 +543,7 @@ async fn update_provider_key_returns_404_for_wrong_owner() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 
@@ -574,7 +574,7 @@ async fn delete_provider_key_returns_404_for_wrong_owner() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 
@@ -604,7 +604,7 @@ async fn unassign_returns_403_for_wrong_owner() {
   let key_id = state
     .providers
     .storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
     .await
     .unwrap();
 

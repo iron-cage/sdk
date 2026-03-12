@@ -14,6 +14,7 @@ use core::{
   fmt::{Debug, Formatter, Result as FmtResult},
   str::FromStr,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
@@ -105,6 +106,8 @@ pub struct CreateProviderKeyRequest {
   pub base_url: Option<String>,
   /// Optional human-readable description
   pub description: Option<String>,
+  /// Optional human-friendly alias
+  pub alias: Option<String>,
 }
 
 impl CreateProviderKeyRequest {
@@ -116,6 +119,9 @@ impl CreateProviderKeyRequest {
 
   /// Maximum description length
   const MAX_DESCRIPTION_LENGTH: usize = 500;
+
+  /// Maximum alias length
+  const MAX_ALIAS_LENGTH: usize = 100;
 
   /// Validate request
   ///
@@ -189,6 +195,22 @@ impl CreateProviderKeyRequest {
       }
     }
 
+    // Validate alias if provided
+    if let Some(ref alias) = self.alias {
+      if alias.len() > Self::MAX_ALIAS_LENGTH {
+        return Err(ValidationError::TooLong {
+          field: "alias".to_owned(),
+          max_length: Self::MAX_ALIAS_LENGTH,
+        });
+      }
+      if alias.contains('\0') {
+        return Err(ValidationError::InvalidCharacter {
+          field: "alias".to_owned(),
+          character: "NULL".to_owned(),
+        });
+      }
+    }
+
     Ok(())
   }
 }
@@ -211,6 +233,8 @@ pub struct UpdateProviderKeyRequest {
   /// - `"spending_cap_usd": 10.0` → `Some(Some(10.0))` (set cap)
   #[serde(default, deserialize_with = "deserialize_nullable_f64")]
   pub spending_cap_usd: Option<Option<f64>>,
+  /// Updated alias
+  pub alias: Option<String>,
 }
 
 /// Deserialize a JSON field into `Option<Option<f64>>` with three-state semantics.
@@ -255,14 +279,20 @@ pub struct ProviderKeyResponse {
   pub spending_cap_usd: Option<f64>,
   /// Amount spent in USD
   pub spending_used_usd: f64,
+  /// Optional human-friendly alias
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub alias: Option<String>,
+  /// Total spend from analytics in USD
+  pub total_spend_usd: f64,
 }
 
 impl ProviderKeyResponse {
-  /// Construct response from metadata, masked key, and assigned projects.
+  /// Construct response from metadata, masked key, assigned projects, and analytics spend.
   fn from_metadata(
     metadata: ProviderKeyMetadata,
     masked_key: impl Into<String>,
     assigned_projects: Vec<String>,
+    total_spend_usd: f64,
   ) -> Self {
     Self {
       id: metadata.id,
@@ -276,6 +306,8 @@ impl ProviderKeyResponse {
       assigned_projects,
       spending_cap_usd: metadata.spending_cap_microdollars.map(microdollars_to_usd),
       spending_used_usd: microdollars_to_usd(metadata.spending_used_microdollars),
+      alias: metadata.alias,
+      total_spend_usd,
     }
   }
 }
@@ -375,6 +407,7 @@ pub async fn create_provider_key(
       request.base_url.as_deref(),
       request.description.as_deref(),
       &claims.sub,
+      request.alias.as_deref(),
     )
     .await
     .map_err(|_| ApiError::Internal("Failed to create provider key".into()))?;
@@ -387,7 +420,7 @@ pub async fn create_provider_key(
 
   Ok((
     StatusCode::CREATED,
-    Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![])),
+    Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![], 0.0)),
   ))
 }
 
@@ -408,10 +441,34 @@ pub async fn list_provider_keys(
       .into_response();
   };
 
+  // Query analytics spend per key in one batch
+  let key_ids: Vec<i64> = keys.iter().map(|k| k.id).collect();
+  let spend_map: HashMap<i64, i64> = if key_ids.is_empty() {
+    HashMap::new()
+  } else {
+    // Build dynamic IN clause
+    let placeholders: String = key_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+      "SELECT provider_key_id, COALESCE(SUM(cost_micros), 0) \
+       FROM analytics_events \
+       WHERE provider_key_id IN ({placeholders}) AND event_type = 'llm_request_completed' \
+       GROUP BY provider_key_id"
+    );
+    let mut q = sqlx::query_as::<_, (i64, i64)>(&sql);
+    for id in &key_ids {
+      q = q.bind(id);
+    }
+    q.fetch_all(state.storage.pool())
+      .await
+      .unwrap_or_default()
+      .into_iter()
+      .collect()
+  };
+
   // For each key, fetch assigned projects and build response
   let mut responses: Vec<ProviderKeyResponse> = Vec::with_capacity(keys.len());
 
-  for meta in keys {
+  for meta in &keys {
     // Fetch projects assigned to this key
     let assigned_projects = state
       .storage
@@ -419,10 +476,14 @@ pub async fn list_provider_keys(
       .await
       .unwrap_or_default();
 
+    let total_spend_micros = spend_map.get(&meta.id).copied().unwrap_or(0);
+    let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
+
     responses.push(ProviderKeyResponse::from_metadata(
-      meta,
+      meta.clone(),
       "***",
       assigned_projects,
+      total_spend_usd,
     ));
   }
 
@@ -465,12 +526,24 @@ pub async fn get_provider_key(
     .await
     .unwrap_or_default();
 
+  // Query analytics spend for this key
+  let total_spend_micros: i64 = sqlx::query_scalar(
+    "SELECT COALESCE(SUM(cost_micros), 0) FROM analytics_events \
+     WHERE provider_key_id = ? AND event_type = 'llm_request_completed'",
+  )
+  .bind(key_id)
+  .fetch_one(state.storage.pool())
+  .await
+  .unwrap_or(0);
+  let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
+
   (
     StatusCode::OK,
     Json(ProviderKeyResponse::from_metadata(
       metadata,
       "***",
       assigned_projects,
+      total_spend_usd,
     )),
   )
     .into_response()
@@ -520,7 +593,7 @@ pub async fn update_provider_key(
 
   if state
     .storage
-    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
+    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap, request.alias.as_deref().map(Some))
     .await
     .is_err()
   {
@@ -551,12 +624,24 @@ pub async fn update_provider_key(
     .await
     .unwrap_or_default();
 
+  // Query analytics spend for this key
+  let total_spend_micros: i64 = sqlx::query_scalar(
+    "SELECT COALESCE(SUM(cost_micros), 0) FROM analytics_events \
+     WHERE provider_key_id = ? AND event_type = 'llm_request_completed'",
+  )
+  .bind(key_id)
+  .fetch_one(state.storage.pool())
+  .await
+  .unwrap_or(0);
+  let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
+
   (
     StatusCode::OK,
     Json(ProviderKeyResponse::from_metadata(
       updated,
       "***",
       assigned_projects,
+      total_spend_usd,
     )),
   )
     .into_response()
