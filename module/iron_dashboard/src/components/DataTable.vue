@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 
 defineProps<{
@@ -9,6 +10,77 @@ defineProps<{
   loadingText?: string
   onRetry?: () => void
 }>()
+
+const wrapperRef = ref<HTMLElement | null>(null)
+const scrollRatio = ref(1)
+const thumbPos = ref(0)
+
+const showScrollbar = computed(() => scrollRatio.value < 0.9999)
+const thumbWidthPct = computed(() => scrollRatio.value * 100)
+const thumbLeftPct = computed(() => thumbPos.value * (100 - thumbWidthPct.value))
+
+function updateScroll() {
+  const el = wrapperRef.value
+  if (!el) return
+  scrollRatio.value = el.clientWidth / el.scrollWidth
+  const maxScroll = el.scrollWidth - el.clientWidth
+  thumbPos.value = maxScroll > 0 ? el.scrollLeft / maxScroll : 0
+}
+
+// Drag
+let isDragging = false
+let dragStartX = 0
+let dragStartThumbPos = 0
+
+function onThumbPointerDown(e: PointerEvent) {
+  e.preventDefault()
+  isDragging = true
+  dragStartX = e.clientX
+  dragStartThumbPos = thumbPos.value
+  ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function onThumbPointerMove(e: PointerEvent) {
+  if (!isDragging || !wrapperRef.value) return
+  const el = wrapperRef.value
+  const availableTrack = el.clientWidth * (1 - scrollRatio.value)
+  if (availableTrack === 0) return
+  const newPos = Math.max(0, Math.min(1, dragStartThumbPos + (e.clientX - dragStartX) / availableTrack))
+  thumbPos.value = newPos
+  el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
+}
+
+function onThumbPointerUp() {
+  isDragging = false
+}
+
+function onTrackClick(e: MouseEvent) {
+  const thumb = (e.currentTarget as HTMLElement).querySelector('[data-scrollbar-thumb]')
+  if (thumb?.contains(e.target as Node)) return
+  if (!wrapperRef.value) return
+  const el = wrapperRef.value
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const thumbW = rect.width * scrollRatio.value
+  const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / (rect.width - thumbW)))
+  thumbPos.value = newPos
+  el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
+}
+
+let ro: ResizeObserver | null = null
+
+onMounted(() => {
+  const el = wrapperRef.value
+  if (!el) return
+  el.addEventListener('scroll', updateScroll, { passive: true })
+  updateScroll()
+  ro = new ResizeObserver(updateScroll)
+  ro.observe(el)
+})
+
+onUnmounted(() => {
+  wrapperRef.value?.removeEventListener('scroll', updateScroll)
+  ro?.disconnect()
+})
 </script>
 
 <template>
@@ -35,26 +107,49 @@ defineProps<{
 
     <!-- Table -->
     <template v-else>
-      <div class="overflow-x-auto touch-pan-x">
-        <table class="min-w-[700px] w-full divide-y divide-border">
-          <thead>
-            <tr class="text-foreground/70">
-              <th
-                v-for="col in columns"
-                :key="col.label"
-                :class="[
-                  'px-3 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider text-nowrap',
-                  col.align === 'right' ? 'text-right' : 'text-left',
-                ]"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border">
-            <slot />
-          </tbody>
-        </table>
+      <div class="relative">
+        <!-- Scroll wrapper: overflow-x-auto with native scrollbar hidden -->
+        <div
+          ref="wrapperRef"
+          class="overflow-x-auto touch-pan-x [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+        >
+          <table class="w-full min-w-max divide-y divide-border">
+            <thead>
+              <tr class="text-foreground/70">
+                <th
+                  v-for="col in columns"
+                  :key="col.label"
+                  :class="[
+                    'px-3 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider whitespace-nowrap',
+                    col.align === 'right' ? 'text-right' : 'text-left',
+                  ]"
+                >
+                  {{ col.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <slot />
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Custom scrollbar, positioned at the bottom of the table -->
+        <div
+          v-if="showScrollbar"
+          class="absolute bottom-0 left-0 right-0 h-1 cursor-pointer"
+          @click="onTrackClick"
+        >
+          <div
+            data-scrollbar-thumb
+            class="absolute h-full rounded-full bg-border hover:bg-foreground/30 cursor-grab active:cursor-grabbing transition-colors"
+            :style="{ width: thumbWidthPct + '%', left: thumbLeftPct + '%' }"
+            @pointerdown="onThumbPointerDown"
+            @pointermove="onThumbPointerMove"
+            @pointerup="onThumbPointerUp"
+            @pointercancel="onThumbPointerUp"
+          />
+        </div>
       </div>
       <slot name="footer" />
     </template>
