@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -65,28 +65,6 @@ const { data: providerKeys, isLoading, error, refetch } = useQuery({
   queryKey: ['providerKeys'],
   queryFn: () => api.getProviderKeys(),
 })
-
-// Per-key spend, fetched in parallel after keys load.
-// TODO: move to backend — include total_spend in GET /api/v1/provider-keys response.
-const keySpendMap = ref<Record<number, number>>({})
-const keyStatsLoading = ref(false)
-
-watch(providerKeys, async (keys) => {
-  if (!keys?.length) return
-  keyStatsLoading.value = true
-  const results = await Promise.allSettled(
-    keys.map(async (key) => {
-      const res = await api.getAnalyticsSpendingTotal({ period: 'all-time', provider_key_id: key.id })
-      return { id: key.id, spend: res.total_spend }
-    })
-  )
-  const map: Record<number, number> = {}
-  for (const r of results) {
-    if (r.status === 'fulfilled') map[r.value.id] = r.value.spend
-  }
-  keySpendMap.value = map
-  keyStatsLoading.value = false
-}, { immediate: true })
 
 // Create provider key mutation
 const createMutation = useMutation({
@@ -251,8 +229,7 @@ const typedError = error as unknown as Error | null
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
-          <span v-if="keyStatsLoading" class="text-muted-foreground text-xs">…</span>
-          <span v-else>{{ keySpendMap[key.id] !== undefined ? formatCostUsd(keySpendMap[key.id], 2) : '—' }}</span>
+          {{ formatCostUsd(key.total_spend_usd, 2) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap relative -left-3">
           <Button

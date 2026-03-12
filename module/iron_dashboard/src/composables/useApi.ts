@@ -94,6 +94,7 @@ interface ProviderKey {
   last_used_at?: number
   masked_key: string
   assigned_projects: string[]
+  total_spend_usd: number
 }
 
 interface CreateProviderKeyRequest {
@@ -405,7 +406,7 @@ export function useApi() {
   async function createAgent(data: {
     name: string
     providers: string[]
-    provider_key_id: number
+    provider_key_ids: number[]
     initial_budget_microdollars: number
     owner_id?: string  // Admins can assign to other users
   }): Promise<Agent> {
@@ -419,7 +420,7 @@ export function useApi() {
     id: number
     name?: string
     providers?: string[]
-    provider_key_id?: number | null
+    provider_key_ids?: number[]
     owner_id?: string  // Admins can reassign to other users
   }): Promise<Agent> {
     const { id, ...updateData } = data
@@ -773,7 +774,7 @@ export interface Agent {
   providers: string[]
   created_at: number
   owner_id?: string
-  provider_key_id?: number | null
+  provider_key_ids: number[]
 }
 
 export interface AgentBudgetResponse {

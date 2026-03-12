@@ -13,7 +13,7 @@ export function formatMicrodollars(micros: number): string {
 }
 
 export function formatCostUsd(usd: number | null | undefined, decimals = 2): string {
-  if (usd == null || isNaN(usd)) return '—'
+  if (usd == null || isNaN(usd)) return '-'
   return `$${usd.toFixed(decimals)}`
 }
 

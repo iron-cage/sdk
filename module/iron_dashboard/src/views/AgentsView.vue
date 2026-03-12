@@ -136,11 +136,10 @@ function providerKeyLabel(keyId: number): string {
 }
 
 function providerAlias(agent: Agent, providerType: string): string | null {
-  // Prefer the assigned key if its provider matches
-  if (agent.provider_key_id) {
-    const assigned = providers.value?.find(p => p.id === agent.provider_key_id && p.provider === providerType)
-    if (assigned?.alias) return assigned.alias
-  }
+  // Prefer an assigned key whose provider matches
+  const ids = agent.provider_key_ids ?? [] as number[]
+  const assigned = providers.value?.find(p => ids.includes(p.id) && p.provider === providerType)
+  if (assigned?.alias) return assigned.alias
   // Fall back to any key of that provider type
   return providers.value?.find(p => p.provider === providerType)?.alias ?? null
 }
@@ -154,7 +153,7 @@ const { data: users } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number; owner_id?: string }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_ids: number[]; initial_budget_microdollars: number; owner_id?: string }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
@@ -172,7 +171,7 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null; owner_id?: string }) =>
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_ids: number[]; owner_id?: string }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
@@ -219,7 +218,7 @@ function handleCreateAgent() {
   createMutation.mutate({
     name: name.value,
     providers: uniqueProviders,
-    provider_key_id: selectedProviderKeyIds.value[0]!,
+    provider_key_ids: selectedProviderKeyIds.value,
     initial_budget_microdollars: budgetMicros,
     owner_id: selectedOwnerId.value || undefined,
   })
@@ -228,7 +227,7 @@ function handleCreateAgent() {
 function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
-  selectedProviderKeyIds.value = agent.provider_key_id ? [agent.provider_key_id] : []
+  selectedProviderKeyIds.value = [...(agent.provider_key_ids ?? [])]
   addingProviderKeyId.value = ''
   selectedOwnerId.value = agent.owner_id ?? ''
   showUpdateModal.value = true
@@ -252,7 +251,7 @@ function handleUpdateAgent() {
     id: selectedAgent.value.id,
     name: name.value,
     providers: uniqueProviders,
-    provider_key_id: selectedProviderKeyIds.value[0]!,
+    provider_key_ids: selectedProviderKeyIds.value,
     owner_id: selectedOwnerId.value || undefined,
   })
 }
