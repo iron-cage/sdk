@@ -58,7 +58,7 @@ const alias = ref('')
 const baseUrl = ref('')
 const description = ref('')
 const isEnabled = ref(true)
-
+const createKeyError = ref('')
 
 // Fetch provider keys
 const { data: providerKeys, isLoading, error, refetch } = useQuery({
@@ -72,6 +72,7 @@ const createMutation = useMutation({
     api.createProviderKey(data),
   onSuccess: () => {
     showCreateModal.value = false
+    createKeyError.value = ''
     resetForm()
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
@@ -138,8 +139,9 @@ function resetForm() {
 }
 
 function handleCreateKey() {
+  createKeyError.value = ''
   if (!apiKey.value.trim()) {
-    toast.error('API key is required')
+    createKeyError.value = 'API key is required'
     return
   }
 
@@ -345,11 +347,13 @@ const typedError = error as unknown as Error | null
           </div>
         </div>
 
+        <p v-if="createKeyError" class="text-sm text-destructive">{{ createKeyError }}</p>
+
         <DialogFooter>
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; resetForm()"
+            @click="showCreateModal = false; createKeyError = ''; resetForm()"
           >
             <IconX />
             Cancel
