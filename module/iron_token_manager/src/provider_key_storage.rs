@@ -81,6 +81,8 @@ pub struct ProviderKeyMetadata {
   pub spending_cap_microdollars: Option<i64>,
   /// Cumulative spending in microdollars
   pub spending_used_microdollars: i64,
+  /// Optional human-friendly alias
+  pub alias: Option<String>,
 }
 
 /// Summary of spending for a provider key
@@ -140,6 +142,7 @@ impl ProviderKeyStorage {
   /// # Errors
   ///
   /// Returns error if database insert fails
+  #[allow(clippy::too_many_arguments)]
   pub async fn create_key(
     &self,
     provider: ProviderType,
@@ -148,13 +151,14 @@ impl ProviderKeyStorage {
     base_url: Option<&str>,
     description: Option<&str>,
     user_id: &str,
+    alias: Option<&str>,
   ) -> Result<i64> {
     let now_ms = current_time_ms();
 
     let result = sqlx::query(
       "INSERT INTO ai_provider_keys \
-       ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at ) \
-       VALUES ( $1, $2, $3, $4, $5, $6, $7 )"
+       ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at, alias ) \
+       VALUES ( $1, $2, $3, $4, $5, $6, $7, $8 )"
     )
     .bind( provider.as_str() )
     .bind( encrypted_api_key )
@@ -163,6 +167,7 @@ impl ProviderKeyStorage {
     .bind( description )
     .bind( user_id )
     .bind( now_ms )
+    .bind( alias )
     .execute( &self.pool )
     .await
     .map_err( TokenError::Database )?;
@@ -187,7 +192,7 @@ impl ProviderKeyStorage {
     let row = sqlx::query(
       "SELECT id, provider, encrypted_api_key, encryption_nonce, base_url, \
        description, is_enabled, created_at, last_used_at, balance_cents, \
-       balance_updated_at, user_id, spending_cap_microdollars, spending_used_microdollars \
+       balance_updated_at, user_id, spending_cap_microdollars, spending_used_microdollars, alias \
        FROM ai_provider_keys WHERE id = ?",
     )
     .bind(key_id)
@@ -210,7 +215,7 @@ impl ProviderKeyStorage {
     let row = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, encrypted_api_key, balance_updated_at, user_id, \
-       spending_cap_microdollars, spending_used_microdollars \
+       spending_cap_microdollars, spending_used_microdollars, alias \
        FROM ai_provider_keys WHERE id = ?",
     )
     .bind(key_id)
@@ -241,7 +246,7 @@ impl ProviderKeyStorage {
     let rows = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, balance_updated_at, user_id, \
-       spending_cap_microdollars, spending_used_microdollars \
+       spending_cap_microdollars, spending_used_microdollars, alias \
        FROM ai_provider_keys WHERE user_id = $1 ORDER BY created_at DESC",
     )
     .bind(user_id)
@@ -514,17 +519,19 @@ impl ProviderKeyStorage {
     base_url: Option<Option<&str>>,
     is_enabled: Option<bool>,
     spending_cap_microdollars: Option<Option<i64>>,
+    alias: Option<Option<&str>>,
   ) -> Result<()> {
     // Single UPDATE with CASE WHEN guards — atomic without a transaction.
     // Each field is updated only when its Option is Some; otherwise the
     // ELSE branch keeps the existing column value unchanged.
     sqlx::query(
       "UPDATE ai_provider_keys SET \
-         description              = CASE WHEN $1 THEN $2 ELSE description              END, \
-         base_url                 = CASE WHEN $3 THEN $4 ELSE base_url                 END, \
-         is_enabled               = CASE WHEN $5 THEN $6 ELSE is_enabled               END, \
-         spending_cap_microdollars= CASE WHEN $7 THEN $8 ELSE spending_cap_microdollars END \
-       WHERE id = $9",
+         description              = CASE WHEN $1  THEN $2  ELSE description              END, \
+         base_url                 = CASE WHEN $3  THEN $4  ELSE base_url                 END, \
+         is_enabled               = CASE WHEN $5  THEN $6  ELSE is_enabled               END, \
+         spending_cap_microdollars= CASE WHEN $7  THEN $8  ELSE spending_cap_microdollars END, \
+         alias                    = CASE WHEN $9  THEN $10 ELSE alias                    END \
+       WHERE id = $11",
     )
     .bind(description.is_some())
     .bind(description.flatten())
@@ -534,6 +541,8 @@ impl ProviderKeyStorage {
     .bind(is_enabled)
     .bind(spending_cap_microdollars.is_some())
     .bind(spending_cap_microdollars.flatten())
+    .bind(alias.is_some())
+    .bind(alias.flatten())
     .bind(key_id)
     .execute(&self.pool)
     .await
@@ -706,6 +715,7 @@ fn row_to_metadata(row: &SqliteRow) -> ProviderKeyMetadata {
     user_id: row.get("user_id"),
     spending_cap_microdollars: row.get("spending_cap_microdollars"),
     spending_used_microdollars: row.get("spending_used_microdollars"),
+    alias: row.get("alias"),
   }
 }
 
@@ -725,6 +735,7 @@ fn row_to_record(row: &SqliteRow) -> ProviderKeyRecord {
       user_id: row.get("user_id"),
       spending_cap_microdollars: row.get("spending_cap_microdollars"),
       spending_used_microdollars: row.get("spending_used_microdollars"),
+      alias: row.get("alias"),
     },
     encrypted_api_key: row.get("encrypted_api_key"),
     encryption_nonce: row.get("encryption_nonce"),

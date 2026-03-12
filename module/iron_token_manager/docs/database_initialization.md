@@ -66,7 +66,7 @@ make db-reset-seed
 **What it does:**
 1. Creates backup: `./backups/iron_backup_YYYYMMDD_HHMMSS.db`
 2. Deletes current database
-3. Applies all migrations (001-008, skipping 007)
+3. Applies all migrations (001-030, skipping 007 and 028)
 4. Populates test data:
    - 3 users (admin, project_manager, viewer)
    - 3 API tokens (one per user)
@@ -120,11 +120,11 @@ sqlite3 iron.db
 
 # Count tables
 sqlite> SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND substr(name,1,1) != '_';
-# Expected: 11
+# Expected: 19
 
 # Count indexes
 sqlite> SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%';
-# Expected: 32
+# Expected: 56
 
 # List users
 sqlite> SELECT username, role, is_active FROM users;
@@ -167,7 +167,7 @@ async fn test_example()
 
   // Database is:
   // - Created in temporary directory
-  // - Schema applied (all 11 tables, 32 indexes)
+  // - Schema applied (all 19 tables, 56 indexes)
   // - Foreign keys enabled
   // - Isolated from all other tests
 
@@ -228,8 +228,14 @@ migrations::apply_all_migrations( &pool ).await?;
 - 006: User audit log (1 table, 4 indexes)
 - 007: RESERVED (intentionally skipped)
 - 008: Agents support (1 table, 3 indexes)
+- 009–025: Additional features (analytics events, budgets, system config, etc.)
+- 026: Spending limits
+- 027: Gemini and xAI provider support
+- 028: RESERVED (intentionally skipped)
+- 029: Provider key alias
+- 030: Agent provider keys join table (multi-key support)
 
-**Total:** 11 tables, 32 indexes
+**Total:** 19 tables, 56 indexes
 
 ### NO MOCKING Philosophy (ADR-007)
 
@@ -602,7 +608,7 @@ tracker.record_usage( token_id, "openai", "gpt-4", 100, 50, 150 ).await?;
 
 ### Issue: Index count mismatch
 
-**Expected:** 32 indexes (across all migrations)
+**Expected:** 56 indexes (across all migrations)
 
 **Verification:**
 ```bash

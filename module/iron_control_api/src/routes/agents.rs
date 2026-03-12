@@ -42,8 +42,12 @@ pub struct Agent {
   pub created_at: i64,
   /// Owner user identifier
   pub owner_id: String,
-  /// Associated provider key identifier
+  /// Legacy single provider key (kept for DB compat)
+  #[serde(skip)]
   pub provider_key_id: Option<i64>,
+  /// Associated provider key identifiers
+  #[sqlx(skip)]
+  pub provider_key_ids: Vec<i64>,
 }
 
 /// Request body for creating a new agent
@@ -53,8 +57,8 @@ pub struct CreateAgentRequest {
   pub name: String,
   /// List of enabled LLM providers
   pub providers: Vec<String>,
-  /// Associated provider key identifier
-  pub provider_key_id: i64,
+  /// Associated provider key identifiers
+  pub provider_key_ids: Vec<i64>,
   /// Initial budget in microdollars
   pub initial_budget_microdollars: i64,
   /// Optional `owner_id` - admins can assign agents to other users.
@@ -69,8 +73,8 @@ pub struct UpdateAgentRequest {
   pub name: Option<String>,
   /// New list of enabled LLM providers
   pub providers: Option<Vec<String>>,
-  /// New provider key; nested Option to allow clearing
-  pub provider_key_id: Option<Option<i64>>, // Some(Some(id)) sets; Some(None) clears
+  /// New provider key identifiers (replaces all)
+  pub provider_key_ids: Option<Vec<i64>>,
   /// Optional `owner_id` - only admins can reassign agents to other users.
   pub owner_id: Option<String>,
 }
@@ -154,11 +158,35 @@ pub async fn list_agents(
     })?
   };
 
-  // Parse providers JSON
+  // Parse providers JSON and batch-load provider_key_ids
+  let agent_ids: Vec<i64> = agents.iter().map(|a| a.id).collect();
+  let key_mappings: Vec<(i64, i64)> = if agent_ids.is_empty() {
+    vec![]
+  } else {
+    let placeholders: String = agent_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+      "SELECT agent_id, provider_key_id FROM agent_provider_keys WHERE agent_id IN ({placeholders})"
+    );
+    let mut q = sqlx::query_as::<_, (i64, i64)>(&sql);
+    for id in &agent_ids {
+      q = q.bind(id);
+    }
+    q.fetch_all(&pool).await.unwrap_or_else(|e| {
+      tracing::warn!("Failed to load provider key mappings: {e}");
+      vec![]
+    })
+  };
+
+  let mut key_map: std::collections::HashMap<i64, Vec<i64>> = std::collections::HashMap::new();
+  for (agent_id, key_id) in key_mappings {
+    key_map.entry(agent_id).or_default().push(key_id);
+  }
+
   for agent in &mut agents {
     if let Some(ref json) = agent.providers_json {
       agent.providers = serde_json::from_str(json).unwrap_or_else(|_| vec![]);
     }
+    agent.provider_key_ids = key_map.remove(&agent.id).unwrap_or_default();
   }
 
   Ok(Json(agents))
@@ -211,6 +239,18 @@ pub async fn get_agent(
     agent.providers = serde_json::from_str(json).unwrap_or_else(|_| vec![]);
   }
 
+  // Load provider_key_ids from join table
+  agent.provider_key_ids = sqlx::query_scalar::<_, i64>(
+    "SELECT provider_key_id FROM agent_provider_keys WHERE agent_id = ?",
+  )
+  .bind(agent.id)
+  .fetch_all(&pool)
+  .await
+  .unwrap_or_else(|e| {
+    tracing::warn!("Failed to load provider key IDs for agent {}: {e}", agent.id);
+    vec![]
+  });
+
   Ok(Json(agent))
 }
 
@@ -240,32 +280,45 @@ pub async fn create_agent(
     ));
   }
 
-  // Validate provider key exists and fetch provider name
-  let provider_row =
-    sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
-      .bind(req.provider_key_id)
-      .fetch_optional(&pool)
-      .await
-      .map_err(|e| {
-        (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          format!("Database error: {e}"),
-        )
-      })?;
+  if req.provider_key_ids.is_empty() {
+    return Err((
+      StatusCode::BAD_REQUEST,
+      "provider_key_ids must not be empty".to_string(),
+    ));
+  }
 
-  let provider_name: String = match provider_row {
-    Some(row) => row.get::<String, _>("provider"),
-    None => {
-      return Err((
-        StatusCode::NOT_FOUND,
-        "Provider key not found or disabled".to_string(),
-      ));
+  // Validate all provider keys exist and are enabled, collect provider names
+  let mut provider_names: Vec<String> = Vec::new();
+  for key_id in &req.provider_key_ids {
+    let provider_row =
+      sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
+        .bind(key_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| {
+          (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {e}"),
+          )
+        })?;
+
+    match provider_row {
+      Some(row) => {
+        let name: String = row.get("provider");
+        if !provider_names.contains(&name) {
+          provider_names.push(name);
+        }
+      }
+      None => {
+        return Err((
+          StatusCode::NOT_FOUND,
+          format!("Provider key {key_id} not found or disabled"),
+        ));
+      }
     }
-  };
+  }
 
-  // Normalize providers to match provider key
-  let provider_list = vec![provider_name];
-  let providers_json = serde_json::to_string(&provider_list).map_err(|e| {
+  let providers_json = serde_json::to_string(&provider_names).map_err(|e| {
     (
       StatusCode::INTERNAL_SERVER_ERROR,
       format!("JSON error: {e}"),
@@ -310,6 +363,14 @@ pub async fn create_agent(
     user.0.sub.clone()
   };
 
+  let first_key_id = req.provider_key_ids.first().copied();
+  let mut tx = pool.begin().await.map_err(|e| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      format!("Failed to begin transaction: {e}"),
+    )
+  })?;
+
   let result = sqlx::query(
     r"
         INSERT INTO agents (name, providers, created_at, owner_id, provider_key_id)
@@ -320,8 +381,8 @@ pub async fn create_agent(
   .bind(&providers_json)
   .bind(created_at)
   .bind(&owner_id)
-  .bind(req.provider_key_id)
-  .execute(&pool)
+  .bind(first_key_id)
+  .execute(&mut *tx)
   .await
   .map_err(|e| {
     (
@@ -331,6 +392,21 @@ pub async fn create_agent(
   })?;
 
   let agent_id = result.last_insert_rowid();
+
+  // Insert into agent_provider_keys join table
+  for key_id in &req.provider_key_ids {
+    sqlx::query("INSERT INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)")
+      .bind(agent_id)
+      .bind(key_id)
+      .execute(&mut *tx)
+      .await
+      .map_err(|e| {
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          format!("Database error: {e}"),
+        )
+      })?;
+  }
 
   // Create required initial agent budget
   sqlx::query(
@@ -345,7 +421,7 @@ pub async fn create_agent(
   .bind(req.initial_budget_microdollars)
   .bind(created_at)
   .bind(created_at)
-  .execute(&pool)
+  .execute(&mut *tx)
   .await
   .map_err(|e| {
     (
@@ -354,14 +430,22 @@ pub async fn create_agent(
     )
   })?;
 
+  tx.commit().await.map_err(|e| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      format!("Failed to commit transaction: {e}"),
+    )
+  })?;
+
   let agent = Agent {
     id: agent_id,
     name: req.name,
-    providers: provider_list,
+    providers: provider_names,
     providers_json: Some(providers_json),
     created_at,
     owner_id,
-    provider_key_id: Some(req.provider_key_id),
+    provider_key_id: first_key_id,
+    provider_key_ids: req.provider_key_ids,
   };
 
   Ok((StatusCode::CREATED, Json(agent)))
@@ -438,9 +522,11 @@ pub async fn update_agent(
       })?;
   }
 
-  // Update provider_key_id if provided (Some(Some(id)) sets; Some(None) clears)
-  if let Some(provider_key_id_opt) = req.provider_key_id {
-    if let Some(key_id) = provider_key_id_opt {
+  // Update provider_key_ids if provided
+  if let Some(ref new_key_ids) = req.provider_key_ids {
+    // Validate all keys and collect provider names
+    let mut provider_names: Vec<String> = Vec::new();
+    for key_id in new_key_ids {
       let provider_row =
         sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
           .bind(key_id)
@@ -452,49 +538,68 @@ pub async fn update_agent(
               format!("Database error: {e}"),
             )
           })?;
-      let provider_name: String = match provider_row {
-        Some(row) => row.get::<String, _>("provider"),
+      match provider_row {
+        Some(row) => {
+          let name: String = row.get("provider");
+          if !provider_names.contains(&name) {
+            provider_names.push(name);
+          }
+        }
         None => {
           return Err((
             StatusCode::NOT_FOUND,
-            "Provider key not found or disabled".to_string(),
+            format!("Provider key {key_id} not found or disabled"),
           ));
         }
-      };
+      }
+    }
 
-      // Align providers list with provider key
-      let providers_json = serde_json::to_string(&vec![provider_name]).map_err(|e| {
+    // Update providers list and legacy provider_key_id
+    let providers_json = serde_json::to_string(&provider_names).map_err(|e| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("JSON error: {e}"),
+      )
+    })?;
+
+    let first_key_id = new_key_ids.first().copied();
+    let mut tx = pool.begin().await.map_err(|e| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("Failed to begin transaction: {e}"),
+      )
+    })?;
+
+    sqlx::query("UPDATE agents SET provider_key_id = ?, providers = ? WHERE id = ?")
+      .bind(first_key_id)
+      .bind(&providers_json)
+      .bind(id)
+      .execute(&mut *tx)
+      .await
+      .map_err(|e| {
         (
           StatusCode::INTERNAL_SERVER_ERROR,
-          format!("JSON error: {e}"),
+          format!("Database error: {e}"),
         )
       })?;
 
-      sqlx::query("UPDATE agents SET provider_key_id = ?, providers = ? WHERE id = ?")
-        .bind(Some(key_id))
-        .bind(&providers_json)
-        .bind(id)
-        .execute(&pool)
-        .await
-        .map_err(|e| {
-          (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Database error: {e}"),
-          )
-        })?;
-    } else {
-      // Clearing provider key also clears providers list
-      let providers_json = serde_json::to_string(&Vec::<String>::new()).map_err(|e| {
+    // Replace join table rows
+    sqlx::query("DELETE FROM agent_provider_keys WHERE agent_id = ?")
+      .bind(id)
+      .execute(&mut *tx)
+      .await
+      .map_err(|e| {
         (
           StatusCode::INTERNAL_SERVER_ERROR,
-          format!("JSON error: {e}"),
+          format!("Database error: {e}"),
         )
       })?;
 
-      sqlx::query("UPDATE agents SET provider_key_id = NULL, providers = ? WHERE id = ?")
-        .bind(&providers_json)
+    for key_id in new_key_ids {
+      sqlx::query("INSERT INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)")
         .bind(id)
-        .execute(&pool)
+        .bind(key_id)
+        .execute(&mut *tx)
         .await
         .map_err(|e| {
           (
@@ -503,6 +608,13 @@ pub async fn update_agent(
           )
         })?;
     }
+
+    tx.commit().await.map_err(|e| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("Failed to commit transaction: {e}"),
+      )
+    })?;
   }
 
   // Update owner_id if provided (admin only - already checked above)
@@ -568,6 +680,18 @@ pub async fn update_agent(
   if let Some(ref json) = agent.providers_json {
     agent.providers = serde_json::from_str(json).unwrap_or_else(|_| vec![]);
   }
+
+  // Load provider_key_ids from join table
+  agent.provider_key_ids = sqlx::query_scalar::<_, i64>(
+    "SELECT provider_key_id FROM agent_provider_keys WHERE agent_id = ?",
+  )
+  .bind(agent.id)
+  .fetch_all(&pool)
+  .await
+  .unwrap_or_else(|e| {
+    tracing::warn!("Failed to load provider key IDs after update: {e}");
+    vec![]
+  });
 
   Ok(Json(agent))
 }
