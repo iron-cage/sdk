@@ -38,15 +38,15 @@ const emit = defineEmits<{
 
       <DialogFooter>
         <Button
-          @click="emit('update:open', false)"
           variant="outline"
+          @click="emit('update:open', false)"
         >
           <IconX />
           {{ props.cancelLabel ?? 'Cancel' }}
         </Button>
         <Button
-          @click="emit('confirm')"
           :disabled="props.confirmDisabled"
+          @click="emit('confirm')"
         >
           <slot name="confirm-icon" />
           {{ props.confirmLabel ?? 'Confirm' }}

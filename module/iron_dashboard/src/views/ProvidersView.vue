@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, formatCostUsd } from '@/lib/formatters'
 import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
@@ -41,7 +41,7 @@ import IconEdit from '@/components/icons/IconEdit.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-
+import Switch from '@/components/ui/switch/Switch.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -54,10 +54,11 @@ const editingKey = ref<ProviderKey | null>(null)
 // Form fields
 const provider = ref<ProviderType>('openai')
 const apiKey = ref('')
+const alias = ref('')
 const baseUrl = ref('')
 const description = ref('')
 const isEnabled = ref(true)
-
+const createKeyError = ref('')
 
 // Fetch provider keys
 const { data: providerKeys, isLoading, error, refetch } = useQuery({
@@ -65,14 +66,13 @@ const { data: providerKeys, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
-// Note: Tokens are now user-centric and provider-based, not project-based
-
 // Create provider key mutation
 const createMutation = useMutation({
-  mutationFn: (data: { provider: ProviderType; api_key: string; base_url?: string; description?: string }) =>
+  mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string; base_url?: string; description?: string }) =>
     api.createProviderKey(data),
   onSuccess: () => {
     showCreateModal.value = false
+    createKeyError.value = ''
     resetForm()
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
@@ -83,8 +83,8 @@ const createMutation = useMutation({
 
 // Update provider key mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; base_url?: string; description?: string; is_enabled?: boolean }) =>
-    api.updateProviderKey(data.id, { base_url: data.base_url, description: data.description, is_enabled: data.is_enabled }),
+  mutationFn: (data: { id: number; alias?: string; base_url?: string; description?: string; is_enabled?: boolean }) =>
+    api.updateProviderKey(data.id, { alias: data.alias, base_url: data.base_url, description: data.description, is_enabled: data.is_enabled }),
   onSuccess: () => {
     showEditModal.value = false
     editingKey.value = null
@@ -101,13 +101,28 @@ const deleteMutation = useMutation({
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to delete provider key')
+  },
 })
 
-// Toggle enabled state
+// Toggle enabled state — optimistic update so the switch flips immediately
 const toggleMutation = useMutation({
   mutationFn: (data: { id: number; is_enabled: boolean }) =>
     api.updateProviderKey(data.id, { is_enabled: data.is_enabled }),
-  onSuccess: () => {
+  onMutate: async (data) => {
+    await queryClient.cancelQueries({ queryKey: ['providerKeys'] })
+    const previous = queryClient.getQueryData<ProviderKey[]>(['providerKeys'])
+    queryClient.setQueryData<ProviderKey[]>(['providerKeys'], old =>
+      old?.map(k => k.id === data.id ? { ...k, is_enabled: data.is_enabled } : k)
+    )
+    return { previous }
+  },
+  onError: (_err, _vars, context) => {
+    if (context?.previous) queryClient.setQueryData(['providerKeys'], context.previous)
+    toast.error('Failed to update provider key')
+  },
+  onSettled: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
@@ -117,20 +132,23 @@ const toggleMutation = useMutation({
 function resetForm() {
   provider.value = 'openai'
   apiKey.value = ''
+  alias.value = ''
   baseUrl.value = ''
   description.value = ''
   isEnabled.value = true
 }
 
 function handleCreateKey() {
+  createKeyError.value = ''
   if (!apiKey.value.trim()) {
-    toast.error('API key is required')
+    createKeyError.value = 'API key is required'
     return
   }
 
   createMutation.mutate({
     provider: provider.value,
     api_key: apiKey.value,
+    alias: alias.value || undefined,
     base_url: baseUrl.value || undefined,
     description: description.value || undefined,
   })
@@ -138,6 +156,7 @@ function handleCreateKey() {
 
 function openEditModal(key: ProviderKey) {
   editingKey.value = key
+  alias.value = key.alias || ''
   baseUrl.value = key.base_url || ''
   description.value = key.description || ''
   isEnabled.value = key.is_enabled
@@ -148,6 +167,7 @@ function handleUpdateKey() {
   if (!editingKey.value) return
   updateMutation.mutate({
     id: editingKey.value.id,
+    alias: alias.value || undefined,
     base_url: baseUrl.value || undefined,
     description: description.value || undefined,
     is_enabled: isEnabled.value,
@@ -167,7 +187,7 @@ function handleToggleEnabled(key: ProviderKey) {
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
-
+const typedError = error as unknown as Error | null
 
 </script>
 
@@ -183,14 +203,16 @@ function handleToggleEnabled(key: ProviderKey) {
     <DataTable
       :columns="[
         { label: 'Provider' },
+        { label: 'Name' },
         { label: 'Description' },
         { label: 'API Key' },
+        { label: 'Spend (all-time)' },
         { label: 'Status' },
         { label: 'Created' },
         { label: 'Actions', align: 'right' },
       ]"
       :is-loading="isLoading"
-      :error="error as Error | null"
+      :error="typedError"
       :is-empty="!providerKeys || providerKeys.length === 0"
       loading-text="Loading provider keys..."
       :on-retry="() => refetch()"
@@ -205,18 +227,21 @@ function handleToggleEnabled(key: ProviderKey) {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <ProviderBadge :provider="key.provider" />
         </td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.alias || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ key.description || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground">{{ key.masked_key }}</td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
+          {{ formatCostUsd(key.total_spend_usd, 2) }}
+        </td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap relative -left-3">
           <Button
-            @click="handleToggleEnabled(key)"
-            :disabled="toggleMutation.isPending.value"
-            :variant="key.is_enabled ? 'default' : 'outline'"
+            variant="outline"
             size="sm"
-            :class="key.is_enabled ? '' : 'text-muted-foreground'"
+            :disabled="toggleMutation.isPending.value"
+            @click="handleToggleEnabled(key)"
           >
             <IconCheck v-if="key.is_enabled" class="text-success" />
-            <IconX v-else />
+            <IconX v-else class="text-muted-foreground" />
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
@@ -230,12 +255,12 @@ function handleToggleEnabled(key: ProviderKey) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="openEditModal(key)" :disabled="updateMutation.isPending.value">
+              <DropdownMenuItem :disabled="updateMutation.isPending.value" @click="openEditModal(key)">
                 <IconEdit />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="handleDeleteKey(key)" :disabled="deleteMutation.isPending.value" class="text-destructive">
+              <DropdownMenuItem :disabled="deleteMutation.isPending.value" class="text-destructive" @click="handleDeleteKey(key)">
                 <IconTrash />
                 Delete
               </DropdownMenuItem>
@@ -286,6 +311,19 @@ function handleToggleEnabled(key: ProviderKey) {
           </div>
 
           <div class="space-y-1.5">
+            <Label for="alias">Name / Alias (optional)</Label>
+            <Input
+              id="alias"
+              v-model="alias"
+              placeholder="e.g., Production, Team A key"
+              :disabled="createMutation.isPending.value"
+            />
+            <p class="text-xs text-muted-foreground">
+              A friendly name shown in the agent selector instead of the provider type.
+            </p>
+          </div>
+
+          <div class="space-y-1.5">
             <Label for="baseUrl">Base URL (optional)</Label>
             <Input
               id="baseUrl"
@@ -309,18 +347,20 @@ function handleToggleEnabled(key: ProviderKey) {
           </div>
         </div>
 
+        <p v-if="createKeyError" class="text-sm text-destructive">{{ createKeyError }}</p>
+
         <DialogFooter>
           <Button
-            @click="showCreateModal = false; resetForm()"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false; createKeyError = ''; resetForm()"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateKey"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateKey"
           >
             <IconPlus />
             {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
@@ -346,6 +386,16 @@ function handleToggleEnabled(key: ProviderKey) {
           </div>
 
           <div class="space-y-1.5">
+            <Label for="editAlias">Name / Alias (optional)</Label>
+            <Input
+              id="editAlias"
+              v-model="alias"
+              placeholder="e.g., Production, Team A key"
+              :disabled="updateMutation.isPending.value"
+            />
+          </div>
+
+          <div class="space-y-1.5">
             <Label for="editBaseUrl">Base URL (optional)</Label>
             <Input
               id="editBaseUrl"
@@ -366,12 +416,10 @@ function handleToggleEnabled(key: ProviderKey) {
           </div>
 
           <div class="flex items-center space-x-2">
-            <input
+            <Switch
               id="editEnabled"
-              type="checkbox"
               v-model="isEnabled"
               :disabled="updateMutation.isPending.value"
-              class="h-4 w-4 rounded border-border text-primary focus:ring-ring"
             />
             <Label for="editEnabled">Enabled</Label>
           </div>
@@ -379,16 +427,16 @@ function handleToggleEnabled(key: ProviderKey) {
 
         <DialogFooter>
           <Button
-            @click="showEditModal = false; editingKey = null"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="showEditModal = false; editingKey = null"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleUpdateKey"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateKey"
           >
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Key' }}

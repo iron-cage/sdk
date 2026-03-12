@@ -83,7 +83,7 @@ const { data: providerList } = useQuery({
 const activeFilters = computed(() => ({
   period: selectedPeriod.value,
   agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
-  provider_id: selectedProviderId.value !== 'all' ? selectedProviderId.value : undefined,
+  provider_key_id: selectedProviderId.value !== 'all' ? Number(selectedProviderId.value) : undefined,
 }))
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
@@ -170,6 +170,7 @@ const providerBreakdown = computed(() => {
             .sort((a, b) => b.percentage - a.percentage)
 })
 
+
 const modelBreakdown = computed(() => {
   const data = modelUsage.value?.data ?? []
   if (!data.length) return []
@@ -227,10 +228,10 @@ function openLogModal(event: AnalyticsEvent) {
             <SelectItem value="all">All Providers</SelectItem>
             <SelectItem
               v-for="p in providerList"
-              :key="p.provider"
-              :value="p.provider"
+              :key="p.id"
+              :value="String(p.id)"
             >
-              {{ getProviderLabel(p.provider) }}
+              {{ p.alias || getProviderLabel(p.provider) }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -268,7 +269,7 @@ function openLogModal(event: AnalyticsEvent) {
             <IconBarChart class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalRequests) }}</div>
-          <TrendBadge :changePercent="requestStats?.previous_period?.change_percent" class="mt-1" />
+          <TrendBadge :change-percent="requestStats?.previous_period?.change_percent" class="mt-1" />
         </StatCard>
 
 
@@ -296,7 +297,7 @@ function openLogModal(event: AnalyticsEvent) {
           <div class="flex gap-2 items-center">
             <TrendBadge
             v-if="requestStats?.previous_period"
-            :changePercent="(requestStats.success_rate - requestStats.previous_period.success_rate)"
+            :change-percent="(requestStats.success_rate - requestStats.previous_period.success_rate)"
             class="mt-1"
           />
 
@@ -314,7 +315,7 @@ function openLogModal(event: AnalyticsEvent) {
             <IconCoin class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatCost(totalSpend) }}</div>
-          <TrendBadge :changePercent="spendingTotal?.previous_period?.change_percent" class="mt-1" />
+          <TrendBadge :change-percent="spendingTotal?.previous_period?.change_percent" class="mt-1" />
         </StatCard>
 
         <StatCard title="Avg Cost / Request">
@@ -332,7 +333,7 @@ function openLogModal(event: AnalyticsEvent) {
 
       <!-- Provider and Model breakdown -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <StatCard title="Usage by Provider" :showSeparator="true">
+        <StatCard title="Usage by Provider" :show-separator="true">
           <template #icon>
             <IconServer class="h-4 w-4 text-muted-foreground" />
           </template>
@@ -342,7 +343,7 @@ function openLogModal(event: AnalyticsEvent) {
           <div v-else class="space-y-4">
             <div v-for="provider in visibleProviders" :key="provider.provider">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ getProviderLabel(provider.provider) }}</span>
+                <span class="text-base font-medium text-foreground">{{ provider.alias || getProviderLabel(provider.provider) }}</span>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
@@ -364,7 +365,7 @@ function openLogModal(event: AnalyticsEvent) {
           </div>
         </StatCard>
 
-        <StatCard title="Usage by Model" :showSeparator="true">
+        <StatCard title="Usage by Model" :show-separator="true">
           <template #icon>
             <IconGrid class="h-4 w-4 text-muted-foreground" />
           </template>
@@ -407,7 +408,7 @@ function openLogModal(event: AnalyticsEvent) {
       </div>
 
       <!-- Spending by Agent -->
-      <StatCard title="Spending by Agent" :showSeparator="true" class="mb-6">
+      <StatCard title="Spending by Agent" :show-separator="true" class="mb-6">
         <template #icon>
           <IconUsers class="h-4 w-4 text-muted-foreground" />
         </template>
@@ -425,9 +426,9 @@ function openLogModal(event: AnalyticsEvent) {
             { label: 'Used' },
             { label: 'Requests' },
           ]"
-          :isLoading="agentSpendingLoading"
-          :isEmpty="agentBreakdown.length === 0"
-          loadingText="Loading agent spending..."
+          :is-loading="agentSpendingLoading"
+          :is-empty="agentBreakdown.length === 0"
+          loading-text="Loading agent spending..."
         >
           <template #empty>
             <p class="text-muted-foreground">No agent spending data available</p>
@@ -465,7 +466,7 @@ function openLogModal(event: AnalyticsEvent) {
       </StatCard>
 
       <!-- Token Usage by Agent -->
-      <StatCard title="Token Usage by Agent" :showSeparator="true" class="mb-6">
+      <StatCard title="Token Usage by Agent" :show-separator="true" class="mb-6">
         <template #icon>
           <IconChip class="h-4 w-4 text-muted-foreground" />
         </template>
@@ -485,9 +486,9 @@ function openLogModal(event: AnalyticsEvent) {
             { label: 'Requests' },
             { label: 'Avg / Request' },
           ]"
-          :isLoading="tokensByAgentLoading"
-          :isEmpty="!tokensByAgent?.data?.length"
-          loadingText="Loading token usage..."
+          :is-loading="tokensByAgentLoading"
+          :is-empty="!tokensByAgent?.data?.length"
+          loading-text="Loading token usage..."
         >
           <template #empty>
             <p class="text-muted-foreground">No token usage data available</p>
@@ -521,7 +522,7 @@ function openLogModal(event: AnalyticsEvent) {
       </StatCard>
 
       <!-- Recent Logs -->
-      <StatCard title="Recent Logs" :showSeparator="true">
+      <StatCard title="Recent Logs" :show-separator="true">
         <template #icon>
           <IconClipboard class="h-4 w-4 text-muted-foreground" />
         </template>
@@ -541,9 +542,9 @@ function openLogModal(event: AnalyticsEvent) {
             { label: 'Cost' },
             { label: 'Actions', align: 'right' },
           ]"
-          :isLoading="eventsLoading && accumulatedLogs.length === 0"
-          :isEmpty="accumulatedLogs.length === 0"
-          loadingText="Loading logs..."
+          :is-loading="eventsLoading && accumulatedLogs.length === 0"
+          :is-empty="accumulatedLogs.length === 0"
+          loading-text="Loading logs..."
         >
           <template #empty>
             <p class="text-muted-foreground mt-4">No logs available</p>
@@ -570,7 +571,7 @@ function openLogModal(event: AnalyticsEvent) {
           </tr>
           <template #footer>
             <div v-if="logsPage < totalPages" class="p-4 text-center">
-              <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
+              <Button variant="outline" :disabled="eventsFetching" @click="loadMoreLogs">
                 <IconDownload />
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>

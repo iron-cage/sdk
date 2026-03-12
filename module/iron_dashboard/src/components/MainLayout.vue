@@ -178,8 +178,8 @@ async function handleLogout() {
           class="absolute bottom-full left-2 right-2 mb-1 bg-background border border-border rounded-[8px] shadow-md overflow-hidden"
         >
           <button
-            @click="handleLogout"
             class="flex items-center gap-2 w-full px-3 py-2 text-base text-trettiary hover:bg-border/50 text-left"
+            @click="handleLogout"
           >
             <IconLogOut class="w-4 h-4 flex-shrink-0" />
             Sign out
@@ -189,8 +189,8 @@ async function handleLogout() {
 
         <!-- Trigger button -->
         <button
-          @click="userMenuOpen = !userMenuOpen"
           class="flex items-center gap-2 w-full px-2 py-1.5 rounded-[8px] hover:bg-border/50 text-left"
+          @click="userMenuOpen = !userMenuOpen"
         >
           <!-- Avatar -->
           <AvatarInitial :name="authStore.username || 'u'" />

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent, type IcTokenStatus, type ProviderType } from '../composables/useApi'
+import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,8 +31,8 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
 import { formatDate, formatTimestamp } from '@/lib/formatters'
+import { getProviderLabel } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
-import ProviderBadge from '@/components/ProviderBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -57,7 +57,8 @@ const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmCallback, openConfirm } = useConfirm()
 const name = ref('')
-const selectedProviderKeyId = ref<string>('')
+const selectedProviderKeyIds = ref<number[]>([])
+const addingProviderKeyId = ref<string>('')
 const initialBudgetUsd = ref<number | undefined>(undefined)
 const selectedOwnerId = ref<string>('')
 const selectedAgent = ref<Agent | null>(null)
@@ -65,6 +66,8 @@ const agentToDelete = ref<Agent | null>(null)
 const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
 const icTokenStatusLoading = ref(false)
 const tokenActionLoadingId = ref<number | null>(null)
+const createFormError = ref('')
+const updateFormError = ref('')
 const showTokenDialog = ref(false)
 const tokenDialogValue = ref('')
 const tokenDialogAgentName = ref('')
@@ -94,8 +97,8 @@ watch(
         try {
           const status = await api.getIcTokenStatus(agent.id)
           statusMap[agent.id] = status
-        } catch (err) {
-          console.error('Failed to load IC token status for agent', agent.id, err)
+        } catch {
+          toast.error('Failed to load IC token status for agent ' + agent.name)
         }
       })
     )
@@ -112,6 +115,37 @@ const { data: providers } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
+const availableProviderKeys = computed(() =>
+  (providers.value ?? []).filter(p => !selectedProviderKeyIds.value.includes(p.id))
+)
+
+function addProviderKey() {
+  const id = Number(addingProviderKeyId.value)
+  if (id && !selectedProviderKeyIds.value.includes(id)) {
+    selectedProviderKeyIds.value = [...selectedProviderKeyIds.value, id]
+    addingProviderKeyId.value = ''
+  }
+}
+
+function removeProviderKey(keyId: number) {
+  selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter(id => id !== keyId)
+}
+
+function providerKeyLabel(keyId: number): string {
+  const key = providers.value?.find(p => p.id === keyId)
+  if (!key) return `#${keyId}`
+  return key.alias || key.provider
+}
+
+function providerAlias(agent: Agent, providerType: string): string | null {
+  // Prefer an assigned key whose provider matches
+  const ids = agent.provider_key_ids ?? [] as number[]
+  const assigned = providers.value?.find(p => ids.includes(p.id) && p.provider === providerType)
+  if (assigned?.alias) return assigned.alias
+  // Fall back to any key of that provider type
+  return providers.value?.find(p => p.provider === providerType)?.alias ?? null
+}
+
 // Fetch users for owner selection (admin only)
 const { data: users } = useQuery({
   queryKey: ['users-for-agents'],
@@ -121,14 +155,16 @@ const { data: users } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number; owner_id?: string }) =>
+  mutationFn: (data: { name: string; providers: string[]; provider_key_ids: number[]; initial_budget_microdollars: number; owner_id?: string }) =>
     api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
-    selectedProviderKeyId.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = ''
+    createFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -138,14 +174,16 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null; owner_id?: string }) =>
+  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_ids: number[]; owner_id?: string }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
     name.value = ''
-    selectedProviderKeyId.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
     selectedOwnerId.value = ''
+    updateFormError.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -162,34 +200,30 @@ const deleteMutation = useMutation({
 })
 
 function handleCreateAgent() {
+  createFormError.value = ''
   if (!name.value) {
-    toast.error('Name is required')
+    createFormError.value = 'Name is required'
     return
   }
 
-  if (!selectedProviderKeyId.value) {
-    toast.error('Provider key is required')
+  if (selectedProviderKeyIds.value.length === 0) {
+    createFormError.value = 'At least one provider key is required'
     return
   }
 
   if (!initialBudgetUsd.value || initialBudgetUsd.value <= 0) {
-    toast.error('Initial budget (USD) is required and must be positive')
+    createFormError.value = 'Initial budget (USD) is required and must be positive'
     return
   }
 
-  const providerKeyId = Number(selectedProviderKeyId.value)
-  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
-  if (!providerRecord) {
-    toast.error('Selected provider key not found')
-    return
-  }
-
+  const selectedKeys = (providers.value ?? []).filter(p => selectedProviderKeyIds.value.includes(p.id))
+  const uniqueProviders = [...new Set(selectedKeys.map(p => p.provider))]
   const budgetMicros = Math.round(initialBudgetUsd.value * 1_000_000)
 
   createMutation.mutate({
     name: name.value,
-    providers: [providerRecord.provider],
-    provider_key_id: providerKeyId,
+    providers: uniqueProviders,
+    provider_key_ids: selectedProviderKeyIds.value,
     initial_budget_microdollars: budgetMicros,
     owner_id: selectedOwnerId.value || undefined,
   })
@@ -198,34 +232,33 @@ function handleCreateAgent() {
 function openUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
-  selectedProviderKeyId.value = agent.provider_key_id ? String(agent.provider_key_id) : ''
+  selectedProviderKeyIds.value = [...(agent.provider_key_ids ?? [])]
+  addingProviderKeyId.value = ''
   selectedOwnerId.value = agent.owner_id ?? ''
+  updateFormError.value = ''
   showUpdateModal.value = true
 }
 
 function handleUpdateAgent() {
+  updateFormError.value = ''
   if (!selectedAgent.value || !name.value) {
-    toast.error('Name is required')
+    updateFormError.value = 'Name is required'
     return
   }
 
-  if (!selectedProviderKeyId.value) {
-    toast.error('Provider key is required')
+  if (selectedProviderKeyIds.value.length === 0) {
+    updateFormError.value = 'At least one provider key is required'
     return
   }
 
-  const providerKeyId = Number(selectedProviderKeyId.value)
-  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
-  if (!providerRecord) {
-    toast.error('Selected provider key not found')
-    return
-  }
+  const selectedKeys = (providers.value ?? []).filter(p => selectedProviderKeyIds.value.includes(p.id))
+  const uniqueProviders = [...new Set(selectedKeys.map(p => p.provider))]
 
   updateMutation.mutate({
     id: selectedAgent.value.id,
     name: name.value,
-    providers: [providerRecord.provider],
-    provider_key_id: providerKeyId,
+    providers: uniqueProviders,
+    provider_key_ids: selectedProviderKeyIds.value,
     owner_id: selectedOwnerId.value || undefined,
   })
 }
@@ -326,9 +359,11 @@ async function copyTokenToClipboard() {
   try {
     await navigator.clipboard.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
-  } catch (err) {
-    copyMessage.value = err instanceof Error ? err.message : 'Copy failed'
-  }
+    } catch (_err: unknown) {
+      const message = _err instanceof Error ? _err.message : 'Copy failed'
+      copyMessage.value = message
+    }
+
 }
 
 </script>
@@ -348,7 +383,6 @@ async function copyTokenToClipboard() {
         { label: 'Name' },
         { label: 'Owner' },
         { label: 'Providers' },
-        { label: 'Provider Key' },
         { label: 'IC Token' },
         { label: 'Created' },
         { label: 'Actions', align: 'right' },
@@ -375,12 +409,15 @@ async function copyTokenToClipboard() {
           {{ agent.owner_id || 'Unknown' }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          <div class="flex gap-1 flex-wrap">
-            <ProviderBadge v-for="provider in agent.providers" :key="provider" :provider="provider as ProviderType" />
+          <div class="flex gap-1 flex-wrap items-center">
+            <span
+              v-for="provider in agent.providers"
+              :key="provider"
+              class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+            >
+              {{ providerAlias(agent, provider) || getProviderLabel(provider) }}
+            </span>
           </div>
-        </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
-          {{ agent.provider_key_id ?? 'None' }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
@@ -407,24 +444,24 @@ async function copyTokenToClipboard() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
-                @click="handleGenerateIcToken(agent)"
                 :disabled="tokenActionLoadingId === agent.id"
+                @click="handleGenerateIcToken(agent)"
               >
                 <IconKey />
                 {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
               </DropdownMenuItem>
               <template v-else>
                 <DropdownMenuItem
-                  @click="handleRegenerateIcToken(agent)"
                   :disabled="tokenActionLoadingId === agent.id"
+                  @click="handleRegenerateIcToken(agent)"
                 >
                   <IconRefresh />
                   {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  @click="handleRevokeIcToken(agent)"
                   :disabled="tokenActionLoadingId === agent.id"
                   class="text-destructive"
+                  @click="handleRevokeIcToken(agent)"
                 >
                   <IconBan />
                   Revoke IC Token
@@ -436,7 +473,7 @@ async function copyTokenToClipboard() {
                   <IconEdit />
                   Edit Agent
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-destructive">
+                <DropdownMenuItem class="text-destructive" @click="handleDeleteAgent(agent)">
                   <IconTrash />
                   Delete Agent
                 </DropdownMenuItem>
@@ -470,21 +507,42 @@ async function copyTokenToClipboard() {
           </div>
 
           <div class="space-y-1.5">
-            <Label for="create-provider-key">Assigned Provider Key (required)</Label>
-            <Select v-model="selectedProviderKeyId" :disabled="createMutation.isPending.value">
-              <SelectTrigger id="create-provider-key">
-                <SelectValue placeholder="Select a provider key" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="providerKey in providers"
-                  :key="providerKey.id"
-                  :value="String(providerKey.id)"
+            <Label>Provider Keys</Label>
+            <div v-if="selectedProviderKeyIds.length > 0" class="flex flex-wrap gap-1 mb-2">
+              <div
+                v-for="keyId in selectedProviderKeyIds"
+                :key="keyId"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted"
+              >
+                <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
+                <button
+                  type="button"
+                  class="ml-0.5 text-muted-foreground hover:text-destructive"
+                  @click="removeProviderKey(keyId)"
                 >
-                  {{ providerKey.id }} - {{ providerKey.provider }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  <IconX class="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+            <div v-if="availableProviderKeys.length" class="flex gap-2">
+              <Select v-model="addingProviderKeyId" :disabled="createMutation.isPending.value">
+                <SelectTrigger class="flex-1">
+                  <SelectValue placeholder="Add a provider key" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="pk in availableProviderKeys"
+                    :key="pk.id"
+                    :value="String(pk.id)"
+                  >
+                    {{ pk.alias || pk.provider }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="addProviderKey">
+                <IconPlus />
+              </Button>
+            </div>
           </div>
 
           <div class="space-y-1.5">
@@ -499,7 +557,7 @@ async function copyTokenToClipboard() {
               :disabled="createMutation.isPending.value"
             />
             <p class="text-xs text-muted-foreground">
-              Required. Used to create the agent's budget (microdollars on backend).
+              Required. Used to create the agent's budget.
             </p>
           </div>
 
@@ -525,18 +583,20 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
+        <p v-if="createFormError" class="text-sm text-destructive">{{ createFormError }}</p>
+
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false; createFormError = ''"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateAgent"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateAgent"
           >
             <IconPlus />
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Agent' }}
@@ -568,21 +628,42 @@ async function copyTokenToClipboard() {
           </div>
 
           <div class="space-y-1.5">
-            <Label for="update-provider-key">Assigned Provider Key</Label>
-            <Select v-model="selectedProviderKeyId" :disabled="updateMutation.isPending.value">
-              <SelectTrigger id="update-provider-key">
-                <SelectValue placeholder="Select a provider key" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="providerKey in providers"
-                  :key="providerKey.id"
-                  :value="String(providerKey.id)"
+            <Label>Provider Keys</Label>
+            <div v-if="selectedProviderKeyIds.length > 0" class="flex flex-wrap gap-1 mb-2">
+              <div
+                v-for="keyId in selectedProviderKeyIds"
+                :key="keyId"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted"
+              >
+                <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
+                <button
+                  type="button"
+                  class="ml-0.5 text-muted-foreground hover:text-destructive"
+                  @click="removeProviderKey(keyId)"
                 >
-                  {{ providerKey.id }} - {{ providerKey.provider }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  <IconX class="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+            <div v-if="availableProviderKeys.length" class="flex gap-2">
+              <Select v-model="addingProviderKeyId" :disabled="updateMutation.isPending.value">
+                <SelectTrigger class="flex-1">
+                  <SelectValue placeholder="Add a provider key" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="pk in availableProviderKeys"
+                    :key="pk.id"
+                    :value="String(pk.id)"
+                  >
+                    {{ pk.alias || pk.provider }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="addProviderKey">
+                <IconPlus />
+              </Button>
+            </div>
           </div>
 
           <div v-if="authStore.isAdmin" class="space-y-2">
@@ -604,18 +685,20 @@ async function copyTokenToClipboard() {
           </div>
         </div>
 
+        <p v-if="updateFormError" class="text-sm text-destructive">{{ updateFormError }}</p>
+
         <DialogFooter>
           <Button
-            @click="showUpdateModal = false"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="showUpdateModal = false; updateFormError = ''"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleUpdateAgent"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateAgent"
           >
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
@@ -636,17 +719,17 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showDeleteModal = false"
             :disabled="deleteMutation.isPending.value"
             variant="outline"
+            @click="showDeleteModal = false"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            @click="confirmDelete"
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
+            @click="confirmDelete"
           >
             <IconTrash />
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}

@@ -45,7 +45,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
 </script>
 
 <template>
-  <PageLayout title="Dashboard" contentClass="p-4 lg:p-6 space-y-6">
+  <PageLayout title="Dashboard" content-class="p-4 lg:p-6 space-y-6">
     <!-- System health bar -->
     <div class="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-lg">
       <div class="flex items-center gap-3">
@@ -111,7 +111,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       <!-- Quick Actions -->
-      <StatCard title="Quick Actions" :showSeparator="true" :grow="true">
+      <StatCard title="Quick Actions" :show-separator="true" :grow="true">
         <template #icon>
           <IconCog class="h-4 w-4 text-muted-foreground" />
         </template>
@@ -159,7 +159,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
       </StatCard>
 
       <!-- Top Spenders -->
-      <StatCard title="Top Spenders" :showSeparator="true" :grow="true">
+      <StatCard title="Top Spenders" :show-separator="true" :grow="true">
         <template #icon>
           <IconUsers class="h-4 w-4 text-muted-foreground" />
         </template>
@@ -169,7 +169,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           </RouterLink>
         </template>
         <div class="space-y-3">
-          <p class="text-sm text-muted-foreground text-center py-2" v-if="topSpenders.length === 0">No data yet</p>
+          <p v-if="topSpenders.length === 0" class="text-sm text-muted-foreground text-center py-2">No data yet</p>
           <div
             v-for="(agent, i) in topSpenders"
             :key="agent.agent_name"

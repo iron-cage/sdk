@@ -86,6 +86,7 @@ type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
 interface ProviderKey {
   id: number
   provider: ProviderType
+  alias?: string
   base_url?: string
   description?: string
   is_enabled: boolean
@@ -93,16 +94,19 @@ interface ProviderKey {
   last_used_at?: number
   masked_key: string
   assigned_projects: string[]
+  total_spend_usd: number
 }
 
 interface CreateProviderKeyRequest {
   provider: ProviderType
   api_key: string
+  alias?: string
   base_url?: string
   description?: string
 }
 
 interface UpdateProviderKeyRequest {
+  alias?: string
   base_url?: string
   description?: string
   is_enabled?: boolean
@@ -402,7 +406,7 @@ export function useApi() {
   async function createAgent(data: {
     name: string
     providers: string[]
-    provider_key_id: number
+    provider_key_ids: number[]
     initial_budget_microdollars: number
     owner_id?: string  // Admins can assign to other users
   }): Promise<Agent> {
@@ -416,7 +420,7 @@ export function useApi() {
     id: number
     name?: string
     providers?: string[]
-    provider_key_id?: number | null
+    provider_key_ids?: number[]
     owner_id?: string  // Admins can reassign to other users
   }): Promise<Agent> {
     const { id, ...updateData } = data
@@ -503,6 +507,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`)
@@ -515,6 +520,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`)
   }
@@ -526,6 +532,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`)
@@ -539,6 +546,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
@@ -553,6 +561,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
@@ -584,6 +593,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
@@ -597,6 +607,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`)
   }
@@ -609,6 +620,7 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
@@ -762,7 +774,7 @@ export interface Agent {
   providers: string[]
   created_at: number
   owner_id?: string
-  provider_key_id?: number | null
+  provider_key_ids: number[]
 }
 
 export interface AgentBudgetResponse {
@@ -826,6 +838,7 @@ export interface AnalyticsFilters {
   period?: AnalyticsPeriod
   agent_id?: number
   provider_id?: string
+  provider_key_id?: number
   compare?: boolean
 }
 
@@ -850,6 +863,8 @@ export interface SpendingTotalResponse {
 
 export interface ProviderSpending {
   provider: string
+  provider_key_id?: number
+  alias?: string
   spending: number
   request_count: number
   avg_cost_per_request: number
