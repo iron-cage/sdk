@@ -75,6 +75,14 @@ async fn seed_encrypted_provider_key(pool: &sqlx::SqlitePool, agent_id: i64, api
     .execute(pool)
     .await
     .unwrap();
+
+  // Also insert into join table (new multi-key resolution path)
+  sqlx::query("INSERT OR IGNORE INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)")
+    .bind(agent_id)
+    .bind(provider_key_id)
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 #[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts

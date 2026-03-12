@@ -193,6 +193,7 @@ impl TestState {
         None, // base_url
         Some("Test provider key"),
         "test_user",
+        None,
       )
       .await
       .expect("LOUD FAILURE: Failed to create provider key");

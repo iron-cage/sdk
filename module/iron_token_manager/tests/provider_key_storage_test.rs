@@ -15,6 +15,7 @@ async fn create_and_get_key() {
       None,
       Some("Test key"),
       "user_001",
+      None,
     )
     .await
     .unwrap();
@@ -44,6 +45,7 @@ async fn list_keys_by_user() {
       None,
       Some("Key 1"),
       "user_001",
+      None,
     )
     .await
     .unwrap();
@@ -55,6 +57,7 @@ async fn list_keys_by_user() {
       None,
       Some("Key 2"),
       "user_001",
+      None,
     )
     .await
     .unwrap();
@@ -66,6 +69,7 @@ async fn list_keys_by_user() {
       None,
       Some("Key 3"),
       "user_002",
+      None,
     )
     .await
     .unwrap();
@@ -81,7 +85,7 @@ async fn list_keys_by_user() {
 async fn enable_disable_key() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -113,7 +117,7 @@ async fn enable_disable_key() {
 async fn update_balance() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -142,7 +146,7 @@ async fn update_balance() {
 async fn delete_key() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -159,11 +163,11 @@ async fn create_two_keys_same_provider_same_user() {
   let (storage, _db) = common::create_test_provider_storage().await;
 
   let id_a = storage
-    .create_key(ProviderType::OpenAI, "enc_a", "nonce_a", None, Some("Key A"), "user_001")
+    .create_key(ProviderType::OpenAI, "enc_a", "nonce_a", None, Some("Key A"), "user_001", None)
     .await
     .unwrap();
   let id_b = storage
-    .create_key(ProviderType::OpenAI, "enc_b", "nonce_b", None, Some("Key B"), "user_001")
+    .create_key(ProviderType::OpenAI, "enc_b", "nonce_b", None, Some("Key B"), "user_001", None)
     .await
     .unwrap();
 
@@ -184,17 +188,17 @@ async fn cross_tenant_list_isolation() {
 
   // user_001 has two OpenAI keys
   storage
-    .create_key(ProviderType::OpenAI, "enc_a1", "nonce_a1", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc_a1", "nonce_a1", None, None, "user_001", None)
     .await
     .unwrap();
   storage
-    .create_key(ProviderType::OpenAI, "enc_a2", "nonce_a2", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc_a2", "nonce_a2", None, None, "user_001", None)
     .await
     .unwrap();
 
   // user_002 has one OpenAI key
   storage
-    .create_key(ProviderType::OpenAI, "enc_b1", "nonce_b1", None, None, "user_002")
+    .create_key(ProviderType::OpenAI, "enc_b1", "nonce_b1", None, None, "user_002", None)
     .await
     .unwrap();
 
@@ -231,7 +235,7 @@ async fn cross_tenant_list_isolation() {
 async fn project_assignment() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -295,7 +299,7 @@ async fn delete_nonexistent_key_returns_error() {
 async fn update_key_fields_nonexistent_returns_error() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let result = storage
-    .update_key_fields(99999, Some(Some("desc")), None, None, None)
+    .update_key_fields(99999, Some(Some("desc")), None, None, None, None)
     .await;
   assert!(result.is_err(), "update_key_fields for nonexistent ID must return Err");
 }
@@ -308,7 +312,7 @@ async fn update_key_fields_nonexistent_returns_error() {
 async fn assign_and_retrieve_project_key() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -328,7 +332,7 @@ async fn get_project_key_returns_none_when_unassigned() {
 async fn unassign_project_key() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -344,7 +348,7 @@ async fn unassign_project_key() {
 async fn get_key_projects_returns_all_assigned_projects() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -361,11 +365,11 @@ async fn get_key_projects_returns_all_assigned_projects() {
 async fn get_project_key_deterministic_multiple_assignments() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_a = storage
-    .create_key(ProviderType::OpenAI, "enc_a", "nonce_a", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc_a", "nonce_a", None, None, "user_001", None)
     .await
     .unwrap();
   let key_b = storage
-    .create_key(ProviderType::OpenAI, "enc_b", "nonce_b", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc_b", "nonce_b", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -390,12 +394,12 @@ async fn get_project_key_deterministic_multiple_assignments() {
 async fn update_key_fields_single_field() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Original"), "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Original"), "user_001", None)
     .await
     .unwrap();
 
   storage
-    .update_key_fields(key_id, Some(Some("Updated")), None, None, None)
+    .update_key_fields(key_id, Some(Some("Updated")), None, None, None, None)
     .await
     .unwrap();
 
@@ -412,12 +416,12 @@ async fn update_key_fields_single_field() {
 async fn update_key_fields_clear_nullable() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("To be cleared"), "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("To be cleared"), "user_001", None)
     .await
     .unwrap();
 
   storage
-    .update_key_fields(key_id, Some(None), None, None, None)
+    .update_key_fields(key_id, Some(None), None, None, None, None)
     .await
     .unwrap();
 
@@ -429,12 +433,12 @@ async fn update_key_fields_clear_nullable() {
 async fn update_key_fields_multiple_fields_atomic() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Old"), "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Old"), "user_001", None)
     .await
     .unwrap();
 
   storage
-    .update_key_fields(key_id, Some(Some("New")), None, Some(false), None)
+    .update_key_fields(key_id, Some(Some("New")), None, Some(false), None, None)
     .await
     .unwrap();
 
@@ -447,13 +451,13 @@ async fn update_key_fields_multiple_fields_atomic() {
 async fn update_key_fields_no_change() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Keep me"), "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Keep me"), "user_001", None)
     .await
     .unwrap();
 
   // All None — no changes requested; row must remain intact
   storage
-    .update_key_fields(key_id, None, None, None, None)
+    .update_key_fields(key_id, None, None, None, None, None)
     .await
     .unwrap();
 
@@ -470,7 +474,7 @@ async fn update_key_fields_no_change() {
 async fn set_spending_cap_and_get_summary() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -485,7 +489,7 @@ async fn set_spending_cap_and_get_summary() {
 async fn remove_spending_cap() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -500,7 +504,7 @@ async fn remove_spending_cap() {
 async fn increment_spending_within_cap() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -515,7 +519,7 @@ async fn increment_spending_within_cap() {
 async fn increment_spending_exceeds_cap() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -528,7 +532,7 @@ async fn increment_spending_exceeds_cap() {
 async fn increment_spending_no_cap() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -543,7 +547,7 @@ async fn increment_spending_no_cap() {
 async fn reserve_and_adjust_spending() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -563,7 +567,7 @@ async fn reserve_and_adjust_spending() {
 async fn adjust_spending_zero_delta_is_noop() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
