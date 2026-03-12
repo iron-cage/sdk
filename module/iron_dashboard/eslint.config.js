@@ -20,6 +20,8 @@ export default [
         navigator: "readonly",
         HTMLElement: "readonly",
         MouseEvent: "readonly",
+        PointerEvent: "readonly",
+        ResizeObserver: "readonly",
         Node: "readonly",
       },
     },
