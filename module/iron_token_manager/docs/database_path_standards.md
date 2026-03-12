@@ -50,8 +50,8 @@ Example: `iron_backup_20251211_125024.db`
    - Verifies backup naming
 
 2. **Schema Validator** (`scripts/validate_db_schema.sh`)
-   - Confirms 17 tables (11 application + 6 migration guards)
-   - Validates 32 indexes
+   - Confirms 48 tables (19 application + 29 migration guards)
+   - Validates 56 indexes
    - Checks foreign key support
    - Verifies migration guards
 

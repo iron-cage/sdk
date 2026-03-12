@@ -171,7 +171,10 @@ pub async fn list_agents(
     for id in &agent_ids {
       q = q.bind(id);
     }
-    q.fetch_all(&pool).await.unwrap_or_default()
+    q.fetch_all(&pool).await.unwrap_or_else(|e| {
+      tracing::warn!("Failed to load provider key mappings: {e}");
+      vec![]
+    })
   };
 
   let mut key_map: std::collections::HashMap<i64, Vec<i64>> = std::collections::HashMap::new();
@@ -243,7 +246,10 @@ pub async fn get_agent(
   .bind(agent.id)
   .fetch_all(&pool)
   .await
-  .unwrap_or_default();
+  .unwrap_or_else(|e| {
+    tracing::warn!("Failed to load provider key IDs for agent {}: {e}", agent.id);
+    vec![]
+  });
 
   Ok(Json(agent))
 }
@@ -358,6 +364,13 @@ pub async fn create_agent(
   };
 
   let first_key_id = req.provider_key_ids.first().copied();
+  let mut tx = pool.begin().await.map_err(|e| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      format!("Failed to begin transaction: {e}"),
+    )
+  })?;
+
   let result = sqlx::query(
     r"
         INSERT INTO agents (name, providers, created_at, owner_id, provider_key_id)
@@ -369,7 +382,7 @@ pub async fn create_agent(
   .bind(created_at)
   .bind(&owner_id)
   .bind(first_key_id)
-  .execute(&pool)
+  .execute(&mut *tx)
   .await
   .map_err(|e| {
     (
@@ -385,7 +398,7 @@ pub async fn create_agent(
     sqlx::query("INSERT INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)")
       .bind(agent_id)
       .bind(key_id)
-      .execute(&pool)
+      .execute(&mut *tx)
       .await
       .map_err(|e| {
         (
@@ -408,12 +421,19 @@ pub async fn create_agent(
   .bind(req.initial_budget_microdollars)
   .bind(created_at)
   .bind(created_at)
-  .execute(&pool)
+  .execute(&mut *tx)
   .await
   .map_err(|e| {
     (
       StatusCode::INTERNAL_SERVER_ERROR,
       format!("Failed to create agent budget: {e}"),
+    )
+  })?;
+
+  tx.commit().await.map_err(|e| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      format!("Failed to commit transaction: {e}"),
     )
   })?;
 
@@ -543,11 +563,18 @@ pub async fn update_agent(
     })?;
 
     let first_key_id = new_key_ids.first().copied();
+    let mut tx = pool.begin().await.map_err(|e| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("Failed to begin transaction: {e}"),
+      )
+    })?;
+
     sqlx::query("UPDATE agents SET provider_key_id = ?, providers = ? WHERE id = ?")
       .bind(first_key_id)
       .bind(&providers_json)
       .bind(id)
-      .execute(&pool)
+      .execute(&mut *tx)
       .await
       .map_err(|e| {
         (
@@ -559,7 +586,7 @@ pub async fn update_agent(
     // Replace join table rows
     sqlx::query("DELETE FROM agent_provider_keys WHERE agent_id = ?")
       .bind(id)
-      .execute(&pool)
+      .execute(&mut *tx)
       .await
       .map_err(|e| {
         (
@@ -572,7 +599,7 @@ pub async fn update_agent(
       sqlx::query("INSERT INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)")
         .bind(id)
         .bind(key_id)
-        .execute(&pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| {
           (
@@ -581,6 +608,13 @@ pub async fn update_agent(
           )
         })?;
     }
+
+    tx.commit().await.map_err(|e| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("Failed to commit transaction: {e}"),
+      )
+    })?;
   }
 
   // Update owner_id if provided (admin only - already checked above)
@@ -654,7 +688,10 @@ pub async fn update_agent(
   .bind(agent.id)
   .fetch_all(&pool)
   .await
-  .unwrap_or_default();
+  .unwrap_or_else(|e| {
+    tracing::warn!("Failed to load provider key IDs after update: {e}");
+    vec![]
+  });
 
   Ok(Json(agent))
 }

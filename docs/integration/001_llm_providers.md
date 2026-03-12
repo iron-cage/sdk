@@ -26,7 +26,8 @@ Agent --unified API--> Iron Cage --provider API--> OpenAI
 | OpenAI | GPT-4, GPT-3.5 | Full support |
 | Anthropic | Claude 3 | Full support |
 | Azure OpenAI | GPT-4, GPT-3.5 | Full support |
-| Google | Gemini | Basic support |
+| Google | Gemini | Full support |
+| xAI | Grok | Full support |
 | Local | Ollama, vLLM | Beta |
 
 ## Unified API

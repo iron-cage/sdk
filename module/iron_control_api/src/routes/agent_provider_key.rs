@@ -67,7 +67,7 @@ pub struct GetProviderKeyResponse {
 ///
 /// 1. Validate request
 /// 2. Verify IC Token -> extract `agent_id`
-/// 3. Query agents table for `provider_key_id`
+/// 3. Query `agent_provider_keys` join table for first enabled provider key
 /// 4. If NULL -> 403 `NO_PROVIDER_ASSIGNED`
 /// 5. Get `ai_provider_keys` record
 /// 6. Check key is enabled
@@ -124,7 +124,7 @@ pub async fn get_provider_key(
   let provider_key_id: Option<i64> = match sqlx::query_scalar::<_, i64>(
     "SELECT apk.provider_key_id FROM agent_provider_keys apk \
      JOIN ai_provider_keys pk ON apk.provider_key_id = pk.id \
-     WHERE apk.agent_id = ? AND pk.is_enabled = 1 LIMIT 1",
+     WHERE apk.agent_id = ? AND pk.is_enabled = 1 ORDER BY apk.provider_key_id ASC LIMIT 1",
   )
   .bind(agent_id)
   .fetch_optional(&state.db_pool)

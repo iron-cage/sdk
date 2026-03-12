@@ -261,7 +261,10 @@ pub async fn get_usage_tokens(
     tq = tq.bind(provider_key_id);
   }
 
-  let totals = tq.fetch_one(&state.pool).await.unwrap_or((0, 0));
+  let totals = tq.fetch_one(&state.pool).await.unwrap_or_else(|e| {
+    tracing::warn!("Failed to fetch token totals in get_usage_tokens: {e}");
+    (0, 0)
+  });
 
   // Build dynamic count query
   let mut count_query = String::from(
@@ -302,7 +305,10 @@ pub async fn get_usage_tokens(
     cq = cq.bind(provider_key_id);
   }
 
-  let total_count: i64 = cq.fetch_one(&state.pool).await.unwrap_or(0);
+  let total_count: i64 = cq.fetch_one(&state.pool).await.unwrap_or_else(|e| {
+    tracing::warn!("Failed to fetch agent count in get_usage_tokens: {e}");
+    0
+  });
 
   match rows {
     Ok(rows) => {
@@ -474,7 +480,10 @@ pub async fn get_usage_models(
     tq = tq.bind(provider_key_id);
   }
 
-  let totals = tq.fetch_one(&state.pool).await.unwrap_or((0, 0, 0));
+  let totals = tq.fetch_one(&state.pool).await.unwrap_or_else(|e| {
+    tracing::warn!("Failed to fetch model totals in get_usage_models: {e}");
+    (0, 0, 0)
+  });
 
   match rows {
     Ok(rows) => {

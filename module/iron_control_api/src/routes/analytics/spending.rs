@@ -49,7 +49,7 @@ pub async fn get_spending_total(
     query.push_str(" AND agent_id = ?");
   }
   if params.provider_id.is_some() {
-    query.push_str(" AND provider_id = ?");
+    query.push_str(" AND provider = ?");
   }
   if params.provider_key_id.is_some() {
     query.push_str(" AND provider_key_id = ?");
@@ -585,7 +585,7 @@ pub async fn get_spending_avg(
     query.push_str(" AND agent_id = ?");
   }
   if params.provider_id.is_some() {
-    query.push_str(" AND provider_id = ?");
+    query.push_str(" AND provider = ?");
   }
   if params.provider_key_id.is_some() {
     query.push_str(" AND provider_key_id = ?");
@@ -669,55 +669,108 @@ async fn compute_median(
   user_sub: &str,
   params: &AnalyticsQuery,
 ) -> f64 {
-  let mut query = String::from(
-    "SELECT cost_micros FROM analytics_events \
-     WHERE timestamp_ms >= ? AND timestamp_ms <= ? \
+  // Step 1: Build the WHERE clause (shared between count and value queries)
+  let mut where_clause = String::from(
+    "WHERE timestamp_ms >= ? AND timestamp_ms <= ? \
      AND event_type = 'llm_request_completed'",
   );
 
   if !is_admin {
-    query.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
+    where_clause.push_str( " AND EXISTS (SELECT 1 FROM agents a WHERE a.id = analytics_events.agent_id AND a.owner_id = ?)" );
   }
   if params.agent_id.is_some() {
-    query.push_str(" AND agent_id = ?");
+    where_clause.push_str(" AND agent_id = ?");
   }
   if params.provider_id.is_some() {
-    query.push_str(" AND provider_id = ?");
+    where_clause.push_str(" AND provider = ?");
   }
   if params.provider_key_id.is_some() {
-    query.push_str(" AND provider_key_id = ?");
+    where_clause.push_str(" AND provider_key_id = ?");
   }
 
-  query.push_str(" ORDER BY cost_micros");
+  // Step 2: Query the count of matching rows
+  let count_query = format!("SELECT COUNT(*) FROM analytics_events {}", where_clause);
 
-  let mut q = sqlx::query_scalar::<_, i64>(&query)
+  let mut cq = sqlx::query_scalar::<_, i64>(&count_query)
     .bind(start_ms)
     .bind(end_ms);
 
   if !is_admin {
-    q = q.bind(user_sub);
+    cq = cq.bind(user_sub);
   }
   if let Some(agent_id) = params.agent_id {
-    q = q.bind(agent_id);
+    cq = cq.bind(agent_id);
   }
   if let Some(ref provider_id) = params.provider_id {
-    q = q.bind(provider_id);
+    cq = cq.bind(provider_id);
   }
   if let Some(provider_key_id) = params.provider_key_id {
-    q = q.bind(provider_key_id);
+    cq = cq.bind(provider_key_id);
   }
 
-  let values = q.fetch_all(&state.pool).await.unwrap_or_default();
+  let count = match cq.fetch_one(&state.pool).await {
+    Ok(c) => c,
+    Err(e) => {
+      tracing::error!("Failed to query median count: {}", e);
+      return 0.0;
+    }
+  };
+
+  if count == 0 {
+    return 0.0;
+  }
+
+  // Step 3: Fetch only the 1-2 middle values needed for the median
+  let mid = count as usize / 2;
+  let (offset, limit) = if count % 2 == 0 {
+    (mid - 1, 2i64)
+  } else {
+    (mid, 1i64)
+  };
+
+  let value_query = format!(
+    "SELECT cost_micros FROM analytics_events {} ORDER BY cost_micros LIMIT ? OFFSET ?",
+    where_clause
+  );
+
+  let mut vq = sqlx::query_scalar::<_, i64>(&value_query)
+    .bind(start_ms)
+    .bind(end_ms);
+
+  if !is_admin {
+    vq = vq.bind(user_sub);
+  }
+  if let Some(agent_id) = params.agent_id {
+    vq = vq.bind(agent_id);
+  }
+  if let Some(ref provider_id) = params.provider_id {
+    vq = vq.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    vq = vq.bind(provider_key_id);
+  }
+
+  let values = match vq
+    .bind(limit)
+    .bind(offset as i64)
+    .fetch_all(&state.pool)
+    .await
+  {
+    Ok(v) => v,
+    Err(e) => {
+      tracing::error!("Failed to query median values: {}", e);
+      return 0.0;
+    }
+  };
 
   if values.is_empty() {
     return 0.0;
   }
 
-  let mid = values.len() / 2;
-  let median_micros = if values.len() % 2 == 0 {
-    (values[mid - 1] + values[mid]) as f64 / 2.0
+  let median_micros = if count % 2 == 0 && values.len() == 2 {
+    (values[0] + values[1]) as f64 / 2.0
   } else {
-    values[mid] as f64
+    values[0] as f64
   };
 
   median_micros / 1_000_000.0

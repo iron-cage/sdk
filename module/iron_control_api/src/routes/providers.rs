@@ -460,7 +460,7 @@ pub async fn list_provider_keys(
     }
     q.fetch_all(state.storage.pool())
       .await
-      .unwrap_or_default()
+      .unwrap_or_else(|e| { tracing::warn!("Failed to fetch analytics spend for provider keys: {e}"); Vec::new() })
       .into_iter()
       .collect()
   };
@@ -474,7 +474,7 @@ pub async fn list_provider_keys(
       .storage
       .get_key_projects(meta.id)
       .await
-      .unwrap_or_default();
+      .unwrap_or_else(|e| { tracing::warn!("Failed to fetch projects for provider key {}: {e}", meta.id); Vec::new() });
 
     let total_spend_micros = spend_map.get(&meta.id).copied().unwrap_or(0);
     let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
@@ -524,7 +524,7 @@ pub async fn get_provider_key(
     .storage
     .get_key_projects(key_id)
     .await
-    .unwrap_or_default();
+    .unwrap_or_else(|e| { tracing::warn!("Failed to fetch projects for provider key {key_id} in get_provider_key: {e}"); Vec::new() });
 
   // Query analytics spend for this key
   let total_spend_micros: i64 = sqlx::query_scalar(
@@ -622,7 +622,7 @@ pub async fn update_provider_key(
     .storage
     .get_key_projects(key_id)
     .await
-    .unwrap_or_default();
+    .unwrap_or_else(|e| { tracing::warn!("Failed to fetch projects for provider key {key_id} in update_provider_key: {e}"); Vec::new() });
 
   // Query analytics spend for this key
   let total_spend_micros: i64 = sqlx::query_scalar(
