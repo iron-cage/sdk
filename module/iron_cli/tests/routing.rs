@@ -6,7 +6,6 @@
 //! Verifies that all CLI commands route to correct adapter functions
 //! and that no routes call orphaned adapters (adapters without valid API endpoints).
 
-mod routing
-{
+mod routing {
   pub mod correctness;
 }

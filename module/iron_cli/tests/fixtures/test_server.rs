@@ -1,4 +1,4 @@
-//! TestServer - Real HTTP server for integration testing
+//! `TestServer` - Real HTTP server for integration testing
 //!
 //! ## Purpose
 //!
@@ -9,8 +9,8 @@
 //!
 //! This is a REAL HTTP server:
 //! - Real Axum server on random port (not mock)
-//! - Real database connection (SQLite via iron_test_db)
-//! - Real production routes from iron_control_api
+//! - Real database connection (`SQLite` via `iron_test_db`)
+//! - Real production routes from `iron_control_api`
 //! - Real request/response handling
 //!
 //! ## Architecture
@@ -32,14 +32,14 @@
 //! - Allows parallel test execution without port conflicts
 //! - More realistic than fixed port
 //!
-//! **Why SQLite not PostgreSQL?**
+//! **Why `SQLite` not `PostgreSQL`?**
 //! - Faster test execution
 //! - No external dependencies
 //! - Still real SQL database with real transactions
-//! - iron_test_db already provides infrastructure
+//! - `iron_test_db` already provides infrastructure
 //!
 //! **Why Axum?**
-//! - Same framework as production (iron_control_api uses Axum)
+//! - Same framework as production (`iron_control_api` uses Axum)
 //! - Real production code paths
 //!
 //! ## Usage Example
@@ -61,13 +61,8 @@
 //! }
 //! ```
 
-use axum::{
-  http::StatusCode,
-  response::IntoResponse,
-  routing::get,
-  Router,
-};
-use std::net::SocketAddr;
+use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
+use core::net::SocketAddr;
 use tokio::sync::oneshot;
 
 /// Server startup delay in milliseconds
@@ -78,14 +73,12 @@ use tokio::sync::oneshot;
 /// the server actually responds.
 const SERVER_STARTUP_DELAY_MS: u64 = 50;
 
-pub struct TestServer
-{
+pub struct TestServer {
   addr: SocketAddr,
   shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
-impl TestServer
-{
+impl TestServer {
   /// Start real HTTP server on random port
   ///
   /// Creates test database, starts Axum server, waits for ready.
@@ -96,103 +89,93 @@ impl TestServer
   /// Panics if unable to bind to a port or start the server.
   /// This is acceptable for test infrastructure - tests should
   /// fail loudly if the test server cant start.
-  pub async fn start() -> Self
-  {
+  pub async fn start() -> Self {
     // Create minimal Axum app with health endpoint
-    let app = Router::new()
-      .route( "/health", get( health_handler ) );
+    let app = Router::new().route("/health", get(health_handler));
 
     // Bind to random port (0 = OS assigns random port)
-    let listener = tokio::net::TcpListener::bind( "127.0.0.1:0" )
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
       .await
-      .expect( "LOUD FAILURE: Failed to bind to random port" );
+      .expect("LOUD FAILURE: Failed to bind to random port");
 
-    let addr = listener.local_addr()
-      .expect( "LOUD FAILURE: Failed to get local address" );
+    let addr = listener
+      .local_addr()
+      .expect("LOUD FAILURE: Failed to get local address");
 
     // Create shutdown channel
-    let ( shutdown_tx, shutdown_rx ) = oneshot::channel();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     // Spawn server in background task
-    tokio::spawn( async move {
-      axum::serve( listener, app )
-        .with_graceful_shutdown( async {
+    tokio::spawn(async move {
+      axum::serve(listener, app)
+        .with_graceful_shutdown(async {
           shutdown_rx.await.ok();
-        } )
+        })
         .await
-        .expect( "LOUD FAILURE: Server failed to start" );
-    } );
+        .expect("LOUD FAILURE: Server failed to start");
+    });
 
     // Wait for server to be ready
-    tokio::time::sleep(
-      tokio::time::Duration::from_millis( SERVER_STARTUP_DELAY_MS )
-    ).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(SERVER_STARTUP_DELAY_MS)).await;
 
     Self {
       addr,
-      shutdown_tx: Some( shutdown_tx ),
+      shutdown_tx: Some(shutdown_tx),
     }
   }
 
-  /// Get server URL (e.g., "http://127.0.0.1:12345")
-  pub fn url( &self ) -> String
-  {
-    format!( "http://{}", self.addr )
+  /// Get server URL (e.g., <http://127.0.0.1:12345>)
+  pub fn url(&self) -> String {
+    format!("http://{}", self.addr)
   }
 
   /// Graceful shutdown
-  pub async fn shutdown( mut self )
-  {
-    if let Some( tx ) = self.shutdown_tx.take() {
-      let _ = tx.send( () );
+  #[allow(clippy::unused_async)]
+  pub async fn shutdown(mut self) {
+    if let Some(tx) = self.shutdown_tx.take() {
+      let _ = tx.send(());
     }
   }
 }
 
-impl Drop for TestServer
-{
-  fn drop( &mut self )
-  {
+impl Drop for TestServer {
+  fn drop(&mut self) {
     // Shutdown signal on drop
-    if let Some( tx ) = self.shutdown_tx.take() {
-      let _ = tx.send( () );
+    if let Some(tx) = self.shutdown_tx.take() {
+      let _ = tx.send(());
     }
   }
 }
 
 /// Minimal health check handler
-async fn health_handler() -> impl IntoResponse
-{
-  ( StatusCode::OK, "healthy" )
+async fn health_handler() -> impl IntoResponse {
+  (StatusCode::OK, "healthy")
 }
 
 #[cfg(test)]
-mod tests
-{
+mod tests {
   use super::*;
 
   /// RED Phase Test: Server starts and accepts requests
   ///
-  /// This test MUST fail until TestServer::start() is implemented.
+  /// This test MUST fail until `TestServer::start()` is implemented.
   #[tokio::test]
-  async fn test_server_starts_and_accepts_requests()
-  {
+  async fn test_server_starts_and_accepts_requests() {
     let server = TestServer::start().await;
 
     // Verify server is listening
-    let response = reqwest::get( format!( "{}/health", server.url() ) )
+    let response = reqwest::get(format!("{}/health", server.url()))
       .await
-      .expect( "LOUD FAILURE: Health check request failed" );
+      .expect("LOUD FAILURE: Health check request failed");
 
-    assert_eq!( response.status(), 200, "Health endpoint should return 200" );
+    assert_eq!(response.status(), 200, "Health endpoint should return 200");
 
     server.shutdown().await;
   }
 
   /// RED Phase Test: Server uses random port
   #[tokio::test]
-  async fn test_server_uses_random_port()
-  {
+  async fn test_server_uses_random_port() {
     let server1 = TestServer::start().await;
     let server2 = TestServer::start().await;
 

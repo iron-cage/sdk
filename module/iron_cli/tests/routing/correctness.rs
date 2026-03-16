@@ -12,12 +12,12 @@
 //! ## Orphaned Adapters (Deleted in Migration)
 //!
 //! The following 6 adapters were deleted because they had no matching API endpoints:
-//! - `show_agent_usage_adapter` (usage_adapters.rs)
-//! - `export_agent_usage_adapter` (usage_adapters.rs)
-//! - `reset_limit_adapter` (limits_adapters.rs)
-//! - `show_agent_limits_adapter` (limits_adapters.rs)
-//! - `update_agent_limit_adapter` (limits_adapters.rs)
-//! - `show_trace_stats_adapter` (traces_adapters.rs)
+//! - `show_agent_usage_adapter` (`usage_adapters.rs`)
+//! - `export_agent_usage_adapter` (`usage_adapters.rs`)
+//! - `reset_limit_adapter` (`limits_adapters.rs`)
+//! - `show_agent_limits_adapter` (`limits_adapters.rs`)
+//! - `update_agent_limit_adapter` (`limits_adapters.rs`)
+//! - `show_trace_stats_adapter` (`traces_adapters.rs`)
 
 use std::path::PathBuf;
 
@@ -30,7 +30,7 @@ use std::path::PathBuf;
 ///
 /// Auth (3): .auth.{login, refresh, logout}
 /// Tokens (5): .tokens.{generate, list, get, rotate, revoke}
-/// Usage (4): .usage.{show, by_project, by_provider, export}
+/// Usage (4): .usage.{show, `by_project`, `by_provider`, export}
 /// Limits (5): .limits.{list, get, create, update, delete}
 /// Traces (3): .traces.{list, get, export}
 /// Health (2): .health, .version
@@ -38,17 +38,19 @@ use std::path::PathBuf;
 /// ## Verification Method
 ///
 /// Reads the routing source code and verifies each command has a route entry.
-#[ test ]
-fn test_all_commands_route_correctly()
-{
+#[test]
+fn test_all_commands_route_correctly() {
   // Read routing source file
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
-  let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  let routing_file = manifest_dir.join("src/bin/iron_token_unilang.rs");
 
-  assert!( routing_file.exists(), "Routing file must exist: {:?}", routing_file );
+  assert!(
+    routing_file.exists(),
+    "Routing file must exist: {routing_file:?}"
+  );
 
-  let routing_content = std::fs::read_to_string( &routing_file )
-    .expect("LOUD FAILURE: Failed to read routing file");
+  let routing_content =
+    std::fs::read_to_string(&routing_file).expect("LOUD FAILURE: Failed to read routing file");
 
   // Expected commands (22 total)
   let expected_commands = vec![
@@ -56,54 +58,43 @@ fn test_all_commands_route_correctly()
     ".auth.login",
     ".auth.refresh",
     ".auth.logout",
-
     // Token commands (5)
     ".tokens.generate",
     ".tokens.list",
     ".tokens.get",
     ".tokens.rotate",
     ".tokens.revoke",
-
     // Usage commands (4)
     ".usage.show",
     ".usage.by_project",
     ".usage.by_provider",
     ".usage.export",
-
     // Limits commands (5)
     ".limits.list",
     ".limits.get",
     ".limits.create",
     ".limits.update",
     ".limits.delete",
-
     // Traces commands (3)
     ".traces.list",
     ".traces.get",
     ".traces.export",
-
     // Health commands (2)
     ".health",
     ".version",
   ];
 
   // Verify each command has a route entry
-  for command in &expected_commands
-  {
-    let pattern = format!( "\"{}\"", command );
+  for command in &expected_commands {
+    let pattern = format!("\"{command}\"");
     assert!(
-      routing_content.contains( &pattern ),
-      "Command '{}' must have route entry in routing file",
-      command
+      routing_content.contains(&pattern),
+      "Command '{command}' must have route entry in routing file"
     );
   }
 
   // Verify total count matches expectation
-  assert_eq!(
-    expected_commands.len(),
-    22,
-    "Expected exactly 22 commands"
-  );
+  assert_eq!(expected_commands.len(), 22, "Expected exactly 22 commands");
 }
 
 /// Test that no routes call orphaned adapters
@@ -118,26 +109,25 @@ fn test_all_commands_route_correctly()
 ///
 /// ## Orphaned Adapters (6 total)
 ///
-/// - show_agent_usage_adapter
-/// - export_agent_usage_adapter
-/// - reset_limit_adapter
-/// - show_agent_limits_adapter
-/// - update_agent_limit_adapter
-/// - show_trace_stats_adapter
+/// - `show_agent_usage_adapter`
+/// - `export_agent_usage_adapter`
+/// - `reset_limit_adapter`
+/// - `show_agent_limits_adapter`
+/// - `update_agent_limit_adapter`
+/// - `show_trace_stats_adapter`
 ///
 /// ## Verification Method
 ///
 /// Searches routing source code for references to orphaned adapter names.
 /// Any reference indicates a broken route that must be fixed.
-#[ test ]
-fn test_no_orphaned_adapter_usage()
-{
+#[test]
+fn test_no_orphaned_adapter_usage() {
   // Read routing source file
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
-  let routing_file = manifest_dir.join( "src/bin/iron_token_unilang.rs" );
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  let routing_file = manifest_dir.join("src/bin/iron_token_unilang.rs");
 
-  let routing_content = std::fs::read_to_string( &routing_file )
-    .expect("LOUD FAILURE: Failed to read routing file");
+  let routing_content =
+    std::fs::read_to_string(&routing_file).expect("LOUD FAILURE: Failed to read routing file");
 
   // List of orphaned adapters (deleted in migration)
   let orphaned_adapters = vec![
@@ -150,25 +140,22 @@ fn test_no_orphaned_adapter_usage()
   ];
 
   // Verify no orphaned adapters are referenced in routing
-  for adapter in &orphaned_adapters
-  {
+  for adapter in &orphaned_adapters {
     assert!(
-      !routing_content.contains( adapter ),
-      "Routing file must NOT reference orphaned adapter: {}",
-      adapter
+      !routing_content.contains(adapter),
+      "Routing file must NOT reference orphaned adapter: {adapter}"
     );
   }
 
   // NC-R.1: Verify count is zero
-  let orphaned_count = orphaned_adapters.iter()
-    .filter( |adapter| routing_content.contains( *adapter ) )
+  let orphaned_count = orphaned_adapters
+    .iter()
+    .filter(|adapter| routing_content.contains(*adapter))
     .count();
 
   assert_eq!(
-    orphaned_count,
-    0,
-    "NC-R.1 violated: Found {} routes calling orphaned adapters (expected 0)",
-    orphaned_count
+    orphaned_count, 0,
+    "NC-R.1 violated: Found {orphaned_count} routes calling orphaned adapters (expected 0)"
   );
 }
 
@@ -200,9 +187,8 @@ fn test_no_orphaned_adapter_usage()
 /// This test passes because the code compiles. The presence of this test
 /// documents the compile-time protection mechanism. If someone attempts to
 /// restore old routing patterns, they will get compilation errors.
-#[ test ]
-fn test_routing_compilation_prevents_old_adapters()
-{
+#[test]
+fn test_routing_compilation_prevents_old_adapters() {
   // This test documents compile-time protection
   // The fact that this test compiles proves that:
   // 1. No references to deleted adapters exist in routing code
@@ -210,7 +196,7 @@ fn test_routing_compilation_prevents_old_adapters()
   // 3. Rollback to old routing patterns will fail at compilation
 
   // Verify adapter modules still exist (non-orphaned adapters)
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
   // Check adapter module files exist
   let adapter_files = vec![
@@ -222,14 +208,9 @@ fn test_routing_compilation_prevents_old_adapters()
     "src/adapters/health_adapters.rs",
   ];
 
-  for adapter_file in &adapter_files
-  {
-    let path = manifest_dir.join( adapter_file );
-    assert!(
-      path.exists(),
-      "Adapter module must exist: {}",
-      adapter_file
-    );
+  for adapter_file in &adapter_files {
+    let path = manifest_dir.join(adapter_file);
+    assert!(path.exists(), "Adapter module must exist: {adapter_file}");
   }
 
   // Compilation success proves no orphaned adapter usage (syntactic protection layer)
@@ -251,7 +232,7 @@ fn test_routing_compilation_prevents_old_adapters()
 ///
 /// 1. **Documentation-Only Issue**: No automated tests verify help text accuracy
 /// 2. **Manual Testing Gap**: Help examples weren't tested during development
-/// 3. **Parser Behavior**: Error comes from unilang library, not iron_cli code
+/// 3. **Parser Behavior**: Error comes from unilang library, not `iron_cli` code
 ///
 /// ## Fix Applied
 ///
@@ -277,29 +258,23 @@ fn test_routing_compilation_prevents_old_adapters()
 ///
 /// **Specific lesson**: Before documenting any CLI syntax, test it actually
 /// works. Don't assume similar tools' conventions apply without verification.
-#[ test ]
-fn bug_reproducer_issue_004_help_syntax_consistency()
-{
+#[test]
+fn bug_reproducer_issue_004_help_syntax_consistency() {
   // Read both binary source files
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
   let binaries = vec![
     "src/bin/iron_token_unilang.rs",
     "src/bin/iron_control_unilang.rs",
   ];
 
-  for binary_file in &binaries
-  {
-    let path = manifest_dir.join( binary_file );
+  for binary_file in &binaries {
+    let path = manifest_dir.join(binary_file);
 
-    assert!(
-      path.exists(),
-      "Binary source must exist: {}",
-      binary_file
-    );
+    assert!(path.exists(), "Binary source must exist: {binary_file}");
 
-    let content = std::fs::read_to_string( &path )
-      .expect("LOUD FAILURE: Failed to read binary source");
+    let content =
+      std::fs::read_to_string(&path).expect("LOUD FAILURE: Failed to read binary source");
 
     // Verify help text doesn't contain invalid ?? syntax
     // Search for pattern: ".command ??" in help examples
@@ -310,26 +285,22 @@ fn bug_reproducer_issue_004_help_syntax_consistency()
       "command ??",
     ];
 
-    for pattern in &invalid_patterns
-    {
+    for pattern in &invalid_patterns {
       assert!(
-        !content.contains( pattern ),
-        "File {} contains invalid help syntax '{}'. Only single '?' is valid.",
-        binary_file,
-        pattern
+        !content.contains(pattern),
+        "File {binary_file} contains invalid help syntax '{pattern}'. Only single '?' is valid."
       );
     }
 
     // Verify at least one valid single ? help example exists
     assert!(
-      content.contains( " ?" ) && !content.contains( " ??" ),
-      "File {} should contain valid single '?' help examples",
-      binary_file
+      content.contains(" ?") && !content.contains(" ??"),
+      "File {binary_file} should contain valid single '?' help examples"
     );
   }
 }
 
-/// Bug reproducer for Issue 7: token_id type mismatch between YAML and handlers
+/// Bug reproducer for Issue 7: `token_id` type mismatch between YAML and handlers
 ///
 /// ## Root Cause
 ///
@@ -375,7 +346,7 @@ fn bug_reproducer_issue_004_help_syntax_consistency()
 ///    - Updated example: `token_id::456` → `token_id::tok_def456`
 ///
 /// Also updated manual test plan `tests/manual/readme.md` test cases:
-/// TC-3.3, TC-3.4, TC-3.5, TC-7.3 to use string token_id format.
+/// TC-3.3, TC-3.4, TC-3.5, TC-7.3 to use string `token_id` format.
 ///
 /// ## Prevention
 ///
@@ -407,121 +378,109 @@ fn bug_reproducer_issue_004_help_syntax_consistency()
 /// "tok_*" prefix) must ALWAYS be declared as `kind: String` in YAML, never as
 /// Integer even if they contain numbers. The presence of a prefix pattern
 /// automatically means String type.
-#[ test ]
-fn bug_reproducer_issue_007_token_id_type_mismatch()
-{
+#[test]
+fn bug_reproducer_issue_007_token_id_type_mismatch() {
   // Read YAML command definitions
-  let manifest_dir = PathBuf::from( env!( "CARGO_MANIFEST_DIR" ) );
-  let yaml_file = manifest_dir.join( "commands/tokens.yaml" );
+  let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  let yaml_file = manifest_dir.join("commands/tokens.yaml");
 
   assert!(
     yaml_file.exists(),
-    "YAML command definitions must exist: {:?}",
-    yaml_file
+    "YAML command definitions must exist: {yaml_file:?}"
   );
 
-  let yaml_content = std::fs::read_to_string( &yaml_file )
-    .expect("LOUD FAILURE: Failed to read YAML file");
+  let yaml_content =
+    std::fs::read_to_string(&yaml_file).expect("LOUD FAILURE: Failed to read YAML file");
 
   // Commands that require token_id parameter with String type
-  let commands_with_token_id = vec![
-    ".tokens.get",
-    ".tokens.rotate",
-    ".tokens.revoke",
-  ];
+  let commands_with_token_id = vec![".tokens.get", ".tokens.rotate", ".tokens.revoke"];
 
   // Verify each command declares token_id as String (not Integer)
-  for command in &commands_with_token_id
-  {
+  for command in &commands_with_token_id {
     // Find command definition section
-    let command_pattern = format!( "name: {}", command );
+    let command_pattern = format!("name: {command}");
     assert!(
-      yaml_content.contains( &command_pattern ),
-      "Command '{}' must exist in YAML",
-      command
+      yaml_content.contains(&command_pattern),
+      "Command '{command}' must exist in YAML"
     );
 
     // Extract section for this command (from "name: .tokens.X" to next "- name:" or EOF)
-    let start_idx = yaml_content.find( &command_pattern )
+    let start_idx = yaml_content
+      .find(&command_pattern)
       .expect("LOUD FAILURE: Command must exist in YAML");
 
-    let remaining = &yaml_content[ start_idx.. ];
-    let next_command = remaining[ 1.. ].find( "\n- name:" ).unwrap_or( remaining.len() );
-    let command_section = &remaining[ ..next_command ];
+    let remaining = &yaml_content[start_idx..];
+    let next_command = remaining[1..].find("\n- name:").unwrap_or(remaining.len());
+    let command_section = &remaining[..next_command];
 
     // Verify token_id parameter exists and is String type
     assert!(
-      command_section.contains( "- name: token_id" ),
-      "Command '{}' must have token_id parameter",
-      command
+      command_section.contains("- name: token_id"),
+      "Command '{command}' must have token_id parameter"
     );
 
     // CRITICAL: Verify kind is String, not Integer
     // This regex-free check looks for the parameter definition block
-    let token_id_start = command_section.find( "- name: token_id" )
+    let token_id_start = command_section
+      .find("- name: token_id")
       .expect("LOUD FAILURE: token_id parameter must exist");
 
-    let param_section = &command_section[ token_id_start.. ];
-    let next_param = param_section[ 1.. ].find( "\n  - name:" )
-      .or_else( || param_section[ 1.. ].find( "\nexamples:" ) )
-      .unwrap_or( param_section.len() );
+    let param_section = &command_section[token_id_start..];
+    let next_param = param_section[1..]
+      .find("\n  - name:")
+      .or_else(|| param_section[1..].find("\nexamples:"))
+      .unwrap_or(param_section.len());
 
-    let param_def = &param_section[ ..next_param ];
+    let param_def = &param_section[..next_param];
 
     // Verify String type (not Integer)
     assert!(
-      param_def.contains( "kind: String" ),
-      "Command '{}' token_id must be 'kind: String' (not Integer). \
-       Handlers expect 'tok_*' format which is a String type.",
-      command
+      param_def.contains("kind: String"),
+      "Command '{command}' token_id must be 'kind: String' (not Integer). \
+       Handlers expect 'tok_*' format which is a String type."
     );
 
     // Verify Integer is NOT present (common mistake)
     assert!(
-      !param_def.contains( "kind: Integer" ),
-      "Command '{}' token_id must NOT be 'kind: Integer'. \
-       The 'tok_*' prefix format requires String type.",
-      command
+      !param_def.contains("kind: Integer"),
+      "Command '{command}' token_id must NOT be 'kind: Integer'. \
+       The 'tok_*' prefix format requires String type."
     );
 
     // Verify hint mentions the tok_* format
     assert!(
-      param_def.contains( "tok_" ),
-      "Command '{}' token_id hint should document 'tok_*' format requirement",
-      command
+      param_def.contains("tok_"),
+      "Command '{command}' token_id hint should document 'tok_*' format requirement"
     );
   }
 
   // Verify examples use string format (tok_*), not numeric format
-  for command in &commands_with_token_id
-  {
-    let command_pattern = format!( "name: {}", command );
-    let start_idx = yaml_content.find( &command_pattern )
+  for command in &commands_with_token_id {
+    let command_pattern = format!("name: {command}");
+    let start_idx = yaml_content
+      .find(&command_pattern)
       .expect("LOUD FAILURE: Command must exist");
 
-    let remaining = &yaml_content[ start_idx.. ];
-    let next_command = remaining[ 1.. ].find( "\n- name:" ).unwrap_or( remaining.len() );
-    let command_section = &remaining[ ..next_command ];
+    let remaining = &yaml_content[start_idx..];
+    let next_command = remaining[1..].find("\n- name:").unwrap_or(remaining.len());
+    let command_section = &remaining[..next_command];
 
     // Check examples section contains tok_ format
-    if let Some( examples_start ) = command_section.find( "examples:" )
-    {
-      let examples_section = &command_section[ examples_start.. ];
+    if let Some(examples_start) = command_section.find("examples:") {
+      let examples_section = &command_section[examples_start..];
 
       assert!(
-        examples_section.contains( "token_id::tok_" ),
-        "Command '{}' examples must use 'tok_*' string format (not numeric)",
-        command
+        examples_section.contains("token_id::tok_"),
+        "Command '{command}' examples must use 'tok_*' string format (not numeric)"
       );
 
       // Verify examples don't use old numeric format
       // This checks for "token_id::123" or similar numeric patterns
       assert!(
-        !examples_section.contains( "token_id::123" ) &&
-        !examples_section.contains( "token_id::456" ) &&
-        !examples_section.contains( "token_id::789" ),
-        "Command '{}' examples must NOT use numeric format (use tok_* instead)",
-        command
+        !examples_section.contains("token_id::123")
+          && !examples_section.contains("token_id::456")
+          && !examples_section.contains("token_id::789"),
+        "Command '{command}' examples must NOT use numeric format (use tok_* instead)"
       );
     }
   }

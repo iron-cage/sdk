@@ -18,15 +18,15 @@
 //! 4. Store results (if not dry-run)
 //! 5. Format output
 
-use super::{ AdapterError, ServiceError };
-use super::services::{ AuthService, StorageService };
-use crate::handlers::auth_handlers;
+use super::services::{AuthService, StorageService};
+use super::{AdapterError, ServiceError};
 use crate::formatting::TreeFmtFormatter;
+use crate::handlers::auth_handlers;
 use std::collections::HashMap;
 
-/// Extract parameters from mock VerifiedCommand
+/// Extract parameters from mock `VerifiedCommand`
 ///
-/// TODO: Replace with real unilang VerifiedCommand when available
+/// TODO: Replace with real unilang `VerifiedCommand` when available
 fn extract_params<T>(command: &T) -> HashMap<String, String>
 where
   T: HasParams,
@@ -35,17 +35,17 @@ where
 }
 
 /// Temporary trait for parameter extraction (until unilang types available)
-pub trait HasParams
-{
+pub trait HasParams {
+  /// Get parameters as a key-value map
   fn get_params(&self) -> HashMap<String, String>;
 }
 
 /// Check if dry-run mode enabled
-fn is_dry_run(params: &HashMap<String, String>) -> bool
-{
-  params.get( "dry_run" )
-    .and_then( |v| v.parse::<bool>().ok() )
-    .unwrap_or( false )
+fn is_dry_run(params: &HashMap<String, String>) -> bool {
+  params
+    .get("dry_run")
+    .and_then(|v| v.parse::<bool>().ok())
+    .unwrap_or(false)
 }
 
 /// Login adapter
@@ -55,9 +55,14 @@ fn is_dry_run(params: &HashMap<String, String>) -> bool
 /// ## Flow
 ///
 /// 1. Extract username/password from command
-/// 2. Call login_handler() for validation
-/// 3. Perform async login via AuthService (stores tokens internally)
+/// 2. Call `login_handler()` for validation
+/// 3. Perform async login via `AuthService` (stores tokens internally)
 /// 4. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if parameter extraction, handler validation,
+/// or authentication service fails.
 pub async fn login_adapter<T, A>(
   command: &T,
   auth_service: A,
@@ -68,32 +73,32 @@ where
   A: AuthService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = auth_handlers::login_handler( &params )?;
+  let _ = auth_handlers::login_handler(&params)?;
 
   // Extract validated parameters
-  let email = params.get( "email" ).ok_or_else( || {
-    AdapterError::ExtractionError( "email missing after validation".to_string() )
-  })?;
+  let email = params
+    .get("email")
+    .ok_or_else(|| AdapterError::ExtractionError("email missing after validation".to_string()))?;
 
-  let password = params.get( "password" ).ok_or_else( || {
-    AdapterError::ExtractionError( "password missing after validation".to_string() )
+  let password = params.get("password").ok_or_else(|| {
+    AdapterError::ExtractionError("password missing after validation".to_string())
   })?;
 
   // Perform async authentication
-  let tokens = auth_service.login( email, password ).await?;
+  let tokens = auth_service.login(email, password).await?;
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), "success".to_string() );
-  output_data.insert( "user".to_string(), email.clone() );
-  output_data.insert( "access_token".to_string(), tokens.access_token.clone() );
+  output_data.insert("status".to_string(), "success".to_string());
+  output_data.insert("user".to_string(), email.clone());
+  output_data.insert("access_token".to_string(), tokens.access_token.clone());
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }
 
 /// Refresh adapter
@@ -103,10 +108,15 @@ where
 /// ## Flow
 ///
 /// 1. Load refresh token from storage
-/// 2. Call refresh_handler() for validation
-/// 3. Perform async refresh via AuthService
+/// 2. Call `refresh_handler()` for validation
+/// 3. Perform async refresh via `AuthService`
 /// 4. Store new tokens (if not dry-run)
 /// 5. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if parameter extraction, handler validation,
+/// storage load, or token refresh fails.
 pub async fn refresh_adapter<T, A, S>(
   command: &T,
   auth_service: A,
@@ -119,42 +129,46 @@ where
   S: StorageService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = auth_handlers::refresh_handler( &params )?;
+  let _ = auth_handlers::refresh_handler(&params)?;
 
   // Load tokens from storage
-  let stored_tokens = storage_service.load_tokens().await?
-    .ok_or( ServiceError::NotFound )?;
+  let stored_tokens = storage_service
+    .load_tokens()
+    .await?
+    .ok_or(ServiceError::NotFound)?;
 
-  let dry_run = is_dry_run( &params );
+  let dry_run = is_dry_run(&params);
 
-  if dry_run
-  {
+  if dry_run {
     // Dry-run: simulate output without performing refresh
     let mut output_data = HashMap::new();
-    output_data.insert( "status".to_string(), "refreshed (dry-run)".to_string() );
-    output_data.insert( "access_token".to_string(), stored_tokens.access_token.clone() );
+    output_data.insert("status".to_string(), "refreshed (dry-run)".to_string());
+    output_data.insert(
+      "access_token".to_string(),
+      stored_tokens.access_token.clone(),
+    );
 
-    let output = formatter.format_single( &output_data );
-    return Ok( output );
+    let output = formatter.format_single(&output_data);
+    return Ok(output);
   }
 
   // Perform async refresh (not dry-run)
-  let new_tokens = auth_service.refresh( &stored_tokens.refresh_token ).await?;
+  let new_tokens = auth_service.refresh(&stored_tokens.refresh_token).await?;
 
   // Store new tokens
-  storage_service.save_tokens( &new_tokens ).await?;
+  storage_service.save_tokens(&new_tokens).await?;
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), "refreshed".to_string() );
-  output_data.insert( "access_token".to_string(), new_tokens.access_token.clone() );
+  output_data.insert("status".to_string(), "refreshed".to_string());
+  output_data.insert("access_token".to_string(), new_tokens.access_token.clone());
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }
 
 /// Logout adapter
@@ -163,11 +177,16 @@ where
 ///
 /// ## Flow
 ///
-/// 1. Call logout_handler() for validation
+/// 1. Call `logout_handler()` for validation
 /// 2. Load tokens (if any)
-/// 3. Perform async logout via AuthService (if logged in)
+/// 3. Perform async logout via `AuthService` (if logged in)
 /// 4. Clear storage (if not dry-run)
 /// 5. Format output
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if parameter extraction, handler validation,
+/// storage operations, or logout service call fails.
 pub async fn logout_adapter<T, A, S>(
   command: &T,
   auth_service: A,
@@ -180,44 +199,38 @@ where
   S: StorageService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = auth_handlers::logout_handler( &params )?;
+  let _ = auth_handlers::logout_handler(&params)?;
 
-  let dry_run = is_dry_run( &params );
+  let dry_run = is_dry_run(&params);
 
   // Load tokens (might not exist if already logged out)
   let tokens_opt = storage_service.load_tokens().await?;
 
-  let message = if let Some( tokens ) = tokens_opt
-  {
-    if dry_run
-    {
+  let message = if let Some(tokens) = tokens_opt {
+    if dry_run {
       // Dry-run: simulate logout without clearing tokens
       "Logout successful (dry-run - no changes made)"
-    }
-    else
-    {
+    } else {
       // Perform async logout
-      auth_service.logout( &tokens.access_token ).await?;
+      auth_service.logout(&tokens.access_token).await?;
 
       // Clear storage
       storage_service.clear_tokens().await?;
 
       "Logout successful"
     }
-  }
-  else
-  {
+  } else {
     "Already logged out (not logged in)"
   };
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), message.to_string() );
+  output_data.insert("status".to_string(), message.to_string());
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }

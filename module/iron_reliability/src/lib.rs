@@ -21,16 +21,16 @@
 //!   on each failure. Transitions to Open when failures reach threshold.
 //!
 //! - **Open**: Circuit is open, requests fail fast without hitting upstream service.
-//!   Prevents wasted resources on known-bad endpoints. Transitions to HalfOpen
+//!   Prevents wasted resources on known-bad endpoints. Transitions to `HalfOpen`
 //!   after timeout expires.
 //!
-//! - **HalfOpen**: Trial period, allows limited requests to test recovery.
+//! - **`HalfOpen`**: Trial period, allows limited requests to test recovery.
 //!   First success closes circuit. First failure reopens circuit.
 //!
 //! # Key Types
 //!
 //! - [`CircuitBreaker`] - Main circuit breaker with per-service state tracking
-//! - [`CircuitState`] - Circuit state enum (Closed, Open, HalfOpen)
+//! - [`CircuitState`] - Circuit state enum (Closed, Open, `HalfOpen`)
 //!
 //! # Public API
 //!
@@ -105,11 +105,11 @@
 //!
 //! Circuit breaker behavior is controlled by two parameters:
 //!
-//! - **failure_threshold**: Number of consecutive failures before opening circuit.
+//! - **`failure_threshold`**: Number of consecutive failures before opening circuit.
 //!   Higher values tolerate transient failures. Lower values provide faster detection.
 //!   Typical: 3-10 failures.
 //!
-//! - **timeout_secs**: How long circuit stays open before attempting recovery.
+//! - **`timeout_secs`**: How long circuit stays open before attempting recovery.
 //!   Longer timeouts reduce load on failing services. Shorter timeouts enable
 //!   faster recovery. Typical: 30-120 seconds.
 //!
@@ -118,67 +118,89 @@
 //! [`CircuitBreaker`] is thread-safe and designed for concurrent access.
 //! Internal state uses `Arc<Mutex<>>` for safe sharing across request handlers.
 
-use std::collections::HashMap;
-use std::sync::{ Arc, Mutex };
-use std::time::{ Duration, Instant };
+use core::time::Duration;
+use std::{
+  collections::HashMap,
+  sync::{Arc, Mutex},
+  time::Instant,
+};
 
-#[derive( Debug, Clone, Copy, PartialEq )]
-pub enum CircuitState
-{
+/// State of a circuit breaker for a given service.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CircuitState {
+  /// Circuit is closed — requests flow normally.
   Closed,
+  /// Circuit is open — requests are blocked until the timeout expires.
   Open,
+  /// Circuit is half-open — one probe request is allowed through.
   HalfOpen,
 }
 
-type CircuitStateEntry = ( CircuitState, Instant, u32 );
+type CircuitStateEntry = (CircuitState, Instant, u32);
 
-pub struct CircuitBreaker
-{
-  state : Arc< Mutex< HashMap< String, CircuitStateEntry > > >,
-  failure_threshold : u32,
-  timeout : Duration,
+/// Per-service circuit breaker that tracks failures and blocks requests when
+/// a failure threshold is exceeded.
+#[derive(Debug)]
+pub struct CircuitBreaker {
+  state: Arc<Mutex<HashMap<String, CircuitStateEntry>>>,
+  failure_threshold: u32,
+  timeout: Duration,
 }
 
-impl CircuitBreaker
-{
-  pub fn new( failure_threshold : u32, timeout_secs : u64 ) -> Self
-  {
-    Self
-    {
-      state : Arc::new( Mutex::new( HashMap::new() ) ),
+impl CircuitBreaker {
+  /// Create a new circuit breaker with the given failure threshold and timeout.
+  #[must_use]
+  pub fn new(failure_threshold: u32, timeout_secs: u64) -> Self {
+    Self {
+      state: Arc::new(Mutex::new(HashMap::new())),
       failure_threshold,
-      timeout : Duration::from_secs( timeout_secs ),
+      timeout: Duration::from_secs(timeout_secs),
     }
   }
 
-  pub fn is_open( &self, service : &str ) -> bool
-  {
+  /// Returns `true` if the circuit is open for the given service, blocking requests.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal state mutex is poisoned.
+  #[must_use]
+  pub fn is_open(&self, service: &str) -> bool {
     let state = self.state.lock().unwrap();
-    if let Some( ( circuit_state, opened_at, _ ) ) = state.get( service )
-    {
-      if *circuit_state == CircuitState::Open && opened_at.elapsed() < self.timeout
-      {
+    if let Some((circuit_state, opened_at, _)) = state.get(service) {
+      if *circuit_state == CircuitState::Open && opened_at.elapsed() < self.timeout {
         return true;
       }
     }
     false
   }
 
-  pub fn record_success( &self, service : &str )
-  {
+  /// Records a successful call and resets the circuit to `Closed` for the given service.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal state mutex is poisoned.
+  pub fn record_success(&self, service: &str) {
     let mut state = self.state.lock().unwrap();
-    state.insert( service.to_string(), ( CircuitState::Closed, Instant::now(), 0 ) );
+    state.insert(
+      service.to_string(),
+      (CircuitState::Closed, Instant::now(), 0),
+    );
   }
 
-  pub fn record_failure( &self, service : &str )
-  {
+  /// Records a failed call and opens the circuit if the failure threshold is reached.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the internal state mutex is poisoned.
+  pub fn record_failure(&self, service: &str) {
     let mut state = self.state.lock().unwrap();
-    let entry = state.entry( service.to_string() )
-      .or_insert( ( CircuitState::Closed, Instant::now(), 0 ) );
+    let entry =
+      state
+        .entry(service.to_string())
+        .or_insert((CircuitState::Closed, Instant::now(), 0));
 
     entry.2 += 1;
-    if entry.2 >= self.failure_threshold
-    {
+    if entry.2 >= self.failure_threshold {
       entry.0 = CircuitState::Open;
       entry.1 = Instant::now();
     }

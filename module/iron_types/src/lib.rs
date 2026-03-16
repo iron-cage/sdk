@@ -158,66 +158,74 @@
 #![cfg_attr(not(feature = "enabled"), allow(unused))]
 
 #[cfg(feature = "enabled")]
-mod types
-{
+mod types {
   use serde::{Deserialize, Serialize};
   use thiserror::Error;
 
   /// Main configuration for Iron Cage runtime
   #[derive(Debug, Clone, Serialize, Deserialize)]
-  pub struct Config
-  {
+  pub struct Config {
+    /// Safety module configuration (PII detection, audit logging).
     pub safety: SafetyConfig,
+    /// Cost module configuration (budget limits and alert thresholds).
     pub cost: CostConfig,
+    /// Reliability module configuration (circuit breaker settings).
     pub reliability: ReliabilityConfig,
   }
 
   /// Safety module configuration
   #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-  pub struct SafetyConfig
-  {
+  pub struct SafetyConfig {
+    /// Whether PII detection is active for agent outputs.
     #[serde(default)]
     pub pii_detection_enabled: bool,
+    /// Optional path for writing structured audit log entries.
     #[serde(default)]
-    pub audit_log_path: Option< String >,
+    pub audit_log_path: Option<String>,
   }
 
   /// Cost module configuration
   #[derive(Debug, Clone, Serialize, Deserialize)]
-  pub struct CostConfig
-  {
+  pub struct CostConfig {
+    /// Maximum allowed spend in USD before the budget is considered exceeded.
     pub budget_usd: f64,
+    /// Fraction of the budget (0.0–1.0) at which a warning alert is triggered.
     pub alert_threshold: f64,
   }
 
   /// Reliability module configuration
   #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-  pub struct ReliabilityConfig
-  {
+  pub struct ReliabilityConfig {
+    /// Whether the circuit breaker is active for downstream service calls.
     #[serde(default)]
     pub circuit_breaker_enabled: bool,
+    /// Number of consecutive failures before the circuit opens.
     #[serde(default)]
     pub failure_threshold: u32,
   }
 
   /// Common error type
   #[derive(Debug, Error)]
-  pub enum Error
-  {
+  pub enum Error {
     #[error("Safety violation: {0}")]
+    /// A safety policy violation was detected (e.g. PII in output).
     Safety(String),
 
     #[error("Budget exceeded: {0}")]
+    /// The agent's USD budget was exceeded.
     BudgetExceeded(String),
 
     #[error("Circuit breaker open: {0}")]
+    /// A downstream service is unavailable — circuit breaker is open.
     CircuitBreakerOpen(String),
 
     #[error("Configuration error: {0}")]
+    /// A configuration value is invalid or missing.
     Config(String),
   }
 
-  pub type Result< T > = std::result::Result< T, Error >;
+  /// Convenience `Result` alias using the crate's [`Error`] type.
+  pub type Result<T> = core::result::Result<T, Error>;
 }
 
 #[cfg(feature = "enabled")]
@@ -227,8 +235,7 @@ pub use types::*;
 pub mod ids;
 
 #[cfg(feature = "enabled")]
-pub use ids::
-{
-  AgentId, ApiTokenId, BudgetRequestId, IcTokenId, IdError, LeaseId,
-  ProviderId, ProjectId, RequestId,
+pub use ids::{
+  AgentId, ApiTokenId, BudgetRequestId, IcTokenId, IdError, LeaseId, ProjectId, ProviderId,
+  RequestId,
 };

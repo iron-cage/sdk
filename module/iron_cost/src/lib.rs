@@ -10,7 +10,7 @@
 //! - Pre-request budget validation and reservation
 //! - Real-time cost tracking during streaming
 //! - Post-request cost reconciliation
-//! - Pricing lookup from LiteLLM database
+//! - Pricing lookup from `LiteLLM` database
 //! - Token estimation for cost prediction
 //!
 //! # Precision Guarantees
@@ -31,7 +31,7 @@
 //!
 //! - [`budget::CostController`] - Thread-safe budget management with atomic operations
 //! - [`budget::Reservation`] - RAII handle for reserved budget (commit or auto-cancel)
-//! - [`pricing::PricingManager`] - Lock-free pricing database from LiteLLM JSON
+//! - [`pricing::PricingManager`] - Lock-free pricing database from `LiteLLM` JSON
 //! - [`pricing::Model`] - Per-model pricing with max token limits
 //! - [`converter`] - Conversion utilities between USD and microdollars
 //! - [`token_estimation`] - Estimate input tokens from request JSON
@@ -105,5 +105,5 @@ pub mod budget;
 pub mod budget_client;
 pub mod converter;
 pub mod error;
-pub mod token_estimation;
 pub mod pricing;
+pub mod token_estimation;

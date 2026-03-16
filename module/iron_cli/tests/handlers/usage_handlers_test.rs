@@ -5,16 +5,15 @@
 //! Covers show, by-project, by-provider, export usage handlers.
 //! Total: 20 test cases
 
+use iron_cli::handlers::{usage_handlers::*, CliError};
 use std::collections::HashMap;
-use iron_cli::handlers::{ usage_handlers::*, CliError };
 
 // ============================================================================
 // .usage.show tests (5 tests)
 // ============================================================================
 
 #[test]
-fn test_show_usage_handler_success_default()
-{
+fn test_show_usage_handler_success_default() {
   let params = HashMap::new();
 
   let result = show_usage_handler(&params);
@@ -23,8 +22,7 @@ fn test_show_usage_handler_success_default()
 }
 
 #[test]
-fn test_show_usage_handler_with_date_range()
-{
+fn test_show_usage_handler_with_date_range() {
   let mut params = HashMap::new();
   params.insert("start_date".into(), "2025-01-01".into());
   params.insert("end_date".into(), "2025-01-31".into());
@@ -35,8 +33,7 @@ fn test_show_usage_handler_with_date_range()
 }
 
 #[test]
-fn test_show_usage_handler_invalid_date_format()
-{
+fn test_show_usage_handler_invalid_date_format() {
   let mut params = HashMap::new();
   params.insert("start_date".into(), "invalid-date".into());
 
@@ -46,8 +43,7 @@ fn test_show_usage_handler_invalid_date_format()
 }
 
 #[test]
-fn test_show_usage_handler_date_range_backwards()
-{
+fn test_show_usage_handler_date_range_backwards() {
   let mut params = HashMap::new();
   params.insert("start_date".into(), "2025-02-01".into());
   params.insert("end_date".into(), "2025-01-01".into());
@@ -58,18 +54,16 @@ fn test_show_usage_handler_date_range_backwards()
 }
 
 #[test]
-fn test_show_usage_handler_all_formats()
-{
+fn test_show_usage_handler_all_formats() {
   let formats = vec!["table", "expanded", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("format".into(), format.into());
 
     let result = show_usage_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -78,8 +72,7 @@ fn test_show_usage_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_usage_by_project_handler_success()
-{
+fn test_usage_by_project_handler_success() {
   let mut params = HashMap::new();
   params.insert("project_id".into(), "proj_123".into());
 
@@ -89,25 +82,22 @@ fn test_usage_by_project_handler_success()
 }
 
 #[test]
-fn test_usage_by_project_handler_missing_project_id()
-{
+fn test_usage_by_project_handler_missing_project_id() {
   let params = HashMap::new();
 
   let result = usage_by_project_handler(&params);
 
   assert!(result.is_err(), "Should fail without project_id");
-  match result.unwrap_err()
-  {
+  match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "project_id"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
-fn test_usage_by_project_handler_empty_project_id()
-{
+fn test_usage_by_project_handler_empty_project_id() {
   let mut params = HashMap::new();
-  params.insert("project_id".into(), "".into());
+  params.insert("project_id".into(), String::new());
 
   let result = usage_by_project_handler(&params);
 
@@ -115,8 +105,7 @@ fn test_usage_by_project_handler_empty_project_id()
 }
 
 #[test]
-fn test_usage_by_project_handler_with_date_range()
-{
+fn test_usage_by_project_handler_with_date_range() {
   let mut params = HashMap::new();
   params.insert("project_id".into(), "proj_123".into());
   params.insert("start_date".into(), "2025-01-01".into());
@@ -127,19 +116,17 @@ fn test_usage_by_project_handler_with_date_range()
 }
 
 #[test]
-fn test_usage_by_project_handler_all_formats()
-{
+fn test_usage_by_project_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("project_id".into(), "proj_123".into());
     params.insert("format".into(), format.into());
 
     let result = usage_by_project_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -148,8 +135,7 @@ fn test_usage_by_project_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_usage_by_provider_handler_success()
-{
+fn test_usage_by_provider_handler_success() {
   let mut params = HashMap::new();
   params.insert("provider".into(), "openai".into());
 
@@ -159,8 +145,7 @@ fn test_usage_by_provider_handler_success()
 }
 
 #[test]
-fn test_usage_by_provider_handler_missing_provider()
-{
+fn test_usage_by_provider_handler_missing_provider() {
   let params = HashMap::new();
 
   let result = usage_by_provider_handler(&params);
@@ -169,8 +154,7 @@ fn test_usage_by_provider_handler_missing_provider()
 }
 
 #[test]
-fn test_usage_by_provider_handler_invalid_provider()
-{
+fn test_usage_by_provider_handler_invalid_provider() {
   let mut params = HashMap::new();
   params.insert("provider".into(), "invalid-provider".into());
 
@@ -180,8 +164,7 @@ fn test_usage_by_provider_handler_invalid_provider()
 }
 
 #[test]
-fn test_usage_by_provider_handler_with_aggregation()
-{
+fn test_usage_by_provider_handler_with_aggregation() {
   let mut params = HashMap::new();
   params.insert("provider".into(), "openai".into());
   params.insert("aggregation".into(), "daily".into());
@@ -192,19 +175,17 @@ fn test_usage_by_provider_handler_with_aggregation()
 }
 
 #[test]
-fn test_usage_by_provider_handler_all_formats()
-{
+fn test_usage_by_provider_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("provider".into(), "openai".into());
     params.insert("format".into(), format.into());
 
     let result = usage_by_provider_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -213,8 +194,7 @@ fn test_usage_by_provider_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_export_usage_handler_success()
-{
+fn test_export_usage_handler_success() {
   let mut params = HashMap::new();
   params.insert("output".into(), "/tmp/usage.json".into());
 
@@ -224,8 +204,7 @@ fn test_export_usage_handler_success()
 }
 
 #[test]
-fn test_export_usage_handler_missing_output()
-{
+fn test_export_usage_handler_missing_output() {
   let params = HashMap::new();
 
   let result = export_usage_handler(&params);
@@ -234,10 +213,9 @@ fn test_export_usage_handler_missing_output()
 }
 
 #[test]
-fn test_export_usage_handler_empty_output_path()
-{
+fn test_export_usage_handler_empty_output_path() {
   let mut params = HashMap::new();
-  params.insert("output".into(), "".into());
+  params.insert("output".into(), String::new());
 
   let result = export_usage_handler(&params);
 
@@ -245,8 +223,7 @@ fn test_export_usage_handler_empty_output_path()
 }
 
 #[test]
-fn test_export_usage_handler_format_json()
-{
+fn test_export_usage_handler_format_json() {
   let mut params = HashMap::new();
   params.insert("output".into(), "/tmp/usage.json".into());
   params.insert("format".into(), "json".into());
@@ -257,8 +234,7 @@ fn test_export_usage_handler_format_json()
 }
 
 #[test]
-fn test_export_usage_handler_format_csv()
-{
+fn test_export_usage_handler_format_csv() {
   let mut params = HashMap::new();
   params.insert("output".into(), "/tmp/usage.csv".into());
   params.insert("format".into(), "csv".into());

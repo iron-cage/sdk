@@ -124,6 +124,8 @@ missing_docs_in_private_items = "allow"
 missing_inline_in_public_items = "allow"
 # Allow long functions - API handlers naturally exceed 100 lines due to validation, auth, SQL
 too_many_lines = "allow"
+# CLI adapters accept caller-supplied HashMap values; generic BuildHasher bound adds no safety benefit
+implicit_hasher = "allow"
 
 ## Serialization
 
@@ -263,6 +265,18 @@ version = "0.22"
 
 [workspace.dependencies.headers]
 version = "0.4"
+
+[workspace.dependencies.tree_fmt]
+version = "0.9"
+
+[workspace.dependencies.keyring]
+version = "3.6"
+
+[workspace.dependencies.dirs]
+version = "6.0"
+
+[workspace.dependencies.unilang]
+version = "0.48"
 
 ## Modularity
 

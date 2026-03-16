@@ -3,8 +3,8 @@
 //! Provides unified configuration loading across all Iron Runtime modules
 //! using a 5-layer precedence system.
 
-use crate::error::{ ConfigError, Result };
-use crate::layer::{ ConfigLayer, ConfigValue, LayersBuilder };
+use crate::error::{ConfigError, Result};
+use crate::layer::{ConfigLayer, ConfigValue, LayersBuilder};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
@@ -32,23 +32,22 @@ use std::collections::HashMap;
 /// let loader = ConfigLoader::new("iron_token_manager")?;
 /// let db_config: DatabaseConfig = loader.get("database")?;
 /// ```
-pub struct ConfigLoader
-{
+#[derive(Debug)]
+pub struct ConfigLoader {
   /// Configuration layers (sorted by priority)
-  layers: Vec< Box< dyn ConfigLayer > >,
+  layers: Vec<Box<dyn ConfigLayer>>,
   /// Module name
   module: String,
   /// Resolved configuration cache
-  cache: HashMap< String, ConfigValue >,
+  cache: HashMap<String, ConfigValue>,
 }
 
-impl ConfigLoader
-{
+impl ConfigLoader {
   /// Create new configuration loader for module
   ///
   /// # Arguments
   ///
-  /// * `module` - Module name (e.g., "iron_token_manager")
+  /// * `module` - Module name (e.g., `iron_token_manager`)
   ///
   /// # Errors
   ///
@@ -59,13 +58,11 @@ impl ConfigLoader
   /// ```ignore
   /// let loader = ConfigLoader::new("iron_token_manager")?;
   /// ```
-  pub fn new( module: impl Into< String > ) -> Result< Self >
-  {
+  pub fn new(module: impl Into<String>) -> Result<Self> {
     let module = module.into();
-    let layers = LayersBuilder::new( module.clone() ).build()?;
+    let layers = LayersBuilder::new(module.clone()).build()?;
 
-    let mut loader = Self
-    {
+    let mut loader = Self {
       layers,
       module,
       cache: HashMap::new(),
@@ -73,7 +70,7 @@ impl ConfigLoader
 
     loader.resolve_all()?;
 
-    Ok( loader )
+    Ok(loader)
   }
 
   /// Create new configuration loader with custom environment
@@ -83,20 +80,20 @@ impl ConfigLoader
   /// * `module` - Module name
   /// * `env` - Environment (e.g., "development", "test", "production")
   ///
+  /// # Errors
+  ///
+  /// Returns an error if any config file is found but cannot be read or parsed.
+  ///
   /// # Examples
   ///
   /// ```ignore
   /// let loader = ConfigLoader::with_env("iron_token_manager", "production")?;
   /// ```
-  pub fn with_env( module: impl Into< String >, env: impl Into< String > ) -> Result< Self >
-  {
+  pub fn with_env(module: impl Into<String>, env: impl Into<String>) -> Result<Self> {
     let module = module.into();
-    let layers = LayersBuilder::new( module.clone() )
-      .env( env )
-      .build()?;
+    let layers = LayersBuilder::new(module.clone()).env(env).build()?;
 
-    let mut loader = Self
-    {
+    let mut loader = Self {
       layers,
       module,
       cache: HashMap::new(),
@@ -104,7 +101,7 @@ impl ConfigLoader
 
     loader.resolve_all()?;
 
-    Ok( loader )
+    Ok(loader)
   }
 
   /// Create configuration loader with custom default values
@@ -113,6 +110,10 @@ impl ConfigLoader
   ///
   /// * `module` - Module name
   /// * `defaults` - Default configuration as TOML string
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if `defaults` is not valid TOML, or if any config file cannot be read.
   ///
   /// # Examples
   ///
@@ -125,19 +126,17 @@ impl ConfigLoader
   ///
   /// let loader = ConfigLoader::with_defaults("iron_token_manager", defaults)?;
   /// ```
-  pub fn with_defaults( module: impl Into< String >, defaults: &str ) -> Result< Self >
-  {
+  pub fn with_defaults(module: impl Into<String>, defaults: &str) -> Result<Self> {
     let module = module.into();
-    let mut builder = LayersBuilder::new( module.clone() );
+    let mut builder = LayersBuilder::new(module.clone());
 
     // Add default layer (priority 1 - lowest)
-    let default_layer = crate::layer::FileLayer::from_str( "Crate Defaults", 1, defaults )?;
-    builder = builder.add_layer( Box::new( default_layer ) );
+    let default_layer = crate::layer::FileLayer::from_str("Crate Defaults", 1, defaults)?;
+    builder = builder.add_layer(Box::new(default_layer));
 
     let layers = builder.build()?;
 
-    let mut loader = Self
-    {
+    let mut loader = Self {
       layers,
       module,
       cache: HashMap::new(),
@@ -145,47 +144,39 @@ impl ConfigLoader
 
     loader.resolve_all()?;
 
-    Ok( loader )
+    Ok(loader)
   }
 
   /// Resolve all configuration values from layers
-  fn resolve_all( &mut self ) -> Result< () >
-  {
+  fn resolve_all(&mut self) -> Result<()> {
     // Collect all keys from all layers
     let mut all_keys = std::collections::HashSet::new();
 
-    for layer in &self.layers
-    {
-      for key in layer.get_all()?.keys()
-      {
-        all_keys.insert( key.clone() );
+    for layer in &self.layers {
+      for key in layer.get_all()?.keys() {
+        all_keys.insert(key.clone());
       }
     }
 
     // Resolve each key using precedence
-    for key in all_keys
-    {
-      if let Some( value ) = self.resolve_key( &key )?
-      {
-        self.cache.insert( key, value );
+    for key in all_keys {
+      if let Some(value) = self.resolve_key(&key)? {
+        self.cache.insert(key, value);
       }
     }
 
-    Ok( () )
+    Ok(())
   }
 
   /// Resolve single key using precedence (highest priority wins)
-  fn resolve_key( &self, key: &str ) -> Result< Option< ConfigValue > >
-  {
-    for layer in &self.layers
-    {
-      if let Some( value ) = layer.get( key )?
-      {
-        return Ok( Some( value ) );
+  fn resolve_key(&self, key: &str) -> Result<Option<ConfigValue>> {
+    for layer in &self.layers {
+      if let Some(value) = layer.get(key)? {
+        return Ok(Some(value));
       }
     }
 
-    Ok( None )
+    Ok(None)
   }
 
   /// Get configuration value by key path
@@ -204,21 +195,24 @@ impl ConfigLoader
   /// let url: String = loader.get("database.url")?;
   /// let max_conn: u32 = loader.get("database.max_connections")?;
   /// ```
-  pub fn get< T: DeserializeOwned >( &self, key: &str ) -> Result< T >
-  {
-    let value = self.cache
-      .get( key )
-      .ok_or_else( || ConfigError::MissingKey( key.to_string() ) )?;
+  pub fn get<T: DeserializeOwned>(&self, key: &str) -> Result<T> {
+    let value = self
+      .cache
+      .get(key)
+      .ok_or_else(|| ConfigError::MissingKey(key.to_string()))?;
 
-    let deserialized = value.value.clone().try_into::< T >()
-      .map_err( | _e | ConfigError::InvalidType
-      {
-        key: key.to_string(),
-        expected: std::any::type_name::< T >().to_string(),
-        actual: format!( "{:?}", value.value ),
-      } )?;
+    let deserialized =
+      value
+        .value
+        .clone()
+        .try_into::<T>()
+        .map_err(|_e| ConfigError::InvalidType {
+          key: key.to_string(),
+          expected: core::any::type_name::<T>().to_string(),
+          actual: format!("{:?}", value.value),
+        })?;
 
-    Ok( deserialized )
+    Ok(deserialized)
   }
 
   /// Get optional configuration value
@@ -227,18 +221,20 @@ impl ConfigLoader
   ///
   /// # Examples
   ///
+  /// # Errors
+  ///
+  /// Returns an error if the value exists but cannot be deserialized into `T`.
+  ///
   /// ```ignore
   /// if let Some(url) = loader.get_opt::<String>("database.url")? {
   ///   println!("Database URL: {}", url);
   /// }
   /// ```
-  pub fn get_opt< T: DeserializeOwned >( &self, key: &str ) -> Result< Option< T > >
-  {
-    match self.get( key )
-    {
-      Ok( value ) => Ok( Some( value ) ),
-      Err( ConfigError::MissingKey( _ ) ) => Ok( None ),
-      Err( e ) => Err( e ),
+  pub fn get_opt<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+    match self.get(key) {
+      Ok(value) => Ok(Some(value)),
+      Err(ConfigError::MissingKey(_)) => Ok(None),
+      Err(e) => Err(e),
     }
   }
 
@@ -263,58 +259,49 @@ impl ConfigLoader
   ///
   /// let db_config: DatabaseConfig = loader.get_section("database")?;
   /// ```
-  pub fn get_section< T: DeserializeOwned >( &self, prefix: &str ) -> Result< T >
-  {
+  pub fn get_section<T: DeserializeOwned>(&self, prefix: &str) -> Result<T> {
     // Collect all keys with this prefix
     let mut section = toml::Table::new();
 
-    for ( key, value ) in &self.cache
-    {
-      if let Some( suffix ) = key.strip_prefix( &format!( "{}.", prefix ) )
-      {
+    for (key, value) in &self.cache {
+      if let Some(suffix) = key.strip_prefix(&format!("{prefix}.")) {
         // Reconstruct nested structure
-        Self::insert_nested( &mut section, suffix, value.value.clone() );
+        Self::insert_nested(&mut section, suffix, value.value.clone());
       }
     }
 
     // Deserialize the section
-    let toml_value = toml::Value::Table( section );
-    T::deserialize( toml_value )
-      .map_err( | e | ConfigError::InvalidType
-      {
-        key: prefix.to_string(),
-        expected: std::any::type_name::< T >().to_string(),
-        actual: format!( "{:?}", e ),
-      } )
+    let toml_value = toml::Value::Table(section);
+    T::deserialize(toml_value).map_err(|e| ConfigError::InvalidType {
+      key: prefix.to_string(),
+      expected: core::any::type_name::<T>().to_string(),
+      actual: format!("{e:?}"),
+    })
   }
 
   /// Insert value into nested TOML table
-  fn insert_nested( table: &mut toml::Table, key_path: &str, value: toml::Value )
-  {
-    let parts: Vec< &str > = key_path.split( '.' ).collect();
+  fn insert_nested(table: &mut toml::Table, key_path: &str, value: toml::Value) {
+    let parts: Vec<&str> = key_path.split('.').collect();
 
-    if parts.len() == 1
-    {
-      table.insert( parts[ 0 ].to_string(), value );
-    }
-    else
-    {
-      let first = parts[ 0 ];
-      let rest = parts[ 1.. ].join( "." );
+    if parts.len() == 1 {
+      table.insert(parts[0].to_string(), value);
+    } else {
+      let first = parts[0];
+      let rest = parts[1..].join(".");
 
       let nested = table
-        .entry( first.to_string() )
-        .or_insert_with( || toml::Value::Table( toml::Table::new() ) )
+        .entry(first.to_string())
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()))
         .as_table_mut()
         .unwrap();
 
-      Self::insert_nested( nested, &rest, value );
+      Self::insert_nested(nested, &rest, value);
     }
   }
 
   /// Get all configuration keys
-  pub fn keys( &self ) -> Vec< String >
-  {
+  #[must_use]
+  pub fn keys(&self) -> Vec<String> {
     self.cache.keys().cloned().collect()
   }
 
@@ -324,48 +311,58 @@ impl ConfigLoader
   ///
   /// # Examples
   ///
+  /// # Errors
+  ///
+  /// Returns `ConfigError::MissingKey` if `key` is not found, or a deserialization error
+  /// if the value cannot be converted to `T`.
+  ///
   /// ```ignore
   /// let (url, source) = loader.get_with_source::<String>("database.url")?;
   /// println!("Database URL: {} (from {})", url, source);
   /// ```
-  pub fn get_with_source< T: DeserializeOwned >( &self, key: &str ) -> Result< ( T, String ) >
-  {
-    let value = self.cache
-      .get( key )
-      .ok_or_else( || ConfigError::MissingKey( key.to_string() ) )?;
+  pub fn get_with_source<T: DeserializeOwned>(&self, key: &str) -> Result<(T, String)> {
+    let value = self
+      .cache
+      .get(key)
+      .ok_or_else(|| ConfigError::MissingKey(key.to_string()))?;
 
-    let deserialized = value.value.clone().try_into::< T >()
-      .map_err( | _e | ConfigError::InvalidType
-      {
-        key: key.to_string(),
-        expected: std::any::type_name::< T >().to_string(),
-        actual: format!( "{:?}", value.value ),
-      } )?;
+    let deserialized =
+      value
+        .value
+        .clone()
+        .try_into::<T>()
+        .map_err(|_e| ConfigError::InvalidType {
+          key: key.to_string(),
+          expected: core::any::type_name::<T>().to_string(),
+          actual: format!("{:?}", value.value),
+        })?;
 
-    Ok( ( deserialized, value.source.clone() ) )
+    Ok((deserialized, value.source.clone()))
   }
 
   /// Print configuration summary for debugging
   ///
   /// Shows all resolved configuration values with their sources.
-  pub fn debug_summary( &self ) -> String
-  {
+  #[must_use]
+  pub fn debug_summary(&self) -> String {
     let mut lines = Vec::new();
-    lines.push( format!( "Configuration for '{}' ({} keys)", self.module, self.cache.len() ) );
-    lines.push( String::new() );
+    lines.push(format!(
+      "Configuration for '{}' ({} keys)",
+      self.module,
+      self.cache.len()
+    ));
+    lines.push(String::new());
 
-    let mut keys: Vec< _ > = self.cache.keys().collect();
+    let mut keys: Vec<_> = self.cache.keys().collect();
     keys.sort();
 
-    for key in keys
-    {
-      if let Some( value ) = self.cache.get( key )
-      {
-        lines.push( format!( "  {} = {:?}", key, value.value ) );
-        lines.push( format!( "    source: {}", value.source ) );
+    for key in keys {
+      if let Some(value) = self.cache.get(key) {
+        lines.push(format!("  {} = {:?}", key, value.value));
+        lines.push(format!("    source: {}", value.source));
       }
     }
 
-    lines.join( "\n" )
+    lines.join("\n")
   }
 }

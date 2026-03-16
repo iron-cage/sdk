@@ -3,13 +3,12 @@
 //!
 //! Stores and queries detailed API call traces for debugging and cost analysis.
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions, Row };
 use crate::error::Result;
+use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
 
 /// API call trace record from database
-#[ derive( Debug, Clone ) ]
-pub struct TraceRecord
-{
+#[derive(Debug, Clone)]
+pub struct TraceRecord {
   /// Database ID
   pub id: i64,
   /// Token ID this trace belongs to
@@ -39,14 +38,12 @@ pub struct TraceRecord
 /// Trace storage
 ///
 /// Stores and queries API call traces with real database persistence.
-#[ derive( Debug, Clone ) ]
-pub struct TraceStorage
-{
+#[derive(Debug, Clone)]
+pub struct TraceStorage {
   pool: SqlitePool,
 }
 
-impl TraceStorage
-{
+impl TraceStorage {
   /// Create new trace storage
   ///
   /// # Arguments
@@ -60,22 +57,21 @@ impl TraceStorage
   /// # Errors
   ///
   /// Returns error if database connection fails or migration fails
-  pub async fn new( database_url: &str ) -> Result< Self >
-  {
+  pub async fn new(database_url: &str) -> Result<Self> {
     let pool = SqlitePoolOptions::new()
-      .max_connections( 5 )
-      .connect( database_url )
+      .max_connections(5)
+      .connect(database_url)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| crate::error::TokenError::Generic)?;
 
     // Run migrations
-    let migration_sql = include_str!( "../migrations/001_initial_schema.sql" );
-    sqlx::raw_sql( migration_sql )
-      .execute( &pool )
+    let migration_sql = include_str!("../migrations/001_initial_schema.sql");
+    sqlx::raw_sql(migration_sql)
+      .execute(&pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| crate::error::TokenError::Generic)?;
 
-    Ok( Self { pool } )
+    Ok(Self { pool })
   }
 
   /// Get all trace records
@@ -87,8 +83,7 @@ impl TraceStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_all_traces( &self ) -> Result< Vec< TraceRecord > >
-  {
+  pub async fn get_all_traces(&self) -> Result<Vec<TraceRecord>> {
     let rows = sqlx::query(
       "SELECT id, token_id, provider, model, endpoint, response_status, duration_ms, \
        input_tokens, output_tokens, (input_tokens + output_tokens) as total_tokens, cost_cents, traced_at \
@@ -99,20 +94,23 @@ impl TraceStorage
     .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
-      rows.iter().map( |row| TraceRecord {
-        id: row.get( "id" ),
-        token_id: row.get( "token_id" ),
-        provider: row.get( "provider" ),
-        model: row.get( "model" ),
-        endpoint: row.get( "endpoint" ),
-        response_status: row.get( "response_status" ),
-        duration_ms: row.get( "duration_ms" ),
-        input_tokens: row.get( "input_tokens" ),
-        output_tokens: row.get( "output_tokens" ),
-        total_tokens: row.get( "total_tokens" ),
-        cost_cents: row.get( "cost_cents" ),
-        traced_at: row.get( "traced_at" ),
-      } ).collect()
+      rows
+        .iter()
+        .map(|row| TraceRecord {
+          id: row.get("id"),
+          token_id: row.get("token_id"),
+          provider: row.get("provider"),
+          model: row.get("model"),
+          endpoint: row.get("endpoint"),
+          response_status: row.get("response_status"),
+          duration_ms: row.get("duration_ms"),
+          input_tokens: row.get("input_tokens"),
+          output_tokens: row.get("output_tokens"),
+          total_tokens: row.get("total_tokens"),
+          cost_cents: row.get("cost_cents"),
+          traced_at: row.get("traced_at"),
+        })
+        .collect(),
     )
   }
 
@@ -129,8 +127,7 @@ impl TraceStorage
   /// # Errors
   ///
   /// Returns error if trace not found or database query fails
-  pub async fn get_trace_by_id( &self, id: i64 ) -> Result< TraceRecord >
-  {
+  pub async fn get_trace_by_id(&self, id: i64) -> Result<TraceRecord> {
     let row = sqlx::query(
       "SELECT id, token_id, provider, model, endpoint, response_status, duration_ms, \
        input_tokens, output_tokens, (input_tokens + output_tokens) as total_tokens, cost_cents, traced_at \
@@ -142,20 +139,20 @@ impl TraceStorage
     .map_err( |_| crate::error::TokenError::Generic )?
     .ok_or( crate::error::TokenError::Generic )?;
 
-    Ok( TraceRecord {
-      id: row.get( "id" ),
-      token_id: row.get( "token_id" ),
-      provider: row.get( "provider" ),
-      model: row.get( "model" ),
-      endpoint: row.get( "endpoint" ),
-      response_status: row.get( "response_status" ),
-      duration_ms: row.get( "duration_ms" ),
-      input_tokens: row.get( "input_tokens" ),
-      output_tokens: row.get( "output_tokens" ),
-      total_tokens: row.get( "total_tokens" ),
-      cost_cents: row.get( "cost_cents" ),
-      traced_at: row.get( "traced_at" ),
-    } )
+    Ok(TraceRecord {
+      id: row.get("id"),
+      token_id: row.get("token_id"),
+      provider: row.get("provider"),
+      model: row.get("model"),
+      endpoint: row.get("endpoint"),
+      response_status: row.get("response_status"),
+      duration_ms: row.get("duration_ms"),
+      input_tokens: row.get("input_tokens"),
+      output_tokens: row.get("output_tokens"),
+      total_tokens: row.get("total_tokens"),
+      cost_cents: row.get("cost_cents"),
+      traced_at: row.get("traced_at"),
+    })
   }
 
   /// Get traces for specific token
@@ -171,8 +168,7 @@ impl TraceStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_traces_for_token( &self, token_id: i64 ) -> Result< Vec< TraceRecord > >
-  {
+  pub async fn get_traces_for_token(&self, token_id: i64) -> Result<Vec<TraceRecord>> {
     let rows = sqlx::query(
       "SELECT id, token_id, provider, model, endpoint, response_status, duration_ms, \
        input_tokens, output_tokens, (input_tokens + output_tokens) as total_tokens, cost_cents, traced_at \
@@ -184,20 +180,23 @@ impl TraceStorage
     .map_err( |_| crate::error::TokenError::Generic )?;
 
     Ok(
-      rows.iter().map( |row| TraceRecord {
-        id: row.get( "id" ),
-        token_id: row.get( "token_id" ),
-        provider: row.get( "provider" ),
-        model: row.get( "model" ),
-        endpoint: row.get( "endpoint" ),
-        response_status: row.get( "response_status" ),
-        duration_ms: row.get( "duration_ms" ),
-        input_tokens: row.get( "input_tokens" ),
-        output_tokens: row.get( "output_tokens" ),
-        total_tokens: row.get( "total_tokens" ),
-        cost_cents: row.get( "cost_cents" ),
-        traced_at: row.get( "traced_at" ),
-      } ).collect()
+      rows
+        .iter()
+        .map(|row| TraceRecord {
+          id: row.get("id"),
+          token_id: row.get("token_id"),
+          provider: row.get("provider"),
+          model: row.get("model"),
+          endpoint: row.get("endpoint"),
+          response_status: row.get("response_status"),
+          duration_ms: row.get("duration_ms"),
+          input_tokens: row.get("input_tokens"),
+          output_tokens: row.get("output_tokens"),
+          total_tokens: row.get("total_tokens"),
+          cost_cents: row.get("cost_cents"),
+          traced_at: row.get("traced_at"),
+        })
+        .collect(),
     )
   }
 }

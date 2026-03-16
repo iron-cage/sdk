@@ -27,8 +27,8 @@
 //!
 //! # Key Types
 //!
-//! - [`AnalyticsEvent`] - Typed event with metadata (timestamp, event_id, agent_id)
-//! - [`EventPayload`] - Event variants (LlmRequestCompleted, LlmRequestFailed, etc.)
+//! - [`AnalyticsEvent`] - Typed event with metadata (timestamp, `event_id`, `agent_id`)
+//! - [`EventPayload`] - Event variants (`LlmRequestCompleted`, `LlmRequestFailed`, etc.)
 //! - [`EventStore`] - Lock-free append-only event storage with deduplication
 //! - [`ComputedStats`] - Aggregated statistics snapshot (totals, by-model, by-provider)
 //! - [`ModelStats`] - Per-model usage statistics (requests, tokens, cost)
@@ -116,42 +116,45 @@
 //!
 //! Typical overhead: <1μs per event in hot path.
 
-#![ cfg_attr( not( feature = "enabled" ), allow( unused_imports, unused_variables, dead_code ) ) ]
+#![cfg_attr(
+  not(feature = "enabled"),
+  allow(unused_imports, unused_variables, dead_code)
+)]
 
-#[ cfg( feature = "enabled" ) ]
+#[cfg(feature = "enabled")]
 pub mod event;
 
-#[ cfg( feature = "enabled" ) ]
+#[cfg(feature = "enabled")]
 pub mod provider_utils;
 
-#[ cfg( feature = "enabled" ) ]
+#[cfg(feature = "enabled")]
 pub mod stats;
 
-#[ cfg( feature = "enabled" ) ]
+#[cfg(feature = "enabled")]
 pub mod event_storage;
 
-#[ cfg( feature = "enabled" ) ]
+#[cfg(feature = "enabled")]
 pub mod recording;
 
-#[ cfg( feature = "sync" ) ]
+#[cfg(feature = "sync")]
 pub mod sync;
 
 // Re-exports: Flat access to common types
 
-#[ cfg( feature = "enabled" ) ]
-pub use event::{ AnalyticsEvent, EventId, EventPayload };
+#[cfg(feature = "enabled")]
+pub use event::{AnalyticsEvent, EventId, EventPayload};
 
-#[ cfg( feature = "enabled" ) ]
-pub use event::{ LlmModelMeta, LlmUsageData, LlmFailureData };
+#[cfg(feature = "enabled")]
+pub use event::{LlmFailureData, LlmModelMeta, LlmUsageData};
 
-#[ cfg( feature = "enabled" ) ]
+#[cfg(feature = "enabled")]
 pub use event_storage::EventStore;
 
-#[ cfg( feature = "enabled" ) ]
-pub use stats::{ ComputedStats, ModelStats };
+#[cfg(feature = "enabled")]
+pub use stats::{ComputedStats, ModelStats};
 
-#[ cfg( feature = "enabled" ) ]
-pub use provider_utils::{ Provider, infer_provider, current_time_ms };
+#[cfg(feature = "enabled")]
+pub use provider_utils::{current_time_ms, infer_provider, Provider};
 
-#[ cfg( feature = "sync" ) ]
-pub use sync::{ SyncClient, SyncConfig, SyncHandle };
+#[cfg(feature = "sync")]
+pub use sync::{SyncClient, SyncConfig, SyncHandle};

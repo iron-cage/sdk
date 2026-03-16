@@ -27,7 +27,7 @@
 //! | Type | Prefix | Example | Use Case |
 //! |------|--------|---------|----------|
 //! | `AgentId` | `agent_` | `agent_550e8400-...` | Runtime AI agents |
-//! | `ProviderId` | `ip_` | `ip_550e8400-...` | LLM providers (OpenAI, Anthropic) |
+//! | `ProviderId` | `ip_` | `ip_550e8400-...` | LLM providers (`OpenAI`, Anthropic) |
 //! | `ProjectId` | `proj_` | `proj_550e8400-...` | User projects |
 //! | `ApiTokenId` | `at_` | `at_550e8400-...` | API authentication tokens |
 //! | `BudgetRequestId` | `breq_` | `breq_550e8400-...` | Budget allocation requests |
@@ -72,11 +72,11 @@
 //!    characters in most languages (Python, Rust, JavaScript), enabling
 //!    copy-paste into code without escaping
 //!
-//! 2. **Database Conventions**: PostgreSQL and MySQL naming standards prefer
-//!    underscores (snake_case) for columns/tables
+//! 2. **Database Conventions**: `PostgreSQL` and `MySQL` naming standards prefer
+//!    underscores (`snake_case`) for columns/tables
 //!
 //! 3. **JSON Style Guides**: Google and Airbnb style guides recommend
-//!    snake_case for JSON properties
+//!    `snake_case` for JSON properties
 //!
 //! 4. **Consistency**: `ic_` prefix already uses underscore, establishing
 //!    existing precedent
@@ -197,55 +197,73 @@
 //! iron_types = { version = "0.2", features = ["telemetry"] }
 //! ```
 
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Entity ID prefixes
-pub mod prefix
-{
+pub mod prefix {
+  /// Prefix for IC token identifiers (`ic_`).
   pub const IC_TOKEN: &str = "ic_";
+  /// Prefix for agent identifiers (`agent_`).
   pub const AGENT: &str = "agent_";
+  /// Prefix for provider identifiers (`ip_`).
   pub const PROVIDER: &str = "ip_";
+  /// Prefix for project identifiers (`proj_`).
   pub const PROJECT: &str = "proj_";
+  /// Prefix for API token identifiers (`at_`).
   pub const API_TOKEN: &str = "at_";
+  /// Prefix for budget request identifiers (`breq_`).
   pub const BUDGET_REQUEST: &str = "breq_";
+  /// Prefix for lease identifiers (`lease_`).
   pub const LEASE: &str = "lease_";
+  /// Prefix for generic request identifiers (`req_`).
   pub const REQUEST: &str = "req_";
 }
 
 /// Errors that can occur during ID parsing
-#[derive( Debug, Clone, PartialEq, Eq, thiserror::Error )]
-pub enum IdError
-{
-  #[error( "Invalid prefix: expected '{expected}', found '{found}'\n\
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum IdError {
+  #[error(
+    "Invalid prefix: expected '{expected}', found '{found}'\n\
             Hint: Entity IDs must start with '{expected}'.\n\
-            Example: {expected}550e8400-e29b-41d4-a716-446655440000" )]
-  InvalidPrefix
-  {
+            Example: {expected}550e8400-e29b-41d4-a716-446655440000"
+  )]
+  /// The ID prefix did not match the expected value for the target type.
+  InvalidPrefix {
+    /// The prefix that was expected for this ID type.
     expected: &'static str,
+    /// The actual prefix that was found in the input string.
     found: String,
   },
 
-  #[error( "Missing UUID component\n\
+  #[error(
+    "Missing UUID component\n\
             Hint: ID format is 'prefix_uuid' where uuid is 36 characters.\n\
-            Example: agent_550e8400-e29b-41d4-a716-446655440000" )]
+            Example: agent_550e8400-e29b-41d4-a716-446655440000"
+  )]
+  /// The ID string contained only a prefix with no UUID component.
   MissingUuid,
 
-  #[error( "Invalid UUID format: '{0}'\n\
+  #[error(
+    "Invalid UUID format: '{0}'\n\
             Hint: UUID must be 36 characters in format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\n\
             - Must use lowercase hexadecimal (a-f, 0-9)\n\
             - Must have hyphens at positions 8, 13, 18, 23\n\
-            Example: agent_550e8400-e29b-41d4-a716-446655440000" )]
-  InvalidUuid( String ),
+            Example: agent_550e8400-e29b-41d4-a716-446655440000"
+  )]
+  /// The UUID component of the ID was malformed.
+  InvalidUuid(String),
 
-  #[error( "Empty ID string\n\
+  #[error(
+    "Empty ID string\n\
             Hint: Provide a valid entity ID in format 'prefix_uuid'.\n\
-            Example: agent_550e8400-e29b-41d4-a716-446655440000" )]
+            Example: agent_550e8400-e29b-41d4-a716-446655440000"
+  )]
+  /// The ID string was empty.
   EmptyId,
 }
 
-impl IdError
-{
+impl IdError {
   /// Get machine-readable error code for API responses
   ///
   /// # Example
@@ -255,12 +273,12 @@ impl IdError
   /// let err = AgentId::parse("invalid").unwrap_err();
   /// assert_eq!(err.code(), "INVALID_PREFIX");
   /// ```
-  pub fn code( &self ) -> &'static str
-  {
+  #[must_use]
+  pub fn code(&self) -> &'static str {
     match self {
       Self::InvalidPrefix { .. } => "INVALID_PREFIX",
       Self::MissingUuid => "MISSING_UUID",
-      Self::InvalidUuid( .. ) => "INVALID_UUID",
+      Self::InvalidUuid(..) => "INVALID_UUID",
       Self::EmptyId => "EMPTY_ID",
     }
   }
@@ -276,66 +294,59 @@ impl IdError
   ///   println!("Suggestion: {}", suggestion);
   /// }
   /// ```
-  pub fn suggestion( &self ) -> Option< String >
-  {
+  #[must_use]
+  pub fn suggestion(&self) -> Option<String> {
     match self {
       Self::InvalidPrefix { expected, found } => {
         // Detect legacy hyphen format
-        if found.starts_with( &expected.replace( '_', "-" ) ) {
-          Some( format!(
+        if found.starts_with(&expected.replace('_', "-")) {
+          Some(format!(
             "Legacy hyphen format detected. Use underscore instead: '{}'",
-            found.replace( '-', "_" )
-          ) )
+            found.replace('-', "_")
+          ))
         } else {
-          Some( format!( "ID must start with '{}'", expected ) )
+          Some(format!("ID must start with '{expected}'"))
         }
       }
-      Self::InvalidUuid( uuid ) => {
+      Self::InvalidUuid(uuid) => {
         if uuid.len() != 36 {
-          Some( format!(
+          Some(format!(
             "UUID must be exactly 36 characters, got {}. \
              Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
             uuid.len()
-          ) )
-        } else if uuid.chars().any( |c| c.is_ascii_uppercase() ) {
-          Some( "UUID must use lowercase hexadecimal characters (a-f, 0-9)".into() )
+          ))
+        } else if uuid.chars().any(|c| c.is_ascii_uppercase()) {
+          Some("UUID must use lowercase hexadecimal characters (a-f, 0-9)".into())
         } else {
-          Some( "Verify UUID has hyphens at correct positions (8-4-4-4-12)".into() )
+          Some("Verify UUID has hyphens at correct positions (8-4-4-4-12)".into())
         }
       }
-      Self::MissingUuid => {
-        Some( "Provide the UUID component after the prefix".into() )
-      }
-      Self::EmptyId => {
-        Some( "Provide a non-empty ID string".into() )
-      }
+      Self::MissingUuid => Some("Provide the UUID component after the prefix".into()),
+      Self::EmptyId => Some("Provide a non-empty ID string".into()),
     }
   }
 }
 
 /// Validates that a string is a valid UUID (hyphenated lowercase hex)
-fn is_valid_uuid( s: &str ) -> bool
-{
+fn is_valid_uuid(s: &str) -> bool {
   // UUID v4 format: 8-4-4-4-12 (36 chars with hyphens)
-  if s.len() != 36
-  {
+  if s.len() != 36 {
     return false;
   }
 
-  let parts: Vec< &str > = s.split( '-' ).collect();
-  if parts.len() != 5
-  {
+  let parts: Vec<&str> = s.split('-').collect();
+  if parts.len() != 5 {
     return false;
   }
 
-  let expected_lens = [ 8, 4, 4, 4, 12 ];
-  for ( part, &expected_len ) in parts.iter().zip( expected_lens.iter() )
-  {
-    if part.len() != expected_len
-    {
+  let expected_lens = [8, 4, 4, 4, 12];
+  for (part, &expected_len) in parts.iter().zip(expected_lens.iter()) {
+    if part.len() != expected_len {
       return false;
     }
-    if !part.chars().all( |c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase() )
+    if !part
+      .chars()
+      .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
     {
       return false;
     }
@@ -363,6 +374,11 @@ macro_rules! define_id
     impl $name
     {
       /// Parse an ID from a string, validating format
+      ///
+      /// # Errors
+      ///
+      /// Returns `IdError` if the string is empty, missing a UUID, has a wrong prefix,
+      /// or contains a malformed UUID.
       ///
       /// # Security
       ///
@@ -445,6 +461,11 @@ macro_rules! define_id
       /// - Processing IDs from external systems during migration
       ///
       /// Once migration is complete, prefer `parse()` for strict validation.
+      ///
+      /// # Errors
+      ///
+      /// Returns `IdError` if the string cannot be parsed in either the current
+      /// or legacy format.
       ///
       /// # Example
       ///
@@ -573,7 +594,7 @@ macro_rules! define_id
       }
     }
 
-    impl std::str::FromStr for $name
+    impl core::str::FromStr for $name
     {
       type Err = IdError;
 
@@ -586,70 +607,59 @@ macro_rules! define_id
 }
 
 // Define all entity ID types
-define_id!
-(
+define_id!(
   AgentId,
   prefix::AGENT,
   "Unique identifier for a runtime agent (format: `agent_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   ProviderId,
   prefix::PROVIDER,
   "Unique identifier for an LLM provider (format: `ip_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   ProjectId,
   prefix::PROJECT,
   "Unique identifier for a user project (format: `proj_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   ApiTokenId,
   prefix::API_TOKEN,
   "Unique identifier for an API token (format: `at_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   BudgetRequestId,
   prefix::BUDGET_REQUEST,
   "Unique identifier for a budget request (format: `breq_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   LeaseId,
   prefix::LEASE,
   "Unique identifier for a budget lease (format: `lease_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   RequestId,
   prefix::REQUEST,
   "Unique identifier for a generic request (format: `req_<uuid>`)"
 );
 
-define_id!
-(
+define_id!(
   IcTokenId,
   prefix::IC_TOKEN,
   "Unique identifier for an IC token (format: `ic_<uuid>`)"
 );
 
 // Test utilities for all ID types
-#[cfg( any( test, feature = "test-helpers" ) )]
-macro_rules! impl_test_utilities
-{
-  ( $name:ident, $prefix:expr ) =>
-  {
-    impl $name
-    {
+#[cfg(any(test, feature = "test-helpers"))]
+macro_rules! impl_test_utilities {
+  ( $name:ident, $prefix:expr ) => {
+    impl $name {
       /// Create ID from a known UUID for testing
       ///
       /// # Example
@@ -661,9 +671,8 @@ macro_rules! impl_test_utilities
       /// let id = AgentId::from_uuid(uuid);
       /// assert_eq!(id.as_str(), "agent_550e8400-e29b-41d4-a716-446655440000");
       /// ```
-      pub fn from_uuid( uuid: uuid::Uuid ) -> Self
-      {
-        Self( format!( "{}{}", $prefix, uuid ) )
+      pub fn from_uuid(uuid: uuid::Uuid) -> Self {
+        Self(format!("{}{}", $prefix, uuid))
       }
 
       /// Create ID with sequential number for testing
@@ -681,10 +690,9 @@ macro_rules! impl_test_utilities
       /// assert_eq!(id1.as_str(), "agent_00000000-0000-0000-0000-000000000001");
       /// assert_eq!(id2.as_str(), "agent_00000000-0000-0000-0000-000000000002");
       /// ```
-      pub fn test_fixture( n: u32 ) -> Self
-      {
-        let uuid = uuid::Uuid::from_u128( n as u128 );
-        Self::from_uuid( uuid )
+      pub fn test_fixture(n: u32) -> Self {
+        let uuid = uuid::Uuid::from_u128(u128::from(n));
+        Self::from_uuid(uuid)
       }
 
       /// Create ID with custom suffix for testing edge cases
@@ -700,27 +708,26 @@ macro_rules! impl_test_utilities
       /// let bad_id = AgentId::test_with_suffix("not-a-uuid");
       /// assert!(AgentId::parse(bad_id.as_str()).is_err());
       /// ```
-      pub fn test_with_suffix( suffix: &str ) -> Self
-      {
-        Self( format!( "{}{}", $prefix, suffix ) )
+      pub fn test_with_suffix(suffix: &str) -> Self {
+        Self(format!("{}{}", $prefix, suffix))
       }
     }
   };
 }
 
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( AgentId, prefix::AGENT );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( ProviderId, prefix::PROVIDER );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( ProjectId, prefix::PROJECT );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( ApiTokenId, prefix::API_TOKEN );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( BudgetRequestId, prefix::BUDGET_REQUEST );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( LeaseId, prefix::LEASE );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( RequestId, prefix::REQUEST );
-#[cfg( any( test, feature = "test-helpers" ) )]
-impl_test_utilities!( IcTokenId, prefix::IC_TOKEN );
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(AgentId, prefix::AGENT);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(ProviderId, prefix::PROVIDER);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(ProjectId, prefix::PROJECT);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(ApiTokenId, prefix::API_TOKEN);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(BudgetRequestId, prefix::BUDGET_REQUEST);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(LeaseId, prefix::LEASE);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(RequestId, prefix::REQUEST);
+#[cfg(any(test, feature = "test-helpers"))]
+impl_test_utilities!(IcTokenId, prefix::IC_TOKEN);

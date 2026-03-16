@@ -4,7 +4,7 @@
 //!
 //! ## Configuration Hierarchy (highest to lowest priority)
 //!
-//! 1. CLI arguments (keyword::value parameters, applied after iron_config_loader loading)
+//! 1. CLI arguments (`keyword::value` parameters, applied after `iron_config_loader` loading)
 //! 2. Environment variables (`IRON_CLI_*` format, e.g., `IRON_CLI_API_URL`)
 //! 3. Project config (`{workspace}/config/iron_cli.{env}.toml`)
 //! 4. User config (`~/.config/iron/iron_cli.toml`)
@@ -32,61 +32,53 @@ use iron_config_loader::ConfigLoader;
 use std::collections::HashMap;
 
 /// Configuration error types
-#[ derive( Debug ) ]
-pub enum ConfigError
-{
+#[derive(Debug)]
+pub enum ConfigError {
   /// Invalid configuration value
-  InvalidValue( String ),
+  InvalidValue(String),
 
   /// Missing required configuration
-  MissingRequired( String ),
+  MissingRequired(String),
 
   /// IO error reading configuration file
-  IoError( String ),
+  IoError(String),
 }
 
-impl std::fmt::Display for ConfigError
-{
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
-  {
-    match self
-    {
-      ConfigError::InvalidValue( msg ) => write!( f, "Invalid configuration value: {}", msg ),
-      ConfigError::MissingRequired( msg ) => write!( f, "Missing required configuration: {}", msg ),
-      ConfigError::IoError( msg ) => write!( f, "Configuration IO error: {}", msg ),
+impl core::fmt::Display for ConfigError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    match self {
+      ConfigError::InvalidValue(msg) => write!(f, "Invalid configuration value: {msg}"),
+      ConfigError::MissingRequired(msg) => write!(f, "Missing required configuration: {msg}"),
+      ConfigError::IoError(msg) => write!(f, "Configuration IO error: {msg}"),
     }
   }
 }
 
-impl std::error::Error for ConfigError {}
+impl core::error::Error for ConfigError {}
 
 /// Configuration container with hierarchical precedence
-#[ derive( Debug, Clone ) ]
-pub struct Config
-{
+#[derive(Debug, Clone)]
+pub struct Config {
   values: HashMap<String, String>,
 }
 
-impl Config
-{
+impl Config {
   /// Create new configuration with defaults only
   ///
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
-  pub fn new() -> Self
-  {
-    Self::builder()
-      .with_iron_config()
-      .build()
+  #[must_use]
+  pub fn new() -> Self {
+    Self::builder().with_iron_config().build()
   }
 
   /// Create configuration from CLI arguments
-  pub fn with_cli_args(cli_args: HashMap<String, String>) -> Self
-  {
+  #[must_use]
+  pub fn with_cli_args(cli_args: HashMap<String, String>) -> Self {
     Self::builder()
       .with_iron_config()
-      .with_cli_args( cli_args )
+      .with_cli_args(cli_args)
       .build()
   }
 
@@ -95,69 +87,66 @@ impl Config
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
-  pub fn from_env() -> Self
-  {
-    Self::builder()
-      .with_iron_config()
-      .build()
+  #[must_use]
+  pub fn from_env() -> Self {
+    Self::builder().with_iron_config().build()
   }
 
   /// Create configuration builder
-  pub fn builder() -> ConfigBuilder
-  {
+  #[must_use]
+  pub fn builder() -> ConfigBuilder {
     ConfigBuilder::new()
   }
 
   /// Get configuration value by key
-  pub fn get(&self, key: &str) -> Option<String>
-  {
-    self.values.get( key ).cloned()
+  #[must_use]
+  pub fn get(&self, key: &str) -> Option<String> {
+    self.values.get(key).cloned()
   }
 
   /// Get configuration value with fallback default
-  pub fn get_or(&self, key: &str, default: &str) -> String
-  {
-    self.values.get( key )
+  #[must_use]
+  pub fn get_or(&self, key: &str, default: &str) -> String {
+    self
+      .values
+      .get(key)
       .cloned()
-      .unwrap_or_else( || default.to_string() )
+      .unwrap_or_else(|| default.to_string())
   }
 
   /// Get all configuration values
-  pub fn all(&self) -> &HashMap<String, String>
-  {
+  #[must_use]
+  pub fn all(&self) -> &HashMap<String, String> {
     &self.values
   }
 
   /// Get default configuration as TOML string
-  fn get_defaults_toml() -> String
-  {
+  fn get_defaults_toml() -> String {
     r#"
 api_url = "https://api.ironcage.ai"
 format = "table"
-"#.to_string()
+"#
+    .to_string()
   }
 }
 
-impl Default for Config
-{
-  fn default() -> Self
-  {
+impl Default for Config {
+  fn default() -> Self {
     Self::new()
   }
 }
 
 /// Builder for creating configuration with multiple sources
-pub struct ConfigBuilder
-{
+#[derive(Debug)]
+pub struct ConfigBuilder {
   values: HashMap<String, String>,
   validate: bool,
 }
 
-impl ConfigBuilder
-{
+impl ConfigBuilder {
   /// Create new configuration builder
-  pub fn new() -> Self
-  {
+  #[must_use]
+  pub fn new() -> Self {
     Self {
       values: HashMap::new(),
       validate: false,
@@ -169,50 +158,53 @@ impl ConfigBuilder
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
-  pub fn with_iron_config(mut self) -> Self
-  {
+  #[must_use]
+  pub fn with_iron_config(mut self) -> Self {
     let defaults = Config::get_defaults_toml();
 
     // Create ConfigLoader with defaults
-    let loader = ConfigLoader::with_defaults( "iron_cli", &defaults )
-      .expect( "Failed to create ConfigLoader" );
+    let loader =
+      ConfigLoader::with_defaults("iron_cli", &defaults).expect("Failed to create ConfigLoader");
 
     // Load all config keys (flat structure)
     // Environment variables follow IRON_CLI_* pattern (e.g., IRON_CLI_API_URL)
-    let config_keys = [ "api_url", "format", "user", "token" ];
+    let config_keys = ["api_url", "format", "user", "token"];
 
-    for key in &config_keys
-    {
-      if let Ok( value ) = loader.get::< String >( key )
-      {
-        self.values.insert( key.to_string(), value );
+    for key in &config_keys {
+      if let Ok(value) = loader.get::<String>(key) {
+        self.values.insert(key.to_string(), value);
       }
     }
 
     self
   }
 
-  /// Add CLI arguments (highest priority, overrides iron_config_loader)
-  pub fn with_cli_args(mut self, cli_args: HashMap<String, String>) -> Self
-  {
+  /// Add CLI arguments (highest priority, overrides `iron_config_loader`)
+  #[must_use]
+  pub fn with_cli_args(mut self, cli_args: HashMap<String, String>) -> Self {
     // CLI args override everything, including iron_config
-    self.values.extend( cli_args );
+    self.values.extend(cli_args);
     self
   }
 
   /// Enable validation of configuration values
-  pub fn validate(mut self) -> Self
-  {
+  #[must_use]
+  pub fn validate(mut self) -> Self {
     self.validate = true;
     self
   }
 
   /// Build configuration (panics on validation error)
-  pub fn build(self) -> Config
-  {
-    if self.validate
-    {
-      self.validate_values().expect( "LOUD FAILURE: Configuration validation failed" );
+  ///
+  /// # Panics
+  ///
+  /// Panics if `validate()` was called and configuration values are invalid.
+  #[must_use]
+  pub fn build(self) -> Config {
+    if self.validate {
+      self
+        .validate_values()
+        .expect("LOUD FAILURE: Configuration validation failed");
     }
 
     Config {
@@ -221,43 +213,41 @@ impl ConfigBuilder
   }
 
   /// Build configuration returning Result
-  pub fn build_result(self) -> Result<Config, ConfigError>
-  {
-    if self.validate
-    {
+  ///
+  /// # Errors
+  ///
+  /// Returns `Err(ConfigError)` if `validate()` was called and configuration values are invalid.
+  pub fn build_result(self) -> Result<Config, ConfigError> {
+    if self.validate {
       self.validate_values()?;
     }
 
-    Ok( Config {
+    Ok(Config {
       values: self.values,
     })
   }
 
   /// Validate configuration values
-  fn validate_values(&self) -> Result<(), ConfigError>
-  {
+  fn validate_values(&self) -> Result<(), ConfigError> {
     // Validate format value if present
-    if let Some( format ) = self.values.get( "format" )
-    {
-      let valid_formats = [ "table", "expanded", "json", "yaml" ];
+    if let Some(format) = self.values.get("format") {
+      let valid_formats = ["table", "expanded", "json", "yaml"];
 
-      if !valid_formats.contains( &format.as_str() )
-      {
-        return Err( ConfigError::InvalidValue(
-          format!( "Invalid format '{}'. Must be one of: {}", format, valid_formats.join( ", " ) )
-        ));
+      if !valid_formats.contains(&format.as_str()) {
+        return Err(ConfigError::InvalidValue(format!(
+          "Invalid format '{}'. Must be one of: {}",
+          format,
+          valid_formats.join(", ")
+        )));
       }
     }
 
-    Ok( () )
+    Ok(())
   }
 }
 
-impl Default for ConfigBuilder
-{
-  fn default() -> Self
-  {
+impl Default for ConfigBuilder {
+  fn default() -> Self {
     Self::new()
   }
 }
-

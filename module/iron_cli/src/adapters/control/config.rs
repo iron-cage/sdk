@@ -12,7 +12,7 @@
 //!
 //! ## Environment Variables
 //!
-//! - `IRON_CONTROL_API_URL`: Base URL for Control API (default: http://localhost:8080)
+//! - `IRON_CONTROL_API_URL`: Base URL for Control API (default: <http://localhost:8080>)
 //! - `IRON_CONTROL_API_TOKEN`: API authentication token (optional)
 //! - `IRON_CONTROL_API_TIMEOUT`: Request timeout in seconds (default: 30)
 //!
@@ -24,14 +24,13 @@
 //! timeout = 30
 //! ```
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use core::time::Duration;
 use iron_config_loader::ConfigLoader;
-use std::time::Duration;
-use base64::{ Engine, engine::general_purpose::URL_SAFE_NO_PAD };
 
 /// Control API configuration
 #[derive(Debug, Clone)]
-pub struct ControlApiConfig
-{
+pub struct ControlApiConfig {
   /// Base URL for Control API
   pub base_url: String,
 
@@ -42,21 +41,17 @@ pub struct ControlApiConfig
   pub timeout: Duration,
 }
 
-impl Default for ControlApiConfig
-{
-  fn default() -> Self
-  {
-    Self
-    {
+impl Default for ControlApiConfig {
+  fn default() -> Self {
+    Self {
       base_url: "http://localhost:8080".to_string(),
       api_token: None,
-      timeout: Duration::from_secs( 30 ),
+      timeout: Duration::from_secs(30),
     }
   }
 }
 
-impl ControlApiConfig
-{
+impl ControlApiConfig {
   /// Load configuration using `iron_config_loader` with 5-layer precedence
   ///
   /// Environment variables: `IRON_CONTROL_API_URL`, `IRON_CONTROL_API_TOKEN`, `IRON_CONTROL_API_TIMEOUT`
@@ -64,48 +59,44 @@ impl ControlApiConfig
   /// # Panics
   ///
   /// Panics if `ConfigLoader` creation fails (should never happen with valid defaults).
-  pub fn load() -> Self
-  {
+  #[must_use]
+  pub fn load() -> Self {
     let defaults = r#"
 url = "http://localhost:8080"
 timeout = 30
 "#;
 
-    let loader = ConfigLoader::with_defaults( "iron_control_api", defaults )
-      .expect( "Failed to create control API config loader" );
+    let loader = ConfigLoader::with_defaults("iron_control_api", defaults)
+      .expect("Failed to create control API config loader");
 
-    let base_url = loader.get::< String >( "url" )
-      .unwrap_or_else( |_| "http://localhost:8080".to_string() );
+    let base_url = loader
+      .get::<String>("url")
+      .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
-    let api_token = loader.get_opt::< String >( "token" )
-      .ok()
-      .flatten();
+    let api_token = loader.get_opt::<String>("token").ok().flatten();
 
-    let timeout_secs = loader.get::< u64 >( "timeout" )
-      .unwrap_or( 30 );
+    let timeout_secs = loader.get::<u64>("timeout").unwrap_or(30);
 
-    Self
-    {
+    Self {
       base_url,
       api_token,
-      timeout: Duration::from_secs( timeout_secs ),
+      timeout: Duration::from_secs(timeout_secs),
     }
   }
 
   /// Create configuration with explicit values
-  pub fn new( base_url: String, api_token: Option<String> ) -> Self
-  {
-    Self
-    {
+  #[must_use]
+  pub fn new(base_url: String, api_token: Option<String>) -> Self {
+    Self {
       base_url,
       api_token,
-      timeout: Duration::from_secs( 30 ),
+      timeout: Duration::from_secs(30),
     }
   }
 
   /// Set timeout
-  pub fn with_timeout( mut self, timeout: Duration ) -> Self
-  {
+  #[must_use]
+  pub fn with_timeout(mut self, timeout: Duration) -> Self {
     self.timeout = timeout;
     self
   }
@@ -114,23 +105,22 @@ timeout = 30
   ///
   /// Parses the JWT token payload and extracts the "sub" claim.
   /// Returns None if token is missing or invalid.
-  pub fn get_user_id( &self ) -> Option< String >
-  {
+  #[must_use]
+  pub fn get_user_id(&self) -> Option<String> {
     let token = self.api_token.as_ref()?;
 
     // JWT format: header.payload.signature
-    let parts: Vec< &str > = token.split( '.' ).collect();
-    if parts.len() != 3
-    {
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() != 3 {
       return None;
     }
 
     // Decode payload (base64url encoded)
-    let payload_bytes = URL_SAFE_NO_PAD.decode( parts[ 1 ] ).ok()?;
-    let payload_str = String::from_utf8( payload_bytes ).ok()?;
+    let payload_bytes = URL_SAFE_NO_PAD.decode(parts[1]).ok()?;
+    let payload_str = String::from_utf8(payload_bytes).ok()?;
 
     // Parse as JSON and extract "sub" claim
-    let payload: serde_json::Value = serde_json::from_str( &payload_str ).ok()?;
-    payload.get( "sub" )?.as_str().map( |s| s.to_string() )
+    let payload: serde_json::Value = serde_json::from_str(&payload_str).ok()?;
+    payload.get("sub")?.as_str().map(ToString::to_string)
   }
 }

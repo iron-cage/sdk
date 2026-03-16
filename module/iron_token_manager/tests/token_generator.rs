@@ -53,128 +53,152 @@
 use iron_token_manager::token_generator::TokenGenerator;
 use std::collections::HashSet;
 
-#[ test ]
-fn test_token_format_protocol_014()
-{
+#[test]
+fn test_token_format_protocol_014() {
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   // Protocol 014 format: apitok_{64 Base62 chars}
-  assert!( token.starts_with( "apitok_" ), "Token should start with 'apitok_' prefix, got: {token}" );
+  assert!(
+    token.starts_with("apitok_"),
+    "Token should start with 'apitok_' prefix, got: {token}"
+  );
 
   // Extract body (everything after prefix)
-  let body = &token[ 7.. ];
-  assert_eq!( body.len(), 64, "Token body should be exactly 64 characters, got: {}", body.len() );
+  let body = &token[7..];
+  assert_eq!(
+    body.len(),
+    64,
+    "Token body should be exactly 64 characters, got: {}",
+    body.len()
+  );
 
   // Verify body contains only Base62 characters [0-9A-Za-z]
-  let is_base62 = body.chars().all( |c| c.is_ascii_alphanumeric() );
-  assert!( is_base62, "Token body should contain only Base62 chars [0-9A-Za-z], got: {body}" );
+  let is_base62 = body.chars().all(|c| c.is_ascii_alphanumeric());
+  assert!(
+    is_base62,
+    "Token body should contain only Base62 chars [0-9A-Za-z], got: {body}"
+  );
 
   // Verify format with regex pattern
-  let format_regex = regex::Regex::new( r"^apitok_[A-Za-z0-9]{64}$" ).unwrap();
-  assert!( format_regex.is_match( &token ), "Token should match format ^apitok_[A-Za-z0-9]{{64}}$, got: {token}" );
+  let format_regex = regex::Regex::new(r"^apitok_[A-Za-z0-9]{64}$").unwrap();
+  assert!(
+    format_regex.is_match(&token),
+    "Token should match format ^apitok_[A-Za-z0-9]{{64}}$, got: {token}"
+  );
 }
 
-#[ test ]
-fn test_token_length_exactly_71_chars()
-{
+#[test]
+fn test_token_length_exactly_71_chars() {
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   // Protocol 014: apitok_ (7 chars) + body (64 chars) = 71 total
-  assert_eq!( token.len(), 71, "Token should be exactly 71 characters, got {}", token.len() );
+  assert_eq!(
+    token.len(),
+    71,
+    "Token should be exactly 71 characters, got {}",
+    token.len()
+  );
 
   // Verify components
-  assert_eq!( "apitok_".len(), 7, "Prefix should be 7 characters" );
-  assert_eq!( &token[ ..7 ], "apitok_", "First 7 chars should be prefix" );
-  assert_eq!( token[ 7.. ].len(), 64, "Body should be 64 characters" );
+  assert_eq!("apitok_".len(), 7, "Prefix should be 7 characters");
+  assert_eq!(&token[..7], "apitok_", "First 7 chars should be prefix");
+  assert_eq!(token[7..].len(), 64, "Body should be 64 characters");
 }
 
-#[ test ]
-fn test_generate_token_produces_unique_tokens()
-{
+#[test]
+fn test_generate_token_produces_unique_tokens() {
   let generator = TokenGenerator::new();
   let mut tokens = HashSet::new();
 
   // Generate 1000 tokens and verify all are unique
-  for _ in 0..1000
-  {
+  for _ in 0..1000 {
     let token = generator.generate();
-    assert!( tokens.insert( token.clone() ), "Generated duplicate token: {token}" );
+    assert!(
+      tokens.insert(token.clone()),
+      "Generated duplicate token: {token}"
+    );
   }
 
-  assert_eq!( tokens.len(), 1000, "Expected 1000 unique tokens" );
+  assert_eq!(tokens.len(), 1000, "Expected 1000 unique tokens");
 }
 
-#[ test ]
-fn test_token_uses_base62_encoding()
-{
+#[test]
+fn test_token_uses_base62_encoding() {
   let generator = TokenGenerator::new();
   let token = generator.generate();
 
   // Extract body (skip "apitok_" prefix)
-  let body = &token[ 7.. ];
+  let body = &token[7..];
 
   // Base62 alphabet: 0-9, A-Z, a-z (no special characters)
-  let is_base62 = body.chars().all( |c| c.is_ascii_alphanumeric() );
-  assert!( is_base62, "Token body should use Base62 encoding [0-9A-Za-z], got: {body}" );
+  let is_base62 = body.chars().all(|c| c.is_ascii_alphanumeric());
+  assert!(
+    is_base62,
+    "Token body should use Base62 encoding [0-9A-Za-z], got: {body}"
+  );
 
   // Verify NO special characters (unlike base64 which has +/=)
-  let has_special_chars = body.chars().any( |c| c == '+' || c == '/' || c == '=' );
-  assert!( !has_special_chars, "Token body should not contain base64 special chars (+/=), got: {body}" );
+  let has_special_chars = body.chars().any(|c| c == '+' || c == '/' || c == '=');
+  assert!(
+    !has_special_chars,
+    "Token body should not contain base64 special chars (+/=), got: {body}"
+  );
 
   // Verify both cases present (uppercase and lowercase)
   // Note: With random generation, extremely unlikely to have zero of either case
-  let has_uppercase = body.chars().any( |c| c.is_ascii_uppercase() );
-  let has_lowercase = body.chars().any( |c| c.is_ascii_lowercase() );
-  let has_digit = body.chars().any( |c| c.is_ascii_digit() );
+  let has_uppercase = body.chars().any(|c| c.is_ascii_uppercase());
+  let has_lowercase = body.chars().any(|c| c.is_ascii_lowercase());
+  let has_digit = body.chars().any(|c| c.is_ascii_digit());
 
   // At least one of each category should be present in 64 random chars
-  assert!( has_uppercase || has_lowercase || has_digit,
-    "Token should contain mix of characters from Base62 alphabet, got: {body}" );
+  assert!(
+    has_uppercase || has_lowercase || has_digit,
+    "Token should contain mix of characters from Base62 alphabet, got: {body}"
+  );
 }
 
-#[ test ]
-fn test_hash_token_produces_sha256_hash()
-{
+#[test]
+fn test_hash_token_produces_sha256_hash() {
   let generator = TokenGenerator::new();
   let token = "test_token_12345";
-  let hash = generator.hash_token( token );
+  let hash = generator.hash_token(token);
 
   // SHA-256 produces 64 hex characters
-  assert_eq!( hash.len(), 64, "SHA-256 hash should be 64 hex characters" );
+  assert_eq!(hash.len(), 64, "SHA-256 hash should be 64 hex characters");
 
   // Verify hex encoding
-  let is_hex = hash.chars().all( |c| c.is_ascii_hexdigit() );
-  assert!( is_hex, "Hash should be hex encoded" );
+  let is_hex = hash.chars().all(|c| c.is_ascii_hexdigit());
+  assert!(is_hex, "Hash should be hex encoded");
 }
 
-#[ test ]
-fn test_hash_token_is_deterministic()
-{
+#[test]
+fn test_hash_token_is_deterministic() {
   let generator = TokenGenerator::new();
   let token = "deterministic_test_token";
 
-  let hash1 = generator.hash_token( token );
-  let hash2 = generator.hash_token( token );
+  let hash1 = generator.hash_token(token);
+  let hash2 = generator.hash_token(token);
 
-  assert_eq!( hash1, hash2, "Same token should produce same hash" );
+  assert_eq!(hash1, hash2, "Same token should produce same hash");
 }
 
-#[ test ]
-fn test_hash_token_different_tokens_produce_different_hashes()
-{
+#[test]
+fn test_hash_token_different_tokens_produce_different_hashes() {
   let generator = TokenGenerator::new();
 
-  let hash1 = generator.hash_token( "token1" );
-  let hash2 = generator.hash_token( "token2" );
+  let hash1 = generator.hash_token("token1");
+  let hash2 = generator.hash_token("token2");
 
-  assert_ne!( hash1, hash2, "Different tokens should produce different hashes" );
+  assert_ne!(
+    hash1, hash2,
+    "Different tokens should produce different hashes"
+  );
 }
 
-#[ test ]
-fn test_hash_strips_apitok_prefix()
-{
+#[test]
+fn test_hash_strips_apitok_prefix() {
   let generator = TokenGenerator::new();
 
   // Create a token with known body
@@ -182,82 +206,79 @@ fn test_hash_strips_apitok_prefix()
   let token_body_only = "ABC123def456GHI789jkl012MNO345pqr678STU901vwx234YZa567bcd890ef";
 
   // Hash both - should produce SAME hash (prefix stripped)
-  let hash_with_prefix = generator.hash_token( token_with_prefix );
-  let hash_body_only = generator.hash_token( token_body_only );
+  let hash_with_prefix = generator.hash_token(token_with_prefix);
+  let hash_body_only = generator.hash_token(token_body_only);
 
   assert_eq!( hash_with_prefix, hash_body_only,
     "Hashing 'apitok_BODY' should produce same hash as hashing 'BODY' alone (prefix should be stripped)" );
 
   // Verify SHA-256 format
-  assert_eq!( hash_with_prefix.len(), 64, "Hash should be 64 hex characters" );
-  let is_hex = hash_with_prefix.chars().all( |c| c.is_ascii_hexdigit() );
-  assert!( is_hex, "Hash should be hex encoded" );
+  assert_eq!(
+    hash_with_prefix.len(),
+    64,
+    "Hash should be 64 hex characters"
+  );
+  let is_hex = hash_with_prefix.chars().all(|c| c.is_ascii_hexdigit());
+  assert!(is_hex, "Hash should be hex encoded");
 }
 
-#[ test ]
-fn test_hash_backward_compatible_with_old_tokens()
-{
+#[test]
+fn test_hash_backward_compatible_with_old_tokens() {
   let generator = TokenGenerator::new();
 
   // Old token format (no apitok_ prefix, just random string)
   let old_token = "xyz789ABC123def456GHI789jkl012MNO345pqr678STU901vwxyz";
 
   // Hash old token - should hash entire string (no prefix stripping)
-  let hash1 = generator.hash_token( old_token );
-  let hash2 = generator.hash_token( old_token );
+  let hash1 = generator.hash_token(old_token);
+  let hash2 = generator.hash_token(old_token);
 
   // Verify deterministic
-  assert_eq!( hash1, hash2, "Old tokens should hash deterministically" );
+  assert_eq!(hash1, hash2, "Old tokens should hash deterministically");
 
   // Verify SHA-256 format
-  assert_eq!( hash1.len(), 64, "Hash should be 64 hex characters" );
-  let is_hex = hash1.chars().all( |c| c.is_ascii_hexdigit() );
-  assert!( is_hex, "Hash should be hex encoded" );
+  assert_eq!(hash1.len(), 64, "Hash should be 64 hex characters");
+  let is_hex = hash1.chars().all(|c| c.is_ascii_hexdigit());
+  assert!(is_hex, "Hash should be hex encoded");
 
   // Verify old token verification still works
-  let is_valid = generator.verify_token( old_token, &hash1 );
-  assert!( is_valid, "Old tokens should verify against their hashes" );
+  let is_valid = generator.verify_token(old_token, &hash1);
+  assert!(is_valid, "Old tokens should verify against their hashes");
 }
 
-#[ test ]
-fn test_verify_token_validates_correct_hash()
-{
+#[test]
+fn test_verify_token_validates_correct_hash() {
   let generator = TokenGenerator::new();
   let token = generator.generate();
-  let hash = generator.hash_token( &token );
+  let hash = generator.hash_token(&token);
 
-  let is_valid = generator.verify_token( &token, &hash );
-  assert!( is_valid, "Token should verify against its own hash" );
+  let is_valid = generator.verify_token(&token, &hash);
+  assert!(is_valid, "Token should verify against its own hash");
 }
 
-#[ test ]
-fn test_verify_token_rejects_wrong_hash()
-{
+#[test]
+fn test_verify_token_rejects_wrong_hash() {
   let generator = TokenGenerator::new();
   let token = generator.generate();
-  let wrong_hash = "0".repeat( 64 );  // Invalid hash
+  let wrong_hash = "0".repeat(64); // Invalid hash
 
-  let is_valid = generator.verify_token( &token, &wrong_hash );
-  assert!( !is_valid, "Token should not verify against wrong hash" );
+  let is_valid = generator.verify_token(&token, &wrong_hash);
+  assert!(!is_valid, "Token should not verify against wrong hash");
 }
 
-#[ test ]
-fn test_generate_token_has_sufficient_entropy()
-{
+#[test]
+fn test_generate_token_has_sufficient_entropy() {
   let generator = TokenGenerator::new();
 
   // Generate multiple tokens and verify they don't share common patterns
-  let tokens : Vec< String > = ( 0..10 ).map( |_| generator.generate() ).collect();
+  let tokens: Vec<String> = (0..10).map(|_| generator.generate()).collect();
 
   // No token should be a substring of another (indicating poor randomness)
-  for i in 0..tokens.len()
-  {
-    for j in 0..tokens.len()
-    {
-      if i != j
-      {
+  for i in 0..tokens.len() {
+    for j in 0..tokens.len() {
+      if i != j {
         assert!(
-          !tokens[ i ].contains( &tokens[ j ] ),
+          !tokens[i].contains(&tokens[j]),
           "Token {i} contains token {j} - insufficient entropy"
         );
       }
@@ -365,15 +386,14 @@ fn test_generate_token_has_sufficient_entropy()
 /// - Database secrets (128+ bits entropy) → SHA-256 if lookup needed, Argon2 if not
 ///
 // test_kind: bug_reproducer(issue-bcrypt-revert)
-#[ test ]
-fn test_bcrypt_nondeterminism_breaks_token_lookup()
-{
+#[test]
+fn test_bcrypt_nondeterminism_breaks_token_lookup() {
   let generator = TokenGenerator::new();
   let token = "test_token_12345";
 
   // Verify deterministic hashing (same input always produces same output)
-  let hash1 = generator.hash_token( token );
-  let hash2 = generator.hash_token( token );
+  let hash1 = generator.hash_token(token);
+  let hash2 = generator.hash_token(token);
 
   assert_eq!(
     hash1, hash2,
@@ -383,13 +403,14 @@ fn test_bcrypt_nondeterminism_breaks_token_lookup()
 
   // Verify SHA-256 format (64 hex chars, not `BCrypt`'s 60-char format)
   assert_eq!(
-    hash1.len(), 64,
+    hash1.len(),
+    64,
     "SHA-256 produces 64-char hex hash. `BCrypt` produces 60-char format \
      (e.g., $2b$12$...), which would fail this assertion."
   );
 
   // Verify hex encoding (SHA-256), not `BCrypt`'s base64-like encoding
-  let is_hex = hash1.chars().all( |c| c.is_ascii_hexdigit() );
+  let is_hex = hash1.chars().all(|c| c.is_ascii_hexdigit());
   assert!(
     is_hex,
     "SHA-256 uses hex encoding (0-9a-f). `BCrypt` uses base64-like encoding \
@@ -397,7 +418,7 @@ fn test_bcrypt_nondeterminism_breaks_token_lookup()
   );
 
   // Verify verification works (relies on determinism)
-  let is_valid = generator.verify_token( token, &hash1 );
+  let is_valid = generator.verify_token(token, &hash1);
   assert!(
     is_valid,
     "Verification must succeed for correct hash. `BCrypt`'s non-determinism \
@@ -418,17 +439,15 @@ fn test_bcrypt_nondeterminism_breaks_token_lookup()
 /// 1. Generate 10,000 tokens
 /// 2. Store in `HashSet` (rejects duplicates)
 /// 3. Verify `HashSet` size equals 10,000 (no collisions)
-#[ test ]
-fn test_generate_produces_unique_tokens_10k()
-{
+#[test]
+fn test_generate_produces_unique_tokens_10k() {
   let generator = TokenGenerator::new();
   let mut tokens = HashSet::new();
 
   // Generate 10,000 tokens (plan requirement)
-  for i in 0..10_000
-  {
+  for i in 0..10_000 {
     let token = generator.generate();
-    let was_unique = tokens.insert( token.clone() );
+    let was_unique = tokens.insert(token.clone());
 
     assert!(
       was_unique,
@@ -439,7 +458,8 @@ fn test_generate_produces_unique_tokens_10k()
   assert_eq!(
     tokens.len(),
     10_000,
-    "LOUD FAILURE: Expected 10,000 unique tokens, got {}", tokens.len()
+    "LOUD FAILURE: Expected 10,000 unique tokens, got {}",
+    tokens.len()
   );
 }
 
@@ -461,22 +481,19 @@ fn test_generate_produces_unique_tokens_10k()
 /// (not perfectly uniform distribution). This is acceptable because security
 /// comes from INPUT entropy (crypto RNG), not OUTPUT character uniformity.
 /// We test for "reasonable" distribution to detect gross encoding errors.
-#[ test ]
-fn test_token_randomness_chi_squared()
-{
+#[test]
+fn test_token_randomness_chi_squared() {
   let generator = TokenGenerator::new();
   let sample_size = 1000;
   let mut char_counts = std::collections::HashMap::new();
 
   // Collect character frequencies from token bodies
-  for _ in 0..sample_size
-  {
+  for _ in 0..sample_size {
     let token = generator.generate();
-    let token_body = token.strip_prefix( "apitok_" ).unwrap_or( &token );
+    let token_body = token.strip_prefix("apitok_").unwrap_or(&token);
 
-    for ch in token_body.chars()
-    {
-      *char_counts.entry( ch ).or_insert( 0 ) += 1;
+    for ch in token_body.chars() {
+      *char_counts.entry(ch).or_insert(0) += 1;
     }
   }
 
@@ -495,11 +512,11 @@ fn test_token_randomness_chi_squared()
   // (not perfectly uniform). We test for "reasonable" distribution, not
   // perfect uniformity. Entropy comes from INPUT bytes (crypto RNG), not
   // OUTPUT character distribution.
-  let total_chars = f64::from( sample_size * 64 );
+  let total_chars = f64::from(sample_size * 64);
   let expected_freq = total_chars / 62.0;
 
-  let max_count = f64::from( char_counts.values().max().copied().unwrap_or( 0 ) );
-  let min_count = f64::from( char_counts.values().min().copied().unwrap_or( 0 ) );
+  let max_count = f64::from(char_counts.values().max().copied().unwrap_or(0));
+  let min_count = f64::from(char_counts.values().min().copied().unwrap_or(0));
   let max_threshold = expected_freq * 2.0;
   let min_threshold = expected_freq * 0.5;
 
@@ -557,28 +574,26 @@ fn test_token_randomness_chi_squared()
 /// 3. Threshold 0.3-3.0 still catches egregious violations (10x+ ratio)
 ///
 /// This maintains security validation while tolerating CI environment variance.
-#[ test ]
-fn test_verify_token_constant_time()
-{
+#[test]
+fn test_verify_token_constant_time() {
   let generator = TokenGenerator::new();
   let token = generator.generate();
-  let correct_hash = generator.hash_token( &token );
+  let correct_hash = generator.hash_token(&token);
 
   // Create wrong tokens with mismatch at different positions
-  let mut wrong_early = String::from( "apitok_X" );
-  wrong_early.push_str( &token[ 8.. ] ); // Mismatch at position 7
+  let mut wrong_early = String::from("apitok_X");
+  wrong_early.push_str(&token[8..]); // Mismatch at position 7
 
-  let mut wrong_late = token[ ..70 ].to_string();
-  wrong_late.push( 'X' ); // Mismatch at position 70 (last char)
+  let mut wrong_late = token[..70].to_string();
+  wrong_late.push('X'); // Mismatch at position 70 (last char)
 
   let warmup_iterations = 100;
   let iterations = 5000;
 
   // Warm-up: stabilize CPU cache and scheduling before measurements
-  for _ in 0..warmup_iterations
-  {
-    let _ = generator.verify_token( &wrong_early, &correct_hash );
-    let _ = generator.verify_token( &wrong_late, &correct_hash );
+  for _ in 0..warmup_iterations {
+    let _ = generator.verify_token(&wrong_early, &correct_hash);
+    let _ = generator.verify_token(&wrong_late, &correct_hash);
   }
 
   // Interleaved measurement: alternate early/late each iteration to neutralize
@@ -586,14 +601,13 @@ fn test_verify_token_constant_time()
   let mut total_early = core::time::Duration::ZERO;
   let mut total_late = core::time::Duration::ZERO;
 
-  for _ in 0..iterations
-  {
+  for _ in 0..iterations {
     let t = std::time::Instant::now();
-    let _ = generator.verify_token( &wrong_early, &correct_hash );
+    let _ = generator.verify_token(&wrong_early, &correct_hash);
     total_early += t.elapsed();
 
     let t = std::time::Instant::now();
-    let _ = generator.verify_token( &wrong_late, &correct_hash );
+    let _ = generator.verify_token(&wrong_late, &correct_hash);
     total_late += t.elapsed();
   }
 
@@ -601,12 +615,9 @@ fn test_verify_token_constant_time()
   let duration_late = total_late;
 
   // Calculate timing ratio
-  let ratio = if duration_late.as_nanos() > 0
-  {
+  let ratio = if duration_late.as_nanos() > 0 {
     duration_early.as_nanos() as f64 / duration_late.as_nanos() as f64
-  }
-  else
-  {
+  } else {
     1.0
   };
 

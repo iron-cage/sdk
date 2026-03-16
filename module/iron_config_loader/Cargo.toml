@@ -1,14 +1,17 @@
 [package]
 name = "iron_config_loader"
-version= "0.4.0"
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+version = "0.4.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Unified configuration management for Iron Runtime"
 repository = "https://github.com/.../iron_runtime"
 readme = "readme.md"
 keywords = ["config", "configuration", "environment", "toml"]
 categories = ["config"]
+
+[lints]
+workspace = true
 
 [features]
 default = ["enabled"]

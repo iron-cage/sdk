@@ -24,7 +24,7 @@
 
 use iron_control_api::{
   ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
-  ip_token::{ IpTokenCrypto, IpTokenKey },
+  ip_token::{IpTokenCrypto, IpTokenKey},
   routes::budget::*,
 };
 use secrecy::ExposeSecret;
@@ -277,7 +277,8 @@ fn test_ip_token_encryption() {
   // Create 32-byte encryption key
   let key: [u8; 32] = [0u8; 32]; // In production, use random key
 
-  let crypto = IpTokenCrypto::from_slice(&key).expect("LOUD FAILURE: Should create IP Token crypto");
+  let crypto =
+    IpTokenCrypto::from_slice(&key).expect("LOUD FAILURE: Should create IP Token crypto");
 
   // Test provider API key
   let provider_key = "sk-proj_test_key_abc123";

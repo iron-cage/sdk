@@ -2,8 +2,7 @@
 
 /// Errors that can occur in the LLM Router
 #[derive(Debug)]
-pub enum LlmRouterError
-{
+pub enum LlmRouterError {
   /// Failed to start the proxy server
   ServerStart(String),
 
@@ -17,18 +16,15 @@ pub enum LlmRouterError
   InvalidToken,
 }
 
-impl std::fmt::Display for LlmRouterError
-{
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
-  {
-    match self
-    {
-      Self::ServerStart(msg) => write!(f, "Server start failed: {}", msg),
-      Self::KeyFetch(msg) => write!(f, "Key fetch failed: {}", msg),
-      Self::Forward(msg) => write!(f, "Forward failed: {}", msg),
+impl core::fmt::Display for LlmRouterError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    match self {
+      Self::ServerStart(msg) => write!(f, "Server start failed: {msg}"),
+      Self::KeyFetch(msg) => write!(f, "Key fetch failed: {msg}"),
+      Self::Forward(msg) => write!(f, "Forward failed: {msg}"),
       Self::InvalidToken => write!(f, "Invalid or missing authentication token"),
     }
   }
 }
 
-impl std::error::Error for LlmRouterError {}
+impl core::error::Error for LlmRouterError {}

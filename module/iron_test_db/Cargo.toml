@@ -1,11 +1,14 @@
 [package]
 name = "iron_test_db"
-version.workspace = true
-edition.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
 authors = ["Iron Runtime Team"]
 description = "Test database infrastructure for Iron Runtime crates"
-license.workspace = true
+license = { workspace = true }
 publish = false
+
+[lints]
+workspace = true
 
 [features]
 enabled = []

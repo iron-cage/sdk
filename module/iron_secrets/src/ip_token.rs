@@ -19,6 +19,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use secrecy::{ExposeSecret, SecretBox};
+use zeroize::Zeroizing;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes)
 const NONCE_SIZE: usize = 12;
@@ -46,9 +47,14 @@ impl IpTokenKey {
 
 impl Clone for IpTokenKey {
   fn clone(&self) -> Self {
-    let bytes = *self.inner.expose_secret();
+    // Fix(issue-003): wrap stack copy in `Zeroizing` so it is zeroed on drop.
+    // Root cause: `*self.inner.expose_secret()` copies 32 key bytes onto the stack;
+    //   without `Zeroizing`, the copy survives past this scope in deallocated frames.
+    // Pitfall: `*secret_box.expose_secret()` silently creates an unguarded stack copy
+    //   that neither the compiler nor `SecretBox` will clean up.
+    let bytes = Zeroizing::new(*self.inner.expose_secret());
     Self {
-      inner: SecretBox::new(Box::new(bytes)),
+      inner: SecretBox::new(Box::new(*bytes)),
     }
   }
 }
@@ -78,10 +84,13 @@ impl TryFrom<&[u8]> for IpTokenKey {
     if bytes.len() != KEY_SIZE {
       return Err(IpTokenError::InvalidKeyLength);
     }
-    let mut key = [0u8; 32];
+    // Fix(issue-003): wrap stack buffer in `Zeroizing` so it is zeroed on drop.
+    // Root cause: intermediate `[0u8; 32]` on the stack held key material after scope exit.
+    // Pitfall: stack-resident key copies are invisible to `SecretBox` — always use `Zeroizing`.
+    let mut key = Zeroizing::new([0u8; 32]);
     key.copy_from_slice(bytes);
     Ok(Self {
-      inner: SecretBox::new(Box::new(key)),
+      inner: SecretBox::new(Box::new(*key)),
     })
   }
 }

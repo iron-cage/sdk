@@ -3,8 +3,7 @@
 use iron_reliability::CircuitBreaker;
 
 #[test]
-fn readme_example_compiles()
-{
+fn readme_example_compiles() {
   // Example from readme.md - verify circuit breaker API works
   let cb = CircuitBreaker::new(5, 60);
 
@@ -18,8 +17,7 @@ fn readme_example_compiles()
 }
 
 #[test]
-fn circuit_breaker_opens_on_failures()
-{
+fn circuit_breaker_opens_on_failures() {
   let cb = CircuitBreaker::new(3, 60);
 
   // Generate failures (below threshold)
@@ -33,8 +31,7 @@ fn circuit_breaker_opens_on_failures()
 }
 
 #[test]
-fn circuit_breaker_resets_on_success()
-{
+fn circuit_breaker_resets_on_success() {
   let cb = CircuitBreaker::new(5, 60);
 
   // Generate some failures

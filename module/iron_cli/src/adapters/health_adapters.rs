@@ -6,18 +6,18 @@
 //!
 //! Health endpoints are public (no auth required).
 
-use std::collections::HashMap;
+use super::token::{TokenApiClient, TokenApiConfig};
+use super::{AdapterError, ServiceError};
 use crate::handlers::health_handlers;
-use super::token::{ TokenApiClient, TokenApiConfig };
-use super::{ AdapterError, ServiceError };
+use std::collections::HashMap;
 
 /// Format JSON response according to format parameter
-fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, AdapterError>
-{
-  match format
-  {
-    "yaml" => serde_yaml::to_string( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
-    _ => serde_json::to_string_pretty( data ).map_err( |e| AdapterError::FormattingError( e.to_string() ) ),
+fn format_response(data: &serde_json::Value, format: &str) -> Result<String, AdapterError> {
+  match format {
+    "yaml" => serde_yaml::to_string(data).map_err(|e| AdapterError::FormattingError(e.to_string())),
+    _ => {
+      serde_json::to_string_pretty(data).map_err(|e| AdapterError::FormattingError(e.to_string()))
+    }
   }
 }
 
@@ -34,27 +34,34 @@ fn format_response( data: &serde_json::Value, format: &str ) -> Result<String, A
 /// ```bash
 /// iron-token .health.check
 /// ```
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails or the HTTP request fails.
 pub async fn health_check_adapter(
   params: &HashMap<String, String>,
-) -> Result<String, AdapterError>
-{
+) -> Result<String, AdapterError> {
   // 1. Validate with handler
-  health_handlers::health_handler( params )?;
+  health_handlers::health_handler(params)?;
 
   // 2. Create HTTP client (no auth needed for health)
   let config = TokenApiConfig::load();
-  let client = TokenApiClient::new( config );
+  let client = TokenApiClient::new(config);
 
-  // 3. Make HTTP call (no access_token needed)
+  // 3. Make HTTP call (no `access_token` needed)
   let response = client
-    .get( "/api/v1/health", None, None )
+    .get("/api/v1/health", None, None)
     .await
-    .map_err( |e| AdapterError::ServiceError( ServiceError::NetworkError( format!( "Health check failed: {}", e ) ) ) )?;
+    .map_err(|e| {
+      AdapterError::ServiceError(ServiceError::NetworkError(format!(
+        "Health check failed: {e}"
+      )))
+    })?;
 
   // 4. Format output
-  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
+  let format = params.get("format").map_or("json", String::as_str);
 
-  format_response( &response, format )
+  format_response(&response, format)
 }
 
 /// Version adapter
@@ -70,26 +77,27 @@ pub async fn health_check_adapter(
 /// ```bash
 /// iron-token .version
 /// ```
-pub async fn version_adapter(
-  params: &HashMap<String, String>,
-) -> Result<String, AdapterError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(AdapterError)` if handler validation fails or formatting fails.
+pub async fn version_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
-  health_handlers::version_handler( params )?;
+  health_handlers::version_handler(params)?;
 
   // 2. Get CLI version (always available)
-  let cli_version = env!( "CARGO_PKG_VERSION" );
+  let cli_version = env!("CARGO_PKG_VERSION");
 
   // 3. Try to get API version (optional, fails gracefully)
   let api_version = {
     let config = TokenApiConfig::load();
-    let client = TokenApiClient::new( config );
+    let client = TokenApiClient::new(config);
 
     client
-      .get( "/api/v1/version", None, None )
+      .get("/api/v1/version", None, None)
       .await
       .ok()
-      .and_then( |v| v.get( "version" ).and_then( |v| v.as_str() ).map( String::from ) )
+      .and_then(|v| v.get("version").and_then(|v| v.as_str()).map(String::from))
   };
 
   // 4. Build response
@@ -97,17 +105,14 @@ pub async fn version_adapter(
     "cli_version": cli_version,
   });
 
-  if let Some( api_ver ) = api_version
-  {
-    version_info[ "api_version" ] = serde_json::json!( api_ver );
-  }
-  else
-  {
-    version_info[ "api_version" ] = serde_json::json!( "<unavailable>" );
+  if let Some(api_ver) = api_version {
+    version_info["api_version"] = serde_json::json!(api_ver);
+  } else {
+    version_info["api_version"] = serde_json::json!("<unavailable>");
   }
 
   // 5. Format output
-  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
+  let format = params.get("format").map_or("json", String::as_str);
 
-  format_response( &version_info, format )
+  format_response(&version_info, format)
 }

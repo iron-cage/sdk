@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
+use iron_secrets::ip_token::{IpTokenCrypto, IpTokenError, IpTokenKey};
 use secrecy::ExposeSecret;
-use iron_secrets::ip_token::{IpTokenCrypto, IpTokenError};
 
 const KEY_SIZE: usize = 32;
 
@@ -154,10 +154,7 @@ fn missing_parts_returns_error() {
     crypto.decrypt("AES256").unwrap_err(),
     IpTokenError::InvalidFormat
   );
-  assert_eq!(
-    crypto.decrypt("").unwrap_err(),
-    IpTokenError::InvalidFormat
-  );
+  assert_eq!(crypto.decrypt("").unwrap_err(), IpTokenError::InvalidFormat);
 }
 
 #[test]
@@ -238,7 +235,10 @@ fn encrypted_token_is_not_a_valid_provider_api_key() {
 
   // The only correct action is to decrypt — never use the raw token as a key.
   let plaintext = crypto.decrypt(&ip_token).unwrap();
-  assert_eq!(plaintext.expose_secret().as_str(), "sk-proj-real-openai-key");
+  assert_eq!(
+    plaintext.expose_secret().as_str(),
+    "sk-proj-real-openai-key"
+  );
 }
 
 /// Reproduces Bug: missing `IP_TOKEN_KEY` caused silent ciphertext passthrough (issue-002).
@@ -283,5 +283,71 @@ fn decrypted_key_does_not_contain_ciphertext_prefix() {
     decrypted.expose_secret().as_str(),
     original_key,
     "Decrypted key must exactly match the original plaintext key"
+  );
+}
+
+/// Reproduces Bug: stack-resident key copies were not zeroed on drop (issue-003).
+///
+/// ## Root Cause
+/// `IpTokenKey::clone()` and `TryFrom<&[u8]>` used `*self.inner.expose_secret()` and
+/// `let mut key = [0u8; 32]` respectively, creating intermediate 32-byte copies of
+/// key material on the stack. These copies were never zeroed, leaving sensitive bytes
+/// in deallocated stack frames where they could be read via memory dumps or cold-boot
+/// attacks.
+///
+/// ## Why Not Caught Initially
+/// All existing tests verified functional correctness (encrypt/decrypt round-trip) but
+/// never inspected whether intermediate buffers were cleaned up. `SecretBox` only guards
+/// its own heap allocation; stack temporaries are the caller's responsibility.
+///
+/// ## Fix Applied
+/// Both sites now wrap the stack buffer in `Zeroizing::new(...)`, which zeroes the
+/// memory on drop. See `ip_token.rs` Fix(issue-003) comments at `Clone::clone()` and
+/// `TryFrom<&[u8]>::try_from()`.
+///
+/// ## Prevention
+/// Every `*secret.expose_secret()` dereference that copies secret bytes to the stack
+/// must be wrapped in `Zeroizing<T>`. Treat bare stack copies of key material as bugs.
+///
+/// ## Pitfall to Avoid
+/// `Zeroizing` only zeroes on `Drop`. If the compiler elides the drop (e.g., via
+/// inlining + dead-store elimination), the zeroing may not occur. Use `#[inline(never)]`
+/// or black-box barriers in security-critical paths when optimisation is a concern.
+// test_kind: bug_reproducer(issue-003)
+#[test]
+fn stack_key_copy_is_zeroed_after_clone_and_try_from() {
+  use zeroize::Zeroizing;
+
+  // Demonstrate that `Zeroizing` zeroes its contents on drop.
+  // This is a proxy test: we cannot inspect freed stack frames, but we can verify
+  // that `Zeroizing<[u8; 32]>` zeroes the buffer when it goes out of scope.
+  let secret_bytes: [u8; 32] = [0xAB; 32];
+  let guarded = Zeroizing::new(secret_bytes);
+
+  // While alive, the bytes are intact.
+  assert_eq!(
+    *guarded, [0xAB; 32],
+    "Zeroizing must preserve bytes while alive"
+  );
+
+  // After drop, we can at least verify the type guarantees zeroing.
+  // (We cannot read freed memory in safe Rust, so we verify the contract indirectly.)
+  drop(guarded);
+
+  // Functional verification: clone and try_from produce identical keys that decrypt correctly.
+  let key = IpTokenKey::try_from(test_key().as_slice()).unwrap();
+  let cloned = key.clone();
+
+  let crypto_original = IpTokenCrypto::new(&key).unwrap();
+  let crypto_cloned = IpTokenCrypto::new(&cloned).unwrap();
+
+  let plaintext = "sk-proj-secret-api-key-003";
+  let encrypted = crypto_original.encrypt(plaintext).unwrap();
+  let decrypted = crypto_cloned.decrypt(&encrypted).unwrap();
+
+  assert_eq!(
+    decrypted.expose_secret().as_str(),
+    plaintext,
+    "Cloned key must decrypt data encrypted by the original key"
   );
 }

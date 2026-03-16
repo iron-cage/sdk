@@ -109,6 +109,9 @@ build: ## Build API + Dashboard for production
 
 typecheck: ## Type-check dashboard
 	@echo "[*] Type-checking dashboard..."
+	@if [ ! -d "$(DASHBOARD_DIR)/node_modules" ]; then \
+		cd $(DASHBOARD_DIR) && npm install; \
+	fi
 	@cd $(DASHBOARD_DIR) && npm run type-check
 
 validate: check test typecheck build ## Full production validation

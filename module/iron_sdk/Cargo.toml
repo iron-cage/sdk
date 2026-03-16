@@ -1,14 +1,17 @@
 [package]
 name = "iron_sdk"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Python SDK for Iron Cage AI agent protection - PyO3 bindings"
 repository = "https://github.com/.../iron_sdk"
 readme = "readme.md"
 keywords = ["sdk", "python", "pyo3", "ai-agent", "llm"]
 categories = ["api-bindings"]
+
+[lints]
+workspace = true
 
 [lib]
 name = "iron_cage"
