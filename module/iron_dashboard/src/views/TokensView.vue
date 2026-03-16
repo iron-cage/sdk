@@ -3,6 +3,9 @@ import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type TokenMetadata, type CreateTokenResponse } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -22,7 +25,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
+import { formatDate } from '@/lib/formatters'
+import { useConfirm } from '@/composables/useConfirm'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import IconX from '@/components/icons/IconX.vue'
+import IconKey from '@/components/icons/IconKey.vue'
+import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
+import IconRefresh from '@/components/icons/IconRefresh.vue'
+import IconBan from '@/components/icons/IconBan.vue'
+import IconCopy from '@/components/icons/IconCopy.vue'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -30,10 +50,10 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showTokenModal = ref(false)
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const newTokenData = ref<CreateTokenResponse | null>(null)
 const projectId = ref('')
 const description = ref('')
-const createError = ref('')
 const selectedUserId = ref('')
 
 // Fetch users for dropdown
@@ -58,12 +78,11 @@ const createMutation = useMutation({
     showTokenModal.value = true
     projectId.value = ''
     description.value = ''
-    selectedUserId.value = authStore.username || ''
-    createError.value = ''
+    selectedUserId.value = authStore.userId || ''
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
   onError: (err) => {
-    createError.value = err instanceof Error ? err.message : 'Failed to create token'
+    toast.error(err instanceof Error ? err.message : 'Failed to create token')
   },
 })
 
@@ -86,134 +105,111 @@ const revokeMutation = useMutation({
 })
 
 function handleCreateToken() {
-  createError.value = ''
+  const userId = selectedUserId.value || authStore.userId
+  if (!userId) {
+    toast.error('Cannot create token: no authenticated user')
+    return
+  }
   createMutation.mutate({
-    user_id: selectedUserId.value || authStore.username || 'default',
+    user_id: userId,
     project_id: projectId.value || undefined,
     description: description.value || undefined,
   })
 }
 
 function handleRotateToken(token: TokenMetadata) {
-  if (confirm(`Rotate token ${token.id}? The old token will be revoked.`)) {
-    rotateMutation.mutate(token.id)
-  }
+  openConfirm(
+    'Rotate Token',
+    `Rotate token ${token.id}? The current token will be revoked and a new one issued.`,
+    'Rotate',
+    () => rotateMutation.mutate(token.id),
+  )
 }
 
 function handleRevokeToken(token: TokenMetadata) {
-  if (confirm(`Revoke token ${token.id}? This action cannot be undone.`)) {
-    revokeMutation.mutate(token.id)
+  openConfirm(
+    'Revoke Token',
+    `Revoke token ${token.id}? This action cannot be undone.`,
+    'Revoke',
+    () => revokeMutation.mutate(token.id),
+  )
+}
+
+async function copyToken(token: string) {
+  try {
+    await navigator.clipboard.writeText(token)
+    toast.success('Token copied to clipboard')
+  } catch {
+    toast.error('Failed to copy token')
   }
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString()
-}
-
-function copyToken(token: string) {
-  navigator.clipboard.writeText(token)
 }
 </script>
 
 <template>
-  <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Token Management</h1>
+  <PageLayout title="Token Management">
+    <template #actions>
       <Button @click="showCreateModal = true">
+        <IconPlus />
         Generate New Token
       </Button>
-    </div>
+    </template>
 
-    <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
-      <p class="text-gray-600">Loading tokens...</p>
-    </div>
+    <DataTable
+      :columns="[
+        { label: 'ID' },
+        { label: 'Provider' },
+        { label: 'Description' },
+        { label: 'Created' },
+        { label: 'Status' },
+        { label: 'Actions', align: 'right' },
+      ]"
+      :is-loading="isLoading"
+      :error="error"
+      :is-empty="!tokens || tokens.length === 0"
+      loading-text="Loading tokens..."
+      :on-retry="() => refetch()"
+    >
+      <template #empty>
+        <p class="text-muted-foreground mb-4">No tokens found</p>
+        <Button @click="showCreateModal = true"><IconPlus />Generate First Token</Button>
+      </template>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
-      <p class="text-red-600">Error loading tokens: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
-        Retry
-      </Button>
-    </div>
-
-    <!-- Tokens table -->
-    <div v-else-if="tokens && tokens.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              ID
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Provider
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Description
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Created
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="token in tokens" :key="token.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              {{ token.id }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <Badge variant="outline">{{ token.provider || '-' }}</Badge>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              {{ token.name || '-' }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ formatDate(token.created_at) }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <Badge :variant="token.is_active ? 'default' : 'destructive'">
-                {{ token.is_active ? 'Active' : 'Revoked' }}
-              </Badge>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-              <Button
-                v-if="token.is_active"
-                @click="handleRotateToken(token)"
-                :disabled="rotateMutation.isPending.value"
-                variant="ghost"
-                size="sm"
-              >
+      <tr v-for="token in tokens" :key="token.id">
+        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">{{ token.id }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
+          <Badge variant="outline" class="max-w-[120px] truncate" :title="token.provider || '-'">{{ token.provider || '-' }}</Badge>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="token.name || '-'">{{ token.name || '-' }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(token.created_at) }}</td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <Badge :variant="token.is_active ? 'default' : 'destructive'">
+            {{ token.is_active ? 'Active' : 'Revoked' }}
+          </Badge>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+          <DropdownMenu v-if="token.is_active">
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm">
+                <span class="sr-only">Open menu</span>
+                <IconDotsHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="max-w-[220px]">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem :disabled="rotateMutation.isPending.value" @click="handleRotateToken(token)">
+                <IconRefresh />
                 Rotate
-              </Button>
-              <Button
-                v-if="token.is_active"
-                @click="handleRevokeToken(token)"
-                :disabled="revokeMutation.isPending.value"
-                variant="ghost"
-                size="sm"
-                class="text-destructive hover:text-destructive"
-              >
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem :disabled="revokeMutation.isPending.value" class="text-destructive" @click="handleRevokeToken(token)">
+                <IconBan />
                 Revoke
-              </Button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-gray-600 mb-4">No tokens found</p>
-      <Button @click="showCreateModal = true">
-        Generate First Token
-      </Button>
-    </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </td>
+      </tr>
+    </DataTable>
 
     <!-- Create token modal -->
     <Dialog v-model:open="showCreateModal">
@@ -225,30 +221,26 @@ function copyToken(token: string) {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ createError }}</AlertDescription>
-        </Alert>
-
-        <div class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div class="space-y-4">
+          <div class="space-y-1.5">
             <Label for="user">User</Label>
             <Select v-model="selectedUserId">
               <SelectTrigger id="user">
                 <SelectValue placeholder="Select a user" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem 
-                  v-for="user in usersList?.users" 
-                  :key="user.id" 
+              <SelectContent class="max-w-[280px]">
+                <SelectItem
+                  v-for="user in usersList?.users"
+                  :key="user.id"
                   :value="user.username"
                 >
-                  {{ user.username }}
+                  <span :title="user.username">{{ user.username }}</span>
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="project">Project ID (optional)</Label>
             <Input
               id="project"
@@ -258,7 +250,7 @@ function copyToken(token: string) {
             />
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <Label for="description">Description (optional)</Label>
             <Input
               id="description"
@@ -271,16 +263,18 @@ function copyToken(token: string) {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
+            <IconX />
             Cancel
           </Button>
           <Button
-            @click="handleCreateToken"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateToken"
           >
+            <IconKey />
             {{ createMutation.isPending.value ? 'Generating...' : 'Generate Token' }}
           </Button>
         </DialogFooter>
@@ -297,31 +291,30 @@ function copyToken(token: string) {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert variant="default" class="bg-yellow-50 border-yellow-400">
-          <AlertDescription class="text-yellow-800">
-            <strong>Important:</strong> Save this token now. You won't be able to see it again!
-          </AlertDescription>
-        </Alert>
+        <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
+          <strong>Important:</strong> Copy this token now — it won't be shown again.
+        </div>
 
-        <div v-if="newTokenData" class="space-y-4 py-4">
-          <div class="space-y-2">
+        <div v-if="newTokenData" class="space-y-4">
+          <div class="space-y-1.5">
             <Label>Token</Label>
             <div class="flex space-x-2">
               <Input
                 v-model="newTokenData.token"
                 readonly
-                class="font-mono text-sm bg-muted"
+                class="font-mono text-base bg-muted"
               />
               <Button
+                variant="outline"
                 @click="copyToken(newTokenData.token)"
-                variant="secondary"
               >
+                <IconCopy />
                 Copy
               </Button>
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="grid grid-cols-2 gap-4 text-base">
             <div>
               <span class="text-muted-foreground">ID:</span>
               <span class="ml-2 font-medium">{{ newTokenData.id }}</span>
@@ -342,11 +335,21 @@ function copyToken(token: string) {
         </div>
 
         <DialogFooter>
-          <Button @click="showTokenModal = false">
+          <Button @click="showTokenModal = false; newTokenData = null">
+            <IconX />
             Close
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      :variant="confirmVariant"
+      @confirm="confirmCallback?.()"
+    />
+  </PageLayout>
 </template>

@@ -162,7 +162,7 @@ import { type ButtonVariants, buttonVariants } from '.'
 
 // Variants defined using class-variance-authority (CVA)
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors',
+  'inline-flex items-center justify-center rounded-md text-base font-medium transition-colors',
   {
     variants: {
       variant: {

@@ -6,4 +6,3 @@
 | App.vue | Root component with authentication routing logic |
 | router/index.ts | Vue Router configuration with protected routes |
 | components/MainLayout.vue | Authenticated layout wrapper component |
-| components/HelloWorld.vue | Example component |

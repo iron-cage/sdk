@@ -13,7 +13,13 @@ export default {
   			'2xl': '1400px'
   		}
   	},
+  	fontFamily: {
+  		sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+  	},
   	extend: {
+		fontSize: {
+			base: ['0.875rem', { lineHeight: '1.25rem' }],
+		},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
@@ -24,6 +30,10 @@ export default {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
+			trettiary: {
+				DEFAULT: 'hsl(var(--trettiary))',
+				foreground: 'hsl(var(--trettiary-foreground))',
+			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
   				foreground: 'hsl(var(--secondary-foreground))'
@@ -48,6 +58,8 @@ export default {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			},
+  			success: 'hsl(var(--success))',
+  			warning: 'hsl(var(--warning))',
   			chart: {
   				'1': 'hsl(var(--chart-1))',
   				'2': 'hsl(var(--chart-2))',

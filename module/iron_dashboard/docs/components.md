@@ -99,7 +99,7 @@ import { Button } from '@/components/ui/button'
 </template>
 ```
 
-**Used In:** All views (LoginView, DashboardView, TokensView, UsageView, LimitsView, TracesView)
+**Used In:** All views (LoginView, DashboardView, TokensView, UsageView, LimitsView)
 
 ---
 
@@ -115,7 +115,7 @@ import { Button } from '@/components/ui/button'
 - `Card` - Root container (rounded border, shadow, bg-card)
 - `CardHeader` - Header section (flex column, space-y-1.5, p-6)
 - `CardTitle` - Title heading (text-2xl font-semibold)
-- `CardDescription` - Subtitle text (text-sm text-muted-foreground)
+- `CardDescription` - Subtitle text (text-base text-muted-foreground)
 - `CardContent` - Main content area (p-6 pt-0)
 - `CardFooter` - Footer section (flex items-center, p-6 pt-0)
 
@@ -144,7 +144,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 </template>
 ```
 
-**Used In:** DashboardView (stat cards), UsageView (analytics cards), TracesView (filter panel)
+**Used In:** DashboardView (stat cards), UsageView (analytics cards)
 
 ---
 
@@ -163,7 +163,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 - `DialogScrollContent` - Scrollable variant of DialogContent
 - `DialogHeader` - Header section (flex column, space-y-1.5, text-center)
 - `DialogTitle` - Dialog title (text-lg font-semibold)
-- `DialogDescription` - Dialog description (text-sm text-muted-foreground)
+- `DialogDescription` - Dialog description (text-base text-muted-foreground)
 - `DialogFooter` - Footer section (flex justify-end, space-x-2)
 - `DialogClose` - Close button component
 
@@ -298,7 +298,7 @@ const selected = ref('option1')
 </template>
 ```
 
-**Used In:** LimitsView (limit type, period selectors), TracesView (provider, model filters)
+**Used In:** LimitsView (limit type, period selectors)
 
 ---
 
@@ -343,7 +343,7 @@ const username = ref('')
 </template>
 ```
 
-**Used In:** LoginView (username, password), TokensView (project_id, description), LimitsView (limit value), TracesView (token ID filter)
+**Used In:** LoginView (username, password), TokensView (project_id, description), LimitsView (limit value)
 
 ---
 
@@ -381,7 +381,7 @@ import { Input } from '@/components/ui/input'
 </template>
 ```
 
-**Used In:** LoginView, TokensView, LimitsView, TracesView (all form inputs)
+**Used In:** LoginView, TokensView, LimitsView (all form inputs)
 
 ---
 
@@ -400,7 +400,7 @@ import { Input } from '@/components/ui/input'
 **Subcomponents:**
 - `Alert` - Root container with variant styling
 - `AlertTitle` - Title heading (mb-1 font-medium leading-none)
-- `AlertDescription` - Description text (text-sm opacity-90)
+- `AlertDescription` - Description text (text-base opacity-90)
 
 **Props:**
 ```typescript
@@ -740,36 +740,6 @@ All mutations invalidate `['tokens']` query to trigger refetch
 
 ---
 
-#### 6. TracesView.vue
-
-**Route:** `/traces`
-**Purpose:** Request-level trace inspection with filtering
-
-**Data Display:**
-- Trace list with timestamp, request ID, token ID, provider, model, cost
-- Input/output token counts
-- Filters: token ID, provider, model
-- Filtered count display
-
-**shadcn-vue Components Used:**
-- `Card`, `CardContent`, `CardHeader`, `CardTitle` - Filter panel container
-- `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue` - Provider and model filter dropdowns
-- `Input` - Token ID filter field
-- `Label` - Filter field labels
-- `Button` - Clear filters, Retry buttons
-
-**API Calls:**
-- `useQuery(['traces'], api.getTraces)` - Fetch all traces
-
-**Usage:**
-```vue
-<template>
-  <TracesView /> <!-- Rendered when route is /traces -->
-</template>
-```
-
----
-
 ### Layout Components
 
 Location: `src/components/`
@@ -845,16 +815,6 @@ This is the root component mounted in `main.ts`:
 ```typescript
 createApp(App).mount('#app')
 ```
-
----
-
-### Utility Components
-
-#### 9. HelloWorld.vue
-
-**Status:** Legacy Vue template component (not used in production)
-**Purpose:** Original Vite + Vue template demo component
-**Action:** Should be removed in future cleanup
 
 ---
 
@@ -979,13 +939,6 @@ App.vue
 │       │   ├── Button (shadcn-vue)
 │       │   ├── Input, Label (shadcn-vue)
 │       │   └── Alert, AlertDescription (shadcn-vue)
-│       └── TracesView.vue
-│           ├── useApi
-│           ├── useQuery (TanStack)
-│           ├── Card, CardContent, CardHeader, CardTitle (shadcn-vue)
-│           ├── Select, SelectContent, SelectItem, SelectTrigger, SelectValue (shadcn-vue)
-│           ├── Input, Label (shadcn-vue)
-│           └── Button (shadcn-vue)
 └── router-view (if not authenticated)
     └── LoginView.vue
         ├── useAuthStore
@@ -1322,7 +1275,7 @@ function handleAction() { /* ... */ }
 | ├─ Separator | 1 | Separator.vue (not currently used) |
 | ├─ Skeleton | 1 | Skeleton.vue (not currently used) |
 | └─ Toast | ~12 | Toast (multiple subcomponents, not currently used) |
-| **Views** | **6** | LoginView, DashboardView, TokensView, UsageView, LimitsView, TracesView |
+| **Views** | **5** | LoginView, DashboardView, TokensView, UsageView, LimitsView |
 | **Layout Components** | **2** | App, MainLayout |
 | **Utility Components** | **1** | HelloWorld (legacy, unused) |
 | **Composables** | **1** | useApi |

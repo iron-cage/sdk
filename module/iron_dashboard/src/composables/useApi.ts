@@ -81,11 +81,12 @@ interface UpdateLimitRequest {
 }
 
 // AI Provider Key types
-type ProviderType = 'openai' | 'anthropic'
+type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
 
 interface ProviderKey {
   id: number
   provider: ProviderType
+  alias?: string
   base_url?: string
   description?: string
   is_enabled: boolean
@@ -93,16 +94,19 @@ interface ProviderKey {
   last_used_at?: number
   masked_key: string
   assigned_projects: string[]
+  total_spend_usd: number
 }
 
 interface CreateProviderKeyRequest {
   provider: ProviderType
   api_key: string
+  alias?: string
   base_url?: string
   description?: string
 }
 
 interface UpdateProviderKeyRequest {
+  alias?: string
   base_url?: string
   description?: string
   is_enabled?: boolean
@@ -145,7 +149,7 @@ interface ListBudgetRequestsResponse {
 interface ApproveBudgetRequestResponse {
   request_id: string
   status: string
-  approved_at: number
+  updated_at: number
 }
 
 interface RejectBudgetRequestRequest {
@@ -155,7 +159,7 @@ interface RejectBudgetRequestRequest {
 interface RejectBudgetRequestResponse {
   request_id: string
   status: string
-  rejected_at: number
+  updated_at: number
 }
 
 export function useApi() {
@@ -189,6 +193,11 @@ export function useApi() {
       return undefined as T
     }
     return JSON.parse(text)
+  }
+
+  // Health API
+  async function getHealth(): Promise<{ status: string; timestamp: number }> {
+    return fetchApi('/api/health')
   }
 
   // Token API methods
@@ -349,7 +358,7 @@ export function useApi() {
     })
   }
 
-  async function updateUserStatus(id: number, isActive: boolean): Promise<User> {
+  async function updateUserStatus(id: string, isActive: boolean): Promise<User> {
     if (isActive) {
       return activateUser(id)
     } else {
@@ -357,35 +366,35 @@ export function useApi() {
     }
   }
 
-  async function suspendUser(id: number, reason?: string): Promise<User> {
+  async function suspendUser(id: string, reason?: string): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/suspend`, {
       method: 'PUT',
       body: JSON.stringify({ reason }),
     })
   }
 
-  async function activateUser(id: number): Promise<User> {
+  async function activateUser(id: string): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/activate`, {
       method: 'PUT',
     })
   }
 
-  async function changeUserRole(id: number, role: string): Promise<User> {
+  async function changeUserRole(id: string, role: string): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/role`, {
       method: 'PUT',
       body: JSON.stringify({ role }),
     })
   }
 
-  async function resetUserPassword(id: number, newPassword: string, forceChange: boolean): Promise<User> {
+  async function resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
       method: 'POST',
       body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
     })
   }
 
-  async function deleteUser(id: number): Promise<{ success: boolean }> {
-    return fetchApi<{ success: boolean }>(`/api/v1/users/${id}`, {
+  async function deleteUser(id: string): Promise<User> {
+    return fetchApi<User>(`/api/v1/users/${id}`, {
       method: 'DELETE',
     })
   }
@@ -402,7 +411,7 @@ export function useApi() {
   async function createAgent(data: {
     name: string
     providers: string[]
-    provider_key_id: number
+    provider_key_ids: number[]
     initial_budget_microdollars: number
     owner_id?: string  // Admins can assign to other users
   }): Promise<Agent> {
@@ -416,7 +425,7 @@ export function useApi() {
     id: number
     name?: string
     providers?: string[]
-    provider_key_id?: number | null
+    provider_key_ids?: number[]
     owner_id?: string  // Admins can reassign to other users
   }): Promise<Agent> {
     const { id, ...updateData } = data
@@ -503,6 +512,8 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`)
   }
@@ -513,6 +524,8 @@ export function useApi() {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`)
   }
@@ -524,6 +537,8 @@ export function useApi() {
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (filters?.compare) params.append('compare', 'true')
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`)
   }
@@ -535,6 +550,8 @@ export function useApi() {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
@@ -548,21 +565,71 @@ export function useApi() {
     const params = new URLSearchParams()
     if (filters?.period) params.append('period', filters.period)
     if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`)
   }
 
-  async function getBudgetStatus(
-    page?: number,
+  async function getBudgetStatus(filters?: {
+    status?: string
+    threshold?: number
+    agent_id?: number
+    page?: number
     per_page?: number
-  ): Promise<BudgetStatusResponse> {
+  }): Promise<BudgetStatusResponse> {
     const params = new URLSearchParams()
-    if (page) params.append('page', String(page))
-    if (per_page) params.append('per_page', String(per_page))
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.threshold != null) params.append('threshold', String(filters.threshold))
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.page) params.append('page', String(filters.page))
+    if (filters?.per_page) params.append('per_page', String(filters.per_page))
     const query = params.toString()
     return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsSpendingByAgent(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams
+  ): Promise<SpendingByAgentResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/by-agent${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsSpendingAvgPerRequest(
+    filters?: AnalyticsFilters
+  ): Promise<AvgCostResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsUsageTokensByAgent(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams
+  ): Promise<TokenUsageByAgentResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/tokens/by-agent${query ? `?${query}` : ''}`)
   }
 
   // ============================================================================
@@ -625,6 +692,7 @@ export function useApi() {
   }
 
   return {
+    getHealth,
     getTokens,
     getToken,
     createToken,
@@ -671,6 +739,9 @@ export function useApi() {
     // Analytics (Protocol 012)
     getAnalyticsSpendingTotal,
     getAnalyticsSpendingByProvider,
+    getAnalyticsSpendingByAgent,
+    getAnalyticsSpendingAvgPerRequest,
+    getAnalyticsUsageTokensByAgent,
     getAnalyticsUsageRequests,
     getAnalyticsUsageModels,
     getAnalyticsEventsList,
@@ -685,7 +756,7 @@ export function useApi() {
 }
 
 export interface User {
-  id: number
+  id: string
   username: string
   email?: string
   role: string
@@ -709,16 +780,14 @@ export interface Agent {
   providers: string[]
   created_at: number
   owner_id?: string
-  provider_key_id?: number | null
-  has_ic_token?: boolean
-  ic_token_created_at?: number
+  provider_key_ids: number[]
 }
 
 export interface AgentBudgetResponse {
   agent_id: number
-  total_allocated: number
-  total_spent: number
-  budget_remaining: number
+  total_allocated: number    // microdollars
+  total_spent: number        // microdollars
+  budget_remaining: number   // microdollars
 }
 // IC Token types
 export interface IcTokenResponse {
@@ -775,6 +844,8 @@ export interface AnalyticsFilters {
   period?: AnalyticsPeriod
   agent_id?: number
   provider_id?: string
+  provider_key_id?: number
+  compare?: boolean
 }
 
 export interface PaginationParams {
@@ -782,16 +853,24 @@ export interface PaginationParams {
   per_page?: number
 }
 
+export interface SpendingTotalComparison {
+  total_spend: number
+  change_percent: number | null
+}
+
 export interface SpendingTotalResponse {
   total_spend: number
   currency: string
   period: string
   filters: { agent_id?: number; provider_id?: string }
+  previous_period?: SpendingTotalComparison
   calculated_at: string
 }
 
 export interface ProviderSpending {
   provider: string
+  provider_key_id?: number
+  alias?: string
   spending: number
   request_count: number
   avg_cost_per_request: number
@@ -839,6 +918,14 @@ export interface BudgetStatus {
   risk_level: string
 }
 
+export interface RequestUsageComparison {
+  total_requests: number
+  successful_requests: number
+  failed_requests: number
+  success_rate: number
+  change_percent: number | null
+}
+
 export interface RequestUsageResponse {
   total_requests: number
   successful_requests: number
@@ -846,6 +933,7 @@ export interface RequestUsageResponse {
   success_rate: number
   period: string
   filters: { agent_id?: number; provider_id?: string }
+  previous_period?: RequestUsageComparison
   calculated_at: string
 }
 
@@ -885,5 +973,60 @@ export interface EventsListResponse {
   data: AnalyticsEvent[]
   pagination: { page: number; per_page: number; total: number; total_pages: number }
   period: string
+  calculated_at: string
+}
+
+export interface AgentSpending {
+  agent_id: number
+  agent_name: string
+  spending: number
+  budget: number
+  percent_used: number
+  request_count: number
+}
+
+export interface SpendingByAgentResponse {
+  data: AgentSpending[]
+  summary: {
+    total_spend: number
+    total_budget: number
+    total_agents: number
+  }
+  pagination: Pagination
+  period: string
+  calculated_at: string
+}
+
+export interface AgentTokenUsage {
+  agent_id: number
+  agent_name: string
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  request_count: number
+  avg_tokens_per_request: number
+}
+
+export interface TokenUsageByAgentResponse {
+  data: AgentTokenUsage[]
+  summary: {
+    total_input_tokens: number
+    total_output_tokens: number
+    total_tokens: number
+  }
+  pagination: Pagination
+  period: string
+  calculated_at: string
+}
+
+export interface AvgCostResponse {
+  average_cost_per_request: number
+  total_requests: number
+  total_spend: number
+  median_cost_per_request: number
+  min_cost_per_request: number
+  max_cost_per_request: number
+  period: string
+  filters: { agent_id: number | null; provider_id: string | null }
   calculated_at: string
 }
