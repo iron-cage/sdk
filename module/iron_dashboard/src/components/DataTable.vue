@@ -40,8 +40,8 @@ defineProps<{
           <thead>
             <tr class="text-foreground/70">
               <th
-                v-for="col in columns"
-                :key="col.key ?? col.label"
+                v-for="(col, index) in columns"
+                :key="col.key ?? `${col.label}-${index}`"
                 :class="[
                   'px-3 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider text-nowrap',
                   col.align === 'right' ? 'text-right' : 'text-left',

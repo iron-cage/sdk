@@ -3,7 +3,7 @@ export function formatDate(ms: number): string {
 }
 
 export function formatTimestamp(ts?: number | null): string {
-  if (!ts) return '-'
+  if (ts == null) return '-'
   const millis = ts > 1_000_000_000_000 ? ts : ts * 1000
   return new Date(millis).toLocaleString()
 }

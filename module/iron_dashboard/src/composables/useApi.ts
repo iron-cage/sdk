@@ -95,6 +95,8 @@ interface ProviderKey {
   masked_key: string
   assigned_projects: string[]
   total_spend_usd: number
+  spending_cap_microdollars: number | null
+  spending_used_microdollars: number
 }
 
 interface CreateProviderKeyRequest {
@@ -979,7 +981,9 @@ export interface EventsListResponse {
 export interface AgentSpending {
   agent_id: number
   agent_name: string
+  /** Total spending in USD */
   spending: number
+  /** Allocated budget in USD (NOT microdollars) */
   budget: number
   percent_used: number
   request_count: number

@@ -102,7 +102,7 @@ const createMutation = useMutation({
     username.value = ''
     password.value = ''
     email.value = ''
-    role.value = 'user'
+    role.value = 'manager'
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
@@ -426,7 +426,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false"
+            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'manager'"
           >
             <IconX />
             Cancel

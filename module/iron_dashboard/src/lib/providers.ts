@@ -25,7 +25,8 @@ export function getProviderLabel(provider: string): string {
 
 export function getProviderBadgeClass(provider: string): string {
   const bg = PROVIDER_BADGE_COLORS[provider] ?? 'bg-muted/80'
-  return `${bg} text-white text-xs font-medium px-2 py-0.5 rounded-full`
+  const text = PROVIDER_BADGE_COLORS[provider] ? 'text-white' : 'text-foreground'
+  return `${bg} ${text} text-xs font-medium px-2 py-0.5 rounded-full`
 }
 
 export function getProviderKeyPlaceholder(provider: string): string {
