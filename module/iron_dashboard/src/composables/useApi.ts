@@ -179,10 +179,24 @@ export function useApi() {
       headers['Authorization'] = authHeader
     }
 
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    let response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers,
     })
+
+    // Attempt token refresh on 401, retry once
+    if (response.status === 401 && authStore.refreshToken) {
+      try {
+        await authStore.refresh()
+        const newAuth = authStore.getAuthHeader()
+        if (newAuth) headers['Authorization'] = newAuth
+        response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+      } catch {
+        await authStore.logout()
+        window.location.href = '/login'
+        throw new Error('Session expired')
+      }
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }))
@@ -232,12 +246,6 @@ export function useApi() {
   }
 
   // Usage API methods
-  async function getUsage(): Promise<UsageRecord[]> {
-    // Backend doesnt have a /api/usage endpoint - return empty array for now
-    // TODO: Add backend endpoint or fetch from tokens
-    return Promise.resolve([])
-  }
-
   async function getUsageStats(): Promise<UsageStats> {
     // Map backend /api/usage/aggregate to frontend format
     const aggregate = await fetchApi<{
@@ -700,7 +708,6 @@ export function useApi() {
     createToken,
     rotateToken,
     revokeToken,
-    getUsage,
     getUsageStats,
     getUsageByToken,
     getLimits,

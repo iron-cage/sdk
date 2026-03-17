@@ -19,9 +19,9 @@ export function useConfirm() {
     confirmDescription.value = description
     confirmLabel.value = label
     confirmVariant.value = variant
-    confirmCallback.value = () => {
+    confirmCallback.value = async () => {
       confirmCallback.value = null
-      action()
+      await action()
     }
     showConfirmModal.value = true
   }

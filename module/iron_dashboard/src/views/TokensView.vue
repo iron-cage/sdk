@@ -94,6 +94,9 @@ const rotateMutation = useMutation({
     showTokenModal.value = true
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to rotate token')
+  },
 })
 
 // Revoke token mutation
@@ -101,6 +104,9 @@ const revokeMutation = useMutation({
   mutationFn: (id: number) => api.revokeToken(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to revoke token')
   },
 })
 
