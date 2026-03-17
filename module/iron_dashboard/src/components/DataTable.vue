@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button'
 
 defineProps<{
-  columns: { label: string; align?: 'left' | 'right' }[]
+  columns: { key?: string; label: string; align?: 'left' | 'right' }[]
   isLoading?: boolean
   error?: Error | null
   isEmpty?: boolean
@@ -41,7 +41,7 @@ defineProps<{
             <tr class="text-foreground/70">
               <th
                 v-for="col in columns"
-                :key="col.label"
+                :key="col.key ?? col.label"
                 :class="[
                   'px-3 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider text-nowrap',
                   col.align === 'right' ? 'text-right' : 'text-left',

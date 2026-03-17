@@ -263,9 +263,9 @@ async function copyToken(token: string) {
 
         <DialogFooter>
           <Button
+            @click="showCreateModal = false; projectId = ''; description = ''; selectedUserId = ''"
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false"
           >
             <IconX />
             Cancel
