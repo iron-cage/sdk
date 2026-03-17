@@ -32,3 +32,22 @@ export function getProviderBadgeClass(provider: string): string {
 export function getProviderKeyPlaceholder(provider: string): string {
   return PROVIDER_KEY_PLACEHOLDERS[provider] ?? 'API key...'
 }
+
+export type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
+
+export function detectProviderFromKey(key: string): ProviderType | null {
+  const trimmed = key.trim()
+  if (trimmed.startsWith('sk-ant-')) return 'anthropic'
+  if (trimmed.startsWith('xai-')) return 'xai'
+  if (trimmed.startsWith('AIza')) return 'gemini'
+  if (trimmed.startsWith('sk-')) return 'openai'
+  return null
+}
+
+export function generateProviderAlias(
+  provider: ProviderType,
+  existingKeys: Array<{ provider: string }>,
+): string {
+  const count = existingKeys.filter(k => k.provider === provider).length
+  return `${getProviderLabel(provider)} ${count + 1}`
+}

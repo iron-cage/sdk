@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate, formatCostUsd } from '@/lib/formatters'
-import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
+import { getProviderLabel, getProviderKeyPlaceholder, detectProviderFromKey, generateProviderAlias } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -48,6 +48,9 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
+const showQuickAddModal = ref(false)
+const quickAddKey = ref('')
+const quickAddError = ref('')
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
 
@@ -189,11 +192,40 @@ function handleToggleEnabled(key: ProviderKey) {
 
 const typedError = error as unknown as Error | null
 
+const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
+
+function handleQuickAdd() {
+  quickAddError.value = ''
+  if (!quickAddKey.value.trim()) {
+    quickAddError.value = 'API key is required'
+    return
+  }
+  if (!detectedProvider.value) {
+    quickAddError.value = 'Could not detect provider. Use "Add Provider Key" to select manually.'
+    return
+  }
+  const alias = generateProviderAlias(detectedProvider.value, providerKeys.value ?? [])
+  createMutation.mutate(
+    { provider: detectedProvider.value, api_key: quickAddKey.value, alias },
+    {
+      onSuccess: () => {
+        showQuickAddModal.value = false
+        quickAddKey.value = ''
+        quickAddError.value = ''
+      },
+    },
+  )
+}
+
 </script>
 
 <template>
   <PageLayout title="AI Provider Keys">
     <template #actions>
+      <Button variant="outline" @click="showQuickAddModal = true">
+        <IconPlus />
+        Quick Add
+      </Button>
       <Button @click="showCreateModal = true">
         <IconPlus />
         Add Provider Key
@@ -269,6 +301,62 @@ const typedError = error as unknown as Error | null
         </td>
       </tr>
     </DataTable>
+
+    <!-- Quick Add modal -->
+    <Dialog
+      :open="showQuickAddModal"
+      @update:open="(open) => { showQuickAddModal = open; if (!open) { quickAddKey = ''; quickAddError = '' } }"
+    >
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Quick Add Provider Key</DialogTitle>
+          <DialogDescription>
+            Paste your API key — the provider will be detected automatically and the key will be saved with a generated name.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <div class="space-y-1.5">
+            <Label for="quick-add-key">API Key</Label>
+            <Input
+              id="quick-add-key"
+              v-model="quickAddKey"
+              type="password"
+              placeholder="sk-ant-... / sk-proj-... / AIza... / xai-..."
+              :disabled="createMutation.isPending.value"
+            />
+            <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
+              <span class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+              Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
+              · will be saved as <span class="font-medium text-foreground">{{ generateProviderAlias(detectedProvider, providerKeys ?? []) }}</span>
+            </p>
+            <p v-else-if="quickAddKey" class="text-xs text-muted-foreground">
+              Provider not recognised — check the key or use "Add Provider Key" to select manually.
+            </p>
+          </div>
+        </div>
+
+        <p v-if="quickAddError" class="text-sm text-destructive">{{ quickAddError }}</p>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            :disabled="createMutation.isPending.value"
+            @click="showQuickAddModal = false; quickAddKey = ''; quickAddError = ''"
+          >
+            <IconX />
+            Cancel
+          </Button>
+          <Button
+            :disabled="createMutation.isPending.value || !detectedProvider"
+            @click="handleQuickAdd"
+          >
+            <IconCheck />
+            {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- Create provider key modal -->
     <Dialog v-model:open="showCreateModal">
