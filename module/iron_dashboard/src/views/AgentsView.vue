@@ -536,7 +536,7 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false; createFormError = ''"
+            @click="showCreateModal = false; createFormError = ''; name = ''; selectedProviderKeyId = ''; initialBudgetUsd = undefined; selectedOwnerId = ''"
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
