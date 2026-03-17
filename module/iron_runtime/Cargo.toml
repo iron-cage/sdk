@@ -83,6 +83,7 @@ secrecy = { workspace = true, optional = true }
 
 # Logging
 tracing = { workspace = true, optional = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

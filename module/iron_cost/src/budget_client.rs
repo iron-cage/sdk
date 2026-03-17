@@ -288,7 +288,7 @@ impl BudgetClient {
 
     let provider_key = ProviderKey {
       provider: self.config.provider.clone(),
-      api_key,
+      api_key: secrecy::SecretBox::new(Box::new(api_key)),
       base_url: None,
     };
 

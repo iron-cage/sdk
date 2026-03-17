@@ -443,3 +443,11 @@ version = "2.4"
 
 [workspace.dependencies.criterion]
 version = "0.8"
+
+[workspace.dependencies.futures-util]
+version = "0.3"
+default-features = false
+features = ["alloc"]
+
+[workspace.dependencies.lru]
+version = "0.12"

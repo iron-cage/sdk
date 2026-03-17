@@ -20,6 +20,9 @@ pub mod translator;
 // Re-export primary types for convenience
 pub use cost::{calculate_request_cost, extract_model_from_body, CostInfo};
 pub use error::{create_openai_error, LlmCoreError, OpenAiErrorDetail, OpenAiErrorResponse};
-pub use forward::{forward_request, ForwardRequest, ForwardResponse};
+pub use forward::{forward_request, ForwardBody, ForwardRequest, ForwardResponse};
 pub use provider::{detect_provider_from_model, strip_provider_prefix};
-pub use translator::{translate_anthropic_to_openai, translate_openai_to_anthropic};
+pub use translator::{
+  translate_anthropic_to_openai, translate_gemini_to_openai, translate_openai_to_anthropic,
+  translate_openai_to_gemini,
+};

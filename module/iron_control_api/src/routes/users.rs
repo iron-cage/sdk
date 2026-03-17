@@ -369,7 +369,10 @@ pub async fn create_user(
   }
 
   // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
@@ -422,7 +425,10 @@ pub async fn list_users(
   Query(query): Query<ListUsersQuery>,
 ) -> impl IntoResponse {
   // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
@@ -483,7 +489,10 @@ pub async fn get_user(
   Path(user_id): Path<String>,
 ) -> impl IntoResponse {
   // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
@@ -537,11 +546,14 @@ pub async fn suspend_user(
       .into_response();
   }
 
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
@@ -586,11 +598,14 @@ pub async fn activate_user(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(user_id): Path<String>,
 ) -> impl IntoResponse {
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
@@ -632,11 +647,14 @@ pub async fn delete_user(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(user_id): Path<String>,
 ) -> impl IntoResponse {
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
@@ -690,11 +708,14 @@ pub async fn change_user_role(
       .into_response();
   }
 
+  // Check RBAC permission — role assignment is Admin-only
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission — role assignment is Admin-only
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
   if !state
     .permission_checker
     .has_permission(role, Permission::AssignRoles)
@@ -751,11 +772,14 @@ pub async fn reset_password(
       .into_response();
   }
 
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::Developer);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)

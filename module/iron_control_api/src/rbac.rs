@@ -193,10 +193,22 @@ pub mod middleware {
     }
   }
 
-  /// Extract user role from JWT claims
-  #[must_use]
-  pub fn extract_role_from_claims(claims: &crate::jwt_auth::AccessTokenClaims) -> Role {
+  /// Extract user role from JWT claims.
+  ///
+  /// # Errors
+  ///
+  /// Returns `401 Unauthorized` if the role string is not recognized.
+  pub fn extract_role_from_claims(
+    claims: &crate::jwt_auth::AccessTokenClaims,
+  ) -> Result<Role, impl IntoResponse> {
     use core::str::FromStr;
-    Role::from_str(&claims.role).unwrap_or(Role::Developer)
+    Role::from_str(&claims.role).map_err(|_| {
+      (
+        StatusCode::UNAUTHORIZED,
+        axum::Json(json!({
+          "error": format!("Unrecognized role: {}", claims.role)
+        })),
+      )
+    })
   }
 }

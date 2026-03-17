@@ -689,6 +689,8 @@ pub async fn assign_provider_to_project(
 /// DELETE `/api/projects/{project_id}/provider`
 ///
 /// Unassign provider key from project
+///
+/// Requires the `ManageProviderKeys` permission.
 pub async fn unassign_provider_from_project(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
@@ -744,7 +746,9 @@ pub async fn unassign_provider_from_project(
       .into_response();
   }
 
-  // Unassign from project
+  // qqq: BOLA — no project ownership check (same as assign_provider_to_project).
+  // Both Admin and Manager have ManageProviderKeys. Add ownership guard
+  // once projects are first-class entities.
   match state
     .storage
     .unassign_from_project(provider_key_id, &project_id)

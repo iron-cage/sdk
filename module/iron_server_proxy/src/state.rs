@@ -59,7 +59,7 @@ impl AppState {
     // Wrap in Zeroizing so decoded key material is zeroed on drop.
     let key_bytes = Zeroizing::new(
       STANDARD
-        .decode(&config.secrets_master_key)
+        .decode(config.secrets_master_key.as_bytes())
         .map_err(|e| ServerError::Crypto(format!("Invalid base64 master key: {e}")))?,
     );
     if key_bytes.len() != KEY_SIZE {

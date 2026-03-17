@@ -65,11 +65,11 @@ impl LoginRateLimiter {
   /// Returns `Err(retry_after_seconds)` if the IP has exceeded the
   /// maximum login attempts within the rate limit window.
   ///
-  /// # Panics
-  ///
-  /// Panics if the internal mutex is poisoned.
   pub fn check_and_record(&self, ip: IpAddr) -> Result<(), u64> {
-    let mut attempts = self.attempts.lock().unwrap();
+    let Ok(mut attempts) = self.attempts.lock() else {
+      // Poisoned mutex — conservatively allow the request rather than panic
+      return Ok(());
+    };
     let now = Instant::now();
 
     // Get or create attempt history for this IP
@@ -96,12 +96,11 @@ impl LoginRateLimiter {
 
   /// Clear all rate limit data (for testing)
   ///
-  /// # Panics
-  ///
-  /// Panics if the internal mutex is poisoned.
   #[cfg(test)]
   pub fn clear(&self) {
-    let mut attempts = self.attempts.lock().unwrap();
+    let Ok(mut attempts) = self.attempts.lock() else {
+      return;
+    };
     attempts.clear();
   }
 }

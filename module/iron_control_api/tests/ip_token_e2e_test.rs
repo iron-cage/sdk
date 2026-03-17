@@ -26,7 +26,6 @@ use axum::{
 };
 use common::budget;
 use iron_secrets::ip_token::IpTokenCrypto;
-use secrecy::ExposeSecret;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -132,7 +131,7 @@ async fn e2e_handshake_server_encrypts_client_decrypts() {
     .decrypt(ip_token)
     .expect("Client should decrypt IP Token");
 
-  assert_eq!(decrypted.expose_secret().as_str(), original_key);
+  assert_eq!(decrypted.as_str(), original_key);
 }
 
 #[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
@@ -194,7 +193,7 @@ async fn e2e_provider_key_server_encrypts_client_decrypts() {
     .decrypt(ip_token)
     .expect("Client should decrypt IP Token");
 
-  assert_eq!(decrypted.expose_secret().as_str(), original_key);
+  assert_eq!(decrypted.as_str(), original_key);
 }
 
 #[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain concepts
@@ -316,8 +315,8 @@ async fn e2e_same_key_decrypts_both_flows() {
     .decrypt(body2["ip_token"].as_str().unwrap())
     .unwrap();
 
-  assert_eq!(decrypted1.expose_secret().as_str(), original_key);
-  assert_eq!(decrypted2.expose_secret().as_str(), original_key);
+  assert_eq!(decrypted1.as_str(), original_key);
+  assert_eq!(decrypted2.as_str(), original_key);
 
   // But the encrypted tokens should be different (different nonce each time)
   assert_ne!(
