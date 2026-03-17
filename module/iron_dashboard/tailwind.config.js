@@ -30,9 +30,9 @@ export default {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
-			trettiary: {
-				DEFAULT: 'hsl(var(--trettiary))',
-				foreground: 'hsl(var(--trettiary-foreground))',
+			tertiary: {
+				DEFAULT: 'hsl(var(--tertiary))',
+				foreground: 'hsl(var(--tertiary-foreground))',
 			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
