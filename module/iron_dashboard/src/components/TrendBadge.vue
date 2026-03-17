@@ -6,7 +6,7 @@ defineProps<{
 
 <template>
   <span
-    v-if="changePercent != null && changePercent !== 0"
+    v-if="changePercent != null && Number.isFinite(changePercent) && changePercent !== 0"
     class="inline-flex items-center gap-0.5 text-xs font-medium"
     :class="changePercent >= 0 ? 'text-success' : 'text-destructive'"
   >
