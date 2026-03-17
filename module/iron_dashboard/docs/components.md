@@ -621,7 +621,7 @@ Views are route-level components bound to specific URLs via Vue Router. They orc
 
 #### 3. TokensView.vue
 
-**Route:** `/tokens`
+**Route:** `/tokens` _(not yet registered — planned for a future release)_
 **Purpose:** Token management interface (create, rotate, revoke)
 
 **Functionality:**
@@ -818,9 +818,90 @@ createApp(App).mount('#app')
 
 ---
 
+## Custom Shared Components
+
+Location: `src/components/` (non-UI-library components)
+
+These components are project-specific and not part of shadcn-vue.
+
+### PageLayout.vue
+**Purpose:** Wraps every view in a consistent scrollable container with a sticky header bar.
+**Props:** `title: string`, `contentClass?: string`
+**Slots:** `#actions` (header right-hand buttons), default (page body)
+
+### DataTable.vue
+**Purpose:** Reusable table with loading, error, and empty states.
+**Props:** `columns`, `isLoading`, `error`, `isEmpty`, `loadingText`, `onRetry`
+**Slots:** `#empty`, `#footer`, default (table rows via `<tr>`)
+**Note:** Column `key` prop is used as `v-for` key; falls back to `label-index` if absent.
+
+### ConfirmDialog.vue
+**Purpose:** Modal confirmation dialog with configurable variant (default/destructive).
+**Props:** `open`, `title`, `description`, `confirmLabel`, `variant`
+**Emits:** `update:open`, `confirm`
+**Used with:** `useConfirm` composable
+
+### FormDialog.vue
+**Purpose:** Generic form dialog wrapper with consistent header/footer layout.
+**Props:** `open`, `title`, `description`
+**Emits:** `update:open`
+
+### AvatarInitial.vue
+**Purpose:** Circular avatar displaying the first letter(s) of a name with a stable colour derived from a position-weighted hash.
+**Props:** `name: string`
+
+### StatusBadge.vue
+**Purpose:** Coloured pill badge for boolean active/inactive status.
+**Props:** `active: boolean`, `activeLabel?: string`, `inactiveLabel?: string`
+
+### ProviderBadge.vue
+**Purpose:** Coloured pill badge identifying an AI provider (openai/anthropic/gemini/xai). Unknown providers fall back to `bg-muted/80` with `text-foreground` for contrast.
+**Props:** `provider: string`
+
+### PercentBar.vue
+**Purpose:** Horizontal progress bar with automatic colour transitions (success → warning → destructive) and clamped width [0, 100].
+**Props:** `percentage: number`, `warnThreshold?: number` (default 75), `dangerThreshold?: number` (default 90)
+
+### TrendBadge.vue
+**Purpose:** Inline badge showing +/− percentage change vs. previous period with directional arrow. Hidden when `changePercent` is 0, null, or non-finite.
+**Props:** `changePercent: number | null | undefined`
+
+### StatCard.vue
+**Location:** `src/components/cards/StatCard.vue`
+**Purpose:** Metric card with optional icon, separator, and action slot.
+**Props:** `title: string`, `showSeparator?: boolean`
+**Slots:** `#icon`, `#action`, default (metric content)
+
+---
+
 ## Composables (Composition Functions)
 
 Location: `src/composables/`
+
+### useConfirm.ts
+**Purpose:** Composable for a single shared confirm dialog instance per view.
+**Returns:** `showConfirmModal`, `confirmTitle`, `confirmDescription`, `confirmLabel`, `confirmVariant`, `confirmCallback`, `openConfirm`
+**Key behaviour:** The callback passed to `openConfirm` is automatically cleared after execution to prevent double-fire. Accepts both sync and async actions.
+
+```typescript
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
+
+openConfirm('Delete?', 'This cannot be undone.', 'Delete', () => deleteMutation.mutate(id))
+```
+
+Bind in template:
+```vue
+<ConfirmDialog
+  v-model:open="showConfirmModal"
+  :title="confirmTitle"
+  :description="confirmDescription"
+  :confirm-label="confirmLabel"
+  :variant="confirmVariant"
+  @confirm="confirmCallback?.()"
+/>
+```
+
+---
 
 ### useApi.ts
 
@@ -1275,11 +1356,11 @@ function handleAction() { /* ... */ }
 | ├─ Separator | 1 | Separator.vue (not currently used) |
 | ├─ Skeleton | 1 | Skeleton.vue (not currently used) |
 | └─ Toast | ~12 | Toast (multiple subcomponents, not currently used) |
-| **Views** | **5** | LoginView, DashboardView, TokensView, UsageView, LimitsView |
+| **Views** | **8** | LoginView, DashboardView, AgentsView, UsageView, LimitsView, TokensView, ProvidersView, UsersView |
 | **Layout Components** | **2** | App, MainLayout |
-| **Utility Components** | **1** | HelloWorld (legacy, unused) |
-| **Composables** | **1** | useApi |
-| **Total** | **79** | 66 .vue files (57 UI + 9 views/layout/utility), 1 .ts file, 12 index.ts exports |
+| **Custom Shared Components** | **10** | AvatarInitial, ConfirmDialog, DataTable, FormDialog, PageLayout, PercentBar, ProviderBadge, StatCard, StatusBadge, TrendBadge |
+| **Composables** | **2** | useApi, useConfirm |
+| **Total** | **89+** | 57 UI .vue files + 8 views + 12 custom components/layout + 2 .ts composables + 12 index.ts exports |
 
 ---
 

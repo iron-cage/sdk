@@ -437,7 +437,7 @@ function openLogModal(event: AnalyticsEvent) {
           <span class="text-xs text-muted-foreground flex gap-2 max-sm:flex-col">
             <span>Total {{ formatCost(spendingByAgent.summary.total_spend) }}</span>
             <span class="max-sm:hidden">·</span>
-            <span class="max-sm:capitalize">avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / (spendingByAgent.summary.total_budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}% budget used</span>
+            <span class="max-sm:capitalize">avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / spendingByAgent.summary.total_budget) * 100).toFixed(1) : '0.0' }}% budget used</span>
           </span>
         </template>
         <DataTable
@@ -458,11 +458,11 @@ function openLogModal(event: AnalyticsEvent) {
           <tr v-for="agent in agentBreakdown" :key="agent.agent_id">
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.agent_name">{{ agent.agent_name }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatCost(agent.spending) }}</td>
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget / 1_000_000) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget) }}</td>
             <td class="px-3 sm:px-6 py-2 text-base text-foreground">
               <div class="flex items-center gap-2 min-w-[100px]">
-                <PercentBar :percentage="agent.budget > 0 ? (agent.spending / (agent.budget / 1_000_000)) * 100 : 0" class="max-w-[100px] max-sm:hidden" />
-                <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground">{{ agent.budget > 0 ? ((agent.spending / (agent.budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}%</span>
+                <PercentBar :percentage="agent.percent_used" class="max-w-[100px] max-sm:hidden" />
+                <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground">{{ agent.percent_used.toFixed(1) }}%</span>
               </div>
             </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>

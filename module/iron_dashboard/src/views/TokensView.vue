@@ -78,7 +78,7 @@ const createMutation = useMutation({
     showTokenModal.value = true
     projectId.value = ''
     description.value = ''
-    selectedUserId.value = authStore.userId || ''
+    selectedUserId.value = ''
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
   onError: (err) => {
@@ -232,7 +232,7 @@ async function copyToken(token: string) {
                 <SelectItem
                   v-for="user in usersList?.users"
                   :key="user.id"
-                  :value="user.username"
+                  :value="user.id"
                 >
                   <span :title="user.username">{{ user.username }}</span>
                 </SelectItem>
@@ -282,7 +282,10 @@ async function copyToken(token: string) {
     </Dialog>
 
     <!-- New token modal -->
-    <Dialog v-model:open="showTokenModal">
+    <Dialog
+      :open="showTokenModal"
+      @update:open="(open) => { showTokenModal = open; if (!open) newTokenData = null }"
+    >
       <DialogContent class="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Token Generated</DialogTitle>

@@ -436,9 +436,10 @@ async fn test_all_indexes_created() {
   // Migration 019: Rebuilds budget_leases, agent_budgets, usage_limits (now recreates idx_agent_budgets_updated)
   // Migration 020: 1 index (idx_agents_provider_key_id)
   // Migration 022: 1 index (idx_agents_ic_token_hash)
-  // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
+  // Migration 026: 2 indexes (idx_budget_leases_provider_key, idx_analytics_events_provider_key)
+  // Migration 028: 1 index (idx_ai_provider_keys_user_provider)
   assert_eq!(
-    index_count, 53,
-    "Expected 53 indexes to be created across all migrations"
+    index_count, 56,
+    "Expected 56 indexes to be created across all migrations"
   );
 }

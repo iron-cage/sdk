@@ -51,8 +51,8 @@ log_warning() {
 }
 
 # Expected counts (update when adding migrations)
-EXPECTED_TABLE_COUNT=43   # 18 application + 25 migration guards
-EXPECTED_INDEX_COUNT=53
+EXPECTED_TABLE_COUNT=48   # 19 application + 29 migration guards
+EXPECTED_INDEX_COUNT=56
 
 # Validation state
 VIOLATIONS=0
@@ -121,7 +121,7 @@ log_info "Rule 3: Checking migration guard tables..."
 GUARD_VIOLATIONS=0
 
 # Expected migration guards (migrations 001-025, all 25 guards)
-EXPECTED_GUARDS=("_migration_001_completed" "_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_007_completed" "_migration_008_completed" "_migration_009_completed" "_migration_010_completed" "_migration_011_completed" "_migration_012_completed" "_migration_013_completed" "_migration_014_completed" "_migration_015_completed" "_migration_016_completed" "_migration_017_completed" "_migration_018_completed" "_migration_019_completed" "_migration_020_completed" "_migration_021_completed" "_migration_022_completed" "_migration_023_completed" "_migration_024_completed" "_migration_025_completed")
+EXPECTED_GUARDS=("_migration_001_completed" "_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_007_completed" "_migration_008_completed" "_migration_009_completed" "_migration_010_completed" "_migration_011_completed" "_migration_012_completed" "_migration_013_completed" "_migration_014_completed" "_migration_015_completed" "_migration_016_completed" "_migration_017_completed" "_migration_018_completed" "_migration_019_completed" "_migration_020_completed" "_migration_021_completed" "_migration_022_completed" "_migration_023_completed" "_migration_024_completed" "_migration_025_completed" "_migration_026_completed" "_migration_027_completed" "_migration_029_completed" "_migration_030_completed")
 
 for guard in "${EXPECTED_GUARDS[@]}"; do
   COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='$guard';")
@@ -159,7 +159,7 @@ fi
 
 log_info "Rule 5: Checking core application tables..."
 
-CORE_TABLES=("agent_budgets" "agents" "ai_provider_keys" "analytics_events" "api_call_traces" "api_tokens" "audit_log" "blacklist" "budget_change_requests" "budget_leases" "budget_modification_history" "project_provider_key_assignments" "system_config" "token_blacklist" "token_usage" "usage_limits" "user_audit_log" "users")
+CORE_TABLES=("agent_budgets" "agent_provider_keys" "agents" "ai_provider_keys" "analytics_events" "api_call_traces" "api_tokens" "audit_log" "blacklist" "budget_change_requests" "budget_leases" "budget_modification_history" "project_provider_key_assignments" "system_config" "token_blacklist" "token_usage" "usage_limits" "user_audit_log" "users")
 
 TABLE_VIOLATIONS=0
 

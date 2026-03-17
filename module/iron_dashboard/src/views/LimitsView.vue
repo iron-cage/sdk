@@ -221,7 +221,10 @@ function riskBadgeVariant(risk: string) {
     </DataTable>
 
     <!-- Update Agent Budget Modal -->
-    <Dialog v-model:open="showBudgetModal">
+    <Dialog
+      :open="showBudgetModal"
+      @update:open="(open) => { showBudgetModal = open; if (!open) { budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = '' } }"
+    >
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Update Agent Budget</DialogTitle>
@@ -251,7 +254,7 @@ function riskBadgeVariant(risk: string) {
         <p v-if="budgetError" class="text-sm text-destructive">{{ budgetError }}</p>
 
         <DialogFooter>
-          <Button variant="outline" @click="showBudgetModal = false; budgetError = ''">
+          <Button variant="outline" @click="showBudgetModal = false; budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = ''">
             <IconX />
             Cancel
           </Button>

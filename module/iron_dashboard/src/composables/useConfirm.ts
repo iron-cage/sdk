@@ -12,14 +12,17 @@ export function useConfirm() {
     title: string,
     description: string,
     label: string,
-    action: () => void,
+    action: () => void | Promise<void>,
     variant: 'default' | 'destructive' = 'destructive',
   ) {
     confirmTitle.value = title
     confirmDescription.value = description
     confirmLabel.value = label
     confirmVariant.value = variant
-    confirmCallback.value = action
+    confirmCallback.value = () => {
+      confirmCallback.value = null
+      action()
+    }
     showConfirmModal.value = true
   }
 

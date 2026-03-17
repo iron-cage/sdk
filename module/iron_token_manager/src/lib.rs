@@ -97,5 +97,6 @@ pub mod user_service;
 // Re-exports for convenient access
 pub use config::Config;
 pub use migrations::apply_all_migrations;
+pub use agent_budget::{BlockedBy, ReservationResult, SpendingCap};
 pub use provider_key_storage::{ProviderKeyStorage, ProviderType, SpendingSummary};
 pub use seed::{seed_all, seed_users, wipe_database};

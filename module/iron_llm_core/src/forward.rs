@@ -92,6 +92,8 @@ pub async fn forward_request(
     .as_deref()
     .unwrap_or(match target_provider {
       "anthropic" => "https://api.anthropic.com",
+      "gemini" => "https://generativelanguage.googleapis.com",
+      "xai" => "https://api.x.ai",
       _ => "https://api.openai.com",
     });
 
@@ -106,7 +108,11 @@ pub async fn forward_request(
     req_builder = req_builder
       .header("x-api-key", provider_key.api_key.expose_secret().as_str())
       .header("anthropic-version", "2023-06-01");
+  } else if target_provider == "gemini" {
+    req_builder = req_builder
+      .header("x-goog-api-key", provider_key.api_key.expose_secret().as_str());
   } else {
+    // OpenAI, xAI (OpenAI-compatible), and default
     req_builder = req_builder.header(
       header::AUTHORIZATION,
       format!("Bearer {}", provider_key.api_key.expose_secret().as_str()),

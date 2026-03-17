@@ -38,14 +38,14 @@ iron .agent.list format::json
 Create new agent.
 
 ```bash
-iron .agent.create name::<name> providers::<list> provider_key_id::<id> budget::<amount>
+iron .agent.create name::<name> providers::<list> provider_key_ids::<list> budget::<amount>
 ```
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
 | `name::` | string | Agent name (3-100 chars) | - |
 | `providers::` | string | Comma-separated provider list | - |
-| `provider_key_id::` | integer | Provider key ID | - |
+| `provider_key_ids::` | string | Comma-separated provider key IDs (one per provider type) | - |
 | `budget::` | integer | Initial budget in microdollars | - |
 | `dry::` | integer (0\|1) | Dry run flag | 0 |
 | `format::` | [format_output](../parameter_types.md#format_output) | Output format | `table` |
@@ -54,15 +54,18 @@ iron .agent.create name::<name> providers::<list> provider_key_id::<id> budget::
 
 **Example**:
 ```bash
-iron .agent.create name::my-agent providers::openai provider_key_id::1 budget::1000000
+iron .agent.create name::my-agent providers::openai provider_key_ids::1 budget::1000000
 # Agent created
 # ID: abc123
 # Name: my-agent
 # Providers: openai
 # Budget: $1.00
 
+# multiple provider keys (one per provider type)
+iron .agent.create name::multi-agent providers::openai,anthropic provider_key_ids::1,2 budget::1000000
+
 # dry run
-iron .agent.create name::test-agent providers::openai provider_key_id::1 budget::500000 dry::1
+iron .agent.create name::test-agent providers::openai provider_key_ids::1 budget::500000 dry::1
 # Would create agent: test-agent (dry run)
 ```
 

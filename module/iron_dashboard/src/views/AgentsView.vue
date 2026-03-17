@@ -55,7 +55,7 @@ const authStore = useAuthStore()
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
 const showDeleteModal = ref(false)
-const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmCallback, openConfirm } = useConfirm()
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const name = ref('')
 const selectedProviderKeyIds = ref<number[]>([])
 const addingProviderKeyId = ref<string>('')
@@ -695,7 +695,7 @@ async function copyTokenToClipboard() {
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="showUpdateModal = false"
+            @click="showUpdateModal = false; name = ''; selectedProviderKeyIds = []; addingProviderKeyId = ''; selectedOwnerId = ''"
           >
             <IconX />
             Cancel
@@ -743,7 +743,10 @@ async function copyTokenToClipboard() {
     </Dialog>
 
     <!-- IC Token Display Modal -->
-    <Dialog v-model:open="showTokenDialog">
+    <Dialog
+      :open="showTokenDialog"
+      @update:open="(open) => { showTokenDialog = open; if (!open) { tokenDialogValue = ''; tokenDialogAgentName = ''; tokenDialogWarning = ''; copyMessage = '' } }"
+    >
       <DialogContent class="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>IC Token for {{ tokenDialogAgentName }}</DialogTitle>
@@ -765,7 +768,7 @@ async function copyTokenToClipboard() {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="showTokenDialog = false; tokenDialogValue = ''">
+          <Button variant="outline" @click="showTokenDialog = false; tokenDialogValue = ''; tokenDialogAgentName = ''; tokenDialogWarning = ''; copyMessage = ''">
             <IconX />
             Close
           </Button>
@@ -782,6 +785,7 @@ async function copyTokenToClipboard() {
       :title="confirmTitle"
       :description="confirmDescription"
       :confirm-label="confirmLabel"
+      :variant="confirmVariant"
       @confirm="confirmCallback?.()"
     />
   </PageLayout>

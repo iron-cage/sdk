@@ -1,6 +1,6 @@
 //! AI Provider Key storage layer
 //!
-//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`).
+//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`, `Gemini`, `XAI`).
 
 use core::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -15,6 +15,10 @@ pub enum ProviderType {
   OpenAI,
   /// `Anthropic` provider
   Anthropic,
+  /// Google Gemini provider
+  Gemini,
+  /// xAI provider
+  XAI,
 }
 
 impl ProviderType {
@@ -24,6 +28,8 @@ impl ProviderType {
     match self {
       Self::OpenAI => "openai",
       Self::Anthropic => "anthropic",
+      Self::Gemini => "gemini",
+      Self::XAI => "xai",
     }
   }
 
@@ -35,6 +41,8 @@ impl ProviderType {
     match s {
       "openai" => Some(Self::OpenAI),
       "anthropic" => Some(Self::Anthropic),
+      "gemini" => Some(Self::Gemini),
+      "xai" => Some(Self::XAI),
       _ => None,
     }
   }
@@ -73,6 +81,8 @@ pub struct ProviderKeyMetadata {
   pub spending_cap_microdollars: Option<i64>,
   /// Cumulative spending in microdollars
   pub spending_used_microdollars: i64,
+  /// Optional human-friendly alias
+  pub alias: Option<String>,
 }
 
 /// Summary of spending for a provider key
@@ -132,6 +142,7 @@ impl ProviderKeyStorage {
   /// # Errors
   ///
   /// Returns error if database insert fails
+  #[allow(clippy::too_many_arguments)]
   pub async fn create_key(
     &self,
     provider: ProviderType,
@@ -140,13 +151,14 @@ impl ProviderKeyStorage {
     base_url: Option<&str>,
     description: Option<&str>,
     user_id: &str,
+    alias: Option<&str>,
   ) -> Result<i64> {
     let now_ms = current_time_ms();
 
     let result = sqlx::query(
       "INSERT INTO ai_provider_keys \
-       ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at ) \
-       VALUES ( $1, $2, $3, $4, $5, $6, $7 )"
+       ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at, alias ) \
+       VALUES ( $1, $2, $3, $4, $5, $6, $7, $8 )"
     )
     .bind( provider.as_str() )
     .bind( encrypted_api_key )
@@ -155,9 +167,10 @@ impl ProviderKeyStorage {
     .bind( description )
     .bind( user_id )
     .bind( now_ms )
+    .bind( alias )
     .execute( &self.pool )
     .await
-    .map_err( |_| TokenError::Generic )?;
+    .map_err( TokenError::Database )?;
 
     Ok(result.last_insert_rowid())
   }
@@ -179,7 +192,7 @@ impl ProviderKeyStorage {
     let row = sqlx::query(
       "SELECT id, provider, encrypted_api_key, encryption_nonce, base_url, \
        description, is_enabled, created_at, last_used_at, balance_cents, \
-       balance_updated_at, user_id, spending_cap_microdollars, spending_used_microdollars \
+       balance_updated_at, user_id, spending_cap_microdollars, spending_used_microdollars, alias \
        FROM ai_provider_keys WHERE id = ?",
     )
     .bind(key_id)
@@ -189,7 +202,7 @@ impl ProviderKeyStorage {
 
     match row {
       Some(row) => Ok(row_to_record(&row)),
-      None => Err(TokenError::Database(sqlx::Error::RowNotFound)),
+      None => Err(TokenError::NotFound),
     }
   }
 
@@ -202,7 +215,7 @@ impl ProviderKeyStorage {
     let row = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, encrypted_api_key, balance_updated_at, user_id, \
-       spending_cap_microdollars, spending_used_microdollars \
+       spending_cap_microdollars, spending_used_microdollars, alias \
        FROM ai_provider_keys WHERE id = ?",
     )
     .bind(key_id)
@@ -212,7 +225,7 @@ impl ProviderKeyStorage {
 
     match row {
       Some(row) => Ok(row_to_metadata(&row)),
-      None => Err(TokenError::Database(sqlx::Error::RowNotFound)),
+      None => Err(TokenError::NotFound),
     }
   }
 
@@ -233,13 +246,13 @@ impl ProviderKeyStorage {
     let rows = sqlx::query(
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, balance_updated_at, user_id, \
-       spending_cap_microdollars, spending_used_microdollars \
+       spending_cap_microdollars, spending_used_microdollars, alias \
        FROM ai_provider_keys WHERE user_id = $1 ORDER BY created_at DESC",
     )
     .bind(user_id)
     .fetch_all(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     Ok(rows.iter().map(row_to_metadata).collect())
   }
@@ -255,7 +268,7 @@ impl ProviderKeyStorage {
       .bind(key_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -270,7 +283,7 @@ impl ProviderKeyStorage {
       .bind(key_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -285,7 +298,7 @@ impl ProviderKeyStorage {
       .bind(key_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -304,7 +317,7 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -320,7 +333,7 @@ impl ProviderKeyStorage {
       .bind(key_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -334,10 +347,10 @@ impl ProviderKeyStorage {
       .bind(key_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
-      return Err(TokenError::Generic);
+      return Err(TokenError::NotFound);
     }
     Ok(())
   }
@@ -358,7 +371,7 @@ impl ProviderKeyStorage {
     .bind(now_ms)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -376,23 +389,28 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
     Ok(())
   }
 
   /// Get key assigned to a project
+  ///
+  /// Returns the most recently assigned key for the project, or `None` if no key is assigned.
+  /// Uses `ORDER BY assigned_at DESC LIMIT 1` to give deterministic results when multiple
+  /// assignments exist.
   ///
   /// # Errors
   ///
   /// Returns error if database query fails
   pub async fn get_project_key(&self, project_id: &str) -> Result<Option<i64>> {
     let row: Option<(i64,)> = sqlx::query_as(
-      "SELECT provider_key_id FROM project_provider_key_assignments WHERE project_id = $1",
+      "SELECT provider_key_id FROM project_provider_key_assignments \
+       WHERE project_id = $1 ORDER BY assigned_at DESC LIMIT 1",
     )
     .bind(project_id)
     .fetch_optional(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     Ok(row.map(|r| r.0))
   }
@@ -409,12 +427,12 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .fetch_all(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     Ok(rows.into_iter().map(|r| r.0).collect())
   }
 
-  /// Get all keys of provider
+  /// Get all keys of provider (unscoped — admin/internal use only)
   ///
   /// # Errors
   ///
@@ -424,43 +442,120 @@ impl ProviderKeyStorage {
       .bind(provider.as_str())
       .fetch_all(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
 
     Ok(rows.into_iter().map(|r| r.0).collect())
   }
 
-  /// Update key
+  /// Get IDs of all keys belonging to a specific owner for a given provider (owner-scoped)
   ///
   /// # Errors
   ///
-  /// Returns error if database update fails
-  #[allow(clippy::too_many_arguments)]
-  pub async fn update_key(
+  /// Returns error if database query fails
+  pub async fn get_keys_by_owner_and_provider(
+    &self,
+    user_id: &str,
+    provider: ProviderType,
+  ) -> Result<Vec<i64>> {
+    let rows: Vec<(i64,)> = sqlx::query_as(
+      "SELECT id FROM ai_provider_keys WHERE user_id = $1 AND provider = $2",
+    )
+    .bind(user_id)
+    .bind(provider.as_str())
+    .fetch_all(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+
+    Ok(rows.into_iter().map(|r| r.0).collect())
+  }
+
+  /// Count keys belonging to a specific owner for a given provider
+  ///
+  /// Used for quota enforcement before key creation.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn count_keys_by_owner_and_provider(
+    &self,
+    user_id: &str,
+    provider: ProviderType,
+  ) -> Result<i64> {
+    let row: (i64,) = sqlx::query_as(
+      "SELECT COUNT(*) FROM ai_provider_keys WHERE user_id = $1 AND provider = $2",
+    )
+    .bind(user_id)
+    .bind(provider.as_str())
+    .fetch_one(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+
+    Ok(row.0)
+  }
+
+  /// Atomically update one or more mutable fields of a provider key.
+  ///
+  /// Each parameter is `Option` — `None` means "leave unchanged". All provided
+  /// changes are applied in a single UPDATE statement, so either all columns are
+  /// written together or none are (on query failure).
+  ///
+  /// Ownership (`user_id`) and encrypted key material are intentionally excluded
+  /// from this method. Use [`create_key`] / [`delete_key`] for those changes.
+  ///
+  /// # Arguments
+  ///
+  /// * `description` — `None` = skip; `Some(v)` = set to `v` (pass `Some(None)` to clear)
+  /// * `base_url`    — `None` = skip; `Some(v)` = set to `v` (pass `Some(None)` to clear)
+  /// * `is_enabled`  — `None` = skip; `Some(b)` = enable/disable
+  /// * `spending_cap_microdollars` — `None` = skip; `Some(v)` = set cap (`Some(None)` = remove)
+  ///
+  /// # Errors
+  ///
+  /// Returns error if any update fails or the transaction cannot be committed
+  pub async fn update_key_fields(
     &self,
     key_id: i64,
-    provider: ProviderType,
-    encrypted_api_key: &str,
-    encryption_nonce: &str,
-    base_url: Option<&str>,
-    description: Option<&str>,
-    user_id: &str,
-  ) -> Result<i64> {
+    description: Option<Option<&str>>,
+    base_url: Option<Option<&str>>,
+    is_enabled: Option<bool>,
+    spending_cap_microdollars: Option<Option<i64>>,
+    alias: Option<Option<&str>>,
+  ) -> Result<()> {
+    // Single UPDATE with CASE WHEN guards — atomic without a transaction.
+    // Each field is updated only when its Option is Some; otherwise the
+    // ELSE branch keeps the existing column value unchanged.
     sqlx::query(
-      "UPDATE ai_provider_keys \
-       SET provider = $1, encrypted_api_key = $2, encryption_nonce = $3, base_url = $4, description = $5, user_id = $6 \
-       WHERE id = $7"
+      "UPDATE ai_provider_keys SET \
+         description              = CASE WHEN $1  THEN $2  ELSE description              END, \
+         base_url                 = CASE WHEN $3  THEN $4  ELSE base_url                 END, \
+         is_enabled               = CASE WHEN $5  THEN $6  ELSE is_enabled               END, \
+         spending_cap_microdollars= CASE WHEN $7  THEN $8  ELSE spending_cap_microdollars END, \
+         alias                    = CASE WHEN $9  THEN $10 ELSE alias                    END \
+       WHERE id = $11",
     )
-    .bind( provider.as_str() )
-    .bind( encrypted_api_key )
-    .bind( encryption_nonce )
-    .bind( base_url )
-    .bind( description )
-    .bind( user_id )
-    .bind( key_id )
-    .execute( &self.pool )
+    .bind(description.is_some())
+    .bind(description.flatten())
+    .bind(base_url.is_some())
+    .bind(base_url.flatten())
+    .bind(is_enabled.is_some())
+    .bind(is_enabled)
+    .bind(spending_cap_microdollars.is_some())
+    .bind(spending_cap_microdollars.flatten())
+    .bind(alias.is_some())
+    .bind(alias.flatten())
+    .bind(key_id)
+    .execute(&self.pool)
     .await
-    .map_err( |_| TokenError::Generic )?;
-    Ok(key_id)
+    .map_err(TokenError::Database)
+    .and_then(|r| {
+      if r.rows_affected() == 0 {
+        Err(TokenError::NotFound)
+      } else {
+        Ok(())
+      }
+    })?;
+
+    Ok(())
   }
 
   /// Set spending cap for a provider key
@@ -479,7 +574,7 @@ impl ProviderKeyStorage {
       .bind(key_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| TokenError::Generic)?;
+      .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -508,7 +603,7 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
       return Err(TokenError::Generic);
@@ -537,7 +632,7 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
       return Err(TokenError::Generic);
@@ -567,7 +662,7 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
     Ok(())
   }
 
@@ -584,14 +679,14 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .fetch_optional(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     match row {
       Some((used, cap)) => Ok(SpendingSummary {
         used_microdollars: used,
         cap_microdollars: cap,
       }),
-      None => Err(TokenError::Database(sqlx::Error::RowNotFound)),
+      None => Err(TokenError::NotFound),
     }
   }
 }
@@ -620,6 +715,7 @@ fn row_to_metadata(row: &SqliteRow) -> ProviderKeyMetadata {
     user_id: row.get("user_id"),
     spending_cap_microdollars: row.get("spending_cap_microdollars"),
     spending_used_microdollars: row.get("spending_used_microdollars"),
+    alias: row.get("alias"),
   }
 }
 
@@ -639,6 +735,7 @@ fn row_to_record(row: &SqliteRow) -> ProviderKeyRecord {
       user_id: row.get("user_id"),
       spending_cap_microdollars: row.get("spending_cap_microdollars"),
       spending_used_microdollars: row.get("spending_used_microdollars"),
+      alias: row.get("alias"),
     },
     encrypted_api_key: row.get("encrypted_api_key"),
     encryption_nonce: row.get("encryption_nonce"),

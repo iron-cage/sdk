@@ -14,6 +14,7 @@ use core::{
   fmt::{Debug, Formatter, Result as FmtResult},
   str::FromStr,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
@@ -21,7 +22,7 @@ use axum::{
   http::StatusCode,
   response::{IntoResponse, Json},
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::Deserializer, Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 
 use crate::{
@@ -105,6 +106,8 @@ pub struct CreateProviderKeyRequest {
   pub base_url: Option<String>,
   /// Optional human-readable description
   pub description: Option<String>,
+  /// Optional human-friendly alias
+  pub alias: Option<String>,
 }
 
 impl CreateProviderKeyRequest {
@@ -117,6 +120,9 @@ impl CreateProviderKeyRequest {
   /// Maximum description length
   const MAX_DESCRIPTION_LENGTH: usize = 500;
 
+  /// Maximum alias length
+  const MAX_ALIAS_LENGTH: usize = 100;
+
   /// Validate request
   ///
   /// # Errors
@@ -125,10 +131,14 @@ impl CreateProviderKeyRequest {
   /// or too long, or optional fields exceed length limits.
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate provider type
-    if self.provider != "openai" && self.provider != "anthropic" {
+    if self.provider != "openai"
+      && self.provider != "anthropic"
+      && self.provider != "gemini"
+      && self.provider != "xai"
+    {
       return Err(ValidationError::InvalidFormat {
         field: "provider".to_owned(),
-        expected: "'openai' or 'anthropic'".to_owned(),
+        expected: "'openai', 'anthropic', 'gemini', or 'xai'".to_owned(),
       });
     }
 
@@ -185,12 +195,29 @@ impl CreateProviderKeyRequest {
       }
     }
 
+    // Validate alias if provided
+    if let Some(ref alias) = self.alias {
+      if alias.len() > Self::MAX_ALIAS_LENGTH {
+        return Err(ValidationError::TooLong {
+          field: "alias".to_owned(),
+          max_length: Self::MAX_ALIAS_LENGTH,
+        });
+      }
+      if alias.contains('\0') {
+        return Err(ValidationError::InvalidCharacter {
+          field: "alias".to_owned(),
+          character: "NULL".to_owned(),
+        });
+      }
+    }
+
     Ok(())
   }
 }
 
 /// Update provider key request
 #[derive(Debug, Deserialize)]
+#[allow(clippy::option_option)] // Three-state semantics for spending_cap_usd
 pub struct UpdateProviderKeyRequest {
   /// Updated base URL override
   pub base_url: Option<String>,
@@ -199,7 +226,31 @@ pub struct UpdateProviderKeyRequest {
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
   /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
+  ///
+  /// JSON mapping:
+  /// - field absent → `None` (don't change)
+  /// - `"spending_cap_usd": null` → `Some(None)` (remove cap / unlimited)
+  /// - `"spending_cap_usd": 10.0` → `Some(Some(10.0))` (set cap)
+  #[serde(default, deserialize_with = "deserialize_nullable_f64")]
   pub spending_cap_usd: Option<Option<f64>>,
+  /// Updated alias
+  pub alias: Option<String>,
+}
+
+/// Deserialize a JSON field into `Option<Option<f64>>` with three-state semantics.
+///
+/// - Field absent (handled by `#[serde(default)]`) → `None`
+/// - Field present as `null` → `Some(None)`
+/// - Field present as number → `Some(Some(value))`
+#[allow(clippy::option_option)] // Three-state semantics: absent vs null vs value
+fn deserialize_nullable_f64<'de, D>(deserializer: D) -> Result<Option<Option<f64>>, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  // If this function is called, the field was present in JSON.
+  // Deserialize its value: null becomes None, number becomes Some(x).
+  let value: Option<f64> = Option::deserialize(deserializer)?;
+  Ok(Some(value))
 }
 
 /// Provider key response (never contains plaintext API key)
@@ -228,14 +279,20 @@ pub struct ProviderKeyResponse {
   pub spending_cap_usd: Option<f64>,
   /// Amount spent in USD
   pub spending_used_usd: f64,
+  /// Optional human-friendly alias
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub alias: Option<String>,
+  /// Total spend from analytics in USD
+  pub total_spend_usd: f64,
 }
 
 impl ProviderKeyResponse {
-  /// Construct response from metadata, masked key, and assigned projects.
+  /// Construct response from metadata, masked key, assigned projects, and analytics spend.
   fn from_metadata(
     metadata: ProviderKeyMetadata,
     masked_key: impl Into<String>,
     assigned_projects: Vec<String>,
+    total_spend_usd: f64,
   ) -> Self {
     Self {
       id: metadata.id,
@@ -249,6 +306,8 @@ impl ProviderKeyResponse {
       assigned_projects,
       spending_cap_usd: metadata.spending_cap_microdollars.map(microdollars_to_usd),
       spending_used_usd: microdollars_to_usd(metadata.spending_used_microdollars),
+      alias: metadata.alias,
+      total_spend_usd,
     }
   }
 }
@@ -275,174 +334,94 @@ fn usd_to_microdollars(usd: f64) -> i64 {
 }
 
 /// Check if user has `ManageProviderKeys` permission
-fn check_manage_provider_keys(role_str: &str) -> Result<(), impl IntoResponse> {
+fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiError> {
   let role = iron_types::Role::from_str(role_str).map_err(|_| {
-    (
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({ "error": format!("Invalid role: {role_str}") })),
-    )
+    crate::error::ApiError::Forbidden(format!("Invalid role: {role_str}"))
   })?;
   let checker = PermissionChecker::new();
   if checker.has_permission(role, Permission::ManageProviderKeys) {
     Ok(())
   } else {
-    Err((
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({
-        "error": "Insufficient permissions: ManageProviderKeys required"
-      })),
+    Err(crate::error::ApiError::Forbidden(
+      "Insufficient permissions: ManageProviderKeys required".into(),
     ))
   }
-}
-
-/// Error response for disabled feature
-fn feature_disabled_response() -> impl IntoResponse {
-  (
-    StatusCode::SERVICE_UNAVAILABLE,
-    Json(serde_json::json!({
-      "error": "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY environment variable to enable."
-    })),
-  )
 }
 
 /// POST /api/providers
 ///
 /// Create new AI provider key
+///
+/// # Errors
+///
+/// Returns `ApiError` if encryption fails, database insert fails, or request validation fails.
 pub async fn create_provider_key(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(request): JsonBody<CreateProviderKeyRequest>,
-) -> impl IntoResponse {
-  // RBAC: require ManageProviderKeys permission
-  if let Err(resp) = check_manage_provider_keys(&claims.role) {
-    return resp.into_response();
-  }
+) -> crate::error::ApiResult<impl IntoResponse> {
+  use crate::error::ApiError;
 
-  // Check if crypto is enabled
-  let Some(crypto) = &state.crypto else {
-    return feature_disabled_response().into_response();
-  };
+  check_manage_provider_keys(&claims.role)?;
 
-  // Validate request
-  if let Err(validation_error) = request.validate() {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json(serde_json::json!({
-        "error": validation_error.to_string()
-      })),
+  let crypto = state.crypto.as_ref().ok_or_else(|| {
+    ApiError::ServiceUnavailable(
+      "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
     )
-      .into_response();
-  }
+  })?;
 
-  // Parse provider type
+  request.validate().map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
-    _ => {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json(serde_json::json!({
-          "error": "Invalid provider type"
-        })),
-      )
-        .into_response();
-    }
+    "gemini" => ProviderType::Gemini,
+    "xai" => ProviderType::XAI,
+    _ => return Err(ApiError::BadRequest("Invalid provider type".into())),
   };
 
-  // Encrypt API key
-  let Ok(encrypted) = crypto.encrypt(&request.api_key) else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to encrypt API key"
-      })),
-    )
-      .into_response();
-  };
-
-  // Create masked key for response
   let masked_key = mask_api_key(&request.api_key);
 
-  let Ok(keys) = state.storage.get_keys_by_provider(provider).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to get provider keys"
-      })),
-    )
-      .into_response();
-  };
-  let key_id = if keys.is_empty() {
-    match state
-      .storage
-      .create_key(
-        provider,
-        &encrypted.ciphertext_base64(),
-        &encrypted.nonce_base64(),
-        request.base_url.as_deref(),
-        request.description.as_deref(),
-        &claims.sub,
-      )
-      .await
-    {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({
-            "error": "Failed to create provider key"
-          })),
-        )
-          .into_response();
-      }
-    }
-  } else {
-    match state
-      .storage
-      .update_key(
-        keys[0],
-        provider,
-        &encrypted.ciphertext_base64(),
-        &encrypted.nonce_base64(),
-        request.base_url.as_deref(),
-        request.description.as_deref(),
-        &claims.sub,
-      )
-      .await
-    {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({
-            "error": "Failed to update provider key"
-          })),
-        )
-          .into_response();
-      }
-    }
-  };
+  let encrypted = crypto
+    .encrypt(&request.api_key)
+    .map_err(|_| ApiError::Internal("Failed to encrypt API key".into()))?;
 
-  // Get metadata for response
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to retrieve provider key metadata"
-      })),
-    )
-      .into_response();
-  };
+  let count = state
+    .storage
+    .count_keys_by_owner_and_provider(&claims.sub, provider)
+    .await
+    .map_err(|_| ApiError::Internal("Failed to check key quota".into()))?;
 
-  (
+  if count >= 20 {
+    return Err(ApiError::TooManyRequests(
+      "Key quota exceeded: maximum 20 keys per provider".into(),
+    ));
+  }
+
+  let key_id = state
+    .storage
+    .create_key(
+      provider,
+      &encrypted.ciphertext_base64(),
+      &encrypted.nonce_base64(),
+      request.base_url.as_deref(),
+      request.description.as_deref(),
+      &claims.sub,
+      request.alias.as_deref(),
+    )
+    .await
+    .map_err(|_| ApiError::Internal("Failed to create provider key".into()))?;
+
+  let metadata = state
+    .storage
+    .get_key_metadata(key_id)
+    .await
+    .map_err(|_| ApiError::Internal("Failed to retrieve provider key metadata".into()))?;
+
+  Ok((
     StatusCode::CREATED,
-    Json(ProviderKeyResponse::from_metadata(
-      metadata,
-      masked_key,
-      vec![],
-    )),
-  )
-    .into_response()
+    Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![], 0.0)),
+  ))
 }
 
 /// GET /api/providers
@@ -462,21 +441,49 @@ pub async fn list_provider_keys(
       .into_response();
   };
 
+  // Query analytics spend per key in one batch
+  let key_ids: Vec<i64> = keys.iter().map(|k| k.id).collect();
+  let spend_map: HashMap<i64, i64> = if key_ids.is_empty() {
+    HashMap::new()
+  } else {
+    // Build dynamic IN clause
+    let placeholders: String = key_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+      "SELECT provider_key_id, COALESCE(SUM(cost_micros), 0) \
+       FROM analytics_events \
+       WHERE provider_key_id IN ({placeholders}) AND event_type = 'llm_request_completed' \
+       GROUP BY provider_key_id"
+    );
+    let mut q = sqlx::query_as::<_, (i64, i64)>(&sql);
+    for id in &key_ids {
+      q = q.bind(id);
+    }
+    q.fetch_all(state.storage.pool())
+      .await
+      .unwrap_or_else(|e| { tracing::warn!("Failed to fetch analytics spend for provider keys: {e}"); Vec::new() })
+      .into_iter()
+      .collect()
+  };
+
   // For each key, fetch assigned projects and build response
   let mut responses: Vec<ProviderKeyResponse> = Vec::with_capacity(keys.len());
 
-  for meta in keys {
+  for meta in &keys {
     // Fetch projects assigned to this key
     let assigned_projects = state
       .storage
       .get_key_projects(meta.id)
       .await
-      .unwrap_or_default();
+      .unwrap_or_else(|e| { tracing::warn!("Failed to fetch projects for provider key {}: {e}", meta.id); Vec::new() });
+
+    let total_spend_micros = spend_map.get(&meta.id).copied().unwrap_or(0);
+    let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
 
     responses.push(ProviderKeyResponse::from_metadata(
-      meta,
+      meta.clone(),
       "***",
       assigned_projects,
+      total_spend_usd,
     ));
   }
 
@@ -517,7 +524,18 @@ pub async fn get_provider_key(
     .storage
     .get_key_projects(key_id)
     .await
-    .unwrap_or_default();
+    .unwrap_or_else(|e| { tracing::warn!("Failed to fetch projects for provider key {key_id} in get_provider_key: {e}"); Vec::new() });
+
+  // Query analytics spend for this key
+  let total_spend_micros: i64 = sqlx::query_scalar(
+    "SELECT COALESCE(SUM(cost_micros), 0) FROM analytics_events \
+     WHERE provider_key_id = ? AND event_type = 'llm_request_completed'",
+  )
+  .bind(key_id)
+  .fetch_one(state.storage.pool())
+  .await
+  .unwrap_or(0);
+  let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
 
   (
     StatusCode::OK,
@@ -525,6 +543,7 @@ pub async fn get_provider_key(
       metadata,
       "***",
       assigned_projects,
+      total_spend_usd,
     )),
   )
     .into_response()
@@ -565,69 +584,26 @@ pub async fn update_provider_key(
       .into_response();
   }
 
-  // Update fields if provided
-  if let Some(ref description) = request.description {
-    if state
-      .storage
-      .update_description(key_id, Some(description))
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update description"
-        })),
-      )
-        .into_response();
-    }
-  }
+  // Apply all field updates atomically in a single transaction
+  let description = request.description.as_deref().map(Some);
+  let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
+  let spending_cap = request
+    .spending_cap_usd
+    .map(|cap| cap.map(usd_to_microdollars));
 
-  if let Some(ref base_url) = request.base_url {
-    let url = if base_url.is_empty() {
-      None
-    } else {
-      Some(base_url.as_str())
-    };
-    if state.storage.update_base_url(key_id, url).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update base_url"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  if let Some(is_enabled) = request.is_enabled {
-    if state.storage.set_enabled(key_id, is_enabled).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update is_enabled"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  if let Some(spending_cap) = request.spending_cap_usd {
-    let cap_microdollars = spending_cap.map(usd_to_microdollars);
-    if state
-      .storage
-      .set_spending_cap(key_id, cap_microdollars)
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update spending_cap"
-        })),
-      )
-        .into_response();
-    }
+  if state
+    .storage
+    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap, request.alias.as_deref().map(Some))
+    .await
+    .is_err()
+  {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to update provider key"
+      })),
+    )
+      .into_response();
   }
 
   // Get updated metadata
@@ -646,7 +622,18 @@ pub async fn update_provider_key(
     .storage
     .get_key_projects(key_id)
     .await
-    .unwrap_or_default();
+    .unwrap_or_else(|e| { tracing::warn!("Failed to fetch projects for provider key {key_id} in update_provider_key: {e}"); Vec::new() });
+
+  // Query analytics spend for this key
+  let total_spend_micros: i64 = sqlx::query_scalar(
+    "SELECT COALESCE(SUM(cost_micros), 0) FROM analytics_events \
+     WHERE provider_key_id = ? AND event_type = 'llm_request_completed'",
+  )
+  .bind(key_id)
+  .fetch_one(state.storage.pool())
+  .await
+  .unwrap_or(0);
+  let total_spend_usd = total_spend_micros as f64 / 1_000_000.0;
 
   (
     StatusCode::OK,
@@ -654,6 +641,7 @@ pub async fn update_provider_key(
       updated,
       "***",
       assigned_projects,
+      total_spend_usd,
     )),
   )
     .into_response()
@@ -767,9 +755,14 @@ pub async fn assign_provider_to_project(
 /// Unassign provider key from project
 pub async fn unassign_provider_from_project(
   State(state): State<ProvidersState>,
-  AuthenticatedUser(_claims): AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
   Path(project_id): Path<String>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Get the current assignment to verify it exists
   let provider_key_id = match state.storage.get_project_key(&project_id).await {
     Ok(Some(id)) => id,
@@ -792,6 +785,27 @@ pub async fn unassign_provider_from_project(
         .into_response();
     }
   };
+
+  // Verify ownership — only the key owner may remove the assignment
+  let Ok(metadata) = state.storage.get_key_metadata(provider_key_id).await else {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to verify key ownership"
+      })),
+    )
+      .into_response();
+  };
+
+  if metadata.user_id != claims.sub {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": "You do not own the key assigned to this project"
+      })),
+    )
+      .into_response();
+  }
 
   // Unassign from project
   match state

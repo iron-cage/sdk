@@ -280,7 +280,7 @@ async fn test_report_usage_negative_tokens() {
   seed_agent_with_budget(&pool, 111, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
-  let ic_token = create_ic_token(&pool, 1, &state.ic_token_manager).await;
+  let ic_token = create_ic_token(&pool, 111, &state.ic_token_manager).await;
 
   // Create lease first
   let app1 = create_budget_router(state.clone()).await;
@@ -371,7 +371,7 @@ async fn test_report_usage_negative_cost() {
   seed_agent_with_budget(&pool, 112, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
-  let ic_token = create_ic_token(&pool, 1, &state.ic_token_manager).await;
+  let ic_token = create_ic_token(&pool, 112, &state.ic_token_manager).await;
 
   // Create lease first
   let app1 = create_budget_router(state.clone()).await;
@@ -510,7 +510,7 @@ async fn test_report_usage_zero_cost_cached_response() {
   seed_agent_with_budget(&pool, 113, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
-  let ic_token = create_ic_token(&pool, 1, &state.ic_token_manager).await;
+  let ic_token = create_ic_token(&pool, 113, &state.ic_token_manager).await;
 
   // Create lease first
   let app1 = create_budget_router(state.clone()).await;
@@ -1160,7 +1160,7 @@ async fn test_cost_exactly_equals_remaining_budget() {
   let lease_id = "lease_exact_boundary_test";
   state
     .lease_manager
-    .create_lease(lease_id, 120, 120, 10_000_000, None)
+    .create_lease(lease_id, 120, 120, 10_000_000, None, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 
@@ -1367,7 +1367,7 @@ async fn test_report_usage_integer_overflow_tokens() {
   let lease_id = "lease_tokens_overflow_test";
   state
     .lease_manager
-    .create_lease(lease_id, 121, 121, 10_000_000, None)
+    .create_lease(lease_id, 121, 121, 10_000_000, None, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 
@@ -1443,7 +1443,7 @@ async fn test_idempotency_duplicate_event_id() {
   let budget_granted = 10_000_000i64; // $10 USD
   state
     .lease_manager
-    .create_lease(lease_id, agent_id, agent_id, budget_granted, None)
+    .create_lease(lease_id, agent_id, agent_id, budget_granted, None, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 

@@ -115,6 +115,16 @@ async fn seed_agent_with_encrypted_key(
   .execute( pool )
   .await
   .unwrap();
+
+  // Also insert into agent_provider_keys join table
+  sqlx::query(
+    "INSERT OR IGNORE INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)"
+  )
+  .bind( agent_id )
+  .bind( provider_key_id )
+  .execute( pool )
+  .await
+  .unwrap();
 }
 
 /// Seed agent without provider key assignment
@@ -407,6 +417,16 @@ async fn test_get_provider_key_crypto_unavailable() {
   .await
   .unwrap();
 
+  // Also insert into agent_provider_keys join table
+  sqlx::query(
+    "INSERT OR IGNORE INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)"
+  )
+  .bind( 103i64 )
+  .bind( 103_000_i64 )
+  .execute( &pool )
+  .await
+  .unwrap();
+
   let app = create_provider_key_router(state.clone()).await;
 
   // Generate IC token for agent_103 and store hash for runtime validation
@@ -496,6 +516,16 @@ async fn test_get_provider_key_disabled_key() {
   .bind( "[\"openai\"]" )
   .bind( now_ms )
   .bind( "test_user" )
+  .bind( 104_000_i64 )
+  .execute( &pool )
+  .await
+  .unwrap();
+
+  // Also insert into agent_provider_keys join table
+  sqlx::query(
+    "INSERT OR IGNORE INTO agent_provider_keys (agent_id, provider_key_id) VALUES (?, ?)"
+  )
+  .bind( 104i64 )
   .bind( 104_000_i64 )
   .execute( &pool )
   .await
