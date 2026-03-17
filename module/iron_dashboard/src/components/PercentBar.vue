@@ -5,11 +5,15 @@ import { cn } from '@/lib/utils'
 const props = defineProps<{
   percentage: number
   class?: string
+  warnThreshold?: number
+  dangerThreshold?: number
 }>()
 
 const colorClass = computed(() => {
-  if (props.percentage >= 90) return 'bg-destructive'
-  if (props.percentage >= 75) return 'bg-warning'
+  const danger = props.dangerThreshold ?? 90
+  const warn = props.warnThreshold ?? 75
+  if (props.percentage >= danger) return 'bg-destructive'
+  if (props.percentage >= warn) return 'bg-warning'
   return 'bg-success'
 })
 </script>
