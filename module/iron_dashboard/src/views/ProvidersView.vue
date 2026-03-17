@@ -194,6 +194,18 @@ const typedError = error as unknown as Error | null
 
 const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
 
+const previewAlias = computed(() =>
+  detectedProvider.value
+    ? generateProviderAlias(detectedProvider.value, providerKeys.value ?? [])
+    : ''
+)
+
+function closeQuickAdd() {
+  showQuickAddModal.value = false
+  quickAddKey.value = ''
+  quickAddError.value = ''
+}
+
 function handleQuickAdd() {
   quickAddError.value = ''
   if (!quickAddKey.value.trim()) {
@@ -204,16 +216,9 @@ function handleQuickAdd() {
     quickAddError.value = 'Could not detect provider. Use "Add Provider Key" to select manually.'
     return
   }
-  const alias = generateProviderAlias(detectedProvider.value, providerKeys.value ?? [])
   createMutation.mutate(
-    { provider: detectedProvider.value, api_key: quickAddKey.value, alias },
-    {
-      onSuccess: () => {
-        showQuickAddModal.value = false
-        quickAddKey.value = ''
-        quickAddError.value = ''
-      },
-    },
+    { provider: detectedProvider.value, api_key: quickAddKey.value, alias: previewAlias.value },
+    { onSuccess: () => closeQuickAdd() },
   )
 }
 
@@ -303,10 +308,7 @@ function handleQuickAdd() {
     </DataTable>
 
     <!-- Quick Add modal -->
-    <Dialog
-      :open="showQuickAddModal"
-      @update:open="(open) => { showQuickAddModal = open; if (!open) { quickAddKey = ''; quickAddError = '' } }"
-    >
+    <Dialog v-model:open="showQuickAddModal" @update:open="(open) => { if (!open) closeQuickAdd() }">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Quick Add Provider Key</DialogTitle>
@@ -322,17 +324,21 @@ function handleQuickAdd() {
               id="quick-add-key"
               v-model="quickAddKey"
               type="password"
+              autocomplete="off"
               placeholder="sk-ant-... / sk-proj-... / AIza... / xai-..."
+              aria-describedby="quick-add-hint"
               :disabled="createMutation.isPending.value"
             />
-            <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
-              <span class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
-              Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
-              · will be saved as <span class="font-medium text-foreground">{{ generateProviderAlias(detectedProvider, providerKeys ?? []) }}</span>
-            </p>
-            <p v-else-if="quickAddKey" class="text-xs text-muted-foreground">
-              Provider not recognised — check the key or use "Add Provider Key" to select manually.
-            </p>
+            <div id="quick-add-hint" aria-live="polite" aria-atomic="true" class="min-h-[1.25rem]">
+              <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
+                <span class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+                Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
+                · will be saved as <span class="font-medium text-foreground">{{ previewAlias }}</span>
+              </p>
+              <p v-else-if="quickAddKey" class="text-xs text-muted-foreground">
+                Provider not recognised — check the key or use "Add Provider Key" to select manually.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -342,7 +348,7 @@ function handleQuickAdd() {
           <Button
             variant="outline"
             :disabled="createMutation.isPending.value"
-            @click="showQuickAddModal = false; quickAddKey = ''; quickAddError = ''"
+            @click="closeQuickAdd"
           >
             <IconX />
             Cancel
@@ -390,6 +396,7 @@ function handleQuickAdd() {
               id="apiKey"
               v-model="apiKey"
               type="password"
+              autocomplete="off"
               :placeholder="getProviderKeyPlaceholder(provider)"
               :disabled="createMutation.isPending.value"
             />

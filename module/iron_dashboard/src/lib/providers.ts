@@ -46,8 +46,15 @@ export function detectProviderFromKey(key: string): ProviderType | null {
 
 export function generateProviderAlias(
   provider: ProviderType,
-  existingKeys: Array<{ provider: string }>,
+  existingKeys: Array<{ provider: string; alias?: string }>,
 ): string {
-  const count = existingKeys.filter(k => k.provider === provider).length
-  return `${getProviderLabel(provider)} ${count + 1}`
+  const label = getProviderLabel(provider)
+  const re = new RegExp(`^${label} (\\d+)$`)
+  let max = 0
+  for (const k of existingKeys) {
+    if (k.provider !== provider) continue
+    const m = k.alias?.match(re)
+    if (m) max = Math.max(max, parseInt(m[1], 10))
+  }
+  return `${label} ${max + 1}`
 }

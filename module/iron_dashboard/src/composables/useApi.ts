@@ -1,4 +1,5 @@
 import { useAuthStore } from '../stores/auth'
+import type { ProviderType } from '@/lib/providers'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -81,8 +82,6 @@ interface UpdateLimitRequest {
 }
 
 // AI Provider Key types
-type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
-
 interface ProviderKey {
   id: number
   provider: ProviderType
