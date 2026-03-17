@@ -185,7 +185,7 @@ async fn test_create_agent_as_admin_success() {
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai", "anthropic"],
-    "provider_key_id": 1,
+    "provider_key_ids": [1],
     "initial_budget_microdollars": 1_000_000
   });
 
@@ -225,7 +225,7 @@ async fn test_create_agent_as_user_forbidden() {
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
-    "provider_key_id": 1,
+    "provider_key_ids": [1],
     "initial_budget_microdollars": 1_000_000
   });
 
@@ -256,7 +256,7 @@ async fn test_create_agent_without_auth_unauthorized() {
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
-    "provider_key_id": 1,
+    "provider_key_ids": [1],
     "initial_budget_microdollars": 1_000_000
   });
 
@@ -866,7 +866,7 @@ async fn test_admin_can_assign_agent_to_other_user() {
   let request_body = json!({
     "name": "Test Agent",
     "providers": ["openai"],
-    "provider_key_id": 1,
+    "provider_key_ids": [1],
     "initial_budget_microdollars": 1_000_000,
     "owner_id": user_id  // Admin assigns agent to user
   });

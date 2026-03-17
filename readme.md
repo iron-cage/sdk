@@ -73,7 +73,7 @@ This diagram shows Iron Cage's three-boundary architecture at the highest level,
 ## Workspace Organization
 
 <details>
-<summary>Module Responsibilities & Boundaries (click to expand - 19 modules across 7 layers)</summary>
+<summary>Module Responsibilities & Boundaries (click to expand - 21 modules across 7 layers)</summary>
 
 | Entity | Responsibility | Input→Output | Scope | Out of Scope |
 |--------|----------------|--------------|-------|--------------|
@@ -91,6 +91,8 @@ This diagram shows Iron Cage's three-boundary architecture at the highest level,
 | iron_runtime | Agent runtime and LLM routing | Agent requests → Provider API calls | Request translation, response parsing | Actual LLM provider SDKs |
 | iron_cli | Command-line interface | User commands → API operations | CLI parsing, formatting, output | API implementation, business logic |
 | iron_control_schema | Database schema definitions | Schema changes → SQL migrations | Table definitions, migrations, indexes | Query logic, application code |
+| providers_api_tests | Integration tests for providers HTTP API | Test scenarios → pass/fail assertions | RBAC enforcement, input validation, happy paths, ownership isolation | Unit tests, load testing |
+| providers_multi_key_tests | Integration tests for multi-key provider support | Test scenarios → pass/fail assertions | Multi-key creation, cross-tenant isolation, quota limits, handshake key routing, TOCTOU re-checks | Unit tests, load testing |
 
 ### Layer Organization
 
@@ -102,6 +104,7 @@ Specialized:    iron_control_schema
 Integration:    iron_control_api, iron_runtime
 Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
 Frontend:       iron_dashboard
+Tests:          providers_api_tests, providers_multi_key_tests
 ```
 
 </details>

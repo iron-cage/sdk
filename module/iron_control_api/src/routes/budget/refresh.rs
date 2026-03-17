@@ -277,26 +277,12 @@ pub async fn refresh_budget(
   // endpoint does this correctly (handshake.rs:256-258), refresh endpoint must match.
 
   // Atomically check and reserve budget for new lease
-  let budget_granted = match state
+  let reservation = match state
     .agent_budget_manager
-    .check_and_reserve_budget(lease.agent_id, requested_budget)
+    .reserve_budget_with_limits(lease.agent_id, lease.provider_key_id, requested_budget)
     .await
   {
-    Ok(granted) if granted > 0 => granted,
-    Ok(_) => {
-      // Insufficient budget - deny request
-      return (
-        StatusCode::OK,
-        Json(BudgetRefreshResponse {
-          status: "denied".to_string(),
-          budget_granted: None,
-          budget_remaining: agent_budget.budget_remaining,
-          lease_id: None,
-          reason: Some("insufficient_budget".to_string()),
-        }),
-      )
-        .into_response();
-    }
+    Ok(r) => r,
     Err(err) => {
       tracing::error!("Database error checking and reserving budget: {}", err);
       return (
@@ -305,6 +291,27 @@ pub async fn refresh_budget(
       )
         .into_response();
     }
+  };
+
+  let budget_granted = if reservation.blocked_by.is_none() && reservation.granted > 0 {
+    reservation.granted
+  } else {
+    let reason = match reservation.blocked_by {
+      Some(iron_token_manager::BlockedBy::AgentSpendingCap) => "agent_spending_cap_exceeded",
+      Some(iron_token_manager::BlockedBy::ProviderKeyCap) => "provider_key_cap_exceeded",
+      Some(iron_token_manager::BlockedBy::InsufficientBudget) | None => "insufficient_budget",
+    };
+    return (
+      StatusCode::OK,
+      Json(BudgetRefreshResponse {
+        status: "denied".to_string(),
+        budget_granted: None,
+        budget_remaining: agent_budget.budget_remaining,
+        lease_id: None,
+        reason: Some(reason.to_string()),
+      }),
+    )
+      .into_response();
   };
 
   // Create new lease with granted budget
@@ -318,6 +325,7 @@ pub async fn refresh_budget(
       lease.budget_id,
       budget_granted,
       None,
+      lease.provider_key_id,
     )
     .await
   {

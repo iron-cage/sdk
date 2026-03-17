@@ -31,9 +31,9 @@ pub use shared::{
   AnalyticsState, AvgCostResponse, BudgetStatus, BudgetStatusQuery, BudgetStatusResponse,
   BudgetSummary, EventResponse, EventsListQuery, EventsListResponse, Filters, ModelUsage,
   ModelUsageResponse, ModelUsageSummary, Pagination, PaginationQuery, Period, ProviderSpending,
-  ProviderSpendingSummary, RequestUsageResponse, SpendingByAgentResponse,
-  SpendingByProviderResponse, SpendingSummary, SpendingTotalResponse, TokenUsageResponse,
-  TokenUsageSummary,
+  ProviderSpendingSummary, RequestUsageComparison, RequestUsageResponse, SpendingByAgentResponse,
+  SpendingByProviderResponse, SpendingSummary, SpendingTotalComparison, SpendingTotalResponse,
+  TokenUsageResponse, TokenUsageSummary,
 };
 
 pub use budget::get_budget_status;

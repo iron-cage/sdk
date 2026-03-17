@@ -133,7 +133,19 @@ fn test_infer_provider_anthropic_case_insensitive() {
 fn test_infer_provider_unknown() {
   assert_eq!(infer_provider("llama-2-70b"), Provider::Unknown);
   assert_eq!(infer_provider("mistral-7b"), Provider::Unknown);
-  assert_eq!(infer_provider("gemini-pro"), Provider::Unknown);
   assert_eq!(infer_provider("custom-model"), Provider::Unknown);
   assert_eq!(infer_provider(""), Provider::Unknown);
+}
+
+#[test]
+fn test_infer_provider_gemini() {
+  assert_eq!(infer_provider("gemini-pro"), Provider::Gemini);
+  assert_eq!(infer_provider("gemini-1.5-pro"), Provider::Gemini);
+  assert_eq!(infer_provider("gemini-2.0-flash"), Provider::Gemini);
+}
+
+#[test]
+fn test_infer_provider_xai() {
+  assert_eq!(infer_provider("grok-2"), Provider::XAI);
+  assert_eq!(infer_provider("grok-beta"), Provider::XAI);
 }

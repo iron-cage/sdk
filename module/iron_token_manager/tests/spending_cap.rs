@@ -10,7 +10,7 @@ use iron_token_manager::ProviderType;
 async fn no_cap_reserve_succeeds() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -22,7 +22,7 @@ async fn no_cap_reserve_succeeds() {
 async fn set_cap_and_reserve_within_limit() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -38,7 +38,7 @@ async fn set_cap_and_reserve_within_limit() {
 async fn increment_then_reserve_still_within() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -57,7 +57,7 @@ async fn increment_then_reserve_still_within() {
 async fn reserve_to_exact_cap_succeeds() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -77,7 +77,7 @@ async fn reserve_to_exact_cap_succeeds() {
 async fn increment_beyond_cap_fails() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -92,7 +92,7 @@ async fn increment_beyond_cap_fails() {
 async fn increment_without_cap_succeeds() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -107,7 +107,7 @@ async fn increment_without_cap_succeeds() {
 async fn get_spending_summary_initial() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -120,7 +120,7 @@ async fn get_spending_summary_initial() {
 async fn get_spending_summary_after_usage() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -139,7 +139,7 @@ async fn get_spending_summary_after_usage() {
 async fn multiple_increments_accumulate() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -167,7 +167,7 @@ async fn multiple_increments_accumulate() {
 async fn remove_cap_allows_unlimited() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -203,7 +203,7 @@ async fn reserve_nonexistent_key_fails() {
 async fn adjust_spending_releases_excess() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 
@@ -229,7 +229,7 @@ async fn adjust_spending_releases_excess() {
 async fn adjust_spending_no_change() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let key_id = storage
-    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001", None)
     .await
     .unwrap();
 

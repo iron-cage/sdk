@@ -18,6 +18,8 @@
 pub enum TokenError {
   /// Generic token management error
   Generic,
+  /// The requested resource was not found (row does not exist)
+  NotFound,
   /// Database error preserving sqlx details for FK constraint detection
   Database(sqlx::Error),
   /// Validation error with specific field and reason
@@ -33,6 +35,7 @@ impl core::fmt::Display for TokenError {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match self {
       Self::Generic => write!(f, "Token management error"),
+      Self::NotFound => write!(f, "Resource not found"),
       Self::Database(e) => write!(f, "Database error: {e}"),
       Self::Validation { field, reason } => write!(f, "Validation error: {field} - {reason}"),
     }

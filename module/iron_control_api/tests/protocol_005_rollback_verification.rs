@@ -225,7 +225,7 @@ async fn test_protocol_005_budget_flow_works() {
   let budget_id = agent_id; // budget_id = agent_id (1:1 relationship)
 
   lease_manager
-    .create_lease(&lease_id, agent_id, budget_id, 10_000_000, None)
+    .create_lease(&lease_id, agent_id, budget_id, 10_000_000, None, None)
     .await
     .unwrap();
 

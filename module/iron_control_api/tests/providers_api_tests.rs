@@ -1,0 +1,637 @@
+//! Integration tests for providers API: RBAC, validation, happy paths, ownership.
+//!
+//! Covers:
+//! - RBAC: developer role blocked from mutating endpoints (403)
+//! - Input validation: create rejects empty/too-long/invalid api_key and provider
+//! - Happy paths: update, delete, assign/unassign all return correct status codes
+//! - Ownership: another user's key returns 404 (GET/PUT/DELETE) or 403 (unassign)
+
+#![allow(missing_docs)]
+
+mod common;
+
+use std::sync::Arc;
+
+use axum::{
+  body::Body,
+  http::{Method, Request, StatusCode},
+  routing::{delete, get, post, put},
+  Router,
+};
+use common::budget::setup_test_db;
+use iron_control_api::{
+  jwt_auth::JwtSecret,
+  routes::{
+    auth::AuthState,
+    providers::{
+      assign_provider_to_project, create_provider_key, delete_provider_key, get_provider_key,
+      list_provider_keys, unassign_provider_from_project, update_provider_key, ProvidersState,
+    },
+  },
+};
+use iron_secrets::crypto::CryptoService;
+use iron_token_manager::provider_key_storage::{ProviderKeyStorage, ProviderType};
+use serde_json::json;
+use tower::ServiceExt;
+
+// ─────────────────────────────────────────────────────────────────
+// Constants & shared state builders
+// ─────────────────────────────────────────────────────────────────
+
+const TEST_JWT_SECRET: &str = "test_jwt_secret_for_providers_12345";
+const MASTER_KEY: [u8; 32] = [42u8; 32];
+
+#[derive(Clone)]
+struct TestProvidersAppState {
+  providers: ProvidersState,
+  auth: AuthState,
+}
+
+impl axum::extract::FromRef<TestProvidersAppState> for ProvidersState {
+  fn from_ref(s: &TestProvidersAppState) -> Self {
+    s.providers.clone()
+  }
+}
+
+impl axum::extract::FromRef<TestProvidersAppState> for AuthState {
+  fn from_ref(s: &TestProvidersAppState) -> Self {
+    s.auth.clone()
+  }
+}
+
+async fn make_providers_state(pool: &sqlx::SqlitePool) -> TestProvidersAppState {
+  let storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
+  let crypto = Arc::new(CryptoService::new(&MASTER_KEY).unwrap());
+  let providers = ProvidersState { storage, crypto: Some(crypto) };
+  let auth = AuthState::new(TEST_JWT_SECRET.to_string(), "sqlite::memory:", false)
+    .await
+    .expect("LOUD FAILURE: Failed to create test AuthState");
+  TestProvidersAppState { providers, auth }
+}
+
+async fn make_providers_state_no_crypto(pool: &sqlx::SqlitePool) -> TestProvidersAppState {
+  let storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
+  let providers = ProvidersState { storage, crypto: None };
+  let auth = AuthState::new(TEST_JWT_SECRET.to_string(), "sqlite::memory:", false)
+    .await
+    .expect("LOUD FAILURE: Failed to create test AuthState");
+  TestProvidersAppState { providers, auth }
+}
+
+/// Build a router with all 7 provider handler routes
+fn build_full_router(state: TestProvidersAppState) -> Router {
+  Router::new()
+    .route("/api/v1/providers", post(create_provider_key))
+    .route("/api/v1/providers", get(list_provider_keys))
+    .route("/api/v1/providers/{id}", get(get_provider_key))
+    .route("/api/v1/providers/{id}", put(update_provider_key))
+    .route("/api/v1/providers/{id}", delete(delete_provider_key))
+    .route("/api/v1/projects/{id}/provider", post(assign_provider_to_project))
+    .route("/api/v1/projects/{id}/provider", delete(unassign_provider_from_project))
+    .with_state(state)
+}
+
+/// Admin bearer token (has ManageProviderKeys)
+fn bearer(user_id: &str) -> String {
+  let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());
+  let token = jwt
+    .generate_access_token(user_id, &format!("{user_id}@example.com"), "admin", "tok_001")
+    .expect("LOUD FAILURE: Failed to generate test JWT");
+  format!("Bearer {token}")
+}
+
+/// Developer bearer token (lacks ManageProviderKeys)
+fn bearer_developer(user_id: &str) -> String {
+  let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());
+  let token = jwt
+    .generate_access_token(user_id, &format!("{user_id}@example.com"), "developer", "tok_002")
+    .expect("LOUD FAILURE: Failed to generate developer JWT");
+  format!("Bearer {token}")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// RBAC tests — developer role blocked from mutating endpoints
+// ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn update_provider_key_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::from(r#"{"description":"new"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to update provider keys"
+  );
+}
+
+#[tokio::test]
+async fn delete_provider_key_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::DELETE)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to delete provider keys"
+  );
+}
+
+#[tokio::test]
+async fn assign_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  let body = json!({ "provider_key_id": key_id });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/projects/proj_rbac/provider")
+        .header("content-type", "application/json")
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to assign provider keys"
+  );
+}
+
+#[tokio::test]
+async fn unassign_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::DELETE)
+        .uri("/api/v1/projects/proj_rbac/provider")
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to unassign provider keys"
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Validation tests — create_provider_key
+// ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn create_rejects_empty_api_key() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(
+          serde_json::to_string(&json!({ "provider": "openai", "api_key": "" })).unwrap(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "Empty api_key must be rejected");
+}
+
+#[tokio::test]
+async fn create_rejects_api_key_too_long() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let body = json!({ "provider": "openai", "api_key": "x".repeat(501) });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "501-char api_key must be rejected");
+}
+
+#[tokio::test]
+async fn create_rejects_null_byte_in_api_key() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let body = json!({ "provider": "openai", "api_key": "sk-\0abc" });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::BAD_REQUEST,
+    "NULL byte in api_key must be rejected"
+  );
+}
+
+#[tokio::test]
+async fn create_rejects_invalid_provider() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let body = json!({ "provider": "mistral", "api_key": "sk-valid-key-0000000000000000" });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "Unknown provider must be rejected");
+}
+
+#[tokio::test]
+async fn create_rejects_description_too_long() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let body = json!({
+    "provider": "openai",
+    "api_key": "sk-valid-key-0000000000000000",
+    "description": "x".repeat(501),
+  });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "501-char description must be rejected");
+}
+
+#[tokio::test]
+async fn create_disabled_without_master_key() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state_no_crypto(&pool).await;
+
+  let body = json!({ "provider": "openai", "api_key": "sk-valid-key-0000000000000000" });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::SERVICE_UNAVAILABLE,
+    "Missing crypto must return 503"
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Happy paths — update, delete, assign/unassign
+// ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn update_provider_key_success() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Before"), "owner_upd", None)
+    .await
+    .unwrap();
+
+  let body = json!({ "description": "After", "is_enabled": false });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer("owner_upd"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(resp.status(), StatusCode::OK, "Valid PUT must return 200");
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+  assert_eq!(json["description"].as_str().unwrap(), "After");
+  assert!(!json["is_enabled"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn delete_provider_key_success() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "owner_del", None)
+    .await
+    .unwrap();
+
+  let delete_resp = build_full_router(state.clone())
+    .oneshot(
+      Request::builder()
+        .method(Method::DELETE)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("authorization", bearer("owner_del"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(delete_resp.status(), StatusCode::NO_CONTENT, "DELETE must return 204");
+
+  // Subsequent GET must return 404
+  let get_resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::GET)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("authorization", bearer("owner_del"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    get_resp.status(),
+    StatusCode::NOT_FOUND,
+    "Deleted key must return 404 on subsequent GET"
+  );
+}
+
+#[tokio::test]
+async fn assign_and_unassign_project_provider() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "owner_assign", None)
+    .await
+    .unwrap();
+
+  // Assign
+  let assign_body = json!({ "provider_key_id": key_id });
+  let assign_resp = build_full_router(state.clone())
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/projects/proj_happy/provider")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("owner_assign"))
+        .body(Body::from(serde_json::to_string(&assign_body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(assign_resp.status(), StatusCode::OK, "Assign must return 200");
+
+  // Unassign
+  let unassign_resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::DELETE)
+        .uri("/api/v1/projects/proj_happy/provider")
+        .header("authorization", bearer("owner_assign"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(unassign_resp.status(), StatusCode::NO_CONTENT, "Unassign must return 204");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Ownership enforcement — wrong owner gets 404 / 403
+// ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn get_provider_key_returns_404_for_wrong_owner() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::GET)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("authorization", bearer("user_b"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::NOT_FOUND,
+    "Wrong owner must receive 404 on GET"
+  );
+}
+
+#[tokio::test]
+async fn update_provider_key_returns_404_for_wrong_owner() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_b"))
+        .body(Body::from(r#"{"description":"sneaky"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::NOT_FOUND,
+    "Wrong owner must receive 404 on PUT"
+  );
+}
+
+#[tokio::test]
+async fn delete_provider_key_returns_404_for_wrong_owner() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::DELETE)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("authorization", bearer("user_b"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::NOT_FOUND,
+    "Wrong owner must receive 404 on DELETE"
+  );
+}
+
+#[tokio::test]
+async fn unassign_returns_403_for_wrong_owner() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a", None)
+    .await
+    .unwrap();
+
+  // user_a assigns key to project
+  state
+    .providers
+    .storage
+    .assign_to_project(key_id, "proj_ownership")
+    .await
+    .unwrap();
+
+  // user_b tries to unassign — owns neither the key nor the assignment
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::DELETE)
+        .uri("/api/v1/projects/proj_ownership/provider")
+        .header("authorization", bearer("user_b"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Non-owner trying to unassign must receive 403"
+  );
+}

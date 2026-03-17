@@ -13,7 +13,7 @@ This protocol defines the HTTP API for analytics event ingestion and query endpo
 - Event deduplication using per-agent event_id (UNIQUE(agent_id, event_id)) preventing duplicate analytics
 - Async event processing (202 Accepted) with non-blocking ingestion for minimal latency impact
 - Cost tracking in microdollars (1 USD = 1,000,000 microdollars) for precision
-- Pagination (offset-based, default 50 items/page, max 100) and filtering (agent_id, provider_id)
+- Pagination (offset-based, default 50 items/page, max 100) and filtering (agent_id, provider_id, provider_key_id)
 
 #### Out of Scope
 
@@ -30,7 +30,7 @@ This protocol defines the HTTP API for analytics event ingestion and query endpo
 
 **User Need**: Developers need real-time visibility into agent LLM spending, token usage, and budget status to optimize costs and prevent budget exhaustion. Admins need aggregated analytics across all agents to understand provider cost breakdown, identify high-spend agents, and forecast capacity needs. Both need historical trend analysis (today, yesterday, last-7-days, last-30-days, all-time) and risk alerts when agents approach budget limits.
 
-**Solution**: This API provides event-based analytics with dual functionality: async event ingestion (POST /api/v1/analytics/events) for LlmRouter to report completed/failed LLM requests without blocking request latency, and 8 query endpoints delivering answers to critical questions about spending, usage, and budget status. Events use per-agent deduplication (UNIQUE(agent_id, event_id)) enabling idempotent retries while cost tracking uses microdollars (1 USD = 1,000,000) for precision. Period-based queries (today through all-time) with pagination and filtering (agent_id, provider_id) enable both real-time monitoring and historical analysis. Authorization separates user data (own agents only) from admin data (all agents) while rate limiting (20 req/min queries, 1000 events/min) protects database performance.
+**Solution**: This API provides event-based analytics with dual functionality: async event ingestion (POST /api/v1/analytics/events) for LlmRouter to report completed/failed LLM requests without blocking request latency, and 8 query endpoints delivering answers to critical questions about spending, usage, and budget status. Events use per-agent deduplication (UNIQUE(agent_id, event_id)) enabling idempotent retries while cost tracking uses microdollars (1 USD = 1,000,000) for precision. Period-based queries (today through all-time) with pagination and filtering (agent_id, provider_id, provider_key_id) enable both real-time monitoring and historical analysis. Authorization separates user data (own agents only) from admin data (all agents) while rate limiting (20 req/min queries, 1000 events/min) protects database performance.
 
 **Key Insight**: Analytics requires event ingestion decoupled from query performance. By accepting events asynchronously (202 Accepted) and processing them in background, we eliminate analytics overhead from critical LLM request path. Per-agent event_id deduplication (not global) enables safe retries without duplicate charges while maintaining event namespace separation. The 8 query endpoints directly answer the questions developers ask ("How much have I spent?", "Which agents are near budget limits?", "What's the most expensive model?") rather than exposing raw events, optimizing for human decision-making over system flexibility.
 
@@ -76,7 +76,7 @@ This protocol adheres to the following Iron Cage standards:
 
 **API Design Standards** ([api_design_standards.md](../standards/api_design_standards.md))
 - Pagination: Offset-based with `?page=N&per_page=M` (default 50 items/page)
-- Filtering: Query parameters for `agent_id`, `provider_id`, `period`
+- Filtering: Query parameters for `agent_id`, `provider_id`, `provider_key_id`, `period`
 - URL structure: `/api/v1/analytics/*`
 
 
@@ -351,6 +351,7 @@ Authorization: Bearer <user-token or api-token>
 | `period` | string | `all-time` | Time range |
 | `agent_id` | string | - | Filter by specific agent (returns single result) |
 | `provider_id` | string | - | Filter by specific provider |
+| `provider_key_id` | integer | - | Filter by specific provider key |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
 
@@ -541,6 +542,8 @@ Authorization: Bearer <user-token or api-token>
 | `period` | string | `all-time` | Time range |
 | `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider (returns single result) |
+| `provider_key_id` | integer | - | Filter by specific provider key |
+| `group_by` | string | - | Group by dimension. Use `key` to group by provider key instead of provider |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
 
@@ -596,7 +599,34 @@ Content-Type: application/json
 | `data[].request_count` | integer | Number of requests |
 | `data[].avg_cost_per_request` | number | Average cost per request (USD, 4 decimal places) |
 | `data[].agent_count` | integer | Number of agents using provider |
+| `data[].provider_key_id` | integer | Provider key ID (only when `group_by=key`) |
+| `data[].alias` | string | Provider key alias (only when `group_by=key`) |
 | `summary` | object | Aggregate statistics |
+
+**`group_by=key` Response:**
+
+When `group_by=key` is specified, results are grouped by individual provider key instead of provider type. Each entry includes `provider_key_id` and `alias` fields:
+
+```json
+{
+  "data": [
+    {
+      "provider_name": "openai",
+      "spending": 500.00,
+      "request_count": 8000,
+      "provider_key_id": 1,
+      "alias": "Production Key"
+    },
+    {
+      "provider_name": "openai",
+      "spending": 289.45,
+      "request_count": 4456,
+      "provider_key_id": 3,
+      "alias": "Team A Key"
+    }
+  ]
+}
+```
 
 **Authorization:**
 - **User:** See own usage only
@@ -684,6 +714,7 @@ Authorization: Bearer <user-token or api-token>
 | `period` | string | `all-time` | Time range |
 | `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
+| `provider_key_id` | integer | - | Filter by specific provider key |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
 
@@ -770,6 +801,7 @@ Authorization: Bearer <user-token or api-token>
 | `period` | string | `all-time` | Time range |
 | `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
+| `provider_key_id` | integer | - | Filter by specific provider key |
 | `page` | integer | 1 | Page number |
 | `per_page` | integer | 50 | Results per page (max 100) |
 
@@ -864,6 +896,7 @@ Authorization: Bearer <user-token or api-token>
 | `period` | string | `all-time` | Time range |
 | `agent_id` | string | - | Filter by specific agent |
 | `provider_id` | string | - | Filter by specific provider |
+| `provider_key_id` | integer | - | Filter by specific provider key |
 
 **Success Response:**
 
@@ -946,6 +979,7 @@ All list endpoints support pagination:
 |-----------|------|-------------|
 | `agent_id` | string | Filter by specific agent |
 | `provider_id` | string | Filter by specific provider |
+| `provider_key_id` | integer | Filter by specific provider key |
 
 **Note:** Filters are optional. Omitting filters returns data for all accessible agents/providers (based on user authorization).
 
