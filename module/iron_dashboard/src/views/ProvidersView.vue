@@ -219,7 +219,7 @@ const typedError = error as unknown as Error | null
     >
       <template #empty>
         <p class="text-muted-foreground mb-2">No AI provider keys configured</p>
-        <p class="text-base text-muted-foreground mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
+        <p class="text-base text-muted-foreground mb-4">Add API keys for OpenAI, Anthropic, Gemini, or xAI to get started.</p>
         <Button @click="showCreateModal = true"><IconPlus />Add First Provider Key</Button>
       </template>
 
@@ -276,7 +276,7 @@ const typedError = error as unknown as Error | null
         <DialogHeader>
           <DialogTitle>Add Provider Key</DialogTitle>
           <DialogDescription>
-            Add an API key for OpenAI or Anthropic. The key will be encrypted and stored securely.
+            Add an API key for OpenAI, Anthropic, Gemini, or xAI. The key will be encrypted and stored securely.
           </DialogDescription>
         </DialogHeader>
 

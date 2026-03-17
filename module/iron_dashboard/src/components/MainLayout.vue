@@ -40,9 +40,9 @@ function navLinkClass(path: string): string {
   let base = 'flex items-center px-3 py-1.5 text-base rounded-[8px]'
   
   if (isActive(path)) {
-    return `${base} bg-border/80 text-trettiary font-medium`
+    return `${base} bg-border/80 text-tertiary font-medium`
   }
-  return `${base} text-trettiary hover:bg-border/50`
+  return `${base} text-tertiary hover:bg-border/50`
 }
 
 function handleNavClick() {
@@ -178,7 +178,7 @@ async function handleLogout() {
           class="absolute bottom-full left-2 right-2 mb-1 bg-background border border-border rounded-[8px] shadow-md overflow-hidden"
         >
           <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-base text-trettiary hover:bg-border/50 text-left"
+            class="flex items-center gap-2 w-full px-3 py-2 text-base text-tertiary hover:bg-border/50 text-left"
             @click="handleLogout"
           >
             <IconLogOut class="w-4 h-4 flex-shrink-0" />
@@ -195,7 +195,7 @@ async function handleLogout() {
           <!-- Avatar -->
           <AvatarInitial :name="authStore.username || 'u'" />
           <!-- Name -->
-          <span class="text-base text-trettiary truncate flex-1">{{ authStore.username }}</span>
+          <span class="text-base text-tertiary truncate flex-1">{{ authStore.username }}</span>
           <!-- Chevron -->
           <IconChevronDown class="w-3 h-3 text-muted-foreground transition-transform duration-150 flex-shrink-0" :class="userMenuOpen ? 'rotate-180' : ''" />
         </button>
