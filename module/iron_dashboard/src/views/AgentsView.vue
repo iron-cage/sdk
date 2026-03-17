@@ -131,8 +131,9 @@ function removeProviderKey(keyId: number) {
 
 function ownerEmail(ownerId: string | null | undefined): string {
   if (!ownerId) return 'Unknown'
-  const user = users.value?.users.find(u => u.id === ownerId)
-  return user?.email || ownerId
+  if (!users.value) return '…'
+  const user = ownerMap.value.get(ownerId)
+  return user?.email || user?.username || 'Unknown'
 }
 
 function providerKeyLabel(keyId: number): string {
@@ -147,6 +148,11 @@ const { data: users } = useQuery({
   queryFn: () => api.getUsers({ is_active: true }),
   enabled: authStore.isAdmin,
 })
+
+// O(1) lookup map — avoids O(n×m) Array.find on every render cycle
+const ownerMap = computed(() =>
+  new Map(users.value?.users.map(u => [u.id, u]) ?? [])
+)
 
 // Create agent mutation
 const createMutation = useMutation({
@@ -392,11 +398,11 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.name">
-          {{ agent.name }}
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
+          <div class="max-w-[300px] truncate" :title="agent.name">{{ agent.name }}</div>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
-          {{ ownerEmail(agent.owner_id) }}
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
+          <div class="max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">{{ ownerEmail(agent.owner_id) }}</div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
           <div class="flex gap-1 items-center flex-wrap max-w-[200px]">
@@ -414,11 +420,11 @@ async function copyTokenToClipboard() {
                   +{{ agent.provider_key_ids.length - 3 }}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" class="flex flex-wrap gap-1 max-w-[220px]">
+              <PopoverContent align="start" class="flex flex-wrap gap-1">
                 <span
                   v-for="keyId in agent.provider_key_ids.slice(3)"
                   :key="keyId"
-                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border max-w-[200px] truncate"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
                   :title="providerKeyLabel(keyId)"
                 >
                   {{ providerKeyLabel(keyId) }}
@@ -466,7 +472,7 @@ async function copyTokenToClipboard() {
                   <IconRefresh />
                   {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
                 </DropdownMenuItem>
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   :disabled="tokenActionLoadingId === agent.id"
                   class="text-destructive"
                   @click="handleRevokeIcToken(agent)"

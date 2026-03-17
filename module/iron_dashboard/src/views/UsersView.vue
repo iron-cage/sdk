@@ -303,7 +303,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
             <AvatarInitial :name="user.username || 'u'" />
           <div class="flex flex-col min-w-0">
             <span class="text-base font-medium text-foreground max-w-[280px] truncate" :title="user.username">{{ user.username }}</span>
-            <span class="text-muted-foreground text-xs max-w-[280px] truncate" :title="user.email">{{ user.email }}</span>
+            <span class="text-muted-foreground text-xs max-w-[280px] truncate" :title="user.email || ''">{{ user.email }}</span>
           </div>
           </div>
         </td>

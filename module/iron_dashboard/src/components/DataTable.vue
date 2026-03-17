@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, useId } from 'vue'
 import { Button } from '@/components/ui/button'
 
 defineProps<{
@@ -15,9 +15,15 @@ const wrapperRef = ref<HTMLElement | null>(null)
 const scrollRatio = ref(1)
 const thumbPos = ref(0)
 
-const showScrollbar = computed(() => scrollRatio.value < 0.9999)
-const thumbWidthPct = computed(() => scrollRatio.value * 100)
-const thumbLeftPct = computed(() => thumbPos.value * (100 - thumbWidthPct.value))
+// Unique ID for the scroll wrapper so the ARIA scrollbar can reference it
+const wrapperId = useId()
+
+// Clamp scrollRatio to [0,1] to prevent thumb geometry breaking at certain
+// zoom levels or before layout settles (clientWidth can briefly exceed scrollWidth)
+const clampedRatio  = computed(() => Math.min(1, Math.max(0, scrollRatio.value)))
+const showScrollbar = computed(() => clampedRatio.value < 0.9999)
+const thumbWidthPct = computed(() => clampedRatio.value * 100)
+const thumbLeftPct  = computed(() => thumbPos.value * (100 - thumbWidthPct.value))
 
 function updateScroll() {
   const el = wrapperRef.value
@@ -27,7 +33,8 @@ function updateScroll() {
   thumbPos.value = maxScroll > 0 ? el.scrollLeft / maxScroll : 0
 }
 
-// Drag
+// Drag — listeners attached to document so fast pointer movement on Firefox/Safari
+// does not outrun the element-bound handler before pointer capture takes effect
 let isDragging = false
 let dragStartX = 0
 let dragStartThumbPos = 0
@@ -38,12 +45,14 @@ function onThumbPointerDown(e: PointerEvent) {
   dragStartX = e.clientX
   dragStartThumbPos = thumbPos.value
   ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  document.addEventListener('pointermove', onThumbPointerMove)
+  document.addEventListener('pointerup', onThumbPointerUp)
 }
 
 function onThumbPointerMove(e: PointerEvent) {
   if (!isDragging || !wrapperRef.value) return
   const el = wrapperRef.value
-  const availableTrack = el.clientWidth * (1 - scrollRatio.value)
+  const availableTrack = el.clientWidth * (1 - clampedRatio.value)
   if (availableTrack === 0) return
   const newPos = Math.max(0, Math.min(1, dragStartThumbPos + (e.clientX - dragStartX) / availableTrack))
   thumbPos.value = newPos
@@ -52,6 +61,8 @@ function onThumbPointerMove(e: PointerEvent) {
 
 function onThumbPointerUp() {
   isDragging = false
+  document.removeEventListener('pointermove', onThumbPointerMove)
+  document.removeEventListener('pointerup', onThumbPointerUp)
 }
 
 function onTrackClick(e: MouseEvent) {
@@ -60,10 +71,17 @@ function onTrackClick(e: MouseEvent) {
   if (!wrapperRef.value) return
   const el = wrapperRef.value
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const thumbW = rect.width * scrollRatio.value
+  const thumbW = rect.width * clampedRatio.value
   const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / (rect.width - thumbW)))
   thumbPos.value = newPos
   el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
+}
+
+function scrollByKey(dir: -1 | 1) {
+  const el = wrapperRef.value
+  if (!el) return
+  el.scrollLeft += dir * 40
+  updateScroll()
 }
 
 let ro: ResizeObserver | null = null
@@ -81,6 +99,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   wrapperRef.value?.removeEventListener('scroll', updateScroll)
+  document.removeEventListener('pointermove', onThumbPointerMove)
+  document.removeEventListener('pointerup', onThumbPointerUp)
   ro?.disconnect()
 })
 </script>
@@ -109,10 +129,11 @@ onUnmounted(() => {
 
     <!-- Table -->
     <template v-else>
-      <div class="relative">
+      <div class="relative" :class="{ 'pb-1': showScrollbar }">
         <!-- Scroll wrapper: overflow-x-auto with native scrollbar hidden -->
         <div
           ref="wrapperRef"
+          :id="wrapperId"
           class="overflow-x-auto touch-pan-x [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
         >
           <table class="min-w-[700px] w-full divide-y divide-border">
@@ -139,16 +160,23 @@ onUnmounted(() => {
         <!-- Custom scrollbar, positioned at the bottom of the table -->
         <div
           v-if="showScrollbar"
-          class="absolute bottom-0 left-0 right-0 h-1 cursor-pointer"
+          role="scrollbar"
+          aria-orientation="horizontal"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="Math.round(thumbPos * 100)"
+          :aria-controls="wrapperId"
+          tabindex="0"
+          class="absolute bottom-0 left-0 right-0 h-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           @click="onTrackClick"
+          @keydown.left.prevent="scrollByKey(-1)"
+          @keydown.right.prevent="scrollByKey(1)"
         >
           <div
             data-scrollbar-thumb
             class="absolute h-full rounded-full bg-border hover:bg-foreground/30 cursor-grab active:cursor-grabbing transition-colors"
             :style="{ width: thumbWidthPct + '%', left: thumbLeftPct + '%' }"
             @pointerdown="onThumbPointerDown"
-            @pointermove="onThumbPointerMove"
-            @pointerup="onThumbPointerUp"
             @pointercancel="onThumbPointerUp"
           />
         </div>

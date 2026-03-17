@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
+  // Pass :horizontal="false" to suppress the horizontal scrollbar. Defaults to true.
   horizontal?: boolean
 }>()
 </script>

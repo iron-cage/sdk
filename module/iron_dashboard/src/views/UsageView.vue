@@ -197,7 +197,7 @@ function loadMoreLogs() {
 
 const selectedLog = ref<AnalyticsEvent | null>(null)
 const showLogModal = ref(false)
-
+const mobileFiltersOpen = ref(false)
 
 function openLogModal(event: AnalyticsEvent) {
   selectedLog.value = event
@@ -209,7 +209,7 @@ function openLogModal(event: AnalyticsEvent) {
   <PageLayout title="Analytics" content-class="p-4 lg:p-6">
     <template #actions>
       <!-- Mobile: filters dropdown -->
-      <Popover>
+      <Popover v-model:open="mobileFiltersOpen">
         <PopoverTrigger as-child>
           <Button variant="outline" size="sm" class="sm:hidden">
             Filters
@@ -217,23 +217,23 @@ function openLogModal(event: AnalyticsEvent) {
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" class="flex flex-col gap-2 w-52">
-          <Select v-model="selectedAgentId">
+          <Select v-model="selectedAgentId" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
-            <SelectContent>
+            <SelectContent class="w-full">
               <SelectItem value="all">All Agents</SelectItem>
               <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">{{ agent.name }}</SelectItem>
             </SelectContent>
           </Select>
-          <Select v-model="selectedProviderId">
+          <Select v-model="selectedProviderId" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
-            <SelectContent>
+            <SelectContent class="w-full">
               <SelectItem value="all">All Providers</SelectItem>
               <SelectItem v-for="p in providerList" :key="p.id" :value="String(p.id)">{{ p.alias || getProviderLabel(p.provider) }}</SelectItem>
             </SelectContent>
           </Select>
-          <Select v-model="selectedPeriod">
+          <Select v-model="selectedPeriod" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectContent class="w-full">
               <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
             </SelectContent>
           </Select>
@@ -437,7 +437,7 @@ function openLogModal(event: AnalyticsEvent) {
           <span class="text-xs text-muted-foreground flex gap-2 max-sm:flex-col">
             <span>Total {{ formatCost(spendingByAgent.summary.total_spend) }}</span>
             <span class="max-sm:hidden">·</span>
-            <span class="max-sm:capitalize">avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / spendingByAgent.summary.total_budget) * 100).toFixed(1) : '0.0' }}% budget used</span>
+            <span>Avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / spendingByAgent.summary.total_budget) * 100).toFixed(1) : '0.0' }}% budget used</span>
           </span>
         </template>
         <DataTable
@@ -456,7 +456,9 @@ function openLogModal(event: AnalyticsEvent) {
             <p class="text-muted-foreground">No agent spending data available</p>
           </template>
           <tr v-for="agent in agentBreakdown" :key="agent.agent_id">
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.agent_name">{{ agent.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
+              <div class="max-w-[300px] truncate" :title="agent.agent_name">{{ agent.agent_name }}</div>
+            </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatCost(agent.spending) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget) }}</td>
             <td class="px-3 sm:px-6 py-2 text-base text-foreground">
@@ -516,7 +518,9 @@ function openLogModal(event: AnalyticsEvent) {
             <p class="text-muted-foreground">No token usage data available</p>
           </template>
           <tr v-for="row in tokensByAgent?.data" :key="row.agent_id">
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[200px] truncate" :title="row.agent_name">{{ row.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
+              <div class="max-w-[200px] truncate" :title="row.agent_name">{{ row.agent_name }}</div>
+            </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.input_tokens) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ formatNumber(row.total_tokens) }}</td>
@@ -573,8 +577,12 @@ function openLogModal(event: AnalyticsEvent) {
           </template>
           <tr v-for="event in accumulatedLogs" :key="event.event_id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="event.agent_name">{{ event.agent_name }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[240px] truncate" :title="event.model">{{ event.model }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              <div class="max-w-[300px] truncate" :title="event.agent_name">{{ event.agent_name }}</div>
+            </td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">
+              <div class="max-w-[240px] truncate" :title="event.model">{{ event.model }}</div>
+            </td>
             <td class="px-3 sm:px-6 py-4">
               <span
                 class="px-2 py-1 text-xs font-medium rounded-full"
