@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { ProviderType } from '@/composables/useApi'
 import { Badge } from '@/components/ui/badge'
 import { getProviderLabel, getProviderBadgeClass } from '@/lib/providers'
 
-defineProps<{ provider: ProviderType }>()
+defineProps<{ provider: string }>()
 </script>
 
 <template>

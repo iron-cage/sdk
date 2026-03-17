@@ -78,7 +78,7 @@ const createMutation = useMutation({
     showTokenModal.value = true
     projectId.value = ''
     description.value = ''
-    selectedUserId.value = authStore.username || ''
+    selectedUserId.value = authStore.userId || ''
     queryClient.invalidateQueries({ queryKey: ['tokens'] })
   },
   onError: (err) => {
@@ -105,8 +105,13 @@ const revokeMutation = useMutation({
 })
 
 function handleCreateToken() {
+  const userId = selectedUserId.value || authStore.userId
+  if (!userId) {
+    toast.error('Cannot create token: no authenticated user')
+    return
+  }
   createMutation.mutate({
-    user_id: selectedUserId.value || authStore.username || 'default',
+    user_id: userId,
     project_id: projectId.value || undefined,
     description: description.value || undefined,
   })
@@ -191,12 +196,12 @@ async function copyToken(token: string) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem @click="handleRotateToken(token)" :disabled="rotateMutation.isPending.value">
+              <DropdownMenuItem :disabled="rotateMutation.isPending.value" @click="handleRotateToken(token)">
                 <IconRefresh />
                 Rotate
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem @click="handleRevokeToken(token)" :disabled="revokeMutation.isPending.value" class="text-destructive">
+              <DropdownMenuItem :disabled="revokeMutation.isPending.value" class="text-destructive" @click="handleRevokeToken(token)">
                 <IconBan />
                 Revoke
               </DropdownMenuItem>
@@ -266,8 +271,8 @@ async function copyToken(token: string) {
             Cancel
           </Button>
           <Button
-            @click="handleCreateToken"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateToken"
           >
             <IconKey />
             {{ createMutation.isPending.value ? 'Generating...' : 'Generate Token' }}
@@ -300,8 +305,8 @@ async function copyToken(token: string) {
                 class="font-mono text-base bg-muted"
               />
               <Button
-                @click="copyToken(newTokenData.token)"
                 variant="outline"
+                @click="copyToken(newTokenData.token)"
               >
                 <IconCopy />
                 Copy

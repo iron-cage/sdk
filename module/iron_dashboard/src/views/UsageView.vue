@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi, type AnalyticsPeriod, type AnalyticsEvent } from '../composables/useApi'
+import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '../composables/useApi'
+import IconChip from '@/components/icons/IconChip.vue'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -17,6 +18,8 @@ import PercentBar from '@/components/PercentBar.vue'
 import DataTable from '@/components/DataTable.vue'
 import IconChevronUp from '@/components/icons/IconChevronUp.vue'
 import IconChevronDown from '@/components/icons/IconChevronDown.vue'
+import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
+import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 import IconDownload from '@/components/icons/IconDownload.vue'
 import IconBarChart from '@/components/icons/IconBarChart.vue'
 import IconCheckCircle from '@/components/icons/IconCheckCircle.vue'
@@ -26,16 +29,22 @@ import IconCoin from '@/components/icons/IconCoin.vue'
 import IconServer from '@/components/icons/IconServer.vue'
 import IconGrid from '@/components/icons/IconGrid.vue'
 import IconClipboard from '@/components/icons/IconClipboard.vue'
+import IconUsers from '@/components/icons/IconUsers.vue'
+import IconExternalLink from '@/components/icons/IconExternalLink.vue'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {cn} from "@/lib/utils"
+import TrendBadge from '@/components/TrendBadge.vue'
+import { getProviderLabel } from '@/lib/providers'
 
 const api = useApi()
 
 const selectedAgentId = ref<string>('all')
-
-const { data: agents } = useQuery({
-  queryKey: ['agents'],
-  queryFn: () => api.getAgents(),
-})
-
+const selectedProviderId = ref<string>('all')
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
 
 const logsPage = ref(1)
@@ -44,41 +53,77 @@ const accumulatedLogs = ref<AnalyticsEvent[]>([])
 const totalEvents = ref(0)
 const totalPages = ref(1)
 
+const ANALYTICS_PER_PAGE = 10
+const agentSpendingPage = ref(1)
+const modelsPage = ref(1)
+const tokensPage = ref(1)
+
 const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
-  { value: 'today',       label: 'Today'       },
-  { value: 'yesterday',   label: 'Yesterday'   },
-  { value: 'last7-days',  label: 'Last 7 Days' },
-  { value: 'last30-days', label: 'Last 30 Days'},
-  { value: 'this-month',  label: 'This Month'  },
-  { value: 'all-time',    label: 'All Time'    },
+  { value: 'today',       label: 'Today'        },
+  { value: 'yesterday',   label: 'Yesterday'    },
+  { value: 'last7-days',  label: 'Last 7 Days'  },
+  { value: 'last30-days', label: 'Last 30 Days' },
+  { value: 'this-month',  label: 'This Month'   },
+  { value: 'last-month',  label: 'Last Month'   },
+  { value: 'all-time',    label: 'All Time'     },
 ]
 
+const { data: agents } = useQuery({
+  queryKey: ['agents'],
+  queryFn: () => api.getAgents(),
+})
+
+// Provider list for the dropdown — uses the providers endpoint so all
+// configured providers appear regardless of whether they have usage in the current period.
+const { data: providerList } = useQuery({
+  queryKey: ['providers'],
+  queryFn: () => api.getProviderKeys(),
+})
+
+const activeFilters = computed(() => ({
+  period: selectedPeriod.value,
+  agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
+  provider_key_id: selectedProviderId.value !== 'all' ? Number(selectedProviderId.value) : undefined,
+}))
+
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
-  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageRequests({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
-  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingByProvider({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingByProvider(activeFilters.value),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
-  queryKey: ['analytics-models', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageModels({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderId, modelsPage],
+  queryFn: () => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
-  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingTotal({ period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined }),
+  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
 })
 
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
-  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
-  queryFn: () => api.getAnalyticsEventsList(
-    { period: selectedPeriod.value, agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined },
-    { page: logsPage.value, per_page: logsPerPage },
-  ),
+  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderId, logsPage],
+  queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
+})
+
+const { data: spendingByAgent, isLoading: agentSpendingLoading } = useQuery({
+  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderId, agentSpendingPage],
+  queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }),
+})
+
+const { data: avgCostData } = useQuery({
+  queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryFn: () => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value),
+})
+
+const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
+  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderId, tokensPage],
+  queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 watch(eventsList, (newData) => {
@@ -91,9 +136,17 @@ watch(eventsList, (newData) => {
   }
 }, { immediate: true })
 
-watch([selectedPeriod, selectedAgentId], () => {
+watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
+  agentSpendingPage.value = 1
+  modelsPage.value = 1
+  tokensPage.value = 1
+})
+
+const agentBreakdown = computed<AgentSpending[]>(() => {
+  const data = spendingByAgent.value?.data ?? []
+  return [...data].sort((a, b) => b.spending - a.spending)
 })
 
 const isLoading = computed(() =>
@@ -117,6 +170,7 @@ const providerBreakdown = computed(() => {
             .sort((a, b) => b.percentage - a.percentage)
 })
 
+
 const modelBreakdown = computed(() => {
   const data = modelUsage.value?.data ?? []
   if (!data.length) return []
@@ -127,13 +181,9 @@ const modelBreakdown = computed(() => {
 
 const BREAKDOWN_LIMIT = 10
 const showAllProviders = ref(false)
-const showAllModels = ref(false)
 
 const visibleProviders = computed(() =>
   showAllProviders.value ? providerBreakdown.value : providerBreakdown.value.slice(0, BREAKDOWN_LIMIT)
-)
-const visibleModels = computed(() =>
-  showAllModels.value ? modelBreakdown.value : modelBreakdown.value.slice(0, BREAKDOWN_LIMIT)
 )
 
 function formatCost(cost: number): string {
@@ -142,6 +192,14 @@ function formatCost(cost: number): string {
 
 function loadMoreLogs() {
   logsPage.value++
+}
+
+const selectedLog = ref<AnalyticsEvent | null>(null)
+const showLogModal = ref(false)
+
+function openLogModal(event: AnalyticsEvent) {
+  selectedLog.value = event
+  showLogModal.value = true
 }
 </script>
 
@@ -157,6 +215,23 @@ function loadMoreLogs() {
             <SelectItem value="all">All Agents</SelectItem>
             <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">
               {{ agent.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div class="w-full md:w-40">
+        <Select v-model="selectedProviderId">
+          <SelectTrigger>
+            <SelectValue placeholder="All Providers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Providers</SelectItem>
+            <SelectItem
+              v-for="p in providerList"
+              :key="p.id"
+              :value="String(p.id)"
+            >
+              {{ p.alias || getProviderLabel(p.provider) }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -188,20 +263,16 @@ function loadMoreLogs() {
     <!-- Analytics content -->
     <div v-else>
       <!-- Summary statistics -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <StatCard title="Total Requests">
           <template #icon>
             <IconBarChart class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalRequests) }}</div>
+          <TrendBadge :change-percent="requestStats?.previous_period?.change_percent" class="mt-1" />
         </StatCard>
 
-        <StatCard title="Success Rate">
-          <template #icon>
-            <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
-          </template>
-          <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
-        </StatCard>
+
 
         <StatCard title="Input Tokens">
           <template #icon>
@@ -217,17 +288,52 @@ function loadMoreLogs() {
           <div class="text-2xl font-bold text-foreground">{{ formatNumber(totalOutputTokens) }}</div>
         </StatCard>
 
-          <StatCard title="Total Cost">
+        <StatCard title="Success Rate">
+          <template #icon>
+            <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
+          </template>
+          <div class="text-2xl font-bold text-foreground">{{ successRate.toFixed(1) }}%</div>
+
+          <div class="flex gap-2 items-center">
+            <TrendBadge
+            v-if="requestStats?.previous_period"
+            :change-percent="(requestStats.success_rate - requestStats.previous_period.success_rate)"
+            class="mt-1"
+          />
+
+          <span v-if="requestStats?.failed_requests && requestStats.previous_period" class="size-1 inline-block bg-muted-foreground rounded-full"></span>
+
+          <div v-if="requestStats?.failed_requests" class="text-xs text-destructive mt-1">
+            {{ formatNumber(requestStats.failed_requests) }} failed
+          </div>
+
+          </div>
+        </StatCard>
+
+        <StatCard title="Total Cost">
           <template #icon>
             <IconCoin class="h-4 w-4 text-muted-foreground" />
           </template>
           <div class="text-2xl font-bold text-foreground">{{ formatCost(totalSpend) }}</div>
+          <TrendBadge :change-percent="spendingTotal?.previous_period?.change_percent" class="mt-1" />
+        </StatCard>
+
+        <StatCard title="Avg Cost / Request">
+          <template #icon>
+            <IconCoin class="h-4 w-4 text-muted-foreground" />
+          </template>
+          <div :class="cn('text-2xl font-bold', avgCostData ? 'text-foreground' : 'text-muted-foreground')">
+            {{ avgCostData ? formatCost(avgCostData.average_cost_per_request) : "No data" }}
+          </div>
+          <div v-if="avgCostData?.median_cost_per_request != null" class="text-xs text-muted-foreground mt-1">
+            median {{ formatCost(avgCostData.median_cost_per_request) }}
+          </div>
         </StatCard>
       </div>
 
       <!-- Provider and Model breakdown -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <StatCard title="Usage by Provider" :showSeparator="true">
+        <StatCard title="Usage by Provider" :show-separator="true">
           <template #icon>
             <IconServer class="h-4 w-4 text-muted-foreground" />
           </template>
@@ -237,7 +343,7 @@ function loadMoreLogs() {
           <div v-else class="space-y-4">
             <div v-for="provider in visibleProviders" :key="provider.provider">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ provider.provider }}</span>
+                <span class="text-base font-medium text-foreground">{{ provider.alias || getProviderLabel(provider.provider) }}</span>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatCost(provider.spending) }}</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatNumber(provider.request_count) }} requests</span>
@@ -259,7 +365,7 @@ function loadMoreLogs() {
           </div>
         </StatCard>
 
-        <StatCard title="Usage by Model" :showSeparator="true">
+        <StatCard title="Usage by Model" :show-separator="true">
           <template #icon>
             <IconGrid class="h-4 w-4 text-muted-foreground" />
           </template>
@@ -267,33 +373,156 @@ function loadMoreLogs() {
             No model data available
           </div>
           <div v-else class="space-y-4">
-            <div v-for="model in visibleModels" :key="model.model">
+            <div v-for="model in modelBreakdown" :key="model.model">
               <div class="flex justify-between items-center mb-2">
-                <span class="text-base font-medium text-foreground">{{ model.model }}</span>
+                <div>
+                  <span class="text-base font-medium text-foreground">{{ model.model }}</span>
+                  <span class="text-xs text-muted-foreground block">{{ getProviderLabel(model.provider) }}</span>
+                </div>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
                   <span class="text-xs text-muted-foreground ml-2">{{ formatCost(model.spending) }}</span>
+                  <span class="text-xs text-muted-foreground block">
+                    {{ formatCost((model.spending / ((model.input_tokens + model.output_tokens) || 1)) * 1000) }}/1k tokens
+                  </span>
                 </div>
               </div>
               <PercentBar :percentage="model.percentage" />
             </div>
-            <Button
-              v-if="modelBreakdown.length > BREAKDOWN_LIMIT"
-              variant="ghost"
-              size="sm"
-              class="w-full"
-              @click="showAllModels = !showAllModels"
-            >
-              <IconChevronUp v-if="showAllModels" />
-              <IconChevronDown v-else />
-              {{ showAllModels ? 'Show less' : `Show all ${modelBreakdown.length}` }}
-            </Button>
+            <div v-if="modelUsage?.pagination && modelUsage.pagination.total_pages > 1" class="flex items-center justify-between pt-2 border-t border-border">
+              <p class="text-xs text-muted-foreground">
+                Page <span class="font-medium">{{ modelsPage }}</span> of <span class="font-medium">{{ modelUsage.pagination.total_pages }}</span>
+                · <span class="font-medium">{{ modelUsage.pagination.total }}</span> models
+              </p>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" :disabled="modelsPage === 1" @click="modelsPage--">
+                  <IconChevronLeft />Previous
+                </Button>
+                <Button variant="outline" size="sm" :disabled="modelsPage >= modelUsage.pagination.total_pages" @click="modelsPage++">
+                  Next<IconChevronRight />
+                </Button>
+              </div>
+            </div>
           </div>
         </StatCard>
       </div>
 
+      <!-- Spending by Agent -->
+      <StatCard title="Spending by Agent" :show-separator="true" class="mb-6">
+        <template #icon>
+          <IconUsers class="h-4 w-4 text-muted-foreground" />
+        </template>
+        <template v-if="spendingByAgent?.summary" #action>
+          <span class="text-xs text-muted-foreground">
+            Total {{ formatCost(spendingByAgent.summary.total_spend) }}
+            · avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / (spendingByAgent.summary.total_budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}% budget used
+          </span>
+        </template>
+        <DataTable
+          :columns="[
+            { label: 'Agent' },
+            { label: 'Spending' },
+            { label: 'Budget' },
+            { label: 'Used' },
+            { label: 'Requests' },
+          ]"
+          :is-loading="agentSpendingLoading"
+          :is-empty="agentBreakdown.length === 0"
+          loading-text="Loading agent spending..."
+        >
+          <template #empty>
+            <p class="text-muted-foreground">No agent spending data available</p>
+          </template>
+          <tr v-for="agent in agentBreakdown" :key="agent.agent_id">
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ agent.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatCost(agent.spending) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget / 1_000_000) }}</td>
+            <td class="px-3 sm:px-6 py-2 text-base text-foreground">
+              <div class="flex items-center gap-2 min-w-[100px]">
+                <PercentBar :percentage="agent.budget > 0 ? (agent.spending / (agent.budget / 1_000_000)) * 100 : 0" class="max-w-[100px]" />
+                <span class="shrink-0 text-muted-foreground text-xs">{{ agent.budget > 0 ? ((agent.spending / (agent.budget / 1_000_000)) * 100).toFixed(1) : '0.0' }}%</span>
+              </div>
+            </td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>
+          </tr>
+          <template #footer>
+            <div v-if="spendingByAgent?.pagination && spendingByAgent.pagination.total_pages > 1" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
+              <p class="text-xs text-muted-foreground">
+                Showing <span class="font-medium">{{ (agentSpendingPage - 1) * ANALYTICS_PER_PAGE + 1 }}</span>
+                – <span class="font-medium">{{ Math.min(agentSpendingPage * ANALYTICS_PER_PAGE, spendingByAgent.pagination.total) }}</span>
+                of <span class="font-medium">{{ spendingByAgent.pagination.total }}</span>
+              </p>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" :disabled="agentSpendingPage === 1" @click="agentSpendingPage--">
+                  <IconChevronLeft />Previous
+                </Button>
+                <Button variant="outline" size="sm" :disabled="agentSpendingPage >= spendingByAgent.pagination.total_pages" @click="agentSpendingPage++">
+                  Next<IconChevronRight />
+                </Button>
+              </div>
+            </div>
+          </template>
+        </DataTable>
+      </StatCard>
+
+      <!-- Token Usage by Agent -->
+      <StatCard title="Token Usage by Agent" :show-separator="true" class="mb-6">
+        <template #icon>
+          <IconChip class="h-4 w-4 text-muted-foreground" />
+        </template>
+        <template v-if="tokensByAgent?.summary" #action>
+          <span class="text-xs text-muted-foreground">
+            {{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens
+            · {{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in
+            · {{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out
+          </span>
+        </template>
+        <DataTable
+          :columns="[
+            { label: 'Agent' },
+            { label: 'Input Tokens' },
+            { label: 'Output Tokens' },
+            { label: 'Total Tokens' },
+            { label: 'Requests' },
+            { label: 'Avg / Request' },
+          ]"
+          :is-loading="tokensByAgentLoading"
+          :is-empty="!tokensByAgent?.data?.length"
+          loading-text="Loading token usage..."
+        >
+          <template #empty>
+            <p class="text-muted-foreground">No token usage data available</p>
+          </template>
+          <tr v-for="row in tokensByAgent?.data" :key="row.agent_id">
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ row.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.input_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.output_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ formatNumber(row.total_tokens) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(row.request_count) }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(Math.round(row.avg_tokens_per_request)) }}</td>
+          </tr>
+          <template #footer>
+            <div v-if="tokensByAgent?.pagination && tokensByAgent.pagination.total_pages > 1" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
+              <p class="text-xs text-muted-foreground">
+                Showing <span class="font-medium">{{ (tokensPage - 1) * ANALYTICS_PER_PAGE + 1 }}</span>
+                – <span class="font-medium">{{ Math.min(tokensPage * ANALYTICS_PER_PAGE, tokensByAgent.pagination.total) }}</span>
+                of <span class="font-medium">{{ tokensByAgent.pagination.total }}</span>
+              </p>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" :disabled="tokensPage === 1" @click="tokensPage--">
+                  <IconChevronLeft />Previous
+                </Button>
+                <Button variant="outline" size="sm" :disabled="tokensPage >= tokensByAgent.pagination.total_pages" @click="tokensPage++">
+                  Next<IconChevronRight />
+                </Button>
+              </div>
+            </div>
+          </template>
+        </DataTable>
+      </StatCard>
+
       <!-- Recent Logs -->
-      <StatCard title="Recent Logs" :showSeparator="true">
+      <StatCard title="Recent Logs" :show-separator="true">
         <template #icon>
           <IconClipboard class="h-4 w-4 text-muted-foreground" />
         </template>
@@ -311,10 +540,11 @@ function loadMoreLogs() {
             { label: 'Status' },
             { label: 'Tokens' },
             { label: 'Cost' },
+            { label: 'Actions', align: 'right' },
           ]"
-          :isLoading="eventsLoading && accumulatedLogs.length === 0"
-          :isEmpty="accumulatedLogs.length === 0"
-          loadingText="Loading logs..."
+          :is-loading="eventsLoading && accumulatedLogs.length === 0"
+          :is-empty="accumulatedLogs.length === 0"
+          loading-text="Loading logs..."
         >
           <template #empty>
             <p class="text-muted-foreground mt-4">No logs available</p>
@@ -323,7 +553,7 @@ function loadMoreLogs() {
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.agent_name }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.model }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+            <td class="px-3 sm:px-6 py-4">
               <span
                 class="px-2 py-1 text-xs font-medium rounded-full"
                 :class="event.event_type === 'llm_request_completed' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'"
@@ -333,10 +563,15 @@ function loadMoreLogs() {
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(event.input_tokens + event.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ formatMicrodollars(event.cost_micros) }}</td>
+            <td class="px-3 sm:px-6 py-4 text-right whitespace-nowrap">
+              <Button variant="ghost" size="sm" @click="openLogModal(event)">
+                <IconExternalLink class="h-4 w-4" />
+              </Button>
+            </td>
           </tr>
           <template #footer>
             <div v-if="logsPage < totalPages" class="p-4 text-center">
-              <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
+              <Button variant="outline" :disabled="eventsFetching" @click="loadMoreLogs">
                 <IconDownload />
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>
@@ -345,5 +580,66 @@ function loadMoreLogs() {
         </DataTable>
       </StatCard>
     </div>
+
+    <!-- Log detail modal -->
+    <Dialog v-model:open="showLogModal">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <span
+              class="px-2 py-0.5 text-xs font-medium rounded-full"
+              :class="selectedLog?.event_type === 'llm_request_completed' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'"
+            >
+              {{ selectedLog?.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
+            </span>
+            Event Details
+          </DialogTitle>
+        </DialogHeader>
+
+        <div v-if="selectedLog" class="space-y-4 text-sm">
+          <!-- Error block (only for failed) -->
+          <div v-if="selectedLog.event_type !== 'llm_request_completed'" class="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+            <p class="font-medium text-destructive">{{ selectedLog.error_code ?? 'Unknown error' }}</p>
+            <p v-if="selectedLog.error_message" class="text-destructive/80">{{ selectedLog.error_message }}</p>
+          </div>
+
+          <!-- Fields grid -->
+          <div class="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Event ID</p>
+              <p class="font-mono text-xs text-foreground truncate">{{ selectedLog.event_id }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Time</p>
+              <p class="text-foreground">{{ formatTimestamp(selectedLog.timestamp_ms) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Agent</p>
+              <p class="text-foreground">{{ selectedLog.agent_name }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Provider</p>
+              <p class="text-foreground">{{ getProviderLabel(selectedLog.provider) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Model</p>
+              <p class="text-foreground">{{ selectedLog.model }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Cost</p>
+              <p class="text-foreground">{{ formatMicrodollars(selectedLog.cost_micros) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Input Tokens</p>
+              <p class="text-foreground">{{ formatNumber(selectedLog.input_tokens) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted-foreground mb-0.5">Output Tokens</p>
+              <p class="text-foreground">{{ formatNumber(selectedLog.output_tokens) }}</p>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   </PageLayout>
 </template>

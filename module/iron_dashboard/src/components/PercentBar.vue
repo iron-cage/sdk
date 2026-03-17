@@ -16,6 +16,12 @@ const colorClass = computed(() => {
   if (props.percentage >= warn) return 'bg-warning'
   return 'bg-success'
 })
+
+const normalizedPercentage = computed(() => {
+  if (props.percentage < 0) return 0
+  if (props.percentage > 100) return 100
+  return props.percentage
+})
 </script>
 
 <template>
@@ -23,7 +29,7 @@ const colorClass = computed(() => {
     <div
       class="h-1.5 rounded-full transition-all"
       :class="colorClass"
-      :style="{ width: `${percentage}%` }"
+      :style="{ width: `${normalizedPercentage}%` }"
     />
   </div>
 </template>
