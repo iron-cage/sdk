@@ -43,13 +43,17 @@ const router = createRouter({
       path: '/providers',
       name: 'providers',
       component: () => import('../views/ProvidersView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/users',
       name: 'users',
       component: () => import('../views/UsersView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/dashboard',
     },
   ],
 })
@@ -61,6 +65,8 @@ router.beforeEach((to, _from, next) => {
 
   if (requiresAuth && !authStore.isAuthenticated) {
     next('/login')
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/dashboard')
   } else if (to.path === '/login' && authStore.isAuthenticated) {
     next('/dashboard')
   } else {

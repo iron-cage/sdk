@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
+import { formatTimestamp } from '@/lib/formatters'
 import { useAuthStore } from '../stores/auth'
 import DataTable from '@/components/DataTable.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
@@ -111,6 +112,9 @@ const createMutation = useMutation({
 })
 
 function handleCreateUser() {
+  if (!username.value.trim()) { toast.error('Username is required'); return }
+  if (!email.value.trim()) { toast.error('Email is required'); return }
+  if (!password.value) { toast.error('Password is required'); return }
   createMutation.mutate({
     username: username.value,
     password: password.value,
@@ -231,6 +235,7 @@ function handleResetPassword(user: User) {
 }
 
 function confirmResetPassword() {
+  if (!newPassword.value) { toast.error('New password is required'); return }
   if (userToResetPassword.value) {
     resetPasswordMutation.mutate({
       id: userToResetPassword.value.id,
@@ -243,6 +248,11 @@ function confirmResetPassword() {
 // Watch for filter changes to reset page
 watch([searchDebounced, roleFilter, isActiveFilter], () => {
   page.value = 1
+})
+
+// Clear sensitive data when create dialog closes (e.g. via overlay/X)
+watch(showCreateModal, (open) => {
+  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'manager' }
 })
 
 
@@ -314,7 +324,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
           <StatusBadge :active="user.is_active" active-label="Active" inactive-label="Suspended" />
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          {{ new Date(user.created_at).toLocaleDateString() }}
+          {{ formatTimestamp(user.created_at) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>

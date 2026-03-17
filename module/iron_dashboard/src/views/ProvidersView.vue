@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -190,7 +190,9 @@ function handleToggleEnabled(key: ProviderKey) {
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
-const typedError = error as unknown as Error | null
+watch(showCreateModal, (open) => {
+  if (!open) { resetForm(); createKeyError.value = '' }
+})
 
 const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
 
@@ -249,7 +251,7 @@ function handleQuickAdd() {
         { label: 'Actions', align: 'right' },
       ]"
       :is-loading="isLoading"
-      :error="typedError"
+      :error="error"
       :is-empty="!providerKeys || providerKeys.length === 0"
       loading-text="Loading provider keys..."
       :on-retry="() => refetch()"
