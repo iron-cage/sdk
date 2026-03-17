@@ -347,6 +347,7 @@ impl ProviderKeyStorage {
   ///
   /// Returns [`TokenError::KeyQuotaExceeded`] if quota is already reached,
   /// or a database error if the transaction fails.
+  #[allow(clippy::too_many_arguments)] // transactional helper; params are all required for atomic count+insert
   pub async fn create_key_within_quota(
     &self,
     provider: ProviderType,
@@ -400,6 +401,7 @@ impl ProviderKeyStorage {
     }
   }
 
+  #[allow(clippy::too_many_arguments)] // internal helper called only by create_key_within_quota
   async fn create_key_within_quota_inner(
     &self,
     conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,

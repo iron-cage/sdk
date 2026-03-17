@@ -84,7 +84,8 @@ impl BudgetState {
   ) -> Result<Self, Box<dyn core::error::Error>> {
     // Enforce referential integrity on every connection in this pool.
     // SQLite disables FK enforcement by default; PRAGMA must be re-issued per
-    // connection so every pool connection has it active.
+    // connection. Using after_connect (not a one-shot .execute(&pool)) ensures
+    // ALL pool connections have FK enforcement, not just the first one.
     let db_pool = sqlx::sqlite::SqlitePoolOptions::new()
       .after_connect(|conn, _| {
         Box::pin(async move {

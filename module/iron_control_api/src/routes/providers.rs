@@ -301,6 +301,10 @@ const MAX_KEYS_PER_USER_PER_PROVIDER: i64 = 20;
 /// POST /api/providers
 ///
 /// Create new AI provider key
+///
+/// # Errors
+///
+/// Returns `ApiError` on validation failure, quota exceeded, or database error.
 pub async fn create_provider_key(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
@@ -331,6 +335,7 @@ pub async fn create_provider_key(
     .encrypt(&request.api_key)
     .map_err(|_| ApiError::Internal("Failed to encrypt API key".into()))?;
 
+  // Atomic count + insert inside BEGIN IMMEDIATE to prevent TOCTOU quota race.
   let key_id = state
     .storage
     .create_key_within_quota(
@@ -347,10 +352,8 @@ pub async fn create_provider_key(
       if matches!(e, iron_token_manager::error::TokenError::KeyQuotaExceeded) {
         ApiError::TooManyRequests(
           format!(
-            "Key quota exceeded: maximum {} keys per provider",
-            MAX_KEYS_PER_USER_PER_PROVIDER
-          )
-          .into(),
+            "Key quota exceeded: maximum {MAX_KEYS_PER_USER_PER_PROVIDER} keys per provider",
+          ),
         )
       } else {
         ApiError::Internal("Failed to create provider key".into())
@@ -506,7 +509,8 @@ pub async fn update_provider_key(
     }
   }
 
-  // Apply all field updates atomically in a single transaction
+  // Apply all field updates atomically in a single transaction.
+  // description is Option<Option<String>>: None = skip, Some(None) = clear, Some(Some(s)) = set.
   let description = request.description.as_ref().map(|opt| opt.as_deref());
   //qqq: [Low] empty string is a sentinel to clear base_url — undocumented and inconsistent with description field semantics
   let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
