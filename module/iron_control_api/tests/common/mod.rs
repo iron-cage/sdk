@@ -225,6 +225,7 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 ///
 /// `std::env::set_var` / `remove_var` are not thread-safe across threads.
 /// Any test that sets this env var must hold this guard for the duration of the call.
+#[allow(dead_code)]
 pub static DEV_KEY_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[cfg(test)]

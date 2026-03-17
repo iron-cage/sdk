@@ -23,7 +23,6 @@ use common::providers::{bearer, make_providers_state, TestProvidersAppState, MAS
 use iron_control_api::routes::{budget::handshake, providers::create_provider_key};
 use iron_secrets::{crypto::CryptoService, ip_token::IpTokenCrypto};
 use iron_token_manager::provider_key_storage::ProviderKeyStorage;
-use secrecy::ExposeSecret;
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -345,7 +344,7 @@ async fn test_handshake_uses_agent_assigned_key() {
   let decrypted = client_crypto.decrypt(ip_token).expect("ip_token should decrypt successfully");
 
   assert_eq!(
-    decrypted.expose_secret().as_str(),
+    decrypted.as_str(),
     "sk-agent-assigned-key",
     "Decrypted ip_token must equal the seeded provider API key"
   );

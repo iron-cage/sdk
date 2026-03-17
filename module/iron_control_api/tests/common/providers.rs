@@ -16,7 +16,7 @@ pub const TEST_JWT_SECRET: &str = "test_jwt_secret_for_providers_12345";
 pub const MASTER_KEY: [u8; 32] = [42u8; 32];
 
 /// Combined state satisfying both `ProvidersState` and `AuthState` extraction.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TestProvidersAppState {
   pub providers: ProvidersState,
   pub auth: AuthState,

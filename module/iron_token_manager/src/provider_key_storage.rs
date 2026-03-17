@@ -190,7 +190,7 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     match row {
-      Some(row) => Ok(row_to_record(&row)),
+      Some(row) => Ok(row_to_record(&row)?),
       None => Err(TokenError::NotFound),
     }
   }
@@ -213,7 +213,7 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     match row {
-      Some(row) => Ok(row_to_metadata(&row)),
+      Some(row) => Ok(row_to_metadata(&row)?),
       None => Err(TokenError::NotFound),
     }
   }
@@ -244,7 +244,7 @@ impl ProviderKeyStorage {
     .await
     .map_err(TokenError::Database)?;
 
-    Ok(rows.iter().map(row_to_metadata).collect())
+    rows.iter().map(row_to_metadata).collect()
   }
 
   /// Update balance
@@ -850,6 +850,19 @@ impl ProviderKeyStorage {
     };
 
     if result.rows_affected() == 0 {
+      if delta > 0 {
+        // Positive delta branch used a conditional UPDATE (cap check).
+        // Distinguish: row missing vs. cap condition blocked the update.
+        let exists: bool =
+          sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_provider_keys WHERE id = $1)")
+            .bind(key_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(TokenError::Database)?;
+        if exists {
+          return Err(TokenError::SpendingCapExceeded);
+        }
+      }
       return Err(TokenError::NotFound);
     }
     Ok(())
@@ -889,12 +902,11 @@ fn current_time_ms() -> i64 {
     .as_millis() as i64
 }
 
-fn row_to_metadata(row: &SqliteRow) -> ProviderKeyMetadata {
+fn row_to_metadata(row: &SqliteRow) -> Result<ProviderKeyMetadata> {
   let provider_str: String = row.get("provider");
-  ProviderKeyMetadata {
+  Ok(ProviderKeyMetadata {
     id: row.get("id"),
-    //qqq: [Medium] unknown provider string silently defaults to OpenAI — DB corruption or new provider before enum extension would be misreported; consider returning TokenError
-    provider: ProviderType::parse_str(&provider_str).unwrap_or(ProviderType::OpenAI),
+    provider: ProviderType::parse_str(&provider_str).ok_or(TokenError::Generic)?,
     base_url: row.get("base_url"),
     description: row.get("description"),
     is_enabled: row.get("is_enabled"),
@@ -905,15 +917,15 @@ fn row_to_metadata(row: &SqliteRow) -> ProviderKeyMetadata {
     user_id: row.get("user_id"),
     spending_cap_microdollars: row.get("spending_cap_microdollars"),
     spending_used_microdollars: row.get("spending_used_microdollars"),
-  }
+  })
 }
 
-fn row_to_record(row: &SqliteRow) -> ProviderKeyRecord {
+fn row_to_record(row: &SqliteRow) -> Result<ProviderKeyRecord> {
   let provider_str: String = row.get("provider");
-  ProviderKeyRecord {
+  Ok(ProviderKeyRecord {
     metadata: ProviderKeyMetadata {
       id: row.get("id"),
-      provider: ProviderType::parse_str(&provider_str).unwrap_or(ProviderType::OpenAI),
+      provider: ProviderType::parse_str(&provider_str).ok_or(TokenError::Generic)?,
       base_url: row.get("base_url"),
       description: row.get("description"),
       is_enabled: row.get("is_enabled"),
@@ -927,5 +939,5 @@ fn row_to_record(row: &SqliteRow) -> ProviderKeyRecord {
     },
     encrypted_api_key: row.get("encrypted_api_key"),
     encryption_nonce: row.get("encryption_nonce"),
-  }
+  })
 }

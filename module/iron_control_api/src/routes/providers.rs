@@ -740,11 +740,12 @@ pub async fn unassign_provider_from_project(
   };
 
   //qqq: [Low] returns 403 on wrong owner; assign returns 404 — inconsistent; 404 is preferable to not leak key existence
+  // aaa: Fixed — now returns 404, consistent with get/update/delete/assign endpoints.
   if metadata.user_id != claims.sub {
     return (
-      StatusCode::FORBIDDEN,
+      StatusCode::NOT_FOUND,
       Json(serde_json::json!({
-        "error": "You do not own the key assigned to this project"
+        "error": "No provider key assigned to this project"
       })),
     )
       .into_response();

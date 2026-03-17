@@ -70,8 +70,62 @@ fn bearer_developer(user_id: &str) -> String {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// RBAC tests — developer role blocked from mutating endpoints
+// RBAC tests — developer role blocked from all provider endpoints
 // ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn list_provider_keys_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::GET)
+        .uri("/api/v1/providers")
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to list provider keys"
+  );
+}
+
+#[tokio::test]
+async fn get_provider_key_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_a")
+    .await
+    .unwrap();
+
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::GET)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to get provider key details"
+  );
+}
 
 #[tokio::test]
 async fn update_provider_key_requires_manage_permission() {
