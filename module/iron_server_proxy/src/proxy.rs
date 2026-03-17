@@ -58,8 +58,15 @@ async fn handle_proxy_inner(
   addr: SocketAddr,
   request: Request,
 ) -> Result<Response, ProxyError> {
-  // Step 0: Rate limit check using TCP peer IP (not spoofable via headers)
-  let client_ip = addr.ip().to_string();
+  // Step 0: Rate limit check using real client IP.
+  // Behind nginx, addr.ip() is always 127.0.0.1. Use X-Real-IP set by nginx
+  // (from $remote_addr, not spoofable by clients) to get the actual client IP.
+  // Falls back to TCP peer IP for direct connections without a reverse proxy.
+  let client_ip = request
+    .headers()
+    .get("x-real-ip")
+    .and_then(|v| v.to_str().ok())
+    .map_or_else(|| addr.ip().to_string(), ToString::to_string);
   if let Err(retry_after) = state.auth_rate_limiter.check(&client_ip) {
     return Err(ProxyError::RateLimited(retry_after));
   }
@@ -147,12 +154,20 @@ async fn handle_proxy_inner(
     .estimate_max_cost(&body)
     .map_or(1_000_000, |c| i64::try_from(c).unwrap_or(i64::MAX));
 
-  if let Err(_e) = state
+  if let Err(e) = state
     .provider_key_storage
     .reserve_spending(provider_key_id, estimated_cost)
     .await
   {
-    return Err(ProxyError::SpendingCapExceeded);
+    return match e {
+      iron_token_manager::error::TokenError::SpendingCapExceeded => {
+        Err(ProxyError::SpendingCapExceeded)
+      }
+      other => {
+        tracing::error!(key_id = provider_key_id, "Spending reservation failed: {other}");
+        Err(ProxyError::Internal(format!("Spending reservation failed: {other}")))
+      }
+    };
   }
 
   // Step 6: Decrypt provider API key (AES-256-GCM, stays in memory only)

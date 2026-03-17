@@ -537,10 +537,10 @@ impl ProviderKeyStorage {
     .bind(key_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| TokenError::Generic)?;
+    .map_err(TokenError::Database)?;
 
     if result.rows_affected() == 0 {
-      return Err(TokenError::Generic);
+      return Err(TokenError::SpendingCapExceeded);
     }
     Ok(())
   }

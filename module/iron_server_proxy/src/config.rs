@@ -44,8 +44,9 @@ pub struct Config {
   #[arg(long, env = "PROXY_PORT", default_value = "8081")]
   pub port: u16,
 
-  /// Bind address (0.0.0.0 for external access, 127.0.0.1 for localhost only).
-  #[arg(long, env = "BIND_ADDR", default_value = "0.0.0.0")]
+  /// Bind address. Defaults to localhost (safe behind nginx).
+  /// Use 0.0.0.0 only for Docker or direct-access deployments.
+  #[arg(long, env = "BIND_ADDR", default_value = "127.0.0.1")]
   pub bind_addr: String,
 
   /// `SQLite` database URL (shared with `iron_control_api`).
