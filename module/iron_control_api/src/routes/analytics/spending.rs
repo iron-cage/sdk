@@ -166,19 +166,30 @@ pub async fn get_spending_by_agent(
       .await
   };
 
-  // Build count query with same filters
-  let mut count_query = String::from(
-    r"SELECT COUNT(DISTINCT e.agent_id)
-       FROM analytics_events e
-       INNER JOIN agents a ON e.agent_id = a.id
-       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-       AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL",
-  );
-
-  if !is_admin {
-    count_query.push_str(" AND a.owner_id = ?");
-  }
+  // Build count query with same JOIN semantics as data query
+  let mut count_query = if is_admin {
+    // Admin: LEFT JOIN matches data query — includes events for deleted agents
+    String::from(
+      r"SELECT COUNT(DISTINCT e.agent_id)
+         FROM analytics_events e
+         LEFT JOIN agents a ON e.agent_id = a.id
+         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+         AND e.event_type = 'llm_request_completed'
+         AND e.agent_id IS NOT NULL",
+    )
+  } else {
+    // Non-admin: INNER JOIN — owner_id filter requires agent to exist
+    let mut q = String::from(
+      r"SELECT COUNT(DISTINCT e.agent_id)
+         FROM analytics_events e
+         INNER JOIN agents a ON e.agent_id = a.id
+         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+         AND e.event_type = 'llm_request_completed'
+         AND e.agent_id IS NOT NULL",
+    );
+    q.push_str(" AND a.owner_id = ?");
+    q
+  };
 
   if params.provider_key_id.is_some() {
     count_query.push_str(" AND e.provider_key_id = ?");
@@ -195,7 +206,17 @@ pub async fn get_spending_by_agent(
     if let Some(provider_key_id) = params.provider_key_id {
       cq = cq.bind(provider_key_id);
     }
-    cq.fetch_one(&state.pool).await.unwrap_or(0)
+    match cq.fetch_one(&state.pool).await {
+      Ok(count) => count,
+      Err(e) => {
+        tracing::error!("Failed to query spending count: {e}");
+        return (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(serde_json::json!({ "error": "Database query failed" })),
+        )
+          .into_response();
+      }
+    }
   };
 
   match rows {

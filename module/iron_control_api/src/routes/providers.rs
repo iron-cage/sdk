@@ -296,11 +296,16 @@ fn microdollars_to_usd(microdollars: i64) -> f64 {
   microdollars as f64 / 1_000_000.0
 }
 
-/// Convert USD (f64) to microdollars (i64), rounding to nearest
+/// Max USD value that fits safely in i64 microdollars (~$9 trillion).
+const MAX_SPENDING_CAP_USD: f64 = 9_000_000_000_000.0;
+
+/// Convert USD (f64) to microdollars (i64), rounding to nearest.
 #[allow(clippy::cast_possible_truncation)]
 fn usd_to_microdollars(usd: f64) -> i64 {
-  // Safe: spending caps are bounded; matches iron_cost::converter pattern
-  (usd * 1_000_000.0).round() as i64
+  // Clamp to prevent i64 saturation on astronomically large values.
+  // Callers validate is_finite() and >= 0 before reaching here.
+  let clamped = usd.min(MAX_SPENDING_CAP_USD);
+  (clamped * 1_000_000.0).round() as i64
 }
 
 /// Check if user has `ManageProviderKeys` permission

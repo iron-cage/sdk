@@ -202,11 +202,16 @@ impl LeaseManager {
     lease_id: &str,
     additional_budget: i64,
   ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE budget_leases SET budget_granted = budget_granted + ? WHERE id = ?")
-      .bind(additional_budget)
-      .bind(lease_id)
-      .execute(&self.pool)
-      .await?;
+    let result =
+      sqlx::query("UPDATE budget_leases SET budget_granted = budget_granted + ? WHERE id = ?")
+        .bind(additional_budget)
+        .bind(lease_id)
+        .execute(&self.pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+      return Err(sqlx::Error::RowNotFound);
+    }
 
     Ok(())
   }

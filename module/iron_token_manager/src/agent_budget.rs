@@ -438,7 +438,7 @@ impl AgentBudgetManager {
       .expect("LOUD FAILURE: Time went backwards")
       .as_millis() as i64;
 
-    sqlx::query(
+    let result = sqlx::query(
       "UPDATE agent_budgets
       SET total_allocated = total_allocated + ?,
           budget_remaining = budget_remaining + ?,
@@ -451,6 +451,10 @@ impl AgentBudgetManager {
     .bind(agent_id)
     .execute(&self.pool)
     .await?;
+
+    if result.rows_affected() == 0 {
+      return Err(sqlx::Error::RowNotFound);
+    }
 
     Ok(())
   }
@@ -707,12 +711,9 @@ impl AgentBudgetManager {
 
     let budget_remaining: i64 = agent_row.get("budget_remaining");
 
-    // 2. Check IP-key (provider key) spending cap.
-    //    Provider-key cap check is still a read-then-check pattern; it is
-    //    protected from the critical TOCTOU race by SQLite's serialized write
-    //    semantics within this IMMEDIATE transaction. For full atomicity on the
-    //    provider key cap the check should be merged into the UPDATE in step 4
-    //    below (future improvement).
+    // 2. Pre-check IP-key (provider key) spending cap.
+    //    This read is an early rejection for better error messages. The actual
+    //    enforcement is atomic in step 4's UPDATE WHERE clause.
     if let Some(pkey_id) = provider_key_id {
       let pkey_row = sqlx::query(
         "SELECT spending_cap_microdollars, spending_used_microdollars \
@@ -823,15 +824,33 @@ impl AgentBudgetManager {
       });
     };
 
-    // 4. Increment provider key spending_used
+    // 4. Atomically increment provider key spending_used with cap guard.
+    //    The WHERE clause enforces the cap so concurrent transactions cannot
+    //    jointly exceed it — mirrors the IC-key pattern in step 3.
     if let Some(pkey_id) = provider_key_id {
-      sqlx::query(
-        "UPDATE ai_provider_keys SET spending_used_microdollars = spending_used_microdollars + ? WHERE id = ?",
+      let pkey_result = sqlx::query(
+        "UPDATE ai_provider_keys \
+         SET spending_used_microdollars = spending_used_microdollars + ? \
+         WHERE id = ? \
+         AND (spending_cap_microdollars IS NULL \
+              OR spending_used_microdollars + ? <= spending_cap_microdollars)",
       )
       .bind(granted)
       .bind(pkey_id)
+      .bind(granted)
       .execute(&mut *tx)
       .await?;
+
+      if pkey_result.rows_affected() == 0 {
+        // Provider key cap exceeded (race with concurrent reservation).
+        // Roll back the agent budget reservation from step 3.
+        tx.rollback().await?;
+        return Ok(ReservationResult {
+          granted: 0,
+          agent_budget_remaining: budget_remaining,
+          blocked_by: Some(BlockedBy::ProviderKeyCap),
+        });
+      }
     }
 
     // Get final budget_remaining

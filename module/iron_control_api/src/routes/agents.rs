@@ -846,20 +846,18 @@ pub async fn get_agent_tokens(
   Ok(Json(tokens))
 }
 
-/// Request body for setting agent spending cap
+/// Request body for setting agent spending cap.
+///
+/// Uses 2-state `Option<f64>` (not 3-state `Option<Option<f64>>`) because this is
+/// a dedicated single-field PUT endpoint — the caller is explicitly replacing the
+/// cap state, so there is no "skip / don't change" case.
 #[derive(Debug, Deserialize)]
 pub struct SetSpendingCapRequest {
   /// Spending cap in USD.
   ///
-  /// - `null` or field absent → `None` → [`SpendingCap::Unlimited`] (no cap enforced)
-  /// - `0.0` → [`SpendingCap::Limited(0)`] — sets a zero-microdollar cap, which immediately
-  ///   blocks all budget reservations for this agent ("freeze" mode).
-  /// - Any positive finite value → cap in USD, converted to microdollars (rounded).
-  ///
-  /// Note: `spending_cap_usd: 0.0` sets a zero-microdollar cap, which immediately
-  /// blocks all budget reservations for this agent ("freeze" mode).
-  /// To remove the cap entirely, omit the field or set it to `null` (if supported),
-  /// or call with `spending_cap_usd: null` which maps to `SpendingCap::Unlimited`.
+  /// - `null` or field absent → remove cap ([`SpendingCap::Unlimited`])
+  /// - `0.0` → freeze mode (zero-microdollar cap blocks all budget reservations)
+  /// - Any positive finite value → cap in USD, converted to microdollars
   pub spending_cap_usd: Option<f64>,
 }
 
@@ -903,7 +901,7 @@ pub async fn set_agent_spending_cap(
   user: AuthenticatedUser,
   Json(req): Json<SetSpendingCapRequest>,
 ) -> Result<Json<AgentSpendingResponse>, (StatusCode, String)> {
-  if user.0.role != "admin" {
+  if parse_role(&user.0)? != crate::rbac::Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can set spending caps".to_string(),
@@ -966,7 +964,13 @@ fn microdollars_to_usd(microdollars: i64) -> f64 {
   microdollars as f64 / 1_000_000.0
 }
 
+/// Max USD value that fits safely in i64 microdollars (~$9 trillion).
+const MAX_SPENDING_CAP_USD: f64 = 9_000_000_000_000.0;
+
 #[allow(clippy::cast_possible_truncation)]
 fn usd_to_microdollars(usd: f64) -> i64 {
-  (usd * 1_000_000.0).round() as i64
+  // Clamp to prevent i64 saturation on astronomically large values.
+  // Callers validate is_finite() and >= 0 before reaching here.
+  let clamped = usd.min(MAX_SPENDING_CAP_USD);
+  (clamped * 1_000_000.0).round() as i64
 }

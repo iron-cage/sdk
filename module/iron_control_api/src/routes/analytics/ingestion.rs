@@ -111,7 +111,10 @@ pub async fn post_event(
   .bind(&event.provider)
   .bind(event.input_tokens.unwrap_or(0))
   .bind(event.output_tokens.unwrap_or(0))
-  .bind(event.cost_micros.unwrap_or(0))
+  // qqq: [Low] cost_micros is client-reported — analytics-only, NOT used for budget
+  // enforcement (caps use reserve_spending / adjust_spending on ai_provider_keys).
+  // Clamped to [0, 100_000_000] (max $100/request) to prevent dashboard corruption.
+  .bind(event.cost_micros.unwrap_or(0).clamp(0, 100_000_000))
   .bind(agent_id) // From verified IC token, not request body
   .bind(&event.provider_id)
   .bind(&event.error_code)

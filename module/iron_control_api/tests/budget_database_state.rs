@@ -597,11 +597,11 @@ async fn test_report_usage_on_expired_lease() {
 
   // Assert: HTTP 403 Forbidden (lease expired)
   // NOTE: This assertion will FAIL, exposing the bug
+  // aaa: Fix(issue-budget-001): expiry check now enforced in report_usage handler — test passes
   assert_eq!(
     response.status(),
     StatusCode::FORBIDDEN,
-    "BUG EXPOSED: Report usage on expired lease should return 403 Forbidden, \
-     but implementation at budget.rs:590-610 doesnt check expiry"
+    "Report usage on expired lease should return 403 Forbidden"
   );
 
   let body = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -763,11 +763,11 @@ async fn test_report_usage_exceeding_lease_budget() {
 
   // Assert: HTTP 403 Forbidden (insufficient lease budget)
   // NOTE: This assertion will FAIL, exposing CRITICAL bug
+  // aaa: Fix(issue-budget-002): budget sufficiency check now enforced in report_usage handler — test passes
   assert_eq!(
     response.status(),
     StatusCode::FORBIDDEN,
-    "CRITICAL BUG EXPOSED: Report usage exceeding lease budget should return 403 Forbidden, \
-     but implementation at budget.rs:612-624 doesnt check lease remaining budget"
+    "Report usage exceeding lease budget should return 403 Forbidden"
   );
 
   let body = axum::body::to_bytes(response.into_body(), usize::MAX)
