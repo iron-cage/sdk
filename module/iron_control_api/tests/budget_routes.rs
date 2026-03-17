@@ -27,7 +27,6 @@ use iron_control_api::{
   ip_token::{IpTokenCrypto, IpTokenKey},
   routes::budget::*,
 };
-use secrecy::ExposeSecret;
 
 /// Test handshake request validation
 #[test]
@@ -293,7 +292,7 @@ fn test_ip_token_encryption() {
   let decrypted = crypto
     .decrypt(&ip_token)
     .expect("LOUD FAILURE: Should decrypt");
-  assert_eq!(decrypted.expose_secret(), provider_key);
+  assert_eq!(decrypted.as_str(), provider_key);
 }
 
 /// Test IP Token format validation

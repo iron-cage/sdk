@@ -221,8 +221,8 @@ impl core::error::Error for CryptoError {}
 /// Mask an API key for display (never show full key)
 ///
 /// # Rules
-/// - char_count <= 8: "***"
-/// - char_count > 8: "first4...last3"
+/// - `char_count` <= 8: `"***"`
+/// - `char_count` > 8: `"first4...last3"`
 ///
 /// Slices by character count to avoid panicking on multibyte UTF-8 input.
 #[must_use]

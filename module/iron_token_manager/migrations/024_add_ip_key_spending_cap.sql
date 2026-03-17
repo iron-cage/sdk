@@ -13,6 +13,7 @@ ALTER TABLE ai_provider_keys ADD COLUMN spending_cap_microdollars INTEGER;
 
 -- Add spending used counter (default 0)
 -- //qqq: [Medium] no CHECK (spending_used_microdollars >= 0) constraint — negative values possible via buggy adjust_spending
+-- aaa: Addressed by migration 028 (BEFORE UPDATE trigger) and Rust-layer MAX(0, ...) clamp in refund path.
 ALTER TABLE ai_provider_keys ADD COLUMN spending_used_microdollars INTEGER NOT NULL DEFAULT 0;
 
 -- Create guard table to mark migration as completed

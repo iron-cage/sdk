@@ -395,7 +395,8 @@ async fn test_wipe_and_seed_integration_with_config() {
   // Add extra data manually to simulate existing data from previous runs
   sqlx::query(
     "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ('user_manual', 'manual_user', 'hash', 'manual@example.com', 'user', 1, 0)",
+     VALUES ('user_manual', 'manual_user', 'hash', 'manual@example.com', 'manager', 1, 0)",
+  // 'manager' is the post-migration-025 name for the former 'user' role
   )
   .execute(pool)
   .await
@@ -495,7 +496,8 @@ async fn test_wipe_and_seed_disabled_preserves_data() {
   // Manually insert a user
   sqlx::query(
     "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-     VALUES ('user_persistent', 'persistent_user', 'hash', 'persistent@example.com', 'user', 1, 0)",
+     VALUES ('user_persistent', 'persistent_user', 'hash', 'persistent@example.com', 'manager', 1, 0)",
+  // 'manager' is the post-migration-025 name for the former 'user' role
   )
   .execute(pool)
   .await

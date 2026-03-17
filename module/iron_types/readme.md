@@ -78,6 +78,7 @@ Defines shared types, traits, and error types used across all iron_cage crates a
 |------|----------------|
 | lib.rs | Foundational types and type-safe identifiers for Iron Runtime |
 | ids.rs | Type-safe entity identifiers with validation |
+| role.rs | RBAC role enum (Admin, Manager, Developer) with string parsing. |
 
 **Notes:**
 - Entries marked 'TBD' require manual documentation

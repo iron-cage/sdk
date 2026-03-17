@@ -4,16 +4,19 @@
 //! After [`MAX_AUTH_FAILURES`] failures within [`AUTH_WINDOW`], subsequent requests
 //! are rejected with 429 until the oldest failure expires.
 //!
-//! Includes LRU eviction at [`MAX_ENTRIES`] to prevent memory exhaustion from
-//! spoofed IP headers.
+//! Uses an [`lru::LruCache`] bounded to [`MAX_ENTRIES`] so that eviction of the
+//! least-recently-used entry is O(1) rather than the O(n log n) sort a plain
+//! `HashMap` requires.
 
+use core::num::NonZeroUsize;
 use core::time::Duration;
 use std::sync::PoisonError;
 use std::{
-  collections::HashMap,
   sync::{Arc, Mutex},
   time::Instant,
 };
+
+use lru::LruCache;
 
 /// Maximum failed auth attempts before blocking.
 pub const MAX_AUTH_FAILURES: usize = 20;
@@ -22,14 +25,18 @@ pub const MAX_AUTH_FAILURES: usize = 20;
 const AUTH_WINDOW: Duration = Duration::from_secs(60);
 
 /// Hard cap on tracked IPs to prevent memory exhaustion.
-const MAX_ENTRIES: usize = 100_000;
+// SAFETY: 100_000 is non-zero, so this never panics.
+const MAX_ENTRIES: NonZeroUsize = match NonZeroUsize::new(100_000) {
+  Some(v) => v,
+  None => unreachable!(),
+};
 
 /// Per-IP sliding window rate limiter for auth failures.
 ///
 /// Thread-safe via `Arc<Mutex<_>>`. Cloning shares the same state.
 #[derive(Clone, Debug)]
 pub struct AuthRateLimiter {
-  failures: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
+  failures: Arc<Mutex<LruCache<String, Vec<Instant>>>>,
   window: Duration,
 }
 
@@ -38,7 +45,7 @@ impl AuthRateLimiter {
   #[must_use]
   pub fn new() -> Self {
     Self {
-      failures: Arc::new(Mutex::new(HashMap::new())),
+      failures: Arc::new(Mutex::new(LruCache::new(MAX_ENTRIES))),
       window: AUTH_WINDOW,
     }
   }
@@ -47,36 +54,30 @@ impl AuthRateLimiter {
   #[must_use]
   pub fn with_window(window: Duration) -> Self {
     Self {
-      failures: Arc::new(Mutex::new(HashMap::new())),
+      failures: Arc::new(Mutex::new(LruCache::new(MAX_ENTRIES))),
       window,
     }
   }
 
-  /// Lock mutex, sweep expired entries, and enforce LRU eviction.
-  fn lock_and_sweep(&self) -> std::sync::MutexGuard<'_, HashMap<String, Vec<Instant>>> {
-    let mut map = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+  /// Lock mutex and sweep expired timestamps.
+  fn lock_and_sweep(&self) -> std::sync::MutexGuard<'_, LruCache<String, Vec<Instant>>> {
+    let mut cache = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
     // Remove expired timestamps (skip if process uptime < window)
     if let Some(cutoff) = Instant::now().checked_sub(self.window) {
-      map.retain(|_, timestamps| {
-        timestamps.retain(|t| *t > cutoff);
-        !timestamps.is_empty()
-      });
-    }
-
-    // LRU eviction if over hard cap
-    if map.len() > MAX_ENTRIES {
-      let excess = map.len() - MAX_ENTRIES;
-      let mut keys_by_age: Vec<(String, Instant)> = map
+      let keys: Vec<String> = cache
         .iter()
-        .filter_map(|(key, ts)| ts.first().map(|t| (key.clone(), *t)))
+        .map(|(k, _)| k.clone())
         .collect();
-      keys_by_age.sort_unstable_by_key(|(_, t)| *t);
-      for (key, _) in keys_by_age.into_iter().take(excess) {
-        map.remove(&key);
+      for key in keys {
+        if let Some(timestamps) = cache.get_mut(&key) {
+          timestamps.retain(|t| *t > cutoff);
+          if timestamps.is_empty() {
+            cache.pop(&key);
+          }
+        }
       }
     }
-
-    map
+    cache
   }
 
   /// Check if the IP is currently rate-limited.
@@ -87,8 +88,8 @@ impl AuthRateLimiter {
   ///
   /// Returns `Err(retry_after_secs)` if the IP has exceeded the failure threshold.
   pub fn check(&self, ip: &str) -> Result<(), u64> {
-    let map = self.lock_and_sweep();
-    let Some(timestamps) = map.get(ip) else {
+    let mut cache = self.lock_and_sweep();
+    let Some(timestamps) = cache.get(ip) else {
       return Ok(());
     };
     if timestamps.len() >= MAX_AUTH_FAILURES {
@@ -106,9 +107,13 @@ impl AuthRateLimiter {
   }
 
   /// Record a failed auth attempt for the given IP.
+  ///
+  /// If the cache is at capacity, the least-recently-used entry is evicted in O(1).
   pub fn record_failure(&self, ip: &str) {
-    let mut map = self.lock_and_sweep();
-    map.entry(ip.to_string()).or_default().push(Instant::now());
+    let mut cache = self.lock_and_sweep();
+    cache
+      .get_or_insert_mut(ip.to_string(), Vec::new)
+      .push(Instant::now());
   }
 }
 

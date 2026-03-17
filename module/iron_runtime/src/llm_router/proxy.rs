@@ -21,7 +21,7 @@ use iron_cost::{
   error::CostError,
   pricing::PricingManager,
 };
-use iron_llm_core::{CostInfo, ForwardRequest, LlmCoreError};
+use iron_llm_core::{CostInfo, ForwardBody, ForwardRequest, LlmCoreError};
 use iron_secrets::ip_token::IpTokenKey;
 
 #[cfg(feature = "analytics")]
@@ -350,7 +350,6 @@ async fn handle_proxy(
 
   let status =
     StatusCode::from_u16(forward_resp.status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-  let resp_body = forward_resp.body;
 
   // 5. Settle budget reservation
   let cost_info = if status.is_success() {
@@ -363,7 +362,7 @@ async fn handle_proxy(
     settle_reservation(controller, reservation, cost_info.as_ref());
   }
 
-  // 6. Log cost and record analytics
+  // 6. Log cost, record analytics, and build response
   if let Some(ref ci) = cost_info {
     tracing::info!(
       model = %ci.model,
@@ -377,16 +376,38 @@ async fn handle_proxy(
     record_success_analytics(&state, &orig_path, &body_bytes, ci);
   }
 
-  if !status.is_success() {
-    #[cfg(feature = "analytics")]
-    record_failure_analytics(&state, status, &body_bytes, &resp_body);
-  }
+  let content_type = forward_resp
+    .headers
+    .get(header::CONTENT_TYPE)
+    .and_then(|v| v.to_str().ok())
+    .unwrap_or("application/json")
+    .to_owned();
 
-  let mut response = Response::builder().status(status);
-  response = response.header(header::CONTENT_TYPE, "application/json");
+  let (response_body, is_streaming) = match forward_resp.body {
+    ForwardBody::Buffered(bytes) => {
+      if !status.is_success() {
+        #[cfg(feature = "analytics")]
+        record_failure_analytics(&state, status, &body_bytes, &bytes);
+      }
+      (Body::from(bytes), false)
+    }
+    ForwardBody::Streaming(provider_resp) => (
+      Body::from_stream(futures_util::stream::unfold(provider_resp, |mut resp| async move {
+        match resp.chunk().await {
+          Ok(Some(chunk)) => Some((Ok::<_, String>(chunk), resp)),
+          _ => None,
+        }
+      })),
+      true,
+    ),
+  };
 
-  response
-    .body(Body::from(resp_body))
+  let _ = is_streaming; // available for future analytics differentiation
+
+  Response::builder()
+    .status(status)
+    .header(header::CONTENT_TYPE, content_type)
+    .body(response_body)
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 

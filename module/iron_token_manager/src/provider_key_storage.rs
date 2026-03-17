@@ -300,6 +300,152 @@ impl ProviderKeyStorage {
     Ok(())
   }
 
+  /// Check whether `user_id` owns the given `project_id`.
+  ///
+  /// Ownership is determined by the presence of at least one `api_tokens` row
+  /// with matching `user_id` and `project_id`.  Returns `Ok(true)` when the
+  /// caller owns the project, `Ok(false)` when no such token exists (which
+  /// callers should map to 404 to avoid revealing project existence).
+  ///
+  /// # Errors
+  ///
+  /// Returns error if the database query fails
+  pub async fn verify_project_owner(&self, project_id: &str, user_id: &str) -> Result<bool> {
+    let exists: bool = sqlx::query_scalar(
+      "SELECT EXISTS(SELECT 1 FROM api_tokens WHERE project_id = $1 AND user_id = $2)",
+    )
+    .bind(project_id)
+    .bind(user_id)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+    Ok(exists)
+  }
+
+  /// Atomically create a provider key within the per-user per-provider quota.
+  ///
+  /// Runs the COUNT check and the INSERT inside a single `BEGIN IMMEDIATE`
+  /// transaction so two concurrent requests cannot both pass the guard when
+  /// the count is at the limit.
+  ///
+  /// # Arguments
+  ///
+  /// * `provider` - Provider type (openai, anthropic)
+  /// * `encrypted_api_key` - Encrypted API key (base64)
+  /// * `encryption_nonce` - Encryption nonce (base64)
+  /// * `base_url` - Optional custom base URL
+  /// * `description` - Optional description
+  /// * `user_id` - Owner user ID
+  /// * `max_keys` - Maximum number of keys allowed per user per provider
+  ///
+  /// # Returns
+  ///
+  /// Database ID of the created key, or [`TokenError::KeyQuotaExceeded`] if
+  /// the count was already at or above `max_keys`.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`TokenError::KeyQuotaExceeded`] if quota is already reached,
+  /// or a database error if the transaction fails.
+  #[allow(clippy::too_many_arguments)] // transactional helper; params are all required for atomic count+insert
+  pub async fn create_key_within_quota(
+    &self,
+    provider: ProviderType,
+    encrypted_api_key: &str,
+    encryption_nonce: &str,
+    base_url: Option<&str>,
+    description: Option<&str>,
+    user_id: &str,
+    max_keys: i64,
+  ) -> Result<i64> {
+    let now_ms = current_time_ms();
+    let provider_str = provider.as_str();
+
+    // Acquire a raw connection so we can issue BEGIN IMMEDIATE ourselves.
+    // pool.begin() emits BEGIN (deferred); we need BEGIN IMMEDIATE to block
+    // concurrent readers from sneaking in between our COUNT and INSERT.
+    let mut conn = self.pool.acquire().await.map_err(TokenError::Database)?;
+
+    sqlx::query("BEGIN IMMEDIATE")
+      .execute(&mut *conn)
+      .await
+      .map_err(TokenError::Database)?;
+
+    let result = self
+      .create_key_within_quota_inner(
+        &mut conn,
+        provider_str,
+        encrypted_api_key,
+        encryption_nonce,
+        base_url,
+        description,
+        user_id,
+        max_keys,
+        now_ms,
+      )
+      .await;
+
+    match result {
+      Ok(key_id) => {
+        sqlx::query("COMMIT")
+          .execute(&mut *conn)
+          .await
+          .map_err(TokenError::Database)?;
+        Ok(key_id)
+      }
+      Err(e) => {
+        // Best-effort rollback; ignore secondary error
+        let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+        Err(e)
+      }
+    }
+  }
+
+  #[allow(clippy::too_many_arguments)] // internal helper called only by create_key_within_quota
+  async fn create_key_within_quota_inner(
+    &self,
+    conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,
+    provider_str: &str,
+    encrypted_api_key: &str,
+    encryption_nonce: &str,
+    base_url: Option<&str>,
+    description: Option<&str>,
+    user_id: &str,
+    max_keys: i64,
+    now_ms: i64,
+  ) -> Result<i64> {
+    let count: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM ai_provider_keys WHERE user_id = $1 AND provider = $2",
+    )
+    .bind(user_id)
+    .bind(provider_str)
+    .fetch_one(&mut **conn)
+    .await
+    .map_err(TokenError::Database)?;
+
+    if count >= max_keys {
+      return Err(TokenError::KeyQuotaExceeded);
+    }
+
+    let result = sqlx::query(
+      "INSERT INTO ai_provider_keys \
+       ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at ) \
+       VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
+    )
+    .bind(provider_str)
+    .bind(encrypted_api_key)
+    .bind(encryption_nonce)
+    .bind(base_url)
+    .bind(description)
+    .bind(user_id)
+    .bind(now_ms)
+    .execute(&mut **conn)
+    .await
+    .map_err(TokenError::Database)?;
+
+    Ok(result.last_insert_rowid())
+  }
+
   /// Assign a key to a project
   ///
   /// # Errors
@@ -686,24 +832,34 @@ impl ProviderKeyStorage {
     if delta == 0 {
       return Ok(());
     }
-    let result = sqlx::query(
-      "UPDATE ai_provider_keys \
-       SET spending_used_microdollars = MAX(0, \
-         CASE \
-           WHEN $1 > 0 AND spending_cap_microdollars IS NOT NULL \
-             THEN MIN(spending_cap_microdollars, spending_used_microdollars + $2) \
-           ELSE spending_used_microdollars + $3 \
-         END \
-       ) \
-       WHERE id = $4",
-    )
-    .bind(delta)
-    .bind(delta)
-    .bind(delta)
-    .bind(key_id)
-    .execute(&self.pool)
-    .await
-    .map_err(TokenError::Database)?;
+
+    let result = if delta > 0 {
+      // Actual exceeded estimate: enforce cap so we don't silently bust it
+      sqlx::query(
+        "UPDATE ai_provider_keys \
+         SET spending_used_microdollars = spending_used_microdollars + $1 \
+         WHERE id = $2 \
+         AND (spending_cap_microdollars IS NULL \
+              OR spending_used_microdollars + $1 <= spending_cap_microdollars)",
+      )
+      .bind(delta)
+      .bind(key_id)
+      .execute(&self.pool)
+      .await
+      .map_err(TokenError::Database)?
+    } else {
+      // Refund path: unconditional decrement, clamped to zero
+      sqlx::query(
+        "UPDATE ai_provider_keys \
+         SET spending_used_microdollars = MAX(0, spending_used_microdollars + $1) \
+         WHERE id = $2",
+      )
+      .bind(delta)
+      .bind(key_id)
+      .execute(&self.pool)
+      .await
+      .map_err(TokenError::Database)?
+    };
 
     if result.rows_affected() == 0 {
       return Err(TokenError::NotFound);

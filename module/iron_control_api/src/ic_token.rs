@@ -463,7 +463,10 @@ impl IcTokenRateLimiter {
     };
 
     if entries.len() >= IC_TOKEN_MAX_FAILURES {
-      let oldest = entries.first().unwrap();
+      // entries.len() >= IC_TOKEN_MAX_FAILURES > 0, so first() is always Some
+      let Some(oldest) = entries.first() else {
+        return Ok(());
+      };
       let retry_after = window
         .saturating_sub(now.duration_since(*oldest))
         .as_secs()
@@ -553,7 +556,9 @@ pub async fn validate_ic_token_for_endpoint(
   // take the same wall-clock time from the caller's perspective.
   let elapsed = start.elapsed();
   if elapsed < VALIDATION_TIMING_TARGET {
-    tokio::time::sleep(VALIDATION_TIMING_TARGET.checked_sub(elapsed).unwrap()).await;
+    if let Some(remaining) = VALIDATION_TIMING_TARGET.checked_sub(elapsed) {
+      tokio::time::sleep(remaining).await;
+    }
   }
 
   match result {

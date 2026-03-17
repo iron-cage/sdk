@@ -74,6 +74,7 @@ Provides secure secrets management with AES-256-GCM encryption at rest, Argon2id
 | error.rs | Error types |
 | secrets_manager.rs | Secrets manager service |
 | storage.rs | Encrypted storage backend |
+| ip_token.rs | Iron Provider Token types (ProviderKey, ProviderApiKey) for decrypted key handling. |
 
 **Notes:**
 - Entries marked 'TBD' require manual documentation

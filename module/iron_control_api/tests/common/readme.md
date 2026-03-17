@@ -11,6 +11,7 @@
 | `fixtures.rs` | Test data factories for valid fixtures |
 | `http.rs` | HTTP test server and request helpers |
 | `mod.rs` | Module declarations and shared test utilities |
+| `providers.rs` | Shared test state and helpers for provider API tests |
 | `source_analysis.rs` | Source code file existence and content analysis |
 | `sql_injection_helpers.rs` | SQL injection test helper functions |
 | `test_db.rs` | Test database creation using iron_test_db |

@@ -95,6 +95,53 @@ impl TryFrom<&[u8]> for IpTokenKey {
   }
 }
 
+/// Plaintext provider API key, guaranteed to be zeroed on drop.
+///
+/// Wraps `Zeroizing<String>` so callers never hold a plain `String` containing key material.
+/// Implements `Deref<Target = str>` for use in HTTP header construction.
+#[derive(Clone)]
+pub struct ProviderApiKey(Zeroizing<String>);
+
+impl ProviderApiKey {
+  /// Wrap a plaintext key string, immediately protecting it with `Zeroizing`.
+  #[must_use]
+  pub fn new(key: String) -> Self {
+    Self(Zeroizing::new(key))
+  }
+
+  /// Expose the key as a `&str` for use in HTTP headers.
+  #[must_use]
+  pub fn as_str(&self) -> &str {
+    self.0.as_str()
+  }
+}
+
+impl core::ops::Deref for ProviderApiKey {
+  type Target = str;
+  fn deref(&self) -> &str {
+    self.0.as_str()
+  }
+}
+
+impl core::fmt::Debug for ProviderApiKey {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.write_str("<redacted>")
+  }
+}
+
+impl zeroize::Zeroize for ProviderApiKey {
+  fn zeroize(&mut self) {
+    self.0.zeroize();
+  }
+}
+
+impl From<Zeroizing<String>> for ProviderApiKey {
+  /// Move a `Zeroizing<String>` into `ProviderApiKey` without copying the key bytes.
+  fn from(key: Zeroizing<String>) -> Self {
+    Self(key)
+  }
+}
+
 /// Provider API key returned after IP Token decryption.
 ///
 /// Canonical definition shared by `iron_runtime` (`KeyFetcher`) and `iron_cost` (`BudgetClient`).
@@ -106,7 +153,7 @@ pub struct ProviderKey {
   /// Provider type: "openai" or "anthropic"
   pub provider: String,
   /// The actual API key (protected from Debug/Display leaks, zeroed on drop)
-  pub api_key: SecretBox<String>,
+  pub api_key: SecretBox<ProviderApiKey>,
   /// Optional custom base URL for the provider
   pub base_url: Option<String>,
 }
@@ -254,7 +301,7 @@ impl IpTokenCrypto {
   /// - Base64 decoding fails
   /// - Decryption fails (wrong key or tampered data)
   /// - Plaintext is not valid UTF-8
-  pub fn decrypt(&self, ip_token: &str) -> Result<SecretBox<String>, IpTokenError> {
+  pub fn decrypt(&self, ip_token: &str) -> Result<ProviderApiKey, IpTokenError> {
     // Parse format: AES256:{IV}:{ciphertext}:{tag}
     let parts: Vec<&str> = ip_token.split(':').collect();
     if parts.len() != 4 || parts[0] != "AES256" {
@@ -296,7 +343,7 @@ impl IpTokenCrypto {
 
     let plaintext = String::from_utf8(plaintext_bytes).map_err(|_| IpTokenError::InvalidUtf8)?;
 
-    Ok(SecretBox::new(Box::new(plaintext)))
+    Ok(ProviderApiKey::new(plaintext))
   }
 }
 
