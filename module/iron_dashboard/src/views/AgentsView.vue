@@ -131,13 +131,17 @@ function removeProviderKey(keyId: number) {
 
 function ownerEmail(ownerId: string | null | undefined): string {
   if (!ownerId) return 'Unknown'
-  if (!users.value) return '…'
+  if (!users.value) return ownerId
   const user = ownerMap.value.get(ownerId)
-  return user?.email || user?.username || 'Unknown'
+  return user?.email || user?.username || ownerId
 }
 
+const providerKeyMap = computed(() =>
+  new Map(providers.value?.map(p => [p.id, p]) ?? [])
+)
+
 function providerKeyLabel(keyId: number): string {
-  const key = providers.value?.find(p => p.id === keyId)
+  const key = providerKeyMap.value.get(keyId)
   if (!key) return `#${keyId}`
   return key.alias || key.provider
 }

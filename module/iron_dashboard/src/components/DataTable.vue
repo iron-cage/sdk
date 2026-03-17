@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, useId } from 'vue'
+import { ref, computed, watch, onUnmounted, useId } from 'vue'
 import { Button } from '@/components/ui/button'
 
 defineProps<{
@@ -86,8 +86,12 @@ function scrollByKey(dir: -1 | 1) {
 
 let ro: ResizeObserver | null = null
 
-onMounted(() => {
-  const el = wrapperRef.value
+watch(wrapperRef, (el, oldEl) => {
+  if (oldEl) {
+    oldEl.removeEventListener('scroll', updateScroll)
+  }
+  ro?.disconnect()
+
   if (!el) return
   el.addEventListener('scroll', updateScroll, { passive: true })
   updateScroll()
@@ -95,7 +99,7 @@ onMounted(() => {
   ro.observe(el)
   const tableEl = el.querySelector('table')
   if (tableEl) ro.observe(tableEl)
-})
+}, { flush: 'post' })
 
 onUnmounted(() => {
   wrapperRef.value?.removeEventListener('scroll', updateScroll)
@@ -129,7 +133,7 @@ onUnmounted(() => {
 
     <!-- Table -->
     <template v-else>
-      <div class="relative" :class="{ 'pb-1': showScrollbar }">
+      <div class="relative" :class="{ 'pb-2': showScrollbar }">
         <!-- Scroll wrapper: overflow-x-auto with native scrollbar hidden -->
         <div
           ref="wrapperRef"
@@ -157,7 +161,7 @@ onUnmounted(() => {
           </table>
         </div>
 
-        <!-- Custom scrollbar, positioned at the bottom of the table -->
+        <!-- Custom scrollbar — h-6 invisible hit zone, h-1.5 visible track -->
         <div
           v-if="showScrollbar"
           role="scrollbar"
@@ -167,18 +171,20 @@ onUnmounted(() => {
           :aria-valuenow="Math.round(thumbPos * 100)"
           :aria-controls="wrapperId"
           tabindex="0"
-          class="absolute bottom-0 left-0 right-0 h-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          class="absolute bottom-0 left-0 right-0 h-6 flex items-end cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           @click="onTrackClick"
           @keydown.left.prevent="scrollByKey(-1)"
           @keydown.right.prevent="scrollByKey(1)"
         >
-          <div
-            data-scrollbar-thumb
-            class="absolute h-full rounded-full bg-border hover:bg-foreground/30 cursor-grab active:cursor-grabbing transition-colors"
-            :style="{ width: thumbWidthPct + '%', left: thumbLeftPct + '%' }"
-            @pointerdown="onThumbPointerDown"
-            @pointercancel="onThumbPointerUp"
-          />
+          <div class="relative w-full h-1.5">
+            <div
+              data-scrollbar-thumb
+              class="absolute h-full rounded-full bg-border hover:bg-foreground/30 cursor-grab active:cursor-grabbing transition-colors"
+              :style="{ width: thumbWidthPct + '%', left: thumbLeftPct + '%' }"
+              @pointerdown="onThumbPointerDown"
+              @pointercancel="onThumbPointerUp"
+            />
+          </div>
         </div>
       </div>
       <slot name="footer" />

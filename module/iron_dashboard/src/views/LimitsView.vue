@@ -209,7 +209,7 @@ function riskBadgeVariant(risk: string) {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem @click="openBudgetModal(row)">
                 <IconEdit />
                 Update Budget

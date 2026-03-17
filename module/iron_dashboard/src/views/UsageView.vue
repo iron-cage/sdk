@@ -494,7 +494,7 @@ function openLogModal(event: AnalyticsEvent) {
         </template>
         <template v-if="tokensByAgent?.summary" #action>
           <span class="text-xs text-muted-foreground flex gap-2">
-            {{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens
+            <span>{{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens</span>
             <span class="max-sm:hidden"> · </span><span class="max-sm:hidden">{{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in</span>
             <span class="max-sm:hidden"> · </span><span class="max-sm:hidden">{{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out</span>
           </span>

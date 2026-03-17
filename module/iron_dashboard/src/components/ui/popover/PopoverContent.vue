@@ -1,25 +1,32 @@
 <script setup lang="ts">
-import { PopoverContent, PopoverPortal } from 'reka-ui'
+import type { PopoverContentProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { PopoverContent, PopoverPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<{
-  class?: string
-  side?: 'top' | 'right' | 'bottom' | 'left'
-  align?: 'start' | 'center' | 'end'
-  sideOffset?: number
-  avoidCollisions?: boolean
-  collisionPadding?: number | Partial<Record<'top' | 'right' | 'bottom' | 'left', number>>
+const props = withDefaults(
+  defineProps<PopoverContentProps & { class?: HTMLAttributes['class'] }>(),
+  { side: 'bottom', align: 'center', sideOffset: 4, avoidCollisions: true },
+)
+
+const emits = defineEmits<{
+  escapeKeyDown: [event: KeyboardEvent]
+  pointerDownOutside: [event: Event]
+  focusOutside: [event: Event]
+  interactOutside: [event: Event]
+  openAutoFocus: [event: Event]
+  closeAutoFocus: [event: Event]
 }>()
+
+const delegatedProps = reactiveOmit(props, 'class')
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
   <PopoverPortal>
     <PopoverContent
-      :side="props.side ?? 'bottom'"
-      :align="props.align ?? 'center'"
-      :side-offset="props.sideOffset ?? 4"
-      :avoid-collisions="props.avoidCollisions ?? true"
-      :collision-padding="props.collisionPadding"
+      v-bind="forwarded"
       :class="cn(
         'z-50 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md outline-none',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
