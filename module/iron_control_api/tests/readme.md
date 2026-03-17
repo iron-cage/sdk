@@ -47,6 +47,7 @@ tests/
 │   └── readme.md           # Manual testing procedures (416 lines, covers FR-7/8/9)
 ├── api_test.rs             # API integration tests
 ├── integration_tests.rs    # Full integration test suite
+├── spending_limits.rs      # Per-provider spending limit enforcement tests (11 tests)
 └── rbac.rs                 # RBAC middleware tests
 ```
 
@@ -86,12 +87,13 @@ tests/
 | `agent_provider_key_tests.rs` | Test provider API key retrieval endpoint | Key fetch scenarios → Retrieval validation | Feature 014 provider key tests | NOT budget (budget_*), NOT auth (auth/), NOT tokens (tokens/) |
 | `ip_token_e2e_test.rs` | Test end-to-end IP Token encryption flow across server/client boundary | Server response → Client plaintext key | NOT HTTP integration (integration_tests.rs), NOT budget flow (budget_*), NOT auth (auth/) |
 | `test_no_url_redirect.rs` | Validate url_redirect middleware deletion | Source code → NEGATIVE ACCEPTANCE validation | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
+| `spending_limits.rs` | Test per-IC-key and per-IP-key spending limit enforcement (unified reservation) | Spending cap scenarios → Atomic enforcement validation | NOT budget accounting (budget_database_state.rs), NOT budget flow (budget_routes.rs), NOT concurrency (budget_concurrency.rs), NOT auth (auth/) |
 | `test_cors_configuration.rs` | Validate CORS configuration via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_server_port_configuration.rs` | Validate server port via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 
 ## Test Coverage Summary
 
-**Total Tests:** 504 (499 passing, 5 failing infrastructure bug reproducers for issue-003, 8 implementation bugs fixed, +26 Protocol 005 tests, +120 Migration tests)
+**Total Tests:** 549 (544 passing, 5 failing infrastructure bug reproducers for issue-003, 8 implementation bugs fixed, +26 Protocol 005 tests, +120 Migration tests, +11 Spending Limits tests)
 
 **Phase 1 Security Additions** (2025-12-06):
 - **issue-001:** 3 DoS protection bug reproducer tests (unbounded string inputs)
@@ -193,6 +195,22 @@ tests/
   - `total_allocated = total_spent + budget_remaining` verified after handshake, report, and refresh
 - **Migration Complete:** 499 tests → **IC Token Runtime Validation Complete:** 538 tests (+39 tests, +8%)
 - **Status:** All IC Token runtime validation tests passing, HMAC secret redacted, rate limiting enforced
+
+**Per-Provider Spending Limits** (2026-03-09):
+- **spending_limits.rs:** 11 integration tests for unified per-IC-key and per-IP-key spending cap enforcement
+  - IC-key (agent) spending cap blocks handshake when exceeded → `BlockedBy::AgentSpendingCap`
+  - IP-key (provider key) spending cap blocks handshake when exceeded → `BlockedBy::ProviderKeyCap`
+  - Sequential handshakes exhaust IC-key cap (grants until cap hit, then blocked)
+  - Sequential handshakes exhaust IP-key cap (grants until cap hit, then blocked)
+  - Budget return reverses both IC-key and IP-key spending atomically
+  - NULL spending cap = unlimited (no enforcement)
+  - Lease stores correct `provider_key_id` for attribution
+  - Multiple agents sharing same IP key — cap applies across all agents
+  - Agent cap isolation — one agent's cap doesn't affect other agents
+  - Concurrent handshakes respect IC-key cap (exactly N succeed where N = cap / amount)
+  - Insufficient agent budget blocks before cap checks
+- **IC Token Runtime Validation Complete:** 538 tests → **Spending Limits Complete:** 549 tests (+11 tests, +2%)
+- **Status:** All spending limit tests passing, atomic single-transaction enforcement verified
 
 ### By Protocol and Functional Requirement
 
@@ -368,8 +386,8 @@ Follow bug-fixing workflow (code_design.rulebook.md):
 
 ## Verification
 
-Last verified: 2026-02-18 (IC Token Runtime Validation Complete — PR #44)
-- ✅ 538 tests passing (all 8 implementation bugs fixed + 39 new IC Token tests)
+Last verified: 2026-03-09 (Per-Provider Spending Limits Complete)
+- ✅ 549 tests passing (all 8 implementation bugs fixed + 39 IC Token tests + 11 spending limit tests)
 - ✅ 0 clippy warnings
 - ✅ All Phase 1-5 tests passing (Security, Corner Cases, API Contract, Edge Cases, Additional Coverage)
 - ✅ All doc tests passing
@@ -404,3 +422,9 @@ Last verified: 2026-02-18 (IC Token Runtime Validation Complete — PR #44)
   - ✅ validate_ic_token_for_endpoint all code paths covered (GAP-2)
   - ✅ Concurrent validation + regeneration: no deadlock (H5)
   - ✅ Analytics endpoint IC Token rotation tested (M5)
+- ✅ Per-provider spending limits complete:
+  - ✅ IC-key (agent) spending cap enforcement via `reserve_budget_with_limits`
+  - ✅ IP-key (provider key) spending cap enforcement in same atomic transaction
+  - ✅ Budget return reverses both caps atomically via `restore_budget_with_limits`
+  - ✅ NULL cap = unlimited, concurrent races respect caps, lease attribution verified
+  - ✅ Multi-agent shared key isolation, agent cap isolation across agents

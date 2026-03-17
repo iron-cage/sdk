@@ -50,6 +50,9 @@ pub async fn get_spending_total(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut q = sqlx::query_scalar::<_, i64>(&query)
     .bind(start_ms)
@@ -65,6 +68,9 @@ pub async fn get_spending_total(
   }
   if let Some(ref provider_id) = params.provider_id {
     q = q.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   match q.fetch_one(&state.pool).await {
@@ -82,6 +88,7 @@ pub async fn get_spending_total(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
           calculated_at: Utc::now().to_rfc3339(),
         }),
@@ -116,8 +123,8 @@ pub async fn get_spending_by_agent(
   let offset = (page.page - 1) * page.per_page;
   let is_admin = user.0.role == "admin";
 
-  // Build query with optional owner filter
-  let base_query = if is_admin {
+  // Build query with optional owner and provider_key_id filters
+  let mut base_query = String::from(
     r"SELECT
          e.agent_id,
          a.name as agent_name,
@@ -129,79 +136,87 @@ pub async fn get_spending_by_agent(
        LEFT JOIN agent_budgets ab ON e.agent_id = ab.agent_id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
        AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL
-       GROUP BY e.agent_id
-       ORDER BY spending_micros DESC
-       LIMIT ? OFFSET ?"
-  } else {
-    r"SELECT
-         e.agent_id,
-         a.name as agent_name,
-         COALESCE(SUM(e.cost_micros), 0) as spending_micros,
-         COUNT(*) as request_count,
-         ab.total_allocated as budget
-       FROM analytics_events e
-       LEFT JOIN agents a ON e.agent_id = a.id
-       LEFT JOIN agent_budgets ab ON e.agent_id = ab.agent_id
-       WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
-       AND e.event_type = 'llm_request_completed'
-       AND e.agent_id IS NOT NULL
-       AND a.owner_id = ?
-       GROUP BY e.agent_id
-       ORDER BY spending_micros DESC
-       LIMIT ? OFFSET ?"
-  };
+       AND e.agent_id IS NOT NULL",
+  );
+
+  if !is_admin {
+    base_query.push_str(" AND a.owner_id = ?");
+  }
+
+  if params.provider_key_id.is_some() {
+    base_query.push_str(" AND e.provider_key_id = ?");
+  }
+
+  base_query.push_str(" GROUP BY e.agent_id ORDER BY spending_micros DESC LIMIT ? OFFSET ?");
 
   // Query spending by agent with budget info
-  let rows: Result<Vec<SpendingByAgentRow>, _> = if is_admin {
-    sqlx::query_as(base_query)
+  let rows: Result<Vec<SpendingByAgentRow>, _> = {
+    let mut q = sqlx::query_as::<_, SpendingByAgentRow>(&base_query)
       .bind(start_ms)
-      .bind(end_ms)
-      .bind(i64::from(page.per_page))
-      .bind(i64::from(offset))
-      .fetch_all(&state.pool)
-      .await
-  } else {
-    sqlx::query_as(base_query)
-      .bind(start_ms)
-      .bind(end_ms)
-      .bind(&user.0.sub)
-      .bind(i64::from(page.per_page))
+      .bind(end_ms);
+    if !is_admin {
+      q = q.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      q = q.bind(provider_key_id);
+    }
+    q.bind(i64::from(page.per_page))
       .bind(i64::from(offset))
       .fetch_all(&state.pool)
       .await
   };
 
-  // Query total count (filtered by owner for non-admins)
-  let total_count: i64 = if is_admin {
-    sqlx::query_scalar(
-      r"SELECT COUNT(DISTINCT agent_id)
-         FROM analytics_events
-         WHERE timestamp_ms >= ? AND timestamp_ms <= ?
-         AND event_type = 'llm_request_completed'
-         AND agent_id IS NOT NULL",
+  // Build count query with same JOIN semantics as data query
+  let mut count_query = if is_admin {
+    // Admin: LEFT JOIN matches data query — includes events for deleted agents
+    String::from(
+      r"SELECT COUNT(DISTINCT e.agent_id)
+         FROM analytics_events e
+         LEFT JOIN agents a ON e.agent_id = a.id
+         WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
+         AND e.event_type = 'llm_request_completed'
+         AND e.agent_id IS NOT NULL",
     )
-    .bind(start_ms)
-    .bind(end_ms)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0)
   } else {
-    sqlx::query_scalar(
+    // Non-admin: INNER JOIN — owner_id filter requires agent to exist
+    let mut q = String::from(
       r"SELECT COUNT(DISTINCT e.agent_id)
          FROM analytics_events e
          INNER JOIN agents a ON e.agent_id = a.id
          WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?
          AND e.event_type = 'llm_request_completed'
-         AND e.agent_id IS NOT NULL
-         AND a.owner_id = ?",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .bind(&user.0.sub)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0)
+         AND e.agent_id IS NOT NULL",
+    );
+    q.push_str(" AND a.owner_id = ?");
+    q
+  };
+
+  if params.provider_key_id.is_some() {
+    count_query.push_str(" AND e.provider_key_id = ?");
+  }
+
+  // Query total count (filtered by owner for non-admins)
+  let total_count: i64 = {
+    let mut cq = sqlx::query_scalar::<_, i64>(&count_query)
+      .bind(start_ms)
+      .bind(end_ms);
+    if !is_admin {
+      cq = cq.bind(&user.0.sub);
+    }
+    if let Some(provider_key_id) = params.provider_key_id {
+      cq = cq.bind(provider_key_id);
+    }
+    match cq.fetch_one(&state.pool).await {
+      Ok(count) => count,
+      Err(e) => {
+        tracing::error!("Failed to query spending count: {e}");
+        return (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(serde_json::json!({ "error": "Database query failed" })),
+        )
+          .into_response();
+      }
+    }
   };
 
   match rows {
@@ -301,6 +316,9 @@ pub async fn get_spending_by_provider(
   if params.agent_id.is_some() {
     query.push_str(" AND agent_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   query.push_str(" GROUP BY provider ORDER BY spending_micros DESC");
 
@@ -315,6 +333,9 @@ pub async fn get_spending_by_provider(
 
   if let Some(agent_id) = params.agent_id {
     q = q.bind(agent_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   let rows = q.fetch_all(&state.pool).await;
@@ -413,6 +434,9 @@ pub async fn get_spending_avg(
   if params.provider_id.is_some() {
     query.push_str(" AND provider_id = ?");
   }
+  if params.provider_key_id.is_some() {
+    query.push_str(" AND provider_key_id = ?");
+  }
 
   let mut q = sqlx::query_as::<_, (i64, i64, i64, i64)>(&query)
     .bind(start_ms)
@@ -428,6 +452,9 @@ pub async fn get_spending_avg(
   }
   if let Some(ref provider_id) = params.provider_id {
     q = q.bind(provider_id);
+  }
+  if let Some(provider_key_id) = params.provider_key_id {
+    q = q.bind(provider_key_id);
   }
 
   match q.fetch_one(&state.pool).await {
@@ -455,6 +482,7 @@ pub async fn get_spending_avg(
           filters: Filters {
             agent_id: params.agent_id,
             provider_id: params.provider_id,
+            provider_key_id: params.provider_key_id,
           },
           calculated_at: Utc::now().to_rfc3339(),
         }),

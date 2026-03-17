@@ -75,6 +75,25 @@ pub async fn post_event(
       .into_response();
   }
 
+  // Validate provider_key_id exists if supplied
+  if let Some(key_id) = event.provider_key_id {
+    let exists: bool = sqlx::query_scalar(
+      "SELECT EXISTS(SELECT 1 FROM ai_provider_keys WHERE id = ?)",
+    )
+    .bind(key_id)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(false);
+
+    if !exists {
+      return (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({ "error": "provider_key_id not found" })),
+      )
+        .into_response();
+    }
+  }
+
   let now_ms = Utc::now().timestamp_millis();
 
   // INSERT OR IGNORE for deduplication (agent_id from verified token)
@@ -82,8 +101,8 @@ pub async fn post_event(
     r"INSERT OR IGNORE INTO analytics_events
        (event_id, timestamp_ms, event_type, model, provider,
         input_tokens, output_tokens, cost_micros,
-        agent_id, provider_id, error_code, error_message, received_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        agent_id, provider_id, error_code, error_message, provider_key_id, received_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&event.event_id)
   .bind(event.timestamp_ms)
@@ -92,11 +111,15 @@ pub async fn post_event(
   .bind(&event.provider)
   .bind(event.input_tokens.unwrap_or(0))
   .bind(event.output_tokens.unwrap_or(0))
-  .bind(event.cost_micros.unwrap_or(0))
+  // qqq: [Low] cost_micros is client-reported — analytics-only, NOT used for budget
+  // enforcement (caps use reserve_spending / adjust_spending on ai_provider_keys).
+  // Clamped to [0, 100_000_000] (max $100/request) to prevent dashboard corruption.
+  .bind(event.cost_micros.unwrap_or(0).clamp(0, 100_000_000))
   .bind(agent_id) // From verified IC token, not request body
   .bind(&event.provider_id)
   .bind(&event.error_code)
   .bind(&event.error_message)
+  .bind(event.provider_key_id)
   .bind(now_ms)
   .execute(&state.pool)
   .await;
@@ -189,7 +212,7 @@ pub async fn list_events(
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
          COALESCE(a.name, 'Unknown') as agent_name,
-         e.error_code, e.error_message
+         e.error_code, e.error_message, e.provider_key_id
        FROM analytics_events e
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ? AND e.agent_id = ?
@@ -200,7 +223,7 @@ pub async fn list_events(
          e.event_id, e.timestamp_ms, e.event_type, e.model, e.provider,
          e.input_tokens, e.output_tokens, e.cost_micros, e.agent_id,
          COALESCE(a.name, 'Unknown') as agent_name,
-         e.error_code, e.error_message
+         e.error_code, e.error_message, e.provider_key_id
        FROM analytics_events e
        LEFT JOIN agents a ON e.agent_id = a.id
        WHERE e.timestamp_ms >= ? AND e.timestamp_ms <= ?

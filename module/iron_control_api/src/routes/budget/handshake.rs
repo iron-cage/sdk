@@ -359,10 +359,17 @@ pub async fn handshake(
         "SELECT provider_key_id FROM agents WHERE id = ?",
       )
       .bind(agent_id)
-      .fetch_one(&state.db_pool)
+      .fetch_optional(&state.db_pool)
       .await
       {
-        Ok(id) => id,
+        Ok(Some(id)) => id,
+        Ok(None) => {
+          return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "NO_PROVIDER_ASSIGNED" })),
+          )
+            .into_response();
+        }
         Err(err) => {
           tracing::error!("Database error fetching agent provider_key_id: {}", err);
           return (
@@ -432,44 +439,50 @@ pub async fn handshake(
     .unwrap_or(HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET);
 
   //qqq: [Medium] spending_cap_microdollars on the provider key is NOT checked here — cap is only enforced at the proxy layer; a lease can be issued for a key already at its cap
-  // aaa: Addressed — reserve_spending (line 543) atomically checks cap before incrementing.
-  // If the key is at cap, reserve_spending fails and the handshake is rejected.
-  let budget_to_grant = match state
+  // aaa: Addressed — reserve_budget_with_limits atomically checks cap before incrementing.
+  // If the key is at cap, the reservation is blocked and the handshake is rejected.
+  let reservation = match state
     .agent_budget_manager
-    .check_and_reserve_budget(agent_id, budget_requested)
+    .reserve_budget_with_limits(agent_id, Some(key_id_pre), budget_requested)
     .await
   {
-    Ok(granted) if granted > 0 => granted,
-    Ok(_) => {
-      // Insufficient budget or agent doesnt exist
-      // Fetch budget details for error response
-      let agent_budget = state
-        .agent_budget_manager
-        .get_budget_status(agent_id)
-        .await
-        .ok()
-        .flatten();
-
-      return (
-        StatusCode::FORBIDDEN,
-        Json(serde_json::json!(
-        {
-          "error": "Budget limit exceeded",
-          "total_allocated": agent_budget.as_ref().map( | b | b.total_allocated ),
-          "total_spent": agent_budget.as_ref().map( | b | b.total_spent ),
-          "budget_remaining": agent_budget.as_ref().map( | b | b.budget_remaining )
-        } )),
-      )
-        .into_response();
-    }
+    Ok(r) => r,
     Err(err) => {
-      tracing::error!("Database error checking and reserving budget: {}", err);
+      tracing::error!("Database error reserving budget: {}", err);
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(serde_json::json!({ "error": "Budget service unavailable" })),
       )
         .into_response();
     }
+  };
+
+  let budget_to_grant = if reservation.blocked_by.is_none() && reservation.granted > 0 {
+    reservation.granted
+  } else {
+    let error_msg = match reservation.blocked_by {
+      Some(iron_token_manager::BlockedBy::AgentSpendingCap) => "Agent spending limit exceeded",
+      Some(iron_token_manager::BlockedBy::ProviderKeyCap) => "Provider key spending cap exceeded",
+      Some(iron_token_manager::BlockedBy::InsufficientBudget) | None => "Budget limit exceeded",
+    };
+
+    let agent_budget = state
+      .agent_budget_manager
+      .get_budget_status(agent_id)
+      .await
+      .ok()
+      .flatten();
+
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": error_msg,
+        "total_allocated": agent_budget.as_ref().map(|b| b.total_allocated),
+        "total_spent": agent_budget.as_ref().map(|b| b.total_spent),
+        "budget_remaining": agent_budget.as_ref().map(|b| b.budget_remaining)
+      })),
+    )
+      .into_response();
   };
 
   let key_id = key_id_pre;
@@ -667,7 +680,7 @@ pub async fn handshake(
 
   if let Err(err) = state
     .lease_manager
-    .create_lease(&lease_id, agent_id, agent_id, budget_to_grant, None)
+    .create_lease(&lease_id, agent_id, agent_id, budget_to_grant, None, Some(key_id))
     .await
   {
     tracing::error!("Database error creating lease: {}", err);
@@ -708,13 +721,7 @@ pub async fn handshake(
     "Budget lease granted, deducted from usage_limits"
   );
 
-  let budget_remaining_after = state
-    .agent_budget_manager
-    .get_budget_status(agent_id)
-    .await
-    .ok()
-    .flatten()
-    .map_or(0, |b| b.budget_remaining);
+  let budget_remaining_after = reservation.agent_budget_remaining;
 
   // Return successful handshake response
   (

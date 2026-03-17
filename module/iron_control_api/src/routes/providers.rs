@@ -21,7 +21,7 @@ use axum::{
   http::StatusCode,
   response::{IntoResponse, Json},
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::Deserializer, Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 
 use crate::{
@@ -197,6 +197,7 @@ impl CreateProviderKeyRequest {
 
 /// Update provider key request
 #[derive(Debug, Deserialize)]
+#[allow(clippy::option_option)] // Three-state semantics for spending_cap_usd
 pub struct UpdateProviderKeyRequest {
   /// Updated base URL override
   pub base_url: Option<String>,
@@ -205,7 +206,29 @@ pub struct UpdateProviderKeyRequest {
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
   /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
+  ///
+  /// JSON mapping:
+  /// - field absent → `None` (don't change)
+  /// - `"spending_cap_usd": null` → `Some(None)` (remove cap / unlimited)
+  /// - `"spending_cap_usd": 10.0` → `Some(Some(10.0))` (set cap)
+  #[serde(default, deserialize_with = "deserialize_nullable_f64")]
   pub spending_cap_usd: Option<Option<f64>>,
+}
+
+/// Deserialize a JSON field into `Option<Option<f64>>` with three-state semantics.
+///
+/// - Field absent (handled by `#[serde(default)]`) → `None`
+/// - Field present as `null` → `Some(None)`
+/// - Field present as number → `Some(Some(value))`
+#[allow(clippy::option_option)] // Three-state semantics: absent vs null vs value
+fn deserialize_nullable_f64<'de, D>(deserializer: D) -> Result<Option<Option<f64>>, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  // If this function is called, the field was present in JSON.
+  // Deserialize its value: null becomes None, number becomes Some(x).
+  let value: Option<f64> = Option::deserialize(deserializer)?;
+  Ok(Some(value))
 }
 
 /// Provider key response (never contains plaintext API key)
@@ -273,11 +296,16 @@ fn microdollars_to_usd(microdollars: i64) -> f64 {
   microdollars as f64 / 1_000_000.0
 }
 
-/// Convert USD (f64) to microdollars (i64), rounding to nearest
+/// Max USD value that fits safely in i64 microdollars (~$9 trillion).
+const MAX_SPENDING_CAP_USD: f64 = 9_000_000_000_000.0;
+
+/// Convert USD (f64) to microdollars (i64), rounding to nearest.
 #[allow(clippy::cast_possible_truncation)]
 fn usd_to_microdollars(usd: f64) -> i64 {
-  // Safe: spending caps are bounded; matches iron_cost::converter pattern
-  (usd * 1_000_000.0).round() as i64
+  // Clamp to prevent i64 saturation on astronomically large values.
+  // Callers validate is_finite() and >= 0 before reaching here.
+  let clamped = usd.min(MAX_SPENDING_CAP_USD);
+  (clamped * 1_000_000.0).round() as i64
 }
 
 /// Check if user has `ManageProviderKeys` permission
@@ -501,6 +529,12 @@ pub async fn update_provider_key(
 
   // Validate spending_cap_usd is non-negative if provided
   if let Some(Some(cap)) = request.spending_cap_usd {
+    if !cap.is_finite() {
+      return crate::error::ApiError::BadRequest(
+        "spending_cap_usd must be a finite number".into(),
+      )
+      .into_response();
+    }
     if cap < 0.0 {
       return crate::error::ApiError::BadRequest(
         "spending_cap_usd must be greater than or equal to 0".into(),

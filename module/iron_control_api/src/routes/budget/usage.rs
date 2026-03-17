@@ -523,17 +523,18 @@ pub async fn return_budget(
   if returned > 0 {
     if let Err(err) = state
       .agent_budget_manager
-      .restore_reserved_budget(lease.agent_id, returned)
+      .restore_budget_with_limits(lease.agent_id, lease.provider_key_id, returned)
       .await
     {
       tracing::error!("Database error restoring agent budget: {}", err);
-      // Continue - lease is closed, log the error but don't fail the return
+      // Continue — lease is already closed; budget restoration failure is non-fatal.
+      // Returning an error here would break return_budget idempotency (client cannot retry).
     } else {
       tracing::info!(
         lease_id = %request.lease_id,
         agent_id = lease.agent_id,
         returned_microdollars = %returned,
-        "Budget restored to agent_budgets"
+        "Budget restored to agent_budgets and provider key"
       );
     }
   }

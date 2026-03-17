@@ -730,6 +730,11 @@ impl ProviderKeyStorage {
   /// Uses a conditional UPDATE to ensure the spending cap is not exceeded.
   /// If the cap was exceeded, no update occurs and an error is returned.
   ///
+  /// **Warning:** This method does not enforce spending caps in the SQL expression
+  /// itself beyond the WHERE-clause guard — if the guard passes, the full amount is
+  /// added unconditionally. Use [`reserve_spending`] for the cap-aware reserve/adjust
+  /// workflow where `adjust_spending` applies its own clamping.
+  ///
   /// # Arguments
   ///
   /// * `key_id` - Provider key database ID
@@ -812,6 +817,13 @@ impl ProviderKeyStorage {
   /// Corrects the difference between reserved and actual cost.
   /// If actual < reserved, releases the excess. If actual > reserved, adds the difference.
   ///
+  /// Clamping rules applied at the SQL level:
+  /// - A **positive** delta (actual > reserved) is clamped to `spending_cap_microdollars`
+  ///   so that `spending_used_microdollars` never exceeds the cap, even when the actual
+  ///   cost is higher than the estimate.
+  /// - A **negative** delta (actual < reserved, returning unused budget) is clamped to
+  ///   zero so that `spending_used_microdollars` never goes below zero.
+  ///
   /// # Errors
   ///
   /// Returns error if database update fails
@@ -862,7 +874,7 @@ impl ProviderKeyStorage {
   /// Returns error if key not found or database query fails
   pub async fn get_spending_summary(&self, key_id: i64) -> Result<SpendingSummary> {
     let row: Option<(i64, Option<i64>)> = sqlx::query_as(
-      "SELECT spending_used_microdollars, spending_cap_microdollars \
+      "SELECT COALESCE(spending_used_microdollars, 0), spending_cap_microdollars \
        FROM ai_provider_keys WHERE id = $1",
     )
     .bind(key_id)

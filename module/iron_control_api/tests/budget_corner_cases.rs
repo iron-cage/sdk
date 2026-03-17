@@ -1160,7 +1160,7 @@ async fn test_cost_exactly_equals_remaining_budget() {
   let lease_id = "lease_exact_boundary_test";
   state
     .lease_manager
-    .create_lease(lease_id, 120, 120, 10_000_000, None)
+    .create_lease(lease_id, 120, 120, 10_000_000, None, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 
@@ -1367,7 +1367,7 @@ async fn test_report_usage_integer_overflow_tokens() {
   let lease_id = "lease_tokens_overflow_test";
   state
     .lease_manager
-    .create_lease(lease_id, 121, 121, 10_000_000, None)
+    .create_lease(lease_id, 121, 121, 10_000_000, None, None)
     .await
     .expect("LOUD FAILURE: Should create lease");
 

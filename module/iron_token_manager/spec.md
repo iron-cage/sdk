@@ -201,7 +201,8 @@ lease_mgr.create_lease(
   42,                 // agent_id
   42,                 // budget_id (1:1 with agent)
   10.0,               // budget_granted (USD)
-  None                // expires_at (optional)
+  None,               // expires_at (optional)
+  None                // provider_key_id (optional)
 ).await?;
 
 // Record usage

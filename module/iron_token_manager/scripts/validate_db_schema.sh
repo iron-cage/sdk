@@ -52,7 +52,7 @@ log_warning() {
 
 # Expected counts (update when adding migrations)
 EXPECTED_TABLE_COUNT=46   # 18 application + 28 migration guards
-EXPECTED_INDEX_COUNT=54
+EXPECTED_INDEX_COUNT=56
 
 # Validation state
 VIOLATIONS=0
@@ -120,7 +120,7 @@ log_info "Rule 3: Checking migration guard tables..."
 
 GUARD_VIOLATIONS=0
 
-# Expected migration guards (migrations 001-027, all 26 guards)
+# Expected migration guards (migrations 001-028, all 28 guards)
 EXPECTED_GUARDS=("_migration_001_completed" "_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_007_completed" "_migration_008_completed" "_migration_009_completed" "_migration_010_completed" "_migration_011_completed" "_migration_012_completed" "_migration_013_completed" "_migration_014_completed" "_migration_015_completed" "_migration_016_completed" "_migration_017_completed" "_migration_018_completed" "_migration_019_completed" "_migration_020_completed" "_migration_021_completed" "_migration_022_completed" "_migration_023_completed" "_migration_024_completed" "_migration_025_completed" "_migration_026_completed" "_migration_027_completed" "_migration_028_completed")
 
 for guard in "${EXPECTED_GUARDS[@]}"; do

@@ -201,7 +201,7 @@ pub async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_mic
   .await
   .unwrap();
 
-  // Insert provider key
+  // Insert provider key first (agent references it via FK)
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
   // Create real encrypted provider key for testing
   // Must be inserted BEFORE the agent row so the provider_key_id foreign key is valid

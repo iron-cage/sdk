@@ -37,6 +37,8 @@ pub struct BudgetLease {
   pub created_at: i64,
   /// Expiration timestamp (milliseconds since epoch, None for no expiration)
   pub expires_at: Option<i64>,
+  /// Provider key ID used for this lease (for spending attribution)
+  pub provider_key_id: Option<i64>,
 }
 
 /// Lease manager for budget lease CRUD operations
@@ -80,6 +82,7 @@ impl LeaseManager {
     budget_id: i64,
     budget_granted: i64,
     expires_at: Option<i64>,
+    provider_key_id: Option<i64>,
   ) -> Result<(), sqlx::Error> {
     #[allow(clippy::cast_possible_truncation)]
     let now = SystemTime::now()
@@ -89,8 +92,8 @@ impl LeaseManager {
 
     sqlx::query(
       "INSERT INTO budget_leases
-      (id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at)
-      VALUES (?, ?, ?, ?, 0, 'active', ?, ?)",
+      (id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at, provider_key_id)
+      VALUES (?, ?, ?, ?, 0, 'active', ?, ?, ?)",
     )
     .bind(lease_id)
     .bind(agent_id)
@@ -98,6 +101,7 @@ impl LeaseManager {
     .bind(budget_granted)
     .bind(now)
     .bind(expires_at)
+    .bind(provider_key_id)
     .execute(&self.pool)
     .await?;
 
@@ -115,7 +119,7 @@ impl LeaseManager {
   /// Returns error if database query fails
   pub async fn get_lease(&self, lease_id: &str) -> Result<Option<BudgetLease>, sqlx::Error> {
     let row = sqlx::query(
-      "SELECT id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at
+      "SELECT id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at, provider_key_id
       FROM budget_leases WHERE id = ?"
     )
     .bind( lease_id )
@@ -131,6 +135,7 @@ impl LeaseManager {
       lease_status: r.get("lease_status"),
       created_at: r.get("created_at"),
       expires_at: r.get("expires_at"),
+      provider_key_id: r.get("provider_key_id"),
     }))
   }
 
@@ -197,11 +202,16 @@ impl LeaseManager {
     lease_id: &str,
     additional_budget: i64,
   ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE budget_leases SET budget_granted = budget_granted + ? WHERE id = ?")
-      .bind(additional_budget)
-      .bind(lease_id)
-      .execute(&self.pool)
-      .await?;
+    let result =
+      sqlx::query("UPDATE budget_leases SET budget_granted = budget_granted + ? WHERE id = ?")
+        .bind(additional_budget)
+        .bind(lease_id)
+        .execute(&self.pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+      return Err(sqlx::Error::RowNotFound);
+    }
 
     Ok(())
   }
@@ -235,7 +245,7 @@ impl LeaseManager {
   /// Returns error if database query fails
   pub async fn get_agent_leases(&self, agent_id: i64) -> Result<Vec<BudgetLease>, sqlx::Error> {
     let rows = sqlx::query(
-      "SELECT id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at
+      "SELECT id, agent_id, budget_id, budget_granted, budget_spent, lease_status, created_at, expires_at, provider_key_id
       FROM budget_leases WHERE agent_id = ? AND lease_status = 'active'"
     )
     .bind( agent_id )
@@ -254,6 +264,7 @@ impl LeaseManager {
           lease_status: r.get("lease_status"),
           created_at: r.get("created_at"),
           expires_at: r.get("expires_at"),
+          provider_key_id: r.get("provider_key_id"),
         })
         .collect(),
     )
