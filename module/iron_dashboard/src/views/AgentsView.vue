@@ -639,7 +639,7 @@ async function copyTokenToClipboard() {
               <div
                 v-for="keyId in selectedProviderKeyIds"
                 :key="keyId"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted  max-w-[190px]"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted max-w-[190px]"
               >
                 <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
