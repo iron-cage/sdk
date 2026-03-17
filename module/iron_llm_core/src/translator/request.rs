@@ -130,6 +130,48 @@ pub fn translate_openai_to_anthropic(openai_body: &[u8]) -> Result<Vec<u8>, Stri
     anthropic["stream"] = stream.clone();
   }
 
+  // Translate tools: OpenAI function.parameters → Anthropic input_schema
+  if let Some(tools) = openai.get("tools").and_then(|t| t.as_array()) {
+    let anthropic_tools: Vec<Value> = tools
+      .iter()
+      .filter_map(|tool| {
+        let func = tool.get("function")?;
+        Some(json!({
+          "name": func["name"],
+          "description": func.get("description").cloned().unwrap_or(Value::Null),
+          "input_schema": func.get("parameters").cloned().unwrap_or(json!({"type": "object"})),
+        }))
+      })
+      .collect();
+    anthropic["tools"] = json!(anthropic_tools);
+  }
+
+  // Translate tool_choice:
+  // OpenAI "none" → Anthropic {"type":"none"} (via omission — Anthropic defaults to auto)
+  // OpenAI "auto" → Anthropic {"type":"auto"}
+  // OpenAI "required" → Anthropic {"type":"any"}
+  // OpenAI {"type":"function","function":{"name":"X"}} → Anthropic {"type":"tool","name":"X"}
+  if let Some(tc) = openai.get("tool_choice") {
+    let anthropic_tc = if let Some(s) = tc.as_str() {
+      match s {
+        "auto" => Some(json!({"type": "auto"})),
+        "required" => Some(json!({"type": "any"})),
+        "none" => Some(json!({"type": "none"})),
+        _ => None,
+      }
+    } else if tc.is_object() {
+      // {"type":"function","function":{"name":"X"}}
+      tc["function"]["name"]
+        .as_str()
+        .map(|name| json!({"type": "tool", "name": name}))
+    } else {
+      None
+    };
+    if let Some(atc) = anthropic_tc {
+      anthropic["tool_choice"] = atc;
+    }
+  }
+
   serde_json::to_vec(&anthropic).map_err(|e| format!("Serialization error: {e}"))
 }
 
@@ -204,4 +246,185 @@ fn parse_data_url(url: &str) -> Option<(&str, &str)> {
   let (meta, data) = rest.split_once(',')?;
   let media_type = meta.strip_suffix(";base64")?;
   Some((media_type, data))
+}
+
+/// Translate `OpenAI` `/v1/chat/completions` request to Gemini `generateContent` format
+///
+/// Key transformations:
+/// - `OpenAI` `messages` → Gemini `contents` (role mapping: `assistant` → `model`)
+/// - `OpenAI` `system` message → Gemini `systemInstruction`
+/// - `OpenAI` `tools[].function` → Gemini `tools[].functionDeclarations[]`
+/// - `OpenAI` `tool_choice` → Gemini `toolConfig.functionCallingConfig`
+/// - `OpenAI` `max_tokens` → Gemini `generationConfig.maxOutputTokens`
+///
+/// # Errors
+///
+/// Returns an error string if the input is not valid JSON or serialization fails.
+pub fn translate_openai_to_gemini(openai_body: &[u8]) -> Result<Vec<u8>, String> {
+  let openai =
+    serde_json::from_slice::<Value>(openai_body).map_err(|e| format!("Invalid JSON: {e}"))?;
+
+  let messages = openai["messages"]
+    .as_array()
+    .ok_or("Missing 'messages' array")?;
+
+  // Separate system messages and content messages
+  let mut system_parts = Vec::new();
+  let mut contents = Vec::new();
+
+  for msg in messages {
+    let role = msg["role"].as_str().unwrap_or("");
+    match role {
+      "system" => {
+        let text = extract_text_content(&msg["content"]);
+        if !text.is_empty() {
+          system_parts.push(json!({"text": text}));
+        }
+      }
+      "tool" => {
+        // OpenAI tool result → Gemini functionResponse (role is "user" per Gemini API)
+        contents.push(json!({
+          "role": "user",
+          "parts": [{
+            "functionResponse": {
+              "name": msg.get("name").and_then(|n| n.as_str()).unwrap_or("unknown"),
+              "response": {
+                "content": msg["content"],
+              }
+            }
+          }]
+        }));
+      }
+      "assistant" => {
+        if let Some(tool_calls) = msg["tool_calls"].as_array() {
+          // Assistant with tool calls → Gemini model turn with functionCall parts
+          let mut parts = Vec::new();
+          let text = extract_text_content(&msg["content"]);
+          if !text.is_empty() {
+            parts.push(json!({"text": text}));
+          }
+          for call in tool_calls {
+            let args: Value = call["function"]["arguments"]
+              .as_str()
+              .and_then(|s| serde_json::from_str(s).ok())
+              .unwrap_or(json!({}));
+            parts.push(json!({
+              "functionCall": {
+                "name": call["function"]["name"],
+                "args": args,
+              }
+            }));
+          }
+          contents.push(json!({"role": "model", "parts": parts}));
+        } else {
+          // Plain assistant message
+          let text = extract_text_content(&msg["content"]);
+          contents.push(json!({
+            "role": "model",
+            "parts": [{"text": text}]
+          }));
+        }
+      }
+      _ => {
+        // user and other roles
+        let text = extract_text_content(&msg["content"]);
+        contents.push(json!({
+          "role": "user",
+          "parts": [{"text": text}]
+        }));
+      }
+    }
+  }
+
+  let mut gemini = json!({
+    "contents": contents,
+  });
+
+  // System instruction
+  if !system_parts.is_empty() {
+    gemini["systemInstruction"] = json!({"parts": system_parts});
+  }
+
+  // Generation config
+  let mut gen_config = serde_json::Map::new();
+  if let Some(max_tokens) = openai
+    .get("max_tokens")
+    .or_else(|| openai.get("max_completion_tokens"))
+  {
+    gen_config.insert("maxOutputTokens".to_string(), max_tokens.clone());
+  }
+  if let Some(temp) = openai.get("temperature") {
+    gen_config.insert("temperature".to_string(), temp.clone());
+  }
+  if let Some(top_p) = openai.get("top_p") {
+    gen_config.insert("topP".to_string(), top_p.clone());
+  }
+  if let Some(stop) = openai.get("stop") {
+    if stop.is_array() {
+      gen_config.insert("stopSequences".to_string(), stop.clone());
+    } else if stop.is_string() {
+      gen_config.insert("stopSequences".to_string(), json!([stop]));
+    }
+  }
+  if !gen_config.is_empty() {
+    gemini["generationConfig"] = Value::Object(gen_config);
+  }
+
+  // Translate tools: OpenAI function → Gemini functionDeclarations
+  if let Some(tools) = openai.get("tools").and_then(|t| t.as_array()) {
+    let declarations: Vec<Value> = tools
+      .iter()
+      .filter_map(|tool| {
+        let func = tool.get("function")?;
+        let mut decl = json!({
+          "name": func["name"],
+        });
+        if let Some(desc) = func.get("description") {
+          decl["description"] = desc.clone();
+        }
+        if let Some(params) = func.get("parameters") {
+          decl["parameters"] = params.clone();
+        }
+        Some(decl)
+      })
+      .collect();
+    if !declarations.is_empty() {
+      gemini["tools"] = json!([{"functionDeclarations": declarations}]);
+    }
+  }
+
+  // Translate tool_choice → Gemini toolConfig.functionCallingConfig
+  // OpenAI "auto" → Gemini mode: "AUTO"
+  // OpenAI "required" → Gemini mode: "ANY"
+  // OpenAI "none" → Gemini mode: "NONE"
+  // OpenAI {"type":"function","function":{"name":"X"}} → mode: "ANY" + allowedFunctionNames: ["X"]
+  if let Some(tc) = openai.get("tool_choice") {
+    let tool_config = if let Some(s) = tc.as_str() {
+      match s {
+        "auto" => Some(json!({"functionCallingConfig": {"mode": "AUTO"}})),
+        "required" => Some(json!({"functionCallingConfig": {"mode": "ANY"}})),
+        "none" => Some(json!({"functionCallingConfig": {"mode": "NONE"}})),
+        _ => None,
+      }
+    } else if tc.is_object() {
+      tc["function"]["name"].as_str().map(|name| {
+        json!({"functionCallingConfig": {"mode": "ANY", "allowedFunctionNames": [name]}})
+      })
+    } else {
+      None
+    };
+    if let Some(tc_val) = tool_config {
+      gemini["toolConfig"] = tc_val;
+    }
+  }
+
+  serde_json::to_vec(&gemini).map_err(|e| format!("Serialization error: {e}"))
+}
+
+/// Extract the model name from an `OpenAI` request body
+#[must_use]
+pub fn extract_model(body: &[u8]) -> Option<String> {
+  serde_json::from_slice::<Value>(body)
+    .ok()
+    .and_then(|v| v["model"].as_str().map(String::from))
 }

@@ -400,6 +400,83 @@ async fn test_e2e_health_endpoint() {
   assert_eq!(body["status"], "ok");
 }
 
+/// Streaming responses must preserve the pre-flight spending reservation.
+/// Regression test: previously `cost_info: None` on streaming caused
+/// `adjust_spending(estimated, 0)`, releasing the full reservation and
+/// tracking the request as free — allowing spending cap bypass over time.
+#[tokio::test]
+async fn test_e2e_streaming_preserves_spending_reservation() {
+  // Setup mock LLM provider returning SSE streaming response
+  let mock_server = MockServer::start().await;
+  let sse_body = "\
+    data: {\"id\":\"chatcmpl-stream\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":null}]}\n\n\
+    data: {\"id\":\"chatcmpl-stream\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"!\"},\"finish_reason\":\"stop\"}]}\n\n\
+    data: [DONE]\n\n";
+  Mock::given(matchers::method("POST"))
+    .and(matchers::path("/v1/chat/completions"))
+    .respond_with(
+      ResponseTemplate::new(200)
+        .insert_header("content-type", "text/event-stream")
+        .set_body_string(sse_body),
+    )
+    .expect(1)
+    .mount(&mock_server)
+    .await;
+
+  // Setup database
+  let pool = setup_test_db().await;
+  create_test_user(&pool).await;
+
+  let crypto = Arc::new(CryptoService::new(&TEST_MASTER_KEY).expect("crypto init"));
+  let key_id = create_test_provider_key(&pool, &crypto, &mock_server.uri()).await;
+  let _agent_id = create_test_agent(&pool, key_id, TEST_IC_TOKEN).await;
+
+  // Verify spending starts at zero
+  let storage = ProviderKeyStorage::new(pool.clone());
+  let before = storage
+    .get_spending_summary(key_id)
+    .await
+    .expect("spending summary");
+  assert_eq!(before.used_microdollars, 0, "Spending should start at 0");
+
+  // Start proxy and send streaming request
+  let state = build_test_state(pool.clone(), crypto);
+  let proxy_url = start_test_proxy(state).await;
+
+  let client = Client::new();
+  let resp = client
+    .post(format!("{proxy_url}/v1/chat/completions"))
+    .header("Authorization", format!("Bearer {TEST_IC_TOKEN}"))
+    .json(&serde_json::json!({
+      "model": "gpt-4",
+      "messages": [{"role": "user", "content": "Hello!"}],
+      "stream": true
+    }))
+    .send()
+    .await
+    .expect("Request failed");
+
+  assert_eq!(resp.status(), 200, "Expected 200 OK");
+
+  // Consume the streaming response fully
+  let _body = resp.bytes().await.expect("Failed to read streaming body");
+
+  // Allow a small window for the proxy to finish its post-response work
+  tokio::time::sleep(Duration::from_millis(50)).await;
+
+  // Verify spending was NOT released back to zero
+  let after = storage
+    .get_spending_summary(key_id)
+    .await
+    .expect("spending summary");
+  assert!(
+    after.used_microdollars > 0,
+    "Streaming request spending must be preserved (got {}), \
+     not released to zero — otherwise spending cap can be bypassed",
+    after.used_microdollars
+  );
+}
+
 /// IC Token via x-api-key header also works.
 #[tokio::test]
 async fn test_e2e_x_api_key_header_auth() {

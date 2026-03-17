@@ -192,22 +192,22 @@ async fn handle_proxy_inner(
   // Step 9: Adjust spending to actual cost.
   // The pre-flight reservation (Step 5b) already incremented by estimated_cost.
   // Now correct the delta: release excess if actual < estimated, or add if actual > estimated.
-  let actual_cost = forward_resp
-    .cost_info
-    .as_ref()
-    .map_or(0, |c| i64::try_from(c.cost_micros).unwrap_or(i64::MAX));
-
-  if let Err(e) = state
-    .provider_key_storage
-    .adjust_spending(provider_key_id, estimated_cost, actual_cost)
-    .await
-  {
-    tracing::error!(
-      key_id = provider_key_id,
-      estimated = estimated_cost,
-      actual = actual_cost,
-      "Failed to adjust spending after forward: {e}"
-    );
+  // For streaming responses cost_info is None — keep the conservative estimate
+  // to avoid under-counting spending (which could allow spending cap bypass).
+  if let Some(cost) = &forward_resp.cost_info {
+    let actual_cost = i64::try_from(cost.cost_micros).unwrap_or(i64::MAX);
+    if let Err(e) = state
+      .provider_key_storage
+      .adjust_spending(provider_key_id, estimated_cost, actual_cost)
+      .await
+    {
+      tracing::error!(
+        key_id = provider_key_id,
+        estimated = estimated_cost,
+        actual = actual_cost,
+        "Failed to adjust spending after forward: {e}"
+      );
+    }
   }
 
   // Step 10: Return provider response to agent (no API key leaks)

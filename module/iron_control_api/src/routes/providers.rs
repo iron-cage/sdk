@@ -745,7 +745,10 @@ pub async fn assign_provider_to_project(
       .into_response();
   }
 
-  // Assign to project
+  // qqq: BOLA — no project ownership check. Both Admin and Manager roles
+  // have ManageProviderKeys. No projects table exists yet, so ownership
+  // cannot be verified. Add a project ownership guard once projects are
+  // implemented as first-class entities.
   match state
     .storage
     .assign_to_project(request.provider_key_id, &project_id)
@@ -799,7 +802,9 @@ pub async fn unassign_provider_from_project(
     }
   };
 
-  // Unassign from project
+  // qqq: BOLA — no project ownership check (same as assign_provider_to_project).
+  // Both Admin and Manager have ManageProviderKeys. Add ownership guard
+  // once projects are first-class entities.
   match state
     .storage
     .unassign_from_project(provider_key_id, &project_id)

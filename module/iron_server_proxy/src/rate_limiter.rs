@@ -25,7 +25,11 @@ pub const MAX_AUTH_FAILURES: usize = 20;
 const AUTH_WINDOW: Duration = Duration::from_secs(60);
 
 /// Hard cap on tracked IPs to prevent memory exhaustion.
-const MAX_ENTRIES: NonZeroUsize = const { NonZeroUsize::new(100_000).unwrap() };
+// SAFETY: 100_000 is non-zero, so this never panics.
+const MAX_ENTRIES: NonZeroUsize = match NonZeroUsize::new(100_000) {
+  Some(v) => v,
+  None => unreachable!(),
+};
 
 /// Per-IP sliding window rate limiter for auth failures.
 ///

@@ -101,15 +101,25 @@ pub async fn forward_request(
   let model_provider = provider::detect_provider_from_model(&request.body);
   let target_provider = path_provider.or(model_provider).unwrap_or("openai");
 
-  // 2. Detect if translation is needed (OpenAI format + Anthropic model)
+  // 2. Detect if translation is needed (OpenAI format + non-OpenAI provider)
   let is_openai_format = clean_path.contains("/chat/completions");
-  let needs_translation = is_openai_format && target_provider == "anthropic";
+  let needs_anthropic_translation = is_openai_format && target_provider == "anthropic";
+  let needs_gemini_translation = is_openai_format && target_provider == "gemini";
 
   // 3. Prepare request body (translate if needed)
-  let (request_body, request_path) = if needs_translation {
+  let (request_body, request_path) = if needs_anthropic_translation {
     let translated = translator::translate_openai_to_anthropic(&request.body)
       .map_err(|e| LlmCoreError::Translation(format!("Request: {e}")))?;
     (translated, "/v1/messages".to_string())
+  } else if needs_gemini_translation {
+    let translated = translator::translate_openai_to_gemini(&request.body)
+      .map_err(|e| LlmCoreError::Translation(format!("Request: {e}")))?;
+    // Gemini endpoint: /v1beta/models/{model}:generateContent
+    let model = translator::extract_model(&request.body).unwrap_or_else(|| "gemini-pro".into());
+    (
+      translated,
+      format!("/v1beta/models/{model}:generateContent"),
+    )
   } else {
     (request.body.clone(), clean_path)
   };
@@ -120,6 +130,8 @@ pub async fn forward_request(
     .as_deref()
     .unwrap_or(match target_provider {
       "anthropic" => "https://api.anthropic.com",
+      "gemini" => "https://generativelanguage.googleapis.com",
+      "xai" => "https://api.x.ai",
       _ => "https://api.openai.com",
     });
 
@@ -130,15 +142,25 @@ pub async fn forward_request(
     .request(request.method, &target_url)
     .header(header::CONTENT_TYPE, "application/json");
 
-  if target_provider == "anthropic" {
-    req_builder = req_builder
-      .header("x-api-key", provider_key.api_key.expose_secret().as_str())
-      .header("anthropic-version", "2023-06-01");
-  } else {
-    req_builder = req_builder.header(
-      header::AUTHORIZATION,
-      format!("Bearer {}", provider_key.api_key.expose_secret().as_str()),
-    );
+  match target_provider {
+    "anthropic" => {
+      req_builder = req_builder
+        .header("x-api-key", provider_key.api_key.expose_secret().as_str())
+        .header("anthropic-version", "2023-06-01");
+    }
+    "gemini" => {
+      req_builder = req_builder.header(
+        "x-goog-api-key",
+        provider_key.api_key.expose_secret().as_str(),
+      );
+    }
+    _ => {
+      // OpenAI, xAI, and other Bearer-token providers
+      req_builder = req_builder.header(
+        header::AUTHORIZATION,
+        format!("Bearer {}", provider_key.api_key.expose_secret().as_str()),
+      );
+    }
   }
 
   // 6. Detect streaming from original request body
@@ -162,7 +184,8 @@ pub async fn forward_request(
   if is_streaming {
     tracing::debug!(
       target_provider,
-      needs_translation,
+      needs_anthropic_translation,
+      needs_gemini_translation,
       status = %status,
       "LLM streaming request forwarded"
     );
@@ -190,8 +213,11 @@ pub async fn forward_request(
       "Provider auth error (original body suppressed to prevent key leakage)"
     );
     br#"{"error":{"message":"Provider authentication failed","type":"auth_error"}}"#.to_vec()
-  } else if needs_translation && status.is_success() {
+  } else if needs_anthropic_translation && status.is_success() {
     translator::translate_anthropic_to_openai(&resp_body)
+      .map_err(|e| LlmCoreError::Translation(format!("Response: {e}")))?
+  } else if needs_gemini_translation && status.is_success() {
+    translator::translate_gemini_to_openai(&resp_body)
       .map_err(|e| LlmCoreError::Translation(format!("Response: {e}")))?
   } else {
     resp_body.to_vec()
@@ -206,7 +232,8 @@ pub async fn forward_request(
 
   tracing::debug!(
     target_provider,
-    needs_translation,
+    needs_anthropic_translation,
+    needs_gemini_translation,
     status = %status,
     "LLM request forwarded"
   );

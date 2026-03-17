@@ -20,7 +20,7 @@
 /// ```
 #[must_use]
 pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
-  if path.starts_with("/anthropic/") || path.starts_with("/anthropic") {
+  if path.starts_with("/anthropic/") || path == "/anthropic" {
     let clean = path.strip_prefix("/anthropic").unwrap_or(path);
     let clean = if clean.is_empty() {
       "/".to_string()
@@ -28,7 +28,7 @@ pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
       clean.to_string()
     };
     (clean, Some("anthropic"))
-  } else if path.starts_with("/openai/") || path.starts_with("/openai") {
+  } else if path.starts_with("/openai/") || path == "/openai" {
     let clean = path.strip_prefix("/openai").unwrap_or(path);
     let clean = if clean.is_empty() {
       "/".to_string()
@@ -36,6 +36,22 @@ pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
       clean.to_string()
     };
     (clean, Some("openai"))
+  } else if path.starts_with("/gemini/") || path == "/gemini" {
+    let clean = path.strip_prefix("/gemini").unwrap_or(path);
+    let clean = if clean.is_empty() {
+      "/".to_string()
+    } else {
+      clean.to_string()
+    };
+    (clean, Some("gemini"))
+  } else if path.starts_with("/xai/") || path == "/xai" {
+    let clean = path.strip_prefix("/xai").unwrap_or(path);
+    let clean = if clean.is_empty() {
+      "/".to_string()
+    } else {
+      clean.to_string()
+    };
+    (clean, Some("xai"))
   } else {
     (path.to_string(), None)
   }
@@ -46,7 +62,11 @@ pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
 /// Inspects the `"model"` field of the JSON body:
 /// - Models starting with `"claude"` → `"anthropic"`
 /// - Models starting with `"gpt"`, `"o1"`, or `"o3"` → `"openai"`
+/// - Models starting with `"gemini"` → `"gemini"`
+/// - Models starting with `"grok"` → `"xai"`
 /// - Otherwise → `None`
+///
+// qqq: gemini and xai providers also need to be added to the Python client library.
 #[must_use]
 pub fn detect_provider_from_model(body: &[u8]) -> Option<&'static str> {
   if let Ok(json) = serde_json::from_slice::<serde_json::Value>(body) {
@@ -56,6 +76,12 @@ pub fn detect_provider_from_model(body: &[u8]) -> Option<&'static str> {
       }
       if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") {
         return Some("openai");
+      }
+      if model.starts_with("gemini") {
+        return Some("gemini");
+      }
+      if model.starts_with("grok") {
+        return Some("xai");
       }
     }
   }
