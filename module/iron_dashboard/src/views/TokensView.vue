@@ -175,18 +175,18 @@ async function copyToken(token: string) {
       </template>
 
       <tr v-for="token in tokens" :key="token.id">
-        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">{{ token.id }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ token.id }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           <Badge variant="outline" class="max-w-[120px] truncate" :title="token.provider || '-'">{{ token.provider || '-' }}</Badge>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="token.name || '-'">{{ token.name || '-' }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(token.created_at) }}</td>
-        <td class="px-6 py-4 whitespace-nowrap">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="token.name || '-'">{{ token.name || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(token.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <Badge :variant="token.is_active ? 'default' : 'destructive'">
             {{ token.is_active ? 'Active' : 'Revoked' }}
           </Badge>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu v-if="token.is_active">
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">
