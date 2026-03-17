@@ -209,7 +209,7 @@ function openLogModal(event: AnalyticsEvent) {
   <PageLayout title="Analytics" content-class="p-4 lg:p-6">
     <template #actions>
       <!-- Mobile: filters dropdown -->
-      <Popover class="sm:hidden">
+      <Popover>
         <PopoverTrigger as-child>
           <Button variant="outline" size="sm" class="sm:hidden">
             Filters
