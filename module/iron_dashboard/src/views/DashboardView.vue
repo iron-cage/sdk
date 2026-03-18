@@ -19,15 +19,15 @@ const router = useRouter()
 const authStore = useAuthStore()
 const api = useApi()
 
-const { data: spending } = useQuery({
+const { data: spending, isLoading: spendingLoading } = useQuery({
   queryKey: ['analytics-spending'],
   queryFn: () => api.getAnalyticsSpendingTotal({ period: 'all-time' }),
 })
-const { data: requestUsage } = useQuery({
+const { data: requestUsage, isLoading: requestsLoading } = useQuery({
   queryKey: ['analytics-requests'],
   queryFn: () => api.getAnalyticsUsageRequests({ period: 'all-time' }),
 })
-const { data: agents } = useQuery({
+const { data: agents, isLoading: agentsLoading } = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
@@ -43,6 +43,7 @@ const { data: health, isLoading: healthLoading, isError: healthError } = useQuer
   retry: 0,
 })
 
+const statsLoading   = computed(() => spendingLoading.value || requestsLoading.value || agentsLoading.value)
 const totalSpend     = computed(() => spending.value?.total_spend ?? 0)
 const totalRequests  = computed(() => requestUsage.value?.total_requests ?? 0)
 const successRate    = computed(() => requestUsage.value?.success_rate ?? 0)
@@ -86,7 +87,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Total Spending</span>
           <IconCoin class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ formatCostUsd(totalSpend, 3) }}</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ formatCostUsd(totalSpend, 3) }}</p>
         <p class="text-xs text-muted-foreground mt-1">All time</p>
       </div>
 
@@ -96,7 +98,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Total Requests</span>
           <IconBarChart class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ formatNumber(totalRequests) }}</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ formatNumber(totalRequests) }}</p>
         <p class="text-xs text-muted-foreground mt-1">API calls made</p>
       </div>
 
@@ -106,7 +109,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Success Rate</span>
           <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ successRate.toFixed(1) }}%</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ successRate.toFixed(1) }}%</p>
         <p class="text-xs text-muted-foreground mt-1">{{ formatNumber(successfulReqs) }}/{{ formatNumber(totalRequests) }} successful</p>
       </div>
 
@@ -116,7 +120,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Active Agents</span>
           <IconCog class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ agentCount }}</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ agentCount }}</p>
         <p class="text-xs text-muted-foreground mt-1">Registered agents</p>
       </div>
     </div>
@@ -186,7 +191,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <p v-if="topSpenders.length === 0" class="text-sm text-muted-foreground text-center py-2">No data yet</p>
           <div
             v-for="(agent, i) in topSpenders"
-            :key="agent.agent_name"
+            :key="agent.agent_id"
             class="flex items-center justify-between"
           >
             <div class="flex items-center gap-3 min-w-0">

@@ -55,6 +55,10 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = tokens.user.id
     role.value = tokens.user.role
 
+    // SECURITY NOTE: localStorage is XSS-accessible. Access and refresh tokens are
+    // stored here for SPA session persistence. The accepted risk is that an XSS
+    // vulnerability would expose these tokens. Mitigations: strict CSP, short token
+    // TTLs, and refresh token rotation are required to limit blast radius.
     localStorage.setItem('access_token', tokens.user_token)
     localStorage.setItem('refresh_token', tokens.refresh_token)
     localStorage.setItem('username', username.value)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '../composables/useApi'
 import IconChip from '@/components/icons/IconChip.vue'
@@ -194,6 +194,7 @@ function formatCost(cost: number): string {
 }
 
 function loadMoreLogs() {
+  if (logsPage.value >= totalPages.value || eventsFetching.value) return
   logsPage.value++
 }
 
@@ -204,6 +205,15 @@ function openLogModal(event: AnalyticsEvent) {
   selectedLog.value = event
   showLogModal.value = true
 }
+
+watch(showLogModal, (open) => {
+  if (!open) selectedLog.value = null
+})
+
+onUnmounted(() => {
+  accumulatedLogs.value = []
+  selectedLog.value = null
+})
 </script>
 
 <template>

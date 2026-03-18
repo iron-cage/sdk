@@ -5,7 +5,7 @@ export function useConfirm() {
   const confirmTitle = ref('')
   const confirmDescription = ref('')
   const confirmLabel = ref('Confirm')
-  const confirmVariant = ref<'default' | 'destructive'>('destructive')
+  const confirmVariant = ref<'default' | 'destructive'>('default')
   const confirmCallback = ref<(() => void) | null>(null)
 
   function openConfirm(
@@ -13,7 +13,7 @@ export function useConfirm() {
     description: string,
     label: string,
     action: () => void | Promise<void>,
-    variant: 'default' | 'destructive' = 'destructive',
+    variant: 'default' | 'destructive' = 'default',
   ) {
     confirmTitle.value = title
     confirmDescription.value = description

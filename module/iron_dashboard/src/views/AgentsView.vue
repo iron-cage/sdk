@@ -53,7 +53,6 @@ const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
-const showDeleteModal = ref(false)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const name = ref('')
 const selectedProviderKeyIds = ref<number[]>([])
@@ -61,7 +60,6 @@ const addingProviderKeyId = ref<string>('')
 const initialBudgetUsd = ref<number | undefined>(undefined)
 const selectedOwnerId = ref<string>('')
 const selectedAgent = ref<Agent | null>(null)
-const agentToDelete = ref<Agent | null>(null)
 const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
 const icTokenStatusLoading = ref(false)
 const tokenActionLoadingId = ref<number | null>(null)
@@ -255,16 +253,13 @@ function handleUpdateAgent() {
 }
 
 function handleDeleteAgent(agent: Agent) {
-  agentToDelete.value = agent
-  showDeleteModal.value = true
-}
-
-function confirmDelete() {
-  if (agentToDelete.value) {
-    deleteMutation.mutate(agentToDelete.value.id)
-    showDeleteModal.value = false
-    agentToDelete.value = null
-  }
+  openConfirm(
+    'Delete Agent',
+    `Delete "${agent.name}"? This action cannot be undone.`,
+    'Delete',
+    () => deleteMutation.mutate(agent.id),
+    'destructive',
+  )
 }
 
 function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
@@ -319,6 +314,7 @@ async function handleRegenerateIcToken(agent: Agent) {
         tokenActionLoadingId.value = null
       }
     },
+    'destructive',
   )
 }
 
@@ -341,6 +337,7 @@ async function handleRevokeIcToken(agent: Agent) {
         tokenActionLoadingId.value = null
       }
     },
+    'destructive',
   )
 }
 
@@ -701,37 +698,6 @@ async function copyTokenToClipboard() {
           >
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- Delete Confirmation Modal -->
-    <Dialog v-model:open="showDeleteModal">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Delete Agent</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete "{{ agentToDelete?.name }}"? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter>
-          <Button
-            :disabled="deleteMutation.isPending.value"
-            variant="outline"
-            @click="showDeleteModal = false"
-          >
-            <IconX />
-            Cancel
-          </Button>
-          <Button
-            :disabled="deleteMutation.isPending.value"
-            variant="destructive"
-            @click="confirmDelete"
-          >
-            <IconTrash />
-            {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
           </Button>
         </DialogFooter>
       </DialogContent>

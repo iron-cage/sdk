@@ -149,6 +149,7 @@ const activateMutation = useMutation({
 })
 
 function handleToggleStatus(user: User) {
+  if (user.id === authStore.userId) return
   if (user.is_active) {
     userToDisable.value = user
     showDisableConfirm.value = true
@@ -158,6 +159,7 @@ function handleToggleStatus(user: User) {
       `Restore access for ${user.username}?`,
       'Activate',
       () => activateMutation.mutate(user.id),
+      'default',
     )
   }
 }
@@ -182,6 +184,7 @@ const deleteMutation = useMutation({
 })
 
 function handleDeleteUser(user: User) {
+  if (user.id === authStore.userId) return
   userToDelete.value = user
   showDeleteConfirm.value = true
 }
@@ -206,6 +209,7 @@ const changeRoleMutation = useMutation({
 })
 
 function handleChangeRole(user: User) {
+  if (user.id === authStore.userId) return
   userToChangeRole.value = user
   newRole.value = user.role
   showChangeRoleModal.value = true
