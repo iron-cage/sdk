@@ -841,11 +841,6 @@ These components are project-specific and not part of shadcn-vue.
 **Emits:** `update:open`, `confirm`
 **Used with:** `useConfirm` composable
 
-### FormDialog.vue
-**Purpose:** Generic form dialog wrapper with consistent header/footer layout.
-**Props:** `open`, `title`, `description`
-**Emits:** `update:open`
-
 ### AvatarInitial.vue
 **Purpose:** Circular avatar displaying the first letter(s) of a name with a stable colour derived from a position-weighted hash.
 **Props:** `name: string`
@@ -1358,7 +1353,7 @@ function handleAction() { /* ... */ }
 | └─ Toast | ~12 | Toast (multiple subcomponents, not currently used) |
 | **Views** | **8** | LoginView, DashboardView, AgentsView, UsageView, LimitsView, TokensView, ProvidersView, UsersView |
 | **Layout Components** | **2** | App, MainLayout |
-| **Custom Shared Components** | **10** | AvatarInitial, ConfirmDialog, DataTable, FormDialog, PageLayout, PercentBar, ProviderBadge, StatCard, StatusBadge, TrendBadge |
+| **Custom Shared Components** | **9** | AvatarInitial, ConfirmDialog, DataTable, PageLayout, PercentBar, ProviderBadge, StatCard, StatusBadge, TrendBadge |
 | **Composables** | **2** | useApi, useConfirm |
 | **Total** | **89+** | 57 UI .vue files + 8 views + 12 custom components/layout + 2 .ts composables + 12 index.ts exports |
 
