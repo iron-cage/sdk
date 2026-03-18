@@ -7,6 +7,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 // refresh request (token refresh race condition).
 let _refreshPromise: Promise<void> | null = null
 
+// Prevents concurrent refresh-failure handlers from each firing an independent
+// server-side logout revocation request.
+let _logoutPromise: Promise<void> | null = null
+
 interface TokenMetadata {
   id: number
   user_id: string
@@ -201,12 +205,18 @@ export function useApi() {
         if (newAuth) headers['Authorization'] = newAuth
         response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
       } catch {
-        await authStore.logout()
+        if (!_logoutPromise) {
+          _logoutPromise = authStore.logout().finally(() => { _logoutPromise = null })
+        }
+        await _logoutPromise
         router.push('/login')
         throw new Error('Session expired')
       }
     } else if (response.status === 401) {
-      await authStore.logout()
+      if (!_logoutPromise) {
+        _logoutPromise = authStore.logout().finally(() => { _logoutPromise = null })
+      }
+      await _logoutPromise
       router.push('/login')
       throw new Error('Session expired')
     }

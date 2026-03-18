@@ -136,7 +136,7 @@ function removeProviderKey(keyId: number) {
 
 function ownerEmail(ownerId: string | null | undefined): string {
   if (!ownerId) return 'Unknown'
-  if (!users.value) return ownerId
+  if (!users.value) return 'Unknown'
   const user = ownerMap.value.get(ownerId)
   return user?.email || user?.username || ownerId
 }
