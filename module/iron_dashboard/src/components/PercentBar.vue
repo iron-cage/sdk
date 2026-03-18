@@ -18,7 +18,7 @@ const colorClass = computed(() => {
 })
 
 const normalizedPercentage = computed(() => {
-  if (props.percentage < 0) return 0
+  if (!Number.isFinite(props.percentage) || props.percentage < 0) return 0
   if (props.percentage > 100) return 100
   return props.percentage
 })

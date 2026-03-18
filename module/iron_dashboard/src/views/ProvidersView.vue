@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate, formatCostUsd } from '@/lib/formatters'
+import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
 import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
@@ -48,6 +48,7 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
+const toggleLoadingId = ref<number | null>(null)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
 
@@ -123,6 +124,7 @@ const toggleMutation = useMutation({
     toast.error('Failed to update provider key')
   },
   onSettled: () => {
+    toggleLoadingId.value = null
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
@@ -184,6 +186,7 @@ function handleDeleteKey(key: ProviderKey) {
 }
 
 function handleToggleEnabled(key: ProviderKey) {
+  toggleLoadingId.value = key.id
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
@@ -239,7 +242,7 @@ watch(showCreateModal, (open) => {
           <Button
             variant="outline"
             size="sm"
-            :disabled="toggleMutation.isPending.value"
+            :disabled="toggleLoadingId === key.id"
             @click="handleToggleEnabled(key)"
           >
             <IconCheck v-if="key.is_enabled" class="text-success" />
@@ -247,7 +250,7 @@ watch(showCreateModal, (open) => {
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(key.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(key.created_at) }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>

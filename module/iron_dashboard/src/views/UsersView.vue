@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type CreateUserRequest, type User } from '../composables/useApi'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -52,6 +54,7 @@ import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 const api = useApi()
 const queryClient = useQueryClient()
 const authStore = useAuthStore()
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 
 // State
 const page = ref(1)
@@ -59,7 +62,6 @@ const pageSize = ref(20)
 const search = ref('')
 const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
-const isActiveFilter = ref<boolean | undefined>(undefined)
 
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
@@ -85,13 +87,12 @@ const forcePasswordChange = ref(true)
 
 // Fetch users
 const { data: usersData, isLoading, error, refetch } = useQuery({
-  queryKey: ['users', page, pageSize, searchDebounced, roleFilter, isActiveFilter],
+  queryKey: ['users', page, pageSize, searchDebounced, roleFilter],
   queryFn: () => api.getUsers({
     page: page.value,
     page_size: pageSize.value,
     search: searchDebounced.value || undefined,
     role: roleFilter.value === 'all' ? undefined : roleFilter.value,
-    is_active: isActiveFilter.value
   }),
 })
 
@@ -152,7 +153,12 @@ function handleToggleStatus(user: User) {
     userToDisable.value = user
     showDisableConfirm.value = true
   } else {
-    activateMutation.mutate(user.id)
+    openConfirm(
+      'Activate User',
+      `Restore access for ${user.username}?`,
+      'Activate',
+      () => activateMutation.mutate(user.id),
+    )
   }
 }
 
@@ -246,7 +252,7 @@ function confirmResetPassword() {
 }
 
 // Watch for filter changes to reset page
-watch([searchDebounced, roleFilter, isActiveFilter], () => {
+watch([searchDebounced, roleFilter], () => {
   page.value = 1
 })
 
@@ -361,9 +367,12 @@ watch(showCreateModal, (open) => {
       <template #footer>
         <div v-if="usersData" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <p class="text-xs text-muted-foreground">
-            Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
-            to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
-            of <span class="font-medium">{{ usersData.total }}</span> results
+            <template v-if="usersData.total > 0">
+              Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
+              to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
+              of <span class="font-medium">{{ usersData.total }}</span> results
+            </template>
+            <template v-else>No results</template>
           </p>
           <div class="flex gap-2">
             <Button variant="outline" :disabled="page === 1" @click="page--"><IconChevronLeft />Previous</Button>
@@ -571,6 +580,15 @@ watch(showCreateModal, (open) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      :variant="confirmVariant"
+      @confirm="confirmCallback?.()"
+    />
 
     <!-- Reset Password Modal -->
     <Dialog v-model:open="showResetPasswordModal">

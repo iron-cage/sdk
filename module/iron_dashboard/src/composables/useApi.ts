@@ -1,6 +1,11 @@
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+// Prevents concurrent 401 responses from each triggering an independent
+// refresh request (token refresh race condition).
+let _refreshPromise: Promise<void> | null = null
 
 interface TokenMetadata {
   id: number
@@ -166,6 +171,7 @@ interface RejectBudgetRequestResponse {
 
 export function useApi() {
   const authStore = useAuthStore()
+  const router = useRouter()
 
   async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
@@ -187,15 +193,22 @@ export function useApi() {
     // Attempt token refresh on 401, retry once
     if (response.status === 401 && authStore.refreshToken) {
       try {
-        await authStore.refresh()
+        if (!_refreshPromise) {
+          _refreshPromise = authStore.refresh().finally(() => { _refreshPromise = null })
+        }
+        await _refreshPromise
         const newAuth = authStore.getAuthHeader()
         if (newAuth) headers['Authorization'] = newAuth
         response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
       } catch {
         await authStore.logout()
-        window.location.href = '/login'
+        router.push('/login')
         throw new Error('Session expired')
       }
+    } else if (response.status === 401) {
+      await authStore.logout()
+      router.push('/login')
+      throw new Error('Session expired')
     }
 
     if (!response.ok) {
@@ -208,7 +221,11 @@ export function useApi() {
     if (!text) {
       return undefined as T
     }
-    return JSON.parse(text)
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      throw new Error('Invalid response from server (expected JSON)')
+    }
   }
 
   // Health API
@@ -403,8 +420,8 @@ export function useApi() {
     })
   }
 
-  async function deleteUser(id: string): Promise<User> {
-    return fetchApi<User>(`/api/v1/users/${id}`, {
+  async function deleteUser(id: string): Promise<void> {
+    await fetchApi<void>(`/api/v1/users/${id}`, {
       method: 'DELETE',
     })
   }
@@ -460,29 +477,6 @@ export function useApi() {
 
   async function getAgentTokens(agentId: number): Promise<TokenMetadata[]> {
     return fetchApi<TokenMetadata[]>(`/api/v1/agents/${agentId}/tokens`)
-  }
-
-  async function createAgentToken(data: { agent_id: number; user_id: string; provider: string; description?: string }): Promise<CreateTokenResponse> {
-    // TODO: Update backend to accept agent_id and provider
-    return fetchApi<CreateTokenResponse>('/api/v1/api-tokens', {
-      method: 'POST',
-      body: JSON.stringify({
-        user_id: data.user_id,
-        description: data.description,
-        // Backend needs to be updated to accept these fields
-        agent_id: data.agent_id,
-        provider: data.provider,
-      }),
-    })
-  }
-
-  async function updateTokenProvider(tokenId: number, provider: string): Promise<void> {
-    // TODO: Add backend endpoint for updating token provider
-    // For now, this is a placeholder
-    await fetchApi<void>(`/api/v1/api-tokens/${tokenId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ provider }),
-    })
   }
 
   // ============================================================================
@@ -738,8 +732,6 @@ export function useApi() {
     updateAgentBudget,
     deleteAgent,
     getAgentTokens,
-    createAgentToken,
-    updateTokenProvider,
     // IC Token methods (agent runtime authentication)
     generateIcToken,
     getIcTokenStatus,

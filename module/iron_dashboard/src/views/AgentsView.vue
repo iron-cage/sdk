@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
-import { formatDate, formatTimestamp } from '@/lib/formatters'
+import { formatTimestamp } from '@/lib/formatters'
 import { useConfirm } from '@/composables/useConfirm'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -344,6 +344,16 @@ async function handleRevokeIcToken(agent: Agent) {
   )
 }
 
+watch(showCreateModal, (open) => {
+  if (!open) {
+    name.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
+    initialBudgetUsd.value = undefined
+    selectedOwnerId.value = ''
+  }
+})
+
 async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return
 
@@ -422,7 +432,7 @@ async function copyTokenToClipboard() {
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          {{ formatDate(agent.created_at) }}
+          {{ formatTimestamp(agent.created_at) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
@@ -508,6 +518,7 @@ async function copyTokenToClipboard() {
                 <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
+                  :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive"
                   @click="removeProviderKey(keyId)"
                 >
@@ -627,6 +638,7 @@ async function copyTokenToClipboard() {
                 <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
+                  :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive"
                   @click="removeProviderKey(keyId)"
                 >

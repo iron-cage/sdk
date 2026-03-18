@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatTimestamp } from '@/lib/formatters'
+import { formatTimestamp, formatCostUsd, formatNumber } from '@/lib/formatters'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
-import { formatCostUsd, formatNumber } from '@/lib/formatters'
 import StatCard from '@/components/cards/StatCard.vue'
 import IconCoin from '@/components/icons/IconCoin.vue'
 import IconBarChart from '@/components/icons/IconBarChart.vue'
@@ -41,6 +40,7 @@ const { data: health, isLoading: healthLoading, isError: healthError } = useQuer
   queryKey: ['health'],
   queryFn: () => api.getHealth(),
   refetchInterval: 30_000,
+  retry: 0,
 })
 
 const totalSpend     = computed(() => spending.value?.total_spend ?? 0)

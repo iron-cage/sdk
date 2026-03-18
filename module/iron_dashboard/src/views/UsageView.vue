@@ -106,7 +106,7 @@ const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
 })
 
-const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
+const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching, error: eventsError } = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderId, logsPage],
   queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
 })
@@ -149,15 +149,14 @@ watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
 })
 
 const agentBreakdown = computed<AgentSpending[]>(() => {
-  const data = spendingByAgent.value?.data ?? []
-  return [...data].sort((a, b) => b.spending - a.spending)
+  return spendingByAgent.value?.data ?? []
 })
 
 const isLoading = computed(() =>
   requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
 )
 const error = computed(() =>
-  requestsError.value || providerError.value || modelError.value
+  requestsError.value || providerError.value || modelError.value || eventsError.value
 )
 
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
@@ -261,7 +260,7 @@ function openLogModal(event: AnalyticsEvent) {
 
     <!-- Error state -->
     <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading usage analytics: {{ (error as Error).message }}</p>
+      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : String(error) }}</p>
     </div>
 
     <!-- Analytics content -->

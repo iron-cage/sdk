@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'vue-sonner'
-import { formatDate } from '@/lib/formatters'
+import { formatTimestamp } from '@/lib/formatters'
 import { useConfirm } from '@/composables/useConfirm'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -186,7 +186,7 @@ async function copyToken(token: string) {
           <Badge variant="outline">{{ token.provider || '-' }}</Badge>
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-base text-foreground">{{ token.name || '-' }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(token.created_at) }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(token.created_at) }}</td>
         <td class="px-6 py-4 whitespace-nowrap">
           <Badge :variant="token.is_active ? 'default' : 'destructive'">
             {{ token.is_active ? 'Active' : 'Revoked' }}
@@ -309,7 +309,7 @@ async function copyToken(token: string) {
             <Label>Token</Label>
             <div class="flex space-x-2">
               <Input
-                v-model="newTokenData.token"
+                :value="newTokenData.token"
                 readonly
                 class="font-mono text-base bg-muted"
               />

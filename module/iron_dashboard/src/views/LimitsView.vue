@@ -258,9 +258,9 @@ function riskBadgeVariant(risk: string) {
             <IconX />
             Cancel
           </Button>
-          <Button @click="handleUpdateBudget">
+          <Button :disabled="updateBudgetMutation.isPending.value" @click="handleUpdateBudget">
             <IconCheck />
-            Update Budget
+            {{ updateBudgetMutation.isPending.value ? 'Updating...' : 'Update Budget' }}
           </Button>
         </DialogFooter>
       </DialogContent>
