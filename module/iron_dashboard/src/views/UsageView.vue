@@ -107,7 +107,7 @@ const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
 })
 
-const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
+const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching, error: eventsError } = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderId, logsPage],
   queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
 })
@@ -129,9 +129,13 @@ const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
 
 watch(eventsList, (newData) => {
   if (newData) {
-    accumulatedLogs.value = logsPage.value === 1
-      ? newData.data
-      : [...accumulatedLogs.value, ...newData.data]
+    if (logsPage.value === 1) {
+      accumulatedLogs.value = newData.data
+    } else {
+      const existingIds = new Set(accumulatedLogs.value.map(e => e.event_id))
+      const newEvents = newData.data.filter(e => !existingIds.has(e.event_id))
+      accumulatedLogs.value = [...accumulatedLogs.value, ...newEvents]
+    }
     totalEvents.value = newData.pagination.total
     totalPages.value = newData.pagination.total_pages
   }
@@ -153,14 +157,14 @@ const isLoading = computed(() =>
   requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
 )
 const error = computed(() =>
-  requestsError.value || providerError.value || modelError.value
+  requestsError.value || providerError.value || modelError.value || eventsError.value
 )
 
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
 const successRate = computed(() => requestStats.value?.success_rate || 0)
 const totalSpend = computed(() => spendingTotal.value?.total_spend || 0)
-const totalInputTokens = computed(() => modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0)
-const totalOutputTokens = computed(() => modelUsage.value?.data.reduce((sum, m) => sum + m.output_tokens, 0) || 0)
+const totalInputTokens = computed(() => tokensByAgent.value?.summary?.total_input_tokens ?? 0)
+const totalOutputTokens = computed(() => tokensByAgent.value?.summary?.total_output_tokens ?? 0)
 
 const providerBreakdown = computed(() => {
   const data = spendingByProvider.value?.data ?? []

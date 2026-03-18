@@ -18,7 +18,7 @@ const colorClass = computed(() => {
 })
 
 const normalizedPercentage = computed(() => {
-  if (props.percentage < 0) return 0
+  if (!Number.isFinite(props.percentage) || props.percentage < 0) return 0
   if (props.percentage > 100) return 100
   return props.percentage
 })
@@ -27,7 +27,7 @@ const normalizedPercentage = computed(() => {
 <template>
   <div :class="cn('w-full bg-muted rounded-full h-2', props.class)">
     <div
-      class="h-1.5 rounded-full transition-all"
+      class="h-2 rounded-full transition-all"
       :class="colorClass"
       :style="{ width: `${normalizedPercentage}%` }"
     />

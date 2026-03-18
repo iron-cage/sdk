@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type CreateUserRequest, type User } from '../composables/useApi'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -33,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
+import { formatTimestamp } from '@/lib/formatters'
 import { useAuthStore } from '../stores/auth'
 import DataTable from '@/components/DataTable.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
@@ -52,6 +55,7 @@ import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 const api = useApi()
 const queryClient = useQueryClient()
 const authStore = useAuthStore()
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 
 // State
 const page = ref(1)
@@ -111,6 +115,7 @@ const createMutation = useMutation({
 
 function handleCreateUser() {
   if (!username.value.trim()) { toast.error('Username is required'); return }
+  if (!email.value.trim()) { toast.error('Email is required'); return }
   if (!password.value) { toast.error('Password is required'); return }
   createMutation.mutate({
     username: username.value,
@@ -149,7 +154,12 @@ function handleToggleStatus(user: User) {
     userToDisable.value = user
     showDisableConfirm.value = true
   } else {
-    activateMutation.mutate(user.id)
+    openConfirm(
+      'Activate User',
+      `Restore access for ${user.username}?`,
+      'Activate',
+      () => activateMutation.mutate(user.id),
+    )
   }
 }
 
@@ -232,6 +242,7 @@ function handleResetPassword(user: User) {
 }
 
 function confirmResetPassword() {
+  if (!newPassword.value) { toast.error('New password is required'); return }
   if (userToResetPassword.value) {
     resetPasswordMutation.mutate({
       id: userToResetPassword.value.id,
@@ -244,6 +255,11 @@ function confirmResetPassword() {
 // Watch for filter changes to reset page
 watch([searchDebounced, roleFilter], () => {
   page.value = 1
+})
+
+// Clear sensitive data when create dialog closes (e.g. via overlay/X)
+watch(showCreateModal, (open) => {
+  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'manager' }
 })
 
 
@@ -352,9 +368,12 @@ watch([searchDebounced, roleFilter], () => {
       <template #footer>
         <div v-if="usersData" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <p class="text-xs text-muted-foreground">
-            Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
-            to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
-            of <span class="font-medium">{{ usersData.total }}</span> results
+            <template v-if="usersData.total > 0">
+              Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
+              to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
+              of <span class="font-medium">{{ usersData.total }}</span> results
+            </template>
+            <template v-else>No results</template>
           </p>
           <div class="flex gap-2">
             <Button variant="outline" :disabled="page === 1" @click="page--"><IconChevronLeft />Previous</Button>
@@ -562,6 +581,15 @@ watch([searchDebounced, roleFilter], () => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      :variant="confirmVariant"
+      @confirm="confirmCallback?.()"
+    />
 
     <!-- Reset Password Modal -->
     <Dialog v-model:open="showResetPasswordModal">

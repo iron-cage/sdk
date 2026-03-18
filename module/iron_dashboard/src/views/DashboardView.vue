@@ -40,6 +40,7 @@ const { data: health, isLoading: healthLoading, isError: healthError } = useQuer
   queryKey: ['health'],
   queryFn: () => api.getHealth(),
   refetchInterval: 30_000,
+  retry: 0,
 })
 
 const totalSpend     = computed(() => spending.value?.total_spend ?? 0)

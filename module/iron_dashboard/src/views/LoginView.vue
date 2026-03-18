@@ -43,7 +43,7 @@ async function handleLogin() {
           <Input
             id="email"
             v-model="email"
-            type="text"
+            type="email"
             required
             :disabled="loading"
           />

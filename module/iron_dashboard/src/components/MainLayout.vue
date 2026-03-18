@@ -203,7 +203,7 @@ async function handleLogout() {
     </div>
 
     <!-- Main content -->
-    <div class="lg:ml-56 lg:my-[8px] lg:mr-[8px] rounded-[8px] h-[calc(100vh-16px)] border border-border overflow-hidden bg-background flex flex-col">
+    <div class="lg:ml-56 lg:my-[8px] lg:mr-[8px] rounded-[8px] h-screen lg:h-[calc(100vh-16px)] border border-border overflow-hidden bg-background flex flex-col">
       <!-- Mobile header -->
       <div class="lg:hidden h-12 flex items-center px-3 border-b border-border shrink-0">
         <button

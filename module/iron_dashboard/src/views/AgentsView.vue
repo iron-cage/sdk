@@ -89,6 +89,7 @@ watch(
 
     icTokenStatusLoading.value = true
     const statusMap: Record<number, IcTokenStatus> = {}
+    const failures: string[] = []
 
     await Promise.all(
       agentList.map(async (agent) => {
@@ -96,10 +97,14 @@ watch(
           const status = await api.getIcTokenStatus(agent.id)
           statusMap[agent.id] = status
         } catch {
-          toast.error('Failed to load IC token status for agent ' + agent.name)
+          failures.push(agent.name)
         }
       })
     )
+
+    if (failures.length) {
+      toast.error(`Failed to load IC token status for ${failures.length} agent(s)`)
+    }
 
     icTokenStatuses.value = statusMap
     icTokenStatusLoading.value = false
@@ -355,6 +360,16 @@ async function handleRevokeIcToken(agent: Agent) {
     },
   )
 }
+
+watch(showCreateModal, (open) => {
+  if (!open) {
+    name.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
+    initialBudgetUsd.value = undefined
+    selectedOwnerId.value = ''
+  }
+})
 
 async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return

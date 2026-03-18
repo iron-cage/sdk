@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
@@ -48,6 +48,7 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
+const toggleLoadingId = ref<number | null>(null)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
 
@@ -188,9 +189,13 @@ function handleDeleteKey(key: ProviderKey) {
 }
 
 function handleToggleEnabled(key: ProviderKey) {
+  toggleLoadingId.value = key.id
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
+watch(showCreateModal, (open) => {
+  if (!open) { resetForm(); createKeyError.value = '' }
+})
 
 </script>
 
