@@ -108,8 +108,6 @@ const deleteMutation = useMutation({
 })
 
 // Toggle enabled state — optimistic update so the switch flips immediately
-const toggleLoadingId = ref<number | null>(null)
-
 const toggleMutation = useMutation({
   mutationFn: (data: { id: number; is_enabled: boolean }) =>
     api.updateProviderKey(data.id, { is_enabled: data.is_enabled }),
