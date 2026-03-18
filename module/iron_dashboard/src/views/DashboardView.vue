@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatTimestamp } from '@/lib/formatters'
+import { formatTimestamp, formatCostUsd, formatNumber } from '@/lib/formatters'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
-import { formatCostUsd, formatNumber } from '@/lib/formatters'
 import StatCard from '@/components/cards/StatCard.vue'
 import IconCoin from '@/components/icons/IconCoin.vue'
 import IconBarChart from '@/components/icons/IconBarChart.vue'

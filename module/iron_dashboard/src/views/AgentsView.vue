@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
-import { formatDate, formatTimestamp } from '@/lib/formatters'
+import { formatTimestamp } from '@/lib/formatters'
 import { useConfirm } from '@/composables/useConfirm'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -200,6 +200,9 @@ const deleteMutation = useMutation({
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to delete agent')
+  },
 })
 
 function handleCreateAgent() {
@@ -359,10 +362,10 @@ async function copyTokenToClipboard() {
   try {
     await navigator.clipboard.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
-    } catch (_err: unknown) {
-      const message = _err instanceof Error ? _err.message : 'Copy failed'
-      copyMessage.value = message
-    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Copy failed'
+    copyMessage.value = message
+  }
 
 }
 
@@ -449,7 +452,7 @@ async function copyTokenToClipboard() {
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          {{ formatDate(agent.created_at) }}
+          {{ formatTimestamp(agent.created_at) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
@@ -535,6 +538,7 @@ async function copyTokenToClipboard() {
                 <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
+                  :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive shrink-0"
                   @click="removeProviderKey(keyId)"
                 >
@@ -654,6 +658,7 @@ async function copyTokenToClipboard() {
                 <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
+                  :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive shrink-0"
                   @click="removeProviderKey(keyId)"
                 >

@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate, formatCostUsd } from '@/lib/formatters'
+import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
 import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
@@ -107,10 +107,13 @@ const deleteMutation = useMutation({
 })
 
 // Toggle enabled state — optimistic update so the switch flips immediately
+const toggleLoadingId = ref<number | null>(null)
+
 const toggleMutation = useMutation({
   mutationFn: (data: { id: number; is_enabled: boolean }) =>
     api.updateProviderKey(data.id, { is_enabled: data.is_enabled }),
   onMutate: async (data) => {
+    toggleLoadingId.value = data.id
     await queryClient.cancelQueries({ queryKey: ['providerKeys'] })
     const previous = queryClient.getQueryData<ProviderKey[]>(['providerKeys'])
     queryClient.setQueryData<ProviderKey[]>(['providerKeys'], old =>
@@ -123,6 +126,7 @@ const toggleMutation = useMutation({
     toast.error('Failed to update provider key')
   },
   onSettled: () => {
+    toggleLoadingId.value = null
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
@@ -187,7 +191,6 @@ function handleToggleEnabled(key: ProviderKey) {
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
-const typedError = error as unknown as Error | null
 
 </script>
 
@@ -212,7 +215,7 @@ const typedError = error as unknown as Error | null
         { label: 'Actions', align: 'right' },
       ]"
       :is-loading="isLoading"
-      :error="typedError"
+      :error="error"
       :is-empty="!providerKeys || providerKeys.length === 0"
       loading-text="Loading provider keys..."
       :on-retry="() => refetch()"
@@ -237,7 +240,7 @@ const typedError = error as unknown as Error | null
           <Button
             variant="outline"
             size="sm"
-            :disabled="toggleMutation.isPending.value"
+            :disabled="toggleLoadingId === key.id"
             @click="handleToggleEnabled(key)"
           >
             <IconCheck v-if="key.is_enabled" class="text-success" />
@@ -245,7 +248,7 @@ const typedError = error as unknown as Error | null
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(key.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(key.created_at) }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>

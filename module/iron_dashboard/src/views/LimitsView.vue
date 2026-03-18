@@ -254,13 +254,13 @@ function riskBadgeVariant(risk: string) {
         <p v-if="budgetError" class="text-sm text-destructive">{{ budgetError }}</p>
 
         <DialogFooter>
-          <Button variant="outline" @click="showBudgetModal = false; budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = ''">
+          <Button variant="outline" :disabled="updateBudgetMutation.isPending.value" @click="showBudgetModal = false; budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = ''">
             <IconX />
             Cancel
           </Button>
-          <Button @click="handleUpdateBudget">
+          <Button :disabled="updateBudgetMutation.isPending.value" @click="handleUpdateBudget">
             <IconCheck />
-            Update Budget
+            {{ updateBudgetMutation.isPending.value ? 'Updating...' : 'Update Budget' }}
           </Button>
         </DialogFooter>
       </DialogContent>

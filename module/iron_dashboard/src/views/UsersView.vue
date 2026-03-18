@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'vue-sonner'
+import { formatTimestamp } from '@/lib/formatters'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +59,6 @@ const pageSize = ref(20)
 const search = ref('')
 const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
-const isActiveFilter = ref<boolean | undefined>(undefined)
 
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
@@ -84,13 +84,12 @@ const forcePasswordChange = ref(true)
 
 // Fetch users
 const { data: usersData, isLoading, error, refetch } = useQuery({
-  queryKey: ['users', page, pageSize, searchDebounced, roleFilter, isActiveFilter],
+  queryKey: ['users', page, pageSize, searchDebounced, roleFilter],
   queryFn: () => api.getUsers({
     page: page.value,
     page_size: pageSize.value,
     search: searchDebounced.value || undefined,
     role: roleFilter.value === 'all' ? undefined : roleFilter.value,
-    is_active: isActiveFilter.value
   }),
 })
 
@@ -111,6 +110,8 @@ const createMutation = useMutation({
 })
 
 function handleCreateUser() {
+  if (!username.value.trim()) { toast.error('Username is required'); return }
+  if (!password.value) { toast.error('Password is required'); return }
   createMutation.mutate({
     username: username.value,
     password: password.value,
@@ -241,7 +242,7 @@ function confirmResetPassword() {
 }
 
 // Watch for filter changes to reset page
-watch([searchDebounced, roleFilter, isActiveFilter], () => {
+watch([searchDebounced, roleFilter], () => {
   page.value = 1
 })
 
@@ -314,7 +315,7 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
           <StatusBadge :active="user.is_active" active-label="Active" inactive-label="Suspended" />
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          {{ new Date(user.created_at).toLocaleDateString() }}
+          {{ formatTimestamp(user.created_at) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>

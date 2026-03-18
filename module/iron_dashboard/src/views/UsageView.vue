@@ -145,10 +145,9 @@ watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
   tokensPage.value = 1
 })
 
-const agentBreakdown = computed<AgentSpending[]>(() => {
-  const data = spendingByAgent.value?.data ?? []
-  return [...data].sort((a, b) => b.spending - a.spending)
-})
+const agentBreakdown = computed<AgentSpending[]>(() =>
+  spendingByAgent.value?.data ?? []
+)
 
 const isLoading = computed(() =>
   requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
@@ -278,7 +277,7 @@ function openLogModal(event: AnalyticsEvent) {
 
     <!-- Error state -->
     <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading usage analytics: {{ (error as Error).message }}</p>
+      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : 'An unexpected error occurred' }}</p>
     </div>
 
     <!-- Analytics content -->
