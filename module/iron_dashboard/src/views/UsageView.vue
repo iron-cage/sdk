@@ -44,7 +44,7 @@ import { getProviderLabel } from '@/lib/providers'
 const api = useApi()
 
 const selectedAgentId = ref<string>('all')
-const selectedProviderId = ref<string>('all')
+const selectedProviderKeyId = ref<string>('all')
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
 
 const logsPage = ref(1)
@@ -83,46 +83,46 @@ const { data: providerList } = useQuery({
 const activeFilters = computed(() => ({
   period: selectedPeriod.value,
   agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
-  provider_key_id: selectedProviderId.value !== 'all' ? Number(selectedProviderId.value) : undefined,
+  provider_key_id: selectedProviderKeyId.value !== 'all' ? Number(selectedProviderKeyId.value) : undefined,
 }))
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
-  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderKeyId],
   queryFn: () => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
-  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderKeyId],
   queryFn: () => api.getAnalyticsSpendingByProvider(activeFilters.value),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
-  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderId, modelsPage],
+  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderKeyId, modelsPage],
   queryFn: () => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
-  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderKeyId],
   queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
 })
 
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching, error: eventsError } = useQuery({
-  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderId, logsPage],
+  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderKeyId, logsPage],
   queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
 })
 
 const { data: spendingByAgent, isLoading: agentSpendingLoading } = useQuery({
-  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderId, agentSpendingPage],
+  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderKeyId, agentSpendingPage],
   queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
 const { data: avgCostData } = useQuery({
-  queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderId],
+  queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderKeyId],
   queryFn: () => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value),
 })
 
 const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
-  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderId, tokensPage],
+  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderKeyId, tokensPage],
   queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }),
 })
 
@@ -140,7 +140,7 @@ watch(eventsList, (newData) => {
   }
 }, { immediate: true })
 
-watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
+watch([selectedPeriod, selectedAgentId, selectedProviderKeyId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
   agentSpendingPage.value = 1
@@ -161,6 +161,12 @@ const error = computed(() =>
 
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
 const successRate = computed(() => requestStats.value?.success_rate || 0)
+const successRateChangePct = computed(() => {
+  const prev = requestStats.value?.previous_period?.success_rate
+  const curr = requestStats.value?.success_rate
+  if (prev == null || curr == null || prev === 0) return null
+  return ((curr - prev) / prev) * 100
+})
 const totalSpend = computed(() => spendingTotal.value?.total_spend || 0)
 const totalInputTokens = computed(() => tokensByAgent.value?.summary?.total_input_tokens ?? 0)
 const totalOutputTokens = computed(() => tokensByAgent.value?.summary?.total_output_tokens ?? 0)
@@ -233,7 +239,7 @@ onUnmounted(() => {
         </Select>
       </div>
       <div class="w-full md:w-40">
-        <Select v-model="selectedProviderId">
+        <Select v-model="selectedProviderKeyId">
           <SelectTrigger>
             <SelectValue placeholder="All Providers" />
           </SelectTrigger>
@@ -309,8 +315,8 @@ onUnmounted(() => {
 
           <div class="flex gap-2 items-center">
             <TrendBadge
-            v-if="requestStats?.previous_period"
-            :change-percent="(requestStats.success_rate - requestStats.previous_period.success_rate)"
+            v-if="successRateChangePct != null"
+            :change-percent="successRateChangePct"
             class="mt-1"
           />
 

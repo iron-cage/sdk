@@ -78,7 +78,7 @@ const userToResetPassword = ref<User | null>(null)
 const username = ref('')
 const password = ref('')
 const email = ref('')
-const role = ref('manager')
+const role = ref('developer')
 const suspendReason = ref('')
 const newRole = ref('')
 const newPassword = ref('')
@@ -104,7 +104,7 @@ const createMutation = useMutation({
     username.value = ''
     password.value = ''
     email.value = ''
-    role.value = 'manager'
+    role.value = 'developer'
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
@@ -262,7 +262,11 @@ watch([searchDebounced, roleFilter], () => {
 
 // Clear sensitive data when create dialog closes (e.g. via overlay/X)
 watch(showCreateModal, (open) => {
-  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'manager' }
+  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'developer' }
+})
+
+watch(showDisableConfirm, (open) => {
+  if (!open) { suspendReason.value = '' }
 })
 
 

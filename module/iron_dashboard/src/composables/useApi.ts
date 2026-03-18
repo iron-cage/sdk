@@ -200,6 +200,11 @@ export function useApi() {
         const newAuth = authStore.getAuthHeader()
         if (newAuth) headers['Authorization'] = newAuth
         response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+        if (response.status === 401) {
+          await authStore.logout()
+          router.push('/login')
+          throw new Error('Session expired')
+        }
       } catch {
         await authStore.logout()
         router.push('/login')

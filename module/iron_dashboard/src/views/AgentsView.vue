@@ -351,6 +351,16 @@ watch(showCreateModal, (open) => {
   }
 })
 
+watch(showUpdateModal, (open) => {
+  if (!open) {
+    name.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
+    selectedOwnerId.value = ''
+    selectedAgent.value = null
+  }
+})
+
 async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return
 
