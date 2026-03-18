@@ -15,7 +15,7 @@ const PROVIDER_BADGE_COLORS: Record<string, string> = {
 const PROVIDER_KEY_PLACEHOLDERS: Record<string, string> = {
   openai: 'sk-proj-...',
   anthropic: 'sk-ant-...',
-  gemini: 'AIza...',
+  gemini: 'AIzaSy...',
   xai: 'xai-...',
 }
 
@@ -39,7 +39,7 @@ export function detectProviderFromKey(key: string): ProviderType | null {
   const trimmed = key.trim()
   if (trimmed.startsWith('sk-ant-')) return 'anthropic'
   if (trimmed.startsWith('xai-')) return 'xai'
-  if (trimmed.startsWith('AIza')) return 'gemini'
+  if (trimmed.startsWith('AIzaSy')) return 'gemini'
   if (trimmed.startsWith('sk-')) return 'openai'
   return null
 }
@@ -49,7 +49,8 @@ export function generateProviderAlias(
   existingKeys: Array<{ provider: string; alias?: string }>,
 ): string {
   const label = getProviderLabel(provider)
-  const re = new RegExp(`^${label} (\\d+)$`)
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`^${escaped} (\\d+)$`)
   let max = 0
   for (const k of existingKeys) {
     if (k.provider !== provider) continue

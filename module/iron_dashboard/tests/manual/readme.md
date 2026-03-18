@@ -738,6 +738,62 @@ This section documents exhaustive corner cases across all frontend functionality
 
 ---
 
+## Test 9: Provider Key Management
+
+### Prerequisites
+- At least one provider key already saved (for alias-numbering tests)
+- Valid API keys for at least one provider available for pasting
+
+### Quick Add Flow
+
+#### Provider Detection
+- [ ] **Anthropic key**: Paste `sk-ant-api03-...` → Detected: Anthropic, hint shows generated alias (e.g. "Anthropic 1")
+- [ ] **xAI key**: Paste `xai-...` → Detected: xAI
+- [ ] **Gemini key**: Paste `AIzaSy...` → Detected: Gemini
+- [ ] **OpenAI key**: Paste `sk-proj-...` → Detected: OpenAI
+- [ ] **`AIza` non-Gemini key**: Paste key starting with `AIzaXX` (not `AIzaSy`) → Provider not recognised
+- [ ] **Unrecognised prefix**: Paste `abc123` → "Provider not recognised" hint shown, Add button disabled
+
+#### Button State
+- [ ] **Empty input**: Add button disabled
+- [ ] **Short string (< 10 chars)**: Add button disabled even if prefix matches (e.g. `sk-proj-`)
+- [ ] **Valid key (≥ 10 chars, recognised prefix)**: Add button enabled
+- [ ] **During submit**: Add button shows "Adding..." and is disabled
+
+#### Successful Submit
+- [ ] Paste valid key → click Add Key → modal closes, new key appears in table with correct provider badge and auto-generated alias
+- [ ] Key with leading/trailing whitespace: paste `  sk-ant-api03-...  ` → submits correctly (whitespace stripped)
+- [ ] Alias counter increments: with "Anthropic 1" already saved, adding a second Anthropic key → alias "Anthropic 2"
+
+#### Error Handling
+- [ ] **Server error (e.g., duplicate key)**: modal stays open, inline error message displayed inside the modal (not only a toast)
+- [ ] After inline error appears: error message is announced by screen reader (role="alert")
+
+#### Modal State Reset
+- [ ] Cancel button: closes modal, clears key input, clears any error
+- [ ] Escape key: closes modal, clears key input, clears any error
+- [ ] Re-open after cancel: input is empty, no stale error shown
+
+### Standard Add Provider Key Flow
+
+#### Validation
+- [ ] Submit with empty API key → inline error "API key is required" shown inside modal
+- [ ] Inline error announced by screen reader (role="alert")
+
+#### Successful Submit
+- [ ] Select provider → enter key → click Add Key → modal closes, key appears in table
+- [ ] Key with leading/trailing whitespace: strips correctly
+
+#### Error Handling
+- [ ] Server error → inline error message shown inside modal (not only toast)
+
+### Keyboard Navigation
+- [ ] Tab through Quick Add modal: API Key input → Cancel → Add Key (correct order)
+- [ ] Enter in API Key input triggers submit when Add button is enabled
+- [ ] Escape closes Quick Add modal and resets state
+
+---
+
 ## Test Execution Checklist
 
 **Before Testing:**
@@ -752,7 +808,7 @@ This section documents exhaustive corner cases across all frontend functionality
 - [ ] All UI updates appear within 200ms
 
 **After Testing:**
-- [ ] All 8 test categories passed
+- [ ] All 9 test categories passed
 - [ ] All acceptance criteria met
 - [ ] Any failures documented with screenshots/details
 
@@ -776,7 +832,7 @@ This section documents exhaustive corner cases across all frontend functionality
 
 | Entity | Responsibility | Input→Output | Scope | Out of Scope |
 |--------|----------------|--------------|-------|--------------|
-| `readme.md` | Manual testing procedures and acceptance criteria | - → Test plan | All 8 test categories, step-by-step procedures, acceptance criteria | Automated tests (../unit/, ../component/), test results (external) |
+| `readme.md` | Manual testing procedures and acceptance criteria | - → Test plan | All 9 test categories, step-by-step procedures, acceptance criteria | Automated tests (../unit/, ../component/), test results (external) |
 
 **Complete Entity Coverage Verified:** 1 entity listed (all files in manual/).
 
@@ -808,6 +864,7 @@ After completing manual testing, document results:
 | 6. Responsive Layout | ⚠️ PARTIAL | Mobile layout needs adjustment |
 | 7. Keyboard Navigation | ✅ PASS | All elements accessible |
 | 8. Screen Reader | ✅ PASS | NVDA compatibility confirmed |
+| 9. Provider Key Management | ✅ PASS | Quick Add and standard flows verified |
 
 ### Issues Found
 

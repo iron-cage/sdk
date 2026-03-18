@@ -74,13 +74,7 @@ const createMutation = useMutation({
   mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string; base_url?: string; description?: string }) =>
     api.createProviderKey(data),
   onSuccess: () => {
-    showCreateModal.value = false
-    createKeyError.value = ''
-    resetForm()
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
-  },
-  onError: (err) => {
-    toast.error(err instanceof Error ? err.message : 'Failed to create provider key')
   },
 })
 
@@ -148,13 +142,21 @@ function handleCreateKey() {
     return
   }
 
-  createMutation.mutate({
-    provider: provider.value,
-    api_key: apiKey.value,
-    alias: alias.value || undefined,
-    base_url: baseUrl.value || undefined,
-    description: description.value || undefined,
-  })
+  createMutation.mutate(
+    {
+      provider: provider.value,
+      api_key: apiKey.value.trim(),
+      alias: alias.value || undefined,
+      base_url: baseUrl.value || undefined,
+      description: description.value || undefined,
+    },
+    {
+      onSuccess: () => { showCreateModal.value = false; createKeyError.value = ''; resetForm() },
+      onError: (err) => {
+        createKeyError.value = err instanceof Error ? err.message : 'Failed to create provider key'
+      },
+    },
+  )
 }
 
 function openEditModal(key: ProviderKey) {
@@ -194,6 +196,10 @@ watch(showCreateModal, (open) => {
   if (!open) { resetForm(); createKeyError.value = '' }
 })
 
+watch(showQuickAddModal, (open) => {
+  if (!open) { quickAddKey.value = ''; quickAddError.value = '' }
+})
+
 const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
 
 const previewAlias = computed(() =>
@@ -219,8 +225,13 @@ function handleQuickAdd() {
     return
   }
   createMutation.mutate(
-    { provider: detectedProvider.value, api_key: quickAddKey.value, alias: previewAlias.value },
-    { onSuccess: () => closeQuickAdd() },
+    { provider: detectedProvider.value, api_key: quickAddKey.value.trim(), alias: previewAlias.value },
+    {
+      onSuccess: () => closeQuickAdd(),
+      onError: (err) => {
+        quickAddError.value = err instanceof Error ? err.message : 'Failed to add key — please try again'
+      },
+    },
   )
 }
 
@@ -310,7 +321,7 @@ function handleQuickAdd() {
     </DataTable>
 
     <!-- Quick Add modal -->
-    <Dialog v-model:open="showQuickAddModal" @update:open="(open) => { if (!open) closeQuickAdd() }">
+    <Dialog v-model:open="showQuickAddModal">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Quick Add Provider Key</DialogTitle>
@@ -333,7 +344,7 @@ function handleQuickAdd() {
             />
             <div id="quick-add-hint" aria-live="polite" aria-atomic="true" class="min-h-[1.25rem]">
               <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
-                <span class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+                <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
                 Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
                 · will be saved as <span class="font-medium text-foreground">{{ previewAlias }}</span>
               </p>
@@ -344,7 +355,7 @@ function handleQuickAdd() {
           </div>
         </div>
 
-        <p v-if="quickAddError" class="text-sm text-destructive">{{ quickAddError }}</p>
+        <p v-if="quickAddError" role="alert" aria-live="assertive" aria-atomic="true" class="text-sm text-destructive">{{ quickAddError }}</p>
 
         <DialogFooter>
           <Button
@@ -356,7 +367,7 @@ function handleQuickAdd() {
             Cancel
           </Button>
           <Button
-            :disabled="createMutation.isPending.value || !detectedProvider"
+            :disabled="createMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10"
             @click="handleQuickAdd"
           >
             <IconCheck />
@@ -444,7 +455,7 @@ function handleQuickAdd() {
           </div>
         </div>
 
-        <p v-if="createKeyError" class="text-sm text-destructive">{{ createKeyError }}</p>
+        <p v-if="createKeyError" role="alert" aria-live="assertive" aria-atomic="true" class="text-sm text-destructive">{{ createKeyError }}</p>
 
         <DialogFooter>
           <Button
