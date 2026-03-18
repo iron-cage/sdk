@@ -35,7 +35,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
-import { formatTimestamp } from '@/lib/formatters'
 import { useAuthStore } from '../stores/auth'
 import DataTable from '@/components/DataTable.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
