@@ -222,21 +222,21 @@ function openLogModal(event: AnalyticsEvent) {
         <PopoverContent align="end" class="flex flex-col gap-2 w-52">
           <Select v-model="selectedAgentId" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
-            <SelectContent class="w-full">
+            <SelectContent class="w-52">
               <SelectItem value="all">All Agents</SelectItem>
               <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">{{ agent.name }}</SelectItem>
             </SelectContent>
           </Select>
           <Select v-model="selectedProviderId" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
-            <SelectContent class="w-full">
+            <SelectContent class="w-52">
               <SelectItem value="all">All Providers</SelectItem>
               <SelectItem v-for="p in providerList" :key="p.id" :value="String(p.id)">{{ p.alias || getProviderLabel(p.provider) }}</SelectItem>
             </SelectContent>
           </Select>
           <Select v-model="selectedPeriod" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent class="w-full">
+            <SelectContent class="w-52">
               <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
             </SelectContent>
           </Select>
@@ -399,9 +399,9 @@ function openLogModal(event: AnalyticsEvent) {
           <div v-else class="space-y-4">
             <div v-for="model in modelBreakdown" :key="model.model">
               <div class="flex justify-between items-center mb-2">
-                <div>
-                  <span class="text-base font-medium text-foreground">{{ model.model }}</span>
-                  <span class="text-xs text-muted-foreground block">{{ getProviderLabel(model.provider) }}</span>
+                <div class="min-w-0 mr-2">
+                  <span class="text-base font-medium text-foreground block truncate max-w-[220px]" :title="model.model">{{ model.model }}</span>
+                  <span class="text-xs text-muted-foreground block truncate max-w-[220px]">{{ getProviderLabel(model.provider) }}</span>
                 </div>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
@@ -459,7 +459,7 @@ function openLogModal(event: AnalyticsEvent) {
             <p class="text-muted-foreground">No agent spending data available</p>
           </template>
           <tr v-for="agent in agentBreakdown" :key="agent.agent_id">
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.agent_name">{{ agent.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.agent_name">{{ agent.agent_name }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatCost(agent.spending) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget) }}</td>
             <td class="px-3 sm:px-6 py-2 text-base text-foreground">
@@ -519,7 +519,7 @@ function openLogModal(event: AnalyticsEvent) {
             <p class="text-muted-foreground">No token usage data available</p>
           </template>
           <tr v-for="row in tokensByAgent?.data" :key="row.agent_id">
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[200px] truncate" :title="row.agent_name">{{ row.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[200px] truncate" :title="row.agent_name">{{ row.agent_name }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.input_tokens) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ formatNumber(row.total_tokens) }}</td>
@@ -576,8 +576,8 @@ function openLogModal(event: AnalyticsEvent) {
           </template>
           <tr v-for="event in accumulatedLogs" :key="event.event_id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="event.agent_name">{{ event.agent_name }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[240px] truncate" :title="event.model">{{ event.model }}</td>
+            <td class="px-3 sm:px-6 py-4 text-base text-foreground max-w-[300px] truncate" :title="event.agent_name">{{ event.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-4 text-base text-foreground max-w-[240px] truncate" :title="event.model">{{ event.model }}</td>
             <td class="px-3 sm:px-6 py-4">
               <span
                 class="px-2 py-1 text-xs font-medium rounded-full"

@@ -55,7 +55,6 @@ function onThumbPointerMove(e: PointerEvent) {
   const availableTrack = el.clientWidth * (1 - clampedRatio.value)
   if (availableTrack === 0) return
   const newPos = Math.max(0, Math.min(1, dragStartThumbPos + (e.clientX - dragStartX) / availableTrack))
-  thumbPos.value = newPos
   el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
 }
 
@@ -72,16 +71,21 @@ function onTrackClick(e: MouseEvent) {
   const el = wrapperRef.value
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const thumbW = rect.width * clampedRatio.value
-  const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / (rect.width - thumbW)))
-  thumbPos.value = newPos
-  el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
+  const available = rect.width - thumbW
+  if (available < 1) return
+  el.scrollLeft = Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / available)) * (el.scrollWidth - el.clientWidth)
 }
 
 function scrollByKey(dir: -1 | 1) {
   const el = wrapperRef.value
   if (!el) return
   el.scrollLeft += dir * 40
-  updateScroll()
+}
+
+function scrollToEnd(pos: 0 | 1) {
+  const el = wrapperRef.value
+  if (!el) return
+  el.scrollLeft = pos === 0 ? 0 : el.scrollWidth - el.clientWidth
 }
 
 let ro: ResizeObserver | null = null
@@ -133,7 +137,7 @@ onUnmounted(() => {
 
     <!-- Table -->
     <template v-else>
-      <div class="relative" :class="{ 'pb-2': showScrollbar }">
+      <div class="relative" :class="{ 'pb-6': showScrollbar }">
         <!-- Scroll wrapper: overflow-x-auto with native scrollbar hidden -->
         <div
           ref="wrapperRef"
@@ -165,6 +169,7 @@ onUnmounted(() => {
         <div
           v-if="showScrollbar"
           role="scrollbar"
+          aria-label="Scroll table horizontally"
           aria-orientation="horizontal"
           aria-valuemin="0"
           aria-valuemax="100"
@@ -175,6 +180,8 @@ onUnmounted(() => {
           @click="onTrackClick"
           @keydown.left.prevent="scrollByKey(-1)"
           @keydown.right.prevent="scrollByKey(1)"
+          @keydown.home.prevent="scrollToEnd(0)"
+          @keydown.end.prevent="scrollToEnd(1)"
         >
           <div class="relative w-full h-1.5">
             <div

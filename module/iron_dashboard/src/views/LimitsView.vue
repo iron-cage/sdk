@@ -174,7 +174,7 @@ function riskBadgeVariant(risk: string) {
         <p class="text-muted-foreground">No agent budget data available.</p>
       </template>
       <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="row.agent_name">
+        <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[300px] truncate" :title="row.agent_name">
           {{ row.agent_name }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
@@ -254,7 +254,7 @@ function riskBadgeVariant(risk: string) {
         <p v-if="budgetError" class="text-sm text-destructive">{{ budgetError }}</p>
 
         <DialogFooter>
-          <Button variant="outline" :disabled="updateBudgetMutation.isPending.value" @click="showBudgetModal = false; budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = ''">
+          <Button variant="outline" @click="showBudgetModal = false; budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = ''">
             <IconX />
             Cancel
           </Button>

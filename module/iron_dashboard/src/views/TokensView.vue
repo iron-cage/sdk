@@ -164,7 +164,7 @@ async function copyToken(token: string) {
       :columns="[
         { label: 'ID' },
         { label: 'Provider' },
-        { label: 'Description' },
+        { label: 'Name' },
         { label: 'Created' },
         { label: 'Status' },
         { label: 'Actions', align: 'right' },
@@ -185,7 +185,7 @@ async function copyToken(token: string) {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           <Badge variant="outline" class="max-w-[120px] truncate" :title="token.provider || '-'">{{ token.provider || '-' }}</Badge>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="token.name || '-'">{{ token.name || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 text-base text-foreground max-w-[300px] truncate" :title="token.name || '-'">{{ token.name || '-' }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(token.created_at) }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <Badge :variant="token.is_active ? 'default' : 'destructive'">

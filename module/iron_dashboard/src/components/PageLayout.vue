@@ -29,7 +29,7 @@ const slots = useSlots()
     </template>
 
     <!-- Scrollable content -->
-    <ScrollArea class="flex-1" :horizontal="false">
+    <ScrollArea class="flex-1">
       <div class="" :class="props.contentClass">
         <slot />
       </div>

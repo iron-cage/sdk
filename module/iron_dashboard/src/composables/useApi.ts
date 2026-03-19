@@ -204,20 +204,39 @@ export function useApi() {
         const newAuth = authStore.getAuthHeader()
         if (newAuth) headers['Authorization'] = newAuth
         response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
-      } catch {
+        // Refresh succeeded but retried request is still 401 — treat as full session expiry
+        if (response.status === 401) {
+          const isFirstCaller = !_logoutPromise
+          if (!_logoutPromise) {
+            _logoutPromise = authStore.logout()
+              .then(() => { router.push('/login') })
+              .finally(() => { _logoutPromise = null })
+          }
+          await _logoutPromise
+          if (!isFirstCaller) return new Promise<T>(() => {})
+          throw new Error('Session expired')
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Session expired') throw err
+        const isFirstCaller = !_logoutPromise
         if (!_logoutPromise) {
-          _logoutPromise = authStore.logout().finally(() => { _logoutPromise = null })
+          _logoutPromise = authStore.logout()
+            .then(() => { router.push('/login') })
+            .finally(() => { _logoutPromise = null })
         }
         await _logoutPromise
-        router.push('/login')
+        if (!isFirstCaller) return new Promise<T>(() => {})
         throw new Error('Session expired')
       }
     } else if (response.status === 401) {
+      const isFirstCaller = !_logoutPromise
       if (!_logoutPromise) {
-        _logoutPromise = authStore.logout().finally(() => { _logoutPromise = null })
+        _logoutPromise = authStore.logout()
+          .then(() => { router.push('/login') })
+          .finally(() => { _logoutPromise = null })
       }
       await _logoutPromise
-      router.push('/login')
+      if (!isFirstCaller) return new Promise<T>(() => {})
       throw new Error('Session expired')
     }
 

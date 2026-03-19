@@ -186,13 +186,13 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <p v-if="topSpenders.length === 0" class="text-sm text-muted-foreground text-center py-2">No data yet</p>
           <div
             v-for="(agent, i) in topSpenders"
-            :key="agent.agent_name"
+            :key="agent.agent_id"
             class="flex items-center justify-between"
           >
             <div class="flex items-center gap-3 min-w-0">
               <span class="text-xs text-muted-foreground w-4 shrink-0">{{ i + 1 }}</span>
               <div class="min-w-0">
-                <p class="text-sm font-medium text-foreground truncate">{{ agent.agent_name }}</p>
+                <p class="text-sm font-medium text-foreground truncate" :title="agent.agent_name">{{ agent.agent_name }}</p>
                 <p class="text-xs text-muted-foreground">{{ formatNumber(agent.request_count) }} req</p>
               </div>
             </div>

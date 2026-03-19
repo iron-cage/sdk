@@ -32,7 +32,7 @@ const props = defineProps<{
       orientation="horizontal"
       class="flex touch-none select-none transition-colors h-2 border-t border-t-transparent p-px"
     >
-      <ScrollAreaThumb class="relative rounded-full bg-border" />
+      <ScrollAreaThumb class="relative flex-1 rounded-full bg-border" />
     </ScrollAreaScrollbar>
     <ScrollAreaCorner />
   </ScrollAreaRoot>

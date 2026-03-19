@@ -134,13 +134,6 @@ function removeProviderKey(keyId: number) {
   selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter(id => id !== keyId)
 }
 
-function ownerEmail(ownerId: string | null | undefined): string {
-  if (!ownerId) return 'Unknown'
-  if (!users.value) return 'Unknown'
-  const user = ownerMap.value.get(ownerId)
-  return user?.email || user?.username || ownerId
-}
-
 const providerKeyMap = computed(() =>
   new Map(providers.value?.map(p => [p.id, p]) ?? [])
 )
@@ -162,6 +155,22 @@ const { data: users } = useQuery({
 const ownerMap = computed(() =>
   new Map(users.value?.users.map(u => [u.id, u]) ?? [])
 )
+
+function ownerEmail(ownerId: string | null | undefined): string {
+  if (!ownerId) return '—'
+  if (!users.value) return '—'
+  const user = ownerMap.value.get(ownerId)
+  return user?.email || user?.username || ownerId
+}
+
+const tableColumns = computed(() => [
+  { label: 'Name' },
+  ...(authStore.isAdmin ? [{ label: 'Owner' }] : []),
+  { label: 'Providers' },
+  { label: 'IC Token' },
+  { label: 'Created' },
+  { label: 'Actions', align: 'right' as const },
+])
 
 // Create agent mutation
 const createMutation = useMutation({
@@ -203,9 +212,13 @@ const updateMutation = useMutation({
 const deleteMutation = useMutation({
   mutationFn: (id: number) => api.deleteAgent(id),
   onSuccess: () => {
+    showDeleteModal.value = false
+    agentToDelete.value = null
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
+    showDeleteModal.value = false
+    agentToDelete.value = null
     toast.error(err instanceof Error ? err.message : 'Failed to delete agent')
   },
 })
@@ -279,8 +292,6 @@ function handleDeleteAgent(agent: Agent) {
 function confirmDelete() {
   if (agentToDelete.value) {
     deleteMutation.mutate(agentToDelete.value.id)
-    showDeleteModal.value = false
-    agentToDelete.value = null
   }
 }
 
@@ -371,6 +382,16 @@ watch(showCreateModal, (open) => {
   }
 })
 
+watch(showUpdateModal, (open) => {
+  if (!open) {
+    selectedAgent.value = null
+    name.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
+    selectedOwnerId.value = ''
+  }
+})
+
 async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return
 
@@ -397,14 +418,7 @@ async function copyTokenToClipboard() {
 
 
     <DataTable
-      :columns="[
-        { label: 'Name' },
-        { label: 'Owner' },
-        { label: 'Providers' },
-        { label: 'IC Token' },
-        { label: 'Created' },
-        { label: 'Actions', align: 'right' },
-      ]"
+      :columns="tableColumns"
       :is-loading="isLoading"
       :error="error"
       :is-empty="!agents || agents.length === 0"
@@ -420,10 +434,10 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.name">
+        <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.name">
           {{ agent.name }}
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
+        <td v-if="authStore.isAdmin" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
           {{ ownerEmail(agent.owner_id) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
@@ -438,11 +452,14 @@ async function copyTokenToClipboard() {
             </span>
             <Popover v-if="agent.provider_key_ids.length > 3">
               <PopoverTrigger as-child>
-                <button class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border-border border hover:text-foreground transition-colors">
+                <button
+                  :aria-label="`Show ${agent.provider_key_ids.length - 3} more provider keys`"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border-border border hover:text-foreground transition-colors"
+                >
                   +{{ agent.provider_key_ids.length - 3 }}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" class="flex flex-wrap gap-1">
+              <PopoverContent align="start" class="flex flex-wrap gap-1 max-w-[320px] max-h-[200px] overflow-y-auto">
                 <span
                   v-for="keyId in agent.provider_key_ids.slice(3)"
                   :key="keyId"
