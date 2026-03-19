@@ -8,7 +8,7 @@ interface LoginCredentials {
 
 interface AuthTokens {
   user_token: string
-  refresh_token: string
+  refresh_token?: string  // backend uses Option<String> with skip_serializing_if
   token_type: string
   expires_in: number
   user: {
@@ -16,6 +16,16 @@ interface AuthTokens {
     email: string
     role: string
     name: string
+  }
+}
+
+/** Decode role claim from JWT payload without verifying signature. */
+function decodeJwtRole(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.role === 'string' ? payload.role : null
+  } catch {
+    return null
   }
 }
 
@@ -36,30 +46,44 @@ export const useAuthStore = defineStore('auth', () => {
     const storedRefreshToken = localStorage.getItem('refresh_token')
     const storedUsername = localStorage.getItem('username')
     const storedUserId = localStorage.getItem('user_id')
-    const storedRole = localStorage.getItem('role')
 
-    if (storedAccessToken && storedRefreshToken) {
+    // Treat the literal string "undefined" written by old code as absent
+    const validRefreshToken =
+      storedRefreshToken && storedRefreshToken !== 'undefined'
+        ? storedRefreshToken
+        : null
+
+    if (storedAccessToken) {
       accessToken.value = storedAccessToken
-      refreshToken.value = storedRefreshToken
+      refreshToken.value = validRefreshToken
       username.value = storedUsername
       userId.value = storedUserId
-      role.value = storedRole
+      // Derive role from the JWT payload — do not trust the localStorage value
+      role.value = decodeJwtRole(storedAccessToken)
     }
   }
 
   // Save tokens to localStorage
   function saveTokens(tokens: AuthTokens) {
     accessToken.value = tokens.user_token
-    refreshToken.value = tokens.refresh_token
+    refreshToken.value = tokens.refresh_token ?? null
     username.value = tokens.user.name || tokens.user.email
     userId.value = tokens.user.id
-    role.value = tokens.user.role
+    // Prefer JWT-decoded role; fall back to the login response body
+    role.value = decodeJwtRole(tokens.user_token) ?? tokens.user.role
 
+    // SECURITY NOTE: localStorage is XSS-accessible. Access and refresh tokens are
+    // stored here for SPA session persistence. The accepted risk is that an XSS
+    // vulnerability would expose these tokens. Mitigations: strict CSP, short token
+    // TTLs, and refresh token rotation are required to limit blast radius.
     localStorage.setItem('access_token', tokens.user_token)
-    localStorage.setItem('refresh_token', tokens.refresh_token)
+    if (tokens.refresh_token) {
+      localStorage.setItem('refresh_token', tokens.refresh_token)
+    } else {
+      localStorage.removeItem('refresh_token')
+    }
     localStorage.setItem('username', username.value)
     localStorage.setItem('user_id', tokens.user.id)
-    localStorage.setItem('role', tokens.user.role)
   }
 
   // Clear tokens from localStorage
@@ -74,7 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('username')
     localStorage.removeItem('user_id')
-    localStorage.removeItem('role')
+    localStorage.removeItem('role')  // clean up legacy key
   }
 
   // Login

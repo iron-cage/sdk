@@ -78,7 +78,7 @@ const userToResetPassword = ref<User | null>(null)
 const username = ref('')
 const password = ref('')
 const email = ref('')
-const role = ref('manager')
+const role = ref('developer')
 const suspendReason = ref('')
 const newRole = ref('')
 const newPassword = ref('')
@@ -104,7 +104,7 @@ const createMutation = useMutation({
     username.value = ''
     password.value = ''
     email.value = ''
-    role.value = 'manager'
+    role.value = 'developer'
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
@@ -149,6 +149,7 @@ const activateMutation = useMutation({
 })
 
 function handleToggleStatus(user: User) {
+  if (user.id === authStore.userId) return
   if (user.is_active) {
     userToDisable.value = user
     showDisableConfirm.value = true
@@ -158,6 +159,7 @@ function handleToggleStatus(user: User) {
       `Restore access for ${user.username}?`,
       'Activate',
       () => activateMutation.mutate(user.id),
+      'default',
     )
   }
 }
@@ -182,6 +184,7 @@ const deleteMutation = useMutation({
 })
 
 function handleDeleteUser(user: User) {
+  if (user.id === authStore.userId) return
   userToDelete.value = user
   showDeleteConfirm.value = true
 }
@@ -206,6 +209,7 @@ const changeRoleMutation = useMutation({
 })
 
 function handleChangeRole(user: User) {
+  if (user.id === authStore.userId) return
   userToChangeRole.value = user
   newRole.value = user.role
   showChangeRoleModal.value = true
@@ -258,7 +262,11 @@ watch([searchDebounced, roleFilter], () => {
 
 // Clear sensitive data when create dialog closes (e.g. via overlay/X)
 watch(showCreateModal, (open) => {
-  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'manager' }
+  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'developer' }
+})
+
+watch(showDisableConfirm, (open) => {
+  if (!open) { suspendReason.value = '' }
 })
 
 
@@ -445,7 +453,7 @@ watch(showCreateModal, (open) => {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'manager'"
+            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'developer'"
           >
             <IconX />
             Cancel
@@ -627,7 +635,7 @@ watch(showCreateModal, (open) => {
           <Button
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
-            @click="showResetPasswordModal = false"
+            @click="showResetPasswordModal = false; userToResetPassword = null; newPassword = ''; forcePasswordChange = true"
           >
             <IconX />
             Cancel

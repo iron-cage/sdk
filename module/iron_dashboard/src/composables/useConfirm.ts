@@ -5,15 +5,15 @@ export function useConfirm() {
   const confirmTitle = ref('')
   const confirmDescription = ref('')
   const confirmLabel = ref('Confirm')
-  const confirmVariant = ref<'default' | 'destructive'>('destructive')
-  const confirmCallback = ref<(() => void) | null>(null)
+  const confirmVariant = ref<'default' | 'destructive'>('default')
+  const confirmCallback = ref<(() => void | Promise<void>) | null>(null)
 
   function openConfirm(
     title: string,
     description: string,
     label: string,
     action: () => void | Promise<void>,
-    variant: 'default' | 'destructive' = 'destructive',
+    variant: 'default' | 'destructive' = 'default',
   ) {
     confirmTitle.value = title
     confirmDescription.value = description
@@ -21,7 +21,11 @@ export function useConfirm() {
     confirmVariant.value = variant
     confirmCallback.value = async () => {
       confirmCallback.value = null
-      await action()
+      try {
+        await action()
+      } catch (err) {
+        console.error('Confirm action failed:', err)
+      }
     }
     showConfirmModal.value = true
   }

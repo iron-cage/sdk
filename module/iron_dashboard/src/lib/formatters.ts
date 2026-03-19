@@ -1,7 +1,3 @@
-export function formatDate(ms: number): string {
-  return new Date(ms).toLocaleString()
-}
-
 export function formatTimestamp(ts?: number | null): string {
   if (ts == null) return '-'
   const millis = ts > 1_000_000_000_000 ? ts : ts * 1000
@@ -15,10 +11,6 @@ export function formatMicrodollars(micros: number): string {
 export function formatCostUsd(usd: number | null | undefined, decimals = 2): string {
   if (usd == null || isNaN(usd)) return '-'
   return `$${usd.toFixed(decimals)}`
-}
-
-export function formatCostFromCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`
 }
 
 export function formatNumber(n: number): string {

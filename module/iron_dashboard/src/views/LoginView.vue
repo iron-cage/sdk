@@ -14,8 +14,10 @@ const authStore = useAuthStore()
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
+const loginError = ref('')
 
 async function handleLogin() {
+  loginError.value = ''
   loading.value = true
 
   try {
@@ -25,7 +27,8 @@ async function handleLogin() {
     })
     router.push('/dashboard')
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Unexpected error')
+    loginError.value = err instanceof Error ? err.message : 'Unexpected error'
+    toast.error(loginError.value)
   } finally {
     loading.value = false
   }
@@ -59,6 +62,8 @@ async function handleLogin() {
             :disabled="loading"
           />
         </div>
+
+        <p v-if="loginError" role="alert" class="text-sm text-destructive text-center">{{ loginError }}</p>
 
         <Button type="submit" :disabled="loading" class="w-full">
           <IconLogIn />

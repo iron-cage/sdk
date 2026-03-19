@@ -17,7 +17,7 @@ withDefaults(defineProps<{
   variant?: 'default' | 'destructive'
 }>(), {
   confirmLabel: 'Confirm',
-  variant: 'destructive',
+  variant: 'default',
 })
 
 const emit = defineEmits<{

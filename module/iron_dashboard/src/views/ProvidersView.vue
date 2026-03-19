@@ -183,6 +183,7 @@ function handleDeleteKey(key: ProviderKey) {
     `Delete the ${getProviderLabel(key.provider)} key? This action cannot be undone.`,
     'Delete',
     () => deleteMutation.mutate(key.id),
+    'destructive',
   )
 }
 

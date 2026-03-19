@@ -37,58 +37,6 @@ interface CreateTokenResponse {
   created_at: number
 }
 
-interface UsageRecord {
-  id: number
-  token_id: number
-  provider: string
-  model: string
-  input_tokens: number
-  output_tokens: number
-  cost: number
-  timestamp: number
-}
-
-interface UsageStats {
-  total_requests: number
-  total_input_tokens: number
-  total_output_tokens: number
-  total_cost: number
-  by_provider: {
-    provider: string
-    requests: number
-    cost: number
-  }[]
-  by_model: {
-    model: string
-    requests: number
-    cost: number
-  }[]
-}
-
-interface LimitRecord {
-  id: number
-  user_id: string
-  project_id?: string
-  max_tokens_per_day?: number
-  max_requests_per_minute?: number
-  max_cost_per_month_microdollars?: number  // Backend uses microdollars (1 cent = 10,000 microdollars)
-  created_at: number
-}
-
-interface CreateLimitRequest {
-  user_id: string
-  project_id?: string
-  max_tokens_per_day?: number
-  max_requests_per_minute?: number
-  max_cost_per_month_microdollars?: number  // Backend uses microdollars
-}
-
-interface UpdateLimitRequest {
-  max_tokens_per_day?: number
-  max_requests_per_minute?: number
-  max_cost_per_month_microdollars?: number  // Backend uses microdollars
-}
-
 // AI Provider Key types
 type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'xai'
 
@@ -121,668 +69,6 @@ interface UpdateProviderKeyRequest {
   base_url?: string
   description?: string
   is_enabled?: boolean
-}
-
-interface AssignProviderRequest {
-  provider_key_id: number
-}
-
-// Budget Request Workflow types
-interface BudgetRequest {
-  id: string
-  agent_id: number
-  requester_id: string
-  current_budget_usd: number
-  requested_budget_usd: number
-  justification: string
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
-  created_at: number
-  updated_at: number
-}
-
-interface CreateBudgetRequestRequest {
-  agent_id: number
-  requester_id: string
-  requested_budget_usd: number
-  justification: string
-}
-
-interface CreateBudgetRequestResponse {
-  request_id: string
-  status: string
-  created_at: number
-}
-
-interface ListBudgetRequestsResponse {
-  requests: BudgetRequest[]
-}
-
-interface ApproveBudgetRequestResponse {
-  request_id: string
-  status: string
-  updated_at: number
-}
-
-interface RejectBudgetRequestRequest {
-  rejection_reason: string
-}
-
-interface RejectBudgetRequestResponse {
-  request_id: string
-  status: string
-  updated_at: number
-}
-
-export function useApi() {
-  const authStore = useAuthStore()
-  const router = useRouter()
-
-  async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...((options.headers as Record<string, string>) || {}),
-    }
-
-    const authHeader = authStore.getAuthHeader()
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader
-    }
-
-    let response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      headers,
-    })
-
-    // Attempt token refresh on 401, retry once
-    if (response.status === 401 && authStore.refreshToken) {
-      try {
-        if (!_refreshPromise) {
-          _refreshPromise = authStore.refresh().finally(() => { _refreshPromise = null })
-        }
-        await _refreshPromise
-        const newAuth = authStore.getAuthHeader()
-        if (newAuth) headers['Authorization'] = newAuth
-        response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
-        // Refresh succeeded but retried request is still 401 — treat as full session expiry
-        if (response.status === 401) {
-          const isFirstCaller = !_logoutPromise
-          if (!_logoutPromise) {
-            _logoutPromise = authStore.logout()
-              .then(() => { router.push('/login') })
-              .finally(() => { _logoutPromise = null })
-          }
-          await _logoutPromise
-          if (!isFirstCaller) return new Promise<T>(() => {})
-          throw new Error('Session expired')
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message === 'Session expired') throw err
-        const isFirstCaller = !_logoutPromise
-        if (!_logoutPromise) {
-          _logoutPromise = authStore.logout()
-            .then(() => { router.push('/login') })
-            .finally(() => { _logoutPromise = null })
-        }
-        await _logoutPromise
-        if (!isFirstCaller) return new Promise<T>(() => {})
-        throw new Error('Session expired')
-      }
-    } else if (response.status === 401) {
-      const isFirstCaller = !_logoutPromise
-      if (!_logoutPromise) {
-        _logoutPromise = authStore.logout()
-          .then(() => { router.push('/login') })
-          .finally(() => { _logoutPromise = null })
-      }
-      await _logoutPromise
-      if (!isFirstCaller) return new Promise<T>(() => {})
-      throw new Error('Session expired')
-    }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }))
-      throw new Error(error.error || `HTTP ${response.status}`)
-    }
-
-    // Handle empty responses (204 No Content, or empty body)
-    const text = await response.text()
-    if (!text) {
-      return undefined as T
-    }
-    try {
-      return JSON.parse(text) as T
-    } catch {
-      throw new Error('Invalid response from server (expected JSON)')
-    }
-  }
-
-  // Health API
-  async function getHealth(): Promise<{ status: string; timestamp: number }> {
-    return fetchApi('/api/health')
-  }
-
-  // Token API methods
-  async function getTokens(): Promise<TokenMetadata[]> {
-    return fetchApi<TokenMetadata[]>('/api/v1/api-tokens')
-  }
-
-  async function getToken(id: number): Promise<TokenMetadata> {
-    return fetchApi<TokenMetadata>(`/api/v1/api-tokens/${id}`)
-  }
-
-  async function createToken(data: CreateTokenRequest): Promise<CreateTokenResponse> {
-    return fetchApi<CreateTokenResponse>('/api/v1/api-tokens', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function rotateToken(id: number): Promise<CreateTokenResponse> {
-    return fetchApi<CreateTokenResponse>(`/api/v1/api-tokens/${id}/rotate`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    })
-  }
-
-  async function revokeToken(id: number): Promise<void> {
-    await fetchApi<void>(`/api/v1/api-tokens/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  // Usage API methods
-  async function getUsageStats(): Promise<UsageStats> {
-    // Map backend /api/usage/aggregate to frontend format
-    const aggregate = await fetchApi<{
-      total_tokens: number
-      total_requests: number
-      total_cost_cents: number
-      providers: Array<{
-        provider: string
-        tokens: number
-        requests: number
-        cost_cents: number
-      }>
-    }>('/api/v1/usage/aggregate')
-
-    return {
-      total_requests: aggregate.total_requests,
-      total_input_tokens: 0, // Backend doesnt track separately
-      total_output_tokens: aggregate.total_tokens,
-      total_cost: aggregate.total_cost_cents / 100, // Convert cents to dollars
-      by_provider: aggregate.providers.map(p => ({
-        provider: p.provider,
-        requests: p.requests,
-        cost: p.cost_cents / 100, // Convert cents to dollars
-      })),
-      by_model: [], // Backend doesnt track by model
-    }
-  }
-
-  async function getUsageByToken(tokenId: number): Promise<UsageRecord[]> {
-    return fetchApi<UsageRecord[]>(`/api/v1/usage/token/${tokenId}`)
-  }
-
-  // Limits API methods
-  async function getLimits(): Promise<LimitRecord[]> {
-    return fetchApi<LimitRecord[]>('/api/v1/limits')
-  }
-
-  async function getLimit(id: number): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>(`/api/v1/limits/${id}`)
-  }
-
-  async function createLimit(data: CreateLimitRequest): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>('/api/v1/limits', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function updateLimit(id: number, data: UpdateLimitRequest): Promise<LimitRecord> {
-    return fetchApi<LimitRecord>(`/api/v1/limits/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function deleteLimit(id: number): Promise<void> {
-    await fetchApi<void>(`/api/v1/limits/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  // Provider Key API methods
-  async function getProviderKeys(): Promise<ProviderKey[]> {
-    return fetchApi<ProviderKey[]>('/api/v1/providers')
-  }
-
-  async function getProviderKey(id: number): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`)
-  }
-
-  async function createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>('/api/v1/providers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
-    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function deleteProviderKey(id: number): Promise<void> {
-    await fetchApi<void>(`/api/v1/providers/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  async function assignProjectProvider(projectId: string, keyId: number): Promise<void> {
-    await fetchApi<void>(`/api/v1/projects/${projectId}/provider`, {
-      method: 'POST',
-      body: JSON.stringify({ provider_key_id: keyId }),
-    })
-  }
-
-  async function unassignProjectProvider(projectId: string): Promise<void> {
-    await fetchApi<void>(`/api/v1/projects/${projectId}/provider`, {
-      method: 'DELETE',
-    })
-  }
-
-  // User API methods
-  async function getUsers(params?: { role?: string; is_active?: boolean; search?: string; page?: number; page_size?: number }): Promise<{ users: User[]; total: number; page: number; page_size: number }> {
-    const query = new URLSearchParams()
-    if (params?.role) query.append('role', params.role)
-    if (params?.is_active !== undefined) query.append('is_active', String(params.is_active))
-    if (params?.search) query.append('search', params.search)
-    if (params?.page) query.append('page', String(params.page))
-    if (params?.page_size) query.append('page_size', String(params.page_size))
-    
-    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(`/api/v1/users?${query.toString()}`)
-  }
-
-  async function createUser(data: CreateUserRequest): Promise<User> {
-    return fetchApi<User>('/api/v1/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function updateUserStatus(id: string, isActive: boolean): Promise<User> {
-    if (isActive) {
-      return activateUser(id)
-    } else {
-      return suspendUser(id)
-    }
-  }
-
-  async function suspendUser(id: string, reason?: string): Promise<User> {
-    return fetchApi<User>(`/api/v1/users/${id}/suspend`, {
-      method: 'PUT',
-      body: JSON.stringify({ reason }),
-    })
-  }
-
-  async function activateUser(id: string): Promise<User> {
-    return fetchApi<User>(`/api/v1/users/${id}/activate`, {
-      method: 'PUT',
-    })
-  }
-
-  async function changeUserRole(id: string, role: string): Promise<User> {
-    return fetchApi<User>(`/api/v1/users/${id}/role`, {
-      method: 'PUT',
-      body: JSON.stringify({ role }),
-    })
-  }
-
-  async function resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User> {
-    return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
-      method: 'POST',
-      body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
-    })
-  }
-
-  async function deleteUser(id: string): Promise<void> {
-    await fetchApi<void>(`/api/v1/users/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  // Agent API methods
-  async function getAgents(): Promise<Agent[]> {
-    return fetchApi<Agent[]>('/api/v1/agents')
-  }
-
-  async function getAgent(id: number): Promise<Agent> {
-    return fetchApi<Agent>(`/api/v1/agents/${id}`)
-  }
-
-  async function createAgent(data: {
-    name: string
-    providers: string[]
-    provider_key_ids: number[]
-    initial_budget_microdollars: number
-    owner_id?: string  // Admins can assign to other users
-  }): Promise<Agent> {
-    return fetchApi<Agent>('/api/v1/agents', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function updateAgent(data: {
-    id: number
-    name?: string
-    providers?: string[]
-    provider_key_ids?: number[]
-    owner_id?: string  // Admins can reassign to other users
-  }): Promise<Agent> {
-    const { id, ...updateData } = data
-    return fetchApi<Agent>(`/api/v1/agents/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updateData),
-    })
-  }
-
-  async function updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse> {
-    return fetchApi<AgentBudgetResponse>(`/api/v1/agents/${agentId}/budget`, {
-      method: 'PUT',
-      body: JSON.stringify({ total_allocated_microdollars }),
-    })
-  }
-
-  async function deleteAgent(id: number): Promise<void> {
-    await fetchApi<void>(`/api/v1/agents/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  async function getAgentTokens(agentId: number): Promise<TokenMetadata[]> {
-    return fetchApi<TokenMetadata[]>(`/api/v1/agents/${agentId}/tokens`)
-  }
-
-  // ============================================================================
-  // IC Token API (Agent Runtime Authentication)
-  // ============================================================================
-
-  async function generateIcToken(agentId: number): Promise<IcTokenResponse> {
-    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token`, {
-      method: 'POST',
-    })
-  }
-
-  async function getIcTokenStatus(agentId: number): Promise<IcTokenStatus> {
-    return fetchApi<IcTokenStatus>(`/api/v1/agents/${agentId}/ic-token`)
-  }
-
-  async function regenerateIcToken(agentId: number): Promise<IcTokenResponse> {
-    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token/regenerate`, {
-      method: 'POST',
-    })
-  }
-
-  async function revokeIcToken(agentId: number): Promise<void> {
-    await fetchApi<void>(`/api/v1/agents/${agentId}/ic-token`, {
-      method: 'DELETE',
-    })
-  }
-
-  // ============================================================================
-  // Analytics API (Protocol 012)
-  // ============================================================================
-
-  async function getAnalyticsSpendingTotal(
-    filters?: AnalyticsFilters
-  ): Promise<SpendingTotalResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    if (filters?.compare) params.append('compare', 'true')
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsSpendingByProvider(
-    filters?: AnalyticsFilters
-  ): Promise<SpendingByProviderResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsUsageRequests(
-    filters?: AnalyticsFilters
-  ): Promise<RequestUsageResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    if (filters?.compare) params.append('compare', 'true')
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsUsageModels(
-    filters?: AnalyticsFilters,
-    pagination?: PaginationParams
-  ): Promise<ModelUsageResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    if (pagination?.page) params.append('page', String(pagination.page))
-    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsEventsList(
-    filters?: AnalyticsFilters,
-    pagination?: PaginationParams
-  ): Promise<EventsListResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    if (pagination?.page) params.append('page', String(pagination.page))
-    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`)
-  }
-
-  async function getBudgetStatus(filters?: {
-    status?: string
-    threshold?: number
-    agent_id?: number
-    page?: number
-    per_page?: number
-  }): Promise<BudgetStatusResponse> {
-    const params = new URLSearchParams()
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.threshold != null) params.append('threshold', String(filters.threshold))
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.page) params.append('page', String(filters.page))
-    if (filters?.per_page) params.append('per_page', String(filters.per_page))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsSpendingByAgent(
-    filters?: AnalyticsFilters,
-    pagination?: PaginationParams
-  ): Promise<SpendingByAgentResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    if (pagination?.page) params.append('page', String(pagination.page))
-    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/spending/by-agent${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsSpendingAvgPerRequest(
-    filters?: AnalyticsFilters
-  ): Promise<AvgCostResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`)
-  }
-
-  async function getAnalyticsUsageTokensByAgent(
-    filters?: AnalyticsFilters,
-    pagination?: PaginationParams
-  ): Promise<TokenUsageByAgentResponse> {
-    const params = new URLSearchParams()
-    if (filters?.period) params.append('period', filters.period)
-    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
-    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
-    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
-    if (pagination?.page) params.append('page', String(pagination.page))
-    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
-    const query = params.toString()
-    return fetchApi(`/api/v1/analytics/usage/tokens/by-agent${query ? `?${query}` : ''}`)
-  }
-
-  // ============================================================================
-  // Budget Request Workflow API
-  // ============================================================================
-
-  async function createBudgetRequest(
-    data: CreateBudgetRequestRequest
-  ): Promise<CreateBudgetRequestResponse> {
-    return fetchApi<CreateBudgetRequestResponse>('/api/v1/budget/requests', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async function getBudgetRequest(requestId: string): Promise<BudgetRequest> {
-    return fetchApi<BudgetRequest>(`/api/v1/budget/requests/${requestId}`)
-  }
-
-  async function listBudgetRequests(filters?: {
-    status?: string
-    requester_id?: string
-    start_date?: number
-    end_date?: number
-  }): Promise<ListBudgetRequestsResponse> {
-    const params = new URLSearchParams()
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.requester_id) params.append('requester_id', filters.requester_id)
-    if (filters?.start_date) params.append('start_date', String(filters.start_date))
-    if (filters?.end_date) params.append('end_date', String(filters.end_date))
-    const query = params.toString()
-    return fetchApi<ListBudgetRequestsResponse>(
-      `/api/v1/budget/requests${query ? `?${query}` : ''}`
-    )
-  }
-
-  async function approveBudgetRequest(
-    requestId: string
-  ): Promise<ApproveBudgetRequestResponse> {
-    return fetchApi<ApproveBudgetRequestResponse>(
-      `/api/v1/budget/requests/${requestId}/approve`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({}),
-      }
-    )
-  }
-
-  async function rejectBudgetRequest(
-    requestId: string,
-    data: RejectBudgetRequestRequest
-  ): Promise<RejectBudgetRequestResponse> {
-    return fetchApi<RejectBudgetRequestResponse>(
-      `/api/v1/budget/requests/${requestId}/reject`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }
-    )
-  }
-
-  return {
-    getHealth,
-    getTokens,
-    getToken,
-    createToken,
-    rotateToken,
-    revokeToken,
-    getUsageStats,
-    getUsageByToken,
-    getLimits,
-    getLimit,
-    createLimit,
-    updateLimit,
-    deleteLimit,
-    getProviderKeys,
-    getProviderKey,
-    createProviderKey,
-    updateProviderKey,
-    deleteProviderKey,
-    assignProjectProvider,
-    unassignProjectProvider,
-    getUsers,
-    createUser,
-    updateUserStatus,
-    suspendUser,
-    activateUser,
-    changeUserRole,
-    resetUserPassword,
-    deleteUser,
-    // Agent methods
-    getAgents,
-    getAgent,
-    createAgent,
-    updateAgent,
-    updateAgentBudget,
-    deleteAgent,
-    getAgentTokens,
-    // IC Token methods (agent runtime authentication)
-    generateIcToken,
-    getIcTokenStatus,
-    regenerateIcToken,
-    revokeIcToken,
-    // Analytics (Protocol 012)
-    getAnalyticsSpendingTotal,
-    getAnalyticsSpendingByProvider,
-    getAnalyticsSpendingByAgent,
-    getAnalyticsSpendingAvgPerRequest,
-    getAnalyticsUsageTokensByAgent,
-    getAnalyticsUsageRequests,
-    getAnalyticsUsageModels,
-    getAnalyticsEventsList,
-    getBudgetStatus,
-    // Budget Request Workflow
-    createBudgetRequest,
-    getBudgetRequest,
-    listBudgetRequests,
-    approveBudgetRequest,
-    rejectBudgetRequest,
-  }
 }
 
 export interface User {
@@ -819,6 +105,7 @@ export interface AgentBudgetResponse {
   total_spent: number        // microdollars
   budget_remaining: number   // microdollars
 }
+
 // IC Token types
 export interface IcTokenResponse {
   agent_id: number
@@ -832,29 +119,6 @@ export interface IcTokenStatus {
   agent_id: number
   has_ic_token: boolean
   created_at: number | null
-}
-
-export type {
-  TokenMetadata,
-  CreateTokenRequest,
-  CreateTokenResponse,
-  UsageRecord,
-  UsageStats,
-  LimitRecord,
-  CreateLimitRequest,
-  UpdateLimitRequest,
-  ProviderType,
-  ProviderKey,
-  CreateProviderKeyRequest,
-  UpdateProviderKeyRequest,
-  AssignProviderRequest,
-  BudgetRequest,
-  CreateBudgetRequestRequest,
-  CreateBudgetRequestResponse,
-  ListBudgetRequestsResponse,
-  ApproveBudgetRequestResponse,
-  RejectBudgetRequestRequest,
-  RejectBudgetRequestResponse,
 }
 
 // ============================================================================
@@ -1061,4 +325,484 @@ export interface AvgCostResponse {
   period: string
   filters: { agent_id: number | null; provider_id: string | null }
   calculated_at: string
+}
+
+// ============================================================================
+// useApi composable
+// ============================================================================
+
+export function useApi() {
+  const authStore = useAuthStore()
+  const router = useRouter()
+
+  async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
+    }
+
+    const authHeader = authStore.getAuthHeader()
+
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+
+    let response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    })
+
+    // Attempt token refresh on 401, retry once
+    if (response.status === 401 && authStore.refreshToken) {
+      try {
+        if (!_refreshPromise) {
+          _refreshPromise = authStore.refresh().finally(() => { _refreshPromise = null })
+        }
+        await _refreshPromise
+        const newAuth = authStore.getAuthHeader()
+        if (newAuth) headers['Authorization'] = newAuth
+        response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+        // Refresh succeeded but retried request is still 401 — treat as full session expiry
+        if (response.status === 401) {
+          const isFirstCaller = !_logoutPromise
+          if (!_logoutPromise) {
+            _logoutPromise = authStore.logout()
+              .then(() => { router.push('/login') })
+              .finally(() => { _logoutPromise = null })
+          }
+          await _logoutPromise
+          if (!isFirstCaller) return new Promise<T>(() => {})
+          throw new Error('Session expired')
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Session expired') throw err
+        const isFirstCaller = !_logoutPromise
+        if (!_logoutPromise) {
+          _logoutPromise = authStore.logout()
+            .then(() => { router.push('/login') })
+            .finally(() => { _logoutPromise = null })
+        }
+        await _logoutPromise
+        if (!isFirstCaller) return new Promise<T>(() => {})
+        throw new Error('Session expired')
+      }
+    } else if (response.status === 401) {
+      const isFirstCaller = !_logoutPromise
+      if (!_logoutPromise) {
+        _logoutPromise = authStore.logout()
+          .then(() => { router.push('/login') })
+          .finally(() => { _logoutPromise = null })
+      }
+      await _logoutPromise
+      if (!isFirstCaller) return new Promise<T>(() => {})
+      throw new Error('Session expired')
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
+
+    // Handle empty responses (204 No Content, or empty body)
+    const text = await response.text()
+    if (!text) {
+      return undefined as T
+    }
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      throw new Error('Invalid response from server (expected JSON)')
+    }
+  }
+
+  // Health API
+  async function getHealth(): Promise<{ status: string; timestamp: number }> {
+    return fetchApi('/api/health')
+  }
+
+  // Token API methods
+  async function getTokens(): Promise<TokenMetadata[]> {
+    return fetchApi<TokenMetadata[]>('/api/v1/api-tokens')
+  }
+
+  async function getToken(id: number): Promise<TokenMetadata> {
+    return fetchApi<TokenMetadata>(`/api/v1/api-tokens/${id}`)
+  }
+
+  async function createToken(data: CreateTokenRequest): Promise<CreateTokenResponse> {
+    return fetchApi<CreateTokenResponse>('/api/v1/api-tokens', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function rotateToken(id: number): Promise<CreateTokenResponse> {
+    return fetchApi<CreateTokenResponse>(`/api/v1/api-tokens/${id}/rotate`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  }
+
+  async function revokeToken(id: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/api-tokens/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // Provider Key API methods
+  async function getProviderKeys(): Promise<ProviderKey[]> {
+    return fetchApi<ProviderKey[]>('/api/v1/providers')
+  }
+
+  async function getProviderKey(id: number): Promise<ProviderKey> {
+    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`)
+  }
+
+  async function createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey> {
+    return fetchApi<ProviderKey>('/api/v1/providers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
+    return fetchApi<ProviderKey>(`/api/v1/providers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function deleteProviderKey(id: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/providers/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // User API methods
+  async function getUsers(params?: { role?: string; is_active?: boolean; search?: string; page?: number; page_size?: number }): Promise<{ users: User[]; total: number; page: number; page_size: number }> {
+    const query = new URLSearchParams()
+    if (params?.role) query.append('role', params.role)
+    if (params?.is_active !== undefined) query.append('is_active', String(params.is_active))
+    if (params?.search) query.append('search', params.search)
+    if (params?.page) query.append('page', String(params.page))
+    if (params?.page_size) query.append('page_size', String(params.page_size))
+
+    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(`/api/v1/users?${query.toString()}`)
+  }
+
+  async function createUser(data: CreateUserRequest): Promise<User> {
+    return fetchApi<User>('/api/v1/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function updateUserStatus(id: string, isActive: boolean): Promise<User> {
+    if (isActive) {
+      return activateUser(id)
+    } else {
+      return suspendUser(id)
+    }
+  }
+
+  async function suspendUser(id: string, reason?: string): Promise<User> {
+    return fetchApi<User>(`/api/v1/users/${id}/suspend`, {
+      method: 'PUT',
+      body: JSON.stringify({ reason }),
+    })
+  }
+
+  async function activateUser(id: string): Promise<User> {
+    return fetchApi<User>(`/api/v1/users/${id}/activate`, {
+      method: 'PUT',
+    })
+  }
+
+  async function changeUserRole(id: string, role: string): Promise<User> {
+    return fetchApi<User>(`/api/v1/users/${id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    })
+  }
+
+  async function resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User> {
+    return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
+    })
+  }
+
+  async function deleteUser(id: string): Promise<void> {
+    await fetchApi<void>(`/api/v1/users/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // Agent API methods
+  async function getAgents(): Promise<Agent[]> {
+    return fetchApi<Agent[]>('/api/v1/agents')
+  }
+
+  async function getAgent(id: number): Promise<Agent> {
+    return fetchApi<Agent>(`/api/v1/agents/${id}`)
+  }
+
+  async function createAgent(data: {
+    name: string
+    providers: string[]
+    provider_key_ids: number[]
+    initial_budget_microdollars: number
+    owner_id?: string  // Admins can assign to other users
+  }): Promise<Agent> {
+    return fetchApi<Agent>('/api/v1/agents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async function updateAgent(data: {
+    id: number
+    name?: string
+    providers?: string[]
+    provider_key_ids?: number[]
+    owner_id?: string  // Admins can reassign to other users
+  }): Promise<Agent> {
+    const { id, ...updateData } = data
+    return fetchApi<Agent>(`/api/v1/agents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    })
+  }
+
+  async function updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse> {
+    return fetchApi<AgentBudgetResponse>(`/api/v1/agents/${agentId}/budget`, {
+      method: 'PUT',
+      body: JSON.stringify({ total_allocated_microdollars }),
+    })
+  }
+
+  async function deleteAgent(id: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/agents/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============================================================================
+  // IC Token API (Agent Runtime Authentication)
+  // ============================================================================
+
+  async function generateIcToken(agentId: number): Promise<IcTokenResponse> {
+    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token`, {
+      method: 'POST',
+    })
+  }
+
+  async function getIcTokenStatus(agentId: number): Promise<IcTokenStatus> {
+    return fetchApi<IcTokenStatus>(`/api/v1/agents/${agentId}/ic-token`)
+  }
+
+  async function regenerateIcToken(agentId: number): Promise<IcTokenResponse> {
+    return fetchApi<IcTokenResponse>(`/api/v1/agents/${agentId}/ic-token/regenerate`, {
+      method: 'POST',
+    })
+  }
+
+  async function revokeIcToken(agentId: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/agents/${agentId}/ic-token`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============================================================================
+  // Analytics API (Protocol 012)
+  // ============================================================================
+
+  async function getAnalyticsSpendingTotal(
+    filters?: AnalyticsFilters,
+    signal?: AbortSignal
+  ): Promise<SpendingTotalResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (filters?.compare) params.append('compare', 'true')
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/total${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getAnalyticsSpendingByProvider(
+    filters?: AnalyticsFilters,
+    signal?: AbortSignal
+  ): Promise<SpendingByProviderResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/by-provider${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getAnalyticsUsageRequests(
+    filters?: AnalyticsFilters,
+    signal?: AbortSignal
+  ): Promise<RequestUsageResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (filters?.compare) params.append('compare', 'true')
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/requests${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getAnalyticsUsageModels(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams,
+    signal?: AbortSignal
+  ): Promise<ModelUsageResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/models${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getAnalyticsEventsList(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams,
+    signal?: AbortSignal
+  ): Promise<EventsListResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getBudgetStatus(filters?: {
+    status?: string
+    threshold?: number
+    agent_id?: number
+    page?: number
+    per_page?: number
+  }): Promise<BudgetStatusResponse> {
+    const params = new URLSearchParams()
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.threshold != null) params.append('threshold', String(filters.threshold))
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.page) params.append('page', String(filters.page))
+    if (filters?.per_page) params.append('per_page', String(filters.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
+  }
+
+  async function getAnalyticsSpendingByAgent(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams,
+    signal?: AbortSignal
+  ): Promise<SpendingByAgentResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/by-agent${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getAnalyticsSpendingAvgPerRequest(
+    filters?: AnalyticsFilters,
+    signal?: AbortSignal
+  ): Promise<AvgCostResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`, { signal })
+  }
+
+  async function getAnalyticsUsageTokensByAgent(
+    filters?: AnalyticsFilters,
+    pagination?: PaginationParams,
+    signal?: AbortSignal
+  ): Promise<TokenUsageByAgentResponse> {
+    const params = new URLSearchParams()
+    if (filters?.period) params.append('period', filters.period)
+    if (filters?.agent_id) params.append('agent_id', String(filters.agent_id))
+    if (filters?.provider_id) params.append('provider_id', filters.provider_id)
+    if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
+    if (pagination?.page) params.append('page', String(pagination.page))
+    if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
+    const query = params.toString()
+    return fetchApi(`/api/v1/analytics/usage/tokens/by-agent${query ? `?${query}` : ''}`, { signal })
+  }
+
+  return {
+    getHealth,
+    getTokens,
+    getToken,
+    createToken,
+    rotateToken,
+    revokeToken,
+    getProviderKeys,
+    getProviderKey,
+    createProviderKey,
+    updateProviderKey,
+    deleteProviderKey,
+    getUsers,
+    createUser,
+    updateUserStatus,
+    suspendUser,
+    activateUser,
+    changeUserRole,
+    resetUserPassword,
+    deleteUser,
+    // Agent methods
+    getAgents,
+    getAgent,
+    createAgent,
+    updateAgent,
+    updateAgentBudget,
+    deleteAgent,
+    // IC Token methods (agent runtime authentication)
+    generateIcToken,
+    getIcTokenStatus,
+    regenerateIcToken,
+    revokeIcToken,
+    // Analytics (Protocol 012)
+    getAnalyticsSpendingTotal,
+    getAnalyticsSpendingByProvider,
+    getAnalyticsSpendingByAgent,
+    getAnalyticsSpendingAvgPerRequest,
+    getAnalyticsUsageTokensByAgent,
+    getAnalyticsUsageRequests,
+    getAnalyticsUsageModels,
+    getAnalyticsEventsList,
+    getBudgetStatus,
+  }
+}
+
+export type {
+  TokenMetadata,
+  CreateTokenRequest,
+  CreateTokenResponse,
+  ProviderType,
+  ProviderKey,
+  CreateProviderKeyRequest,
+  UpdateProviderKeyRequest,
 }
