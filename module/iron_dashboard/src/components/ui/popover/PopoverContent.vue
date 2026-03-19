@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PopoverContentProps } from 'reka-ui'
+import type { PopoverContentEmits, PopoverContentProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
 import { PopoverContent, PopoverPortal, useForwardPropsEmits } from 'reka-ui'
@@ -10,14 +10,7 @@ const props = withDefaults(
   { side: 'bottom', align: 'center', sideOffset: 4, avoidCollisions: true },
 )
 
-const emits = defineEmits<{
-  escapeKeyDown: [event: KeyboardEvent]
-  pointerDownOutside: [event: Event]
-  focusOutside: [event: Event]
-  interactOutside: [event: Event]
-  openAutoFocus: [event: Event]
-  closeAutoFocus: [event: Event]
-}>()
+const emits = defineEmits<PopoverContentEmits>()
 
 const delegatedProps = reactiveOmit(props, 'class')
 const forwarded = useForwardPropsEmits(delegatedProps, emits)

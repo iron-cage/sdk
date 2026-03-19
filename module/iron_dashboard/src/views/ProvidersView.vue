@@ -233,9 +233,9 @@ watch(showCreateModal, (open) => {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <ProviderBadge :provider="key.provider" />
         </td>
-        <td class="px-3 sm:px-6 py-2 text-base text-foreground max-w-[240px] truncate" :title="key.alias || '-'">{{ key.alias || '-' }}</td>
-        <td class="px-3 sm:px-6 py-2 text-base text-foreground max-w-[320px] truncate" :title="key.description || '-'">{{ key.description || '-' }}</td>
-        <td class="px-3 sm:px-6 py-2 text-base font-mono text-muted-foreground max-w-[160px] truncate" :title="key.masked_key">{{ key.masked_key }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[240px] truncate" :title="key.alias || '-'">{{ key.alias || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[320px] truncate" :title="key.description || '-'">{{ key.description || '-' }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground max-w-[160px] truncate" :title="key.masked_key">{{ key.masked_key }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           {{ formatCostUsd(key.total_spend_usd, 2) }}
         </td>

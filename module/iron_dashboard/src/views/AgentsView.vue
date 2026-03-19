@@ -145,6 +145,9 @@ function ownerEmail(ownerId: string | null | undefined): string {
   return user?.email || user?.username || ownerId
 }
 
+// NOTE: The Owner column header below is coupled to the `v-if="authStore.isAdmin"` guard
+// on the Owner <td> in the table body. Both must be updated together to keep
+// header count and cell count in sync.
 const tableColumns = computed(() => [
   { label: 'Name' },
   ...(authStore.isAdmin ? [{ label: 'Owner' }] : []),

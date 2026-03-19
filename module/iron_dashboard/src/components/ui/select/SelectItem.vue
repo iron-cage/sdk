@@ -28,8 +28,8 @@ const forwardedProps = useForwardProps(delegatedProps)
       )
     "
   >
-    <SelectItemText class="flex-1 min-w-0 truncate">
-      <slot />
+    <SelectItemText class="flex-1 min-w-0">
+      <span class="block truncate"><slot /></span>
     </SelectItemText>
 
     <span class="shrink-0 ms-2 flex h-3.5 w-3.5 items-center justify-center">
@@ -37,6 +37,5 @@ const forwardedProps = useForwardProps(delegatedProps)
         <Check class="h-4 w-4" />
       </SelectItemIndicator>
     </span>
-
   </SelectItem>
 </template>

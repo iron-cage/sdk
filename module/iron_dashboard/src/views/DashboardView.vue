@@ -67,7 +67,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
             {{ healthLoading ? 'Checking...' : healthError ? 'Service Unavailable' : 'All Systems Operational' }}
           </span>
         </div>
-        <template v-if="!healthLoading && health">
+        <template v-if="!healthLoading && health && !healthError">
           <span class="text-muted-foreground max-sm:hidden">·</span>
           <span class="text-xs text-muted-foreground max-sm:hidden">Last checked {{ formatTimestamp(health.timestamp) }}</span>
         </template>

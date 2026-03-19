@@ -20,7 +20,7 @@ const wrapperId = useId()
 
 // Clamp scrollRatio to [0,1] to prevent thumb geometry breaking at certain
 // zoom levels or before layout settles (clientWidth can briefly exceed scrollWidth)
-const clampedRatio  = computed(() => Math.min(1, Math.max(0, scrollRatio.value)))
+const clampedRatio = computed(() => Math.min(1, Math.max(0, scrollRatio.value)))
 const showScrollbar = computed(() => clampedRatio.value < 0.9999)
 const thumbWidthPct = computed(() => clampedRatio.value * 100)
 const thumbLeftPct  = computed(() => thumbPos.value * (100 - thumbWidthPct.value))

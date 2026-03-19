@@ -9,9 +9,9 @@ const props = defineProps<{ provider: string; class?: string }>()
 <template>
   <Badge
     variant="outline"
-    :class="cn(getProviderBadgeClass(provider), 'max-w-[120px] truncate', props.class)"
+    :class="cn(getProviderBadgeClass(provider), 'max-w-[120px]', props.class)"
     :title="getProviderLabel(provider)"
   >
-    {{ getProviderLabel(provider) }}
+    <span class="block truncate">{{ getProviderLabel(provider) }}</span>
   </Badge>
 </template>
