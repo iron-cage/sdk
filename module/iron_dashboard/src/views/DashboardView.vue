@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatTimestamp } from '@/lib/formatters'
+import { formatTimestamp, formatCostUsd, formatNumber } from '@/lib/formatters'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
 import { useAuthStore } from '../stores/auth'
-import { formatCostUsd, formatNumber } from '@/lib/formatters'
 import StatCard from '@/components/cards/StatCard.vue'
 import IconCoin from '@/components/icons/IconCoin.vue'
 import IconBarChart from '@/components/icons/IconBarChart.vue'
@@ -20,29 +19,32 @@ const router = useRouter()
 const authStore = useAuthStore()
 const api = useApi()
 
-const { data: spending } = useQuery({
-  queryKey: ['analytics-spending'],
-  queryFn: () => api.getAnalyticsSpendingTotal({ period: 'all-time' }),
+const { data: spending, isLoading: spendingLoading, error: spendingError } = useQuery({
+  queryKey: ['analytics-spending', 'all-time'],
+  queryFn: ({ signal }) => api.getAnalyticsSpendingTotal({ period: 'all-time' }, signal),
 })
-const { data: requestUsage } = useQuery({
-  queryKey: ['analytics-requests'],
-  queryFn: () => api.getAnalyticsUsageRequests({ period: 'all-time' }),
+const { data: requestUsage, isLoading: requestsLoading, error: requestsError } = useQuery({
+  queryKey: ['analytics-requests', 'all-time'],
+  queryFn: ({ signal }) => api.getAnalyticsUsageRequests({ period: 'all-time' }, signal),
 })
-const { data: agents } = useQuery({
+const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
-const { data: agentSpending } = useQuery({
+const { data: agentSpending, error: agentSpendingError } = useQuery({
   queryKey: ['analytics-spending-agent-dashboard'],
-  queryFn: () => api.getAnalyticsSpendingByAgent({ period: 'all-time' }, { per_page: 5 }),
+  queryFn: ({ signal }) => api.getAnalyticsSpendingByAgent({ period: 'all-time' }, { per_page: 5 }, signal),
 })
 
 const { data: health, isLoading: healthLoading, isError: healthError } = useQuery({
   queryKey: ['health'],
   queryFn: () => api.getHealth(),
   refetchInterval: 30_000,
+  retry: 0,
 })
 
+const statsLoading   = computed(() => spendingLoading.value || requestsLoading.value || agentsLoading.value)
+const statsError     = computed(() => spendingError.value || requestsError.value || agentsError.value || agentSpendingError.value)
 const totalSpend     = computed(() => spending.value?.total_spend ?? 0)
 const totalRequests  = computed(() => requestUsage.value?.total_requests ?? 0)
 const successRate    = computed(() => requestUsage.value?.success_rate ?? 0)
@@ -78,6 +80,15 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
       </RouterLink>
     </div>
 
+    <!-- Stats error banner -->
+    <div
+      v-if="statsError"
+      role="alert"
+      class="px-4 py-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive"
+    >
+      Failed to load statistics. {{ statsError instanceof Error ? statsError.message : 'Please try again.' }}
+    </div>
+
     <!-- Stat cards -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
       <!-- Total Spending -->
@@ -86,7 +97,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Total Spending</span>
           <IconCoin class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ formatCostUsd(totalSpend, 3) }}</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ formatCostUsd(totalSpend, 3) }}</p>
         <p class="text-xs text-muted-foreground mt-1">All time</p>
       </div>
 
@@ -96,7 +108,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Total Requests</span>
           <IconBarChart class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ formatNumber(totalRequests) }}</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ formatNumber(totalRequests) }}</p>
         <p class="text-xs text-muted-foreground mt-1">API calls made</p>
       </div>
 
@@ -106,7 +119,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Success Rate</span>
           <IconCheckCircle class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ successRate.toFixed(1) }}%</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ successRate.toFixed(1) }}%</p>
         <p class="text-xs text-muted-foreground mt-1">{{ formatNumber(successfulReqs) }}/{{ formatNumber(totalRequests) }} successful</p>
       </div>
 
@@ -116,7 +130,8 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <span class="text-xs text-foreground">Active Agents</span>
           <IconCog class="h-4 w-4 text-muted-foreground" />
         </div>
-        <p class="text-2xl font-semibold text-foreground tracking-tight">{{ agentCount }}</p>
+        <p v-if="statsLoading" class="text-2xl font-semibold text-muted-foreground animate-pulse">—</p>
+        <p v-else class="text-2xl font-semibold text-foreground tracking-tight">{{ agentCount }}</p>
         <p class="text-xs text-muted-foreground mt-1">Registered agents</p>
       </div>
     </div>
@@ -159,7 +174,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
 
           <button
             class="w-full flex items-center justify-between p-3 border border-border rounded-md hover:bg-muted/50 hover:border-primary/30 transition-all group"
-            @click="router.push({ name: 'limits' })"
+            @click="router.push({ name: 'budgets' })"
           >
             <div class="flex items-center gap-3">
               <div class="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center transition-colors">
@@ -186,7 +201,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
           <p v-if="topSpenders.length === 0" class="text-sm text-muted-foreground text-center py-2">No data yet</p>
           <div
             v-for="(agent, i) in topSpenders"
-            :key="agent.agent_name"
+            :key="agent.agent_id"
             class="flex items-center justify-between"
           >
             <div class="flex items-center gap-3 min-w-0">

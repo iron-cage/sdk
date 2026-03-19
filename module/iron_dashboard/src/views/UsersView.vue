@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type CreateUserRequest, type User } from '../composables/useApi'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -52,6 +54,7 @@ import IconChevronRight from '@/components/icons/IconChevronRight.vue'
 const api = useApi()
 const queryClient = useQueryClient()
 const authStore = useAuthStore()
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 
 // State
 const page = ref(1)
@@ -60,6 +63,10 @@ const search = ref('')
 const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
 const isActiveFilter = ref<boolean | undefined>(undefined)
+const statusFilterModel = computed({
+  get: (): string => isActiveFilter.value === true ? 'active' : isActiveFilter.value === false ? 'suspended' : 'all',
+  set: (v: string) => { isActiveFilter.value = v === 'active' ? true : v === 'suspended' ? false : undefined },
+})
 
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
@@ -76,7 +83,7 @@ const userToResetPassword = ref<User | null>(null)
 const username = ref('')
 const password = ref('')
 const email = ref('')
-const role = ref('manager')
+const role = ref('developer')
 const suspendReason = ref('')
 const newRole = ref('')
 const newPassword = ref('')
@@ -91,7 +98,7 @@ const { data: usersData, isLoading, error, refetch } = useQuery({
     page_size: pageSize.value,
     search: searchDebounced.value || undefined,
     role: roleFilter.value === 'all' ? undefined : roleFilter.value,
-    is_active: isActiveFilter.value
+    is_active: isActiveFilter.value,
   }),
 })
 
@@ -103,7 +110,7 @@ const createMutation = useMutation({
     username.value = ''
     password.value = ''
     email.value = ''
-    role.value = 'manager'
+    role.value = 'developer'
     queryClient.invalidateQueries({ queryKey: ['users'] })
   },
   onError: (err) => {
@@ -148,11 +155,18 @@ const activateMutation = useMutation({
 })
 
 function handleToggleStatus(user: User) {
+  if (user.id === authStore.userId) return
   if (user.is_active) {
     userToDisable.value = user
     showDisableConfirm.value = true
   } else {
-    activateMutation.mutate(user.id)
+    openConfirm(
+      'Activate User',
+      `Restore access for ${user.username}?`,
+      'Activate',
+      () => activateMutation.mutate(user.id),
+      'default',
+    )
   }
 }
 
@@ -176,6 +190,7 @@ const deleteMutation = useMutation({
 })
 
 function handleDeleteUser(user: User) {
+  if (user.id === authStore.userId) return
   userToDelete.value = user
   showDeleteConfirm.value = true
 }
@@ -200,6 +215,7 @@ const changeRoleMutation = useMutation({
 })
 
 function handleChangeRole(user: User) {
+  if (user.id === authStore.userId) return
   userToChangeRole.value = user
   newRole.value = user.role
   showChangeRoleModal.value = true
@@ -252,7 +268,11 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
 
 // Clear sensitive data when create dialog closes (e.g. via overlay/X)
 watch(showCreateModal, (open) => {
-  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'manager' }
+  if (!open) { username.value = ''; password.value = ''; email.value = ''; role.value = 'developer' }
+})
+
+watch(showDisableConfirm, (open) => {
+  if (!open) { suspendReason.value = '' }
 })
 
 
@@ -277,6 +297,19 @@ watch(showCreateModal, (open) => {
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="manager">Manager</SelectItem>
             <SelectItem value="developer">Developer</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div class="w-full md:w-40">
+        <Select v-model="statusFilterModel">
+          <SelectTrigger id="status-filter">
+            <SelectValue placeholder="All Statuses" class="text-foreground"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -361,9 +394,12 @@ watch(showCreateModal, (open) => {
       <template #footer>
         <div v-if="usersData" class="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <p class="text-xs text-muted-foreground">
-            Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
-            to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
-            of <span class="font-medium">{{ usersData.total }}</span> results
+            <template v-if="usersData.total > 0">
+              Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
+              to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span>
+              of <span class="font-medium">{{ usersData.total }}</span> results
+            </template>
+            <template v-else>No results</template>
           </p>
           <div class="flex gap-2">
             <Button variant="outline" :disabled="page === 1" @click="page--"><IconChevronLeft />Previous</Button>
@@ -436,7 +472,7 @@ watch(showCreateModal, (open) => {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'manager'"
+            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'developer'"
           >
             <IconX />
             Cancel
@@ -572,6 +608,15 @@ watch(showCreateModal, (open) => {
       </DialogContent>
     </Dialog>
 
+    <ConfirmDialog
+      v-model:open="showConfirmModal"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      :variant="confirmVariant"
+      @confirm="confirmCallback?.()"
+    />
+
     <!-- Reset Password Modal -->
     <Dialog v-model:open="showResetPasswordModal">
       <DialogContent class="sm:max-w-md">
@@ -609,7 +654,7 @@ watch(showCreateModal, (open) => {
           <Button
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
-            @click="showResetPasswordModal = false"
+            @click="showResetPasswordModal = false; userToResetPassword = null; newPassword = ''; forcePasswordChange = true"
           >
             <IconX />
             Cancel

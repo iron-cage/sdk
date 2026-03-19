@@ -34,10 +34,15 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/limits',
-      name: 'limits',
-      component: () => import('../views/LimitsView.vue'),
+      path: '/budgets',
+      name: 'budgets',
+      component: () => import('../views/BudgetsView.vue'),
       meta: { requiresAuth: true },
+    },
+    {
+      // Redirect old /limits URL to /budgets for backwards compatibility
+      path: '/limits',
+      redirect: '/budgets',
     },
     {
       path: '/providers',

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuthStore } from '../stores/auth'
-import { formatDate, formatTimestamp } from '@/lib/formatters'
+import { formatTimestamp } from '@/lib/formatters'
 import { useConfirm } from '@/composables/useConfirm'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -53,7 +53,6 @@ const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
-const showDeleteModal = ref(false)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const name = ref('')
 const selectedProviderKeyIds = ref<number[]>([])
@@ -61,9 +60,6 @@ const addingProviderKeyId = ref<string>('')
 const initialBudgetUsd = ref<number | undefined>(undefined)
 const selectedOwnerId = ref<string>('')
 const selectedAgent = ref<Agent | null>(null)
-const agentToDelete = ref<Agent | null>(null)
-const icTokenStatuses = ref<Record<number, IcTokenStatus>>({})
-const icTokenStatusLoading = ref(false)
 const tokenActionLoadingId = ref<number | null>(null)
 const showTokenDialog = ref(false)
 const tokenDialogValue = ref('')
@@ -77,39 +73,25 @@ const { data: agents, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getAgents(),
 })
 
-// Fetch IC token status for each agent once agents are loaded
-watch(
-  () => agents?.value,
-  async (agentList) => {
-    if (!agentList) {
-      icTokenStatuses.value = {}
-      return
-    }
+// Fetch IC token status per agent — one query per agent, managed by TanStack Query
+const icTokenQueries = useQueries({
+  queries: computed(() =>
+    (agents.value ?? []).map(agent => ({
+      queryKey: ['ic-token-status', agent.id] as const,
+      queryFn: () => api.getIcTokenStatus(agent.id),
+      staleTime: 60_000,
+    }))
+  ),
+})
 
-    icTokenStatusLoading.value = true
-    const statusMap: Record<number, IcTokenStatus> = {}
-    const failures: string[] = []
-
-    await Promise.all(
-      agentList.map(async (agent) => {
-        try {
-          const status = await api.getIcTokenStatus(agent.id)
-          statusMap[agent.id] = status
-        } catch {
-          failures.push(agent.name)
-        }
-      })
-    )
-
-    if (failures.length) {
-      toast.error(`Failed to load IC token status for ${failures.length} agent(s)`)
-    }
-
-    icTokenStatuses.value = statusMap
-    icTokenStatusLoading.value = false
-  },
-  { immediate: true }
+const icTokenStatusLoading = computed(() =>
+  icTokenQueries.value.some(q => q.isLoading)
 )
+
+function getIcTokenStatusFromQuery(agentId: number): IcTokenStatus | undefined {
+  const idx = agents.value?.findIndex(a => a.id === agentId) ?? -1
+  return idx >= 0 ? icTokenQueries.value[idx]?.data : undefined
+}
 
 // Fetch providers for selection
 const { data: providers } = useQuery({
@@ -255,34 +237,28 @@ function handleUpdateAgent() {
 }
 
 function handleDeleteAgent(agent: Agent) {
-  agentToDelete.value = agent
-  showDeleteModal.value = true
-}
-
-function confirmDelete() {
-  if (agentToDelete.value) {
-    deleteMutation.mutate(agentToDelete.value.id)
-    showDeleteModal.value = false
-    agentToDelete.value = null
-  }
+  openConfirm(
+    'Delete Agent',
+    `Delete "${agent.name}"? This action cannot be undone.`,
+    'Delete',
+    () => deleteMutation.mutate(agent.id),
+    'destructive',
+  )
 }
 
 function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
-  return icTokenStatuses.value[agentId]
+  return getIcTokenStatusFromQuery(agentId)
 }
 
 async function handleGenerateIcToken(agent: Agent) {
   tokenActionLoadingId.value = agent.id
   try {
     const response = await api.generateIcToken(agent.id)
-    icTokenStatuses.value = {
-      ...icTokenStatuses.value,
-      [agent.id]: {
-        agent_id: agent.id,
-        has_ic_token: true,
-        created_at: response.created_at,
-      },
-    }
+    queryClient.setQueryData(['ic-token-status', agent.id], {
+      agent_id: agent.id,
+      has_ic_token: true,
+      created_at: response.created_at,
+    })
     tokenDialogAgentName.value = agent.name
     tokenDialogValue.value = response.ic_token
     tokenDialogWarning.value = response.warning
@@ -304,10 +280,11 @@ async function handleRegenerateIcToken(agent: Agent) {
       tokenActionLoadingId.value = agent.id
       try {
         const response = await api.regenerateIcToken(agent.id)
-        icTokenStatuses.value = {
-          ...icTokenStatuses.value,
-          [agent.id]: { agent_id: agent.id, has_ic_token: true, created_at: response.created_at },
-        }
+        queryClient.setQueryData(['ic-token-status', agent.id], {
+          agent_id: agent.id,
+          has_ic_token: true,
+          created_at: response.created_at,
+        })
         tokenDialogAgentName.value = agent.name
         tokenDialogValue.value = response.ic_token
         tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
@@ -319,6 +296,7 @@ async function handleRegenerateIcToken(agent: Agent) {
         tokenActionLoadingId.value = null
       }
     },
+    'destructive',
   )
 }
 
@@ -331,18 +309,40 @@ async function handleRevokeIcToken(agent: Agent) {
       tokenActionLoadingId.value = agent.id
       try {
         await api.revokeIcToken(agent.id)
-        icTokenStatuses.value = {
-          ...icTokenStatuses.value,
-          [agent.id]: { agent_id: agent.id, has_ic_token: false, created_at: null },
-        }
+        queryClient.setQueryData(['ic-token-status', agent.id], {
+          agent_id: agent.id,
+          has_ic_token: false,
+          created_at: null,
+        })
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to revoke IC token')
       } finally {
         tokenActionLoadingId.value = null
       }
     },
+    'destructive',
   )
 }
+
+watch(showCreateModal, (open) => {
+  if (!open) {
+    name.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
+    initialBudgetUsd.value = undefined
+    selectedOwnerId.value = ''
+  }
+})
+
+watch(showUpdateModal, (open) => {
+  if (!open) {
+    name.value = ''
+    selectedProviderKeyIds.value = []
+    addingProviderKeyId.value = ''
+    selectedOwnerId.value = ''
+    selectedAgent.value = null
+  }
+})
 
 async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return
@@ -350,10 +350,10 @@ async function copyTokenToClipboard() {
   try {
     await navigator.clipboard.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
-    } catch (_err: unknown) {
-      const message = _err instanceof Error ? _err.message : 'Copy failed'
-      copyMessage.value = message
-    }
+  } catch (_err: unknown) {
+    const message = _err instanceof Error ? _err.message : 'Copy failed'
+    copyMessage.value = message
+  }
 
 }
 
@@ -422,7 +422,7 @@ async function copyTokenToClipboard() {
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          {{ formatDate(agent.created_at) }}
+          {{ formatTimestamp(agent.created_at) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
@@ -508,6 +508,7 @@ async function copyTokenToClipboard() {
                 <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
+                  :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive"
                   @click="removeProviderKey(keyId)"
                 >
@@ -627,6 +628,7 @@ async function copyTokenToClipboard() {
                 <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
+                  :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive"
                   @click="removeProviderKey(keyId)"
                 >
@@ -689,37 +691,6 @@ async function copyTokenToClipboard() {
           >
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- Delete Confirmation Modal -->
-    <Dialog v-model:open="showDeleteModal">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Delete Agent</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete "{{ agentToDelete?.name }}"? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter>
-          <Button
-            :disabled="deleteMutation.isPending.value"
-            variant="outline"
-            @click="showDeleteModal = false"
-          >
-            <IconX />
-            Cancel
-          </Button>
-          <Button
-            :disabled="deleteMutation.isPending.value"
-            variant="destructive"
-            @click="confirmDelete"
-          >
-            <IconTrash />
-            {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
           </Button>
         </DialogFooter>
       </DialogContent>

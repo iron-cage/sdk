@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '../composables/useApi'
 import IconChip from '@/components/icons/IconChip.vue'
@@ -44,7 +44,7 @@ import { getProviderLabel } from '@/lib/providers'
 const api = useApi()
 
 const selectedAgentId = ref<string>('all')
-const selectedProviderId = ref<string>('all')
+const selectedProviderKeyId = ref<string>('all')
 const selectedPeriod = ref<AnalyticsPeriod>('last7-days')
 
 const logsPage = ref(1)
@@ -83,47 +83,47 @@ const { data: providerList } = useQuery({
 const activeFilters = computed(() => ({
   period: selectedPeriod.value,
   agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
-  provider_key_id: selectedProviderId.value !== 'all' ? Number(selectedProviderId.value) : undefined,
+  provider_key_id: selectedProviderKeyId.value !== 'all' ? Number(selectedProviderKeyId.value) : undefined,
 }))
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
-  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }),
+  queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderKeyId],
+  queryFn: ({ signal }) => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }, signal),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
-  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsSpendingByProvider(activeFilters.value),
+  queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderKeyId],
+  queryFn: ({ signal }) => api.getAnalyticsSpendingByProvider(activeFilters.value, signal),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
-  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderId, modelsPage],
-  queryFn: () => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }),
+  queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderKeyId, modelsPage],
+  queryFn: ({ signal }) => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }, signal),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
-  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
+  queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderKeyId],
+  queryFn: ({ signal }) => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }, signal),
 })
 
-const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
-  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderId, logsPage],
-  queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
+const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching, error: eventsError } = useQuery({
+  queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderKeyId, logsPage],
+  queryFn: ({ signal }) => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }, signal),
 })
 
-const { data: spendingByAgent, isLoading: agentSpendingLoading } = useQuery({
-  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderId, agentSpendingPage],
-  queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }),
+const { data: spendingByAgent, isLoading: agentSpendingLoading, error: agentSpendingError } = useQuery({
+  queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderKeyId, agentSpendingPage],
+  queryFn: ({ signal }) => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }, signal),
 })
 
 const { data: avgCostData } = useQuery({
-  queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderId],
-  queryFn: () => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value),
+  queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderKeyId],
+  queryFn: ({ signal }) => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value, signal),
 })
 
 const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
-  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderId, tokensPage],
-  queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }),
+  queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderKeyId, tokensPage],
+  queryFn: ({ signal }) => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }, signal),
 })
 
 watch(eventsList, (newData) => {
@@ -140,7 +140,7 @@ watch(eventsList, (newData) => {
   }
 }, { immediate: true })
 
-watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
+watch([selectedPeriod, selectedAgentId, selectedProviderKeyId], () => {
   logsPage.value = 1
   accumulatedLogs.value = []
   agentSpendingPage.value = 1
@@ -149,19 +149,24 @@ watch([selectedPeriod, selectedAgentId, selectedProviderId], () => {
 })
 
 const agentBreakdown = computed<AgentSpending[]>(() => {
-  const data = spendingByAgent.value?.data ?? []
-  return [...data].sort((a, b) => b.spending - a.spending)
+  return spendingByAgent.value?.data ?? []
 })
 
 const isLoading = computed(() =>
   requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
 )
 const error = computed(() =>
-  requestsError.value || providerError.value || modelError.value
+  requestsError.value || providerError.value || modelError.value || eventsError.value || agentSpendingError.value
 )
 
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
 const successRate = computed(() => requestStats.value?.success_rate || 0)
+const successRateChangePct = computed(() => {
+  const prev = requestStats.value?.previous_period?.success_rate
+  const curr = requestStats.value?.success_rate
+  if (prev == null || curr == null || prev === 0) return null
+  return ((curr - prev) / prev) * 100
+})
 const totalSpend = computed(() => spendingTotal.value?.total_spend || 0)
 const totalInputTokens = computed(() => tokensByAgent.value?.summary?.total_input_tokens ?? 0)
 const totalOutputTokens = computed(() => tokensByAgent.value?.summary?.total_output_tokens ?? 0)
@@ -195,6 +200,7 @@ function formatCost(cost: number): string {
 }
 
 function loadMoreLogs() {
+  if (logsPage.value >= totalPages.value || eventsFetching.value) return
   logsPage.value++
 }
 
@@ -205,6 +211,15 @@ function openLogModal(event: AnalyticsEvent) {
   selectedLog.value = event
   showLogModal.value = true
 }
+
+watch(showLogModal, (open) => {
+  if (!open) selectedLog.value = null
+})
+
+onUnmounted(() => {
+  accumulatedLogs.value = []
+  selectedLog.value = null
+})
 </script>
 
 <template>
@@ -224,7 +239,7 @@ function openLogModal(event: AnalyticsEvent) {
         </Select>
       </div>
       <div class="w-full md:w-40">
-        <Select v-model="selectedProviderId">
+        <Select v-model="selectedProviderKeyId">
           <SelectTrigger>
             <SelectValue placeholder="All Providers" />
           </SelectTrigger>
@@ -261,7 +276,7 @@ function openLogModal(event: AnalyticsEvent) {
 
     <!-- Error state -->
     <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading usage analytics: {{ (error as Error).message }}</p>
+      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : String(error) }}</p>
     </div>
 
     <!-- Analytics content -->
@@ -300,8 +315,8 @@ function openLogModal(event: AnalyticsEvent) {
 
           <div class="flex gap-2 items-center">
             <TrendBadge
-            v-if="requestStats?.previous_period"
-            :change-percent="(requestStats.success_rate - requestStats.previous_period.success_rate)"
+            v-if="successRateChangePct != null"
+            :change-percent="successRateChangePct"
             class="mt-1"
           />
 

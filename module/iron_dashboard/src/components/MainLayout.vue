@@ -74,6 +74,7 @@ async function handleLogout() {
         <span class="text-md font-semibold text-foreground">Iron Cage</span>
         <button
           class="lg:hidden text-foreground"
+          aria-label="Close navigation menu"
           @click="sidebarOpen = false"
         >
           <IconX />
@@ -122,8 +123,8 @@ async function handleLogout() {
             </router-link>
 
             <router-link
-              to="/limits"
-              :class="navLinkClass('/limits')"
+              to="/budgets"
+              :class="navLinkClass('/budgets')"
               @click="handleNavClick"
             >
               <IconCoin class="w-4 h-4 mr-2 flex-shrink-0" />
@@ -208,6 +209,7 @@ async function handleLogout() {
       <div class="lg:hidden h-12 flex items-center px-3 border-b border-border shrink-0">
         <button
           class="p-1 rounded text-muted-foreground hover:text-foreground"
+          aria-label="Open navigation menu"
           @click="sidebarOpen = true"
         >
           <IconMenu />

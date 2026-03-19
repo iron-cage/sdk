@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate, formatCostUsd } from '@/lib/formatters'
+import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
 import { getProviderLabel, getProviderKeyPlaceholder, detectProviderFromKey, generateProviderAlias } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
@@ -51,6 +51,7 @@ const showEditModal = ref(false)
 const showQuickAddModal = ref(false)
 const quickAddKey = ref('')
 const quickAddError = ref('')
+const toggleLoadingId = ref<number | null>(null)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
 
@@ -120,6 +121,7 @@ const toggleMutation = useMutation({
     toast.error('Failed to update provider key')
   },
   onSettled: () => {
+    toggleLoadingId.value = null
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
@@ -185,10 +187,12 @@ function handleDeleteKey(key: ProviderKey) {
     `Delete the ${getProviderLabel(key.provider)} key? This action cannot be undone.`,
     'Delete',
     () => deleteMutation.mutate(key.id),
+    'destructive',
   )
 }
 
 function handleToggleEnabled(key: ProviderKey) {
+  toggleLoadingId.value = key.id
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
@@ -287,7 +291,7 @@ function handleQuickAdd() {
           <Button
             variant="outline"
             size="sm"
-            :disabled="toggleMutation.isPending.value"
+            :disabled="toggleLoadingId === key.id"
             @click="handleToggleEnabled(key)"
           >
             <IconCheck v-if="key.is_enabled" class="text-success" />
@@ -295,7 +299,7 @@ function handleQuickAdd() {
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatDate(key.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(key.created_at) }}</td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
