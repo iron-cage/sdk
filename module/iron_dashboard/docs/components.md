@@ -905,6 +905,9 @@ Bind in template:
 **Exports:**
 ```typescript
 function useApi(): {
+  // Health
+  getHealth(): Promise<{ status: string; timestamp: number }>
+
   // Token methods
   getTokens(): Promise<TokenMetadata[]>
   getToken(id: number): Promise<TokenMetadata>
@@ -912,35 +915,66 @@ function useApi(): {
   rotateToken(id: number): Promise<CreateTokenResponse>
   revokeToken(id: number): Promise<void>
 
-  // Usage methods
-  getUsage(): Promise<UsageRecord[]>
-  getUsageStats(): Promise<UsageStats>
-  getUsageByToken(tokenId: number): Promise<UsageRecord[]>
+  // Provider key methods
+  getProviderKeys(): Promise<ProviderKey[]>
+  getProviderKey(id: number): Promise<ProviderKey>
+  createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey>
+  updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey>
+  deleteProviderKey(id: number): Promise<void>
 
-  // Limits methods
-  getLimits(): Promise<LimitRecord[]>
-  getLimit(id: number): Promise<LimitRecord>
-  createLimit(data: CreateLimitRequest): Promise<LimitRecord>
-  updateLimit(id: number, data: UpdateLimitRequest): Promise<LimitRecord>
-  deleteLimit(id: number): Promise<void>
+  // User methods
+  getUsers(params?): Promise<{ users: User[]; total: number; page: number; page_size: number }>
+  createUser(data: CreateUserRequest): Promise<User>
+  updateUserStatus(id: string, isActive: boolean): Promise<User>
+  suspendUser(id: string, reason?: string): Promise<User>
+  activateUser(id: string): Promise<User>
+  changeUserRole(id: string, role: string): Promise<User>
+  resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User>
+  deleteUser(id: string): Promise<void>
 
-  // Traces methods
-  getTraces(): Promise<TraceRecord[]>
-  getTrace(id: number): Promise<TraceRecord>
+  // Agent methods
+  getAgents(): Promise<Agent[]>
+  getAgent(id: number): Promise<Agent>
+  createAgent(data): Promise<Agent>
+  updateAgent(data): Promise<Agent>
+  updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse>
+  deleteAgent(id: number): Promise<void>
+
+  // IC Token methods
+  generateIcToken(agentId: number): Promise<IcTokenResponse>
+  getIcTokenStatus(agentId: number): Promise<IcTokenStatus>
+  regenerateIcToken(agentId: number): Promise<IcTokenResponse>
+  revokeIcToken(agentId: number): Promise<void>
+
+  // Analytics methods (all accept optional signal?: AbortSignal)
+  getAnalyticsSpendingTotal(filters?, signal?): Promise<SpendingTotalResponse>
+  getAnalyticsSpendingByProvider(filters?, signal?): Promise<SpendingByProviderResponse>
+  getAnalyticsSpendingByAgent(filters?, pagination?, signal?): Promise<SpendingByAgentResponse>
+  getAnalyticsSpendingAvgPerRequest(filters?, signal?): Promise<AvgCostResponse>
+  getAnalyticsUsageRequests(filters?, signal?): Promise<RequestUsageResponse>
+  getAnalyticsUsageModels(filters?, pagination?, signal?): Promise<ModelUsageResponse>
+  getAnalyticsUsageTokensByAgent(filters?, pagination?, signal?): Promise<TokenUsageByAgentResponse>
+  getAnalyticsEventsList(filters?, pagination?, signal?): Promise<EventsListResponse>
+  getBudgetStatus(filters?): Promise<BudgetStatusResponse>
 }
 ```
 
 **Type Exports:**
 ```typescript
-TokenMetadata
-CreateTokenRequest
-CreateTokenResponse
-UsageRecord
-UsageStats
-LimitRecord
-CreateLimitRequest
-UpdateLimitRequest
-TraceRecord
+// Primitive types
+User, CreateUserRequest
+Agent, AgentBudgetResponse
+IcTokenResponse, IcTokenStatus
+TokenMetadata, CreateTokenRequest, CreateTokenResponse
+ProviderKey, ProviderType, CreateProviderKeyRequest, UpdateProviderKeyRequest
+
+// Analytics types
+AnalyticsPeriod, AnalyticsFilters, PaginationParams
+SpendingTotalResponse, SpendingByProviderResponse, SpendingByAgentResponse
+RequestUsageResponse, ModelUsageResponse, EventsListResponse
+TokenUsageByAgentResponse, AvgCostResponse
+BudgetStatusResponse, BudgetStatus
+AgentSpending, AgentTokenUsage, ModelUsage, AnalyticsEvent
 ```
 
 **Authentication:**
@@ -981,48 +1015,43 @@ const { data: tokens } = useQuery({
 ```
 App.vue
 ├── MainLayout.vue (if authenticated)
-│   ├── useRouter (Vue Router)
-│   ├── useAuthStore (Pinia store)
+│   ├── useRouter, useRoute (Vue Router)
+│   ├── useAuthStore (Pinia)
 │   └── router-view (slot)
 │       ├── DashboardView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   ├── useRouter
-│       │   ├── Card, CardContent, CardHeader, CardTitle (shadcn-vue)
-│       │   ├── Button (shadcn-vue)
-│       │   └── Badge (shadcn-vue)
-│       ├── TokensView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   ├── useMutation (TanStack)
-│       │   ├── useQueryClient (TanStack)
-│       │   ├── useAuthStore
-│       │   ├── Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle (shadcn-vue)
-│       │   ├── Button (shadcn-vue)
-│       │   ├── Input, Label (shadcn-vue)
-│       │   ├── Alert, AlertDescription (shadcn-vue)
-│       │   └── Badge (shadcn-vue)
+│       │   ├── useApi, useQuery (TanStack)
+│       │   ├── useAuthStore, useRouter
+│       │   ├── StatCard, PageLayout
+│       │   └── shadcn-vue: — (layout only)
+│       ├── AgentsView.vue
+│       │   ├── useApi, useQuery, useQueries, useMutation, useQueryClient (TanStack)
+│       │   ├── useAuthStore, useConfirm
+│       │   ├── DataTable, ConfirmDialog, StatusBadge, PageLayout
+│       │   └── shadcn-vue: Button, Input, Label, Dialog, Select, DropdownMenu
 │       ├── UsageView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   └── Card, CardContent, CardHeader, CardTitle (shadcn-vue)
-│       ├── LimitsView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   ├── useMutation (TanStack)
-│       │   ├── Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle (shadcn-vue)
-│       │   ├── Select, SelectContent, SelectItem, SelectTrigger, SelectValue (shadcn-vue)
-│       │   ├── Button (shadcn-vue)
-│       │   ├── Input, Label (shadcn-vue)
-│       │   └── Alert, AlertDescription (shadcn-vue)
+│       │   ├── useApi, useQuery (TanStack — 8 queries)
+│       │   ├── DataTable, StatCard, PercentBar, TrendBadge, PageLayout
+│       │   └── shadcn-vue: Button, Select, Dialog
+│       ├── BudgetsView.vue
+│       │   ├── useApi, useQuery, useMutation, useQueryClient (TanStack)
+│       │   ├── useAuthStore
+│       │   ├── DataTable, PercentBar, PageLayout
+│       │   └── shadcn-vue: Button, Badge, Input, Label, Dialog, DropdownMenu
+│       ├── ProvidersView.vue
+│       │   ├── useApi, useQuery, useMutation, useQueryClient (TanStack)
+│       │   ├── useAuthStore, useConfirm
+│       │   ├── DataTable, ConfirmDialog, PageLayout
+│       │   └── shadcn-vue: Button, Input, Label, Dialog, DropdownMenu
+│       └── UsersView.vue
+│           ├── useApi, useQuery, useMutation, useQueryClient (TanStack)
+│           ├── useAuthStore, useConfirm
+│           ├── DataTable, ConfirmDialog, StatusBadge, AvatarInitial, PageLayout
+│           └── shadcn-vue: Button, Badge, Input, Label, Dialog, Select, Switch, DropdownMenu
 └── router-view (if not authenticated)
     └── LoginView.vue
         ├── useAuthStore
         ├── useRouter
-        ├── Card, CardContent, CardDescription, CardHeader, CardTitle (shadcn-vue)
-        ├── Input, Label (shadcn-vue)
-        ├── Button (shadcn-vue)
-        └── Alert, AlertDescription (shadcn-vue)
+        └── shadcn-vue: Button, Input, Label
 ```
 
 ---

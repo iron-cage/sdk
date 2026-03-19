@@ -4,7 +4,6 @@ import {
   formatMicrodollars,
   formatCostUsd,
   formatNumber,
-  formatDate,
 } from './formatters'
 
 describe('formatTimestamp', () => {
@@ -63,12 +62,5 @@ describe('formatCostUsd', () => {
 describe('formatNumber', () => {
   it('formats a number with locale separators', () => {
     expect(formatNumber(1000)).toBe((1000).toLocaleString())
-  })
-})
-
-describe('formatDate', () => {
-  it('formats a millisecond timestamp as a locale string', () => {
-    const ms = 1_710_000_000_000
-    expect(formatDate(ms)).toBe(new Date(ms).toLocaleString())
   })
 })

@@ -453,7 +453,7 @@ watch(showDisableConfirm, (open) => {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'manager'"
+            @click="showCreateModal = false; username = ''; password = ''; email = ''; role = 'developer'"
           >
             <IconX />
             Cancel
@@ -635,7 +635,7 @@ watch(showDisableConfirm, (open) => {
           <Button
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
-            @click="showResetPasswordModal = false"
+            @click="showResetPasswordModal = false; userToResetPassword = null; newPassword = ''; forcePasswordChange = true"
           >
             <IconX />
             Cancel

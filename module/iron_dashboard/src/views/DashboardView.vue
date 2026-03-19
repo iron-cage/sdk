@@ -19,21 +19,21 @@ const router = useRouter()
 const authStore = useAuthStore()
 const api = useApi()
 
-const { data: spending, isLoading: spendingLoading } = useQuery({
-  queryKey: ['analytics-spending'],
-  queryFn: () => api.getAnalyticsSpendingTotal({ period: 'all-time' }),
+const { data: spending, isLoading: spendingLoading, error: spendingError } = useQuery({
+  queryKey: ['analytics-spending', 'all-time'],
+  queryFn: ({ signal }) => api.getAnalyticsSpendingTotal({ period: 'all-time' }, signal),
 })
-const { data: requestUsage, isLoading: requestsLoading } = useQuery({
-  queryKey: ['analytics-requests'],
-  queryFn: () => api.getAnalyticsUsageRequests({ period: 'all-time' }),
+const { data: requestUsage, isLoading: requestsLoading, error: requestsError } = useQuery({
+  queryKey: ['analytics-requests', 'all-time'],
+  queryFn: ({ signal }) => api.getAnalyticsUsageRequests({ period: 'all-time' }, signal),
 })
-const { data: agents, isLoading: agentsLoading } = useQuery({
+const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
-const { data: agentSpending } = useQuery({
+const { data: agentSpending, error: agentSpendingError } = useQuery({
   queryKey: ['analytics-spending-agent-dashboard'],
-  queryFn: () => api.getAnalyticsSpendingByAgent({ period: 'all-time' }, { per_page: 5 }),
+  queryFn: ({ signal }) => api.getAnalyticsSpendingByAgent({ period: 'all-time' }, { per_page: 5 }, signal),
 })
 
 const { data: health, isLoading: healthLoading, isError: healthError } = useQuery({
@@ -44,6 +44,7 @@ const { data: health, isLoading: healthLoading, isError: healthError } = useQuer
 })
 
 const statsLoading   = computed(() => spendingLoading.value || requestsLoading.value || agentsLoading.value)
+const statsError     = computed(() => spendingError.value || requestsError.value || agentsError.value || agentSpendingError.value)
 const totalSpend     = computed(() => spending.value?.total_spend ?? 0)
 const totalRequests  = computed(() => requestUsage.value?.total_requests ?? 0)
 const successRate    = computed(() => requestUsage.value?.success_rate ?? 0)
@@ -77,6 +78,15 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
       >
         View Analytics
       </RouterLink>
+    </div>
+
+    <!-- Stats error banner -->
+    <div
+      v-if="statsError"
+      role="alert"
+      class="px-4 py-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive"
+    >
+      Failed to load statistics. {{ statsError instanceof Error ? statsError.message : 'Please try again.' }}
     </div>
 
     <!-- Stat cards -->
@@ -164,7 +174,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
 
           <button
             class="w-full flex items-center justify-between p-3 border border-border rounded-md hover:bg-muted/50 hover:border-primary/30 transition-all group"
-            @click="router.push({ name: 'limits' })"
+            @click="router.push({ name: 'budgets' })"
           >
             <div class="flex items-center gap-3">
               <div class="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center transition-colors">

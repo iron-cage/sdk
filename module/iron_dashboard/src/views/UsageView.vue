@@ -88,42 +88,42 @@ const activeFilters = computed(() => ({
 
 const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
   queryKey: ['analytics-requests', selectedPeriod, selectedAgentId, selectedProviderKeyId],
-  queryFn: () => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }),
+  queryFn: ({ signal }) => api.getAnalyticsUsageRequests({ ...activeFilters.value, compare: true }, signal),
 })
 
 const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
   queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId, selectedProviderKeyId],
-  queryFn: () => api.getAnalyticsSpendingByProvider(activeFilters.value),
+  queryFn: ({ signal }) => api.getAnalyticsSpendingByProvider(activeFilters.value, signal),
 })
 
 const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
   queryKey: ['analytics-models', selectedPeriod, selectedAgentId, selectedProviderKeyId, modelsPage],
-  queryFn: () => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }),
+  queryFn: ({ signal }) => api.getAnalyticsUsageModels(activeFilters.value, { page: modelsPage.value, per_page: ANALYTICS_PER_PAGE }, signal),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId, selectedProviderKeyId],
-  queryFn: () => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }),
+  queryFn: ({ signal }) => api.getAnalyticsSpendingTotal({ ...activeFilters.value, compare: true }, signal),
 })
 
 const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching, error: eventsError } = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, selectedProviderKeyId, logsPage],
-  queryFn: () => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }),
+  queryFn: ({ signal }) => api.getAnalyticsEventsList(activeFilters.value, { page: logsPage.value, per_page: logsPerPage }, signal),
 })
 
-const { data: spendingByAgent, isLoading: agentSpendingLoading } = useQuery({
+const { data: spendingByAgent, isLoading: agentSpendingLoading, error: agentSpendingError } = useQuery({
   queryKey: ['analytics-spending-agent', selectedPeriod, selectedAgentId, selectedProviderKeyId, agentSpendingPage],
-  queryFn: () => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }),
+  queryFn: ({ signal }) => api.getAnalyticsSpendingByAgent(activeFilters.value, { page: agentSpendingPage.value, per_page: ANALYTICS_PER_PAGE }, signal),
 })
 
 const { data: avgCostData } = useQuery({
   queryKey: ['analytics-avg-cost', selectedPeriod, selectedAgentId, selectedProviderKeyId],
-  queryFn: () => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value),
+  queryFn: ({ signal }) => api.getAnalyticsSpendingAvgPerRequest(activeFilters.value, signal),
 })
 
 const { data: tokensByAgent, isLoading: tokensByAgentLoading } = useQuery({
   queryKey: ['analytics-tokens-by-agent', selectedPeriod, selectedAgentId, selectedProviderKeyId, tokensPage],
-  queryFn: () => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }),
+  queryFn: ({ signal }) => api.getAnalyticsUsageTokensByAgent(activeFilters.value, { page: tokensPage.value, per_page: ANALYTICS_PER_PAGE }, signal),
 })
 
 watch(eventsList, (newData) => {
@@ -156,7 +156,7 @@ const isLoading = computed(() =>
   requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
 )
 const error = computed(() =>
-  requestsError.value || providerError.value || modelError.value || eventsError.value
+  requestsError.value || providerError.value || modelError.value || eventsError.value || agentSpendingError.value
 )
 
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
