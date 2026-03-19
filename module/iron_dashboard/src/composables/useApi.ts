@@ -676,7 +676,7 @@ export function useApi() {
     agent_id?: number
     page?: number
     per_page?: number
-  }): Promise<BudgetStatusResponse> {
+  }, signal?: AbortSignal): Promise<BudgetStatusResponse> {
     const params = new URLSearchParams()
     if (filters?.status) params.append('status', filters.status)
     if (filters?.threshold != null) params.append('threshold', String(filters.threshold))
@@ -684,7 +684,7 @@ export function useApi() {
     if (filters?.page) params.append('page', String(filters.page))
     if (filters?.per_page) params.append('per_page', String(filters.per_page))
     const query = params.toString()
-    return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`)
+    return fetchApi(`/api/v1/analytics/budget/status${query ? `?${query}` : ''}`, { signal })
   }
 
   async function getAnalyticsSpendingByAgent(

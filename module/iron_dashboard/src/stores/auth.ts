@@ -22,7 +22,9 @@ interface AuthTokens {
 /** Decode role claim from JWT payload without verifying signature. */
 function decodeJwtRole(token: string): string | null {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
+    const seg = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = seg.padEnd(Math.ceil(seg.length / 4) * 4, '=')
+    const payload = JSON.parse(atob(padded))
     return typeof payload.role === 'string' ? payload.role : null
   } catch {
     return null

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi, type CreateUserRequest, type User } from '../composables/useApi'
@@ -62,6 +62,11 @@ const pageSize = ref(20)
 const search = ref('')
 const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
+const isActiveFilter = ref<boolean | undefined>(undefined)
+const statusFilterModel = computed({
+  get: (): string => isActiveFilter.value === true ? 'active' : isActiveFilter.value === false ? 'suspended' : 'all',
+  set: (v: string) => { isActiveFilter.value = v === 'active' ? true : v === 'suspended' ? false : undefined },
+})
 
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
@@ -87,12 +92,13 @@ const forcePasswordChange = ref(true)
 
 // Fetch users
 const { data: usersData, isLoading, error, refetch } = useQuery({
-  queryKey: ['users', page, pageSize, searchDebounced, roleFilter],
+  queryKey: ['users', page, pageSize, searchDebounced, roleFilter, isActiveFilter],
   queryFn: () => api.getUsers({
     page: page.value,
     page_size: pageSize.value,
     search: searchDebounced.value || undefined,
     role: roleFilter.value === 'all' ? undefined : roleFilter.value,
+    is_active: isActiveFilter.value,
   }),
 })
 
@@ -256,7 +262,7 @@ function confirmResetPassword() {
 }
 
 // Watch for filter changes to reset page
-watch([searchDebounced, roleFilter], () => {
+watch([searchDebounced, roleFilter, isActiveFilter], () => {
   page.value = 1
 })
 
@@ -291,6 +297,19 @@ watch(showDisableConfirm, (open) => {
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="manager">Manager</SelectItem>
             <SelectItem value="developer">Developer</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div class="w-full md:w-40">
+        <Select v-model="statusFilterModel">
+          <SelectTrigger id="status-filter">
+            <SelectValue placeholder="All Statuses" class="text-foreground"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
       </div>

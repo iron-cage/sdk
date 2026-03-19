@@ -99,7 +99,7 @@ import { Button } from '@/components/ui/button'
 </template>
 ```
 
-**Used In:** All views (LoginView, DashboardView, TokensView, UsageView, LimitsView)
+**Used In:** All views (LoginView, DashboardView, AgentsView, BudgetsView, UsageView, ProvidersView, UsersView)
 
 ---
 
@@ -223,7 +223,7 @@ const showModal = ref(false)
 </template>
 ```
 
-**Used In:** TokensView (create token modal, display token modal), LimitsView (create/edit limit modals)
+**Used In:** AgentsView (create/edit agent modals), BudgetsView (create/edit budget modals), ProvidersView (create/edit key modals), UsersView (create/edit user modals)
 
 ---
 
@@ -298,7 +298,7 @@ const selected = ref('option1')
 </template>
 ```
 
-**Used In:** LimitsView (limit type, period selectors)
+**Used In:** AgentsView (provider/model selectors), ProvidersView (provider selector), UsersView (role filter, status filter)
 
 ---
 
@@ -343,7 +343,7 @@ const username = ref('')
 </template>
 ```
 
-**Used In:** LoginView (username, password), TokensView (project_id, description), LimitsView (limit value)
+**Used In:** LoginView (email, password), AgentsView, BudgetsView, ProvidersView (API key, alias fields), UsersView (search, form fields)
 
 ---
 
@@ -381,7 +381,7 @@ import { Input } from '@/components/ui/input'
 </template>
 ```
 
-**Used In:** LoginView, TokensView, LimitsView (all form inputs)
+**Used In:** LoginView, AgentsView, BudgetsView, ProvidersView, UsersView (all form inputs)
 
 ---
 
@@ -428,7 +428,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 </template>
 ```
 
-**Used In:** LoginView (login errors), TokensView (create errors), LimitsView (create/edit errors)
+**Used In:** Not currently used in views (error messages are shown inline)
 
 ---
 
@@ -465,7 +465,7 @@ import { Badge } from '@/components/ui/badge'
 </template>
 ```
 
-**Used In:** DashboardView (token status), TokensView (token status)
+**Used In:** BudgetsView (status badges), UsersView (role badges)
 
 ---
 
@@ -619,54 +619,6 @@ Views are route-level components bound to specific URLs via Vue Router. They orc
 
 ---
 
-#### 3. TokensView.vue
-
-**Route:** `/tokens` _(not yet registered — planned for a future release)_
-**Purpose:** Token management interface (create, rotate, revoke)
-
-**Functionality:**
-- Display all tokens in table format
-- Create new token modal with project_id/description fields
-- Rotate token (revokes old, generates new)
-- Revoke token with confirmation dialog
-- Copy token to clipboard
-- Display newly created token (one-time display)
-
-**shadcn-vue Components Used:**
-- `Dialog`, `DialogContent`, `DialogDescription`, `DialogFooter`, `DialogHeader`, `DialogTitle` - Create/display token modals
-- `Button` - Action buttons (Create, Rotate, Revoke, Copy, Close)
-- `Input` - Project ID and description fields
-- `Label` - Form field labels
-- `Alert`, `AlertDescription` - Error messages
-- `Badge` - Token status indicators
-
-**State:**
-```typescript
-showCreateModal: Ref<boolean>  // Controls create token modal
-showTokenModal: Ref<boolean>   // Controls "token created" modal
-newTokenData: Ref<CreateTokenResponse | null>  // Stores newly created token
-projectId: Ref<string>         // Form field for project_id
-description: Ref<string>       // Form field for description
-createError: Ref<string>       // Error message display
-```
-
-**Mutations:**
-- `createMutation` - POST /api/tokens
-- `rotateMutation` - POST /api/tokens/:id/rotate
-- `revokeMutation` - POST /api/tokens/:id/revoke
-
-**Query Invalidation:**
-All mutations invalidate `['tokens']` query to trigger refetch
-
-**Usage:**
-```vue
-<template>
-  <TokensView /> <!-- Rendered when route is /tokens -->
-</template>
-```
-
----
-
 #### 4. UsageView.vue
 
 **Route:** `/usage`
@@ -691,50 +643,6 @@ All mutations invalidate `['tokens']` query to trigger refetch
 ```vue
 <template>
   <UsageView /> <!-- Rendered when route is /usage -->
-</template>
-```
-
----
-
-#### 5. LimitsView.vue
-
-**Route:** `/limits`
-**Purpose:** Budget limit configuration interface
-
-**Functionality:**
-- Display all budget limits (daily/weekly/monthly/yearly)
-- Create new limit with type/value/period
-- Update existing limit
-- Delete limit with confirmation
-
-**shadcn-vue Components Used:**
-- `Dialog`, `DialogContent`, `DialogDescription`, `DialogFooter`, `DialogHeader`, `DialogTitle` - Create/edit limit modals
-- `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue` - Limit type and period dropdowns
-- `Button` - Action buttons (Create, Edit, Delete, Cancel)
-- `Input` - Project ID and limit value fields
-- `Label` - Form field labels
-- `Alert`, `AlertDescription` - Error messages
-
-**Limit Types:**
-- `budget` - Maximum cost in USD
-- `tokens` - Maximum tokens consumed
-- `requests` - Maximum number of requests
-
-**Periods:**
-- `daily`
-- `weekly`
-- `monthly`
-- `yearly`
-
-**Mutations:**
-- `createLimit` - POST /api/limits
-- `updateLimit` - PUT /api/limits/:id
-- `deleteLimit` - DELETE /api/limits/:id
-
-**Usage:**
-```vue
-<template>
-  <LimitsView /> <!-- Rendered when route is /limits -->
 </template>
 ```
 
@@ -1089,7 +997,7 @@ const { data, isLoading, error } = useQuery({
 
 ### Mutation Pattern
 
-Components with data modification (TokensView, LimitsView) use TanStack mutations:
+Components with data modification (BudgetsView, UsersView) use TanStack mutations:
 
 ```vue
 <script setup>
@@ -1380,7 +1288,7 @@ function handleAction() { /* ... */ }
 | ├─ Separator | 1 | Separator.vue (not currently used) |
 | ├─ Skeleton | 1 | Skeleton.vue (not currently used) |
 | └─ Toast | ~12 | Toast (multiple subcomponents, not currently used) |
-| **Views** | **8** | LoginView, DashboardView, AgentsView, UsageView, LimitsView, TokensView, ProvidersView, UsersView |
+| **Views** | **7** | LoginView, DashboardView, AgentsView, BudgetsView, UsageView, ProvidersView, UsersView |
 | **Layout Components** | **2** | App, MainLayout |
 | **Custom Shared Components** | **9** | AvatarInitial, ConfirmDialog, DataTable, PageLayout, PercentBar, ProviderBadge, StatCard, StatusBadge, TrendBadge |
 | **Composables** | **2** | useApi, useConfirm |
