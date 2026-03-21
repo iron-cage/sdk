@@ -97,7 +97,7 @@ impl ProvidersState {
 /// Create provider key request
 #[derive(Debug, Deserialize)]
 pub struct CreateProviderKeyRequest {
-  /// Provider type (e.g., "openai", "anthropic")
+  /// Provider type (e.g., "openai", "anthropic", "gemini", "xai")
   pub provider: String,
   /// Plaintext API key to encrypt
   pub api_key: String,
@@ -105,6 +105,9 @@ pub struct CreateProviderKeyRequest {
   pub base_url: Option<String>,
   /// Optional human-readable description
   pub description: Option<String>,
+  /// Optional spending cap in USD. If provided, sets the cap when the key is created,
+  /// eliminating the uncapped window between key creation and a separate PUT call.
+  pub spending_cap_usd: Option<f64>,
 }
 
 impl CreateProviderKeyRequest {
@@ -125,10 +128,13 @@ impl CreateProviderKeyRequest {
   /// or too long, or optional fields exceed length limits.
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate provider type
-    if self.provider != "openai" && self.provider != "anthropic" {
+    if !matches!(
+      self.provider.as_str(),
+      "openai" | "anthropic" | "gemini" | "xai"
+    ) {
       return Err(ValidationError::InvalidFormat {
         field: "provider".to_owned(),
-        expected: "'openai' or 'anthropic'".to_owned(),
+        expected: "'openai', 'anthropic', 'gemini', or 'xai'".to_owned(),
       });
     }
 
@@ -274,6 +280,20 @@ fn usd_to_microdollars(usd: f64) -> i64 {
   (usd * 1_000_000.0).round() as i64
 }
 
+/// Validate and convert a spending cap from USD to microdollars.
+///
+/// Rejects NaN, Infinity, and negative values before conversion so that
+/// the storage layer never receives nonsensical cap values.
+fn validate_and_convert_spending_cap(usd: f64) -> Result<i64, &'static str> {
+  if !usd.is_finite() {
+    return Err("spending_cap_usd must be a finite number");
+  }
+  if usd < 0.0 {
+    return Err("spending_cap_usd must be non-negative");
+  }
+  Ok(usd_to_microdollars(usd))
+}
+
 /// Check if user has `ManageProviderKeys` permission
 fn check_manage_provider_keys(role_str: &str) -> Result<(), impl IntoResponse> {
   let role = iron_types::Role::from_str(role_str).map_err(|_| {
@@ -338,6 +358,8 @@ pub async fn create_provider_key(
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
+    "gemini" => ProviderType::Gemini,
+    "xai" => ProviderType::XAI,
     _ => {
       return (
         StatusCode::BAD_REQUEST,
@@ -422,6 +444,36 @@ pub async fn create_provider_key(
       }
     }
   };
+
+  // If a spending cap was requested, set it atomically as part of creation.
+  // This eliminates the uncapped window that would exist if the caller had to
+  // make a separate PUT request after creating the key.
+  if let Some(cap_usd) = request.spending_cap_usd {
+    let cap_microdollars = match validate_and_convert_spending_cap(cap_usd) {
+      Ok(v) => v,
+      Err(msg) => {
+        return (
+          StatusCode::BAD_REQUEST,
+          Json(serde_json::json!({ "error": msg })),
+        )
+          .into_response();
+      }
+    };
+    if state
+      .storage
+      .set_spending_cap(key_id, Some(cap_microdollars))
+      .await
+      .is_err()
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to set spending cap"
+        })),
+      )
+        .into_response();
+    }
+  }
 
   // Get metadata for response
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
@@ -613,7 +665,20 @@ pub async fn update_provider_key(
   }
 
   if let Some(spending_cap) = request.spending_cap_usd {
-    let cap_microdollars = spending_cap.map(usd_to_microdollars);
+    // Validate the cap value before converting; None means "remove the cap".
+    let cap_microdollars = match spending_cap {
+      None => None,
+      Some(usd) => match validate_and_convert_spending_cap(usd) {
+        Ok(v) => Some(v),
+        Err(msg) => {
+          return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": msg })),
+          )
+            .into_response();
+        }
+      },
+    };
     if state
       .storage
       .set_spending_cap(key_id, cap_microdollars)
@@ -709,114 +774,46 @@ pub async fn delete_provider_key(
 /// POST `/api/projects/{project_id}/provider`
 ///
 /// Assign provider key to project
+///
+/// Returns 501 until project ownership can be properly enforced.
+#[allow(clippy::unused_async)] // async required by axum handler signature
 pub async fn assign_provider_to_project(
-  State(state): State<ProvidersState>,
-  AuthenticatedUser(claims): AuthenticatedUser,
-  Path(project_id): Path<String>,
-  JsonBody(request): JsonBody<AssignProviderRequest>,
+  _state: State<ProvidersState>,
+  _claims: AuthenticatedUser,
+  _path: Path<String>,
+  _request: JsonBody<AssignProviderRequest>,
 ) -> impl IntoResponse {
-  // RBAC: require ManageProviderKeys permission
-  if let Err(resp) = check_manage_provider_keys(&claims.role) {
-    return resp.into_response();
-  }
-
-  // Verify key ownership
-  let Ok(metadata) = state
-    .storage
-    .get_key_metadata(request.provider_key_id)
-    .await
-  else {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  };
-
-  if metadata.user_id != claims.sub {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  }
-
-  // qqq: BOLA — no project ownership check. Both Admin and Manager roles
-  // have ManageProviderKeys. No projects table exists yet, so ownership
-  // cannot be verified. Add a project ownership guard once projects are
-  // implemented as first-class entities.
-  match state
-    .storage
-    .assign_to_project(request.provider_key_id, &project_id)
-    .await
-  {
-    Ok(()) => StatusCode::OK.into_response(),
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to assign provider key to project"
-      })),
-    )
-      .into_response(),
-  }
+  // Projects are not yet implemented as first-class entities.
+  // Return 501 until project ownership can be properly enforced.
+  // TODO: implement once projects table exists (tracks owner_id).
+  (
+    StatusCode::NOT_IMPLEMENTED,
+    Json(serde_json::json!({
+      "error": "project assignment is not yet implemented"
+    })),
+  )
+    .into_response()
 }
 
 /// DELETE `/api/projects/{project_id}/provider`
 ///
 /// Unassign provider key from project
 ///
-/// Requires the `ManageProviderKeys` permission.
+/// Returns 501 until project ownership can be properly enforced.
+#[allow(clippy::unused_async)] // async required by axum handler signature
 pub async fn unassign_provider_from_project(
-  State(state): State<ProvidersState>,
-  AuthenticatedUser(claims): AuthenticatedUser,
-  Path(project_id): Path<String>,
+  _state: State<ProvidersState>,
+  _claims: AuthenticatedUser,
+  _path: Path<String>,
 ) -> impl IntoResponse {
-  // RBAC: require ManageProviderKeys permission
-  if let Err(resp) = check_manage_provider_keys(&claims.role) {
-    return resp.into_response();
-  }
-  // Get the current assignment to verify it exists
-  let provider_key_id = match state.storage.get_project_key(&project_id).await {
-    Ok(Some(id)) => id,
-    Ok(None) => {
-      return (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({
-          "error": "No provider key assigned to this project"
-        })),
-      )
-        .into_response();
-    }
-    Err(_) => {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to query project assignment"
-        })),
-      )
-        .into_response();
-    }
-  };
-
-  // qqq: BOLA — no project ownership check (same as assign_provider_to_project).
-  // Both Admin and Manager have ManageProviderKeys. Add ownership guard
-  // once projects are first-class entities.
-  match state
-    .storage
-    .unassign_from_project(provider_key_id, &project_id)
-    .await
-  {
-    Ok(()) => StatusCode::NO_CONTENT.into_response(),
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to unassign provider key from project"
-      })),
-    )
-      .into_response(),
-  }
+  // Projects are not yet implemented as first-class entities.
+  // Return 501 until project ownership can be properly enforced.
+  // TODO: implement once projects table exists (tracks owner_id).
+  (
+    StatusCode::NOT_IMPLEMENTED,
+    Json(serde_json::json!({
+      "error": "project unassignment is not yet implemented"
+    })),
+  )
+    .into_response()
 }

@@ -80,6 +80,8 @@ static MIGRATIONS: &[(&str, &str)] = &[
   migration!("023_seed_agent1_ic_token"),
   migration!("024_add_ip_key_spending_cap"),
   migration!("025_rename_roles"),
+  migration!("026_add_spending_constraints"),
+  migration!("027_add_agent_token_index"),
 ];
 
 /// Applies all migrations to the database pool.

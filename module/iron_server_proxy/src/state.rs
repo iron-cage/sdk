@@ -30,6 +30,9 @@ pub struct AppState {
   pub pricing_manager: Arc<PricingManager>,
   /// Per-IP rate limiter for failed auth attempts.
   pub auth_rate_limiter: AuthRateLimiter,
+  /// Whether to trust `X-Real-IP` set by a reverse proxy for client IP detection.
+  /// Mirrors `Config::trust_proxy_headers`; stored here so handlers don't need `Config`.
+  pub trust_proxy_headers: bool,
 }
 
 impl AppState {
@@ -90,6 +93,7 @@ impl AppState {
       http_client,
       pricing_manager,
       auth_rate_limiter: AuthRateLimiter::new(),
+      trust_proxy_headers: config.trust_proxy_headers,
     })
   }
 }

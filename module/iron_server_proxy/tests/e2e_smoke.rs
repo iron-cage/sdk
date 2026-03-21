@@ -129,6 +129,7 @@ fn build_test_state(pool: SqlitePool, crypto: Arc<CryptoService>) -> AppState {
       .expect("Failed to build HTTP client"),
     pricing_manager: Arc::new(PricingManager::new().expect("Failed to init pricing manager")),
     auth_rate_limiter: AuthRateLimiter::new(),
+    trust_proxy_headers: false,
   }
 }
 
@@ -558,4 +559,91 @@ async fn test_e2e_rate_limit_after_repeated_auth_failures() {
 
   let body = resp.json::<Value>().await.expect("parse error response");
   assert_eq!(body["error"]["code"], "rate_limited");
+}
+
+/// Disabled provider key returns 403 Forbidden.
+/// Even if IC token is valid, the request must be blocked when the assigned
+/// provider key has been disabled by an admin — e.g. during key rotation or
+/// after a suspected compromise.
+#[tokio::test]
+async fn test_e2e_disabled_provider_key_returns_403() {
+  let mock_server = MockServer::start().await;
+
+  let pool = setup_test_db().await;
+  create_test_user(&pool).await;
+
+  let crypto = Arc::new(CryptoService::new(&TEST_MASTER_KEY).expect("crypto init"));
+  let key_id = create_test_provider_key(&pool, &crypto, &mock_server.uri()).await;
+  let _agent_id = create_test_agent(&pool, key_id, TEST_IC_TOKEN).await;
+
+  // Disable the provider key
+  let storage = ProviderKeyStorage::new(pool.clone());
+  storage
+    .set_enabled(key_id, false)
+    .await
+    .expect("Failed to disable provider key");
+
+  let state = build_test_state(pool, crypto);
+  let proxy_url = start_test_proxy(state).await;
+
+  let client = Client::new();
+  let resp = client
+    .post(format!("{proxy_url}/v1/chat/completions"))
+    .header("Authorization", format!("Bearer {TEST_IC_TOKEN}"))
+    .json(&chat_request_body())
+    .send()
+    .await
+    .expect("Request failed");
+
+  assert_eq!(
+    resp.status(),
+    403,
+    "Disabled provider key must return 403 Forbidden"
+  );
+}
+
+/// Agent without an assigned provider key returns 403 Forbidden.
+/// An agent may exist in the DB but have no provider key assigned yet
+/// (e.g. immediately after creation, before the admin assigns a key).
+/// Such agents must be rejected at the proxy to prevent forwarding
+/// requests with no destination.
+#[tokio::test]
+async fn test_e2e_agent_without_provider_key_returns_403() {
+  let pool = setup_test_db().await;
+  create_test_user(&pool).await;
+
+  let crypto = Arc::new(CryptoService::new(&TEST_MASTER_KEY).expect("crypto init"));
+
+  // Create agent with NULL provider_key_id (no key assigned)
+  let token_hash = format!("{:x}", sha2::Sha256::digest(TEST_IC_TOKEN.as_bytes()));
+  sqlx::query(
+    "INSERT INTO agents (name, providers, created_at, owner_id, provider_key_id, ic_token_hash) \
+     VALUES ($1, $2, $3, $4, NULL, $5)",
+  )
+  .bind("keyless_agent")
+  .bind("[]")
+  .bind(1_700_000_000_000_i64)
+  .bind(TEST_USER_ID)
+  .bind(&token_hash)
+  .execute(&pool)
+  .await
+  .expect("Failed to create keyless agent");
+
+  let state = build_test_state(pool, crypto);
+  let proxy_url = start_test_proxy(state).await;
+
+  let client = Client::new();
+  let resp = client
+    .post(format!("{proxy_url}/v1/chat/completions"))
+    .header("Authorization", format!("Bearer {TEST_IC_TOKEN}"))
+    .json(&chat_request_body())
+    .send()
+    .await
+    .expect("Request failed");
+
+  assert_eq!(
+    resp.status(),
+    403,
+    "Agent with no provider key must return 403 Forbidden"
+  );
 }

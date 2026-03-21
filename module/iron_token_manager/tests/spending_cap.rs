@@ -241,3 +241,96 @@ async fn adjust_spending_no_change() {
   let summary = storage.get_spending_summary(key_id).await.unwrap();
   assert_eq!(summary.used_microdollars, 5_000);
 }
+
+#[tokio::test]
+async fn adjust_spending_actual_exceeds_estimated() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  // Reserve 3000 (LLM returned more tokens than estimated)
+  storage.reserve_spending(key_id, 3_000).await.unwrap();
+
+  // Actual cost was 7000 — adjust must correctly add the 4000 difference
+  storage.adjust_spending(key_id, 3_000, 7_000).await.unwrap();
+
+  let summary = storage.get_spending_summary(key_id).await.unwrap();
+  assert_eq!(
+    summary.used_microdollars, 7_000,
+    "When actual > estimated, adjust_spending must record the full actual cost"
+  );
+}
+
+#[tokio::test]
+async fn reserve_spending_zero_amount_fails() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  let result = storage.reserve_spending(key_id, 0).await;
+  assert!(
+    result.is_err(),
+    "reserve_spending with zero amount must be rejected — \
+     a zero reservation is meaningless and indicates a caller bug"
+  );
+}
+
+#[tokio::test]
+async fn reserve_spending_negative_amount_fails() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  // A negative reservation would DECREASE spending_used, creating a bypass:
+  // an attacker could reduce spending below cap to unlock further requests.
+  let result = storage.reserve_spending(key_id, -500).await;
+  assert!(
+    result.is_err(),
+    "reserve_spending with negative amount must be rejected — \
+     negative values would let callers bypass the spending cap by reducing used amount"
+  );
+}
+
+#[tokio::test]
+async fn increment_spending_zero_amount_fails() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  let result = storage.increment_spending(key_id, 0).await;
+  assert!(
+    result.is_err(),
+    "increment_spending with zero amount must be rejected — zero is not a valid cost"
+  );
+}
+
+#[tokio::test]
+async fn increment_spending_negative_amount_fails() {
+  let (storage, _db) = common::create_test_provider_storage().await;
+  let key_id = storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_001")
+    .await
+    .unwrap();
+
+  storage
+    .set_spending_cap(key_id, Some(5_000))
+    .await
+    .unwrap();
+  storage.increment_spending(key_id, 5_000).await.unwrap();
+
+  // Negative increment would reduce spending below cap, re-enabling blocked requests
+  let result = storage.increment_spending(key_id, -1_000).await;
+  assert!(
+    result.is_err(),
+    "increment_spending with negative amount must be rejected — \
+     negative increments bypass spending caps by reducing the used counter"
+  );
+}

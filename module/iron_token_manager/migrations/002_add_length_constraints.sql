@@ -18,6 +18,8 @@
 -- 3. Drop old table
 -- 4. Rename new table
 
+BEGIN;
+
 -- Clean up any partial migration attempts
 DROP TABLE IF EXISTS api_tokens_new;
 
@@ -68,3 +70,5 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_is_active ON api_tokens( is_active );
 -- Create guard table to mark migration as completed
 CREATE TABLE IF NOT EXISTS _migration_002_completed (applied_at INTEGER NOT NULL);
 INSERT INTO _migration_002_completed (applied_at) VALUES (1733600000000); -- 2025-12-07
+
+COMMIT;

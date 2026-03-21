@@ -348,7 +348,7 @@ version = "0.4.0"
 path = "module/iron_config_loader"
 
 [workspace.dependencies.iron_llm_core]
-version = "0.1.0"
+version = "0.2.0"
 path = "module/iron_llm_core"
 
 [workspace.dependencies.iron_safety]

@@ -7,6 +7,8 @@
 -- access to agent budgets and leases. This migration implements database-level
 -- user isolation.
 
+BEGIN;
+
 -- Add owner_id column to agents table
 -- Note: SQLite requires a multi-step process for adding NOT NULL columns with foreign keys
 -- Step 1: Add column as nullable
@@ -23,3 +25,5 @@ CREATE INDEX IF NOT EXISTS idx_agents_owner_id ON agents(owner_id);
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_015_completed (id INTEGER PRIMARY KEY);
 INSERT INTO _migration_015_completed (id) VALUES (1);
+
+COMMIT;

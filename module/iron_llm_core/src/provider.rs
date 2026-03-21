@@ -20,53 +20,34 @@
 /// ```
 #[must_use]
 pub fn strip_provider_prefix(path: &str) -> (String, Option<&'static str>) {
-  if path.starts_with("/anthropic/") || path == "/anthropic" {
-    let clean = path.strip_prefix("/anthropic").unwrap_or(path);
-    let clean = if clean.is_empty() {
-      "/".to_string()
-    } else {
-      clean.to_string()
-    };
-    (clean, Some("anthropic"))
-  } else if path.starts_with("/openai/") || path == "/openai" {
-    let clean = path.strip_prefix("/openai").unwrap_or(path);
-    let clean = if clean.is_empty() {
-      "/".to_string()
-    } else {
-      clean.to_string()
-    };
-    (clean, Some("openai"))
-  } else if path.starts_with("/gemini/") || path == "/gemini" {
-    let clean = path.strip_prefix("/gemini").unwrap_or(path);
-    let clean = if clean.is_empty() {
-      "/".to_string()
-    } else {
-      clean.to_string()
-    };
-    (clean, Some("gemini"))
-  } else if path.starts_with("/xai/") || path == "/xai" {
-    let clean = path.strip_prefix("/xai").unwrap_or(path);
-    let clean = if clean.is_empty() {
-      "/".to_string()
-    } else {
-      clean.to_string()
-    };
-    (clean, Some("xai"))
-  } else {
-    (path.to_string(), None)
+  const PROVIDERS: &[(&str, &str)] = &[
+    ("anthropic", "anthropic"),
+    ("openai", "openai"),
+    ("gemini", "gemini"),
+    ("xai", "xai"),
+  ];
+
+  for (prefix, provider) in PROVIDERS {
+    let slash_prefix = format!("/{prefix}/");
+    let exact = format!("/{prefix}");
+    if path.starts_with(slash_prefix.as_str()) || path == exact.as_str() {
+      let clean = path.strip_prefix(exact.as_str()).unwrap_or(path);
+      let clean = if clean.is_empty() { "/".to_string() } else { clean.to_string() };
+      return (clean, Some(*provider));
+    }
   }
+  (path.to_string(), None)
 }
 
 /// Detect requested provider from model name in JSON request body
 ///
 /// Inspects the `"model"` field of the JSON body:
 /// - Models starting with `"claude"` → `"anthropic"`
-/// - Models starting with `"gpt"`, `"o1"`, or `"o3"` → `"openai"`
+/// - Models starting with `"gpt"`, `"chatgpt"`, or `OpenAI` o-series (`"oN..."` where N is a digit) → `"openai"`
 /// - Models starting with `"gemini"` → `"gemini"`
 /// - Models starting with `"grok"` → `"xai"`
 /// - Otherwise → `None`
 ///
-// qqq: gemini and xai providers also need to be added to the Python client library.
 #[must_use]
 pub fn detect_provider_from_model(body: &[u8]) -> Option<&'static str> {
   if let Ok(json) = serde_json::from_slice::<serde_json::Value>(body) {
@@ -74,7 +55,10 @@ pub fn detect_provider_from_model(body: &[u8]) -> Option<&'static str> {
       if model.starts_with("claude") {
         return Some("anthropic");
       }
-      if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") {
+      // OpenAI: gpt-*, chatgpt-*, and o-series (o1, o2, o3, o4, o5, ...)
+      let is_openai_o_series =
+        model.starts_with('o') && model.chars().nth(1).is_some_and(|c| c.is_ascii_digit());
+      if model.starts_with("gpt") || model.starts_with("chatgpt") || is_openai_o_series {
         return Some("openai");
       }
       if model.starts_with("gemini") {

@@ -16,6 +16,22 @@ use crate::{
 use iron_cost::pricing::PricingManager;
 use iron_secrets::ip_token::ProviderKey;
 
+/// Anthropic API version header value.
+const ANTHROPIC_API_VERSION: &str = "2023-06-01";
+
+/// Fallback Gemini model when none is specified in the request.
+///
+/// Note: "gemini-pro" is an older model. Update to a current model when the
+/// pricing database is expanded to cover newer Gemini models.
+const GEMINI_FALLBACK_MODEL: &str = "gemini-pro";
+
+/// Fallback estimated cost when the model is not found in the pricing database.
+///
+/// $1.00 (1,000,000 microdollars) is a conservative overestimate used to
+/// ensure spending caps are not bypassed for unknown models.
+#[allow(dead_code)]
+const DEFAULT_COST_FALLBACK_MICRODOLLARS: i64 = 1_000_000;
+
 /// Request to be forwarded to an LLM provider
 #[derive(Debug)]
 pub struct ForwardRequest {
@@ -115,7 +131,7 @@ pub async fn forward_request(
     let translated = translator::translate_openai_to_gemini(&request.body)
       .map_err(|e| LlmCoreError::Translation(format!("Request: {e}")))?;
     // Gemini endpoint: /v1beta/models/{model}:generateContent
-    let model = translator::extract_model(&request.body).unwrap_or_else(|| "gemini-pro".into());
+    let model = translator::extract_model(&request.body).unwrap_or_else(|| GEMINI_FALLBACK_MODEL.into());
     (
       translated,
       format!("/v1beta/models/{model}:generateContent"),
@@ -125,15 +141,17 @@ pub async fn forward_request(
   };
 
   // 4. Build target URL
-  let base_url = provider_key
-    .base_url
-    .as_deref()
-    .unwrap_or(match target_provider {
+  let base_url = if let Some(custom_url) = provider_key.base_url.as_deref() {
+    validate_provider_base_url(custom_url)?;
+    custom_url
+  } else {
+    match target_provider {
       "anthropic" => "https://api.anthropic.com",
       "gemini" => "https://generativelanguage.googleapis.com",
       "xai" => "https://api.x.ai",
       _ => "https://api.openai.com",
-    });
+    }
+  };
 
   let target_url = format!("{base_url}{request_path}{}", request.query);
 
@@ -146,7 +164,7 @@ pub async fn forward_request(
     "anthropic" => {
       req_builder = req_builder
         .header("x-api-key", provider_key.api_key.expose_secret().as_str())
-        .header("anthropic-version", "2023-06-01");
+        .header("anthropic-version", ANTHROPIC_API_VERSION);
     }
     "gemini" => {
       req_builder = req_builder.header(
@@ -244,4 +262,35 @@ pub async fn forward_request(
     body: ForwardBody::Buffered(final_body),
     cost_info,
   })
+}
+
+/// Validate that a user-supplied base URL is from a known LLM provider.
+///
+/// Prevents SSRF: a manager could set `base_url` to an internal service.
+/// The default URLs are safe (hardcoded constants); only user-overrides are validated.
+fn validate_provider_base_url(url: &str) -> Result<(), LlmCoreError> {
+  // In test builds with the `allow-insecure-base-urls` feature, permit loopback
+  // URLs so that wiremock mock servers work in integration tests.
+  // This bypass is NEVER compiled into production binaries.
+  #[cfg(feature = "allow-insecure-base-urls")]
+  if url.starts_with("http://127.0.0.1")
+    || url.starts_with("http://[::1]")
+    || url.starts_with("http://localhost")
+  {
+    return Ok(());
+  }
+
+  const ALLOWED_PREFIXES: &[&str] = &[
+    "https://api.openai.com",
+    "https://api.anthropic.com",
+    "https://generativelanguage.googleapis.com",
+    "https://api.x.ai",
+  ];
+  if ALLOWED_PREFIXES.iter().any(|prefix| url.starts_with(prefix)) {
+    return Ok(());
+  }
+  Err(LlmCoreError::Forward(format!(
+    "provider key base_url '{url}' is not an allowed LLM endpoint; \
+     only official provider URLs are permitted"
+  )))
 }

@@ -7,6 +7,10 @@
 //! Uses an [`lru::LruCache`] bounded to [`MAX_ENTRIES`] so that eviction of the
 //! least-recently-used entry is O(1) rather than the O(n log n) sort a plain
 //! `HashMap` requires.
+//!
+//! Expired timestamps are swept lazily — only the target IP's timestamps are
+//! cleaned on each `check()` or `record_failure()` call (O(k) where k ≤ `MAX_AUTH_FAILURES`).
+//! There is no O(n) global sweep over all tracked IPs.
 
 use core::num::NonZeroUsize;
 use core::time::Duration;
@@ -59,28 +63,9 @@ impl AuthRateLimiter {
     }
   }
 
-  /// Lock mutex and sweep expired timestamps.
-  fn lock_and_sweep(&self) -> std::sync::MutexGuard<'_, LruCache<String, Vec<Instant>>> {
-    let mut cache = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
-    // Remove expired timestamps (skip if process uptime < window)
-    if let Some(cutoff) = Instant::now().checked_sub(self.window) {
-      let keys: Vec<String> = cache
-        .iter()
-        .map(|(k, _)| k.clone())
-        .collect();
-      for key in keys {
-        if let Some(timestamps) = cache.get_mut(&key) {
-          timestamps.retain(|t| *t > cutoff);
-          if timestamps.is_empty() {
-            cache.pop(&key);
-          }
-        }
-      }
-    }
-    cache
-  }
-
   /// Check if the IP is currently rate-limited.
+  ///
+  /// Lazily sweeps only this IP's expired timestamps (O(k) where k ≤ `MAX_AUTH_FAILURES`).
   ///
   /// Returns `Ok(())` if allowed.
   ///
@@ -88,14 +73,17 @@ impl AuthRateLimiter {
   ///
   /// Returns `Err(retry_after_secs)` if the IP has exceeded the failure threshold.
   pub fn check(&self, ip: &str) -> Result<(), u64> {
-    let mut cache = self.lock_and_sweep();
-    let Some(timestamps) = cache.get(ip) else {
+    let mut cache = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+    let Some(timestamps) = cache.get_mut(ip) else {
       return Ok(());
     };
+    // Lazy sweep: only this IP's timestamps, not all cache entries.
+    if let Some(cutoff) = Instant::now().checked_sub(self.window) {
+      timestamps.retain(|t| *t > cutoff);
+    }
     if timestamps.len() >= MAX_AUTH_FAILURES {
       let retry_after = timestamps.first().map_or(1, |oldest| {
-        let expires_at = *oldest + self.window;
-        expires_at
+        (*oldest + self.window)
           .saturating_duration_since(Instant::now())
           .as_secs()
           + 1
@@ -108,12 +96,16 @@ impl AuthRateLimiter {
 
   /// Record a failed auth attempt for the given IP.
   ///
+  /// Lazily sweeps only this IP's expired timestamps before inserting (O(k) amortized).
   /// If the cache is at capacity, the least-recently-used entry is evicted in O(1).
   pub fn record_failure(&self, ip: &str) {
-    let mut cache = self.lock_and_sweep();
-    cache
-      .get_or_insert_mut(ip.to_string(), Vec::new)
-      .push(Instant::now());
+    let mut cache = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+    let timestamps = cache.get_or_insert_mut(ip.to_string(), Vec::new);
+    // Lazy sweep: keep only within-window timestamps before recording the new failure.
+    if let Some(cutoff) = Instant::now().checked_sub(self.window) {
+      timestamps.retain(|t| *t > cutoff);
+    }
+    timestamps.push(Instant::now());
   }
 }
 

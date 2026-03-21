@@ -14,13 +14,7 @@
 -- Root cause: api_tokens.user_id allowed 500 chars but users.id (FK target) only allows 255
 -- Pitfall: FK column constraints must be compatible with referenced column constraints
 
--- Check if migration already applied
-CREATE TABLE IF NOT EXISTS _migration_014_completed (applied_at INTEGER NOT NULL);
-
--- Only proceed if not already applied
-INSERT INTO _migration_014_completed (applied_at)
-SELECT strftime('%s', 'now') * 1000
-WHERE NOT EXISTS (SELECT 1 FROM _migration_014_completed);
+BEGIN;
 
 -- Rebuild api_tokens table with FK constraint
 -- Step 1: Create new table with FK
@@ -76,3 +70,9 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_project_id ON api_tokens(project_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_is_active ON api_tokens(is_active);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_agent_id ON api_tokens(agent_id);
+
+-- Create guard table to mark migration as completed
+CREATE TABLE IF NOT EXISTS _migration_014_completed (applied_at INTEGER NOT NULL);
+INSERT INTO _migration_014_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
+
+COMMIT;

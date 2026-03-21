@@ -9,6 +9,8 @@
 --
 -- Adds indexes for performance on email, role, is_active searches
 
+BEGIN;
+
 -- Add last_login timestamp (Unix epoch milliseconds)
 ALTER TABLE users ADD COLUMN last_login INTEGER;
 
@@ -32,3 +34,5 @@ CREATE INDEX IF NOT EXISTS idx_users_username_search ON users(username);
 -- Create guard table to mark migration as completed
 CREATE TABLE IF NOT EXISTS _migration_005_completed (applied_at INTEGER NOT NULL);
 INSERT INTO _migration_005_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
+
+COMMIT;

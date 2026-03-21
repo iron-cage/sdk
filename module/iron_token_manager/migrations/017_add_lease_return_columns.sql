@@ -5,6 +5,8 @@
 -- - closed_at: Timestamp when lease was closed/returned
 -- - updated_at: Timestamp of last update (for stale lease detection)
 
+BEGIN;
+
 -- Add returned_amount column (USD returned when lease closed)
 ALTER TABLE budget_leases ADD COLUMN returned_amount REAL DEFAULT 0.0;
 
@@ -20,3 +22,5 @@ CREATE INDEX IF NOT EXISTS idx_budget_leases_updated ON budget_leases( updated_a
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_017_completed ( id INTEGER PRIMARY KEY );
 INSERT INTO _migration_017_completed ( id ) VALUES ( 1 );
+
+COMMIT;
