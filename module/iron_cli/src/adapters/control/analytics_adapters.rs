@@ -11,9 +11,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn usage_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn usage_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::usage_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -45,9 +43,7 @@ pub async fn usage_adapter<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn spending_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn spending_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::spending_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -79,9 +75,7 @@ pub async fn spending_adapter<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn metrics_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn metrics_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::metrics_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -103,9 +97,7 @@ pub async fn metrics_adapter<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn usage_by_agent_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn usage_by_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::usage_by_agent_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -137,9 +129,7 @@ pub async fn usage_by_agent_adapter<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn usage_by_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn usage_by_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::usage_by_provider_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -175,8 +165,8 @@ pub async fn usage_by_provider_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `period` parameter is missing from the map after handler validation.
-pub async fn spending_by_period_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn spending_by_period_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   analytics_handlers::spending_by_period_handler(params).map_err(|e| e.to_string())?;
 
@@ -216,9 +206,7 @@ pub async fn spending_by_period_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `export_format` parameter is missing from the map after handler validation.
-pub async fn export_usage_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn export_usage_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::export_usage_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -257,9 +245,7 @@ pub async fn export_usage_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `export_format` parameter is missing from the map after handler validation.
-pub async fn export_spending_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn export_spending_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   analytics_handlers::export_spending_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();

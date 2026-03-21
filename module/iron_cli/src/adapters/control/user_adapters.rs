@@ -12,9 +12,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn list_users_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn list_users_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   control_user_handlers::list_users_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -40,9 +38,7 @@ pub async fn list_users_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `username`, `email`, or `password` parameters are missing after handler validation.
-pub async fn create_user_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn create_user_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   control_user_handlers::create_user_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -92,9 +88,7 @@ pub async fn create_user_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn get_user_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn get_user_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   control_user_handlers::get_user_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -123,9 +117,7 @@ pub async fn get_user_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn update_user_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn update_user_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   control_user_handlers::update_user_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -170,9 +162,7 @@ pub async fn update_user_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn delete_user_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn delete_user_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   control_user_handlers::delete_user_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -211,9 +201,7 @@ pub async fn delete_user_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `id` or `role` parameters are missing after handler validation.
-pub async fn set_user_role_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn set_user_role_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   control_user_handlers::set_user_role_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -257,8 +245,8 @@ pub async fn set_user_role_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `id` or `new_password` parameters are missing after handler validation.
-pub async fn reset_user_password_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn reset_user_password_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   control_user_handlers::reset_password_handler(params).map_err(|e| e.to_string())?;
 
@@ -303,8 +291,8 @@ pub async fn reset_user_password_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn get_user_permissions_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn get_user_permissions_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   control_user_handlers::get_user_permissions_handler(params).map_err(|e| e.to_string())?;
 

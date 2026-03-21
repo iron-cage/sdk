@@ -61,9 +61,7 @@ fn format_response(data: &Value, format: &str) -> Result<String, AdapterError> {
 /// # Panics
 ///
 /// Panics if validated `email` or `password` parameters are missing after handler validation.
-pub async fn login_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn login_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   auth_handlers::login_handler(params)?;
 
@@ -154,9 +152,7 @@ pub async fn login_adapter<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(AdapterError)` if handler validation fails or keyring token clearing fails.
-pub fn logout_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub fn logout_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   auth_handlers::logout_handler(params)?;
 
@@ -204,9 +200,7 @@ pub fn logout_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring operations fail,
 /// the HTTP request fails, or the new `access_token` is missing from the response.
-pub async fn refresh_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn refresh_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   auth_handlers::refresh_handler(params)?;
 

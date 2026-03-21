@@ -12,9 +12,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn list_api_tokens_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn list_api_tokens_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   api_token_handlers::list_api_tokens_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -40,9 +38,7 @@ pub async fn list_api_tokens_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `name` parameter is missing, or if `expires_in` cannot be parsed as `i64`.
-pub async fn create_api_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn create_api_token_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   api_token_handlers::create_api_token_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -90,9 +86,7 @@ pub async fn create_api_token_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn get_api_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn get_api_token_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   api_token_handlers::get_api_token_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -121,9 +115,7 @@ pub async fn get_api_token_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn revoke_api_token_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn revoke_api_token_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   api_token_handlers::revoke_api_token_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params

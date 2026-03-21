@@ -14,9 +14,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn list_providers_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn list_providers_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::list_providers_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -42,9 +40,7 @@ pub async fn list_providers_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `provider` or `api_key` parameters are missing after handler validation.
-pub async fn create_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn create_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::create_provider_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -96,9 +92,7 @@ pub async fn create_provider_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn get_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn get_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::get_provider_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -127,9 +121,7 @@ pub async fn get_provider_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn update_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn update_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::update_provider_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -182,9 +174,7 @@ pub async fn update_provider_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn delete_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn delete_provider_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::delete_provider_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -223,9 +213,7 @@ pub async fn delete_provider_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `id` or `agent_ids` parameters are missing after handler validation.
-pub async fn assign_agents_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn assign_agents_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::assign_agents_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params
@@ -271,8 +259,8 @@ pub async fn assign_agents_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `id` parameter is missing from the map after handler validation.
-pub async fn list_provider_agents_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn list_provider_agents_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, String> {
   provider_handlers::list_provider_agents_handler(params).map_err(|e| e.to_string())?;
 
@@ -302,9 +290,7 @@ pub async fn list_provider_agents_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if validated `id` or `agent_id` parameters are missing after handler validation.
-pub async fn remove_agent_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn remove_agent_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   provider_handlers::remove_agent_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params

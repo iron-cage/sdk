@@ -3,6 +3,8 @@
 //! Handles IC Token validation, budget enforcement, and analytics locally.
 //! Delegates core forwarding logic to `iron_llm_core`.
 
+use std::fmt;
+
 use axum::{
   body::Body,
   extract::{Request, State},
@@ -52,7 +54,6 @@ pub struct ProxyState {
 }
 
 /// Proxy server configuration
-#[derive(Debug)]
 pub struct ProxyConfig {
   /// Port to bind the local proxy server on
   pub port: u16,
@@ -77,6 +78,18 @@ pub struct ProxyConfig {
   /// Provider ID for analytics attribution
   #[cfg(feature = "analytics")]
   pub provider_id: Option<Arc<str>>,
+}
+
+impl fmt::Debug for ProxyConfig {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("ProxyConfig")
+      .field("port", &self.port)
+      .field("ic_token", &"[REDACTED]")
+      .field("server_url", &self.server_url)
+      .field("cache_ttl_seconds", &self.cache_ttl_seconds)
+      .field("provider_key", &self.provider_key.as_ref().map(|_| "[REDACTED]"))
+      .finish_non_exhaustive()
+  }
 }
 
 /// Run the proxy server

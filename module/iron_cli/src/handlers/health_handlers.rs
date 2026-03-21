@@ -18,9 +18,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn health_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn health_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!("Health status: OK\nFormat: {format}"))
@@ -38,9 +36,7 @@ pub fn health_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn version_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn version_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map_or("table", String::as_str);
   let version = env!("CARGO_PKG_VERSION");
 

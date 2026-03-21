@@ -44,9 +44,7 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn show_usage_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn show_usage_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::show_usage_handler(params)?;
 
@@ -115,8 +113,8 @@ pub async fn show_usage_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Panics if validated `export_format` or `output_file` parameters are missing
 /// after handler validation.
-pub async fn export_usage_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn export_usage_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::export_usage_handler(params)?;
@@ -205,8 +203,8 @@ pub async fn export_usage_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, `project_id` is missing,
 /// keyring access fails, or the HTTP request fails.
-pub async fn get_usage_by_project_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn get_usage_by_project_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::usage_by_project_handler(params)?;
@@ -264,8 +262,8 @@ pub async fn get_usage_by_project_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, `provider` is missing,
 /// keyring access fails, or the HTTP request fails.
-pub async fn get_usage_by_provider_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn get_usage_by_provider_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   usage_handlers::usage_by_provider_handler(params)?;

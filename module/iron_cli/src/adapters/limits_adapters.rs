@@ -41,9 +41,7 @@ fn format_response(data: &serde_json::Value, format: &str) -> Result<String, Ada
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, keyring access fails,
 /// or the HTTP request fails.
-pub async fn show_limits_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn show_limits_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::list_limits_handler(params)?;
 
@@ -100,8 +98,8 @@ pub async fn show_limits_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Panics if validated `limit_type` or `value` parameters are missing after handler validation,
 /// or if `value` cannot be parsed as `i64` (validated by handler).
-pub async fn update_limit_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn update_limit_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::update_limit_handler(params)?;
@@ -179,9 +177,7 @@ pub async fn update_limit_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, `limit_id` is missing,
 /// keyring access fails, or the HTTP request fails.
-pub async fn get_limit_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, AdapterError> {
+pub async fn get_limit_adapter(params: &HashMap<String, String>) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::get_limit_handler(params)?;
 
@@ -242,8 +238,8 @@ pub async fn get_limit_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, numeric parameters cannot be
 /// parsed, keyring access fails, or the HTTP request fails.
-pub async fn create_limit_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn create_limit_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::create_limit_handler(params)?;
@@ -334,8 +330,8 @@ pub async fn create_limit_adapter<S: ::core::hash::BuildHasher>(
 ///
 /// Returns `Err(AdapterError)` if handler validation fails, `limit_id` is missing,
 /// keyring access fails, or the HTTP request fails.
-pub async fn delete_limit_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
+pub async fn delete_limit_adapter(
+  params: &HashMap<String, String>,
 ) -> Result<String, AdapterError> {
   // 1. Validate with handler
   limits_handlers::delete_limit_handler(params)?;

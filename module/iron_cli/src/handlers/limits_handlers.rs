@@ -19,9 +19,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn list_limits_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn list_limits_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!("List limits\nFormat: {format}"))
@@ -42,9 +40,7 @@ pub fn list_limits_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn get_limit_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let limit_id = params
     .get("limit_id")
@@ -75,9 +71,7 @@ pub fn get_limit_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn create_limit_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn create_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let resource_type = params
     .get("resource_type")
@@ -117,9 +111,7 @@ pub fn create_limit_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn update_limit_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn update_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let limit_id = params
     .get("limit_id")
@@ -158,9 +150,7 @@ pub fn update_limit_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn delete_limit_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn delete_limit_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let limit_id = params
     .get("limit_id")
