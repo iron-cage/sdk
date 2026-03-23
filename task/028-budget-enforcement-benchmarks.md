@@ -7,7 +7,7 @@
 Rusticon presentation claims "sub-microsecond atomic budget enforcement" but no benchmarks exist to prove this. The `CostController` uses `AtomicU64` with CAS (compare-and-swap) operations for `reserve()`, `commit()`, and `cancel()` - expected to be sub-microsecond but unverified.
 
 Key files:
-- `module/iron_cost/src/cost_controller.rs` - CostController with reserve/commit/cancel pattern
+- `module/iron_cost/src/budget.rs` - CostController with reserve/commit/cancel pattern
 - `module/iron_cost/src/lib.rs` - Public API surface
 
 ## Implementation plan

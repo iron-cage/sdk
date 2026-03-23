@@ -4,7 +4,7 @@
 - None (can start during Stage 2)
 
 ## Context
-No CI/CD pipeline exists. Automated builds, tests, linting, coverage, and distribution are needed for open source quality.
+Three CI workflows exist in `.github/workflows/`: `deploy-check.yml`, `deploy.yaml`, and `iron_token_manager_validation.yml`. However, a comprehensive CI/CD pipeline is missing: no multi-crate test matrix, no clippy enforcement, no coverage reporting, and no automated release/publish workflow. These are needed for open source quality.
 
 Critical areas:
 - `.github/workflows/`

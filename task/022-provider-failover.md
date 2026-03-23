@@ -1,14 +1,14 @@
 # Task 022: Provider failover
 
 ## Dependencies
-- None
+- Task 002
 
 ## Context
 Circuit breaker stops retrying a failed provider but does not automatically route to an alternative. Agents with multiple assigned providers need automatic failover.
 
 Critical areas:
 - `module/iron_runtime/src/llm_router/router.rs`
-- `module/iron_runtime/src/llm_router/circuit_breaker.rs`
+- `module/iron_reliability/src/lib.rs`
 - `module/iron_runtime_analytics/src/`
 
 ## Implementation plan

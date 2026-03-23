@@ -4,14 +4,14 @@
 - None
 
 ## Context
-`iron_sdk` has PyO3 bindings but `start_agent()` returns placeholder string. Async bridge with pyo3-asyncio not implemented. This contradicts promise #5 ("three lines of code").
+`iron_sdk` has PyO3 bindings but `start_agent()` returns placeholder string. Async bridge with pyo3-async-runtimes not implemented. This contradicts promise #5 ("three lines of code").
 
 Critical areas:
 - `module/iron_sdk/src/lib.rs`
 - `module/iron_sdk/python/iron_cage/__init__.py`
 
 ## Implementation plan
-1. Implement async bridge using pyo3-asyncio or equivalent.
+1. Implement async bridge using pyo3-async-runtimes or equivalent.
 2. Replace placeholder `start_agent()` with working implementation.
 3. Ensure `LlmRouter` context manager works end-to-end.
 4. Validate the exact Rusticon presentation snippet works:

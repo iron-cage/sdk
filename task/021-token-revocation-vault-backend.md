@@ -9,7 +9,7 @@ IC Token "revocation" is currently a database delete. No audit event, no grace p
 Critical areas:
 - `module/iron_control_api/src/ic_token.rs`
 - `module/iron_token_manager/src/`
-- `module/iron_crypto/src/`
+- `module/iron_secrets/src/crypto.rs`
 
 ## Implementation plan
 1. Add explicit revocation action (distinct from delete) with audit event.

@@ -4,7 +4,7 @@
 - None
 
 ## Context
-`BudgetClient` already has `refresh()` and `return_budget()` methods in `budget_client.rs`, but there is no background worker that calls refresh automatically. When the local budget wallet depletes, there is no automatic refill from the server. This contradicts promise #6 ("auto-refresh").
+`BudgetClient` already has `refresh()` and `return_unused()` methods in `budget_client.rs`, but there is no background worker that calls refresh automatically. When the local budget wallet depletes, there is no automatic refill from the server. This contradicts promise #6 ("auto-refresh").
 
 Critical areas:
 - `module/iron_cost/src/budget.rs` (CostController)
@@ -12,7 +12,7 @@ Critical areas:
 
 ## Implementation plan
 1. Add `BudgetRefreshWorker` as background tokio task in `iron_cost`.
-2. Monitor `CostController::remaining()`.
+2. Monitor `CostController::available()`.
 3. When remaining drops below configurable threshold (default 10%), request new lease from server.
 4. Implement exponential backoff on refresh failure.
 5. Return unused budget to server on shutdown.

@@ -106,7 +106,7 @@ Currently three different strategies: structured `CliError` in handlers, `unwrap
 
 ### A4. Budget auto-refresh worker
 
-A background task monitoring `CostController::remaining()` that requests new leases when the local wallet depletes below a configurable threshold. Includes budget return on shutdown.
+A background task monitoring `CostController::available()` that requests new leases when the local wallet depletes below a configurable threshold. Includes budget return on shutdown.
 
 **Affected:** `iron_cost/`, `iron_runtime/src/llm_router/router.rs`
 
