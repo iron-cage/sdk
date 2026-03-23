@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Current Metrics
+### 1. Current Metrics
 
 - 15 Rust crates, 1139 .rs files
 - 3386 tests, all passing
@@ -16,7 +16,7 @@
 
 ---
 
-## 2. Strengths
+### 2. Strengths
 
 - **Type-safe foundations** - Entity IDs with compile-time validation, `#[repr(transparent)]` zero-cost wrappers, injection prevention
 - **Modular crate architecture** - Clean dependency graph: foundation -> infrastructure -> features -> integration -> application
@@ -29,7 +29,7 @@
 
 ---
 
-## 3. Weaknesses
+### 3. Weaknesses
 
 | Area | Issue | Severity |
 |------|-------|----------|
@@ -45,7 +45,7 @@
 
 ---
 
-## 4. Coverage Highlights (llvm-cov)
+### 4. Coverage Highlights (llvm-cov)
 
 | Module | Coverage | Status |
 |--------|----------|--------|
@@ -61,7 +61,7 @@
 
 ---
 
-## 5. Rusticon Promise vs Reality
+### 5. Rusticon Promise vs Reality
 
 Source: Rusticon presentation transcript
 
@@ -80,7 +80,7 @@ Source: Rusticon presentation transcript
 
 ---
 
-## 6. Proposed Architectural Changes
+### 6. Proposed Architectural Changes
 
 ### A1. Eliminate panic-prone error handling
 
@@ -122,7 +122,7 @@ Update workspace edition from 2021 to 2024.
 
 ---
 
-## 7. WIP Awareness (Open PRs & Tasks)
+### 7. WIP Awareness (Open PRs & Tasks)
 
 ### Open PRs
 
@@ -172,7 +172,7 @@ Update workspace edition from 2021 to 2024.
 
 ---
 
-## 8. Roadmap Summary
+### 8. Roadmap Summary
 
 | Stage | Goal | Tasks | Key Deliverable |
 |-------|------|-------|-----------------|
