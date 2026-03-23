@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAuthStore } from '../stores/auth'
 import DataTable from '@/components/DataTable.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
@@ -49,6 +50,7 @@ import IconBan from '@/components/icons/IconBan.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
 import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
+import IconChevronDown from '@/components/icons/IconChevronDown.vue'
 
 
 const api = useApi()
@@ -62,6 +64,7 @@ const pageSize = ref(20)
 const search = ref('')
 const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
+const mobileFiltersOpen = ref(false)
 
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
@@ -276,25 +279,49 @@ watch(showDisableConfirm, (open) => {
 <template>
   <PageLayout title="User Management">
     <template #actions>
+      <!-- Mobile: collapsed filter popover -->
+      <Popover v-model:open="mobileFiltersOpen">
+        <PopoverTrigger as-child>
+          <Button variant="outline" size="sm" class="sm:hidden">
+            Filters
+            <IconChevronDown class="w-3.5 h-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="flex flex-col gap-2 w-64">
+          <Input id="search-mobile" v-model="search" placeholder="Search by username or email..." />
+          <Select v-model="roleFilter" @update:modelValue="mobileFiltersOpen = false">
+            <SelectTrigger>
+              <SelectValue placeholder="All Roles" class="text-foreground" />
+            </SelectTrigger>
+            <SelectContent class="max-w-[200px]">
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="manager">Manager</SelectItem>
+              <SelectItem value="developer">Developer</SelectItem>
+            </SelectContent>
+          </Select>
+        </PopoverContent>
+      </Popover>
 
-      <div class="w-full md:w-64">
-        <Input id="search" v-model="search" placeholder="Search by username or email..." />
+      <!-- Desktop: inline filters -->
+      <div class="hidden sm:flex gap-2">
+        <div class="w-64">
+          <Input id="search" v-model="search" placeholder="Search by username or email..." />
+        </div>
+        <div class="w-40">
+          <Select v-model="roleFilter">
+            <SelectTrigger id="role-filter">
+              <SelectValue placeholder="All Roles" class="text-foreground" />
+            </SelectTrigger>
+            <SelectContent class="max-w-[200px]">
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="manager">Manager</SelectItem>
+              <SelectItem value="developer">Developer</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      
-      <div class="w-full md:w-40">
-        <Select v-model="roleFilter">
-          <SelectTrigger id="role-filter">
-            <SelectValue placeholder="All Roles" class="text-foreground"/>
-          </SelectTrigger>
-          <SelectContent class="max-w-[200px]">
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="developer">Developer</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
 
       <Button @click="showCreateModal = true">
         <IconPlus />
