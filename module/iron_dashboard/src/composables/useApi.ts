@@ -780,7 +780,6 @@ export type {
   TokenMetadata,
   CreateTokenRequest,
   CreateTokenResponse,
-  ProviderType,
   ProviderKey,
   CreateProviderKeyRequest,
   UpdateProviderKeyRequest,
