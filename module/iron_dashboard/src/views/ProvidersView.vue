@@ -150,7 +150,7 @@ function handleCreateKey() {
 
   createMutation.mutate({
     provider: provider.value,
-    api_key: apiKey.value,
+    api_key: apiKey.value.trim(),
     alias: alias.value || undefined,
     base_url: baseUrl.value || undefined,
     description: description.value || undefined,

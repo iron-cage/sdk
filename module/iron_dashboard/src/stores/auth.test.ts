@@ -6,7 +6,8 @@ const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
 function makeJwt(payload: object): string {
-  return `header.${btoa(JSON.stringify(payload))}.sig`
+  const seg = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return `header.${seg}.sig`
 }
 
 describe('useAuthStore', () => {
