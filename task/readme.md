@@ -181,8 +181,8 @@ Tasks are organized in this workspace as:
 
 ## Documentation
 
-- Workspace root: `sdk/`
-- Task folder: `sdk/task/`
+- Workspace root: `.`
+- Task folder: `task/`
 
 ---
 
