@@ -20,8 +20,6 @@ last_allocation:
 
 - [Global ID Registry](#global-id-registry) - Centralized ID allocation
 - [Tasks Index](#tasks-index) - Workspace-level tasks
-- [Issues Index](#issues-index) - Issue tracking
-- [Issues](#issues) - Issue details
 - [Summary Statistics](#summary-statistics)
 
 ---
@@ -79,23 +77,6 @@ highest_id: 28
 | 25 | [026](026_documentation_and_examples.md) | 700 | 7 | 5 | 10 | 2 | 🔄 (Planned) | Documentation and examples | Write user-facing documentation, API reference, and integration examples |
 | 26 | [025](025_ci_cd_pipeline.md) | 576 | 8 | 4 | 9 | 2 | 🔄 (Planned) | CI/CD pipeline | Set up GitHub Actions CI/CD with automated testing, linting, and release workflows |
 | 27 | [027](027_dashboard_integration.md) | 504 | 7 | 4 | 9 | 2 | 🔄 (Planned) | Dashboard integration | Connect Control Panel dashboard to backend API endpoints |
-
----
-
----
-
-## Issues Index
-
-| ID | Title | Related Task | Status |
-|----|-------|--------------|--------|
-
-*No task-level issues are currently registered in this workspace task system.*
-
----
-
-## Issues
-
-*No open issues recorded in `task/issue/` for this workspace.*
 
 ---
 
