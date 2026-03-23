@@ -62,7 +62,7 @@ highest_id: 28
 | 10 | [003](003_provider_key_spending_and_limits.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
 | 11 | [007](007_migrate_to_api_llm_bindings.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
 | 12 | [015](015_budget_lease_auto_refresh_worker.md) | 1536 | 8 | 6 | 8 | 4 | 🔄 (Planned) | Budget lease auto-refresh worker | Add background tokio task for threshold-based budget lease auto-refresh |
-| 13 | [017](017_complete_python_sdk_async_bridge.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | Complete Python SDK async bridge | Complete pyo3-asyncio bridge and implement start_agent() for Python SDK |
+| 13 | [017](017_complete_python_sdk_async_bridge.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | Complete Python SDK async bridge | Complete pyo3-async-runtimes bridge and implement start_agent() for Python SDK |
 | 14 | [019](019_e2e_rusticon_demo_script.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | End-to-end Rusticon demo script | Create reproducible end-to-end demo validating all Rusticon promises |
 | 15 | [018](018_pypi_distribution_pipeline.md) | 1080 | 8 | 5 | 9 | 3 | 🔄 (Planned) | PyPI distribution pipeline | Build maturin-based PyPI package and distribution pipeline |
 | 16 | [005](005_add_gemini_provider.md) | 1008 | 7 | 6 | 8 | 3 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
