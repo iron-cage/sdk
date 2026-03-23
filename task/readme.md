@@ -116,7 +116,6 @@ Tasks are organized in this workspace as:
 - **Active**: `task/*.md`
 - **Completed**: `task/completed/*.md`
 - **Backlog**: `task/backlog/*.md`
-- **Obsolete**: `task/obsolete/*.md`
 
 ### Status Indicators
 
@@ -125,7 +124,6 @@ Tasks are organized in this workspace as:
 - ✅ **Completed**: Finished and validated
 - ⛔️ **Blocked**: Waiting on dependency or external factor
 - 📥 **Backlog**: Future work, not yet prioritized
-- 📦 **Obsolete**: Archived as no longer needed
 
 ---
 
