@@ -7,12 +7,12 @@
 Workspace uses edition 2021 (MSRV 1.85). Rust 2024 edition is available with improved `impl Trait` capture rules and `unsafe extern` semantics.
 
 Critical areas:
-- `sdk/Cargo.toml` (workspace edition field)
+- `Cargo.toml` (workspace edition field)
 - Any `unsafe extern` blocks
 - Any `impl Trait` return types that capture differently under 2024 rules
 
 ## Implementation plan
-1. Change workspace edition from `"2021"` to `"2024"` in `sdk/Cargo.toml`.
+1. Change workspace edition from `"2021"` to `"2024"` in `Cargo.toml`.
 2. Run `cargo build --workspace` and fix any breakage.
 3. Run `cargo clippy --workspace` and fix new lints.
 4. Run `cargo test --workspace` and verify all tests pass.
