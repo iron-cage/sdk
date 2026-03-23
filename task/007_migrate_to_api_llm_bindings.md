@@ -1,7 +1,36 @@
 # Task 007: Migrate to `api_llm` bindings
 
+## Goal
+
+Replace all raw `reqwest` HTTP calls to LLM providers in the runtime with a typed `ProviderBinding` trait backed by `api_llm` crates, eliminating hardcoded URLs, manual auth headers, and hand-rolled request/response translation. The result is observable through zero direct `reqwest` calls to provider APIs in `proxy.rs` and a `ProviderRegistry` dispatching to binding implementations. Scoped to OpenAI and Anthropic migration plus establishing the extensible binding layer for future providers. Testable by running existing integration tests through the binding layer with identical behavior and verifying workspace compiles with zero warnings.
+
 ## Dependencies
 - None (foundation task; tasks 005 and 006 depend on this)
+
+## In Scope
+
+- Unblocking `api_llm` crate compilation in the workspace
+- Enabling `api_openai` and `api_claude` dependencies in `iron_token_manager` and `iron_runtime`
+- Extracting a shared `ProviderType` enum with conversions to existing provider enums
+- Defining a `ProviderBinding` trait with `chat_completion`, `chat_completion_stream`, `extract_usage`, and `provider_name` methods
+- Implementing `ProviderBinding` for OpenAI and Anthropic using `api_*` crates
+- Creating a `ProviderRegistry` dispatcher mapping `ProviderType` to binding implementations
+- Removing all legacy direct-HTTP provider code from `proxy.rs`
+
+## Out of Scope
+
+- Gemini or xAI binding implementations (covered by Tasks 005 and 006)
+- Changes to budget enforcement logic or analytics recording format
+- Removal of `reqwest` from `iron_runtime` entirely (retained for key_fetcher, budget handshake, budget return)
+- Changes to the control API layer or token management layer
+
+## Description
+
+The runtime currently executes all LLM provider requests through raw `reqwest` HTTP calls in `proxy.rs`, with manual auth headers, hardcoded provider URLs, hand-rolled request/response translation, and no streaming support. Meanwhile, the `api_llm` workspace provides tested, typed HTTP API bindings for OpenAI, Anthropic, and Gemini - but these dependencies are declared in the workspace `Cargo.toml` and not actually used. In `iron_token_manager`, they are commented out due to a compilation blocker, and `iron_runtime` has no `api_*` dependencies at all.
+
+This task establishes a binding adapter layer that becomes the single boundary through which all LLM calls flow. A `ProviderBinding` trait defines the interface, with implementations for OpenAI and Anthropic that delegate to `api_*` crate clients. A `ProviderRegistry` provides runtime lookup by `ProviderType` enum, and the `LlmRouter` is rewired to use the registry instead of raw HTTP calls. The Anthropic binding absorbs the translator module logic, handling OpenAI-to-Anthropic format conversion internally.
+
+All legacy provider-specific code is removed: hardcoded URLs, manual auth headers, raw JSON usage extraction, provider detection from key format, and the translator module at the proxy level. The result is a clean, extensible architecture where adding a new provider (Gemini, xAI) requires only implementing the `ProviderBinding` trait and registering it with the registry.
 
 ## Context
 The runtime executes all LLM provider requests through raw `reqwest` HTTP calls in `proxy.rs`, with manual auth headers, hardcoded provider URLs, hand-rolled request/response translation, and no streaming support. The `api_llm` workspace (`api_openai`, `api_claude`, `api_gemini`) provides tested, typed HTTP API bindings, but these dependencies are declared in the workspace `Cargo.toml` and not actually used — `iron_token_manager` has them commented out due to a compilation blocker, and `iron_runtime` has no `api_*` dependencies at all.
@@ -22,6 +51,19 @@ Critical areas:
 - `module/iron_runtime/Cargo.toml`
 - `module/iron_runtime_analytics/src/provider_utils.rs`
 - `Cargo.toml`
+
+## Work Procedure
+
+1. Verify `api_openai` and `api_claude` compile cleanly under workspace lint policy - fix upstream issues if needed
+2. Uncomment and enable `api_*` dependencies in `iron_token_manager/Cargo.toml` and add them to `iron_runtime/Cargo.toml`
+3. Extract `ProviderType` enum to shared location with `From`/`Into` conversions to existing enums
+4. Define the `ProviderBinding` trait in `iron_runtime::llm_router` with chat completion, streaming, usage extraction, and provider name methods
+5. Implement `ProviderBinding` for OpenAI - construct requests, send via `api_openai`, map responses
+6. Implement `ProviderBinding` for Anthropic - absorb translator logic, construct requests, send via `api_claude`, map responses
+7. Create `ProviderRegistry` dispatcher with runtime lookup by `ProviderType`
+8. Wire `ProviderRegistry` into `LlmRouter` and replace all raw `reqwest` calls in `proxy.rs`
+9. Implement streaming through the binding layer - replace full body reads with async stream forwarding
+10. Remove all legacy code: hardcoded URLs, manual auth headers, translator module, `detect_provider_from_key`, raw JSON usage extraction
 
 ## Implementation plan
 1. Unblock `api_llm` crate compilation in the workspace.
@@ -77,6 +119,55 @@ Critical areas:
     - Verify streaming, budget enforcement, and cost calculation parity with legacy path.
     - Verify analytics events include correct provider, model, and token counts.
     - Workspace compiles with zero warnings under existing lint policy.
+
+## Test Matrix
+
+| Input/Scenario | Expected Behavior | Pass Criteria |
+|---|---|---|
+| OpenAI chat completion via binding | Response returned through binding layer | Identical behavior to legacy path |
+| Anthropic chat completion via binding | Response returned through binding layer | Format translation handled internally |
+| OpenAI streaming via binding | SSE chunks forwarded in real-time | Token counts from final chunk match expected |
+| Anthropic streaming via binding | SSE chunks forwarded in real-time | Token counts from final chunk match expected |
+| Provider detection by `ProviderType` enum | Correct binding selected | No string-based provider matching |
+| Budget enforcement with binding layer | Budget checks applied pre-request | Identical behavior to legacy path |
+| Cost recording from binding response | Usage metadata extracted via typed response | No raw JSON parsing in proxy |
+| Analytics events with binding layer | Correct provider, model, token counts | Analytics parity with legacy path |
+| Unknown provider type in registry | Error returned | Descriptive error, no panic |
+| Workspace compilation | Zero warnings | `#[deny(warnings)]` passes |
+| OpenAI integration test | Pass through binding | No regression |
+| Anthropic integration test | Pass through binding | No regression |
+
+## Validation List
+
+- [ ] `api_openai` and `api_claude` compile without warnings in workspace
+- [ ] `ProviderBinding` trait exists with required methods
+- [ ] OpenAI `ProviderBinding` implementation exists and functional
+- [ ] Anthropic `ProviderBinding` implementation exists and functional
+- [ ] `ProviderRegistry` dispatches by `ProviderType` enum
+- [ ] Zero direct `reqwest` calls to provider APIs in `proxy.rs`
+- [ ] No hardcoded provider URLs anywhere in the codebase
+- [ ] No manual provider auth headers in runtime code
+- [ ] Translator module removed from proxy level
+- [ ] Provider detection uses `ProviderType` enum, not string matching
+- [ ] Streaming works end-to-end via binding layer
+- [ ] Usage metadata extracted via typed binding responses
+- [ ] No dead code, blocker comments, or template stubs remain
+- [ ] All existing integration tests pass
+
+## Validation Procedure
+
+1. Build the workspace and verify zero warnings under `#[deny(warnings)]` policy
+2. Inspect `proxy.rs` to confirm zero direct `reqwest` calls to provider APIs remain
+3. Search codebase for hardcoded provider URLs (`api.openai.com`, `api.anthropic.com`) - verify none found
+4. Search codebase for manual auth header construction in runtime code - verify none found
+5. Verify `ProviderBinding` trait exists with `chat_completion`, `chat_completion_stream`, `extract_usage`, `provider_name`
+6. Verify OpenAI and Anthropic implementations exist and are registered in `ProviderRegistry`
+7. Run OpenAI integration test through binding layer - verify success
+8. Run Anthropic integration test through binding layer - verify success
+9. Test streaming end-to-end for both providers - verify SSE chunks forwarded correctly
+10. Verify analytics events reflect correct provider identity from binding layer
+11. Verify `reqwest` remains only for key_fetcher, budget handshake, and budget return
+12. Run full test suite and confirm zero regressions
 
 ## Acceptance criteria
 - `api_openai` and `api_claude` compile without warnings in the workspace.
