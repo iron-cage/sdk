@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
+import { useApi, type ProviderKey } from '../composables/useApi'
+import type { ProviderType } from '@/lib/providers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -70,9 +71,18 @@ const { data: providerKeys, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
-// Create provider key mutation
+// Create provider key mutation (standard form)
 const createMutation = useMutation({
   mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string; base_url?: string; description?: string }) =>
+    api.createProviderKey(data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+  },
+})
+
+// Quick Add mutation (separate instance to decouple loading/error state)
+const quickAddMutation = useMutation({
+  mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string }) =>
     api.createProviderKey(data),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
@@ -228,7 +238,7 @@ function handleQuickAdd() {
     quickAddError.value = 'Could not detect provider. Use "Add Provider Key" to select manually.'
     return
   }
-  createMutation.mutate(
+  quickAddMutation.mutate(
     { provider: detectedProvider.value, api_key: quickAddKey.value.trim(), alias: previewAlias.value },
     {
       onSuccess: () => closeQuickAdd(),
@@ -344,7 +354,7 @@ function handleQuickAdd() {
               autocomplete="off"
               placeholder="sk-ant-... / sk-proj-... / AIza... / xai-..."
               aria-describedby="quick-add-hint"
-              :disabled="createMutation.isPending.value"
+              :disabled="quickAddMutation.isPending.value"
             />
             <div id="quick-add-hint" aria-live="polite" aria-atomic="true" class="min-h-[1.25rem]">
               <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -364,18 +374,18 @@ function handleQuickAdd() {
         <DialogFooter>
           <Button
             variant="outline"
-            :disabled="createMutation.isPending.value"
+            :disabled="quickAddMutation.isPending.value"
             @click="closeQuickAdd"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            :disabled="createMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10"
+            :disabled="quickAddMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10"
             @click="handleQuickAdd"
           >
             <IconCheck />
-            {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
+            {{ quickAddMutation.isPending.value ? 'Adding...' : 'Add Key' }}
           </Button>
         </DialogFooter>
       </DialogContent>
