@@ -57,7 +57,7 @@ highest_id: 28
 | 5 | [016](016_expand_pii_detection_patterns.md) | 2160 | 9 | 6 | 10 | 4 | 🔄 (Planned) | Expand PII detection patterns | Add SSN, credit card, E.164 phone, IP address, and AWS key detection patterns |
 | 6 | [002](002_support_multiple_provider_keys_per_provider.md) | 2016 | 8 | 7 | 9 | 4 | 🔄 (Planned) | Support multiple keys per provider | Remove single-key behavior and enforce owner-scoped key selection |
 | 7 | [012](012_unify_error_handling_strategy.md) | 1960 | 7 | 7 | 10 | 4 | 🔄 (Planned) | Unify error handling strategy | Converge formatters and config to Result-based error handling, eliminating silent defaults |
-| 8 | [008](008_deploy_iron_cage_internal.md) | 1800 | 10 | 4 | 9 | 5 | 🔄 (Planned) | Deploy Iron Cage as internal centralized token control platform | Centralized IP key sharing, IC token distribution, RBAC, and secure internal deployment by 2026-02-28 |
+| 8 | [008](008_deploy_iron_cage_internal.md) | 1800 | 10 | 4 | 9 | 5 | 🔄 (Planned) | Deploy Iron Cage as internal centralized token control platform | Centralized IP key sharing, IC token distribution, RBAC, and secure internal deployment |
 | 9 | [004](004_per_ic_key_limits.md) | 1728 | 8 | 6 | 9 | 4 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
 | 10 | [003](003_provider_key_spending_and_limits.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
 | 11 | [007](007_migrate_to_api_llm_bindings.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |

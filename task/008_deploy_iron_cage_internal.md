@@ -48,7 +48,7 @@ Three components are needed:
 
 3. **`iron_runtime` (refactored)** — Becomes a thin wrapper over the shared core for local/embedded execution. Local-specific concerns remain here: dynamic port binding, key fetching from the server, budget handshake protocol, analytics sync.
 
-**Deployment scope:** Internal team network only (not public-facing). Deadline: **2026-02-28**.
+**Deployment scope:** Internal team network only (not public-facing).
 
 Existing components used unchanged:
 - `module/iron_control_api` — Administration REST API (IP key CRUD, IC token management, RBAC, analytics ingestion)
