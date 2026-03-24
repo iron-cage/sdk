@@ -32,6 +32,10 @@ describe('detectProviderFromKey', () => {
     expect(result).not.toBe('openai')
   })
 
+  it('returns null for AIza prefix that is not AIzaSy', () => {
+    expect(detectProviderFromKey('AIzaXXXXXX')).toBeNull()
+  })
+
   it('returns null for an unrecognized prefix', () => {
     expect(detectProviderFromKey('gsk_abc123')).toBeNull()
   })

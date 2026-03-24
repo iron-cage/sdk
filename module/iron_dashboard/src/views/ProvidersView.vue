@@ -238,6 +238,10 @@ function handleQuickAdd() {
     quickAddError.value = 'Could not detect provider. Use "Add Provider Key" to select manually.'
     return
   }
+  if (quickAddKey.value.trim().length < 10) {
+    quickAddError.value = 'Key is too short to submit'
+    return
+  }
   quickAddMutation.mutate(
     { provider: detectedProvider.value, api_key: quickAddKey.value.trim(), alias: previewAlias.value },
     {
@@ -352,9 +356,10 @@ function handleQuickAdd() {
               v-model="quickAddKey"
               type="password"
               autocomplete="off"
-              placeholder="sk-ant-... / sk-proj-... / AIza... / xai-..."
+              placeholder="sk-ant-... / sk-proj-... / AIzaSy... / xai-..."
               aria-describedby="quick-add-hint"
               :disabled="quickAddMutation.isPending.value"
+              @keyup.enter="handleQuickAdd"
             />
             <div id="quick-add-hint" aria-live="polite" aria-atomic="true" class="min-h-[1.25rem]">
               <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
