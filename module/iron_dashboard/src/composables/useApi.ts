@@ -379,7 +379,7 @@ export function useApi() {
           _logoutPromise = authStore.logout()
             .then(() => { router.replace('/login') })
             .finally(() => { _logoutPromise = null })
-          }
+        }
         await _logoutPromise
         throw new Error('Session expired')
       }
