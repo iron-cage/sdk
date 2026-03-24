@@ -129,6 +129,7 @@ Update workspace edition from 2021 to 2024.
 | PR | Title | Relates to |
 |----|-------|-----------|
 | #53 | Server proxy, iron_llm_core extraction, per-IP-key spending caps | Budget enforcement, multi-provider, spending limits |
+| #54 | Add tasks 009-011 | Task file scaffolding for 009-011 |
 | #55 | Dashboard UI/UX overhaul (APPROVED) | Control Panel frontend |
 | #56 | Multiple IP keys per provider | Task 002, multi-tenancy |
 | #57 | Per-key and per-agent spending limits | Task 003/004, budget enforcement |
