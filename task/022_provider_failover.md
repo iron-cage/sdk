@@ -71,7 +71,7 @@ Critical areas:
 
 ## Validation Procedure
 1. Run `cargo test -p iron_runtime -p iron_reliability` and confirm all tests pass.
-2. Configure an agent with two providers, simulate primary failure (mock circuit open), and verify requests route to the secondary.
+2. Configure an agent with two providers and `failure_threshold=1`, send one failed request to trip the circuit breaker naturally, and verify requests route to the secondary.
 3. Query analytics to confirm failover events are recorded with correct source and target providers.
 4. Configure an agent with a single provider, simulate failure, and verify the existing error behavior is preserved.
 5. Run a concurrent test with multiple agents failing over simultaneously and verify no deadlocks or dropped requests.
