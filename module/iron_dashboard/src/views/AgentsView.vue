@@ -415,7 +415,7 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[300px] truncate cursor-pointer" :title="agent.name" @click="navigator.clipboard.writeText(agent.name).then(() => toast.success('Copied name'))">
+        <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[300px] truncate cursor-pointer" :title="agent.name" @click="navigator.clipboard.writeText(agent.name).then(() => toast.success('Copied name')).catch(() => toast.error('Copy failed'))">
           {{ agent.name }}
         </td>
         <td v-if="authStore.isAdmin" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
