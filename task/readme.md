@@ -131,7 +131,7 @@ Tasks are organized in this workspace as:
 
 ### By Concern
 
-**Deployment & Operations** ⚡ (deadline 2026-02-28)
+**Deployment & Operations** ⚡
 - Task 008 (internal deployment — IP key sharing, IC distribution, RBAC, TLS)
 - Task 025 (CI/CD pipeline)
 
