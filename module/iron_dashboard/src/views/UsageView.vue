@@ -81,6 +81,16 @@ const { data: providerList } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
+const agentOptions = computed(() => [
+  { value: 'all', label: 'All Agents' },
+  ...(agents.value ?? []).map(a => ({ value: String(a.id), label: a.name })),
+])
+
+const providerOptions = computed(() => [
+  { value: 'all', label: 'All Providers' },
+  ...(providerList.value ?? []).map(p => ({ value: String(p.id), label: p.alias || getProviderLabel(p.provider) })),
+])
+
 const activeFilters = computed(() => ({
   period: selectedPeriod.value,
   agent_id: selectedAgentId.value !== 'all' ? Number(selectedAgentId.value) : undefined,
@@ -239,21 +249,19 @@ onUnmounted(() => {
           <Select v-model="selectedAgentId" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
             <SelectContent class="w-52">
-              <SelectItem value="all">All Agents</SelectItem>
-              <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">{{ agent.name }}</SelectItem>
+              <SelectItem v-for="opt in agentOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
           <Select v-model="selectedProviderKeyId" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
             <SelectContent class="w-52">
-              <SelectItem value="all">All Providers</SelectItem>
-              <SelectItem v-for="p in providerList" :key="p.id" :value="String(p.id)">{{ p.alias || getProviderLabel(p.provider) }}</SelectItem>
+              <SelectItem v-for="opt in providerOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
           <Select v-model="selectedPeriod" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent class="w-52">
-              <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+              <SelectItem v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </PopoverContent>
@@ -265,8 +273,7 @@ onUnmounted(() => {
           <Select v-model="selectedAgentId">
             <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Agents</SelectItem>
-              <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">{{ agent.name }}</SelectItem>
+              <SelectItem v-for="opt in agentOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -274,8 +281,7 @@ onUnmounted(() => {
           <Select v-model="selectedProviderKeyId">
             <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Providers</SelectItem>
-              <SelectItem v-for="p in providerList" :key="p.id" :value="String(p.id)">{{ p.alias || getProviderLabel(p.provider) }}</SelectItem>
+              <SelectItem v-for="opt in providerOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -283,7 +289,7 @@ onUnmounted(() => {
           <Select v-model="selectedPeriod">
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+              <SelectItem v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </div>

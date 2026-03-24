@@ -71,6 +71,19 @@ const statusFilterModel = computed({
   set: (v: string) => { isActiveFilter.value = v === 'active' ? true : v === 'suspended' ? false : undefined },
 })
 
+const roleOptions = [
+  { value: 'all', label: 'All Roles' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'developer', label: 'Developer' },
+]
+
+const statusOptions = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
+]
+
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
 const showDeleteConfirm = ref(false)
@@ -300,10 +313,7 @@ watch(showDisableConfirm, (open) => {
               <SelectValue placeholder="All Roles" class="text-foreground" />
             </SelectTrigger>
             <SelectContent class="max-w-[200px]">
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="manager">Manager</SelectItem>
-              <SelectItem value="developer">Developer</SelectItem>
+              <SelectItem v-for="opt in roleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
           <Select v-model="statusFilterModel" @update:modelValue="mobileFiltersOpen = false">
@@ -311,9 +321,7 @@ watch(showDisableConfirm, (open) => {
               <SelectValue placeholder="All Statuses" class="text-foreground" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
+              <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </PopoverContent>
@@ -330,10 +338,7 @@ watch(showDisableConfirm, (open) => {
               <SelectValue placeholder="All Roles" class="text-foreground" />
             </SelectTrigger>
             <SelectContent class="max-w-[200px]">
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="manager">Manager</SelectItem>
-              <SelectItem value="developer">Developer</SelectItem>
+              <SelectItem v-for="opt in roleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -343,9 +348,7 @@ watch(showDisableConfirm, (open) => {
               <SelectValue placeholder="All Statuses" class="text-foreground" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
+              <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
