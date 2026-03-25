@@ -1,12 +1,29 @@
-# Issues Index
+# Issues
 
-| ID | Title | Related Task | Status |
-|----|-------|--------------|--------|
-
-*No task-level issues are currently registered in this workspace task system.*
+**Purpose:** Track task-level issues, defects, and regressions discovered during implementation.
 
 ---
 
-## Issues
+## Issue Index
 
-*No open issues recorded in `task/issue/` for this workspace.*
+| Order | ID | Severity | First Seen | Regressions | Status | Issue | Summary |
+|-------|-----|----------|------------|-------------|--------|-------|---------|
+
+*No task-level issues are currently registered.*
+
+---
+
+## Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total issues | 0 |
+| Open | 0 |
+| Resolved | 0 |
+| Regressions | 0 |
+
+---
+
+## Child Issue Systems
+
+*No child issue systems are registered for this workspace.*
