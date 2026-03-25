@@ -60,7 +60,7 @@ Critical areas:
 | `cargo install` from published crate | CLI binary installs successfully | Binary runs `--help` without error |
 | Homebrew formula install | CLI installs via brew | `brew install iron-cage` produces working binary |
 
-## Validation List
+## Validation Checklist
 - [ ] CI workflow runs on every push and PR
 - [ ] Build, test, clippy, and coverage steps are all present
 - [ ] CI covers all workspace crates (not just a subset)
@@ -79,7 +79,7 @@ Critical areas:
 5. Pull the published Docker image and verify the Control API server starts.
 6. Install via the Homebrew formula and verify the CLI binary runs.
 
-## Acceptance criteria
+## Acceptance Criteria
 - PRs blocked if build/test/clippy fails.
 - Coverage report generated on each PR.
 - Tagged releases automatically publish to PyPI and Docker Hub.

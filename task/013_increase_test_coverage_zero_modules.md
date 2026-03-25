@@ -63,7 +63,7 @@ Critical areas:
 | `lease_manager` - acquire lease | Lease is granted with expiry | Lease object has valid expiry timestamp |
 | `lease_manager` - lease expiry handling | Expired lease is detected correctly | Expiry check returns true for past timestamps |
 
-## Validation List
+## Validation Checklist
 - [ ] Every public function in `provider_adapter.rs` has at least one test
 - [ ] Every public function in `trace_storage.rs` has at least one test
 - [ ] Key branches in `budget_request.rs` are covered (success, failure, edge cases)
@@ -79,7 +79,7 @@ Critical areas:
 4. Run `cargo test --workspace` and confirm no regressions in other crates.
 5. Review each target module's public API and cross-check against test inventory.
 
-## Acceptance criteria
+## Acceptance Criteria
 - All public functions in `provider_adapter.rs` have at least one test.
 - All public functions in `trace_storage.rs` have at least one test.
 - Key branches in `budget_request.rs` and `lease_manager.rs` are tested.

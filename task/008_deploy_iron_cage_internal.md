@@ -96,7 +96,7 @@ Existing components used unchanged:
 | `iron_runtime` local mode after refactor | Local proxy works as before | All existing tests pass |
 | Provider key not in logs or responses | No secret leakage | Log and response inspection clean |
 
-## Validation List
+## Validation Checklist
 
 - [ ] Control API deployed and reachable from team machines
 - [ ] Server-side proxy deployed and reachable from team machines
@@ -134,7 +134,7 @@ Existing components used unchanged:
 11. Run `iron_runtime` test suite to confirm no regressions in local mode
 12. Review operational runbook for completeness (startup, shutdown, rotation procedures)
 
-## Acceptance criteria
+## Acceptance Criteria
 
 ### 1. Running Internal Service
 - The control API and the server-side proxy binary are deployed on the internal server and reachable from team machines

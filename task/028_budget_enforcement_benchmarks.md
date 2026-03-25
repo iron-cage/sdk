@@ -59,7 +59,7 @@ Key files:
 | Contended reserve/commit with 8 threads | Scales linearly | Throughput within 3x of single-threaded baseline |
 | Contended reserve/commit with 16 threads | Scales linearly | Throughput within 5x of single-threaded baseline |
 
-## Validation List
+## Validation Checklist
 - [ ] `criterion` dev-dependency added to `iron_cost/Cargo.toml`
 - [ ] Bench file exists at `module/iron_cost/benches/cost_controller_bench.rs`
 - [ ] `cargo bench -p iron_cost` runs without errors
@@ -78,7 +78,7 @@ Key files:
 5. Run benchmarks twice and compare with `critcmp` to verify reproducibility.
 6. Verify that `cargo test -p iron_cost` still passes (benchmarks should not interfere with tests).
 
-## Acceptance criteria
+## Acceptance Criteria
 - `cargo bench -p iron_cost` runs successfully.
 - Single-threaded reserve/commit/cancel each complete in < 1 microsecond on CI hardware.
 - Contended benchmark demonstrates linear scaling characteristics.

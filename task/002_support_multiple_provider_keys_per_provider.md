@@ -74,7 +74,7 @@ Critical areas:
 | Delete key owned by another user | Operation rejected | Authorization error returned |
 | Update key owned by another user | Operation rejected | Authorization error returned |
 
-## Validation List
+## Validation Checklist
 
 - [ ] Provider key creation always inserts a new record
 - [ ] Multiple keys for the same provider can coexist under one user
@@ -97,7 +97,7 @@ Critical areas:
 8. Attempt to delete or update a key owned by another user - verify authorization error
 9. Run full test suite and confirm zero regressions
 
-## Acceptance criteria
+## Acceptance Criteria
 - A single user can create at least two keys for `openai`, both with unique IDs.
 - Creating keys in user B context does not mutate user A keys.
 - `POST /api/v1/providers` no longer updates existing provider keys implicitly.

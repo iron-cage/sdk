@@ -69,7 +69,7 @@ Critical areas:
 | Audit trail export after run | JSON/CSV export contains all events | Export has budget, PII, circuit breaker, and request events |
 | Full demo script execution | All four features activate in sequence | Script exits 0 with all assertions passing |
 
-## Validation List
+## Validation Checklist
 - [ ] Demo script exists as a single executable file
 - [ ] Budget enforcement activates at $1 hard cap
 - [ ] 90% budget warning event is recorded
@@ -89,7 +89,7 @@ Critical areas:
 6. Count events in the export and verify none are missing from the run.
 7. Review the script code to confirm no mocks are used and all providers are real.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Single script reproduces the Rusticon demo scenario.
 - All four features (budget, PII, circuit breaker, audit) activate correctly.
 - Audit export contains all events from the run.

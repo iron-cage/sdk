@@ -56,7 +56,7 @@ Critical areas:
 | Compile without `postgres` feature | No PostgreSQL dependencies pulled | `cargo check` succeeds without libpq |
 | High-volume insert (1000 events) | All events persisted without error | Row count matches insert count |
 
-## Validation List
+## Validation Checklist
 - [ ] `PostgresAuditBackend` implements `AuditBackend` trait fully
 - [ ] All existing audit backend tests pass against PostgreSQL
 - [ ] Retention policy correctly deletes old events
@@ -73,7 +73,7 @@ Critical areas:
 5. Run `cargo check -p iron_runtime_analytics` without the `postgres` feature and confirm no compilation errors.
 6. Run `cargo doc -p iron_runtime_analytics --features postgres --no-deps` and verify zero warnings.
 
-## Acceptance criteria
+## Acceptance Criteria
 - PostgreSQL backend passes same test suite as SQLite backend.
 - Retention policies delete events older than configured threshold.
 - Compliance export produces structured, timestamped records.

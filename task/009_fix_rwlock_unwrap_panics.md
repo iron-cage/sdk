@@ -62,7 +62,7 @@ Critical areas:
 | Existing http adapter tests | All tests pass | No regressions |
 | Search for `.unwrap()` on RwLock | Zero matches | No unwrap calls on lock operations in adapter code |
 
-## Validation List
+## Validation Checklist
 
 - [ ] `AdapterError::LockPoisoned` variant exists
 - [ ] `LockPoisoned` variant has a thiserror `#[error("...")]` annotation
@@ -82,7 +82,7 @@ Critical areas:
 6. Run existing adapter tests and verify all pass
 7. Verify that the `LockPoisoned` error variant is documented
 
-## Acceptance criteria
+## Acceptance Criteria
 - Zero `.unwrap()` calls on RwLock in adapter implementations.
 - `AdapterError::LockPoisoned` variant exists and is documented.
 - Existing adapter tests continue to pass.

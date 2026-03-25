@@ -59,7 +59,7 @@ Critical areas:
 | Transient error with retry success | Retry succeeds before failover | Request served by primary after retry |
 | Failover and primary recovers | New requests continue to secondary until circuit resets | No premature failback |
 
-## Validation List
+## Validation Checklist
 - [ ] `FailoverConfig` struct accepts priority-ordered provider lists
 - [ ] Router selects next provider when circuit breaker is open
 - [ ] Retry with backoff executes before failover
@@ -77,7 +77,7 @@ Critical areas:
 5. Run a concurrent test with multiple agents failing over simultaneously and verify no deadlocks or dropped requests.
 6. Review analytics output for failover frequency statistics.
 
-## Acceptance criteria
+## Acceptance Criteria
 - When primary provider circuit opens, requests route to secondary.
 - Analytics record which provider served each request.
 - Failover is transparent to the calling agent.

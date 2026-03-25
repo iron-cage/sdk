@@ -92,7 +92,7 @@ Critical areas:
 | Anthropic request after xAI integration | Anthropic still works | No regression |
 | Gemini request after xAI integration | Gemini still works | No regression |
 
-## Validation List
+## Validation Checklist
 
 - [ ] xAI added to canonical provider registry
 - [ ] Provider enums, DB constraints, and route validations accept xAI
@@ -118,7 +118,7 @@ Critical areas:
 10. Run OpenAI, Anthropic, and Gemini integration tests - verify no regressions
 11. Run full test suite and confirm zero regressions
 
-## Acceptance criteria
+## Acceptance Criteria
 - xAI provider key can be created, listed, read, updated, and deleted via API.
 - Handshake with `provider=xai` succeeds when key and limits are valid.
 - Runtime proxy routes xAI requests correctly and returns provider responses via `api_llm` bindings where applicable.

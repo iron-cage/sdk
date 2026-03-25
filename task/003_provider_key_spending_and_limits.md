@@ -85,7 +85,7 @@ Critical areas:
 | Analytics query filtered by `provider_key_id` | Correct per-key data returned | Spending matches sum of attributed operations |
 | Global and per-agent limits still enforced | Existing limits unaffected | Regression tests pass |
 
-## Validation List
+## Validation Checklist
 
 - [ ] Per-key limit and spending state model exists
 - [ ] `provider_key_id` persisted in lease lifecycle data
@@ -111,7 +111,7 @@ Critical areas:
 9. Verify existing global and per-agent budget tests still pass
 10. Run full test suite to confirm zero regressions
 
-## Acceptance criteria
+## Acceptance Criteria
 - API returns `limit` and `current_spent` for a given `provider_key_id`.
 - Handshake and refresh are blocked when key limit is exceeded.
 - Successful usage increases key spending; budget return decreases key spending correctly.

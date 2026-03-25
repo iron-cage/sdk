@@ -137,7 +137,7 @@ Critical areas:
 | OpenAI integration test | Pass through binding | No regression |
 | Anthropic integration test | Pass through binding | No regression |
 
-## Validation List
+## Validation Checklist
 
 - [ ] `api_openai` and `api_claude` compile without warnings in workspace
 - [ ] `ProviderBinding` trait exists with required methods
@@ -169,7 +169,7 @@ Critical areas:
 11. Verify `reqwest` remains only for key_fetcher, budget handshake, and budget return
 12. Run full test suite and confirm zero regressions
 
-## Acceptance criteria
+## Acceptance Criteria
 - `api_openai` and `api_claude` compile without warnings in the workspace.
 - A `ProviderBinding` trait exists and is implemented for OpenAI and Anthropic.
 - A `ProviderRegistry` dispatches to the correct binding by `ProviderType` and is extensible for future providers.

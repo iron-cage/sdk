@@ -56,7 +56,7 @@ Critical areas:
 | Code with `impl Trait` return types | Captures behave correctly under 2024 rules | Affected functions compile and tests pass |
 | Any `unsafe extern` blocks | Comply with 2024 stricter semantics | Compilation succeeds without unsafe warnings |
 
-## Validation List
+## Validation Checklist
 - [ ] Workspace `Cargo.toml` contains `edition = "2024"`
 - [ ] No per-crate `Cargo.toml` overrides edition to 2021
 - [ ] `cargo build --workspace` succeeds
@@ -71,7 +71,7 @@ Critical areas:
 4. Run `cargo test --workspace` and confirm all tests pass with no failures.
 5. Check `rust-version` (MSRV) field is consistent with the minimum toolchain that supports edition 2024.
 
-## Acceptance criteria
+## Acceptance Criteria
 - `edition = "2024"` in workspace Cargo.toml.
 - All tests pass.
 - Zero clippy warnings.

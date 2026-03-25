@@ -80,7 +80,7 @@ Critical areas:
 | Token for non-existent agent | Request rejected | 401 with agent not found error |
 | Token with valid JWT but tampered hash | Request rejected | 401 with hash mismatch error |
 
-## Validation List
+## Validation Checklist
 
 - [ ] Shared IC-token validator exists in `ic_token.rs`
 - [ ] All four runtime routes use the shared validator
@@ -104,7 +104,7 @@ Critical areas:
 8. Verify error response bodies contain deterministic, distinguishable error codes
 9. Run full test suite and confirm zero regressions
 
-## Acceptance criteria
+## Acceptance Criteria
 - After `POST /api/v1/agents/:id/ic-token/regenerate`, the old token returns `401` on:
   - `/api/v1/budget/handshake`
   - `/api/v1/budget/refresh`

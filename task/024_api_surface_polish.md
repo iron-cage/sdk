@@ -56,7 +56,7 @@ Critical areas:
 | Public function without rustdoc | None exist | All `pub fn` items have `///` doc comments |
 | Crate version check | All 1.0.0 | Every Cargo.toml has `version = "1.0.0"` |
 
-## Validation List
+## Validation Checklist
 - [ ] All public types have rustdoc with at least one example
 - [ ] All public error enums have `#[non_exhaustive]`
 - [ ] `cargo doc --workspace --no-deps` produces zero warnings
@@ -73,7 +73,7 @@ Critical areas:
 5. Verify every `Cargo.toml` in the workspace has `version = "1.0.0"`.
 6. Run `cargo build --workspace` to confirm no compilation regressions from renaming.
 
-## Acceptance criteria
+## Acceptance Criteria
 - All public types have rustdoc with at least one example.
 - All public error types are `#[non_exhaustive]`.
 - `cargo doc --workspace --no-deps` produces zero warnings.

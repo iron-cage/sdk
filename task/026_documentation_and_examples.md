@@ -61,7 +61,7 @@ Critical areas:
 | `python examples/pii_detection.py` | PII detected and redacted in output | Script shows redacted text |
 | Follow CONTRIBUTING.md build steps | Project builds from source | `cargo build --workspace` succeeds |
 
-## Validation List
+## Validation Checklist
 - [ ] README contains quick-start guide with copy-pasteable commands
 - [ ] README includes architecture diagram
 - [ ] All example scripts run without errors
@@ -78,7 +78,7 @@ Critical areas:
 5. Check all links in README and CONTRIBUTING.md for validity (no 404s).
 6. Have a team member unfamiliar with the project follow the README and provide feedback.
 
-## Acceptance criteria
+## Acceptance Criteria
 - README quick start works on a fresh machine with `pip install iron-cage`.
 - Each example runs successfully.
 - Contributing guide covers: build, test, PR process.

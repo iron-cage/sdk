@@ -67,7 +67,7 @@ Critical areas:
 | User-defined custom pattern | Detected after registry addition | Custom pattern triggers match |
 | PII detection event | Audit event emitted via EventStore | Event recorded with correct type and payload |
 
-## Validation List
+## Validation Checklist
 - [ ] SSN pattern detects valid SSNs and rejects invalid ones
 - [ ] Credit card pattern includes Luhn validation
 - [ ] E.164 international phone format is detected
@@ -87,7 +87,7 @@ Critical areas:
 5. Check for false positive rate documentation in code comments or a dedicated section.
 6. Run `cargo test --workspace` and confirm no regressions.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Each new pattern type has dedicated unit tests with positive and negative cases.
 - Configurable registry allows adding/removing patterns at runtime.
 - PII detections produce audit events.

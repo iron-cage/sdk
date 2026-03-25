@@ -60,7 +60,7 @@ Critical areas:
 | Version check after install | Matches Cargo.toml version | `iron_cage.__version__` equals Cargo.toml version |
 | GitHub Actions workflow on tag push | All platform wheels built and uploaded | Workflow completes green, artifacts present |
 
-## Validation List
+## Validation Checklist
 - [ ] `pyproject.toml` is configured for maturin wheel builds
 - [ ] GitHub Actions workflow exists with Linux x86_64, macOS arm64, macOS x86_64 matrix
 - [ ] Wheels are published to PyPI (or TestPyPI)
@@ -76,7 +76,7 @@ Critical areas:
 4. In the clean venv, run `python -c "from iron_cage import LlmRouter; print('OK')"` and verify it prints "OK".
 5. Compare the installed package version (`pip show iron-cage`) against the version in `Cargo.toml`.
 
-## Acceptance criteria
+## Acceptance Criteria
 - `pip install iron-cage` works on Linux x86_64 and macOS.
 - Package imports correctly: `from iron_cage import LlmRouter`.
 - Version matches Cargo.toml version.

@@ -61,7 +61,7 @@ Critical areas:
 | Rotate encryption key | All secrets re-encrypted with new key | All secrets still retrievable after rotation |
 | Rotate key under concurrent reads | No failed reads during rotation | Zero errors during rotation window |
 
-## Validation List
+## Validation Checklist
 - [ ] Revoke endpoint returns success and emits audit event
 - [ ] Token status transitions follow the correct lifecycle (Active -> Revoked -> rejected)
 - [ ] Grace period is configurable and defaults to 24 hours
@@ -80,7 +80,7 @@ Critical areas:
 6. Perform a key rotation and verify all existing tokens remain accessible.
 7. Run concurrent read requests during a key rotation and verify zero errors.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Revoke action produces audit event.
 - Revoked tokens are rejected after grace period.
 - IP Tokens stored via vault backend, not plain environment variables.

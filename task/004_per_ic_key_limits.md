@@ -88,7 +88,7 @@ Critical areas:
 | Concurrent handshake near IC-key limit | No overspend | Usage never exceeds configured limit |
 | Concurrent usage reporting near limit | Consistent counters | No negative values or double-accounting |
 
-## Validation List
+## Validation Checklist
 
 - [ ] IC-key limit model exists and is bound to agent identity
 - [ ] API endpoints for reading and updating IC-key limits exist
@@ -113,7 +113,7 @@ Critical areas:
 8. Run concurrent handshake tests near the IC-key limit - verify no overspend
 9. Run full test suite and confirm zero regressions in existing budget behavior
 
-## Acceptance criteria
+## Acceptance Criteria
 - Each agent has independently configurable IC-key limit and current usage visibility.
 - Exceeding one agent limit does not block other agents of the same owner.
 - Global and IC-key checks both apply, and error response identifies the blocking limit.

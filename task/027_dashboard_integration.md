@@ -62,7 +62,7 @@ Critical areas:
 | Dashboard on 375px screen | Mobile layout applied | All content accessible, no horizontal scroll |
 | Dashboard on 1024px screen | Desktop layout applied | Full layout with sidebar navigation |
 
-## Validation List
+## Validation Checklist
 - [ ] PR #55 merged successfully
 - [ ] PR #61 merged successfully
 - [ ] Agent CRUD operations work through the dashboard
@@ -83,7 +83,7 @@ Critical areas:
 7. Resize the browser to 375px width and verify the mobile layout is fully functional.
 8. Open browser developer tools and verify no JavaScript errors during all above operations.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Dashboard shows live agent status and budget usage.
 - Mobile layout works on common screen sizes.
 - All CRUD operations (agents, providers, tokens) work through dashboard.

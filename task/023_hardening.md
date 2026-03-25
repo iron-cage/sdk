@@ -60,7 +60,7 @@ Critical areas:
 | 100 concurrent agents on single runtime | Runtime remains responsive | p99 latency under acceptable threshold |
 | Token comparison with near-miss input | Constant-time rejection | No measurable timing difference vs random input |
 
-## Validation List
+## Validation Checklist
 - [ ] Property-based tests for budget concurrency exist and pass
 - [ ] Fuzz targets for PII detection are configured and run without panics
 - [ ] Load test harness executes with 100+ concurrent agents
@@ -78,7 +78,7 @@ Critical areas:
 5. Run `cargo llvm-cov --workspace` and verify the coverage report shows above 70%.
 6. Review the coverage report for remaining uncovered critical paths and document them.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Property tests pass under concurrent budget operations.
 - Fuzz testing runs without panics for 10+ minutes.
 - Load test establishes baseline: max concurrent agents, p99 latency, CPU overhead.

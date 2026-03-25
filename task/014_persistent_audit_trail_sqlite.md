@@ -65,7 +65,7 @@ Critical areas:
 | In-memory stats after write-through | Real-time counters still accurate | DashMap and AtomicU64 values match event count |
 | Checksum validation | Stored checksum matches recomputed checksum | Integrity check passes for all events |
 
-## Validation List
+## Validation Checklist
 - [ ] `AuditBackend` trait is defined with append, query, and export methods
 - [ ] `SqliteAuditBackend` implements the trait using sqlx
 - [ ] Migration file creates `events` table with correct schema
@@ -85,7 +85,7 @@ Critical areas:
 6. Check `Cargo.toml` for the `postgres` feature flag definition.
 7. Run `cargo test --workspace` and confirm no regressions.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Events persist across process restart.
 - Start router, record 100 events, kill process, restart, query audit log - all 100 present.
 - Export produces valid JSON/CSV.

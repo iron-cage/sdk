@@ -91,7 +91,7 @@ Critical areas:
 | OpenAI request after Gemini integration | OpenAI still works | No regression in OpenAI flow |
 | Anthropic request after Gemini integration | Anthropic still works | No regression in Anthropic flow |
 
-## Validation List
+## Validation Checklist
 
 - [ ] Canonical Gemini provider identifier defined and consistent across modules
 - [ ] Provider enums, DB constraints, and route validations accept Gemini
@@ -116,7 +116,7 @@ Critical areas:
 9. Run OpenAI and Anthropic integration tests - verify no regressions
 10. Run full test suite and confirm zero warnings under workspace lint policy
 
-## Acceptance criteria
+## Acceptance Criteria
 - Gemini provider key can be created, listed, read, updated, and deleted via API.
 - Handshake with `provider=gemini` succeeds when key and limits are valid.
 - Runtime proxy can route Gemini requests and return successful provider responses through `api_llm` bindings where applicable.

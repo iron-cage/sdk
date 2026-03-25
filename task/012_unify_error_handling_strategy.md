@@ -57,7 +57,7 @@ Critical areas:
 | Formatter receives valid tree data | Returns `Ok(formatted_string)` | Output matches expected formatted output |
 | Calling removed panicking `build()` | Does not compile | No panicking `build()` method exists |
 
-## Validation List
+## Validation Checklist
 - [ ] No `unwrap_or_else` with silent default values in `tree_formatter.rs`
 - [ ] No panicking `build()` method exists in `config.rs`
 - [ ] Single `build()` method returns `Result`
@@ -73,7 +73,7 @@ Critical areas:
 4. Run `cargo test --workspace` and confirm all tests pass.
 5. Run `cargo clippy --workspace` and confirm zero warnings.
 
-## Acceptance criteria
+## Acceptance Criteria
 - No `unwrap_or_else` with silent default values in formatter code.
 - Single `build()` method on config that returns `Result`.
 - All existing tests pass.

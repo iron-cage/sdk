@@ -60,7 +60,7 @@ Critical areas:
 | Type stubs imported by type checker | All public methods have stubs | mypy or pyright passes on import |
 | Concurrent async calls from Python | Multiple awaits resolve correctly | All responses received without deadlock |
 
-## Validation List
+## Validation Checklist
 - [ ] `start_agent()` returns a real async result, not a placeholder
 - [ ] `LlmRouter.__enter__` initializes the Rust runtime
 - [ ] `LlmRouter.__exit__` cleans up resources properly
@@ -78,7 +78,7 @@ Critical areas:
 5. Run `mypy` or `pyright` against the type stubs to verify they match the implementation.
 6. Run `cargo test --workspace` and confirm no regressions.
 
-## Acceptance criteria
+## Acceptance Criteria
 - `start_agent()` returns actual async result, not placeholder.
 - LlmRouter context manager (`__enter__`/`__exit__`) works.
 - The Rusticon presentation Python code runs successfully.

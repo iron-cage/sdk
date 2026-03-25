@@ -62,7 +62,7 @@ Critical areas:
 | Custom threshold configured at 20% | Refresh triggers at 20% remaining | Worker respects configured threshold |
 | Budget stays above threshold | No refresh attempted | No unnecessary server calls |
 
-## Validation List
+## Validation Checklist
 - [ ] `BudgetRefreshWorker` struct exists in `iron_cost`
 - [ ] Worker spawns as a background tokio task
 - [ ] Refresh triggers when budget drops below configurable threshold
@@ -81,7 +81,7 @@ Critical areas:
 4. Test graceful shutdown by sending a termination signal and verifying `return_unused()` is called.
 5. Run `cargo test --workspace` and confirm no regressions.
 
-## Acceptance criteria
+## Acceptance Criteria
 - Auto-refresh triggers when budget drops below threshold.
 - Exponential backoff on server failure.
 - Unused budget returned on graceful shutdown.
