@@ -1,4 +1,4 @@
-# Issues
+# Issue Tracking
 
 **Purpose:** Track task-level issues, defects, and regressions discovered during implementation.
 
@@ -15,12 +15,11 @@
 
 ## Statistics
 
-| Metric | Value |
-|--------|-------|
-| Total issues | 0 |
-| Open | 0 |
-| Resolved | 0 |
-| Regressions | 0 |
+- **Total Issues:** 0
+- **Open Issues:** 0
+- **Closed Issues:** 0
+- **Total Regressions:** 0 (across all issues)
+- **High Priority Open:** 0
 
 ---
 
