@@ -86,7 +86,7 @@ Source: Rusticon presentation transcript
 
 All 35 RwLock `.unwrap()` calls in adapters should use proper error propagation. Documenting a panic mode in `# Panics` is not a fix - it's acknowledging a crash path.
 
-**Affected:** `iron_cli/src/adapters/implementations/http.rs`, `iron_cli/src/adapters/implementations/in_memory.rs`
+**Affected:** `module/iron_cli/src/adapters/implementations/http.rs`, `module/iron_cli/src/adapters/implementations/in_memory.rs`
 
 ### A2. Pluggable persistent audit trail
 
@@ -96,25 +96,25 @@ Introduce `AuditBackend` trait with two implementations:
 
 Current in-memory `ArrayQueue<AnalyticsEvent>` (crossbeam) becomes a real-time cache with write-through to persistent storage.
 
-**Affected:** `iron_runtime_analytics/src/event_storage.rs`
+**Affected:** `module/iron_runtime_analytics/src/event_storage.rs`
 
 ### A3. Unified error handling strategy
 
 Currently three different strategies: structured `CliError` in handlers, `unwrap_or_else(default)` in formatters (13 locations), dual `build()`/`build_result()` in config. Should converge to one approach: all fallible operations return `Result`, no silent defaults.
 
-**Affected:** `iron_cli/src/config.rs`, `iron_cli/src/formatting/tree_formatter.rs`
+**Affected:** `module/iron_cli/src/config.rs`, `module/iron_cli/src/formatting/tree_formatter.rs`
 
 ### A4. Budget auto-refresh worker
 
 A background task monitoring `CostController::available()` that requests new leases when the local wallet depletes below a configurable threshold. Includes budget return on shutdown.
 
-**Affected:** `iron_cost/`, `iron_runtime/src/llm_router/router.rs`
+**Affected:** `module/iron_cost/`, `module/iron_runtime/src/llm_router/router.rs`
 
 ### A5. PII detection expansion
 
 Add patterns for SSN, credit card numbers (Luhn), E.164 international phones, IP addresses, AWS access keys. Add configurable pattern registry for user-defined rules. Emit audit events on detection.
 
-**Affected:** `iron_safety/src/`
+**Affected:** `module/iron_safety/src/`
 
 ### A6. Rust 2024 edition upgrade
 
