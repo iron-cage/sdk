@@ -117,7 +117,7 @@ async fn test_diagnostic_database_schema() {
   .bind("test_user")
   .bind("$2b$12$abcdefghijklmnopqrstuvwxyz1234567890") // Fake BCrypt hash
   .bind("test@example.com")
-  .bind("user")
+  .bind("manager")
   .bind(now_ms)
   .execute(db.pool())
   .await;
