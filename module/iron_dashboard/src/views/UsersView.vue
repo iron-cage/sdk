@@ -307,7 +307,7 @@ watch(showDisableConfirm, (open) => {
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" class="flex flex-col gap-2 w-64">
-          <Input id="search-mobile" v-model="search" placeholder="Search by username or email..." />
+          <Input id="search-mobile" v-model="search" placeholder="Search by username or email..." @keydown.enter.prevent="mobileFiltersOpen = false" />
           <Select v-model="roleFilter" @update:modelValue="mobileFiltersOpen = false">
             <SelectTrigger>
               <SelectValue placeholder="All Roles" class="text-foreground" />
@@ -324,6 +324,7 @@ watch(showDisableConfirm, (open) => {
               <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" class="w-full mt-1" @click="mobileFiltersOpen = false">Done</Button>
         </PopoverContent>
       </Popover>
 

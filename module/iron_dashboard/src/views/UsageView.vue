@@ -264,6 +264,7 @@ onUnmounted(() => {
               <SelectItem v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" class="w-full mt-1" @click="mobileFiltersOpen = false">Done</Button>
         </PopoverContent>
       </Popover>
 
@@ -303,7 +304,7 @@ onUnmounted(() => {
 
     <!-- Error state -->
     <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : 'An unexpected error occurred' }}</p>
+      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : (typeof error === 'string' ? error : 'An unexpected error occurred') }}</p>
     </div>
 
     <!-- Analytics content -->

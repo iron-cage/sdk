@@ -145,12 +145,11 @@ function ownerEmail(ownerId: string | null | undefined): string {
   return user?.email || user?.username || ownerId
 }
 
-// NOTE: The Owner column header below is coupled to the `v-if="authStore.isAdmin"` guard
-// on the Owner <td> in the table body. Both must be updated together to keep
-// header count and cell count in sync.
+const showOwnerColumn = computed(() => authStore.isAdmin)
+
 const tableColumns = computed(() => [
   { label: 'Name' },
-  ...(authStore.isAdmin ? [{ label: 'Owner' }] : []),
+  ...(showOwnerColumn.value ? [{ label: 'Owner' }] : []),
   { label: 'Providers' },
   { label: 'IC Token' },
   { label: 'Created' },
@@ -175,17 +174,21 @@ const createMutation = useMutation({
   },
 })
 
+function resetUpdateForm() {
+  selectedAgent.value = null
+  name.value = ''
+  selectedProviderKeyIds.value = []
+  addingProviderKeyId.value = ''
+  selectedOwnerId.value = ''
+}
+
 // Update agent mutation
 const updateMutation = useMutation({
   mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_ids: number[]; owner_id?: string }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
-    selectedAgent.value = null
-    name.value = ''
-    selectedProviderKeyIds.value = []
-    addingProviderKeyId.value = ''
-    selectedOwnerId.value = ''
+    resetUpdateForm()
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -364,13 +367,7 @@ watch(showCreateModal, (open) => {
 })
 
 watch(showUpdateModal, (open) => {
-  if (!open) {
-    selectedAgent.value = null
-    name.value = ''
-    selectedProviderKeyIds.value = []
-    addingProviderKeyId.value = ''
-    selectedOwnerId.value = ''
-  }
+  if (!open) resetUpdateForm()
 })
 
 async function copyTokenToClipboard() {
@@ -415,10 +412,16 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2 text-base font-medium text-foreground max-w-[300px] truncate cursor-pointer" :title="agent.name" @click="navigator.clipboard.writeText(agent.name).then(() => toast.success('Copied name')).catch(() => toast.error('Copy failed'))">
-          {{ agent.name }}
+        <td class="px-3 sm:px-6 py-2">
+          <button
+            type="button"
+            class="text-left max-w-full truncate text-base font-medium text-foreground cursor-pointer"
+            :aria-label="`Copy agent name: ${agent.name}`"
+            :title="agent.name"
+            @click="navigator.clipboard.writeText(agent.name).then(() => toast.success('Copied name')).catch(() => toast.error('Copy failed'))"
+          >{{ agent.name }}</button>
         </td>
-        <td v-if="authStore.isAdmin" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
+        <td v-if="showOwnerColumn" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
           {{ ownerEmail(agent.owner_id) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
@@ -440,7 +443,7 @@ async function copyTokenToClipboard() {
                   +{{ agent.provider_key_ids.length - 3 }}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" class="flex flex-wrap gap-1 max-w-[320px] max-h-[200px] overflow-y-auto">
+              <PopoverContent align="start" aria-label="Additional provider keys" class="flex flex-wrap gap-1 max-w-[320px] max-h-[200px] overflow-y-auto">
                 <span
                   v-for="keyId in agent.provider_key_ids.slice(3)"
                   :key="keyId"
