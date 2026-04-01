@@ -49,10 +49,15 @@ function onThumbPointerDown(e: PointerEvent) {
   document.addEventListener('pointerup', onThumbPointerUp)
 }
 
+function computeAvailableTrack(): number {
+  const el = wrapperRef.value
+  return el ? el.clientWidth * (1 - clampedRatio.value) : 0
+}
+
 function onThumbPointerMove(e: PointerEvent) {
   if (!isDragging || !wrapperRef.value) return
   const el = wrapperRef.value
-  const availableTrack = el.clientWidth * (1 - clampedRatio.value)
+  const availableTrack = computeAvailableTrack()
   if (availableTrack === 0) return
   const newPos = Math.max(0, Math.min(1, dragStartThumbPos + (e.clientX - dragStartX) / availableTrack))
   el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
@@ -71,7 +76,7 @@ function onTrackClick(e: MouseEvent) {
   const el = wrapperRef.value
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const thumbW = rect.width * clampedRatio.value
-  const available = rect.width - thumbW
+  const available = computeAvailableTrack()
   if (available < 1) return
   el.scrollLeft = Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / available)) * (el.scrollWidth - el.clientWidth)
 }
@@ -95,6 +100,10 @@ function scrollByPage(dir: -1 | 1) {
 }
 
 let ro: ResizeObserver | null = null
+
+watch(showScrollbar, (nowVisible) => {
+  if (!nowVisible) onThumbPointerUp()
+})
 
 watch(wrapperRef, (el, oldEl) => {
   if (oldEl) {

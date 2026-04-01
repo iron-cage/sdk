@@ -142,7 +142,7 @@ function ownerEmail(ownerId: string | null | undefined): string {
   if (!ownerId) return '—'
   if (!users.value) return '—'
   const user = ownerMap.value.get(ownerId)
-  return user?.email || user?.username || ownerId
+  return user?.email || user?.username || '—'
 }
 
 const showOwnerColumn = computed(() => authStore.isAdmin)
