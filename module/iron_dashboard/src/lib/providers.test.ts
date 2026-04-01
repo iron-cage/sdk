@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectProviderFromKey, generateProviderAlias } from './providers'
+import { detectProviderFromKey, generateProviderAlias, getProviderKeyPlaceholder } from './providers'
 
 describe('detectProviderFromKey', () => {
   it('returns null for an empty string', () => {
@@ -90,5 +90,23 @@ describe('generateProviderAlias', () => {
         { provider: 'xai', alias: 'My custom key' },
       ]),
     ).toBe('xAI 1')
+  })
+})
+
+describe('getProviderKeyPlaceholder', () => {
+  it('returns sk-proj-... for openai', () => {
+    expect(getProviderKeyPlaceholder('openai')).toBe('sk-proj-...')
+  })
+  it('returns sk-ant-... for anthropic', () => {
+    expect(getProviderKeyPlaceholder('anthropic')).toBe('sk-ant-...')
+  })
+  it('returns AIzaSy... for gemini', () => {
+    expect(getProviderKeyPlaceholder('gemini')).toBe('AIzaSy...')
+  })
+  it('returns xai-... for xai', () => {
+    expect(getProviderKeyPlaceholder('xai')).toBe('xai-...')
+  })
+  it('returns generic fallback for unknown provider', () => {
+    expect(getProviderKeyPlaceholder('unknown')).toBe('API key...')
   })
 })

@@ -224,8 +224,6 @@ const previewAlias = computed(() =>
 
 function closeQuickAdd() {
   showQuickAddModal.value = false
-  quickAddKey.value = ''
-  quickAddError.value = ''
 }
 
 function handleQuickAdd() {
@@ -355,13 +353,13 @@ function handleQuickAdd() {
               id="quick-add-key"
               v-model="quickAddKey"
               type="password"
-              autocomplete="off"
+              autocomplete="new-password"
               placeholder="sk-ant-... / sk-proj-... / AIzaSy... / xai-..."
               aria-describedby="quick-add-hint"
               :disabled="quickAddMutation.isPending.value"
               @keyup.enter="handleQuickAdd"
             />
-            <div id="quick-add-hint" aria-live="polite" aria-atomic="true" class="min-h-[1.25rem]">
+            <div id="quick-add-hint" aria-live="polite" class="min-h-[1.25rem]">
               <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
                 Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
@@ -428,7 +426,7 @@ function handleQuickAdd() {
               id="apiKey"
               v-model="apiKey"
               type="password"
-              autocomplete="off"
+              autocomplete="new-password"
               :placeholder="getProviderKeyPlaceholder(provider)"
               :disabled="createMutation.isPending.value"
             />

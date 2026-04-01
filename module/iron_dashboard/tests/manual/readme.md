@@ -864,7 +864,7 @@ After completing manual testing, document results:
 | 6. Responsive Layout | ⚠️ PARTIAL | Mobile layout needs adjustment |
 | 7. Keyboard Navigation | ✅ PASS | All elements accessible |
 | 8. Screen Reader | ✅ PASS | NVDA compatibility confirmed |
-| 9. Provider Key Management | ✅ PASS | Quick Add and standard flows verified |
+| 9. Provider Key Management | ⬜ | — |
 
 ### Issues Found
 
