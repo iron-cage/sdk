@@ -88,6 +88,12 @@ function scrollToEnd(pos: 0 | 1) {
   el.scrollLeft = pos === 0 ? 0 : el.scrollWidth - el.clientWidth
 }
 
+function scrollByPage(dir: -1 | 1) {
+  const el = wrapperRef.value
+  if (!el) return
+  el.scrollLeft += dir * el.clientWidth * 0.8
+}
+
 let ro: ResizeObserver | null = null
 
 watch(wrapperRef, (el, oldEl) => {
@@ -182,6 +188,8 @@ onUnmounted(() => {
           @keydown.right.prevent="scrollByKey(1)"
           @keydown.home.prevent="scrollToEnd(0)"
           @keydown.end.prevent="scrollToEnd(1)"
+          @keydown.page-up.prevent="scrollByPage(-1)"
+          @keydown.page-down.prevent="scrollByPage(1)"
         >
           <div class="relative w-full h-1.5">
             <div
