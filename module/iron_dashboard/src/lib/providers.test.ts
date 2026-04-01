@@ -43,6 +43,20 @@ describe('detectProviderFromKey', () => {
   it('trims surrounding whitespace before matching', () => {
     expect(detectProviderFromKey('  sk-ant-abc  ')).toBe('anthropic')
   })
+
+  // Case-sensitivity is intentional — prefixes are defined by the providers
+  // and real keys never vary in casing.
+  it('returns null for upper-case SK-ANT- (case-sensitive match)', () => {
+    expect(detectProviderFromKey('SK-ANT-abc123')).toBeNull()
+  })
+
+  it('returns null for lower-case aizasy (case-sensitive match)', () => {
+    expect(detectProviderFromKey('aizasyABC123')).toBeNull()
+  })
+
+  it('returns null for upper-case XAI- (case-sensitive match)', () => {
+    expect(detectProviderFromKey('XAI-abc123')).toBeNull()
+  })
 })
 
 describe('generateProviderAlias', () => {

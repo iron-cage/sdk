@@ -217,8 +217,8 @@ watch(showQuickAddModal, (open) => {
 const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
 
 const previewAlias = computed(() =>
-  detectedProvider.value
-    ? generateProviderAlias(detectedProvider.value, providerKeys.value ?? [])
+  detectedProvider.value && providerKeys.value
+    ? generateProviderAlias(detectedProvider.value, providerKeys.value)
     : ''
 )
 
@@ -227,6 +227,7 @@ function closeQuickAdd() {
 }
 
 function handleQuickAdd() {
+  if (quickAddMutation.isPending.value) return
   quickAddError.value = ''
   if (!quickAddKey.value.trim()) {
     quickAddError.value = 'API key is required'
@@ -384,7 +385,7 @@ function handleQuickAdd() {
             Cancel
           </Button>
           <Button
-            :disabled="quickAddMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10"
+            :disabled="quickAddMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10 || !providerKeys"
             @click="handleQuickAdd"
           >
             <IconCheck />
