@@ -241,7 +241,7 @@ watch(showCreateModal, (open) => {
             class="text-left max-w-full truncate font-medium text-foreground cursor-pointer"
             :aria-label="`Copy alias: ${key.alias}`"
             :title="key.alias"
-            @click="navigator.clipboard.writeText(key.alias!).then(() => toast.success('Copied alias')).catch(() => toast.error('Copy failed'))"
+            @click="navigator.clipboard?.writeText(key.alias!)?.then(() => toast.success('Copied alias'))?.catch(() => toast.error('Copy failed'))"
           >{{ key.alias }}</button>
           <span v-else>-</span>
         </td>
@@ -252,7 +252,7 @@ watch(showCreateModal, (open) => {
             class="text-left max-w-full truncate cursor-pointer"
             :aria-label="`Copy API key: ${key.masked_key}`"
             :title="key.masked_key"
-            @click="navigator.clipboard.writeText(key.masked_key).then(() => toast.success('Copied key')).catch(() => toast.error('Copy failed'))"
+            @click="navigator.clipboard?.writeText(key.masked_key)?.then(() => toast.success('Copied key'))?.catch(() => toast.error('Copy failed'))"
           >{{ key.masked_key }}</button>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">

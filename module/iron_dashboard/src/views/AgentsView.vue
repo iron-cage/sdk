@@ -374,7 +374,7 @@ async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return
 
   try {
-    await navigator.clipboard.writeText(tokenDialogValue.value)
+    await navigator.clipboard?.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
   } catch (_err: unknown) {
     const message = _err instanceof Error ? _err.message : 'Copy failed'
@@ -412,13 +412,13 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2">
+        <td class="px-3 sm:px-6 py-2 max-w-[240px]">
           <button
             type="button"
             class="text-left max-w-full truncate text-base font-medium text-foreground cursor-pointer"
             :aria-label="`Copy agent name: ${agent.name}`"
             :title="agent.name"
-            @click="navigator.clipboard.writeText(agent.name).then(() => toast.success('Copied name')).catch(() => toast.error('Copy failed'))"
+            @click="navigator.clipboard?.writeText(agent.name)?.then(() => toast.success('Copied name'))?.catch(() => toast.error('Copy failed'))"
           >{{ agent.name }}</button>
         </td>
         <td v-if="showOwnerColumn" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">

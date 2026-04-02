@@ -79,6 +79,7 @@ describe('useApi — _logoutPromise deduplication', () => {
 
     // Logout should be called exactly once despite two concurrent 401s
     expect(logoutSpy).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith('/login')
 
     refreshMock.mockRestore()
     logoutSpy.mockRestore()
