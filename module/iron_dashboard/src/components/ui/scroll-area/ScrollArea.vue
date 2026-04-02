@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
+  // Pass :horizontal="false" to suppress the horizontal scrollbar. Defaults to true.
+  horizontal?: boolean
 }>()
 </script>
 
@@ -26,10 +28,11 @@ const props = defineProps<{
       <ScrollAreaThumb class="relative flex-1 rounded-full bg-border" />
     </ScrollAreaScrollbar>
     <ScrollAreaScrollbar
+      v-if="props.horizontal !== false"
       orientation="horizontal"
       class="flex touch-none select-none transition-colors h-2 border-t border-t-transparent p-px"
     >
-      <ScrollAreaThumb class="relative rounded-full bg-border" />
+      <ScrollAreaThumb class="relative flex-1 rounded-full bg-border" />
     </ScrollAreaScrollbar>
     <ScrollAreaCorner />
   </ScrollAreaRoot>

@@ -179,7 +179,7 @@ function riskBadgeVariant(risk: string) {
         <p class="text-muted-foreground">No agent budget data available.</p>
       </template>
       <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="row.agent_name">
           {{ row.agent_name }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
@@ -196,8 +196,8 @@ function riskBadgeVariant(risk: string) {
         </td>
         <td class="px-3 sm:px-6 py-2 text-base text-foreground">
           <div class="flex items-center gap-2 min-w-[100px]">
-            <PercentBar :percentage="row.percent_used" class="max-w-[100px]" />
-            <span class="shrink-0 text-muted-foreground text-xs">{{ row.percent_used.toFixed(1) }}%</span>
+            <PercentBar :percentage="row.percent_used" class="max-w-[100px] max-sm:hidden" />
+            <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground">{{ row.percent_used.toFixed(1) }}%</span>
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap ">
@@ -214,7 +214,7 @@ function riskBadgeVariant(risk: string) {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem @click="openBudgetModal(row)">
                 <IconEdit />
                 Update Budget

@@ -7,9 +7,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 // refresh request (token refresh race condition).
 let _refreshPromise: Promise<void> | null = null
 
-// ============================================================================
-// Request / Response types (defined before useApi() so they are importable)
-// ============================================================================
+// Prevents concurrent refresh-failure handlers from each firing an independent
+// server-side logout revocation request.
+let _logoutPromise: Promise<void> | null = null
 
 interface TokenMetadata {
   id: number
@@ -335,6 +335,16 @@ export function useApi() {
   const authStore = useAuthStore()
   const router = useRouter()
 
+  async function startLogoutSequence(): Promise<never> {
+    if (!_logoutPromise) {
+      _logoutPromise = authStore.logout()
+        .then(() => { router.replace('/login') })
+        .finally(() => { _logoutPromise = null })
+    }
+    await _logoutPromise
+    throw new Error('Session expired')
+  }
+
   async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -362,20 +372,17 @@ export function useApi() {
         const newAuth = authStore.getAuthHeader()
         if (newAuth) headers['Authorization'] = newAuth
         response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+        // Refresh succeeded but retried request is still 401 — treat as full session expiry
         if (response.status === 401) {
-          await authStore.logout()
-          router.push('/login')
-          throw new Error('Session expired')
+          return startLogoutSequence()
         }
-      } catch {
-        await authStore.logout()
-        router.push('/login')
-        throw new Error('Session expired')
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Session expired') throw err
+        if (err instanceof TypeError) throw err
+        return startLogoutSequence()
       }
     } else if (response.status === 401) {
-      await authStore.logout()
-      router.push('/login')
-      throw new Error('Session expired')
+      return startLogoutSequence()
     }
 
     if (!response.ok) {

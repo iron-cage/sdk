@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { formatCostUsd, formatMicrodollars, formatNumber, formatTimestamp } from '@/lib/formatters'
 import PageLayout from '@/components/PageLayout.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import StatCard from '@/components/cards/StatCard.vue'
 import PercentBar from '@/components/PercentBar.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -79,6 +80,16 @@ const { data: providerList } = useQuery({
   queryKey: ['providers'],
   queryFn: () => api.getProviderKeys(),
 })
+
+const agentOptions = computed(() => [
+  { value: 'all', label: 'All Agents' },
+  ...(agents.value ?? []).map(a => ({ value: String(a.id), label: a.name })),
+])
+
+const providerOptions = computed(() => [
+  { value: 'all', label: 'All Providers' },
+  ...(providerList.value ?? []).map(p => ({ value: String(p.id), label: p.alias || getProviderLabel(p.provider) })),
+])
 
 const activeFilters = computed(() => ({
   period: selectedPeriod.value,
@@ -148,9 +159,9 @@ watch([selectedPeriod, selectedAgentId, selectedProviderKeyId], () => {
   tokensPage.value = 1
 })
 
-const agentBreakdown = computed<AgentSpending[]>(() => {
-  return spendingByAgent.value?.data ?? []
-})
+const agentBreakdown = computed<AgentSpending[]>(() =>
+  spendingByAgent.value?.data ?? []
+)
 
 const isLoading = computed(() =>
   requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
@@ -206,6 +217,7 @@ function loadMoreLogs() {
 
 const selectedLog = ref<AnalyticsEvent | null>(null)
 const showLogModal = ref(false)
+const mobileFiltersOpen = ref(false)
 
 function openLogModal(event: AnalyticsEvent) {
   selectedLog.value = event
@@ -225,47 +237,63 @@ onUnmounted(() => {
 <template>
   <PageLayout title="Analytics" content-class="p-4 lg:p-6">
     <template #actions>
-      <div class="w-full md:w-40">
-        <Select v-model="selectedAgentId">
-          <SelectTrigger>
-            <SelectValue placeholder="All Agents" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Agents</SelectItem>
-            <SelectItem v-for="agent in agents" :key="agent.id" :value="String(agent.id)">
-              {{ agent.name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div class="w-full md:w-40">
-        <Select v-model="selectedProviderKeyId">
-          <SelectTrigger>
-            <SelectValue placeholder="All Providers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Providers</SelectItem>
-            <SelectItem
-              v-for="p in providerList"
-              :key="p.id"
-              :value="String(p.id)"
-            >
-              {{ p.alias || getProviderLabel(p.provider) }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div class="w-full md:w-40">
-        <Select v-model="selectedPeriod">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="option in periodOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+      <!-- Mobile: filters dropdown -->
+      <Popover v-model:open="mobileFiltersOpen">
+        <PopoverTrigger as-child>
+          <Button variant="outline" size="sm" class="sm:hidden">
+            Filters
+            <IconChevronDown class="w-3.5 h-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="flex flex-col gap-2 w-52">
+          <Select v-model="selectedAgentId" @update:modelValue="mobileFiltersOpen = false">
+            <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
+            <SelectContent class="w-52">
+              <SelectItem v-for="opt in agentOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="selectedProviderKeyId" @update:modelValue="mobileFiltersOpen = false">
+            <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
+            <SelectContent class="w-52">
+              <SelectItem v-for="opt in providerOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="selectedPeriod" @update:modelValue="mobileFiltersOpen = false">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent class="w-52">
+              <SelectItem v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" class="w-full mt-1" @click="mobileFiltersOpen = false">Done</Button>
+        </PopoverContent>
+      </Popover>
+
+      <!-- Desktop: inline filters -->
+      <div class="hidden sm:flex gap-2">
+        <div class="w-40">
+          <Select v-model="selectedAgentId">
+            <SelectTrigger><SelectValue placeholder="All Agents" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="opt in agentOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="w-40">
+          <Select v-model="selectedProviderKeyId">
+            <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="opt in providerOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="w-40">
+          <Select v-model="selectedPeriod">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </template>
 
@@ -276,7 +304,7 @@ onUnmounted(() => {
 
     <!-- Error state -->
     <div v-else-if="error" class="border border-border rounded-lg p-4">
-      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : String(error) }}</p>
+      <p class="text-destructive">Error loading usage analytics: {{ error instanceof Error ? error.message : (typeof error === 'string' ? error : 'An unexpected error occurred') }}</p>
     </div>
 
     <!-- Analytics content -->
@@ -394,9 +422,9 @@ onUnmounted(() => {
           <div v-else class="space-y-4">
             <div v-for="model in modelBreakdown" :key="model.model">
               <div class="flex justify-between items-center mb-2">
-                <div>
-                  <span class="text-base font-medium text-foreground">{{ model.model }}</span>
-                  <span class="text-xs text-muted-foreground block">{{ getProviderLabel(model.provider) }}</span>
+                <div class="min-w-0 mr-2">
+                  <span class="text-base font-medium text-foreground block truncate max-w-[220px]" :title="model.model">{{ model.model }}</span>
+                  <span class="text-xs text-muted-foreground block truncate max-w-[220px]" :title="getProviderLabel(model.provider)">{{ getProviderLabel(model.provider) }}</span>
                 </div>
                 <div class="text-right">
                   <span class="text-base font-semibold text-foreground">{{ formatNumber(model.request_count) }} requests</span>
@@ -432,9 +460,10 @@ onUnmounted(() => {
           <IconUsers class="h-4 w-4 text-muted-foreground" />
         </template>
         <template v-if="spendingByAgent?.summary" #action>
-          <span class="text-xs text-muted-foreground">
-            Total {{ formatCost(spendingByAgent.summary.total_spend) }}
-            · avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / spendingByAgent.summary.total_budget) * 100).toFixed(1) : '0.0' }}% budget used
+          <span class="text-xs text-muted-foreground flex gap-2 max-sm:flex-col">
+            <span>Total {{ formatCost(spendingByAgent.summary.total_spend) }}</span>
+            <span class="max-sm:hidden">·</span>
+            <span>Avg {{ spendingByAgent.summary.total_budget > 0 ? ((spendingByAgent.summary.total_spend / spendingByAgent.summary.total_budget) * 100).toFixed(1) : '0.0' }}% budget used</span>
           </span>
         </template>
         <DataTable
@@ -453,13 +482,13 @@ onUnmounted(() => {
             <p class="text-muted-foreground">No agent spending data available</p>
           </template>
           <tr v-for="agent in agentBreakdown" :key="agent.agent_id">
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ agent.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="agent.agent_name">{{ agent.agent_name }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatCost(agent.spending) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatCost(agent.budget) }}</td>
             <td class="px-3 sm:px-6 py-2 text-base text-foreground">
               <div class="flex items-center gap-2 min-w-[100px]">
-                <PercentBar :percentage="agent.percent_used" class="max-w-[100px]" />
-                <span class="shrink-0 text-muted-foreground text-xs">{{ agent.percent_used.toFixed(1) }}%</span>
+                <PercentBar :percentage="agent.percent_used" class="max-w-[100px] max-sm:hidden" />
+                <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground">{{ agent.percent_used.toFixed(1) }}%</span>
               </div>
             </td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(agent.request_count) }}</td>
@@ -490,10 +519,10 @@ onUnmounted(() => {
           <IconChip class="h-4 w-4 text-muted-foreground" />
         </template>
         <template v-if="tokensByAgent?.summary" #action>
-          <span class="text-xs text-muted-foreground">
-            {{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens
-            · {{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in
-            · {{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out
+          <span class="text-xs text-muted-foreground flex gap-2">
+            <span>{{ formatNumber(tokensByAgent.summary.total_tokens) }} total tokens</span>
+            <span class="max-sm:hidden"> · </span><span class="max-sm:hidden">{{ formatNumber(tokensByAgent.summary.total_input_tokens) }} in</span>
+            <span class="max-sm:hidden"> · </span><span class="max-sm:hidden">{{ formatNumber(tokensByAgent.summary.total_output_tokens) }} out</span>
           </span>
         </template>
         <DataTable
@@ -513,7 +542,7 @@ onUnmounted(() => {
             <p class="text-muted-foreground">No token usage data available</p>
           </template>
           <tr v-for="row in tokensByAgent?.data" :key="row.agent_id">
-            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ row.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[200px] truncate" :title="row.agent_name">{{ row.agent_name }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.input_tokens) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">{{ formatNumber(row.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">{{ formatNumber(row.total_tokens) }}</td>
@@ -570,8 +599,8 @@ onUnmounted(() => {
           </template>
           <tr v-for="event in accumulatedLogs" :key="event.event_id">
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(event.timestamp_ms) }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.agent_name }}</td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ event.model }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[300px] truncate" :title="event.agent_name">{{ event.agent_name }}</td>
+            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground max-w-[240px] truncate" :title="event.model">{{ event.model }}</td>
             <td class="px-3 sm:px-6 py-4">
               <span
                 class="px-2 py-1 text-xs font-medium rounded-full"
