@@ -162,7 +162,7 @@ import { type ButtonVariants, buttonVariants } from '.'
 
 // Variants defined using class-variance-authority (CVA)
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors',
+  'inline-flex items-center justify-center rounded-md text-base font-medium transition-colors',
   {
     variants: {
       variant: {
@@ -431,17 +431,19 @@ router.beforeEach((to, from, next) => {
 
 | Tool | Version | Purpose | Why This Choice |
 |------|---------|---------|-----------------|
-| **vue-tsc** | 2.0.x | TypeScript checking for `.vue` files | Official Vue TypeScript compiler, required for SFC type-checking |
+| **vue-tsc** | 3.1.4 | TypeScript checking for `.vue` files | Official Vue TypeScript compiler, required for SFC type-checking |
 | **@vitejs/plugin-vue** | 6.0.x | Vue SFC support in Vite | Official Vite plugin, enables `<script setup>` HMR |
 | **autoprefixer** | 10.4.x | CSS vendor prefixes | Ensures cross-browser CSS compatibility (flexbox, grid) |
 | **postcss** | 8.4.x | CSS processing | Required by Tailwind and autoprefixer |
+| **vitest** | 2.1.x | Unit test runner | Vite-native test runner; shares Vite config, no extra bundling |
+| **jsdom** | 25.0.x | Browser environment for tests | DOM implementation for component and store tests |
+| **@vue/test-utils** | 2.4.x | Vue component testing | Official mount/wrapper utilities for Vue SFCs |
 
 ---
 
 ### Version Policy
 
 **Locked Versions:**
-- All production dependencies use exact versions in `package.json` (no `^` or `~`)
 - Lock file (`package-lock.json`) committed to ensure reproducible builds
 
 **Update Strategy:**
@@ -600,24 +602,28 @@ src/
 ├── views/                  # Page-level components (routes)
 │   ├── LoginView.vue       # /login
 │   ├── DashboardView.vue   # /dashboard
-│   ├── TokensView.vue      # /tokens
+│   ├── AgentsView.vue      # /agents
 │   ├── UsageView.vue       # /usage
-│   ├── LimitsView.vue      # /limits
-│   └── TracesView.vue      # /traces
+│   ├── BudgetsView.vue     # /budgets
+│   ├── ProvidersView.vue   # /providers (admin only)
+│   └── UsersView.vue       # /users (admin only)
 └── components/             # Reusable UI components
-    ├── AppHeader.vue       # Global header (navigation, logout)
-    ├── BudgetCard.vue      # Budget status widget
-    ├── AgentCard.vue       # Agent execution widget
-    ├── TokenTable.vue      # Token list table
-    ├── CreateTokenModal.vue# Token creation dialog
-    ├── UsageStatsCard.vue  # Usage statistics card
-    ├── LimitForm.vue       # Limit creation/edit form
-    └── TraceDetailModal.vue# Trace detail view dialog
+    ├── MainLayout.vue      # Authenticated layout with sidebar navigation
+    ├── PageLayout.vue      # Per-page layout wrapper (title, actions slot)
+    ├── DataTable.vue       # Generic table with loading/error/empty states
+    ├── ConfirmDialog.vue   # Reusable confirmation modal
+    ├── StatusBadge.vue     # Active/inactive status indicator
+    ├── PercentBar.vue      # Horizontal percentage bar
+    ├── TrendBadge.vue      # Change percentage badge (up/down)
+    ├── AvatarInitial.vue   # User avatar from initials
+    ├── cards/              # Stat and widget cards
+    ├── icons/              # SVG icon components
+    └── ui/                 # shadcn-vue primitives (button, input, dialog, …)
 ```
 
 **Naming Conventions:**
-- Views: `[Feature]View.vue` (e.g., `TokensView.vue`)
-- Components: `[Feature][Type].vue` (e.g., `TokenTable.vue`, `CreateTokenModal.vue`)
+- Views: `[Feature]View.vue` (e.g., `AgentsView.vue`, `BudgetsView.vue`)
+- Components: `[Feature][Type].vue` (e.g., `StatusBadge.vue`, `ConfirmDialog.vue`)
 - Use PascalCase for component names (matches import syntax)
 
 ---
@@ -630,65 +636,49 @@ src/
 - Coordinate multiple child components
 - Handle routing (navigation, query params)
 
-**Example (`TokensView.vue`):**
+**Example (`AgentsView.vue` — simplified):**
 
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useApi } from '@/composables/useApi'
-import TokenTable from '@/components/TokenTable.vue'
-import CreateTokenModal from '@/components/CreateTokenModal.vue'
+import DataTable from '@/components/DataTable.vue'
+import PageLayout from '@/components/PageLayout.vue'
 
 const api = useApi()
 const queryClient = useQueryClient()
 
-// Fetch tokens (TanStack Query)
-const { data: tokens, isLoading } = useQuery({
-  queryKey: ['tokens'],
-  queryFn: () => api.getTokens(),
-  staleTime: 5 * 60 * 1000, // 5 minutes
+// Fetch agents (TanStack Query)
+const { data: agents, isLoading, error, refetch } = useQuery({
+  queryKey: ['agents'],
+  queryFn: () => api.getAgents(),
 })
 
-// Create token mutation
-const createTokenMutation = useMutation({
-  mutationFn: api.createToken,
+// Delete agent mutation
+const deleteMutation = useMutation({
+  mutationFn: (id: number) => api.deleteAgent(id),
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['tokens'] })
-    showCreateModal.value = false
+    queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
 })
-
-// Modal state
-const showCreateModal = ref(false)
-
-function handleCreateToken(data: CreateTokenRequest) {
-  createTokenMutation.mutate(data)
-}
 </script>
 
 <template>
-  <div class="container mx-auto p-6">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">API Tokens</h1>
-      <button @click="showCreateModal = true" class="btn-primary">
-        Create Token
-      </button>
-    </div>
-
-    <TokenTable
-      :tokens="tokens ?? []"
-      :loading="isLoading"
-      @rotate="handleRotateToken"
-      @revoke="handleRevokeToken"
-    />
-
-    <CreateTokenModal
-      v-if="showCreateModal"
-      @create="handleCreateToken"
-      @close="showCreateModal = false"
-    />
-  </div>
+  <PageLayout title="Agents">
+    <DataTable
+      :columns="[{ label: 'Name' }, { label: 'Actions', align: 'right' }]"
+      :is-loading="isLoading"
+      :error="error"
+      :is-empty="!agents?.length"
+      :on-retry="() => refetch()"
+    >
+      <tr v-for="agent in agents" :key="agent.id">
+        <td>{{ agent.name }}</td>
+        <td><button @click="deleteMutation.mutate(agent.id)">Delete</button></td>
+      </tr>
+    </DataTable>
+  </PageLayout>
 </template>
 ```
 
@@ -702,67 +692,29 @@ function handleCreateToken(data: CreateTokenRequest) {
 - Emit events for parent handling
 - Focus on single responsibility
 
-**Example (`TokenTable.vue`):**
+**Example (`StatusBadge.vue`):**
 
 ```vue
 <script setup lang="ts">
-import type { TokenMetadata } from '@/composables/useApi'
-
 interface Props {
-  tokens: TokenMetadata[]
-  loading: boolean
+  active: boolean
+  activeLabel?: string
+  inactiveLabel?: string
 }
-defineProps<Props>()
-
-interface Emits {
-  rotate: [tokenId: number]
-  revoke: [tokenId: number]
-}
-const emit = defineEmits<Emits>()
-
-function handleRotate(tokenId: number) {
-  emit('rotate', tokenId)
-}
-
-function handleRevoke(tokenId: number) {
-  emit('revoke', tokenId)
-}
+withDefaults(defineProps<Props>(), {
+  activeLabel: 'Active',
+  inactiveLabel: 'Inactive',
+})
 </script>
 
 <template>
-  <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-          <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="bg-white divide-y divide-gray-200">
-        <tr v-if="loading">
-          <td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading...</td>
-        </tr>
-        <tr v-else-if="tokens.length === 0">
-          <td colspan="4" class="px-6 py-4 text-center text-gray-500">No tokens found</td>
-        </tr>
-        <tr v-else v-for="token in tokens" :key="token.id">
-          <td class="px-6 py-4 whitespace-nowrap">{{ token.id }}</td>
-          <td class="px-6 py-4 whitespace-nowrap">{{ token.name ?? 'Unnamed' }}</td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <span :class="token.is_active ? 'text-green-600' : 'text-red-600'">
-              {{ token.is_active ? 'Active' : 'Revoked' }}
-            </span>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-right">
-            <button @click="handleRotate(token.id)" class="btn-sm mr-2">Rotate</button>
-            <button @click="handleRevoke(token.id)" class="btn-sm-danger">Revoke</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <span
+    class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+    :class="active ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'"
+  >
+    <span class="h-1.5 w-1.5 rounded-full" :class="active ? 'bg-success' : 'bg-muted-foreground'" />
+    {{ active ? activeLabel : inactiveLabel }}
+  </span>
 </template>
 ```
 
@@ -773,7 +725,7 @@ function handleRevoke(tokenId: number) {
 ### Three Types of State
 
 **1. Server State (TanStack Vue Query)**
-- Data from API (tokens, usage, limits, traces)
+- Data from API (agents, analytics, budgets, providers, users)
 - Cached with automatic invalidation
 - Background refetching
 - Loading/error states

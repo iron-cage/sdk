@@ -5,19 +5,19 @@ import { useAuthStore } from '../stores/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
+import IconLogIn from '@/components/icons/IconLogIn.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const email = ref('')
 const password = ref('')
-const error = ref('')
 const loading = ref(false)
+const loginError = ref('')
 
 async function handleLogin() {
-  error.value = ''
+  loginError.value = ''
   loading.value = true
 
   try {
@@ -27,7 +27,8 @@ async function handleLogin() {
     })
     router.push('/dashboard')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unexpected error"
+    loginError.value = err instanceof Error ? err.message : 'Unexpected error'
+    toast.error(loginError.value)
   } finally {
     loading.value = false
   }
@@ -35,47 +36,40 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50">
-    <Card class="w-full max-w-md">
-      <CardHeader class="space-y-1">
-        <CardTitle class="text-3xl text-center">Iron Cage Dashboard</CardTitle>
-        <CardDescription class="text-center">
-          Sign in to your account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form class="space-y-4" @submit.prevent="handleLogin">
-          <Alert v-if="error" variant="destructive">
-            <AlertDescription>{{ error }}</AlertDescription>
-          </Alert>
+  <div class="min-h-screen flex items-center justify-center bg-background">
+    <div class="w-full max-w-sm px-4">
+      <h1 class="text-lg font-semibold text-foreground mb-1 text-center">Iron Cage</h1>
+      <p class="text-base text-muted-foreground mb-6 text-center">Sign in to continue</p>
+      <form class="space-y-4" @submit.prevent="handleLogin">
+        <div class="space-y-2">
+          <Label for="email">Email</Label>
+          <Input
+            id="email"
+            v-model="email"
+            type="email"
+            required
+            :disabled="loading"
+          />
+        </div>
 
-          <div class="space-y-2">
-            <Label for="email">Email</Label>
-            <Input
-              id="email"
-              v-model="email"
-              type="text"
-              required
-              :disabled="loading"
-            />
-          </div>
+        <div class="space-y-2">
+          <Label for="password">Password</Label>
+          <Input
+            id="password"
+            v-model="password"
+            type="password"
+            required
+            :disabled="loading"
+          />
+        </div>
 
-          <div class="space-y-2">
-            <Label for="password">Password</Label>
-            <Input
-              id="password"
-              v-model="password"
-              type="password"
-              required
-              :disabled="loading"
-            />
-          </div>
+        <p v-if="loginError" role="alert" class="text-sm text-destructive text-center">{{ loginError }}</p>
 
-          <Button type="submit" :disabled="loading" class="w-full">
-            {{ loading ? 'Signing in...' : 'Sign in' }}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <Button type="submit" :disabled="loading" class="w-full">
+          <IconLogIn />
+          {{ loading ? 'Signing in...' : 'Sign in' }}
+        </Button>
+      </form>
+    </div>
   </div>
 </template>

@@ -99,7 +99,7 @@ import { Button } from '@/components/ui/button'
 </template>
 ```
 
-**Used In:** All views (LoginView, DashboardView, TokensView, UsageView, LimitsView, TracesView)
+**Used In:** All views (LoginView, DashboardView, AgentsView, BudgetsView, UsageView, ProvidersView, UsersView)
 
 ---
 
@@ -115,7 +115,7 @@ import { Button } from '@/components/ui/button'
 - `Card` - Root container (rounded border, shadow, bg-card)
 - `CardHeader` - Header section (flex column, space-y-1.5, p-6)
 - `CardTitle` - Title heading (text-2xl font-semibold)
-- `CardDescription` - Subtitle text (text-sm text-muted-foreground)
+- `CardDescription` - Subtitle text (text-base text-muted-foreground)
 - `CardContent` - Main content area (p-6 pt-0)
 - `CardFooter` - Footer section (flex items-center, p-6 pt-0)
 
@@ -144,7 +144,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 </template>
 ```
 
-**Used In:** DashboardView (stat cards), UsageView (analytics cards), TracesView (filter panel)
+**Used In:** DashboardView (stat cards), UsageView (analytics cards)
 
 ---
 
@@ -163,7 +163,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 - `DialogScrollContent` - Scrollable variant of DialogContent
 - `DialogHeader` - Header section (flex column, space-y-1.5, text-center)
 - `DialogTitle` - Dialog title (text-lg font-semibold)
-- `DialogDescription` - Dialog description (text-sm text-muted-foreground)
+- `DialogDescription` - Dialog description (text-base text-muted-foreground)
 - `DialogFooter` - Footer section (flex justify-end, space-x-2)
 - `DialogClose` - Close button component
 
@@ -223,7 +223,7 @@ const showModal = ref(false)
 </template>
 ```
 
-**Used In:** TokensView (create token modal, display token modal), LimitsView (create/edit limit modals)
+**Used In:** AgentsView (create/edit agent modals), BudgetsView (create/edit budget modals), ProvidersView (create/edit key modals), UsersView (create/edit user modals)
 
 ---
 
@@ -298,7 +298,7 @@ const selected = ref('option1')
 </template>
 ```
 
-**Used In:** LimitsView (limit type, period selectors), TracesView (provider, model filters)
+**Used In:** AgentsView (provider/model selectors), ProvidersView (provider selector), UsersView (role filter, status filter)
 
 ---
 
@@ -343,7 +343,7 @@ const username = ref('')
 </template>
 ```
 
-**Used In:** LoginView (username, password), TokensView (project_id, description), LimitsView (limit value), TracesView (token ID filter)
+**Used In:** LoginView (email, password), AgentsView, BudgetsView, ProvidersView (API key, alias fields), UsersView (search, form fields)
 
 ---
 
@@ -381,7 +381,7 @@ import { Input } from '@/components/ui/input'
 </template>
 ```
 
-**Used In:** LoginView, TokensView, LimitsView, TracesView (all form inputs)
+**Used In:** LoginView, AgentsView, BudgetsView, ProvidersView, UsersView (all form inputs)
 
 ---
 
@@ -400,7 +400,7 @@ import { Input } from '@/components/ui/input'
 **Subcomponents:**
 - `Alert` - Root container with variant styling
 - `AlertTitle` - Title heading (mb-1 font-medium leading-none)
-- `AlertDescription` - Description text (text-sm opacity-90)
+- `AlertDescription` - Description text (text-base opacity-90)
 
 **Props:**
 ```typescript
@@ -428,7 +428,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 </template>
 ```
 
-**Used In:** LoginView (login errors), TokensView (create errors), LimitsView (create/edit errors)
+**Used In:** Not currently used in views (error messages are shown inline)
 
 ---
 
@@ -465,7 +465,7 @@ import { Badge } from '@/components/ui/badge'
 </template>
 ```
 
-**Used In:** DashboardView (token status), TokensView (token status)
+**Used In:** BudgetsView (status badges), UsersView (role badges)
 
 ---
 
@@ -619,54 +619,6 @@ Views are route-level components bound to specific URLs via Vue Router. They orc
 
 ---
 
-#### 3. TokensView.vue
-
-**Route:** `/tokens`
-**Purpose:** Token management interface (create, rotate, revoke)
-
-**Functionality:**
-- Display all tokens in table format
-- Create new token modal with project_id/description fields
-- Rotate token (revokes old, generates new)
-- Revoke token with confirmation dialog
-- Copy token to clipboard
-- Display newly created token (one-time display)
-
-**shadcn-vue Components Used:**
-- `Dialog`, `DialogContent`, `DialogDescription`, `DialogFooter`, `DialogHeader`, `DialogTitle` - Create/display token modals
-- `Button` - Action buttons (Create, Rotate, Revoke, Copy, Close)
-- `Input` - Project ID and description fields
-- `Label` - Form field labels
-- `Alert`, `AlertDescription` - Error messages
-- `Badge` - Token status indicators
-
-**State:**
-```typescript
-showCreateModal: Ref<boolean>  // Controls create token modal
-showTokenModal: Ref<boolean>   // Controls "token created" modal
-newTokenData: Ref<CreateTokenResponse | null>  // Stores newly created token
-projectId: Ref<string>         // Form field for project_id
-description: Ref<string>       // Form field for description
-createError: Ref<string>       // Error message display
-```
-
-**Mutations:**
-- `createMutation` - POST /api/tokens
-- `rotateMutation` - POST /api/tokens/:id/rotate
-- `revokeMutation` - POST /api/tokens/:id/revoke
-
-**Query Invalidation:**
-All mutations invalidate `['tokens']` query to trigger refetch
-
-**Usage:**
-```vue
-<template>
-  <TokensView /> <!-- Rendered when route is /tokens -->
-</template>
-```
-
----
-
 #### 4. UsageView.vue
 
 **Route:** `/usage`
@@ -691,80 +643,6 @@ All mutations invalidate `['tokens']` query to trigger refetch
 ```vue
 <template>
   <UsageView /> <!-- Rendered when route is /usage -->
-</template>
-```
-
----
-
-#### 5. LimitsView.vue
-
-**Route:** `/limits`
-**Purpose:** Budget limit configuration interface
-
-**Functionality:**
-- Display all budget limits (daily/weekly/monthly/yearly)
-- Create new limit with type/value/period
-- Update existing limit
-- Delete limit with confirmation
-
-**shadcn-vue Components Used:**
-- `Dialog`, `DialogContent`, `DialogDescription`, `DialogFooter`, `DialogHeader`, `DialogTitle` - Create/edit limit modals
-- `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue` - Limit type and period dropdowns
-- `Button` - Action buttons (Create, Edit, Delete, Cancel)
-- `Input` - Project ID and limit value fields
-- `Label` - Form field labels
-- `Alert`, `AlertDescription` - Error messages
-
-**Limit Types:**
-- `budget` - Maximum cost in USD
-- `tokens` - Maximum tokens consumed
-- `requests` - Maximum number of requests
-
-**Periods:**
-- `daily`
-- `weekly`
-- `monthly`
-- `yearly`
-
-**Mutations:**
-- `createLimit` - POST /api/limits
-- `updateLimit` - PUT /api/limits/:id
-- `deleteLimit` - DELETE /api/limits/:id
-
-**Usage:**
-```vue
-<template>
-  <LimitsView /> <!-- Rendered when route is /limits -->
-</template>
-```
-
----
-
-#### 6. TracesView.vue
-
-**Route:** `/traces`
-**Purpose:** Request-level trace inspection with filtering
-
-**Data Display:**
-- Trace list with timestamp, request ID, token ID, provider, model, cost
-- Input/output token counts
-- Filters: token ID, provider, model
-- Filtered count display
-
-**shadcn-vue Components Used:**
-- `Card`, `CardContent`, `CardHeader`, `CardTitle` - Filter panel container
-- `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue` - Provider and model filter dropdowns
-- `Input` - Token ID filter field
-- `Label` - Filter field labels
-- `Button` - Clear filters, Retry buttons
-
-**API Calls:**
-- `useQuery(['traces'], api.getTraces)` - Fetch all traces
-
-**Usage:**
-```vue
-<template>
-  <TracesView /> <!-- Rendered when route is /traces -->
 </template>
 ```
 
@@ -848,19 +726,85 @@ createApp(App).mount('#app')
 
 ---
 
-### Utility Components
+## Custom Shared Components
 
-#### 9. HelloWorld.vue
+Location: `src/components/` (non-UI-library components)
 
-**Status:** Legacy Vue template component (not used in production)
-**Purpose:** Original Vite + Vue template demo component
-**Action:** Should be removed in future cleanup
+These components are project-specific and not part of shadcn-vue.
+
+### PageLayout.vue
+**Purpose:** Wraps every view in a consistent scrollable container with a sticky header bar.
+**Props:** `title: string`, `contentClass?: string`
+**Slots:** `#actions` (header right-hand buttons), default (page body)
+
+### DataTable.vue
+**Purpose:** Reusable table with loading, error, and empty states.
+**Props:** `columns`, `isLoading`, `error`, `isEmpty`, `loadingText`, `onRetry`
+**Slots:** `#empty`, `#footer`, default (table rows via `<tr>`)
+**Note:** Column `key` prop is used as `v-for` key; falls back to `label-index` if absent.
+
+### ConfirmDialog.vue
+**Purpose:** Modal confirmation dialog with configurable variant (default/destructive).
+**Props:** `open`, `title`, `description`, `confirmLabel`, `variant`
+**Emits:** `update:open`, `confirm`
+**Used with:** `useConfirm` composable
+
+### AvatarInitial.vue
+**Purpose:** Circular avatar displaying the first letter(s) of a name with a stable colour derived from a position-weighted hash.
+**Props:** `name: string`
+
+### StatusBadge.vue
+**Purpose:** Coloured pill badge for boolean active/inactive status.
+**Props:** `active: boolean`, `activeLabel?: string`, `inactiveLabel?: string`
+
+### ProviderBadge.vue
+**Purpose:** Coloured pill badge identifying an AI provider (openai/anthropic/gemini/xai). Unknown providers fall back to `bg-muted/80` with `text-foreground` for contrast.
+**Props:** `provider: string`
+
+### PercentBar.vue
+**Purpose:** Horizontal progress bar with automatic colour transitions (success → warning → destructive) and clamped width [0, 100].
+**Props:** `percentage: number`, `warnThreshold?: number` (default 75), `dangerThreshold?: number` (default 90)
+
+### TrendBadge.vue
+**Purpose:** Inline badge showing +/− percentage change vs. previous period with directional arrow. Hidden when `changePercent` is 0, null, or non-finite.
+**Props:** `changePercent: number | null | undefined`
+
+### StatCard.vue
+**Location:** `src/components/cards/StatCard.vue`
+**Purpose:** Metric card with optional icon, separator, and action slot.
+**Props:** `title: string`, `showSeparator?: boolean`
+**Slots:** `#icon`, `#action`, default (metric content)
 
 ---
 
 ## Composables (Composition Functions)
 
 Location: `src/composables/`
+
+### useConfirm.ts
+**Purpose:** Composable for a single shared confirm dialog instance per view.
+**Returns:** `showConfirmModal`, `confirmTitle`, `confirmDescription`, `confirmLabel`, `confirmVariant`, `confirmCallback`, `openConfirm`
+**Key behaviour:** The callback passed to `openConfirm` is automatically cleared after execution to prevent double-fire. Accepts both sync and async actions.
+
+```typescript
+const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
+
+openConfirm('Delete?', 'This cannot be undone.', 'Delete', () => deleteMutation.mutate(id))
+```
+
+Bind in template:
+```vue
+<ConfirmDialog
+  v-model:open="showConfirmModal"
+  :title="confirmTitle"
+  :description="confirmDescription"
+  :confirm-label="confirmLabel"
+  :variant="confirmVariant"
+  @confirm="confirmCallback?.()"
+/>
+```
+
+---
 
 ### useApi.ts
 
@@ -869,6 +813,9 @@ Location: `src/composables/`
 **Exports:**
 ```typescript
 function useApi(): {
+  // Health
+  getHealth(): Promise<{ status: string; timestamp: number }>
+
   // Token methods
   getTokens(): Promise<TokenMetadata[]>
   getToken(id: number): Promise<TokenMetadata>
@@ -876,35 +823,66 @@ function useApi(): {
   rotateToken(id: number): Promise<CreateTokenResponse>
   revokeToken(id: number): Promise<void>
 
-  // Usage methods
-  getUsage(): Promise<UsageRecord[]>
-  getUsageStats(): Promise<UsageStats>
-  getUsageByToken(tokenId: number): Promise<UsageRecord[]>
+  // Provider key methods
+  getProviderKeys(): Promise<ProviderKey[]>
+  getProviderKey(id: number): Promise<ProviderKey>
+  createProviderKey(data: CreateProviderKeyRequest): Promise<ProviderKey>
+  updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey>
+  deleteProviderKey(id: number): Promise<void>
 
-  // Limits methods
-  getLimits(): Promise<LimitRecord[]>
-  getLimit(id: number): Promise<LimitRecord>
-  createLimit(data: CreateLimitRequest): Promise<LimitRecord>
-  updateLimit(id: number, data: UpdateLimitRequest): Promise<LimitRecord>
-  deleteLimit(id: number): Promise<void>
+  // User methods
+  getUsers(params?): Promise<{ users: User[]; total: number; page: number; page_size: number }>
+  createUser(data: CreateUserRequest): Promise<User>
+  updateUserStatus(id: string, isActive: boolean): Promise<User>
+  suspendUser(id: string, reason?: string): Promise<User>
+  activateUser(id: string): Promise<User>
+  changeUserRole(id: string, role: string): Promise<User>
+  resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User>
+  deleteUser(id: string): Promise<void>
 
-  // Traces methods
-  getTraces(): Promise<TraceRecord[]>
-  getTrace(id: number): Promise<TraceRecord>
+  // Agent methods
+  getAgents(): Promise<Agent[]>
+  getAgent(id: number): Promise<Agent>
+  createAgent(data): Promise<Agent>
+  updateAgent(data): Promise<Agent>
+  updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse>
+  deleteAgent(id: number): Promise<void>
+
+  // IC Token methods
+  generateIcToken(agentId: number): Promise<IcTokenResponse>
+  getIcTokenStatus(agentId: number): Promise<IcTokenStatus>
+  regenerateIcToken(agentId: number): Promise<IcTokenResponse>
+  revokeIcToken(agentId: number): Promise<void>
+
+  // Analytics methods (all accept optional signal?: AbortSignal)
+  getAnalyticsSpendingTotal(filters?, signal?): Promise<SpendingTotalResponse>
+  getAnalyticsSpendingByProvider(filters?, signal?): Promise<SpendingByProviderResponse>
+  getAnalyticsSpendingByAgent(filters?, pagination?, signal?): Promise<SpendingByAgentResponse>
+  getAnalyticsSpendingAvgPerRequest(filters?, signal?): Promise<AvgCostResponse>
+  getAnalyticsUsageRequests(filters?, signal?): Promise<RequestUsageResponse>
+  getAnalyticsUsageModels(filters?, pagination?, signal?): Promise<ModelUsageResponse>
+  getAnalyticsUsageTokensByAgent(filters?, pagination?, signal?): Promise<TokenUsageByAgentResponse>
+  getAnalyticsEventsList(filters?, pagination?, signal?): Promise<EventsListResponse>
+  getBudgetStatus(filters?): Promise<BudgetStatusResponse>
 }
 ```
 
 **Type Exports:**
 ```typescript
-TokenMetadata
-CreateTokenRequest
-CreateTokenResponse
-UsageRecord
-UsageStats
-LimitRecord
-CreateLimitRequest
-UpdateLimitRequest
-TraceRecord
+// Primitive types
+User, CreateUserRequest
+Agent, AgentBudgetResponse
+IcTokenResponse, IcTokenStatus
+TokenMetadata, CreateTokenRequest, CreateTokenResponse
+ProviderKey, CreateProviderKeyRequest, UpdateProviderKeyRequest
+
+// Analytics types
+AnalyticsPeriod, AnalyticsFilters, PaginationParams
+SpendingTotalResponse, SpendingByProviderResponse, SpendingByAgentResponse
+RequestUsageResponse, ModelUsageResponse, EventsListResponse
+TokenUsageByAgentResponse, AvgCostResponse
+BudgetStatusResponse, BudgetStatus
+AgentSpending, AgentTokenUsage, ModelUsage, AnalyticsEvent
 ```
 
 **Authentication:**
@@ -945,55 +923,43 @@ const { data: tokens } = useQuery({
 ```
 App.vue
 ├── MainLayout.vue (if authenticated)
-│   ├── useRouter (Vue Router)
-│   ├── useAuthStore (Pinia store)
+│   ├── useRouter, useRoute (Vue Router)
+│   ├── useAuthStore (Pinia)
 │   └── router-view (slot)
 │       ├── DashboardView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   ├── useRouter
-│       │   ├── Card, CardContent, CardHeader, CardTitle (shadcn-vue)
-│       │   ├── Button (shadcn-vue)
-│       │   └── Badge (shadcn-vue)
-│       ├── TokensView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   ├── useMutation (TanStack)
-│       │   ├── useQueryClient (TanStack)
-│       │   ├── useAuthStore
-│       │   ├── Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle (shadcn-vue)
-│       │   ├── Button (shadcn-vue)
-│       │   ├── Input, Label (shadcn-vue)
-│       │   ├── Alert, AlertDescription (shadcn-vue)
-│       │   └── Badge (shadcn-vue)
+│       │   ├── useApi, useQuery (TanStack)
+│       │   ├── useAuthStore, useRouter
+│       │   ├── StatCard, PageLayout
+│       │   └── shadcn-vue: — (layout only)
+│       ├── AgentsView.vue
+│       │   ├── useApi, useQuery, useQueries, useMutation, useQueryClient (TanStack)
+│       │   ├── useAuthStore, useConfirm
+│       │   ├── DataTable, ConfirmDialog, StatusBadge, PageLayout
+│       │   └── shadcn-vue: Button, Input, Label, Dialog, Select, DropdownMenu
 │       ├── UsageView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   └── Card, CardContent, CardHeader, CardTitle (shadcn-vue)
-│       ├── LimitsView.vue
-│       │   ├── useApi
-│       │   ├── useQuery (TanStack)
-│       │   ├── useMutation (TanStack)
-│       │   ├── Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle (shadcn-vue)
-│       │   ├── Select, SelectContent, SelectItem, SelectTrigger, SelectValue (shadcn-vue)
-│       │   ├── Button (shadcn-vue)
-│       │   ├── Input, Label (shadcn-vue)
-│       │   └── Alert, AlertDescription (shadcn-vue)
-│       └── TracesView.vue
-│           ├── useApi
-│           ├── useQuery (TanStack)
-│           ├── Card, CardContent, CardHeader, CardTitle (shadcn-vue)
-│           ├── Select, SelectContent, SelectItem, SelectTrigger, SelectValue (shadcn-vue)
-│           ├── Input, Label (shadcn-vue)
-│           └── Button (shadcn-vue)
+│       │   ├── useApi, useQuery (TanStack — 8 queries)
+│       │   ├── DataTable, StatCard, PercentBar, TrendBadge, PageLayout
+│       │   └── shadcn-vue: Button, Select, Dialog
+│       ├── BudgetsView.vue
+│       │   ├── useApi, useQuery, useMutation, useQueryClient (TanStack)
+│       │   ├── useAuthStore
+│       │   ├── DataTable, PercentBar, PageLayout
+│       │   └── shadcn-vue: Button, Badge, Input, Label, Dialog, DropdownMenu
+│       ├── ProvidersView.vue
+│       │   ├── useApi, useQuery, useMutation, useQueryClient (TanStack)
+│       │   ├── useAuthStore, useConfirm
+│       │   ├── DataTable, ConfirmDialog, PageLayout
+│       │   └── shadcn-vue: Button, Input, Label, Dialog, DropdownMenu
+│       └── UsersView.vue
+│           ├── useApi, useQuery, useMutation, useQueryClient (TanStack)
+│           ├── useAuthStore, useConfirm
+│           ├── DataTable, ConfirmDialog, StatusBadge, AvatarInitial, PageLayout
+│           └── shadcn-vue: Button, Badge, Input, Label, Dialog, Select, Switch, DropdownMenu
 └── router-view (if not authenticated)
     └── LoginView.vue
         ├── useAuthStore
         ├── useRouter
-        ├── Card, CardContent, CardDescription, CardHeader, CardTitle (shadcn-vue)
-        ├── Input, Label (shadcn-vue)
-        ├── Button (shadcn-vue)
-        └── Alert, AlertDescription (shadcn-vue)
+        └── shadcn-vue: Button, Input, Label
 ```
 
 ---
@@ -1031,7 +997,7 @@ const { data, isLoading, error } = useQuery({
 
 ### Mutation Pattern
 
-Components with data modification (TokensView, LimitsView) use TanStack mutations:
+Components with data modification (BudgetsView, UsersView) use TanStack mutations:
 
 ```vue
 <script setup>
@@ -1322,11 +1288,11 @@ function handleAction() { /* ... */ }
 | ├─ Separator | 1 | Separator.vue (not currently used) |
 | ├─ Skeleton | 1 | Skeleton.vue (not currently used) |
 | └─ Toast | ~12 | Toast (multiple subcomponents, not currently used) |
-| **Views** | **6** | LoginView, DashboardView, TokensView, UsageView, LimitsView, TracesView |
+| **Views** | **7** | LoginView, DashboardView, AgentsView, BudgetsView, UsageView, ProvidersView, UsersView |
 | **Layout Components** | **2** | App, MainLayout |
-| **Utility Components** | **1** | HelloWorld (legacy, unused) |
-| **Composables** | **1** | useApi |
-| **Total** | **79** | 66 .vue files (57 UI + 9 views/layout/utility), 1 .ts file, 12 index.ts exports |
+| **Custom Shared Components** | **9** | AvatarInitial, ConfirmDialog, DataTable, PageLayout, PercentBar, ProviderBadge, StatCard, StatusBadge, TrendBadge |
+| **Composables** | **2** | useApi, useConfirm |
+| **Total** | **89+** | 57 UI .vue files + 8 views + 12 custom components/layout + 2 .ts composables + 12 index.ts exports |
 
 ---
 
