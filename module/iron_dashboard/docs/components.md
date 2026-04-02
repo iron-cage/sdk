@@ -874,7 +874,7 @@ User, CreateUserRequest
 Agent, AgentBudgetResponse
 IcTokenResponse, IcTokenStatus
 TokenMetadata, CreateTokenRequest, CreateTokenResponse
-ProviderKey, ProviderType, CreateProviderKeyRequest, UpdateProviderKeyRequest
+ProviderKey, CreateProviderKeyRequest, UpdateProviderKeyRequest
 
 // Analytics types
 AnalyticsPeriod, AnalyticsFilters, PaginationParams

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
+import { useApi, type ProviderKey } from '../composables/useApi'
+import type { ProviderType } from '@/lib/providers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,7 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
-import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
+import { getProviderLabel, getProviderKeyPlaceholder, detectProviderFromKey, generateProviderAlias } from '@/lib/providers'
 import { useConfirm } from '@/composables/useConfirm'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -48,6 +49,9 @@ const queryClient = useQueryClient()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
+const showQuickAddModal = ref(false)
+const quickAddKey = ref('')
+const quickAddError = ref('')
 const toggleLoadingId = ref<number | null>(null)
 const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
@@ -67,18 +71,21 @@ const { data: providerKeys, isLoading, error, refetch } = useQuery({
   queryFn: () => api.getProviderKeys(),
 })
 
-// Create provider key mutation
+// Create provider key mutation (standard form)
 const createMutation = useMutation({
   mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string; base_url?: string; description?: string }) =>
     api.createProviderKey(data),
   onSuccess: () => {
-    showCreateModal.value = false
-    createKeyError.value = ''
-    resetForm()
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
-  onError: (err) => {
-    toast.error(err instanceof Error ? err.message : 'Failed to create provider key')
+})
+
+// Quick Add mutation (separate instance to decouple loading/error state)
+const quickAddMutation = useMutation({
+  mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string }) =>
+    api.createProviderKey(data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
 
@@ -149,13 +156,21 @@ function handleCreateKey() {
     return
   }
 
-  createMutation.mutate({
-    provider: provider.value,
-    api_key: apiKey.value.trim(),
-    alias: alias.value || undefined,
-    base_url: baseUrl.value || undefined,
-    description: description.value || undefined,
-  })
+  createMutation.mutate(
+    {
+      provider: provider.value,
+      api_key: apiKey.value.trim(),
+      alias: alias.value || undefined,
+      base_url: baseUrl.value || undefined,
+      description: description.value || undefined,
+    },
+    {
+      onSuccess: () => { showCreateModal.value = false; createKeyError.value = ''; resetForm() },
+      onError: (err) => {
+        createKeyError.value = err instanceof Error ? err.message : 'Failed to create provider key'
+      },
+    },
+  )
 }
 
 function openEditModal(key: ProviderKey) {
@@ -196,11 +211,57 @@ watch(showCreateModal, (open) => {
   if (!open) { resetForm(); createKeyError.value = '' }
 })
 
+watch(showQuickAddModal, (open) => {
+  if (!open) { quickAddKey.value = ''; quickAddError.value = '' }
+})
+
+const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
+
+const previewAlias = computed(() =>
+  detectedProvider.value && providerKeys.value
+    ? generateProviderAlias(detectedProvider.value, providerKeys.value)
+    : ''
+)
+
+function closeQuickAdd() {
+  showQuickAddModal.value = false
+}
+
+function handleQuickAdd() {
+  if (quickAddMutation.isPending.value) return
+  quickAddError.value = ''
+  if (!quickAddKey.value.trim()) {
+    quickAddError.value = 'API key is required'
+    return
+  }
+  if (!detectedProvider.value) {
+    quickAddError.value = 'Could not detect provider. Use "Add Provider Key" to select manually.'
+    return
+  }
+  if (quickAddKey.value.trim().length < 10) {
+    quickAddError.value = 'Key is too short to submit'
+    return
+  }
+  quickAddMutation.mutate(
+    { provider: detectedProvider.value, api_key: quickAddKey.value.trim(), alias: previewAlias.value },
+    {
+      onSuccess: () => closeQuickAdd(),
+      onError: (err) => {
+        quickAddError.value = err instanceof Error ? err.message : 'Failed to add key — please try again'
+      },
+    },
+  )
+}
+
 </script>
 
 <template>
   <PageLayout title="AI Provider Keys">
     <template #actions>
+      <Button variant="outline" @click="showQuickAddModal = true">
+        <IconPlus />
+        Quick Add
+      </Button>
       <Button @click="showCreateModal = true">
         <IconPlus />
         Add Provider Key
@@ -295,6 +356,64 @@ watch(showCreateModal, (open) => {
       </tr>
     </DataTable>
 
+    <!-- Quick Add modal -->
+    <Dialog v-model:open="showQuickAddModal">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Quick Add Provider Key</DialogTitle>
+          <DialogDescription>
+            Paste your API key — the provider will be detected automatically and the key will be saved with a generated name.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <div class="space-y-1.5">
+            <Label for="quick-add-key">API Key</Label>
+            <Input
+              id="quick-add-key"
+              v-model="quickAddKey"
+              type="password"
+              autocomplete="new-password"
+              placeholder="sk-ant-... / sk-proj-... / AIzaSy... / xai-..."
+              aria-describedby="quick-add-hint"
+              :disabled="quickAddMutation.isPending.value"
+              @keyup.enter="handleQuickAdd"
+            />
+            <div id="quick-add-hint" aria-live="polite" class="min-h-[1.25rem]">
+              <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
+                <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+                Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
+                · will be saved as <span class="font-medium text-foreground">{{ previewAlias }}</span>
+              </p>
+              <p v-else-if="quickAddKey" class="text-xs text-muted-foreground">
+                Provider not recognised — check the key or use "Add Provider Key" to select manually.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="quickAddError" role="alert" aria-live="assertive" aria-atomic="true" class="text-sm text-destructive">{{ quickAddError }}</p>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            :disabled="quickAddMutation.isPending.value"
+            @click="closeQuickAdd"
+          >
+            <IconX />
+            Cancel
+          </Button>
+          <Button
+            :disabled="quickAddMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10 || !providerKeys"
+            @click="handleQuickAdd"
+          >
+            <IconCheck />
+            {{ quickAddMutation.isPending.value ? 'Adding...' : 'Add Key' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <!-- Create provider key modal -->
     <Dialog v-model:open="showCreateModal">
       <DialogContent class="sm:max-w-md">
@@ -327,6 +446,7 @@ watch(showCreateModal, (open) => {
               id="apiKey"
               v-model="apiKey"
               type="password"
+              autocomplete="new-password"
               :placeholder="getProviderKeyPlaceholder(provider)"
               :disabled="createMutation.isPending.value"
             />
@@ -372,7 +492,7 @@ watch(showCreateModal, (open) => {
           </div>
         </div>
 
-        <p v-if="createKeyError" class="text-sm text-destructive">{{ createKeyError }}</p>
+        <p v-if="createKeyError" role="alert" aria-live="assertive" aria-atomic="true" class="text-sm text-destructive">{{ createKeyError }}</p>
 
         <DialogFooter>
           <Button
