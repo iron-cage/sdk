@@ -37,3 +37,6 @@ mod sql_injection_comprehensive;
 
 #[path = "auth/test_sql_injection_helpers.rs"]
 mod test_sql_injection_helpers;
+
+#[path = "auth/authorization_bypass_comprehensive.rs"]
+mod authorization_bypass_comprehensive;

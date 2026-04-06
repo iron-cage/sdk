@@ -1,6 +1,6 @@
 //! AI Provider Key storage layer
 //!
-//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`).
+//! Manages encrypted storage of AI provider API keys (`OpenAI`, `Anthropic`, `Gemini`, `XAI`).
 
 use core::fmt::{Display, Formatter, Result as FmtResult};
 use std::collections::HashMap;
@@ -16,6 +16,10 @@ pub enum ProviderType {
   OpenAI,
   /// `Anthropic` provider
   Anthropic,
+  /// `Gemini` provider
+  Gemini,
+  /// `XAI` provider
+  XAI,
 }
 
 impl ProviderType {
@@ -25,6 +29,8 @@ impl ProviderType {
     match self {
       Self::OpenAI => "openai",
       Self::Anthropic => "anthropic",
+      Self::Gemini => "gemini",
+      Self::XAI => "xai",
     }
   }
 
@@ -36,6 +42,8 @@ impl ProviderType {
     match s {
       "openai" => Some(Self::OpenAI),
       "anthropic" => Some(Self::Anthropic),
+      "gemini" => Some(Self::Gemini),
+      "xai" => Some(Self::XAI),
       _ => None,
     }
   }
@@ -739,6 +747,9 @@ impl ProviderKeyStorage {
   ///
   /// Returns error if spending cap would be exceeded or database update fails
   pub async fn increment_spending(&self, key_id: i64, amount_microdollars: i64) -> Result<()> {
+    if amount_microdollars <= 0 {
+      return Err(TokenError::Generic);
+    }
     let result = sqlx::query(
       "UPDATE ai_provider_keys \
        SET spending_used_microdollars = spending_used_microdollars + $1 \
@@ -778,6 +789,9 @@ impl ProviderKeyStorage {
   ///
   /// Returns error if spending cap would be exceeded or database update fails
   pub async fn reserve_spending(&self, key_id: i64, estimated_amount: i64) -> Result<()> {
+    if estimated_amount <= 0 {
+      return Err(TokenError::Generic);
+    }
     let result = sqlx::query(
       "UPDATE ai_provider_keys \
        SET spending_used_microdollars = spending_used_microdollars + $1 \

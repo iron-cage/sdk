@@ -126,6 +126,8 @@ sha2 = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 reqwest = { workspace = true }
 walkdir = { workspace = true }
+tempfile = { workspace = true }
+chrono = { workspace = true }
 
 [[bin]]
 name = "iron_control_api_server"

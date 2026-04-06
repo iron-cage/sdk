@@ -4,6 +4,7 @@
 
 | File | Responsibility |
 |------|----------------|
+| `authorization_bypass_comprehensive.rs` | RBAC and privilege escalation prevention tests |
 | `content_type.rs` | Content-Type header validation tests |
 | `http_methods.rs` | HTTP method validation tests |
 | `login.rs` | Login endpoint integration tests |

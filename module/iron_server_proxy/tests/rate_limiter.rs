@@ -91,3 +91,66 @@ fn clone_shares_state() {
     "Cloned limiter should share state with original"
   );
 }
+
+/// Old failures outside the window are not counted toward the threshold.
+///
+/// Records failures for an IP, waits for the sliding window to expire, then
+/// records fewer failures than the threshold. The IP must be allowed because
+/// only recent (within-window) failures count.
+#[test]
+fn sliding_window_only_counts_recent_failures() {
+  let limiter = AuthRateLimiter::with_window(Duration::from_millis(50));
+
+  // Fill to just below threshold
+  for _ in 0..MAX_AUTH_FAILURES - 1 {
+    limiter.record_failure("10.0.0.1");
+  }
+  assert!(
+    limiter.check("10.0.0.1").is_ok(),
+    "Should be allowed while under threshold"
+  );
+
+  // Let the window expire — all previous failures are now outside the window
+  std::thread::sleep(Duration::from_millis(60));
+
+  // Record one fresh failure — well below threshold
+  limiter.record_failure("10.0.0.1");
+
+  assert!(
+    limiter.check("10.0.0.1").is_ok(),
+    "Should be allowed after window expiry: old failures must not count, \
+     only 1 recent failure is present (threshold is {MAX_AUTH_FAILURES})"
+  );
+}
+
+/// Concurrent `record_failure` calls from multiple threads don't corrupt state.
+///
+/// Verifies that the `Arc<Mutex<_>>` interior is thread-safe: no deadlocks,
+/// no panics, and each IP ends up with exactly the expected failure count.
+#[test]
+fn concurrent_failures_thread_safe() {
+  let limiter = AuthRateLimiter::new();
+
+  // 10 threads, each recording 2 failures for a unique IP
+  let threads: Vec<_> = (0_u8..10)
+    .map(|i| {
+      let limiter_clone = limiter.clone();
+      std::thread::spawn(move || {
+        limiter_clone.record_failure(&format!("10.0.0.{i}"));
+        limiter_clone.record_failure(&format!("10.0.0.{i}"));
+      })
+    })
+    .collect();
+
+  for t in threads {
+    t.join().expect("Thread should not panic");
+  }
+
+  // Each IP has 2 failures — far below MAX_AUTH_FAILURES (20), so all must pass
+  for i in 0_u8..10 {
+    assert!(
+      limiter.check(&format!("10.0.0.{i}")).is_ok(),
+      "IP 10.0.0.{i} should be allowed: 2 failures < threshold {MAX_AUTH_FAILURES}"
+    );
+  }
+}

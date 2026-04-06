@@ -12,9 +12,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(String)` if handler validation or the HTTP request fails.
-pub async fn get_budget_limit_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn get_budget_limit_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   budget_limit_handlers::get_budget_limit_handler(params).map_err(|e| e.to_string())?;
 
   let config = ControlApiConfig::load();
@@ -40,9 +38,7 @@ pub async fn get_budget_limit_adapter<S: ::core::hash::BuildHasher>(
 /// # Panics
 ///
 /// Panics if the validated `limit` parameter is missing or cannot be parsed as `i64`.
-pub async fn set_budget_limit_adapter<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, String> {
+pub async fn set_budget_limit_adapter(params: &HashMap<String, String>) -> Result<String, String> {
   budget_limit_handlers::set_budget_limit_handler(params).map_err(|e| e.to_string())?;
 
   let dry_run = params

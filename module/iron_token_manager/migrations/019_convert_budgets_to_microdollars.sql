@@ -17,13 +17,7 @@
 -- - agent_budgets: total_allocated, total_spent, budget_remaining
 -- - usage_limits: max_cost_cents_per_month, current_cost_cents_this_month (renamed to microdollars)
 
--- Check if migration already applied
-CREATE TABLE IF NOT EXISTS _migration_019_completed (applied_at INTEGER NOT NULL);
-
--- Only proceed if not already applied
-INSERT INTO _migration_019_completed (applied_at)
-SELECT strftime('%s', 'now') * 1000
-WHERE NOT EXISTS (SELECT 1 FROM _migration_019_completed);
+BEGIN;
 
 -- ============================================================================
 -- PART 1: Convert budget_leases table (must be first due to FK dependency)
@@ -169,3 +163,9 @@ ALTER TABLE usage_limits_new RENAME TO usage_limits;
 -- Recreate indexes
 CREATE INDEX IF NOT EXISTS idx_usage_limits_user_id ON usage_limits( user_id );
 CREATE INDEX IF NOT EXISTS idx_usage_limits_project_id ON usage_limits( project_id );
+
+-- Create guard table to mark migration as completed
+CREATE TABLE IF NOT EXISTS _migration_019_completed (applied_at INTEGER NOT NULL);
+INSERT INTO _migration_019_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
+
+COMMIT;

@@ -46,7 +46,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **[principles/](principles/readme.md)** | 5 (001-005) | Design principles (philosophy, quality, error handling, testing, workflow) |
 | **[constraints/](constraints/readme.md)** | 4 (001-004) | System constraints (technical, business, scope, trade-offs) |
 | **[capabilities/](capabilities/readme.md)** | 8 (001-008) | Platform capabilities (runtime, LLM control, sandbox, safety, credentials, MCP, observability, data) |
-| **[architecture/](architecture/readme.md)** | 8 (001-008) | System architecture concepts (execution models, layers, service boundaries, data flow, integration, roles, entity model, runtime modes) |
+| **[architecture/](architecture/readme.md)** | 11 (000-010) | System architecture concepts (execution models, layers, service boundaries, data flow, integration, roles, entity model, runtime modes) |
 | **[deployment/](deployment/readme.md)** | 5 (001-005) | Deployment concepts (package model, actors, distribution, scaling, module mapping) |
 | **[security/](security/readme.md)** | 4 (001-004) | Security model concepts (threat model, isolation, credential flow, audit) |
 | **[integration/](integration/readme.md)** | 4 (001-004) | External system integration patterns (LLM providers, secrets, identity, observability) |
@@ -63,6 +63,7 @@ All documentation organized as numbered Design Collections (NNN_ format) per doc
 | **[vocabulary.md](vocabulary.md)** | Canonical definitions for project terminology |
 | **module_package_matrix.md** | Module-to-package mapping for all 20 modules |
 | **deployment_guide.md** | Operational deployment procedures |
+| **[architecture/010_architecture_review_2026_03.md](architecture/010_architecture_review_2026_03.md)** | Full workspace audit, Rusticon promise gap analysis, 3-stage roadmap |
 
 ### Research
 

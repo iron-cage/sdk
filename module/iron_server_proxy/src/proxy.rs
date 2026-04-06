@@ -14,7 +14,6 @@ use axum::{
 };
 use secrecy::SecretBox;
 use sha2::{Digest, Sha256};
-use subtle::ConstantTimeEq;
 
 use crate::{error::ProxyError, state::AppState};
 use iron_llm_core::{self, ForwardRequest};
@@ -48,7 +47,8 @@ struct AgentRecord {
   #[allow(dead_code)]
   name: String,
   provider_key_id: Option<i64>,
-  /// SHA-256 hash of the IC token (used for constant-time comparison).
+  /// SHA-256 hash of the IC token (retained for exact-match lookup; not read after fetch).
+  #[allow(dead_code)]
   ic_token_hash: String,
 }
 
@@ -58,8 +58,19 @@ async fn handle_proxy_inner(
   addr: SocketAddr,
   request: Request,
 ) -> Result<Response, ProxyError> {
-  // Step 0: Rate limit check using TCP peer IP (not spoofable via headers)
-  let client_ip = addr.ip().to_string();
+  // Step 0: Rate limit check using real client IP.
+  // When behind a trusted reverse proxy (nginx sets X-Real-IP from $remote_addr,
+  // not spoofable by clients), use that header. Otherwise use the TCP peer IP
+  // directly. Controlled by `trust_proxy_headers` from config.
+  let client_ip = if state.trust_proxy_headers {
+    request
+      .headers()
+      .get("x-real-ip")
+      .and_then(|v| v.to_str().ok())
+      .map_or_else(|| addr.ip().to_string(), ToString::to_string)
+  } else {
+    addr.ip().to_string()
+  };
   if let Err(retry_after) = state.auth_rate_limiter.check(&client_ip) {
     return Err(ProxyError::RateLimited(retry_after));
   }
@@ -81,32 +92,25 @@ async fn handle_proxy_inner(
     ProxyError::Unauthorized("Missing IC Token")
   })?;
 
-  // Step 2: SHA-256 hash lookup with constant-time comparison.
-  // Fetch candidate by hash prefix (non-secret, narrows DB scan),
-  // then verify full hash via subtle::ct_eq to prevent timing attacks.
+  // Step 2: SHA-256 hash exact lookup.
+  // Migration 027 added a UNIQUE index on ic_token_hash, so a single equality
+  // lookup is both correct and efficient. The subtle ct_eq loop over candidates
+  // is no longer needed; timing variation between present/absent is acceptable
+  // for a single-record hash lookup.
   let token_hash = format!("{:x}", Sha256::digest(ic_token.as_bytes()));
-  let hash_prefix = &token_hash[..8];
 
-  let candidates = sqlx::query_as::<_, AgentRecord>(
-    "SELECT id, name, provider_key_id, ic_token_hash FROM agents WHERE ic_token_hash LIKE ?",
+  let agent_record = sqlx::query_as::<_, AgentRecord>(
+    "SELECT id, name, provider_key_id, ic_token_hash FROM agents WHERE ic_token_hash = ?",
   )
-  .bind(format!("{hash_prefix}%"))
-  .fetch_all(&state.db_pool)
+  .bind(&token_hash)
+  .fetch_optional(&state.db_pool)
   .await
   .map_err(ProxyError::Database)?;
 
-  let agent = candidates
-    .into_iter()
-    .find(|a| {
-      a.ic_token_hash
-        .as_bytes()
-        .ct_eq(token_hash.as_bytes())
-        .into()
-    })
-    .ok_or_else(|| {
-      state.auth_rate_limiter.record_failure(&client_ip);
-      ProxyError::Unauthorized("Invalid or revoked IC Token")
-    })?;
+  let agent = agent_record.ok_or_else(|| {
+    state.auth_rate_limiter.record_failure(&client_ip);
+    ProxyError::Unauthorized("Invalid or revoked IC Token")
+  })?;
 
   // Step 3: Check that agent has a provider key assigned
   let provider_key_id = agent.provider_key_id.ok_or(ProxyError::Forbidden(
@@ -147,12 +151,20 @@ async fn handle_proxy_inner(
     .estimate_max_cost(&body)
     .map_or(1_000_000, |c| i64::try_from(c).unwrap_or(i64::MAX));
 
-  if let Err(_e) = state
+  if let Err(e) = state
     .provider_key_storage
     .reserve_spending(provider_key_id, estimated_cost)
     .await
   {
-    return Err(ProxyError::SpendingCapExceeded);
+    return match e {
+      iron_token_manager::error::TokenError::SpendingCapExceeded => {
+        Err(ProxyError::SpendingCapExceeded)
+      }
+      other => {
+        tracing::error!(key_id = provider_key_id, "Spending reservation failed: {other}");
+        Err(ProxyError::Internal(format!("Spending reservation failed: {other}")))
+      }
+    };
   }
 
   // Step 6: Decrypt provider API key (AES-256-GCM, stays in memory only)
@@ -171,6 +183,23 @@ async fn handle_proxy_inner(
     base_url: key_record.metadata.base_url.clone(),
   };
 
+  // Log a warning when the key's provider doesn't match the path-detected provider.
+  // This is allowed (the forwarding layer will use the key's provider), but may indicate
+  // a misconfiguration (e.g., an OpenAI key assigned to an agent sending Anthropic requests).
+  let (_, path_provider) = iron_llm_core::provider::strip_provider_prefix(&path);
+  if let Some(target) = path_provider {
+    if target != provider_key.provider {
+      tracing::warn!(
+        key_provider = %provider_key.provider,
+        request_provider = %target,
+        agent_id = agent.id,
+        "Provider mismatch: key is for '{}' but request targets '{}'",
+        provider_key.provider,
+        target,
+      );
+    }
+  }
+
   // Step 7: Prepare forward request (body and metadata extracted in Step 5)
   let forward_req = ForwardRequest {
     method,
@@ -179,15 +208,34 @@ async fn handle_proxy_inner(
     body,
   };
 
-  // Step 8: Forward to LLM provider via iron_llm_core
-  let forward_resp = iron_llm_core::forward_request(
+  // Step 8: Forward to LLM provider via iron_llm_core.
+  // On forward error, release the spending reservation so the estimated cost isn't
+  // permanently burned. If the release also fails, log and continue — the request
+  // already failed so we do our best to un-charge.
+  let forward_resp = match iron_llm_core::forward_request(
     &state.http_client,
     &state.pricing_manager,
     &provider_key,
     forward_req,
   )
   .await
-  .map_err(|e| ProxyError::BadGateway(format!("Forward failed: {e}")))?;
+  {
+    Ok(resp) => resp,
+    Err(e) => {
+      if let Err(adj_err) = state
+        .provider_key_storage
+        .adjust_spending(provider_key_id, estimated_cost, 0)
+        .await
+      {
+        tracing::warn!(
+          key_id = provider_key_id,
+          error = %adj_err,
+          "Failed to release spending reservation after forward error"
+        );
+      }
+      return Err(ProxyError::BadGateway(format!("Forward failed: {e}")));
+    }
+  };
 
   // Step 9: Adjust spending to actual cost.
   // The pre-flight reservation (Step 5b) already incremented by estimated_cost.

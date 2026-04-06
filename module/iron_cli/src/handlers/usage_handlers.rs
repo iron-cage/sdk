@@ -21,9 +21,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if date format or ordering is invalid.
-pub fn show_usage_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn show_usage_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate date range if provided
   if let (Some(start), Some(end)) = (params.get("start_date"), params.get("end_date")) {
     // Validate date format
@@ -71,9 +69,7 @@ pub fn show_usage_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn usage_by_project_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn usage_by_project_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let project_id = params
     .get("project_id")
@@ -110,9 +106,7 @@ pub fn usage_by_project_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn usage_by_provider_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn usage_by_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let provider = params
     .get("provider")
@@ -151,9 +145,7 @@ pub fn usage_by_provider_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn export_usage_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn export_usage_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let output = params
     .get("output")

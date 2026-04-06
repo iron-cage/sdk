@@ -97,7 +97,7 @@ impl ProvidersState {
 /// Create provider key request
 #[derive(Debug, Deserialize)]
 pub struct CreateProviderKeyRequest {
-  /// Provider type (e.g., "openai", "anthropic")
+  /// Provider type (e.g., "openai", "anthropic", "gemini", "xai")
   pub provider: String,
   /// Plaintext API key to encrypt
   pub api_key: String,
@@ -105,6 +105,9 @@ pub struct CreateProviderKeyRequest {
   pub base_url: Option<String>,
   /// Optional human-readable description
   pub description: Option<String>,
+  /// Optional spending cap in USD. If provided, sets the cap when the key is created,
+  /// eliminating the uncapped window between key creation and a separate PUT call.
+  pub spending_cap_usd: Option<f64>,
 }
 
 impl CreateProviderKeyRequest {
@@ -125,10 +128,13 @@ impl CreateProviderKeyRequest {
   /// or too long, or optional fields exceed length limits.
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate provider type
-    if self.provider != "openai" && self.provider != "anthropic" {
+    if !matches!(
+      self.provider.as_str(),
+      "openai" | "anthropic" | "gemini" | "xai"
+    ) {
       return Err(ValidationError::InvalidFormat {
         field: "provider".to_owned(),
-        expected: "'openai' or 'anthropic'".to_owned(),
+        expected: "'openai', 'anthropic', 'gemini', or 'xai'".to_owned(),
       });
     }
 
@@ -280,6 +286,20 @@ fn usd_to_microdollars(usd: f64) -> i64 {
   (usd * 1_000_000.0).round() as i64
 }
 
+/// Validate and convert a spending cap from USD to microdollars.
+///
+/// Rejects NaN, Infinity, and negative values before conversion so that
+/// the storage layer never receives nonsensical cap values.
+fn validate_and_convert_spending_cap(usd: f64) -> Result<i64, &'static str> {
+  if !usd.is_finite() {
+    return Err("spending_cap_usd must be a finite number");
+  }
+  if usd < 0.0 {
+    return Err("spending_cap_usd must be non-negative");
+  }
+  Ok(usd_to_microdollars(usd))
+}
+
 /// Check if user has `ManageProviderKeys` permission
 fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiError> {
   let role = iron_types::Role::from_str(role_str).map_err(|_| {
@@ -326,6 +346,8 @@ pub async fn create_provider_key(
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
+    "gemini" => ProviderType::Gemini,
+    "xai" => ProviderType::XAI,
     _ => return Err(ApiError::BadRequest("Invalid provider type".into())),
   };
 
@@ -366,7 +388,60 @@ pub async fn create_provider_key(
     .await
     .map_err(|_| ApiError::Internal("Failed to retrieve provider key metadata".into()))?;
 
-  Ok((
+  // Get metadata for response
+  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to retrieve provider key metadata"
+      })),
+    )
+      .into_response();
+  };
+
+  (
+  // If a spending cap was requested, set it atomically as part of creation.
+  // This eliminates the uncapped window that would exist if the caller had to
+  // make a separate PUT request after creating the key.
+  if let Some(cap_usd) = request.spending_cap_usd {
+    let cap_microdollars = match validate_and_convert_spending_cap(cap_usd) {
+      Ok(v) => v,
+      Err(msg) => {
+        return (
+          StatusCode::BAD_REQUEST,
+          Json(serde_json::json!({ "error": msg })),
+        )
+          .into_response();
+      }
+    };
+    if state
+      .storage
+      .set_spending_cap(key_id, Some(cap_microdollars))
+      .await
+      .is_err()
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to set spending cap"
+        })),
+      )
+        .into_response();
+    }
+  }
+
+  // Get metadata for response
+  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to retrieve provider key metadata"
+      })),
+    )
+      .into_response();
+  };
+
+  (
     StatusCode::CREATED,
     Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![])),
   ))
@@ -518,19 +593,47 @@ pub async fn update_provider_key(
     .spending_cap_usd
     .map(|cap| cap.map(usd_to_microdollars));
 
-  if state
-    .storage
-    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
-    .await
-    .is_err()
-  {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to update provider key"
-      })),
-    )
-      .into_response();
+  if let Some(is_enabled) = request.is_enabled {
+    if state.storage.set_enabled(key_id, is_enabled).await.is_err() {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to update is_enabled"
+        })),
+      )
+        .into_response();
+    }
+  }
+
+  if let Some(spending_cap) = request.spending_cap_usd {
+    // Validate the cap value before converting; None means "remove the cap".
+    let cap_microdollars = match spending_cap {
+      None => None,
+      Some(usd) => match validate_and_convert_spending_cap(usd) {
+        Ok(v) => Some(v),
+        Err(msg) => {
+          return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": msg })),
+          )
+            .into_response();
+        }
+      },
+    };
+    if state
+      .storage
+      .set_spending_cap(key_id, cap_microdollars)
+      .await
+      .is_err()
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to update spending_cap"
+        })),
+      )
+        .into_response();
+    }
   }
 
   // Get updated metadata

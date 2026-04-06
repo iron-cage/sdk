@@ -125,7 +125,7 @@ async fn test_user_cannot_access_other_users_agents() {
   .bind("alice")
   .bind("hash_alice")
   .bind("alice@example.com")
-  .bind("user")
+  .bind("manager")
   .bind(chrono::Utc::now().timestamp())
   .execute(&db_pool)
   .await
@@ -139,7 +139,7 @@ async fn test_user_cannot_access_other_users_agents() {
   .bind("bob")
   .bind("hash_bob")
   .bind("bob@example.com")
-  .bind("user")
+  .bind("manager")
   .bind(chrono::Utc::now().timestamp())
   .execute(&db_pool)
   .await
@@ -205,7 +205,7 @@ async fn test_database_filters_agents_by_owner() {
     .bind(name)
     .bind(format!("hash_{name}"))
     .bind(email)
-    .bind("user")
+    .bind("manager")
     .bind(chrono::Utc::now().timestamp())
     .execute(&db_pool)
     .await
@@ -300,7 +300,7 @@ async fn test_handshake_rejects_unauthorized_agent_access() {
   .bind("alice")
   .bind("hash_alice")
   .bind("alice@example.com")
-  .bind("user")
+  .bind("manager")
   .bind(chrono::Utc::now().timestamp())
   .execute(&db_pool)
   .await
@@ -390,7 +390,7 @@ async fn test_budget_request_rejects_unauthorized_agent() {
     .bind(name)
     .bind(format!("hash_{name}"))
     .bind(email)
-    .bind("user")
+    .bind("manager")
     .bind(chrono::Utc::now().timestamp())
     .execute(&db_pool)
     .await
@@ -451,7 +451,7 @@ async fn test_list_agents_filters_by_owner() {
     .bind(name)
     .bind(format!("hash_{name}"))
     .bind(email)
-    .bind("user")
+    .bind("manager")
     .bind(chrono::Utc::now().timestamp())
     .execute(&db_pool)
     .await

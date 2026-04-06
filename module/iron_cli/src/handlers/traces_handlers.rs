@@ -20,9 +20,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn list_traces_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn list_traces_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map_or("table", String::as_str);
   let filter = params.get("filter").map_or("none", String::as_str);
   let limit = params.get("limit").map_or("default", String::as_str);
@@ -47,9 +45,7 @@ pub fn list_traces_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn get_trace_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_trace_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let trace_id = params
     .get("trace_id")
@@ -84,9 +80,7 @@ pub fn get_trace_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn export_traces_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn export_traces_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let output = params
     .get("output")

@@ -303,6 +303,8 @@ pub async fn handshake(
   let provider_type = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
+    "gemini" => ProviderType::Gemini,
+    "xai" => ProviderType::XAI,
     _ => {
       return (
         StatusCode::BAD_REQUEST,

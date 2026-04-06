@@ -46,10 +46,20 @@ pub async fn start_server(config: &Config, state: AppState) -> Result<(), Server
   Ok(())
 }
 
-/// Wait for Ctrl+C shutdown signal.
+/// Wait for shutdown signal (Ctrl+C or SIGTERM).
+///
+/// Handles both interactive Ctrl+C and systemd's SIGTERM (`systemctl stop`)
+/// so `axum::serve::with_graceful_shutdown` can drain in-flight requests.
 async fn shutdown_signal() {
-  tokio::signal::ctrl_c()
-    .await
-    .expect("Failed to install CTRL+C signal handler");
+  let ctrl_c = tokio::signal::ctrl_c();
+  let mut sigterm =
+    tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+      .expect("Failed to install SIGTERM handler");
+
+  tokio::select! {
+    _ = ctrl_c => {}
+    _ = sigterm.recv() => {}
+  }
+
   tracing::info!("Shutdown signal received, stopping...");
 }

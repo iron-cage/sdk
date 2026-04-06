@@ -24,9 +24,7 @@ use std::collections::HashMap;
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn generate_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn generate_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let name = params
     .get("name")
@@ -95,9 +93,7 @@ pub fn generate_token_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if validation fails.
-pub fn list_tokens_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn list_tokens_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   let format = params.get("format").map_or("table", String::as_str);
   let filter = params.get("filter").map_or("none", String::as_str);
   let sort = params.get("sort").map_or("default", String::as_str);
@@ -122,9 +118,7 @@ pub fn list_tokens_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn get_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn get_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let token_id = params
     .get("token_id")
@@ -155,9 +149,7 @@ pub fn get_token_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn rotate_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn rotate_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let token_id = params
     .get("token_id")
@@ -200,9 +192,7 @@ pub fn rotate_token_handler<S: ::core::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns `Err(CliError)` if required parameters are missing or validation fails.
-pub fn revoke_token_handler<S: ::core::hash::BuildHasher>(
-  params: &HashMap<String, String, S>,
-) -> Result<String, CliError> {
+pub fn revoke_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let token_id = params
     .get("token_id")

@@ -2,6 +2,7 @@
 //!
 //! Python bindings are provided by the `iron_sdk` crate (see ADR-010).
 
+use std::fmt;
 use std::net::TcpListener;
 use std::sync::{Arc, Once};
 use tokio::sync::oneshot;
@@ -56,7 +57,6 @@ use iron_runtime_analytics::{SyncClient, SyncConfig, SyncHandle};
 /// from iron_sdk import LlmRouter
 /// router = LlmRouter(api_key="ic_xxx", server_url="https://...")
 /// ```
-#[derive(Debug)]
 pub struct LlmRouter {
   /// Port the proxy is listening on
   port: u16,
@@ -91,6 +91,17 @@ pub struct LlmRouter {
   sync_handle: Option<SyncHandle>,
   /// Lease ID from server handshake (for budget return on shutdown)
   lease_id: Option<String>,
+}
+
+impl fmt::Debug for LlmRouter {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("LlmRouter")
+      .field("port", &self.port)
+      .field("api_key", &"[REDACTED]")
+      .field("server_url", &self.server_url)
+      .field("provider", &self.provider)
+      .finish_non_exhaustive()
+  }
 }
 
 impl LlmRouter {

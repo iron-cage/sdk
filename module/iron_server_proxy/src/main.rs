@@ -4,7 +4,6 @@
 //! resolves the assigned provider key from the database, decrypts it in memory,
 //! and forwards requests to the LLM provider. No key material is ever sent to the agent.
 
-use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
 use iron_server_proxy::{server, AppState, Config, ServerError};
@@ -19,8 +18,12 @@ async fn main() -> Result<(), ServerError> {
     .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
     .init();
 
-  // Parse config from CLI args + env vars
-  let config = Config::parse();
+  // Load config from environment variables. Startup failure prints and exits
+  // immediately — no useful recovery is possible without valid configuration.
+  let config = Config::from_env().unwrap_or_else(|e| {
+    eprintln!("Configuration error: {e}");
+    std::process::exit(1);
+  });
 
   tracing::info!(
     port = config.port,
